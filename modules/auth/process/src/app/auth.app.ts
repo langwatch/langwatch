@@ -463,6 +463,7 @@ export class AuthModule implements AuthApiContract {
         now,
         users: dependencies.users,
         route: (input) => dependencies.identity.routeSignIn(input),
+        checkSignUp: (input) => dependencies.organizations.checkSignUp(input),
         isWithinBudget: (input) => app.isWithinBudget(input),
         isEmailUnconfigured: async () => {
           const view = await dependencies.notifications.getMailDelivery();
@@ -512,6 +513,7 @@ export class AuthModule implements AuthApiContract {
         },
         passwordIsAllowed: async () =>
           (await app.resolveAuthProvider()) === "email" || config.localPasswords,
+        checkSignUp: (input) => dependencies.organizations.checkSignUp(input),
       }),
       addressConfirmation: AddressConfirmationService.create({
         isConfirmed: async ({ email }) =>
@@ -1114,6 +1116,7 @@ function buildSignUpVerification({
   now,
   users,
   route,
+  checkSignUp,
   isWithinBudget,
   isEmailUnconfigured,
 }: {
@@ -1123,6 +1126,7 @@ function buildSignUpVerification({
   now: () => Instant;
   users: UserApi;
   route: SignUpVerificationDeps["route"];
+  checkSignUp: SignUpVerificationDeps["checkSignUp"];
   isWithinBudget: SignUpVerificationDeps["isWithinBudget"];
   isEmailUnconfigured: SignUpVerificationDeps["isEmailUnconfigured"];
 }): SignUpVerificationService | null {
@@ -1134,6 +1138,7 @@ function buildSignUpVerification({
     mailer: signUpVerificationMailChannels.ses.create({ mailer }),
     users,
     route,
+    checkSignUp,
     isWithinBudget,
     buildVerificationUrl: ({ token }) =>
       `${baseUrl}/auth/signup?verify=${encodeURIComponent(token)}`,

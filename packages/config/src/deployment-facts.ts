@@ -133,6 +133,54 @@ export const signInProviders = Config.define((c) => ({
   oidcIssuer: c.env("OIDC_ISSUER", publicProviderField),
 }));
 
+/**
+ * The addresses the platform-operator seed names. The sign-up policy reads them too: on an
+ * invite-only installation they are the accounts that may be created without an invitation.
+ */
+export const { adminEmails } = Config.define((c) => ({
+  adminEmails: c.env(
+    "ADMIN_EMAILS",
+    z
+      .string()
+      .optional()
+      .transform((raw) =>
+        (raw ?? "")
+          .split(",")
+          .map((email) => email.trim())
+          .filter((email) => email.length > 0),
+      ),
+  ),
+}));
+
+/**
+ * Who may create an account (specs/auth/sign-up-restriction.feature). Organization decides with
+ * them; auth tells the browser the mode. Blank reads as unset, so a templated line with no value
+ * keeps the default.
+ */
+export const { signUpMode, signUpAllowedDomains } = Config.define((c) => ({
+  /** `open` admits anybody who reaches the installation; `invite_only` admits invited addresses. */
+  signUpMode: c.env(
+    "SIGN_UP_MODE",
+    z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.enum(["open", "invite_only"]).default("open"),
+    ),
+  ),
+  /** Lowercased domains without a leading `@`; empty admits any domain. */
+  signUpAllowedDomains: c.env(
+    "SIGN_UP_ALLOWED_DOMAINS",
+    z
+      .string()
+      .optional()
+      .transform((raw) =>
+        (raw ?? "")
+          .split(",")
+          .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
+          .filter((domain) => domain.length > 0),
+      ),
+  ),
+}));
+
 /** Where server-side product analytics goes: shared config no module owns (Alex, 2026-09-29). */
 export const { posthogKey, posthogHost } = Config.define((c) => ({
   posthogKey: c.env("POSTHOG_KEY", z.string().optional()),

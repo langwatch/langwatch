@@ -1,4 +1,4 @@
-import { Config, isSaas, signInProviders, type ConfigOf } from "@langwatch/config";
+import { Config, isSaas, signInProviders, signUpMode, type ConfigOf } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { SignInMethodPolicyService } from "@langwatch/identity-contract";
 import { z } from "zod";
@@ -52,6 +52,8 @@ export const authServerConfig = Config.define((c) => ({
   signInProviders,
   /** The process's own leaf, read here only to tell the browser whether passwords are on. */
   isSaas,
+  /** Organization decides who may sign up; read here only to tell the browser the mode. */
+  signUpMode,
 }));
 
 /**
@@ -100,6 +102,11 @@ export const authWebConfigSchema = z.strictObject({
   publicUrl: z.string().min(1).optional(),
   /** Whether the email/password routes mount here, so the password section shows. */
   emailPasswordEnabled: z.boolean(),
+  /**
+   * `invite_only` hides the create-account links. The server refuses an uninvited sign-up
+   * either way; this only stops offering a door most visitors cannot use.
+   */
+  signUpMode: z.enum(["open", "invite_only"]),
 });
 
 export type AuthWebConfig = z.infer<typeof authWebConfigSchema>;
@@ -119,6 +126,7 @@ export const authBrowserConfig = defineBrowserConfig({
         isSaas: config.isSaas,
         localPasswords: config.localPasswords,
       }),
+      signUpMode: config.signUpMode,
       ...(authProvider ? { authProvider } : {}),
       ...(publicUrl ? { publicUrl } : {}),
     };

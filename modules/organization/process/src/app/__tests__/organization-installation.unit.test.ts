@@ -36,6 +36,9 @@ function process(role: "api" | "worker") {
     .withRelational(createApiFixture<PrismaClient>())
     .withKeyvalue(createApiFixture<RedisConnection>())
     .withObservability((observability) => observability.withLogging(createTestLogger().logger))
+    .withConfig({
+      organization: { signUp: { mode: "open", allowedDomains: [], adminEmails: [] } },
+    })
     .provide({
       "api-key": createApiFixture<ApiKeyApi>(),
       authz: createApiFixture<AuthzApi>(),

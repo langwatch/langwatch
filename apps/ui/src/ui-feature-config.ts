@@ -63,6 +63,7 @@ export function uiDeploymentOf({
     ...(config.auth.authProvider ? { authProvider: config.auth.authProvider } : {}),
     passkeysEnabled: config.auth.passkeys,
     emailPasswordEnabled: config.auth.emailPasswordEnabled,
+    signUpMode: config.auth.signUpMode,
     hasCloudOps: config.ops.cloudOps,
     gatewayBaseUrl: config.gateway.gatewayBaseUrl,
   });

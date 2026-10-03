@@ -211,6 +211,8 @@ export interface UserApi {
   countUsageForMembers(input: { memberUserIds: readonly string[] }): Promise<UserUsageCount>;
   /** Whether anybody with an address on this domain has an account; no address leaves. */
   hasAccountOnDomain(input: { domain: string }): Promise<boolean>;
+  /** Whether the installation holds any account at all; false only on a fresh install. */
+  hasAnyAccount(): Promise<boolean>;
 }
 
 export const UserApi = moduleApi<UserApi>()("user");

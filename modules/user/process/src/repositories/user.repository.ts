@@ -90,4 +90,6 @@ export interface UserRepository {
   countUsageAmong(input: { userIds: readonly string[] }): Promise<UserUsageCount>;
   /** Whether any account's address is on this domain, install-wide, case aside. */
   hasAccountOnDomain(domain: string): Promise<boolean>;
+  /** Whether any account exists, install-wide. */
+  hasAnyAccount(): Promise<boolean>;
 }

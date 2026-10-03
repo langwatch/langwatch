@@ -1,4 +1,5 @@
 import {
+  adminEmails,
   Config,
   environmentOneOrTrueSchema,
   posthogHost,
@@ -39,18 +40,7 @@ export const opsConfig = Config.define((c) => ({
   /** Asks for Cloud admin; boot refuses unless the licence private key matches (§3.5). */
   cloudOps: c.env("LANGWATCH_CLOUD_OPS", z.stringbool().default(false)),
   /** Read only by the one-time platform-operator seed; set afterwards, boot warns it is ignored. */
-  adminEmails: c.env(
-    "ADMIN_EMAILS",
-    z
-      .string()
-      .optional()
-      .transform((raw) =>
-        (raw ?? "")
-          .split(",")
-          .map((email) => email.trim())
-          .filter((email) => email.length > 0),
-      ),
-  ),
+  adminEmails,
 }));
 
 export type OpsServerConfig = ConfigOf<typeof opsConfig>;

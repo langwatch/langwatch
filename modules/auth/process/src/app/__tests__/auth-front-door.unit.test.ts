@@ -59,6 +59,7 @@ async function appFor(
       auth0ManagementClientId: undefined,
       isSaas: false,
       signInProviders: NO_SIGN_IN_PROVIDERS,
+      signUpMode: "open",
     },
     repositories: MemoryAuthRepositories.create(),
     dependencies: {

@@ -45,6 +45,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       auth0ManagementClientId: undefined,
       isSaas: false,
       signInProviders: NO_SIGN_IN_PROVIDERS,
+      signUpMode: "open",
     },
     repositories,
     dependencies: {

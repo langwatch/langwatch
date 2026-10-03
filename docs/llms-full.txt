@@ -61749,8 +61749,28 @@ LangWatch is configured through environment variables. How you set them depends 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
+| `SIGN_UP_MODE` | Who can create an account. `open` lets anybody who can reach the install sign up. `invite_only` lets only invited addresses and `ADMIN_EMAILS` sign up, plus the first account on an install with no users when `ADMIN_EMAILS` is empty. See [Restricting sign-up](#restricting-sign-up). | `open` |
+| `SIGN_UP_ALLOWED_DOMAINS` | Comma-separated email domains that can sign up, such as `acme.com,acme.io`. Empty allows any domain. Invited addresses and `ADMIN_EMAILS` can sign up whatever their domain. | - |
 
 A single sign-on connection is set up per organization in **Settings > Authentication**, with no environment variables. See [SSO Configuration](/self-hosting/configuration/sso). Installs that configure a deployment-wide provider with `NEXTAUTH_PROVIDER` and its provider variables keep working; see [Upgrading SSO](/platform/sso-update).
+
+### Restricting sign-up
+
+By default anybody who can reach the install can create an account and then create an organization of their own. To close that:
+
+- `SIGN_UP_MODE=invite_only` allows an account only for an address with a pending invitation. Members join the organizations that invited them. Only the operators in `ADMIN_EMAILS` can create a new organization, apart from the first organization on an install that has none.
+- `SIGN_UP_ALLOWED_DOMAINS` allows an account only for the listed email domains. It works with either mode.
+
+An invited address can always sign up, whatever its domain, from the invitation link or from the sign-in screen. Either way it lands on its invitation. An address in `ADMIN_EMAILS` can always sign up.
+
+The first administrator on an invite-only install:
+
+1. Set `ADMIN_EMAILS` to your address, then sign up with it. No other address can sign up without an invitation.
+2. Create the first organization and invite the rest of your team from **Settings > Members**.
+
+With `ADMIN_EMAILS` empty, the first account on an install with no users is still allowed, so the install can be set up. When `SIGN_UP_ALLOWED_DOMAINS` is set, that first account also has to be on a listed domain. Anybody who reaches the install before you can take that account, so set `ADMIN_EMAILS` on an install that is reachable from outside your network.
+
+The restriction applies to email and password sign-up, passkey sign-up, and first sign-in through a deployment-wide identity provider (`NEXTAUTH_PROVIDER`). It does not apply to an organization's own single sign-on connection or to SCIM provisioning: those are the organization's decision. Existing accounts are not affected.
 
 ## Services
 
@@ -62028,6 +62048,8 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.http.publicUrl` | `NEXTAUTH_URL` |
 | `app.license.key.value` | `LANGWATCH_LICENSE_KEY` |
 | `app.nextAuth.provider` | `NEXTAUTH_PROVIDER` |
+| `app.signUp.mode` | `SIGN_UP_MODE` |
+| `app.signUp.allowedDomains` | `SIGN_UP_ALLOWED_DOMAINS` (joined with commas) |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
 | `app.cronApiKey.value` | `CRON_API_KEY` |
@@ -64421,7 +64443,7 @@ keywords: first run, setup, first account, license, activation code, sso, single
 These steps take a fresh install to single sign-on through your own identity provider. They apply to [Helm](/self-hosting/deployment/kubernetes-helm), [ArgoCD](/self-hosting/deployment/argocd) and [Docker Compose](/self-hosting/deployment/docker-compose) installs alike.
 
 1. **Install LangWatch.** No email provider is needed for these steps.
-2. **Create the first account.** Open LangWatch and sign up with an email and a password. Do not use a passkey, since step 5 links single sign-on to the password account. The first account is an ordinary organization administrator. It has no rights over the whole installation: the operator pages (`/ops`) open only for the addresses in `ADMIN_EMAILS`. Once another administrator exists, you can change this account's role or remove it.
+2. **Create the first account.** Open LangWatch and sign up with an email and a password. Do not use a passkey, since step 5 links single sign-on to the password account. The first account is an ordinary organization administrator. It has no rights over the whole installation: the operator pages (`/ops`) open only for the addresses in `ADMIN_EMAILS`. Once another administrator exists, you can change this account's role or remove it. To stop anybody else signing up, see [Restricting sign-up](/self-hosting/configuration/environment-variables#restricting-sign-up).
 3. **Add the license.** Open **Settings > License**. Enter the activation code LangWatch sent you, which needs outbound HTTPS to `connect.langwatch.ai` (see [Connect](/self-hosting/connect)). On an install without that access, paste or upload the license key instead (see [Editions and licensing](/self-hosting/licensing)). Single sign-on turns on once the license is active, with no restart.
 4. **Connect your identity provider.** Open **Settings > Authentication > Identity provider** and follow the setup:
    1. Register the connection with the issuer, client id and client secret from your identity provider, or with its SAML metadata.

@@ -38,6 +38,7 @@ import type {
 } from "./join-request.responses.ts";
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
+  PendingInvitationForCaller,
   OrganizationDirectoryCounts,
   OrganizationInviteAccepted,
   OrganizationInviteCreated,
@@ -83,6 +84,7 @@ import type {
   PersonalWorkspaceFeaturesInput,
 } from "./personal-workspace.ts";
 import type { ScopeGraphOrganization } from "./scope-graph.ts";
+import type { SignUpVerdict } from "./sign-up-policy.ts";
 import type { TeamWithProjects } from "./team.responses.ts";
 import type {
   CreateOrganizationTeamWithMembersInput,
@@ -229,6 +231,17 @@ export interface OrganizationApi {
     organization: { id: string; name: string };
     team: { id: string; slug: string; name: string };
   }>;
+  /**
+   * Whether this address may create a new account on the installation
+   * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`). The default settings answer without a read.
+   */
+  checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict>;
+  /**
+   * The invitation waiting for a caller who belongs to no organization yet, on an
+   * installation where accounts are created by invitation. Only addresses the account
+   * has proven count.
+   */
+  getPendingInvitation(by: OrganizationCaller): Promise<PendingInvitationForCaller>;
   deleteMember(
     input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller | null,

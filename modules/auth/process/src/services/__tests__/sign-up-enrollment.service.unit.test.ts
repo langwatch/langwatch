@@ -18,6 +18,7 @@ function enrollment({
   taken = false,
   defaults = [PASSWORD, PASSKEY],
   passwordAllowed = true,
+  signUpRefused = false,
 }: {
   decision: RoutingDecision;
   proofHolds?: boolean;
@@ -25,8 +26,13 @@ function enrollment({
   taken?: boolean;
   defaults?: readonly SignInMethod[];
   passwordAllowed?: boolean;
+  signUpRefused?: boolean;
 }) {
-  const asked: { routed: (string | null)[]; takenFor: string[] } = { routed: [], takenFor: [] };
+  const asked: { routed: (string | null)[]; takenFor: string[]; policyFor: string[] } = {
+    routed: [],
+    takenFor: [],
+    policyFor: [],
+  };
   const service = SignUpEnrollmentService.create({
     validateAddressProof: async () => proofHolds,
     validateUnconfirmedAddressProof: async () => unconfirmedProofHolds,
@@ -40,6 +46,12 @@ function enrollment({
     },
     resolveDefaultMethods: async () => defaults,
     passwordIsAllowed: async () => passwordAllowed,
+    checkSignUp: async ({ email }) => {
+      asked.policyFor.push(email);
+      return signUpRefused
+        ? { allowed: false, reason: "invite_only" }
+        : { allowed: true, via: "open" };
+    },
   });
 
   return { service, asked };
@@ -60,6 +72,42 @@ describe("SignUpEnrollmentService", () => {
         service.getEnrollment({ email: "sam@example.com", addressProof: "stale" }),
       ).rejects.toMatchObject({ code: "auth_no_address_to_confirm" });
       expect(asked.routed).toEqual([]);
+    });
+  });
+
+  describe("when the installation's sign-up policy refuses the address", () => {
+    it("refuses a proven new address by code", async () => {
+      const { service } = enrollment({ decision: UNKNOWN, signUpRefused: true });
+
+      await expect(
+        service.getEnrollment({ email: "stranger@example.com", addressProof: "proof" }),
+      ).rejects.toMatchObject({ code: "auth_sign_up_restricted" });
+    });
+
+    it("does not ask the policy for a caller holding no valid proof", async () => {
+      const { service, asked } = enrollment({
+        decision: UNKNOWN,
+        proofHolds: false,
+        signUpRefused: true,
+      });
+
+      await expect(
+        service.getEnrollment({ email: "stranger@example.com", addressProof: "stale" }),
+      ).rejects.toMatchObject({ code: "auth_no_address_to_confirm" });
+      expect(asked.policyFor).toEqual([]);
+    });
+
+    it("sends an address that already has an account to log in instead", async () => {
+      const { service, asked } = enrollment({
+        decision: UNKNOWN,
+        taken: true,
+        signUpRefused: true,
+      });
+
+      await expect(
+        service.getEnrollment({ email: "sam@example.com", addressProof: "proof" }),
+      ).resolves.toMatchObject({ outcome: "existing_account" });
+      expect(asked.policyFor).toEqual([]);
     });
   });
 

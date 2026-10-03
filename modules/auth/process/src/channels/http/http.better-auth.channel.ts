@@ -57,9 +57,10 @@ import {
   afterUserCreate,
   createBeforeAccountCreateHook,
   createBeforeSessionCreateHook,
-  beforeUserCreate,
+  createBeforeUserCreateHook,
   type BetterAuthHookCollaborators,
   type FindGoverningConnections,
+  type SignUpPolicy,
 } from "./http.better-auth-hooks.channel.ts";
 import type { CredentialSessionGuard } from "./http.credential-session-guard.channel.ts";
 import type { IdTokenIssuerRefusalChannel } from "./http.id-token-issuer-refusal.channel.ts";
@@ -357,6 +358,7 @@ export const createAuthOptions = ({
   credentialGuard,
   signInLockout,
   findGoverningConnections,
+  signUpPolicy,
   passwordResetSession,
   idTokenIssuerRefusals,
 }: {
@@ -371,6 +373,8 @@ export const createAuthOptions = ({
   credentialGuard: CredentialSessionGuard;
   signInLockout: SignInAttemptCounter;
   findGoverningConnections: FindGoverningConnections;
+  /** Who the installation lets create an account; asked before every user row is written. */
+  signUpPolicy: SignUpPolicy;
   /** Opens the session a completed password reset earned. */
   passwordResetSession?: PasswordResetSessionChannel;
   /** Keeps the issuer of an ID token the engine refused, so the redirect can name it. */
@@ -552,7 +556,7 @@ export const createAuthOptions = ({
   databaseHooks: {
     user: {
       create: {
-        before: beforeUserCreate,
+        before: createBeforeUserCreateHook({ policy: signUpPolicy, findGoverningConnections }),
         after: async (user) => {
           await afterUserCreate({
             repo,
@@ -869,6 +873,8 @@ export type BetterAuthTransportOptions = Readonly<{
   signInLockout: SignInAttemptCounter;
   /** The organization connections that govern an address (D04). */
   findGoverningConnections: FindGoverningConnections;
+  /** Who the installation lets create an account. */
+  signUpPolicy: SignUpPolicy;
 }>;
 
 /** The options the deployment's ONE Better Auth instance is built from. */
@@ -893,6 +899,7 @@ const transportOptions = ({
   ssoIssuers,
   signInLockout,
   findGoverningConnections,
+  signUpPolicy,
   ssoMigration,
   storage,
   users,
@@ -910,6 +917,7 @@ const transportOptions = ({
     credentialGuard,
     signInLockout,
     findGoverningConnections,
+    signUpPolicy,
     passwordResetSession,
     idTokenIssuerRefusals,
     hooks: {
@@ -935,6 +943,7 @@ const transportOptions = ({
                 handleSecret: deployment.passkeyHandleSecret,
                 users,
                 verification: signUpVerification,
+                policy: signUpPolicy,
               }),
             }),
           ]

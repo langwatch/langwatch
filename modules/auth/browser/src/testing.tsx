@@ -27,6 +27,7 @@ export const TEST_PUBLIC_ENVIRONMENT: AuthPublicEnvironment = {
   HAS_LANGEVALS_ENDPOINT: false,
   STRIPE_LICENSE_PAYMENT_LINK_URL: undefined,
   NEXTAUTH_PROVIDER: undefined,
+  SIGN_UP_MODE: "open",
 };
 
 export type TestAuthHostOptions = {

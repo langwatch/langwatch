@@ -6,6 +6,7 @@ import { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "./memory.organization.repository.ts";
 import { MemoryPersonalTeamScopeRepository } from "./memory.personal-team-scope.repository.ts";
 import { MemoryScopeGraphRepository } from "./memory.scope-graph.repository.ts";
+import { MemorySignUpPolicyRepository } from "./memory.sign-up-policy.repository.ts";
 import { MemoryTeamRepository } from "./memory.team.repository.ts";
 
 /**
@@ -24,6 +25,7 @@ export const MemoryOrganizationRepositories = {
       membership: () => MemoryOrganizationMembershipRepository.create({ memory }),
       personalTeamScope: MemoryPersonalTeamScopeRepository.create({ memory }),
       scopeGraph: MemoryScopeGraphRepository.create({ memory }),
+      signUpPolicy: MemorySignUpPolicyRepository.create({ memory }),
       inviteRateLimit: MemoryOrganizationInviteRateLimitRepository.create(),
     };
   },

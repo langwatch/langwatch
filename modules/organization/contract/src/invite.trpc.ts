@@ -1,12 +1,14 @@
 /** Every `invite.*` procedure: the invitations administrators send, and accepting one. */
 
 import { defineTrpcContract } from "@langwatch/module";
+import { z } from "zod";
 
 import {
   organizationInviteAcceptedSchema,
   organizationInviteResentSchema,
   organizationInvitesCreatedSchema,
   organizationListedInvitesSchema,
+  organizationPendingInvitationForCallerSchema,
 } from "./organization.responses.ts";
 import {
   organizationApiAcceptInviteInputSchema,
@@ -34,4 +36,8 @@ export const inviteTrpc = defineTrpcContract("invite")
   .mutation("acceptInvite")
   .withInput(organizationApiAcceptInviteInputSchema)
   .withOutput(organizationInviteAcceptedSchema)
+
+  .query("myPendingInvitation")
+  .withInput(z.object({}))
+  .withOutput(organizationPendingInvitationForCallerSchema)
   .build();

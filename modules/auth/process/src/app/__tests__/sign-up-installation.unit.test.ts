@@ -65,6 +65,7 @@ async function bootAuth({
         auth0ManagementClientId: undefined,
         isSaas: false,
         signInProviders: NO_SIGN_IN_PROVIDERS,
+        signUpMode: "open",
       },
     })
     .provide({
@@ -78,7 +79,9 @@ async function bootAuth({
           reasonCode: "identifier_unknown",
         }),
       }),
-      organization: createApiFixture<OrganizationApi>(),
+      organization: createApiFixture<OrganizationApi>({
+        checkSignUp: async () => ({ allowed: true, via: "open" }),
+      }),
       "audit-log": createApiFixture<AuditLogApi>(),
       entitlement: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),

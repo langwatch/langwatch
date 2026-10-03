@@ -272,6 +272,12 @@ jobs:
         if: "!cancelled()"
         run: ./tests/connect-env.sh
 
+      # Same upgrade guarantee for self sign-up: a default render carries no
+      # SIGN_UP_ variable, and the values reach the app when set.
+      - name: "assert sign-up settings render only when set"
+        if: "!cancelled()"
+        run: ./tests/sign-up-env.sh
+
       # apps/api and apps/worker parse one config at each owner (ADR-132), so a
       # variable nothing declares is dead and a missing store URL refuses the
       # boot. Both are only visible by setting the render beside the source.

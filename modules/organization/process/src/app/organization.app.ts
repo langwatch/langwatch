@@ -115,6 +115,10 @@ import {
   type LimitCheckResult,
   type LimitType,
   type ScopeGraphOrganization,
+  organizationServerConfig,
+  type OrganizationServerConfig,
+  type PendingInvitationForCaller,
+  type SignUpVerdict,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -165,6 +169,7 @@ import {
   type PersonalTeamScopeReader,
 } from "../services/personal-team-scope.service.ts";
 import type { SeatLimitNoticeService } from "../services/seat-limit-notice.service.ts";
+import { SignUpPolicyService } from "../services/sign-up-policy.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
 import type { TeamManagementApi } from "../transport/team.rest.ts";
 import { buildOrganizationInfrastructure } from "./organization-composition.build.ts";
@@ -226,6 +231,8 @@ type OrganizationProjectApi = ProjectApi;
 /** Who a write is attributed to. */
 export interface OrganizationCaller {
   readonly id: string;
+  /** The session's address, where the transport read one; the sign-up policy matches it. */
+  readonly email?: string | null;
   /** The key a management-API call arrived on; see the contract's OrganizationCaller. */
   readonly apiKeyId?: string | null;
 }
@@ -257,7 +264,7 @@ type OrganizationMembers = MembersRead<readonly ["prisma", "encryption", "logger
 type OrganizationSetup = FeatureSetup<
   typeof OrganizationModule.dependencies,
   OrganizationMembers,
-  undefined,
+  OrganizationServerConfig,
   OrganizationRepositories
 >;
 
@@ -338,6 +345,8 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     "publicBaseUrl",
     "processName",
   ] as const;
+  /** The sign-up policy's settings (specs/auth/sign-up-restriction.feature). */
+  static readonly config = organizationServerConfig;
   /** LangWatch's own sign-ups Slack webhook, shared with billing, auth and identity (ADR-132). */
   static readonly secrets = { internalSlackSignupsWebhook } as const;
   #dependencies: ServerOrganizationAppDependencies;
@@ -472,6 +481,17 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       createAndAssign: (input, by) => application.createAndAssign(input, by),
       ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });
+    application.#signUpPolicy = SignUpPolicyService.create({
+      settings: setup.config.signUp,
+      repository: setup.repositories.signUpPolicy,
+      users: setup.dependencies.users,
+      // The addresses accepting an invitation takes; an account identity has not resolved yet
+      // answers with none, and the caller's session address stands in.
+      findProvenAddresses: async ({ userId }) => {
+        const verified = await setup.dependencies.identity.verifiedEmailsOf({ userId });
+        return verified.kind === "resolved" ? verified.emails.map((email) => email.value) : [];
+      },
+    });
 
     return application;
   }
@@ -576,6 +596,8 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #invitationDoor!: OrganizationInvitationDoorService | null;
   #joinDoor!: OrganizationJoinDoorService | null;
   #initialization!: OrganizationInitializationService;
+  /** Who may sign up and found an organization; absent only in a test's app, which is open. */
+  #signUpPolicy: SignUpPolicyService | null = null;
 
   /** The invitation ceremony; a deployment without one refuses by name. */
   #invitations(): OrganizationInvitationDoorService {
@@ -604,7 +626,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   // -- the organization, its membership and its invitations ------------------
 
   /** Sign-up: the caller's first organization and its first team. */
-  createAndAssign(
+  async createAndAssign(
     input: Readonly<{
       orgName?: string;
       phoneNumber?: string;
@@ -617,7 +639,25 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     organization: { id: string; name: string };
     team: { id: string; slug: string; name: string };
   }> {
+    // On an invite-only installation members join the organizations that invited them;
+    // founding one is for instance administrators and the first organization.
+    await this.#signUpPolicy?.assertOrganizationCreation({ userId: by.id, email: by.email });
+
     return this.#dependencies.membership.createAndAssign({ ...input, userId: by.id });
+  }
+
+  /** Whether this address may create a new account here. */
+  async checkSignUp(input: Readonly<{ email: string }>): Promise<SignUpVerdict> {
+    return this.#signUpPolicy?.checkSignUp(input) ?? { allowed: true, via: "open" };
+  }
+
+  /** The invitation waiting for a caller who belongs to no organization yet. */
+  async getPendingInvitation(by: OrganizationCaller): Promise<PendingInvitationForCaller> {
+    return (
+      this.#signUpPolicy?.getPendingInvitation({ userId: by.id, email: by.email }) ?? {
+        inviteCode: null,
+      }
+    );
   }
 
   /** Removes one seat, attributed to the caller who asked for it. */

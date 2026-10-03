@@ -6,6 +6,7 @@ import type { PersonalTeamScopeReader } from "../services/personal-team-scope.se
 import type { GroupRepository } from "./group.repository.ts";
 import type { OrganizationMembershipRepository } from "./organization-membership.repository.ts";
 import type { OrganizationRepository } from "./organization.repository.ts";
+import type { SignUpPolicyRepository } from "./sign-up-policy.repository.ts";
 import type { TeamRepository } from "./team.repository.ts";
 
 /**
@@ -25,6 +26,8 @@ export interface OrganizationRepositories {
   readonly membership: (grants: AuthzGrantsService) => OrganizationMembershipRepository;
   readonly personalTeamScope: PersonalTeamScopeReader;
   readonly scopeGraph: OrganizationScopeGraphReader;
+  /** The installation-wide reads the sign-up policy decides over. */
+  readonly signUpPolicy: SignUpPolicyRepository;
   /** The fixed-window counter both invitation throttles spend. */
   readonly inviteRateLimit: OrganizationInviteRateLimit;
 }

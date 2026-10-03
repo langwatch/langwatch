@@ -125,6 +125,10 @@ export function createUserTestOrganizations(projectId = "project-1") {
       throw new OrganizationNotFoundForTeamError(teamId);
     }),
     isMember: vi.fn(async () => true),
+    checkSignUp: vi.fn<OrganizationApi["checkSignUp"]>(async () => ({
+      allowed: true,
+      via: "open",
+    })),
   });
 }
 

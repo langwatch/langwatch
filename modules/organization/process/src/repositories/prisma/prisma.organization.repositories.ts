@@ -6,6 +6,7 @@ import { PrismaOrganizationMembershipRepository } from "./prisma.organization-me
 import { PrismaOrganizationRepository } from "./prisma.organization.repository.ts";
 import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository.ts";
 import { PrismaScopeGraphRepository } from "./prisma.scope-graph.repository.ts";
+import { PrismaSignUpPolicyRepository } from "./prisma.sign-up-policy.repository.ts";
 import { PrismaTeamRepository } from "./prisma.team.repository.ts";
 
 /** Postgres-backed provider for organization, team, group, and workspace repositories. */
@@ -23,5 +24,6 @@ export const PostgresOrganizationRepositories = {
       PrismaOrganizationMembershipRepository.create({ database: prisma, grants }),
     personalTeamScope: PrismaPersonalTeamScopeRepository.bindReader(prisma),
     scopeGraph: PrismaScopeGraphRepository.create(prisma),
+    signUpPolicy: PrismaSignUpPolicyRepository.create(prisma),
   }),
 };

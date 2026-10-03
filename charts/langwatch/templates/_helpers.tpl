@@ -2072,6 +2072,19 @@ here, once, by name, so both consuming templates agree.
   value: {{ .Values.app.nextAuth.provider | quote }}
 {{- end }}
 
+# Self sign-up restrictions. Rendered only when set away from the
+# default, so an upgrade that changes no value adds no variable.
+{{- with .Values.app.signUp }}
+{{- if and .mode (ne (toString .mode) "open") }}
+- name: SIGN_UP_MODE
+  value: {{ .mode | quote }}
+{{- end }}
+{{- if .allowedDomains }}
+- name: SIGN_UP_ALLOWED_DOMAINS
+  value: {{ join "," .allowedDomains | quote }}
+{{- end }}
+{{- end }}
+
 # NextAuth - SSO OAuth providers (auth0, azureAd, cognito, github,
 # gitlab, google, okta, onelogin, oidc).
 # These are this chart's values keys, which map to env prefixes; the

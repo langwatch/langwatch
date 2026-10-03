@@ -13,6 +13,7 @@ export {
   type ProcessConfigOf,
 } from "./config.ts";
 export {
+  adminEmails,
   allowedProxyHosts,
   allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
@@ -29,6 +30,8 @@ export {
   posthogKey,
   SAAS_GATEWAY_URL,
   signInProviders,
+  signUpAllowedDomains,
+  signUpMode,
   telemetryExporterEndpoint,
 } from "./deployment-facts.ts";
 export {

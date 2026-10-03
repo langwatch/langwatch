@@ -349,8 +349,11 @@ export type BuildBetterAuthOptions = Readonly<{
   auth: AuthApi;
   /** The grants ledger an SSO domain auto-join writes its organization binding to. */
   grants: AuthzGrantsService;
-  /** Where a domain auto-join applies the pending invite an address already holds. */
-  organizations: Pick<OrganizationApi, "applyPendingInvite">;
+  /**
+   * Where a domain auto-join applies the pending invite an address already
+   * holds, and who the installation lets create an account.
+   */
+  organizations: Pick<OrganizationApi, "applyPendingInvite" | "checkSignUp">;
   /** Sends a requested reset link; see {@link passwordResetSender}. */
   sendResetPassword: (reset: { email: string; token: string }) => Promise<void>;
   /** The same user directory the rest of this process serves from. */
@@ -503,6 +506,7 @@ export async function buildBetterAuth(
       signInRouting === null
         ? []
         : organizationConnectionsOf(await signInRouting({ identifier: email, breakGlass: false })),
+    signUpPolicy: options.organizations,
     credentialGuard: CredentialSessionGuard.create(
       CredentialSignInPolicyService.create({
         routing: signInRouting === null ? null : { route: signInRouting },

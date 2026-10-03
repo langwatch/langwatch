@@ -672,6 +672,17 @@ app:
     # of its own presents another id and is refused as the wrong instance.
     instanceId: ""
 
+  # Who can create an account and who can create an organization.
+  ## @extra app.signUp Self sign-up restrictions.
+  ## @param app.signUp.mode [string, default: open] `open` lets anybody who reaches the install sign up; `invite_only` admits only invited addresses, ADMIN_EMAILS, and the first account on an install with no users when ADMIN_EMAILS is empty (still subject to allowedDomains).
+  ## @param app.signUp.allowedDomains [array] Email domains allowed to sign up. Empty means any. Invited addresses and ADMIN_EMAILS are admitted whatever their domain.
+  signUp:
+    # Rendered as SIGN_UP_MODE. With invite_only, only an instance administrator
+    # (ADMIN_EMAILS) can create an organization once the first one exists.
+    mode: open
+    # Rendered as SIGN_UP_ALLOWED_DOMAINS, comma-separated.
+    allowedDomains: []
+
   # NextAuth.js authentication configuration
   # Handles user authentication and session management
   # Note: publicUrl is automatically used from http.publicUrl

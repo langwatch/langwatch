@@ -68,6 +68,10 @@ export class MemoryUserRepository implements UserRepository {
       .some((row) => row.email?.trim().toLowerCase().split("@")[1] === domain);
   }
 
+  async hasAnyAccount(): Promise<boolean> {
+    return this.#database.rows().length > 0;
+  }
+
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
     if (userIds.length === 0) return [];
 
