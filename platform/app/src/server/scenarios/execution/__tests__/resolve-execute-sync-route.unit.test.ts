@@ -19,6 +19,7 @@ import { resolveExecuteSyncRoute } from "../resolve-execute-sync-route";
 beforeEach(() => {
   for (const key of Object.keys(mockEnv)) delete mockEnv[key];
   mockEnv.BASE_HOST = "https://app.langwatch.ai";
+  mockEnv.LANGWATCH_ENDPOINT = "http://langwatch-internal";
   mockEnv.LANGWATCH_NLP_SERVICE = "http://nlp.internal:5561";
 });
 
@@ -27,6 +28,29 @@ describe("the route a scenario run is prepared with", () => {
     /** @scenario "A deployment with per-project engines relays" */
     it("routes the run through the control plane", () => {
       mockEnv.LANGWATCH_NLP_LAMBDA_CONFIG = '{"AWS_REGION":"eu-central-1"}';
+
+      expect(resolveExecuteSyncRoute()).toEqual({
+        mode: "relay",
+        relayBaseUrl: "http://langwatch-internal",
+      });
+    });
+
+    /** @scenario "A relayed turn does not leave the deployment" */
+    it("sends the turn to the address the app hands out, not the public one", () => {
+      mockEnv.LANGWATCH_NLP_LAMBDA_CONFIG = '{"AWS_REGION":"eu-central-1"}';
+
+      // The public hostname is served through a CDN that ends a request the
+      // origin has not answered within 100 seconds, which is well under the
+      // ten minutes a turn is allowed. Reading BASE_HOST here put every long
+      // turn on that ceiling instead of the platform's.
+      expect(resolveExecuteSyncRoute()).not.toMatchObject({
+        relayBaseUrl: mockEnv.BASE_HOST,
+      });
+    });
+
+    it("falls back to the public host when no endpoint is configured", () => {
+      mockEnv.LANGWATCH_NLP_LAMBDA_CONFIG = '{"AWS_REGION":"eu-central-1"}';
+      delete mockEnv.LANGWATCH_ENDPOINT;
 
       expect(resolveExecuteSyncRoute()).toEqual({
         mode: "relay",
