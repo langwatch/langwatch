@@ -711,6 +711,34 @@ describe("Scenarios API", () => {
         expect(body.name).toBe("Patched Name");
         expect(body.situation).toBe("Original situation");
       });
+
+      describe("when the body carries a field the endpoint does not have", () => {
+        it("answers 422 naming the field and leaves the scenario as it was", async () => {
+          const scenario = await prisma.scenario.create({
+            data: {
+              projectId: testProjectId,
+              name: "Patch Unknown Field",
+              situation: "Original situation",
+              criteria: [],
+              labels: ["original"],
+            },
+          });
+
+          const res = await helpers.api.patch(`/api/scenarios/${scenario.id}`, {
+            labels: ["relabelled"],
+            status: "active",
+          });
+
+          expect(res.status).toBe(422);
+          const body = await res.json();
+          expect(body.error).toBe("validation_error");
+          expect(JSON.stringify(body.reasons)).toContain("status");
+          const stored = await prisma.scenario.findFirst({
+            where: { id: scenario.id, projectId: testProjectId },
+          });
+          expect(stored?.labels).toEqual(["original"]);
+        });
+      });
     });
 
     describe("when the scenario does not exist", () => {
