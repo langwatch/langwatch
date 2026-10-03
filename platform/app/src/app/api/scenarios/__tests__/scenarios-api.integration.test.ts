@@ -489,20 +489,34 @@ describe("Scenarios API", () => {
       });
 
       describe("when the body carries a field the endpoint does not have", () => {
-        it("refuses the update, names the field and leaves the scenario as it was", async () => {
-          const res = await helpers.api.put(`/api/scenarios/${scenario.id}`, {
+        const putWithUnknownField = () =>
+          helpers.api.put(`/api/scenarios/${scenario.id}`, {
             labels: ["relabelled"],
             status: "active",
           });
+
+        it("answers 422 naming the field", async () => {
+          const res = await putWithUnknownField();
 
           expect(res.status).toBe(422);
           const body = await res.json();
           expect(body.error).toBe("validation_error");
           expect(JSON.stringify(body.reasons)).toContain("status");
+        });
+
+        it("leaves the scenario and its version history as they were", async () => {
+          await putWithUnknownField();
+
           const stored = await prisma.scenario.findFirst({
             where: { id: scenario.id, projectId: testProjectId },
           });
           expect(stored?.labels).toEqual(["original"]);
+          // The fixture is written straight to the table, so it starts with no
+          // version rows; a refused save must not add one.
+          const versions = await prisma.scenarioVersion.count({
+            where: { scenarioId: scenario.id, projectId: testProjectId },
+          });
+          expect(versions).toBe(0);
         });
       });
 
