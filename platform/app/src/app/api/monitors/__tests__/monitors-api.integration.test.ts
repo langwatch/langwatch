@@ -198,4 +198,96 @@ describe("Monitors API", () => {
       });
     });
   });
+
+  describe("when the evaluator carries its own settings", () => {
+    let blocklist: Evaluator;
+
+    const blocklistBody = (overrides: Record<string, unknown> = {}) => ({
+      name: "Competitor Monitor",
+      checkType: "langevals/competitor_blocklist",
+      evaluatorId: blocklist.id,
+      ...overrides,
+    });
+
+    const evaluatorWith = (competitors: string[]) =>
+      prisma.evaluator.create({
+        data: {
+          id: `evaluator_${nanoid()}`,
+          projectId: testProjectId,
+          name: "Competitor Blocklist",
+          slug: `competitor-blocklist-${nanoid()}`,
+          type: "evaluator",
+          config: {
+            evaluatorType: "langevals/competitor_blocklist",
+            settings: { competitors },
+          },
+        },
+      });
+
+    beforeEach(async () => {
+      blocklist = await evaluatorWith(["Acme"]);
+    });
+
+    it("refuses a create whose parameters would never run", async () => {
+      const res = await post(
+        "/api/monitors",
+        blocklistBody({ parameters: { competitors: ["Globex"] } }),
+      );
+
+      expect(res.status).toBe(422);
+      const body = await res.json();
+      expect(body.error).toBe("monitor_parameters_unused");
+      expect(body.evaluatorId).toBe(blocklist.id);
+      expect(
+        await prisma.monitor.findFirst({ where: { projectId: testProjectId } }),
+      ).toBeNull();
+    });
+
+    it("accepts parameters that repeat the evaluator's settings", async () => {
+      const res = await post(
+        "/api/monitors",
+        blocklistBody({ parameters: { competitors: ["Acme"] } }),
+      );
+
+      expect(res.status).toBe(201);
+    });
+
+    it("accepts a create without parameters", async () => {
+      const res = await post("/api/monitors", blocklistBody());
+
+      expect(res.status).toBe(201);
+    });
+
+    it("refuses an update whose parameters would never run", async () => {
+      const monitor = await (
+        await post("/api/monitors", blocklistBody())
+      ).json();
+
+      const res = await patch(`/api/monitors/${monitor.id}`, {
+        parameters: { competitors: ["Globex"] },
+      });
+
+      expect(res.status).toBe(422);
+      expect((await res.json()).error).toBe("monitor_parameters_unused");
+      const persisted = await prisma.monitor.findFirst({
+        where: { id: monitor.id, projectId: testProjectId },
+      });
+      expect(persisted?.parameters).toEqual({});
+    });
+
+    it("checks the parameters against the evaluator the update moves to", async () => {
+      const monitor = await (
+        await post("/api/monitors", blocklistBody())
+      ).json();
+      const other = await evaluatorWith(["Initech"]);
+
+      const res = await patch(`/api/monitors/${monitor.id}`, {
+        evaluatorId: other.id,
+        parameters: { competitors: ["Acme"] },
+      });
+
+      expect(res.status).toBe(422);
+      expect((await res.json()).evaluatorId).toBe(other.id);
+    });
+  });
 });

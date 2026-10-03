@@ -27,3 +27,28 @@ export class MonitorEvaluatorRequiredError extends HandledError {
     this.name = "MonitorEvaluatorRequiredError";
   }
 }
+
+/**
+ * A monitor's `parameters` are only read when its evaluator has no settings of
+ * its own: the evaluator's settings win at run time (langwatch#6397). Storing
+ * parameters that disagree with them saved cleanly and read back like the live
+ * configuration while never running, so they are refused instead.
+ */
+export class MonitorParametersUnusedError extends HandledError {
+  declare readonly code: "monitor_parameters_unused";
+
+  constructor(public readonly evaluatorId: string) {
+    super(
+      "monitor_parameters_unused",
+      "This monitor runs with its evaluator's settings, so these parameters would never be used. " +
+        "Change the evaluator's settings instead, or leave parameters out.",
+      {
+        meta: { field: "parameters", evaluatorId },
+        httpStatus: 422,
+        fault: "customer",
+        ...remediation("monitor_parameters_unused"),
+      },
+    );
+    this.name = "MonitorParametersUnusedError";
+  }
+}
