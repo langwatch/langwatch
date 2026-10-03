@@ -21,6 +21,7 @@ import {
   addressRoutesToConnection,
   credentialAccounts,
   localSignUpDecision,
+  signUpPolicy,
   signUpVerification,
 } from "~/server/app-layer/identity/runtime";
 import {
@@ -344,6 +345,12 @@ export const userRouter = createTRPCRouter({
           retryAfterSeconds: secondsUntil(limit.resetAt),
         });
       }
+
+      // Who may create an account at all on this installation
+      // (SIGN_UP_MODE, SIGN_UP_ALLOWED_DOMAINS). After the rate limit, so
+      // probing addresses spends the same budget, and before the address
+      // proof is spent, so a refused visitor keeps it.
+      await signUpPolicy().assertSignUp({ email });
 
       // The mailbox proof is the authority to enrol a credential. It is spent
       // before hashing or writing anything, and is bound to this exact

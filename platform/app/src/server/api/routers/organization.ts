@@ -19,10 +19,14 @@ import {
 } from "~/server/app-layer/authz/permission-adapters";
 import {
   memberProvenance,
+  signUpPolicy,
   ssoTestArrival,
 } from "~/server/app-layer/identity/runtime";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
-import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
+import {
+  MemberSeatLimitReachedError,
+  OrganizationCreationRestrictedError,
+} from "~/server/app-layer/organizations/errors";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
@@ -124,6 +128,16 @@ export const organizationRouter = createTRPCRouter({
         throw new SsoTestArrivalCannotCreateOrganizationError(
           `session opened through connection ${testArrival.connectionId}, which is not live`,
         );
+      }
+
+      // Invite-only installations (SIGN_UP_MODE=invite_only): members join
+      // the organizations that invited them, and founding a new one is for
+      // instance administrators and the first organization on the install.
+      const creation = await signUpPolicy().checkOrganizationCreation({
+        email: ctx.session.user.email,
+      });
+      if (!creation.allowed) {
+        throw new OrganizationCreationRestrictedError();
       }
 
       const result = await getApp().organizations.createAndAssign({

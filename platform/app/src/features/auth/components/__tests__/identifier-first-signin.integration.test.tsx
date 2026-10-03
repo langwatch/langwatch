@@ -1077,4 +1077,27 @@ describe("given the identifier-first sign-in screen", () => {
       expect(screen.queryByTestId("unknown-identifier")).toBeNull();
     });
   });
+
+  describe("when the installation's sign-up is invite-only", () => {
+    it("offers no create-account link on the address step", async () => {
+      publicEnvRef.current = { IS_SAAS: false, SIGN_UP_MODE: "invite_only" };
+      routeMock.mockResolvedValue(localPicker);
+
+      renderScreen();
+
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("go-to-sign-up")).toBeNull();
+    });
+  });
+
+  describe("when the installation's sign-up is open", () => {
+    it("offers the create-account link on the address step", async () => {
+      publicEnvRef.current = { IS_SAAS: false, SIGN_UP_MODE: "open" };
+      routeMock.mockResolvedValue(localPicker);
+
+      renderScreen();
+
+      expect(await screen.findByTestId("go-to-sign-up")).toBeTruthy();
+    });
+  });
 });

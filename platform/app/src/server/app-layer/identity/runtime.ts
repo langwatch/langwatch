@@ -10,6 +10,7 @@
  * is a closure passed from here — the packages read no env of their own.
  */
 
+import { adminEmailList } from "@ee/admin/isAdmin";
 import { fireActivityTrackingNurturing } from "@ee/billing/nurturing/hooks/activityTracking";
 import { fireSsoAutoAddNurturingCalls } from "@ee/billing/nurturing/hooks/ssoAutoAdd";
 import { ensureUserSyncedToCio } from "@ee/billing/nurturing/hooks/userSync";
@@ -228,6 +229,7 @@ import { PrismaPasskeyRemovalRepository } from "./repositories/passkey-removal.p
 import { PrismaPriorSessionRepository } from "./repositories/prior-session.prisma.repository";
 import { PrismaSecretHealTenantSource } from "./repositories/secret-heal-tenant-source.prisma.repository";
 import { PrismaSignUpHealthRepository } from "./repositories/sign-up-health.prisma.repository";
+import { PrismaSignUpPolicyRepository } from "./repositories/sign-up-policy.prisma.repository";
 import {
   PrismaSignUpAccountDirectory,
   PrismaSignUpVerificationTokenStore,
@@ -260,6 +262,7 @@ import {
 } from "./sign-in-security-adapters";
 import { SignUpHealthService } from "./sign-up-health.service";
 import { SignUpIdentifierService } from "./sign-up-identifier";
+import { parseAllowedDomains, SignUpPolicy } from "./sign-up-policy";
 import { ProjectionSignInAccountLookup } from "./signin-account-lookup";
 import { SignInLinkEvidence } from "./signin-link-evidence";
 import {
@@ -737,6 +740,22 @@ export async function decideLocalSignUp(
   }
 
   return { outcome: "enroll", methodSet, reasonCode: decision.reasonCode };
+}
+
+/**
+ * Who may create an account and who may found an organization here
+ * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`, `ADMIN_EMAILS`). Config is read
+ * per call so a test that rewrites the environment sees its own values.
+ */
+export function signUpPolicy(): SignUpPolicy {
+  return new SignUpPolicy({
+    config: () => ({
+      mode: env.SIGN_UP_MODE,
+      allowedDomains: parseAllowedDomains(env.SIGN_UP_ALLOWED_DOMAINS),
+      adminEmails: adminEmailList(),
+    }),
+    repository: new PrismaSignUpPolicyRepository(prisma),
+  });
 }
 
 export async function localSignUpDecision(
@@ -1536,6 +1555,8 @@ export function passkeySignUp(): PasskeySignUpRegistration {
           decision.methodSet.some((candidate) => candidate.kind === method)
         );
       },
+      policyAdmits: async (email) =>
+        (await signUpPolicy().checkSignUp({ email })).allowed,
     },
     directory: identityUsers,
     accounts: {
@@ -1755,6 +1776,7 @@ export function databaseHooks(): BetterAuthDatabaseHooks {
     ),
     federationAllowed: () => platformSSOAllowed(),
     signInEvidence: signInLinkEvidence(),
+    signUpPolicy: signUpPolicy(),
     analytics: {
       // The same distinct id posthog-js identifies with client-side, so this
       // server event joins the browser person.

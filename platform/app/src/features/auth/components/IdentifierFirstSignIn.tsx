@@ -771,6 +771,12 @@ function SignUpLink({
   email?: string | null;
   label: string;
 }) {
+  // An invite-only installation offers no general sign-up. An invited address
+  // still gets in: the invitation's own link, or the sign-in screen's
+  // "send confirmation link" step for an address with no account.
+  const inviteOnly = usePublicEnv().data?.SIGN_UP_MODE === "invite_only";
+  if (inviteOnly) return null;
+
   // The address rides in the FRAGMENT, which is the half of a URL the browser
   // does not send: it reaches no access log and no `Referer` on the way to the
   // other screen. See `signUpHref`.

@@ -102,6 +102,9 @@ export const STABLE_AUTH_ERRORS = [
   // The ID token's issuer is not the connection's. Stable: the connection's
   // issuer has to change before the same sign-in can succeed.
   "sso_issuer_mismatch",
+  // The installation's sign-up policy does not admit this address. Stable:
+  // what has to change is an invitation, not the attempt.
+  "auth_sign_up_restricted",
 ] as const;
 
 export const isStableAuthError = (error: string | null | undefined): boolean =>

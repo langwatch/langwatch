@@ -83,6 +83,13 @@ const clauseField = (clause: unknown, key: string): unknown =>
     ? (clause as Record<string, unknown>)[key]
     : undefined;
 
+/** Whether an `email` predicate names exactly one address, either as a plain
+ *  string or as `{ equals: <string> }`. */
+const namesOneAddress = (value: unknown): boolean =>
+  (typeof value === "string" && value.length > 0) ||
+  (typeof clauseField(value, "equals") === "string" &&
+    (clauseField(value, "equals") as string).length > 0);
+
 /**
  * Whether a clause names specific rows by id — either one, or a list of them.
  *
@@ -301,8 +308,14 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it
     // names belongs to exactly one organization.
-    extraBound: ({ clause }) =>
-      typeof clauseField(clause, "inviteCode") === "string",
+    //
+    // One read is bounded by subject rather than by tenant: the sign-up
+    // policy asks whether ONE address holds a pending invitation anywhere,
+    // which spans organizations by definition. Admitted for `findFirst` only,
+    // so it answers yes or no and never lists invitations.
+    extraBound: ({ clause, action }) =>
+      typeof clauseField(clause, "inviteCode") === "string" ||
+      (action === "findFirst" && namesOneAddress(clauseField(clause, "email"))),
   },
   // Org-scoped RBAC + config models, audited to already carry a bounded
   // predicate (organizationId, a row id, a compound org key, a parent FK, or

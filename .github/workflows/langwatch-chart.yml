@@ -245,6 +245,12 @@ jobs:
         if: "!cancelled()"
         run: ./tests/connect-env.sh
 
+      # Same upgrade guarantee for self sign-up: a default render carries no
+      # SIGN_UP_ variable, and the values reach the app when set.
+      - name: "assert sign-up settings render only when set"
+        if: "!cancelled()"
+        run: ./tests/sign-up-env.sh
+
       # A default install calls LangWatch only for the license sync and the
       # usage report. The offline defaults that switch off library calls to
       # third parties (Prisma checkpoint, the voice quick tunnel, RAGAS
