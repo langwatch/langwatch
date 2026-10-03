@@ -30,6 +30,10 @@ describe("formatCost", () => {
       expect(formatCost(0.00001)).toBe("$0.00001");
     });
 
+    it("reads as a tenth of a cent when it rounds up to one", () => {
+      expect(formatCost(0.0009999)).toBe("$0.0010");
+    });
+
     it("stays above zero for a cost far below any real price", () => {
       expect(formatCost(1.5e-15)).toBe("$0.0000000000000015");
     });
