@@ -181,6 +181,89 @@ describe("otlp schemas", () => {
         }
       });
     });
+
+    // ─── span.kind defaulting (issue #5898) ───────────────────────────────
+    // OTLP semantics: an omitted `kind` field decodes to SPAN_KIND_UNSPECIFIED
+    // (0) on the wire — both protobuf (default for unset enum field) and JSON
+    // (default per the OTLP HTTP spec). Without this default, a structurally
+    // valid span that legitimately omits `kind` fails schema validation and
+    // is silently dropped, returning HTTP 200 with the span missing.
+    describe("when kind is omitted (OTLP semantics default to UNSPECIFIED)", () => {
+      it("accepts the span and defaults kind to SPAN_KIND_UNSPECIFIED (0)", () => {
+        const span = makeValidSpan();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (span as any).kind;
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.kind).toBe(0);
+        }
+      });
+
+      it("accepts a JSON OTLP span whose only field is traceId/spanId/name/timestamps", () => {
+        // Mirrors the wire shape a minimal OTLP JSON SDK produces — every
+        // optional field omitted. This is the "edge-omitted-kind" reproducer
+        // from issue #5898.
+        const minimalSpan = {
+          traceId: "aaaa0000000000000000000000000001",
+          spanId: "bbbb000000000001",
+          name: "minimal-span",
+          startTimeUnixNano: "1700000000000000000",
+          endTimeUnixNano: "1700000001000000000",
+          attributes: [],
+        };
+
+        const result = spanSchema.safeParse(minimalSpan);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.kind).toBe(0);
+          expect(result.data.events).toEqual([]);
+          expect(result.data.links).toEqual([]);
+        }
+      });
+    });
+
+    describe("when kind is an invalid value", () => {
+      it("rejects an unknown string kind", () => {
+        const span = makeValidSpan({ kind: "SPAN_KIND_FOO" });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(false);
+      });
+
+      it("rejects an out-of-range numeric kind", () => {
+        const span = makeValidSpan({ kind: 99 });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(false);
+      });
+
+      it("rejects a non-string non-number kind", () => {
+        const span = makeValidSpan({ kind: true });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(false);
+      });
+    });
+
+    describe("when kind is a valid string (OTLP JSON form)", () => {
+      it("accepts SPAN_KIND_SERVER and preserves it", () => {
+        const span = makeValidSpan({ kind: "SPAN_KIND_SERVER" });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.kind).toBe("SPAN_KIND_SERVER");
+        }
+      });
+    });
   });
 
   describe("anyValueSchema bytesValue", () => {
