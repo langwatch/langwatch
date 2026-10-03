@@ -1,5 +1,6 @@
 import { UiSlot } from "@langwatch/browser-host/slots";
 import { Box, Field, Input, VStack } from "@langwatch/design-system/primitives";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import type React from "react";
 import { useEffect } from "react";
@@ -12,7 +13,6 @@ import type {
 import { useRequiredCredentialKeys } from "../../behavior/use-required-credential-keys.ts";
 import { fieldMetadataFor } from "../../model/model-provider-field-metadata.ts";
 import { isSecretCredentialField } from "../../model/model-provider-helpers.ts";
-import { SmallLabel } from "../elements/small-label.tsx";
 
 /**
  * One credential input. Requiredness is derived from the provider's own schema

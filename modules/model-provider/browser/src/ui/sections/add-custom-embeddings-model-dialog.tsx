@@ -8,12 +8,12 @@ import {
   DialogTitle,
 } from "@langwatch/design-system/dialog";
 import { Button, HStack, Input, VStack } from "@langwatch/design-system/primitives";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import { customModelEntrySchema } from "@langwatch/model-provider-contract";
 import { useCallback, useRef, useState } from "react";
 
 import { fieldErrorsFromZodIssues } from "../../model/zod-field-errors.ts";
-import { SmallLabel } from "../elements/small-label.tsx";
 
 type AddCustomEmbeddingsModelDialogProps = {
   open: boolean;

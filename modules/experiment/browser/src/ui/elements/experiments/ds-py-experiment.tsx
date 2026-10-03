@@ -2,6 +2,7 @@ import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { formatMoney } from "@langwatch/design-system/format-money";
+import { FormatMoney } from "@langwatch/design-system/format-money-display";
 import {
   Alert,
   Box,
@@ -54,7 +55,6 @@ import type {
 } from "recharts/types/component/DefaultTooltipContent";
 
 import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
-import { FormatMoney } from "../workflow/format-money.tsx";
 
 /** The runs query, with the contract's row rather than the router's inference. */
 type DSPyRunsQuery = UseTRPCQueryResult<

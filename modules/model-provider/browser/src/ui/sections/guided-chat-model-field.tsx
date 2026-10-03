@@ -1,8 +1,8 @@
 import { chakra, Flex, Text, VStack } from "@langwatch/design-system/primitives";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Sparkles } from "lucide-react";
 import type { ComponentProps } from "react";
 
-import { SmallLabel } from "../elements/small-label.tsx";
 import { CustomModelInputSection } from "./model-provider-custom-model-input.tsx";
 
 type CustomModelProps = ComponentProps<typeof CustomModelInputSection>;

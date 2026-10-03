@@ -1,10 +1,9 @@
 import { Box, Field, Input, Text } from "@langwatch/design-system/primitives";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import {
   ROUTING_HANDLE_MAX_LENGTH,
   sanitizeRoutingHandleInput,
 } from "@langwatch/model-provider-contract";
-
-import { SmallLabel } from "../elements/small-label.tsx";
 
 /**
  * Two instances of the same provider type answer to the same family prefix, with the

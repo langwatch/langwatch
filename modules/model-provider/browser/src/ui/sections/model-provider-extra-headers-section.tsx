@@ -1,4 +1,5 @@
 import { Button, Grid, GridItem, HStack, Input, VStack } from "@langwatch/design-system/primitives";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import React from "react";
@@ -8,7 +9,6 @@ import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../behavior/use-model-provider-form.ts";
-import { SmallLabel } from "../elements/small-label.tsx";
 
 /**
  * Renders a section for adding custom HTTP headers to API requests.

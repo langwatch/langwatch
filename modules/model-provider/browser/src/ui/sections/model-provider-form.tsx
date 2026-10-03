@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Switch } from "@langwatch/design-system/switch";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
@@ -47,7 +48,6 @@ import {
   hasUserModifiedNonApiKeyFields,
 } from "../../model/model-provider-helpers.ts";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../model/zod-field-errors.ts";
-import { SmallLabel } from "../elements/small-label.tsx";
 import { CodexSignIn } from "./codex-sign-in.tsx";
 // DefaultProviderSection has been moved out of this drawer to a page-level
 // section on the model-providers settings page (DefaultModelsSection). See

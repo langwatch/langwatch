@@ -1,5 +1,6 @@
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
+import { FormatMoney } from "@langwatch/design-system/format-money-display";
 import {
   Box,
   Button,
@@ -17,7 +18,6 @@ import React, { useEffect, useMemo, useState } from "react";
 
 import { HoverableBigText } from "../../../../behavior/lent-hoverable-big-text.tsx";
 import { EvaluationProgressBar } from "../../BatchEvaluationV2/evaluation-progress-bar.tsx";
-import { FormatMoney } from "../../workflow/format-money.tsx";
 
 export function BatchEvaluationV2EvaluationSummary({
   run,

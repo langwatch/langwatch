@@ -1,7 +1,7 @@
 import { Badge, HStack, Text } from "@langwatch/design-system/primitives";
+import { getColorPaletteForString } from "@langwatch/design-system/rotating-colors";
 
 import { useFilterStore } from "../../../../../../../behavior/explorer.store.ts";
-import { getColorPaletteForString } from "../../../../../../../model/rotating-colors.ts";
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";
 import type { CellDef } from "../../types.ts";

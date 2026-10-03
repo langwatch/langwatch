@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import type {
   CustomModelEntry,
   ModelProviderEditorValue as MaybeStoredModelProvider,
@@ -19,7 +20,6 @@ import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../behavior/use-model-provider-form.ts";
-import { SmallLabel } from "../elements/small-label.tsx";
 import { AddCustomEmbeddingsModelDialog } from "./add-custom-embeddings-model-dialog.tsx";
 import { AddCustomModelDialog } from "./add-custom-model-dialog.tsx";
 import { RegistryModelsModal } from "./registry-models-modal.tsx";

@@ -7,11 +7,10 @@ import {
   DialogTitle,
 } from "@langwatch/design-system/dialog";
 import { Box, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import { getProviderModelOptions } from "@langwatch/model-provider-contract";
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
-
-import { SmallLabel } from "../elements/small-label.tsx";
 
 type RegistryModelsModalProps = {
   open: boolean;

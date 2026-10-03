@@ -1,6 +1,7 @@
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
+import { SmallLabel } from "@langwatch/design-system/small-label";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 
 import type {
@@ -9,7 +10,6 @@ import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../behavior/use-model-provider-form.ts";
-import { SmallLabel } from "../elements/small-label.tsx";
 
 const SCOPE_DESCRIPTION_SINGLE: Record<ModelProviderScopeType, string> = {
   PROJECT: "Only this project can use this provider.",
