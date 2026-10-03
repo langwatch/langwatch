@@ -7,6 +7,7 @@ import type { Evaluator, Prisma } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { EvaluatorNotFoundError } from "~/server/app-layer/evaluations/errors";
+import { isEvaluatorSettingsRecoveryDisabled } from "~/server/app-layer/evaluations/settings-recovery-flag";
 import {
   MonitorEvaluatorRequiredError,
   MonitorParametersUnusedError,
@@ -115,11 +116,10 @@ function toMonitorResponse(monitor: {
  * Refuses `parameters` the run would never read. The runner hands the judge the
  * evaluator's own settings whenever it has some, so parameters that disagree
  * with them would be stored and read back as the monitor's configuration while
- * never running. Resolved as the runner does by default: the operator rollback
- * flag only ever narrows when the evaluator wins, so anything the rollback
- * would ignore is ignored here too.
+ * never running. Resolved exactly as the runner resolves them, operator
+ * rollback flag included, so the API never refuses parameters that would run.
  */
-function assertParametersWillRun({
+async function assertParametersWillRun({
   evaluator,
   parameters,
 }: {
@@ -132,6 +132,11 @@ function assertParametersWillRun({
     config: evaluator.config as Record<string, unknown> | null,
     parameters,
     evaluatorRecordType: evaluator.type,
+    // Same fail-open default as the runner: an unreadable switch leaves
+    // recovery active.
+    recoveryDisabled: await isEvaluatorSettingsRecoveryDisabled().catch(
+      () => false,
+    ),
   });
   if (source === "monitor-parameters" || isEqual(settings, parameters)) return;
 
@@ -272,7 +277,7 @@ secured.access(requires("evaluations:create")).post(
     if (!evaluator) {
       throw new EvaluatorNotFoundError(body.evaluatorId);
     }
-    assertParametersWillRun({ evaluator, parameters: body.parameters });
+    await assertParametersWillRun({ evaluator, parameters: body.parameters });
 
     const slug = `${slugify(body.name)}-${nanoid(5)}`;
 
@@ -374,7 +379,7 @@ secured.access(requires("evaluations:update")).patch(
       });
     }
     if (evaluator) {
-      assertParametersWillRun({
+      await assertParametersWillRun({
         evaluator,
         parameters:
           body.parameters ??

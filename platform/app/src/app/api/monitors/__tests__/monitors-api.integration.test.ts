@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import type {
   Evaluator,
@@ -11,6 +11,11 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
+
+const recoveryFlag = vi.hoisted(() => ({ disabled: false }));
+vi.mock("~/server/app-layer/evaluations/settings-recovery-flag", () => ({
+  isEvaluatorSettingsRecoveryDisabled: async () => recoveryFlag.disabled,
+}));
 
 wireDefaultTestApp();
 
@@ -337,7 +342,7 @@ describe("Monitors API", () => {
       expect(persisted?.parameters).toEqual({});
     });
 
-    it("refuses parameters over a prompt recovered from the top of the config", async () => {
+    const createOverTopLevelPrompt = async () => {
       const topLevel = await prisma.evaluator.create({
         data: {
           id: `evaluator_${nanoid()}`,
@@ -351,17 +356,35 @@ describe("Monitors API", () => {
           },
         },
       });
-
-      const res = await post(
+      return post(
         "/api/monitors",
         createBody({
           evaluatorId: topLevel.id,
           parameters: { prompt: "Is the reply rude?" },
         }),
       );
+    };
+
+    it("refuses parameters over a prompt recovered from the top of the config", async () => {
+      const res = await createOverTopLevelPrompt();
 
       expect(res.status).toBe(422);
       expect((await res.json()).error).toBe("monitor_parameters_unused");
+    });
+
+    describe("when the operator has rolled the settings recovery back", () => {
+      beforeEach(() => {
+        recoveryFlag.disabled = true;
+      });
+      afterEach(() => {
+        recoveryFlag.disabled = false;
+      });
+
+      it("accepts the parameters, since the runner reads them", async () => {
+        const res = await createOverTopLevelPrompt();
+
+        expect(res.status).toBe(201);
+      });
     });
   });
 
