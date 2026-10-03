@@ -346,11 +346,13 @@ describe("evaluateGraphTrigger", () => {
     });
   });
 
-  describe("given a graph whose grouped result exceeds the row ceiling", () => {
-    // The failure this replaces was not an error at all: the result was
-    // materialised until the process died, so the job neither completed nor
-    // failed. Three of those in a row poison-parked the tenant's whole
-    // graph-trigger lane and silently stopped every alert in the project.
+  describe("given a timeseries read that exceeds the row ceiling", () => {
+    // The read no longer groups, so this is the backstop for any read that
+    // still fans out. The failure it replaced was not an error at all: a
+    // grouped result was materialised until the process died, so the job
+    // neither completed nor failed. Three of those in a row poison-parked the
+    // tenant's whole graph-trigger lane and silently stopped every alert in
+    // the project.
     function tooLarge() {
       const error = new Error(
         "Limit for result exceeded: TOO_MANY_ROWS_OR_BYTES",
