@@ -1,0 +1,104 @@
+---
+title: "LangWatchQL (LWQL)"
+description: "Query your LLM observability data directly with SQL — traces, spans, evaluations, costs, and more — through a safe, tenant-isolated analytics API"
+sidebarTitle: Introduction
+keywords: langwatchql, lwql, sql, analytics, clickhouse, query, api, observability
+---
+
+LangWatchQL (LWQL) is LangWatch's analytics SQL API. It lets you — or your agent — run real ClickHouse `SELECT` queries over your observability data: traces, spans, evaluations, simulations, costs, token usage, prompts, experiments, and annotations. You get typed columns, rows, execution statistics, and advisory diagnostics back as JSON.
+
+Instead of being limited to pre-built dashboards, you write the exact question you want answered:
+
+```sql
+SELECT toStartOfDay(OccurredAt) AS Day,
+       count() AS Traces,
+       sum(TotalCost) AS Cost
+FROM traces
+WHERE OccurredAt >= now() - INTERVAL 7 DAY
+GROUP BY Day
+ORDER BY Day
+```
+
+<Note>
+LWQL is currently in preview. If you'd like it enabled for your project, [reach out to us](/support).
+</Note>
+
+## The API
+
+LWQL is two endpoints:
+
+| Endpoint | What it does |
+|---|---|
+| `POST /api/v1/projects/{projectId}/analytics/query/clickhouse` | Runs one read-only SQL statement and returns columns, rows, statistics, and diagnostics |
+| `GET /api/v1/projects/{projectId}/analytics/schema` | Describes every dataset your key can query — columns, types, join keys, freshness, and a runnable example per dataset |
+
+Both authenticate with your project API key (`X-Auth-Token: sk-lw-...`) and require the `analytics:view` scope. The project in the URL is a cross-check, not a selector: the tenant always comes from the credential, so a key can only ever read its own project's data.
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/v1/projects/$PROJECT_ID/analytics/query/clickhouse" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sql": "SELECT count() AS Traces FROM traces WHERE OccurredAt >= now() - INTERVAL 1 DAY"}'
+```
+
+```json
+{
+  "columns": [{ "name": "Traces", "type": "UInt64" }],
+  "rows": [{ "Traces": "1842" }],
+  "statistics": { "elapsedMs": 12, "rowsRead": 1842, "bytesRead": 58944, "rowsReturned": 1 },
+  "truncated": false,
+  "followsTimeWindow": false,
+  "diagnostics": []
+}
+```
+
+## The datasets
+
+Your SQL runs against a curated catalog of views, not raw tables. Each view has a documented grain (what one row *is*), join keys, and a time column for efficient filtering. The schema endpoint is the authoritative, always-current list; today it includes:
+
+| Dataset | One row is |
+|---|---|
+| `traces` | One trace, with duration, cost, token counts, error status, and captured input/output |
+| `spans` | One span, with timing, status, attributes, and cost |
+| `evaluations` | One evaluation run, with its score, verdict, and evaluator |
+| `simulations` | One simulation (scenario) run, with its verdict and criteria |
+| `trace_metrics` | One trace's metrics row, with user, conversation, customer, labels, and per-token-kind counts |
+| `trace_metrics_by_minute` | One minute bucket of trace metrics — counts, costs, durations, tokens, pre-aggregated |
+| `model_usage_by_minute` | One (minute, model, span type) bucket — span counts, cost, and tokens per model |
+| `evaluation_metrics` | One evaluation, enriched with user/conversation/customer context |
+| `evaluation_metrics_by_minute` | One (minute, evaluator type, status) bucket — pass/fail/error counts and score sums |
+| `annotations` | One human annotation, with its thumbs up/down |
+| `projects` | Your project's display name and slug |
+| `prompts` | One managed prompt |
+| `prompt_versions` | One version of a managed prompt |
+| `experiments` | One experiment |
+
+Use the *by-minute* datasets for time-series charts — they're pre-aggregated and orders of magnitude cheaper to scan than the row-level ones.
+
+## How it stays safe
+
+LWQL is designed so that arbitrary customer SQL can run without ever becoming a security or stability problem:
+
+- **A restricted database identity.** Queries never run as the application. They run as a dedicated read-only ClickHouse user that can see only the catalog views — no system tables, no raw tables, no other databases.
+- **Tenant isolation in the database, not the gateway.** Row policies scope every view to your project, resolved from a capability derived from your project's key. Even a bug in the API layer cannot return another tenant's rows.
+- **A default-deny SQL validator.** Before anything reaches the database, the statement is parsed and walked against an allowlist: a single `SELECT` (with CTEs, subqueries, joins, unions, aggregates, and window functions), an allowlisted set of functions, and nothing else. Writes, DDL, `SETTINGS`, table functions, and introspection functions are refused with actionable error codes.
+- **Resource ceilings.** The database pins read-only mode, execution time, memory, and scan limits as constants that no query can change. On top of that, responses are capped (10,000 rows / ~8 MB) and always marked `truncated` when a ceiling cuts them short.
+
+Read more in [Privacy & RBAC](/observability/lwql/privacy-and-rbac).
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Writing queries" href="/observability/lwql/writing-queries" icon="code">
+    The dialect, schema discovery, parameters, limits, and error codes.
+  </Card>
+  <Card title="Handing the reins to your agent" href="/observability/lwql/querying-with-agents" icon="robot">
+    Teach Claude Code, Cursor, or your own agent to answer questions with LWQL.
+  </Card>
+  <Card title="Use cases" href="/observability/lwql/use-cases" icon="lightbulb">
+    Copy-paste queries for cost, latency, quality, and adoption questions.
+  </Card>
+  <Card title="Self-hosted setup" href="/observability/lwql/self-hosted" icon="server">
+    Provision LWQL on your own deployment.
+  </Card>
+</CardGroup>
