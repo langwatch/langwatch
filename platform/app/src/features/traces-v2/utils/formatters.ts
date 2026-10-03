@@ -142,9 +142,19 @@ export function formatAbsoluteTime(timestamp: number): string {
   )} UTC`;
 }
 
+/**
+ * Four decimals cover a tenth of a cent and up. A single call to a cheap model
+ * costs less than that, and four decimals would print it as "$0.0000", which
+ * reads as a model with no price. Below a tenth of a cent the cost keeps its
+ * two leading digits instead, however many decimals that takes.
+ */
 export function formatCost(cost: number, estimated?: boolean): string {
   if (cost === 0) return "—";
   const prefix = estimated ? "~" : "";
+  if (cost > 0 && cost < 0.001) {
+    const decimals = Math.min(1 - Math.floor(Math.log10(cost)), 12);
+    return `${prefix}$${cost.toFixed(decimals)}`;
+  }
   if (cost < 0.01) return `${prefix}$${cost.toFixed(4)}`;
   return `${prefix}$${cost.toFixed(2)}`;
 }
