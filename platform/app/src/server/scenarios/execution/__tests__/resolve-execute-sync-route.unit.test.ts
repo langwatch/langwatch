@@ -51,6 +51,19 @@ describe("the route a scenario run is prepared with", () => {
         relayBaseUrl: "https://app.langwatch.ai",
       });
     });
+
+    it("falls back to the public host when the endpoint is blank", () => {
+      mockEnv.LANGWATCH_NLP_LAMBDA_CONFIG = '{"AWS_REGION":"eu-central-1"}';
+      // Validation rejects a blank endpoint, but SKIP_ENV_VALIDATION hands this
+      // the raw environment, where the empty string would reach the child as
+      // the base URL it posts to.
+      mockEnv.LANGWATCH_ENDPOINT = "";
+
+      expect(resolveExecuteSyncRoute()).toEqual({
+        mode: "relay",
+        relayBaseUrl: "https://app.langwatch.ai",
+      });
+    });
   });
 
   describe("given the deployment has no per-project engines", () => {
