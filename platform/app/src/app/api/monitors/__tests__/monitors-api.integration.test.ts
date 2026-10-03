@@ -304,6 +304,9 @@ describe("Monitors API", () => {
       });
 
       expect(res.status).toBe(422);
+      const body = await res.json();
+      expect(body.error).toBe("monitor_parameters_unused");
+      expect(body.evaluatorId).toBe(other.id);
       const persisted = await prisma.monitor.findFirst({
         where: { id: monitor.id, projectId: testProjectId },
       });
@@ -325,7 +328,13 @@ describe("Monitors API", () => {
       });
 
       expect(res.status).toBe(200);
-      expect((await res.json()).evaluatorId).toBe(other.id);
+      const body = await res.json();
+      expect(body.evaluatorId).toBe(other.id);
+      expect(body.parameters).toEqual({});
+      const persisted = await prisma.monitor.findFirst({
+        where: { id: monitor.id, projectId: testProjectId },
+      });
+      expect(persisted?.parameters).toEqual({});
     });
 
     it("refuses parameters over a prompt recovered from the top of the config", async () => {
