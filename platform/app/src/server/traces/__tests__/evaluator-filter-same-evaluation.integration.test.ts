@@ -237,6 +237,14 @@ describe("a trace filter pairing an evaluator with its result", () => {
       );
     });
 
+    it("leaves it out when two verdicts are picked and only one is X's", async () => {
+      expect(
+        await matching(
+          "(evaluator:X AND evaluatorVerdict:pass AND evaluatorVerdict:fail)",
+        ),
+      ).toEqual([]);
+    });
+
     it("leaves it out for a label only the other evaluator emitted", async () => {
       expect(await matching("evaluator:X AND evaluatorLabel:toxic")).toEqual(
         [],
@@ -274,6 +282,15 @@ describe("a trace filter pairing an evaluator with its result", () => {
       expect(
         await matching(
           "evaluator:X AND evaluatorVerdict:pass",
+          versionsTenantId,
+        ),
+      ).toEqual([X_RAN_TWICE]);
+    });
+
+    it("matches two picked verdicts held by different runs", async () => {
+      expect(
+        await matching(
+          "(evaluator:X AND evaluatorVerdict:pass AND evaluatorVerdict:fail)",
           versionsTenantId,
         ),
       ).toEqual([X_RAN_TWICE]);

@@ -111,6 +111,17 @@ describe("an evaluator paired with its own result", () => {
     });
   });
 
+  describe("when two verdicts are picked and only another evaluator holds one", () => {
+    it("does not match", () => {
+      expect(
+        evaluateQueryInMemory(
+          "(evaluator:X AND evaluatorVerdict:pass AND evaluatorVerdict:fail)",
+          xPassedYFailed,
+        ),
+      ).toBe(false);
+    });
+  });
+
   describe("when the pairing sits next to other conditions", () => {
     it("keeps the pairing and still applies the rest", () => {
       expect(
@@ -157,6 +168,15 @@ describe("an evaluator paired with its own result", () => {
       expect(
         evaluateQueryInMemory(
           "evaluator:X AND evaluatorVerdict:pass",
+          xPassedThenFailed,
+        ),
+      ).toBe(true);
+    });
+
+    it("matches two picked verdicts when its runs hold both", () => {
+      expect(
+        evaluateQueryInMemory(
+          "(evaluator:X AND evaluatorVerdict:pass AND evaluatorVerdict:fail)",
           xPassedThenFailed,
         ),
       ).toBe(true);

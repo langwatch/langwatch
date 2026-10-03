@@ -5,13 +5,14 @@ import type {
   UnaryOperatorToken,
 } from "liqe";
 import type { EvaluationRunData } from "../../evaluations/types";
+import { TABLE_TIME_COLUMNS } from "../facet-registry";
 import {
-  type ExpressionCategoricalDef,
-  FACET_REGISTRY,
-  type RangeFacetDef,
-  TABLE_TIME_COLUMNS,
-} from "../facet-registry";
-import { FIELD_DEF_BY_NAME } from "./build-handlers";
+  EVALUATOR_FIELD,
+  EVALUATOR_LABEL_FIELD,
+  EVALUATOR_SCORE_FIELD,
+  EVALUATOR_VERDICT_FIELD,
+} from "../query-language/evaluatorGroup";
+import { expressionFacet, FIELD_DEF_BY_NAME } from "./build-handlers";
 import { type InMemoryTrace, UNSUPPORTED, type Unsupported } from "./field-def";
 import {
   translateNumericField,
@@ -34,11 +35,16 @@ import {
  * subquery and the pair means "X ran, and some evaluation failed" — a trace
  * where X passed and Y failed matches. So within one AND chain that names
  * exactly one evaluator, the result conditions next to it are judged against
- * X's own evaluations:
+ * X's own evaluations only:
  *
- * - the conditions kept must all hold on one evaluation of X;
- * - a condition excluded with NOT must hold on no evaluation of X, so
+ * - each condition kept must hold on some evaluation of X;
+ * - each condition excluded with NOT must hold on no evaluation of X, so
  *   excluding `fail` hides a trace where any run of X failed.
+ *
+ * Conditions are judged one by one rather than all on one evaluation row,
+ * because the drilldown puts two picked values of one field in the same group
+ * (`evaluator:X AND evaluatorVerdict:pass AND evaluatorVerdict:fail`), which no
+ * single row can satisfy.
  *
  * The chain is read once, from its top, so word order never changes the
  * result. It stops at parentheses: `(evaluator:X AND …) AND (evaluator:Y AND …)`
@@ -49,19 +55,17 @@ import {
  * @see https://github.com/langwatch/tasks/issues/918
  */
 
-/** The evaluator anchor field. */
-const EVALUATOR_FIELD = "evaluator";
-
 /**
  * The result fields a named evaluator binds, keyed by field name, each with
- * the facet its SQL expression comes from (`evaluatorPassed` is the old name
- * of `evaluatorVerdict`).
+ * the facet its SQL expression comes from. The drilldown emits the verdict,
+ * score and label fields; `evaluatorStatus` is typed by hand, and
+ * `evaluatorPassed` is the old name of `evaluatorVerdict`.
  */
 const SCOPED_FACET_KEY_BY_FIELD: ReadonlyMap<string, string> = new Map([
+  [EVALUATOR_VERDICT_FIELD, "evaluatorVerdict"],
+  [EVALUATOR_SCORE_FIELD, "evaluatorScore"],
+  [EVALUATOR_LABEL_FIELD, "evaluatorLabel"],
   ["evaluatorStatus", "evaluatorStatus"],
-  ["evaluatorVerdict", "evaluatorVerdict"],
-  ["evaluatorScore", "evaluatorScore"],
-  ["evaluatorLabel", "evaluatorLabel"],
   ["evaluatorPassed", "evaluatorVerdict"],
 ]);
 
@@ -138,7 +142,9 @@ export function translateEvaluationScope(
   const kept = scope.conditions.filter((c) => !c.negated);
   const excluded = scope.conditions.filter((c) => c.negated);
   return [
-    runsOfX(kept.map((c) => conditionSql(c, ctx))),
+    ...(kept.length > 0
+      ? kept.map((c) => runsOfX([conditionSql(c, ctx)]))
+      : [runsOfX([])]),
     ...excluded.map((c) => `NOT ${runsOfX([conditionSql(c, ctx)])}`),
   ].join(" AND ");
 }
@@ -165,10 +171,9 @@ export function evaluateEvaluationScope(
 
   const kept = scope.conditions.filter((c) => !c.negated);
   const excluded = scope.conditions.filter((c) => c.negated);
-  return (
-    runsOfX.some((evaluation) => kept.every((c) => holds(evaluation, c))) &&
-    excluded.every((c) => !runsOfX.some((evaluation) => holds(evaluation, c)))
-  );
+  const heldByX = (c: ScopedCondition) =>
+    runsOfX.some((evaluation) => holds(evaluation, c));
+  return runsOfX.length > 0 && kept.every(heldByX) && !excluded.some(heldByX);
 }
 
 /**
@@ -186,13 +191,8 @@ function conditionSql(
     : translateStringField(facet.expression, tag, false, ctx, facet.key);
 }
 
-function scopedFacet(field: string): ExpressionCategoricalDef | RangeFacetDef {
-  const key = SCOPED_FACET_KEY_BY_FIELD.get(field);
-  const facet = FACET_REGISTRY.find((def) => def.key === key);
-  if (!facet || !("expression" in facet)) {
-    throw new Error(`facet for '${field}' has no expression to bind`);
-  }
-  return facet;
+function scopedFacet(field: string) {
+  return expressionFacet(SCOPED_FACET_KEY_BY_FIELD.get(field) ?? field);
 }
 
 /** The operands of an AND chain, without looking inside parentheses. */
