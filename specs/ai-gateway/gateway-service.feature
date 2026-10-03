@@ -633,3 +633,26 @@ Feature: Gateway service — public HTTP surface and operational basics
       When the Helm chart's rendered value and the self-hosting docs are read
       Then all three state the same number of bytes
       And changing any one of them alone fails the build
+
+  Rule: No client credential header reaches the provider
+
+    # The passthrough lane forwards the client's own headers upstream, so
+    # every header the gateway accepts a virtual key on has to be removed
+    # first. The gateway has already resolved the key and Bifrost injects the
+    # real provider credential, so a surviving carrier header hands the
+    # customer's virtual key to a vendor that has no use for it. The leak is
+    # silent: the call still succeeds on the injected credential.
+
+    @unit
+    Scenario Outline: the passthrough lane drops every virtual-key carrier header
+      Given a valid virtual key sent on the "<carrier>" header
+      When I POST /v1beta/models/gemini-2.5-flash:generateContent
+      Then the forwarded upstream headers carry no "<carrier>"
+      And unrelated client headers are still forwarded
+
+      Examples:
+        | carrier        |
+        | Authorization  |
+        | X-Api-Key      |
+        | X-Goog-Api-Key |
+        | Xi-Api-Key     |
