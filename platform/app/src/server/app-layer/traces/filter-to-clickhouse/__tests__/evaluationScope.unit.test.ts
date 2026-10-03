@@ -196,17 +196,21 @@ describe("an evaluator paired with its own result", () => {
       ).toBe(false);
     });
 
-    it("keeps two score bounds joined on one run", () => {
+    it("needs one run to sit inside both score bounds", () => {
+      const scoredLowThenHigh = traceWith([
+        makeEval({ evaluationId: "e-x1", evaluatorId: "X", score: 0.1 }),
+        makeEval({ evaluationId: "e-x2", evaluatorId: "X", score: 0.9 }),
+      ]);
       expect(
         evaluateQueryInMemory(
-          "evaluator:Y AND evaluatorScore:>0.05 AND evaluatorScore:<0.2",
-          xPassedYFailed,
+          "evaluator:X AND evaluatorScore:>0.05 AND evaluatorScore:<0.2",
+          scoredLowThenHigh,
         ),
       ).toBe(true);
       expect(
         evaluateQueryInMemory(
-          "evaluator:Y AND evaluatorScore:>0.05 AND evaluatorScore:<0.08",
-          xPassedYFailed,
+          "evaluator:X AND evaluatorScore:>0.5 AND evaluatorScore:<0.2",
+          scoredLowThenHigh,
         ),
       ).toBe(false);
     });
