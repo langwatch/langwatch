@@ -25,6 +25,8 @@ import { getApp, tryGetApp } from "~/server/app-layer/app";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
 import { prisma } from "~/server/db";
+import { isComponentDisabled } from "~/server/event-sourcing/utils/killSwitch";
+import { featureFlagService } from "~/server/featureFlag";
 import { instantEvalsEnabled } from "../access";
 import { getInstantEvalClassifier } from "../classifier";
 import type { InstantEvalSpendRecorder } from "../instant-eval-spend.recorder";
@@ -134,6 +136,15 @@ let cached: InstantEvalRunService | null = null;
 export function getInstantEvalRunService(): InstantEvalRunService {
   cached ??= new InstantEvalRunService({
     runs: getApp().instantEvals.runs,
+    interruptions: getApp().instantEvals.interruptions,
+    isRequestRunDisabled: ({ projectId }) =>
+      isComponentDisabled({
+        featureFlagService,
+        aggregateType: "instant_eval_run",
+        componentType: "command",
+        componentName: "requestRun",
+        tenantId: projectId,
+      }),
     judgments: getApp().instantEvals.judgments,
     rowSource: createInstantEvalRowSource(),
     query: getLangWatchQLService(),

@@ -20,6 +20,7 @@ import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
+  type InstantEvalExplorerRun,
   type InstantEvalExplorerStatus,
   isInstantEvalRunActive,
 } from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
@@ -364,14 +365,16 @@ export const SearchBar: React.FC = () => {
   const { chips: evalChips } = useInstantEvalRuns();
   const evalRuns = useInstantEvalRunStore((s) => s.runs);
   const settledEvalRuns = useInstantEvalRunStore((s) => s.settled);
+  const unavailableEvalRuns = useInstantEvalRunStore((s) => s.readUnavailable);
   const evalChipMarks = useMemo(
     () =>
       instantEvalChipMarks({
         chips: evalChips,
         runs: evalRuns,
         settled: settledEvalRuns,
+        readUnavailable: unavailableEvalRuns,
       }),
-    [evalChips, evalRuns, settledEvalRuns],
+    [evalChips, evalRuns, settledEvalRuns, unavailableEvalRuns],
   );
 
   // Spec: specs/traces-v2/instant-eval-search.feature ("An eval chip sweeps
@@ -381,6 +384,7 @@ export const SearchBar: React.FC = () => {
     isStarting: instantEval.isStarting,
     chips: evalChips,
     runs: evalRuns,
+    readUnavailable: unavailableEvalRuns,
   });
 
   // Publish the (field → value → label) lookup the chip overlay reads
@@ -613,16 +617,39 @@ export function isInstantEvalBusy({
   isStarting,
   chips,
   runs,
+  readUnavailable = {},
 }: {
   isEstimating: boolean;
   isStarting: boolean;
   chips: readonly { runId: string | null }[];
-  runs: Readonly<Record<string, { status: InstantEvalExplorerStatus }>>;
+  runs: Readonly<
+    Record<
+      string,
+      {
+        status: InstantEvalExplorerStatus;
+        processingBlock?: InstantEvalExplorerRun["processingBlock"];
+      }
+    >
+  >;
+  readUnavailable?: Readonly<Record<string, true>>;
 }): boolean {
+  if (
+    chips.some(
+      ({ runId }) =>
+        runId !== null &&
+        (runs[runId]?.processingBlock || readUnavailable[runId]),
+    )
+  )
+    return false;
   if (isEstimating || isStarting) return true;
   return chips.some((chip) => {
     const run = chip.runId === null ? undefined : runs[chip.runId];
-    return run !== undefined && isInstantEvalRunActive(run.status);
+    return (
+      run !== undefined &&
+      !run.processingBlock &&
+      !readUnavailable[chip.runId ?? ""] &&
+      isInstantEvalRunActive(run.status)
+    );
   });
 }
 
@@ -631,6 +658,7 @@ export function instantEvalChipMarks({
   chips,
   runs,
   settled,
+  readUnavailable = {},
 }: {
   chips: readonly { field: string; question: string; runId: string | null }[];
   runs: Readonly<
@@ -640,10 +668,12 @@ export function instantEvalChipMarks({
         status: InstantEvalExplorerStatus;
         progress: number;
         total: number | null;
+        processingBlock?: InstantEvalExplorerRun["processingBlock"];
       }
     >
   >;
   settled: Readonly<Record<string, true>>;
+  readUnavailable?: Readonly<Record<string, true>>;
 }): Record<string, Record<string, string>> {
   const marks: Record<string, Record<string, string>> = {};
   for (const chip of chips) {
@@ -651,6 +681,8 @@ export function instantEvalChipMarks({
       run: chip.runId === null ? undefined : runs[chip.runId],
       hasRun: chip.runId !== null,
       isSettled: chip.runId !== null && settled[chip.runId] === true,
+      isReadUnavailable:
+        chip.runId !== null && readUnavailable[chip.runId] === true,
     });
     if (!mark) continue;
     const label = instantEvalChipLabel({ question: chip.question, mark });
@@ -679,19 +711,24 @@ export function instantEvalChipMark({
   run,
   hasRun,
   isSettled = true,
+  isReadUnavailable = false,
 }: {
   run:
     | {
         status: InstantEvalExplorerStatus;
         progress: number;
         total: number | null;
+        processingBlock?: InstantEvalExplorerRun["processingBlock"];
       }
     | undefined;
   hasRun: boolean;
   /** False while an ended run's counters may still move. */
   isSettled?: boolean;
+  isReadUnavailable?: boolean;
 }): string | null {
   if (!hasRun) return "(pending)";
+  if (run?.processingBlock) return "(reporting interrupted)";
+  if (isReadUnavailable) return "(status unavailable)";
   if (!run) return null;
   if (isInstantEvalRunActive(run.status) || !isSettled) return null;
   const ended = run.status === "cancelled" || run.status === "failed";

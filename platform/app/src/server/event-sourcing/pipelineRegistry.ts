@@ -62,6 +62,7 @@ import { reapExpiredAgentSandboxApiKeys } from "~/server/api-key/agent-sandbox-k
 import { reapExpiredCliLoginKeys } from "~/server/api-key/cli-login-key-reaper";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { reapFinishedSignInLocks } from "~/server/app-layer/identity/sign-in-security-adapters";
+import type { InstantEvalRunInterruptionsRepository } from "~/server/app-layer/instant-evals/run/instant-eval-run-interruptions.repository";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
@@ -511,6 +512,7 @@ export interface PipelineRegistryDeps {
   instantEvals: {
     /** Plans a run, judges one page, finishes it (ADR-137). */
     runPort: InstantEvalRunPort;
+    interruptions: InstantEvalRunInterruptionsRepository;
   };
   enterprisePipelines: EnterprisePipelineSetConfig;
   projects: ProjectService;
@@ -996,6 +998,7 @@ export class PipelineRegistry {
     const pipeline = this.deps.eventSourcing.register(
       createInstantEvalProcessingPipeline({
         instantEvalRunStore: this.deps.repositories.instantEvalRun,
+        interruptions: this.deps.instantEvals.interruptions,
         dispatch: {
           runPort: this.deps.instantEvals.runPort,
           commands: () => {
