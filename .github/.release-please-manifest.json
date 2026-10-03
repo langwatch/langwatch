@@ -4,7 +4,7 @@
   "sdks/go": "1.0.0",
   "sdks/typescript": "1.19.0",
   "sdks/python": "1.4.0",
-  "mcp/typescript": "2.1.0",
+  "mcp/typescript": "2.2.0",
   "services/langevals": "3.1.0",
   ".": "3.20.1",
   "skills": "1.5.0",
