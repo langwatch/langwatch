@@ -3599,6 +3599,13 @@ const presentations = {
     },
   },
 
+  trigger_graph_immutable: {
+    title: "This alert stays on its graph",
+    describe: () =>
+      "An alert keeps the graph it was created on. Create an alert on the " +
+      "graph you want and delete this one.",
+  },
+
   trigger_kind_immutable: {
     title: "This cannot become a different kind of automation",
     describe: () =>

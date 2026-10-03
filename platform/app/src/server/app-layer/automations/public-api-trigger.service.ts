@@ -28,6 +28,7 @@ import {
   TriggerFilterQueryInvalidError,
   TriggerFiltersRequiredError,
   TriggerFiltersUnsupportedError,
+  TriggerGraphImmutableError,
   TriggerKindImmutableError,
   TriggerNotFoundError,
   TriggerRuleFieldsMisplacedError,
@@ -456,9 +457,9 @@ export class PublicApiTriggerService {
     return updated;
   }
 
-  /** The channel an automation delivers on and the kind of automation it is
-   *  are both fixed once it exists. A save that states a different one is
-   *  refused rather than having the field ignored. */
+  /** The channel an automation delivers on, the kind of automation it is and
+   *  the graph an alert watches are all fixed once it exists. A save that
+   *  states a different one is refused rather than having the field ignored. */
   private assertWhatIsFixedIsUnchanged({
     stored,
     input,
@@ -470,6 +471,7 @@ export class PublicApiTriggerService {
       throw new TriggerActionImmutableError(stored.action);
     }
     const kind = stored.triggerKind.toLowerCase();
+    this.assertGraphIsUnchanged({ stored, stated: input.customGraphId, kind });
     if (input.graphAlert !== undefined && stored.customGraphId === null) {
       throw new TriggerKindImmutableError(kind);
     }
@@ -479,6 +481,25 @@ export class PublicApiTriggerService {
     ) {
       throw new TriggerKindImmutableError(kind);
     }
+  }
+
+  /** A stated graph must be the one stored. Adding or removing a graph would
+   *  turn the automation into a different kind; naming another graph would
+   *  move an alert out of the graph slot it owns. */
+  private assertGraphIsUnchanged({
+    stored,
+    stated,
+    kind,
+  }: {
+    stored: Trigger;
+    stated: string | null | undefined;
+    kind: string;
+  }): void {
+    if (stated === undefined || stated === stored.customGraphId) return;
+    if (stored.customGraphId === null || stated === null) {
+      throw new TriggerKindImmutableError(kind);
+    }
+    throw new TriggerGraphImmutableError(stored.customGraphId);
   }
 
   /**
@@ -1245,6 +1266,8 @@ export interface PublicApiUpdateInput {
   /** Accepted so a caller that writes the whole read response back is told
    *  what happened, rather than having the field silently ignored. */
   action?: TriggerAction;
+  /** Accepted for the same reason as `action`: a different graph is refused. */
+  customGraphId?: string | null;
   name?: string;
   active?: boolean;
   message?: string | null;
