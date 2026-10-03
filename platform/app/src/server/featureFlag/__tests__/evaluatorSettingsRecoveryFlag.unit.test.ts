@@ -54,13 +54,27 @@ describe("the evaluator settings-recovery rollback flag", () => {
       resolve(__dirname, "../../event-sourcing/pipelineRegistry.ts"),
       "utf-8",
     );
+    // The flag is read through one shared reader, which the monitors API uses
+    // too, so the wire runs registry -> reader -> key.
+    const reader = readFileSync(
+      resolve(
+        __dirname,
+        "../../app-layer/evaluations/settings-recovery-flag.ts",
+      ),
+      "utf-8",
+    );
 
     it("passes the flag resolver into the evaluation command", () => {
       const construction = registry.slice(
         registry.indexOf("new ExecuteEvaluationCommand({"),
       );
-      expect(construction).toContain("isSettingsRecoveryDisabled:");
-      expect(construction.slice(0, construction.indexOf("});"))).toContain(KEY);
+      expect(construction.slice(0, construction.indexOf("});"))).toContain(
+        "isSettingsRecoveryDisabled: isEvaluatorSettingsRecoveryDisabled",
+      );
+    });
+
+    it("has the shared reader read this flag", () => {
+      expect(reader).toContain(KEY);
     });
   });
 });
