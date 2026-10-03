@@ -380,10 +380,15 @@ describe("Monitors API", () => {
         recoveryFlag.disabled = false;
       });
 
-      it("accepts the parameters, since the runner reads them", async () => {
+      it("accepts and stores the parameters, since the runner reads them", async () => {
         const res = await createOverTopLevelPrompt();
 
         expect(res.status).toBe(201);
+        const { id } = await res.json();
+        const persisted = await prisma.monitor.findFirst({
+          where: { id, projectId: testProjectId },
+        });
+        expect(persisted?.parameters).toEqual({ prompt: "Is the reply rude?" });
       });
     });
   });

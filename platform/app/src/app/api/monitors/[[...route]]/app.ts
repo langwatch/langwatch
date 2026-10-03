@@ -117,7 +117,8 @@ function toMonitorResponse(monitor: {
  * evaluator's own settings whenever it has some, so parameters that disagree
  * with them would be stored and read back as the monitor's configuration while
  * never running. Resolved exactly as the runner resolves them, operator
- * rollback flag included, so the API never refuses parameters that would run.
+ * rollback flag included (an unreadable flag counts as not disabled, as in the
+ * runner), so the API refuses only parameters the runner would set aside.
  */
 async function assertParametersWillRun({
   evaluator,
@@ -135,7 +136,15 @@ async function assertParametersWillRun({
     // Same fail-open default as the runner: an unreadable switch leaves
     // recovery active.
     recoveryDisabled: await isEvaluatorSettingsRecoveryDisabled().catch(
-      () => false,
+      (error: unknown) => {
+        // Message only, as in the runner: a client error can carry connection
+        // detail on its other properties.
+        logger.warn(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Settings-recovery rollback flag could not be read — leaving recovery active",
+        );
+        return false;
+      },
     ),
   });
   if (source === "monitor-parameters" || isEqual(settings, parameters)) return;
