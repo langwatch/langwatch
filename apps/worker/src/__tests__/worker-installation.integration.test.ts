@@ -124,6 +124,7 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
+        nlpInternalSecret: void 0,
         outboundProxy: config.process.outboundProxy,
         processName: "langwatch-worker",
         storageResolver: void 0,
@@ -313,9 +314,7 @@ describe("the worker process installation", () => {
     const { runtime, eventing } = await bootWorker({ saas: true });
 
     try {
-      const usage = eventing.definitions.find(
-        (definition) => definition.metadata.name === "usage",
-      );
+      const usage = eventing.definitions.find((definition) => definition.metadata.name === "usage");
       expect(
         usage?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
       ).toEqual(["orgBillableEventsMeter"]);

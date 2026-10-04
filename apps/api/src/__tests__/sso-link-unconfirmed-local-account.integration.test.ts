@@ -11,7 +11,6 @@ import { RestHost } from "@langwatch/api/rest";
 import { AuthApi, normalizeSignInErrorCode } from "@langwatch/auth-contract";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing } from "@langwatch/eventing";
-import { processModules } from "@langwatch/installed-server-modules";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -39,6 +38,8 @@ import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis"
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
+
+import { processModules } from "../process-modules.generated.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
@@ -130,6 +131,7 @@ async function bootInstallation({ cloud }: { cloud: boolean }) {
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
+        nlpInternalSecret: void 0,
         outboundProxy: config.process.outboundProxy,
         processName: "langwatch-api",
         storageResolver: void 0,

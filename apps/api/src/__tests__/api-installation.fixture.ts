@@ -102,6 +102,7 @@ export async function bootApi({
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
+        nlpInternalSecret: void 0,
         outboundProxy: config.process.outboundProxy,
         processName: "langwatch-api",
         storageResolver: void 0,

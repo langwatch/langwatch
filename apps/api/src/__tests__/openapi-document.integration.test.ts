@@ -9,7 +9,6 @@ import { join } from "node:path";
 
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { RestHost } from "@langwatch/api/rest";
-import { processModules } from "@langwatch/installed-server-modules";
 import { composeApiApplication } from "@langwatch/process";
 import type { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -19,6 +18,7 @@ import {
   generateOpenApiDocument,
   writeOpenApiDocument,
 } from "../openapi-document.ts";
+import { processModules } from "../process-modules.generated.ts";
 import { bootApi } from "./api-installation.fixture.ts";
 
 const METHODS = ["get", "head", "post", "put", "patch", "delete"] as const;

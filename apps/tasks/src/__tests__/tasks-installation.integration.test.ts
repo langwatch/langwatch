@@ -115,6 +115,7 @@ async function bootTasks() {
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
+        nlpInternalSecret: void 0,
         outboundProxy: config.process.outboundProxy,
         processName: "langwatch-tasks",
         storageResolver: void 0,
