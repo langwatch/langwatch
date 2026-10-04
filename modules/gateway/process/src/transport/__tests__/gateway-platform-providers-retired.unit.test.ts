@@ -119,7 +119,7 @@ describe("given the published gateway management surface", () => {
       const response = await mountedPlatform().request("/api/gateway/v1/providers");
       const body = (await response.json()) as { error: { message: string } };
 
-      expect(body.error.message).toContain("/api/gateway/v1/model-providers");
+      expect(body.error.message).toContain("/api/model-providers");
     });
   });
 

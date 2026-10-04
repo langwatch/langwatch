@@ -300,7 +300,7 @@ describe("the gateway platform family's public wire", () => {
 
       expect(answer.status).toBe(410);
       expect(answer.body).toMatchObject({ type: "gone", code: "gateway_provider_bindings_gone" });
-      expect(answer.body.message).toContain("/api/gateway/v1/model-providers");
+      expect(answer.body.message).toContain("/api/model-providers");
     });
   });
 

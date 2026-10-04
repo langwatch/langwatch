@@ -2071,7 +2071,7 @@ export interface paths {
         };
         /**
          * List provider bindings
-         * @description Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/gateway/v1/model-providers.
+         * @description Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/model-providers.
          */
         get: operations["getApiGatewayV1Providers"];
         put?: never;

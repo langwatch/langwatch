@@ -945,12 +945,12 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withDocs({
     summary: "List provider bindings",
     description:
-      "Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/gateway/v1/model-providers.",
+      "Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/model-providers.",
     responses: { ...canonicalBaseResponses, ...canonicalGoneResponses },
   })
   .handle(() => {
     throw new GatewayProviderBindingsGoneError(
-      "Use GET /api/gateway/v1/model-providers, or the Advanced (Gateway) tab in the dashboard.",
+      "Use GET /api/model-providers, or the Advanced (Gateway) tab in the dashboard.",
     );
   })
 
@@ -966,7 +966,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .handle(() => {
     throw new GatewayProviderBindingsGoneError(
-      "Configure rate limits, provider configuration and fallback priority via the Advanced (Gateway) tab on /api/gateway/v1/model-providers.",
+      "Configure rate limits, provider configuration and fallback priority on the model provider: PUT /api/model-providers/:provider, or its Advanced (Gateway) tab in the dashboard.",
     );
   })
 
@@ -982,7 +982,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .handle(() => {
     throw new GatewayProviderBindingsGoneError(
-      "Patch the advanced fields via PATCH /api/gateway/v1/model-providers/:id.",
+      "Update the advanced fields via PUT /api/model-providers/:provider.",
     );
   })
 
@@ -997,7 +997,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .handle(() => {
     throw new GatewayProviderBindingsGoneError(
-      "Disable the underlying model provider via DELETE /api/gateway/v1/model-providers/:id.",
+      "Disable the underlying model provider via PUT /api/model-providers/:provider with enabled false.",
     );
   })
 

@@ -54687,7 +54687,7 @@
             }
           }
         },
-        "description": "Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/gateway/v1/model-providers.",
+        "description": "Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/model-providers.",
         "summary": "List provider bindings",
         "security": [
           {
