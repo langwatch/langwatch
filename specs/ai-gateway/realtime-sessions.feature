@@ -215,6 +215,16 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       And the budget check for the key's next request is a hard block
 
     @integration
+    Scenario: A report debits the bucket of the end user the mint named
+      Given the key has a per-end-user budget of 2 USD
+      And an open realtime session whose mint named an end user
+      When a report takes that end user's bucket to its limit
+      Then the debit lands in that end user's bucket of the per-end-user budget
+      And the usage response says a budget is exceeded with scope attributed_user
+      And the budget check for that end user's next request is a hard block
+      And the budget check for another end user on the key is not blocked by it
+
+    @integration
     Scenario: A session whose reports stopped is closed at what was recorded
       Given a client-metered session recorded reports and then went quiet past the open window
       When the reconciler runs
@@ -516,6 +526,13 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       And the credential expiry the vendor answered is recorded after the mint
       # The expiry only sizes the estimate for a session that never reports,
       # so a failure to record it does not refuse the mint.
+
+    @unit
+    Scenario: A mint books the end user its request named
+      Given a mint request carrying an end user id
+      When the session is booked
+      Then the booking carries that end user id
+      And a mint that names no end user books none
 
     @unit
     Scenario: A response.done event is recorded under its response id
@@ -829,6 +846,140 @@ Feature: Brokered realtime voice sessions on the AI Gateway
     Scenario: Draining ends the remaining calls and sends their final reports
       Given calls are still running when the drain budget ends
       Then each is ended with reason drain and its final report is sent before the process exits
+
+  # ============================================================
+  Rule: A WebSocket-transport client is relayed, frame by frame
+
+    # The vendor's WebSocket needs the real API key, so a client on that
+    # transport cannot dial the vendor itself. It upgrades on the gateway with
+    # its virtual key; the gateway dials the vendor with the provider key and
+    # carries frames both ways. A relayed socket is a supervised session like
+    # a brokered call: booked before the vendor is dialed, metered by the
+    # gateway, ended on budget or revoke, drained on shutdown.
+
+    @unit
+    Scenario: A WebSocket upgrade passes through every layer of the gateway
+      Given the router with its metrics, tracing and access-log layers
+      When a client upgrades on GET /v1/realtime
+      Then the upgrade answers 101 and frames flow both ways
+      And the session is booked with metering gateway
+
+    @unit
+    Scenario: The relay swaps the virtual key for the provider key
+      Given a browser presents its virtual key as the subprotocol openai-insecure-api-key.<key>
+      When it upgrades on GET /v1/realtime?model=<alias>
+      Then the vendor handshake carries the provider key and the resolved model
+      And the virtual key is in no header, query parameter or subprotocol of it
+      And the client is answered the realtime subprotocol, never the key one
+
+    @unit
+    Scenario: The vendor socket of a relay carries the provider key
+      When the relay dials the vendor
+      Then the handshake carries the provider key on the credential's own host
+
+    @unit
+    Scenario: The relay carries every frame unchanged in both directions
+      When text and binary frames are sent each way, one of them larger than a megabyte
+      Then each arrives with the same type and the same bytes
+
+    @unit
+    Scenario: A Live socket's first frame decides the model
+      When the client upgrades on GET /v1/live/sessions and sends session.start
+      Then session.model is resolved and written back into that one frame
+      And the vendor socket is opened with no query string
+      And every later frame is relayed untouched
+
+    @unit
+    Scenario: A Live socket cannot delegate to a model the key does not allow
+      When session.start names a session or delegated model outside the allowlist
+      Then the client gets an error frame and close 1008
+      And nothing is booked and the provider is not dialed
+
+    @unit
+    Scenario: An ElevenLabs socket takes the virtual key in a header or the query
+      When a client upgrades on a speech, dialogue or transcription socket route
+      Then the key parameters are removed from the query and the rest is forwarded as written
+      And the vendor handshake carries the provider key as xi-api-key
+      And key fields in the client's first frame are stripped before it is forwarded
+
+    @unit
+    Scenario: A socket for a model the key does not allow is refused before the upgrade
+      When the model of a Realtime or ElevenLabs socket is outside the allowlist
+      Then the request answers HTTP 400 and no socket is opened
+
+    @unit
+    Scenario: A key with no credential for the socket's vendor is refused
+      Given a key whose only credential is Azure OpenAI
+      When the client upgrades on a Realtime or ElevenLabs socket route
+      Then the request answers HTTP 400 and the provider is not dialed
+      # The Realtime socket is served by an OpenAI credential only: no Azure
+      # realtime deployment URL exists in the gateway to dial.
+
+    @unit
+    Scenario: A budget that is already spent refuses the upgrade
+      Given the key's budget is exhausted
+      When the client upgrades
+      Then the request answers HTTP 402 and nothing is booked
+
+    @unit
+    Scenario: A full or draining gateway refuses an upgrade with 503
+      Given the instance supervises its maximum number of calls, or is shutting down
+      When the client upgrades
+      Then the request answers HTTP 503 with Retry-After and nothing is booked
+
+    @unit
+    Scenario: A vendor that refuses the socket releases the booking
+      When the provider does not open the socket
+      Then the client is refused over HTTP, the booking is released and the slot is given back
+
+    @unit
+    Scenario: Each relayed Realtime response is one report
+      Given the provider sends response.done for three responses
+      Then three reports are recorded with text, audio and cached tokens split
+      And a final report closes the session when the socket ends
+
+    @unit
+    Scenario: A relayed Live socket reports cumulative seconds as deltas
+      Given the provider states 12 cumulative seconds
+      When the client leaves without closing its session
+      Then the gateway sends session.close and bills the final duration the provider states
+
+    @unit
+    Scenario: An ElevenLabs speech socket is metered by the characters the client sends
+      When the client sends text frames, a keep-alive of one space and the empty closing frame
+      Then the characters of every text field are counted, one for the space and none for the empty frame
+      And each frame after the first is forwarded byte for byte
+
+    @unit
+    Scenario: ElevenLabs speech characters are reported at most once per interval
+      Then each report is keyed c-<cumulative characters> and carries the characters since the last one
+
+    @unit
+    Scenario: An ElevenLabs transcription socket is metered by the audio the client sends
+      When the client sends base64 audio chunks
+      Then the decoded byte length over the byte rate of audio_format is reported as audio seconds
+      And each report is keyed a-<cumulative milliseconds>
+
+    @unit
+    Scenario: A relayed socket over budget gets an error frame and close 1008
+      When the receipt of the second response says a budget is exceeded
+      Then the client gets an error frame of type budget_exceeded
+      And the socket closes with code 1008 and a final report is sent
+
+    @unit
+    Scenario: A relayed socket closes when its key is revoked
+      When the virtual key is revoked or disabled during the session
+      Then the socket closes with code 1008 and reason key_revoked within the key refresh interval
+
+    @unit
+    Scenario: A close on one side of a relay reaches the other with its code
+      When the provider or the client closes with a code and a reason
+      Then the other side is closed with the same code and reason
+
+    @unit
+    Scenario: A draining gateway closes relayed sockets with 1012
+      Given a relayed socket is still open when the drain budget ends
+      Then it keeps relaying until then, closes with code 1012 and its final report is sent
 
   # ============================================================
   Rule: What the broker deliberately does not do

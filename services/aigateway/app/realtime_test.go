@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -425,6 +426,35 @@ func TestATokenMintBooksItsSessionBeforeTheVendorCall(t *testing.T) {
 			assert.WithinDuration(t, before.Add(15*time.Minute), booked.CredentialExpiresAt, time.Minute,
 				"the token opens a socket for the fifteen minutes the vendor documents")
 			assert.Empty(t, registry.correlated, "a token mint answers no conversation id to record")
+		})
+	}
+}
+
+// @scenario "A mint books the end user its request named"
+func TestAMintBooksTheEndUserItsRequestNamed(t *testing.T) {
+	t.Parallel()
+
+	mints := map[string]RealtimeMintDispatch{
+		"signed url":       signedURLMint(),
+		"single-use token": tokenMint(domain.ElevenLabsTokenTTSWebsocket),
+	}
+	for name, mint := range mints {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			registry := &mockRealtimeRegistry{}
+			application := mintingApp(registry, &domain.Response{
+				StatusCode: 200, Body: []byte(`{}`), RealtimeConversationID: "conv_1",
+			})
+
+			named := customertracebridge.WithEndUserID(context.Background(), "alice")
+			_, err := application.HandleRealtimeSession(named, elevenLabsBundle(), mint)
+			require.NoError(t, err)
+			_, err = application.HandleRealtimeSession(context.Background(), elevenLabsBundle(), mint)
+			require.NoError(t, err)
+
+			require.Len(t, registry.reserved, 2)
+			assert.Equal(t, "alice", registry.reserved[0].EndUserID)
+			assert.Empty(t, registry.reserved[1].EndUserID)
 		})
 	}
 }

@@ -40,6 +40,15 @@ func OpenAIVoiceEndpoint(cred domain.Credential, urlPath string) string {
 	return realtimeEndpoint(cred, openAIRealtimeDefaultBaseURL, urlPath)
 }
 
+// VoiceRelayEndpoint resolves a relayed socket's path against the host of
+// the credential's own vendor, OpenAI or ElevenLabs.
+func VoiceRelayEndpoint(cred domain.Credential, urlPath string) string {
+	if cred.ProviderID == domain.ProviderElevenLabs {
+		return realtimeEndpoint(cred, elevenLabsRealtimeDefaultBaseURL, urlPath)
+	}
+	return realtimeEndpoint(cred, openAIRealtimeDefaultBaseURL, urlPath)
+}
+
 func (r *BifrostRouter) dispatchVoiceBroker(
 	ctx context.Context,
 	req *domain.Request,

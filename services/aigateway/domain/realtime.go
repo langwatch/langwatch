@@ -57,10 +57,16 @@ type RealtimeSessionRequest struct {
 	// SDP is the caller's WebRTC offer on a brokered Realtime call, which
 	// travels beside the session JSON. Nil on every other route.
 	SDP []byte
+	// RelayKind is the pricing family of a relayed socket, which the route
+	// states. Empty unless Broker is RealtimeBrokerRelay.
+	RelayKind RealtimeSessionKind
 }
 
 // Kind says how the session this mint opens is priced.
 func (r RealtimeSessionRequest) Kind() RealtimeSessionKind {
+	if r.Broker == RealtimeBrokerRelay {
+		return r.RelayKind
+	}
 	if r.Broker == RealtimeBrokerLive {
 		return RealtimeKindLive
 	}
@@ -185,6 +191,9 @@ type RealtimeReservation struct {
 	// TranscriptionModel is the catalog id that prices input transcription
 	// usage, when the session declared one.
 	TranscriptionModel string
+	// EndUserID is the end user the mint was attributed to. Every spend
+	// record of the session carries it. Empty when the request named none.
+	EndUserID string
 	// CredentialExpiresAt is when the minted credential stops opening a
 	// socket. Zero when it is only known after the mint.
 	CredentialExpiresAt time.Time

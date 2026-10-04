@@ -52,6 +52,7 @@ func TestReserveCarriesHowTheSessionIsMetered(t *testing.T) {
 		ModelProviderID: "mp_1", Vendor: domain.RealtimeVendorElevenLabs,
 		Model: "eleven_multilingual_v2", RequestedModel: "eleven_multilingual_v2",
 		Kind: domain.RealtimeKindTTSSocket, Metering: domain.RealtimeMeteringClient,
+		EndUserID:           "alice",
 		CredentialExpiresAt: time.UnixMilli(1790000900000),
 	})
 	require.NoError(t, err)
@@ -61,7 +62,8 @@ func TestReserveCarriesHowTheSessionIsMetered(t *testing.T) {
 	  "session_id":"req_1","project_id":"proj_1","organization_id":"org_1","virtual_key_id":"vk_1",
 	  "model_provider_id":"mp_1","trace_id":"","requested_model":"eleven_multilingual_v2",
 	  "vendor":"elevenlabs","model":"eleven_multilingual_v2",
-	  "kind":"tts_socket","metering":"client","credential_expires_at":1790000900000}`, got.body)
+	  "kind":"tts_socket","metering":"client","end_user_id":"alice",
+	  "credential_expires_at":1790000900000}`, got.body)
 }
 
 func TestReserveLeavesUnknownMeteringOffTheWire(t *testing.T) {
@@ -75,6 +77,7 @@ func TestReserveLeavesUnknownMeteringOffTheWire(t *testing.T) {
 	assert.NotContains(t, got.body, "credential_expires_at",
 		"a zero would fail the control plane's positive-integer check")
 	assert.NotContains(t, got.body, "transcription_model")
+	assert.NotContains(t, got.body, "end_user_id")
 }
 
 // @scenario "An OpenAI mint books what metering needs"

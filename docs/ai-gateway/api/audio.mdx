@@ -96,7 +96,7 @@ curl https://gateway.langwatch.ai/v1/audio/transcriptions \
   -F "response_format=diarized_json" \
   -F "chunking_strategy=auto" \
   -F "known_speaker_names[]=agent" \
-  -F "known_speaker_references[]=data:audio/wav;base64,$(base64 < agent.wav | tr -d '\n')" \
+  --form-string "known_speaker_references[]=data:audio/wav;base64,$(base64 < agent.wav | tr -d '\n')" \
   -F "file=@call-recording.wav"
 ```
 

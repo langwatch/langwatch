@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"net/http"
+	"sync"
 	"time"
 
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -73,3 +76,36 @@ type noVoiceSlot struct{}
 func (noVoiceSlot) Start(domain.BrokeredVoiceSession)                    {}
 func (noVoiceSlot) Abandon(context.Context, domain.BrokeredVoiceSession) {}
 func (noVoiceSlot) Release()                                             {}
+
+// bookedRelay is a relay that holds its slot and its booking.
+type bookedRelay struct {
+	cred        domain.Credential
+	reservation domain.RealtimeReservation
+	slot        domain.VoiceSlot
+}
+
+// voiceRelayTicket answers a booked relay. The vendor socket is dialed by
+// the HTTP layer once the client has upgraded, so nothing is dispatched here.
+func (a *App) voiceRelayTicket(ctx context.Context, call *pipeline.Call, booked bookedRelay) *domain.Response {
+	reservation, slot := booked.reservation, booked.slot
+	brokered := brokeredCall(call, booked.cred, &domain.Response{})
+	brokered.EndUserID = customertracebridge.EndUserID(ctx)
+	var once sync.Once
+	return &domain.Response{
+		StatusCode: http.StatusSwitchingProtocols,
+		VoiceRelay: &domain.VoiceRelayTicket{
+			Session: brokered,
+			Slot:    slot,
+			Model:   resolvedModelID(call.Request),
+			Body:    call.Request.Body,
+			Opened:  func() { a.metrics.RecordRealtimeMint(string(reservation.Vendor), "minted") },
+			Release: func(ctx context.Context, reason string) {
+				once.Do(func() {
+					a.releaseRealtimeSession(context.WithoutCancel(ctx), reservation, reason)
+					a.metrics.RecordRealtimeMint(string(reservation.Vendor), "provider_error")
+					slot.Release()
+				})
+			},
+		},
+	}
+}

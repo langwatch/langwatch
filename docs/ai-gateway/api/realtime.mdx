@@ -16,6 +16,12 @@ A session is admitted at the mint. Its spend is recorded as usage arrives: one r
   reconciles when the call ends. Overshoot on voice is bounded by the length of a call.
 </Note>
 
+### End users
+
+Send `X-LangWatch-End-User-Id` on the request that creates the session (the mint, or the session create of a gateway-metered call). `X-Litellm-End-User-Id` is accepted as an alias. The gateway stores the id on the session, so every usage report, the closing record and an estimated settlement are attributed to that end user and count against a [per-end-user budget](/ai-gateway/budgets). A usage report does not take the header: the session's end user is fixed when it is created.
+
+A session request has no `user` body field, so the header is the only source. On a key with an active per-end-user budget, a session request without the header answers `400 end_user_required`. When a report takes that end user's allowance to its limit, the usage response answers `budget.exceeded: true` with scope `attributed_user`.
+
 ## ElevenLabs Conversational AI
 
 Mint a signed URL for one hosted agent.
@@ -249,6 +255,82 @@ The client sees the peer connection close. It is not told the reason; the reason
 
 Each gateway instance supervises a bounded number of calls (`LW_GATEWAY_VOICE_MAX_SUPERVISED_SESSIONS`, default 2000). A request to an instance that is full or shutting down answers `503 voice_broker_unavailable` with `Retry-After`, before anything is booked. On shutdown an instance keeps metering its calls for `LW_GATEWAY_VOICE_DRAIN_SECONDS` (default 570; the Helm chart sets `shutdown.voiceDrainSeconds`), then ends the ones still open.
 
+## WebSocket relay
+
+OpenAI's WebSocket transport needs the real API key on the socket, so a client on that transport cannot dial OpenAI with a virtual key. For it the gateway relays: the client opens the socket on the gateway with its virtual key, the gateway opens the vendor's socket with the provider key and passes frames both ways.
+
+WebRTC through `/v1/live/sessions` and `/v1/realtime/calls` stays the default, because media then runs client to OpenAI. The relay adds one hop to every frame. Measured on loopback, that hop costs about 11 microseconds per frame at the median and 20 at the 95th percentile, before network distance to the gateway.
+
+The relay meters the session itself, like a brokered call. Your client reports nothing.
+
+### OpenAI Realtime
+
+`GET /v1/realtime?model=...` with a WebSocket upgrade. The model is resolved through the key's aliases and allowlist before the upgrade, so a refused request answers over HTTP.
+
+```bash
+wscat -c "wss://gateway.langwatch.ai/v1/realtime?model=openai/gpt-realtime-2.1" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY"
+> {"type":"response.create","response":{"output_modalities":["text"],"instructions":"Say hello."}}
+```
+
+A browser cannot set headers on a WebSocket. It passes the virtual key as a subprotocol, the way OpenAI's own browser clients pass a key:
+
+```js
+const ws = new WebSocket(
+  "wss://gateway.langwatch.ai/v1/realtime?model=openai/gpt-realtime-2.1",
+  ["realtime", `openai-insecure-api-key.${virtualKey}`],
+);
+```
+
+The gateway answers the `realtime` subprotocol and never the key one. The key subprotocol, and any `openai-organization.` or `openai-project.` subprotocol, is not sent to OpenAI.
+
+Every `response.done` and every input transcription is recorded once, as on a brokered call. The route is served by an OpenAI credential. A key with only an Azure OpenAI credential answers `400 model_provider_not_bound`.
+
+### OpenAI Live
+
+`GET /v1/live/sessions` with a WebSocket upgrade. OpenAI takes the model in the first frame, so the client's first frame must be `session.start`:
+
+```bash
+wscat -c "wss://gateway.langwatch.ai/v1/live/sessions" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY"
+> {"type":"session.start","session":{"model":"openai/gpt-live-1","audio":{"format":{"type":"audio/pcm","rate":24000}}}}
+```
+
+The gateway reads that one frame, resolves `session.model`, checks `session.delegation.responses.model` against the allowlist, writes the resolved model back and sends the frame to OpenAI. A first frame that is not `session.start`, names no model, or names a model the key does not allow gets an error frame and close `1008`. The client has 15 seconds to send it.
+
+Duration is reported from OpenAI's cumulative seconds and delegated responses under their own model, as on the WebRTC route. When the client leaves without `session.close`, the gateway sends it, so the final duration is the one OpenAI states.
+
+### What the relay reads
+
+| Frames | What the gateway does |
+| ------ | --------------------- |
+| Client to vendor | Passed on with the same type and the same bytes. Not parsed. The one exception is the `session.start` frame of a Live socket. |
+| Vendor to client | Passed on with the same type and the same bytes. Text frames are read for the event type, and usage events (`response.done`, input transcription completed, `session.usage.updated`, `session.closed`, a delegated `response.completed`) for their ids and usage numbers. |
+
+Audio and transcripts are not logged or stored. A message can be up to 16 MiB.
+
+### When the relay closes the socket
+
+A close from OpenAI reaches the client with OpenAI's code and reason, and a close from the client reaches OpenAI the same way. The gateway closes the socket itself in these cases:
+
+| Close code | Reason             | Meaning                                                                                              | What the client should do                      |
+| ---------- | ------------------ | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `1008`     | `budget_exceeded`  | A budget that applies to the key is over its limit. Checked after every usage report and every 30 seconds. | Stop. A new socket answers `402` until the budget has room. |
+| `1008`     | `key_revoked`      | The virtual key was revoked, disabled, deleted or expired. Noticed within 60 seconds.                 | Stop. The key no longer works.                 |
+| `1008`     | `session_closed`   | LangWatch already closed the session.                                                                  | Open a new socket.                             |
+| `1012`     | `service_restart`  | The gateway instance is being replaced by a deploy.                                                    | Open a new socket at once. Another instance answers. |
+| `1011`     | `provider_connection_lost` | The vendor socket dropped without a close frame.                                              | Open a new socket.                             |
+
+Before a budget close the client receives one text frame:
+
+```json
+{"type":"error","error":{"type":"budget_exceeded","code":"budget_exceeded","message":"The budget on this key is exhausted, so the gateway is closing this session."}}
+```
+
+On a deploy the instance stops taking upgrades and answers `503 voice_broker_unavailable` with `Retry-After`. Open sockets keep running for `LW_GATEWAY_VOICE_DRAIN_SECONDS`, then close with `1012`. A voice session does not carry over to another instance, so the client starts a new one and resends its session configuration.
+
+Relayed sockets count toward `LW_GATEWAY_VOICE_MAX_SUPERVISED_SESSIONS` and toward the key's max open sessions.
+
 ## Limiting how many calls a key runs at once
 
 Set **max open sessions** on the virtual key. The request-rate limits do not bound voice: one mint is a single request that opens a call billing for as long as it runs, so a key at 60 requests per minute can hold sixty ten-minute calls without tripping anything.
@@ -257,7 +339,7 @@ A mint over the cap answers `429 realtime_session_limit`, and the refusal is rec
 
 ## What the broker does not do
 
-- **It does not proxy the voice socket.** There is no frame-level tracing. A session minted as a client secret, signed URL or single-use token cannot be ended in progress; a call created on `/v1/live/sessions` or `/v1/realtime/calls` can.
+- **It does not proxy the voice socket of a minted or WebRTC session.** Only the [WebSocket relay](#websocket-relay) carries frames, and it records usage, not content. There is no frame-level tracing. A session minted as a client secret, signed URL or single-use token cannot be ended in progress; a call created on `/v1/live/sessions` or `/v1/realtime/calls` can.
 - **It does not enforce the session's tools.** A hosted agent's tools live at the vendor, and an OpenAI session declares its own.
 - **Guardrails do not run on a mint.** The body is a session declaration, not a prompt, and the conversation never reaches the gateway. The response says so on `X-LangWatch-Guardrails-Not-Applied: realtime_session` instead of reporting a check that could not mean anything.
 

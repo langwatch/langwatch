@@ -172,6 +172,45 @@ curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/clos
 
 The response body and the charge for a session that never reports are described on [Realtime voice](/ai-gateway/api/realtime#the-usage-response).
 
+## Relayed sockets
+
+The gateway also serves the ElevenLabs sockets itself. The client opens the socket on the gateway with its virtual key, the gateway opens the same path at ElevenLabs with the stored key and passes frames both ways. Use this when the client should hold no ElevenLabs credential at all and should not report its own usage. A single-use token keeps the socket client to ElevenLabs and saves the hop.
+
+| Route (WebSocket upgrade) | Default `model_id` | Metered by |
+|---|---|---|
+| `GET /v1/text-to-speech/{voice_id}/stream-input` | `eleven_multilingual_v2` | Characters |
+| `GET /v1/text-to-speech/{voice_id}/multi-stream-input` | `eleven_multilingual_v2` | Characters |
+| `GET /v1/text-to-dialogue/stream-input` | `eleven_v3_conversational` | Characters |
+| `GET /v1/speech-to-text/realtime` | `scribe_v2_realtime` | Audio seconds |
+
+Pass the virtual key as `Authorization: Bearer`, as the `xi-api-key` header, or as the `xi-api-key` or `authorization` query parameter. The gateway removes the key parameters from the query string and forwards the rest as written (`output_format`, `audio_format`, `language_code` and so on). `model_id` goes through the key's aliases and allowlist; outside the allowlist the request answers `400 model_not_allowed` before the upgrade.
+
+```bash
+wscat -c "wss://gateway.langwatch.ai/v1/text-to-speech/$VOICE_ID/stream-input?model_id=eleven_flash_v2_5" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY"
+> {"text":" "}
+> {"text":"Hello from the gateway. "}
+> {"text":""}
+```
+
+```bash
+websocat "wss://gateway.langwatch.ai/v1/speech-to-text/realtime?audio_format=pcm_16000&xi-api-key=$LANGWATCH_VIRTUAL_KEY"
+{"message_type":"input_audio_chunk","audio_base_64":"<base64 PCM>","commit":false,"sample_rate":16000}
+```
+
+If the first frame carries `xi-api-key`, `xi_api_key` or `authorization`, the gateway strips those fields from that frame. Every other frame is forwarded byte for byte, in both directions.
+
+### How relayed sockets are metered
+
+ElevenLabs sockets state no usage, so the gateway counts what the client sends.
+
+- **Speech.** The characters of every `text` field the client sends: `text` on `stream-input` and on each context of `multi-stream-input`, and each `inputs[].text` on Text to Dialogue. The keep-alive `" "` counts one character and the closing `""` counts none.
+- **Transcription.** The seconds of audio sent: the decoded length of each `audio_base_64` chunk divided by the byte rate of `audio_format`. `pcm_16000`, the default, is 32,000 bytes per second, and `ulaw_8000` is 8,000.
+
+The gateway reads client text frames for those fields only. Usage is recorded at most every 10 seconds while the socket runs and once more when it closes. Do not post usage for a relayed socket.
+
+A relayed socket is closed by the gateway on an exhausted budget (`1008`), a revoked key (`1008`) and a deploy (`1012`). The codes and what the client should do are on [Realtime voice](/ai-gateway/api/realtime#when-the-relay-closes-the-socket).
+
 ## Post-call webhook
 
 ```

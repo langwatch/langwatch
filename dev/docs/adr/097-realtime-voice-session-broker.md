@@ -238,9 +238,27 @@ The mint (`POST /v1/realtime/client_secrets`) stays, for clients that want the v
 
 Gate 4 is met by the requirement above. Gate 3 was already closed.
 
-Gate 2, draining, is closed for gateway-held server sockets: the gateway tracks them, stops booking new sessions on SIGTERM, supervises until the calls end or the drain budget runs out, then ends what is left and reports it. Hijacked client sockets are not built yet, so the reconnect signal for relayed clients is not either.
+Gate 2, draining, is closed for gateway-held server sockets: the gateway tracks them, stops booking new sessions on SIGTERM, supervises until the calls end or the drain budget runs out, then ends what is left and reports it.
+
+It is closed for hijacked client sockets too. `http.Server.Shutdown` does not see a hijacked connection, so a relayed socket is tracked by the same supervisor, in the same slot count, as a brokered call. On SIGTERM an upgrade answers 503 with `Retry-After`. Open sockets keep relaying until the drain budget runs out, then each client is closed with code 1012 (service restart), which is the reconnect signal, and the final report is sent before the process exits. A voice session has no state the next pod could resume, so the client dials again and starts a new session.
 
 Gate 1 is decided for the server sockets by this dated amendment: gateway pods may dial the OpenAI Realtime and Live hosts directly for an event socket, through the same endpoint policy the mint calls use. The socket carries events and no media, is bounded by the session's own lifetime, and the destination is the provider host the credential names. ADR-053 Track C still governs tenant-selected destinations.
+
+Gate 1 is decided for the relay by the same amendment (2026-10-04): gateway pods may dial the vendor socket of a relayed session directly, on the OpenAI and ElevenLabs hosts the credential names, through that endpoint policy and with no redirects. These sockets carry media. The destination is still never tenant-selected beyond the provider base URL the mint calls already honour, so ADR-053 Track C is unchanged.
+
+### The relay, and where it sits in the decision
+
+The decision stands: media runs client to vendor by default. The mints and the WebRTC brokers are the first choice, because they add no hop to the audio.
+
+The relay exists for one case the brokers cannot serve. A vendor's WebSocket transport authenticates the socket with the real API key, and OpenAI Live has no client credential at all, so a client on that transport can only reach the vendor through a party that holds the key. The gateway is that party: the client upgrades with its virtual key on the vendor's own path, and the gateway dials the vendor with the provider key and passes frames both ways. The ElevenLabs sockets are relayed on the same core, for clients that should hold no vendor credential and report no usage.
+
+A relayed socket is a supervised session with `metering = gateway`. It is booked before the vendor is dialed and released if the dial fails, it reports through the same keyed queue, and it ends on an exhausted budget or a revoked key: the client gets a `budget_exceeded` error frame and close 1008, or close 1008 with reason `key_revoked`.
+
+Client frames are never parsed or re-encoded, with three stated exceptions: the `session.start` frame of a Live socket, which carries the model; key fields in the first frame of an ElevenLabs socket, which are stripped; and the `text` and `audio_base_64` fields of ElevenLabs client frames, which are counted because those sockets state no usage. Vendor frames are passed on unchanged and read only for usage events. Audio and transcripts are not logged or stored, so ADR-017's payload capture does not apply to a relayed socket.
+
+The hop costs about 11 microseconds per frame at the median and 20 at the 95th percentile on loopback (`services/aigateway/BENCHMARKS.md`), against a target of 5 ms. What a client pays is the network distance to the gateway, which is why the relay is not the default.
+
+Input transcription on a relayed Realtime socket is rated under the session model: the transcription model is declared in a `session.update` frame, which the relay does not parse.
 
 ## References
 

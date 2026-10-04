@@ -1,6 +1,8 @@
 package gatewaytracer
 
 import (
+	"bufio"
+	"net"
 	"net/http"
 
 	otelapi "go.opentelemetry.io/otel"
@@ -74,6 +76,9 @@ func Middleware(spanNamer func(*http.Request) string) func(http.Handler) http.Ha
 
 			rec := &statusRecorder{ResponseWriter: w, status: 200}
 			defer func() {
+				if rec.hijacked {
+					span.SetAttributes(attribute.Bool("http.connection.hijacked", true))
+				}
 				if rec.status >= 400 {
 					span.SetStatus(codes.Error, http.StatusText(rec.status))
 				} else {
@@ -106,6 +111,18 @@ func DefaultSpanName(r *http.Request) string {
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
+	// hijacked is set once a handler took the connection over.
+	hijacked bool
+}
+
+// Hijack hands the connection to the handler. The status written before it,
+// 101 on a WebSocket upgrade, is what the span keeps.
+func (r *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	conn, rw, err := http.NewResponseController(r.ResponseWriter).Hijack()
+	if err == nil {
+		r.hijacked = true
+	}
+	return conn, rw, err
 }
 
 func (r *statusRecorder) WriteHeader(code int) {

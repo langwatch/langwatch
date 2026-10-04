@@ -31,6 +31,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/voicesession"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -88,6 +89,9 @@ type RouterDeps struct {
 	// when nil the webhook route is not mounted and a customer bills voice
 	// through the reconciler alone.
 	WebhookRelay WebhookRelay
+	// VoiceRelay relays vendor voice sockets for clients on the WebSocket
+	// transport. Optional; when nil the socket routes are not mounted.
+	VoiceRelay *voicesession.Manager
 }
 
 // WebhookRelay hands one vendor delivery to the control plane byte for byte.
@@ -197,6 +201,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 			// and meters the call from its own server-side socket.
 			v1.Post("/live/sessions", openAILiveSessionHandler(deps))
 			v1.Post("/realtime/calls", openAIRealtimeCallHandler(deps))
+			if deps.VoiceRelay != nil {
+				mountVoiceRelayRoutes(v1, deps)
+			}
 			// ElevenLabs' own audio paths, mirrored for the same reason the
 			// mint above is: an ElevenLabs SDK reaches them by base URL alone,
 			// so a customer already using that SDK gets metering, budgets and

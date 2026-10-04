@@ -194,14 +194,15 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	})
 
 	voice := voicesession.NewManager(voicesession.Options{
-		Registry:    cpClient,
-		Vendor:      voicesession.NewOpenAIVendor(router.VoiceHTTPClient(), providers.OpenAIVoiceEndpoint),
-		Budget:      budgetChecker.Precheck,
-		Keys:        authSvc,
-		Metrics:     metrics,
-		Logger:      logger,
-		MaxSessions: cfg.Voice.MaxSupervisedSessions,
-		DrainBudget: time.Duration(cfg.Voice.DrainSeconds) * time.Second,
+		Registry:      cpClient,
+		Vendor:        voicesession.NewOpenAIVendor(router.VoiceHTTPClient(), providers.OpenAIVoiceEndpoint),
+		RelayEndpoint: providers.VoiceRelayEndpoint,
+		Budget:        budgetChecker.Precheck,
+		Keys:          authSvc,
+		Metrics:       metrics,
+		Logger:        logger,
+		MaxSessions:   cfg.Voice.MaxSupervisedSessions,
+		DrainBudget:   time.Duration(cfg.Voice.DrainSeconds) * time.Second,
 	})
 
 	// Per-credential circuit breaker. A provider that keeps failing is

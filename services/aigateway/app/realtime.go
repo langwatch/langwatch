@@ -74,6 +74,7 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 		RequestedModel:  call.Request.Model,
 		TraceID:         customerTraceID(ctx),
 		Kind:            session.Kind(),
+		EndUserID:       customertracebridge.EndUserID(ctx),
 	}
 	meterRealtimeReservation(&reservation, session, call.Request.Body)
 	if err := a.reserveRealtimeSession(ctx, reservation); err != nil {
@@ -85,6 +86,11 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 		m.RealtimeSessionID = session.SessionID
 	})
 	a.metrics.SetRequestLabels(ctx, string(cred.ProviderID), resolvedModelID(call.Request))
+
+	if session.Broker == domain.RealtimeBrokerRelay {
+		handedOver = true
+		return a.voiceRelayTicket(ctx, call, bookedRelay{cred: cred, reservation: reservation, slot: slot}), nil
+	}
 
 	resp, err := a.providers.Dispatch(ctx, call.Request, cred)
 	if err == nil && resp != nil && resp.StatusCode >= 400 {
@@ -98,7 +104,7 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 	}
 
 	brokered := brokeredCall(call, cred, resp)
-	brokered.EndUserID = customertracebridge.EndUserID(ctx)
+	brokered.EndUserID = reservation.EndUserID
 	if err := a.correlateRealtimeSession(ctx, reservation, resp); err != nil {
 		handedOver = true
 		slot.Abandon(ctx, brokered)

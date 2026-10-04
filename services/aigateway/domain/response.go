@@ -30,6 +30,10 @@ type Response struct {
 	// returned stops opening a socket, when the vendor states it. Zero on
 	// every other lane.
 	RealtimeCredentialExpiresAt time.Time
+
+	// VoiceRelay is set when the request booked a relayed voice socket. The
+	// HTTP layer dials the vendor and relays with it. Nil on every other lane.
+	VoiceRelay *VoiceRelayTicket
 }
 
 // StreamIterator provides pull-based iteration over streaming response chunks.

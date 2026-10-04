@@ -48,6 +48,7 @@ type reserveRequest struct {
 	Kind                string `json:"kind,omitempty"`
 	Metering            string `json:"metering,omitempty"`
 	TranscriptionModel  string `json:"transcription_model,omitempty"`
+	EndUserID           string `json:"end_user_id,omitempty"`
 	CredentialExpiresAt int64  `json:"credential_expires_at,omitempty"`
 }
 
@@ -133,6 +134,7 @@ func (c *Client) Reserve(ctx context.Context, r domain.RealtimeReservation) erro
 		Kind:                string(r.Kind),
 		Metering:            string(r.Metering),
 		TranscriptionModel:  r.TranscriptionModel,
+		EndUserID:           r.EndUserID,
 		CredentialExpiresAt: epochMillis(r.CredentialExpiresAt),
 	})
 	if err != nil {

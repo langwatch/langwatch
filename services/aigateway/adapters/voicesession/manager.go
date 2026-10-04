@@ -109,6 +109,9 @@ type Options struct {
 	Keys    KeyReader
 	Metrics Metrics
 	Logger  *zap.Logger
+	// RelayEndpoint resolves a relayed socket's path against the credential's
+	// own host. Without it the relay routes refuse.
+	RelayEndpoint EndpointFunc
 	// MaxSessions caps the calls supervised at once. Zero means 2000.
 	MaxSessions int
 	// DrainBudget is how long calls may keep running after shutdown begins.
@@ -127,8 +130,9 @@ type Manager struct {
 	logger   *zap.Logger
 	timing   Timing
 
-	maxSessions int
-	drainBudget time.Duration
+	maxSessions   int
+	drainBudget   time.Duration
+	relayEndpoint EndpointFunc
 
 	mu         sync.Mutex
 	admitted   int
@@ -144,18 +148,19 @@ type Manager struct {
 // NewManager builds a Manager. It starts nothing until a call is handed over.
 func NewManager(opts Options) *Manager {
 	m := &Manager{
-		registry:    opts.Registry,
-		vendor:      opts.Vendor,
-		budget:      opts.Budget,
-		keys:        opts.Keys,
-		metrics:     opts.Metrics,
-		logger:      opts.Logger,
-		timing:      opts.Timing.withDefaults(),
-		maxSessions: opts.MaxSessions,
-		drainBudget: opts.DrainBudget,
-		sessions:    make(map[*session]struct{}),
-		counts:      make(map[domain.RealtimeSessionKind]int),
-		watches:     make(map[string]*keyWatch),
+		registry:      opts.Registry,
+		vendor:        opts.Vendor,
+		budget:        opts.Budget,
+		keys:          opts.Keys,
+		metrics:       opts.Metrics,
+		logger:        opts.Logger,
+		timing:        opts.Timing.withDefaults(),
+		maxSessions:   opts.MaxSessions,
+		drainBudget:   opts.DrainBudget,
+		relayEndpoint: opts.RelayEndpoint,
+		sessions:      make(map[*session]struct{}),
+		counts:        make(map[domain.RealtimeSessionKind]int),
+		watches:       make(map[string]*keyWatch),
 	}
 	if m.maxSessions <= 0 {
 		m.maxSessions = 2000
@@ -299,6 +304,12 @@ func (sl *slot) Start(call domain.BrokeredVoiceSession) {
 }
 
 func (m *Manager) start(call domain.BrokeredVoiceSession) {
+	go m.track(call).run()
+}
+
+// track registers a call under the manager: counted, watched and reachable
+// by the drain. Whoever takes it must end in finished.
+func (m *Manager) track(call domain.BrokeredVoiceSession) *session {
 	if call.StartedAt.IsZero() {
 		call.StartedAt = time.Now()
 	}
@@ -321,7 +332,7 @@ func (m *Manager) start(call domain.BrokeredVoiceSession) {
 	if ended {
 		s.requestEnd(ReasonDrain)
 	}
-	go s.run()
+	return s
 }
 
 // finished removes a call that ended and gives its slot back.

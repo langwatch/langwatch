@@ -58,6 +58,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		Status:                statusMon,
 		ControlPlaneBaseURL:   cfg.ControlPlane.BaseURL,
 		WebhookRelay:          deps.ControlPlane,
+		VoiceRelay:            deps.Voice,
 	})
 
 	srv := &http.Server{Handler: handler, Addr: cfg.Server.Addr, ReadHeaderTimeout: 10 * time.Second}
