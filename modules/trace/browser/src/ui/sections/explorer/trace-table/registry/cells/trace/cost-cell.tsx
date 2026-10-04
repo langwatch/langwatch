@@ -61,7 +61,12 @@ export const CostCell = {
         </Text>
       </BundledCostTooltip>
     ) : (
-      <Text textStyle="sm" color="fg.muted" textAlign="right">
+      <Text
+        textStyle="sm"
+        color="fg.muted"
+        textAlign="right"
+        whiteSpace="nowrap"
+      >
         {formatCost(billedCostOf(row), row.tokensEstimated)}
       </Text>
     ),

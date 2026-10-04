@@ -354,7 +354,6 @@ var (
 		"specs/traces-v2/light-mode-contrast.feature",
 		"specs/traces-v2/live-tail.feature",
 		"specs/traces-v2/metadata-facet.feature",
-		"specs/traces-v2/metrics.feature",
 		"specs/traces-v2/model-chip-interactive-card.feature",
 		"specs/traces-v2/multiplayer-presence.feature",
 		"specs/traces-v2/prompt-facets.feature",
@@ -393,6 +392,7 @@ var (
 		"specs/workflows/studio-usage-limits.feature",
 	}
 	legacyPartial = []string{
+		"specs/traces-v2/metrics.feature",
 		"specs/features/analytics-cli.feature",
 		"specs/traces-v2/trace-drawer-shell.feature",
 		"sdks/typescript/specs/cli/daemon.feature",
