@@ -3,6 +3,7 @@
 // other read of it.
 import { ClickHouseUnavailableError } from "@langwatch/analytics-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { RestIdentity } from "@langwatch/api/hosting";
 import type { RestDeclaredResult } from "@langwatch/api/rest";
 import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
@@ -20,8 +21,10 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   type GatewayBudgetOverviewForUser,
   type GatewayAuthorizedKeyCaller,
+  type GatewayAuthorizedVirtualKeyCaller,
   type GatewayKeyCaller,
   type GatewayKeyCallerReach,
+  type GatewayVirtualKeyCaller,
   type GatewayRequestCredential,
   type GatewayVirtualKeyScope,
   type VirtualKeyWithScopes,
@@ -128,6 +131,7 @@ import {
   type GatewayPrincipalModelSpend,
   type GatewayPrincipalSpendSummary,
   type GatewayPrincipalSpendWindow,
+  VirtualKeyNotFoundError,
 } from "@langwatch/gateway-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -136,7 +140,7 @@ import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { type ProcessMembers } from "@langwatch/process-stores/members";
-import { type ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
@@ -228,8 +232,11 @@ import {
   type GatewaySpendScopeQuery,
 } from "../services/gateway-spend-reconciliation.service.ts";
 import { GatewaySpendScopeService } from "../services/gateway-spend-scope.service.ts";
+import type {
+  GatewayUsageService,
+  UsageWindow,
+} from "../services/gateway-spend-summary.service.ts";
 import { GatewayTraceExportKeyService } from "../services/gateway-trace-export-key.service.ts";
-import type { GatewayUsageService, UsageWindow } from "../services/gateway-spend-summary.service.ts";
 import type {
   VirtualKeyCamelDto,
   VirtualKeySnakeDto,
@@ -253,7 +260,6 @@ import {
   GatewayEndUserCapsAdapter,
 } from "./gateway-composition.build.ts";
 import { type GatewayBudgetSpend, type GatewayChangeEvents } from "./gateway.members.ts";
-import type { RestIdentity } from "@langwatch/api/hosting";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped
@@ -559,20 +565,20 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
     userId: string;
   }): Promise<VirtualKeyWithScopes>;
   /**
-   * Keys a PROJECT CREDENTIAL may see on a page: org-scoped keys, its own team's, its own
-   * project's — never a sibling team's. Applied to the page, not the query, so a page can be
-   * shorter than `limit` without the walk being done.
+   * Keys a credential acting in ONE PROJECT may see on a page: org-scoped keys, its own team's,
+   * its own project's, never a sibling team's. Applied to the page, not the query, so a page
+   * can be shorter than `limit` without the walk being done.
    */
-  visibleToProjectCredential(input: {
-    project: ProjectIdentity;
+  visibleInProject(input: {
+    projectId: string;
     virtualKeys: readonly VirtualKeyWithScopes[];
-  }): VirtualKeyWithScopes[];
-  /** One key under that same credential visibility rule, or the not-found refusal. */
-  getVisibleVirtualKeyForProjectCredential(input: {
-    project: ProjectIdentity;
-    id: string;
-    organizationId: string;
-  }): Promise<VirtualKeyWithScopes>;
+  }): Promise<VirtualKeyWithScopes[]>;
+  /** Of a page, the keys the actor holds the permission on at one of their scopes or more. */
+  heldOnAnyScope(input: {
+    actor: GatewayActor;
+    virtualKeys: readonly VirtualKeyWithScopes[];
+    permission: AuthzPermission;
+  }): Promise<VirtualKeyWithScopes[]>;
   /** One key anchored to this organization, without any visibility rule. */
   getExistingVirtualKey(input: {
     organizationId: string;
@@ -2072,19 +2078,58 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return this.#dependencies.getVisibleVirtualKeyForUser(input);
   }
 
-  visibleToProjectCredential(input: {
-    project: ProjectIdentity;
+  /**
+   * A page narrowed to what the caller reads. A credential acting in one project sees what that
+   * project reaches; a key that names none sees the keys its own grants reach (`virtualKeys:view`).
+   */
+  visibleToVirtualKeyCaller(input: {
+    caller: GatewayAuthorizedVirtualKeyCaller;
     virtualKeys: readonly VirtualKeyWithScopes[];
-  }): VirtualKeyWithScopes[] {
-    return this.#dependencies.visibleToProjectCredential(input);
+  }): Promise<VirtualKeyWithScopes[]> {
+    const { caller, virtualKeys } = input;
+    if (caller.projectId !== null) {
+      return this.#dependencies.visibleInProject({ projectId: caller.projectId, virtualKeys });
+    }
+
+    return this.#dependencies.heldOnAnyScope({
+      actor: caller.actor,
+      virtualKeys,
+      permission: "virtualKeys:view",
+    });
   }
 
-  getVisibleVirtualKeyForProjectCredential(input: {
-    project: ProjectIdentity;
+  /**
+   * One key under that same rule: a key the caller cannot see answers not found. A key that
+   * names no project must also hold the route's own permission on a scope the key lives in.
+   */
+  async getVirtualKeyForCaller(input: {
+    caller: GatewayAuthorizedVirtualKeyCaller;
     id: string;
-    organizationId: string;
+    permission: AuthzPermission;
   }): Promise<VirtualKeyWithScopes> {
-    return this.#dependencies.getVisibleVirtualKeyForProjectCredential(input);
+    const { caller, id, permission } = input;
+    const existing = await this.#dependencies.getExistingVirtualKey({
+      organizationId: caller.organizationId,
+      id,
+    });
+    const [visible] = await this.visibleToVirtualKeyCaller({ caller, virtualKeys: [existing] });
+    if (!visible) throw new VirtualKeyNotFoundError();
+    if (caller.projectId !== null || permission === "virtualKeys:view") return visible;
+
+    const [held] = await this.#dependencies.heldOnAnyScope({
+      actor: caller.actor,
+      virtualKeys: [visible],
+      permission,
+    });
+    if (!held) {
+      throw new PermissionDeniedError({
+        permission,
+        scope: { type: "organization", id: caller.organizationId },
+        denialReason: "no-binding",
+      });
+    }
+
+    return held;
   }
 
   getExistingVirtualKey(input: {
@@ -2385,6 +2430,60 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     permission: AuthzPermission;
   }): Promise<void> {
     await this.#dependencies.assertCanOperateAtOrganization(input);
+  }
+
+  /**
+   * Who a virtual key route was called by. A credential acting in one project is asked the
+   * route's permission there, as the project door asked it; a key that names no project reaches
+   * its organization and is asked per virtual key, at the scopes that key lives in.
+   */
+  async authorizeVirtualKeyCaller(input: {
+    caller: GatewayVirtualKeyCaller;
+    permission: AuthzPermission;
+  }): Promise<GatewayAuthorizedVirtualKeyCaller> {
+    const authorized = await this.#virtualKeyCallerOf(input.caller);
+    if (authorized.projectId !== null) {
+      await this.#dependencies.assertCanOperateOnAnyScope({
+        actor: authorized.actor,
+        scopes: [{ scopeType: "PROJECT", scopeId: authorized.projectId }],
+        permission: input.permission,
+      });
+    }
+
+    return authorized;
+  }
+
+  async #virtualKeyCallerOf(
+    caller: GatewayVirtualKeyCaller,
+  ): Promise<GatewayAuthorizedVirtualKeyCaller> {
+    switch (caller.kind) {
+      case "project":
+        return {
+          organizationId: await this.organizationIdForProject(caller.projectId),
+          projectId: caller.projectId,
+          actor: { kind: "legacyProjectKey", projectId: caller.projectId },
+          actorUserId: `svc_${caller.projectId}`,
+        };
+      case "cliAccessToken":
+        return {
+          organizationId: caller.organizationId,
+          projectId: caller.projectId,
+          actor: { kind: "cliAccessToken", userId: caller.userId, projectId: caller.projectId },
+          actorUserId: caller.userId,
+        };
+      case "apiKey":
+        return {
+          organizationId: caller.organizationId,
+          projectId: caller.resolvedProject?.id ?? null,
+          actor: {
+            kind: "apiKey",
+            apiKeyId: caller.apiKeyId,
+            userId: caller.userId,
+            organizationId: caller.organizationId,
+          },
+          actorUserId: caller.userId ?? `svc_${caller.resolvedProject?.id ?? caller.apiKeyId}`,
+        };
+    }
   }
 
   /**

@@ -6,7 +6,7 @@ import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
-import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -53,10 +53,7 @@ import { GatewayUsageService } from "../services/gateway-spend-summary.service.t
 import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
 import { GatewayService, type GatewayBudgetOrganizations } from "../services/gateway.service.ts";
 import { VirtualKeyAuthorizationService } from "../services/virtual-key-authorization.service.ts";
-import type {
-  MembershipSet,
-  VirtualKeyActor,
-} from "../services/virtual-key-authorization.service.ts";
+import type { VirtualKeyActor } from "../services/virtual-key-authorization.service.ts";
 import { VirtualKeyCryptoService } from "../services/virtual-key-crypto.service.ts";
 import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service.ts";
 import { VirtualKeyService } from "../services/virtual-key.service.ts";
@@ -409,18 +406,19 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
         await virtualKeyAuthorization.loadMembershipSet({ organizationId, userId }),
         { id, organizationId },
       ),
-    visibleToProjectCredential: ({ project, virtualKeys: page }) => {
-      const membership = membershipForProjectCredential(project);
+    visibleInProject: async ({ projectId, virtualKeys: page }) => {
+      const membership = await virtualKeyAuthorization.membershipOfProject(projectId);
 
       return page.filter((virtualKey) =>
         virtualKeyAuthorization.isVisibleToMembership(membership, virtualKey.scopes),
       );
     },
-    getVisibleVirtualKeyForProjectCredential: ({ project, id, organizationId }) =>
-      virtualKeyAuthorization.getVisibleVk(virtualKeys, membershipForProjectCredential(project), {
-        id,
-        organizationId,
-      }),
+    heldOnAnyScope: ({ actor, virtualKeys: page, permission }) =>
+      virtualKeyAuthorization.heldByActor(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        page,
+        permission,
+      ),
     getExistingVirtualKey: ({ organizationId, id }) =>
       virtualKeyAuthorization.getExistingVk(virtualKeys, id, organizationId),
 
@@ -580,15 +578,6 @@ function extractSessionActor(value: object): { user: { id: string } } | null {
  * sees organization-scoped keys, its own team's keys and its own project's —
  * and not a sibling team's. The same rule the tRPC list applies to a member.
  */
-function membershipForProjectCredential(project: ProjectIdentity): MembershipSet {
-  return {
-    isOrgMember: true,
-    isOrgAdmin: false,
-    teamIds: new Set([project.teamId]),
-    projectIds: new Set([project.id]),
-  };
-}
-
 function authzScopeOf(scope: GatewayPermissionScope) {
   if (scope.type === "org") return { organizationId: scope.id };
   return scope.type === "team" ? { teamId: scope.id } : { projectId: scope.id };

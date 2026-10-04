@@ -5,8 +5,11 @@
  */
 
 import {
+  keyCredentialOfRequest,
+  keyDoorPrincipalOfRequest,
   principalOfCredential,
   credentialPrincipalOf,
+  recordKeyCredential,
   organizationCredentialPrincipalOf,
   organizationCredentialPrincipalOfToken,
   resolvePersonalCaller,
@@ -14,6 +17,7 @@ import {
 import type {
   PrincipalRef,
   RestCredentialPrincipal,
+  RestKeyDoorPrincipal,
   RestResolvedProjectCredential,
 } from "@langwatch/authorization";
 import { Context } from "hono";
@@ -265,5 +269,46 @@ describe("the key row a project credential names", () => {
     ["a legacy project key", { type: "legacyProjectKey", project }, null],
   ])("given %s", (_label, credential, expected) => {
     expect(principalOfCredential(credential)).toEqual(expected);
+  });
+});
+
+describe("reading what the key door resolved", () => {
+  const requestWith = (principal: RestKeyDoorPrincipal): Request => {
+    const request = new Request("http://localhost/api/gateway/v1/virtual-keys");
+    recordKeyCredential(request, principal);
+    return request;
+  };
+  const accessToken: RestKeyDoorPrincipal = {
+    kind: "cliAccessToken",
+    userId: "user_1",
+    organizationId: "organization-1",
+    projectId: "project-1",
+    teamId: "team-1",
+  };
+
+  describe("given a project-bound access token", () => {
+    it("is handed to a feature that serves it, as its person", () => {
+      expect(keyDoorPrincipalOfRequest(requestWith(accessToken))).toEqual(accessToken);
+    });
+
+    it("is refused as an invalid credential by a feature that serves API keys only", () => {
+      expect(() => keyCredentialOfRequest(requestWith(accessToken))).toThrow(
+        expect.objectContaining({ code: "invalid_credentials" }),
+      );
+    });
+  });
+
+  describe("given an API key", () => {
+    it("is handed to both readers unchanged", () => {
+      const key: RestKeyDoorPrincipal = {
+        kind: "apiKey",
+        apiKeyId: "key_1",
+        userId: "user_1",
+        organizationId: "organization-1",
+      };
+
+      expect(keyCredentialOfRequest(requestWith(key))).toEqual(key);
+      expect(keyDoorPrincipalOfRequest(requestWith(key))).toEqual(key);
+    });
   });
 });

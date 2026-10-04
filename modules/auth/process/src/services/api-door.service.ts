@@ -230,7 +230,7 @@ function keyCaller(request: Request, credential: ApiKeyDoorCredential): RestCall
   const { principal } = credential;
 
   return ownedCaller({
-    userId: principal.kind === "apiKey" ? principal.userId : null,
+    userId: principal.kind === "project" ? null : principal.userId,
     scope: { tier: "organization", id: credential.organizationId },
     markUsed: credential.markUsed,
   });

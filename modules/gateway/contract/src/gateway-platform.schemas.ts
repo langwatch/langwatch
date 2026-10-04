@@ -395,3 +395,35 @@ export const gatewayAuthorizedKeyCallerSchema = z
   .readonly();
 
 export type GatewayAuthorizedKeyCaller = z.infer<typeof gatewayAuthorizedKeyCallerSchema>;
+
+/**
+ * Who a virtual key route was called by: any API key as the key door resolved it, or a
+ * project-bound access token, which is its person inside the one project it is bound to.
+ */
+export const gatewayVirtualKeyCallerSchema = z.discriminatedUnion("kind", [
+  ...gatewayKeyCallerSchema.options,
+  z
+    .object({
+      kind: z.literal("cliAccessToken"),
+      userId: z.string().min(1),
+      organizationId: z.string().min(1),
+      projectId: z.string().min(1),
+      teamId: z.string().min(1),
+    })
+    .readonly(),
+]);
+
+export type GatewayVirtualKeyCaller = z.infer<typeof gatewayVirtualKeyCallerSchema>;
+
+/**
+ * A virtual key caller the application resolved. `projectId` is the one project the credential
+ * acts in, or null for a key that names none and so reaches whatever its grants reach.
+ */
+export const gatewayAuthorizedVirtualKeyCallerSchema = gatewayAuthorizedKeyCallerSchema
+  .unwrap()
+  .extend({ projectId: z.string().min(1).nullable() })
+  .readonly();
+
+export type GatewayAuthorizedVirtualKeyCaller = z.infer<
+  typeof gatewayAuthorizedVirtualKeyCallerSchema
+>;

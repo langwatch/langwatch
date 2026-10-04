@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   gatewayKeyCaller,
+  gatewayVirtualKeyCaller,
   gatewayPlatformRest,
   gatewayRestCredential,
 } from "../gateway-platform.rest.ts";
@@ -72,6 +73,10 @@ function mountedPlatform() {
     onError: renderError,
     facts: [
       bindRestMiddleware(gatewayKeyCaller, (): GatewayKeyCaller => ({
+        kind: "project",
+        projectId: PROJECT_ID,
+      })),
+      bindRestMiddleware(gatewayVirtualKeyCaller, (): GatewayKeyCaller => ({
         kind: "project",
         projectId: PROJECT_ID,
       })),

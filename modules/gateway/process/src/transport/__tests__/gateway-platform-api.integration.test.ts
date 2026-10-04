@@ -1,10 +1,3 @@
-/**
- * @vitest-environment node
- * /api/gateway/v1 refusals raised by the shared gateway services, through the
- * real GatewayModule and the production error mapping.
- * @see specs/ai-gateway/public-rest-api.feature
- */
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
@@ -13,6 +6,13 @@ import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+/**
+ * @vitest-environment node
+ * /api/gateway/v1 refusals raised by the shared gateway services, through the
+ * real GatewayModule and the production error mapping.
+ * @see specs/ai-gateway/public-rest-api.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 import { GatewayModule } from "../../app/gateway.app.ts";
 import {
   gatewayKeyCaller,
+  gatewayVirtualKeyCaller,
   gatewayPlatformRest,
   gatewayRestCredential,
 } from "../gateway-platform.rest.ts";
@@ -111,6 +112,10 @@ async function mount() {
     facts: [
       bindRestMiddleware(gatewayRestCredential, () => legacyProjectKey),
       bindRestMiddleware(gatewayKeyCaller, () => ({
+        kind: "project" as const,
+        projectId: PROJECT_ID,
+      })),
+      bindRestMiddleware(gatewayVirtualKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_ID,
       })),

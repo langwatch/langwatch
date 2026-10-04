@@ -39,16 +39,21 @@ Feature: CLI cross-project access with the user-scoped login key
         exactly as before this feature
 
     @unit
-    Scenario: virtual key commands name the project the login key resolved
+    Scenario: virtual key commands answer for everything the login key reaches
       When the user runs `langwatch virtual-keys list`
       Then the request authenticates with the stored `cli_api_key`
-      And names the personal project in the X-Project-Id header
+      And sends no X-Project-Id header, so every virtual key the key can see is listed
 
     @unit
     Scenario: virtual key commands follow --project
       Given the key reaches a project with id "proj-b"
       When the user runs `langwatch virtual-keys spend vk_1 --project proj-b`
       Then the request names "proj-b" in the X-Project-Id header
+
+    @unit
+    Scenario: a virtual key created with no scope lands in the resolved project
+      When the user runs `langwatch virtual-keys create --name ci` naming no scope
+      Then the request names the personal project in the X-Project-Id header
 
   Rule: --project selects the target project by id or slug
 
