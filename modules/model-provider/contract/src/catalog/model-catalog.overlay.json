@@ -6,7 +6,7 @@
       "name": "Voyage AI: Voyage 3.5",
       "provider": "voyage",
       "pricing": {
-        "inputCostPerToken": 6e-8,
+        "inputCostPerToken": 6e-08,
         "outputCostPerToken": 0
       },
       "contextLength": 32000,
@@ -26,7 +26,7 @@
       "name": "Voyage AI: Voyage 3.5 Lite",
       "provider": "voyage",
       "pricing": {
-        "inputCostPerToken": 2e-8,
+        "inputCostPerToken": 2e-08,
         "outputCostPerToken": 0
       },
       "contextLength": 32000,
@@ -51,7 +51,9 @@
       },
       "contextLength": 400000,
       "maxCompletionTokens": 128000,
-      "supportedParameters": ["reasoning_effort"],
+      "supportedParameters": [
+        "reasoning_effort"
+      ],
       "defaultParameters": null,
       "modality": "text->text",
       "mode": "chat",
@@ -71,7 +73,9 @@
       },
       "contextLength": 400000,
       "maxCompletionTokens": 128000,
-      "supportedParameters": ["reasoning_effort"],
+      "supportedParameters": [
+        "reasoning_effort"
+      ],
       "defaultParameters": null,
       "modality": "text->text",
       "mode": "chat",
@@ -91,7 +95,9 @@
       },
       "contextLength": 400000,
       "maxCompletionTokens": 128000,
-      "supportedParameters": ["reasoning_effort"],
+      "supportedParameters": [
+        "reasoning_effort"
+      ],
       "defaultParameters": null,
       "modality": "text->text",
       "mode": "chat",
@@ -108,7 +114,7 @@
       "pricing": {
         "inputCostPerToken": 0,
         "outputCostPerToken": 0,
-        "inputCostPerCharacter": 1.667e-5
+        "inputCostPerCharacter": 1.667e-05
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -127,11 +133,11 @@
       "name": "OpenAI: GPT Image 2",
       "provider": "openai",
       "pricing": {
-        "inputCostPerToken": 5e-6,
+        "inputCostPerToken": 5e-06,
         "outputCostPerToken": 0,
-        "inputCacheReadPerToken": 1.25e-6,
-        "imageCostPerToken": 8e-6,
-        "imageOutputCostPerToken": 3e-5
+        "inputCacheReadPerToken": 1.25e-06,
+        "imageCostPerToken": 8e-06,
+        "imageOutputCostPerToken": 3e-05
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -150,11 +156,11 @@
       "name": "OpenAI: GPT Image 1",
       "provider": "openai",
       "pricing": {
-        "inputCostPerToken": 5e-6,
+        "inputCostPerToken": 5e-06,
         "outputCostPerToken": 0,
-        "inputCacheReadPerToken": 1.25e-6,
-        "imageCostPerToken": 1e-5,
-        "imageOutputCostPerToken": 4e-5
+        "inputCacheReadPerToken": 1.25e-06,
+        "imageCostPerToken": 1e-05,
+        "imageOutputCostPerToken": 4e-05
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -173,11 +179,11 @@
       "name": "OpenAI: GPT Image 1 mini",
       "provider": "openai",
       "pricing": {
-        "inputCostPerToken": 2e-6,
+        "inputCostPerToken": 2e-06,
         "outputCostPerToken": 0,
-        "inputCacheReadPerToken": 2e-7,
-        "imageCostPerToken": 2.5e-6,
-        "imageOutputCostPerToken": 8e-6
+        "inputCacheReadPerToken": 2e-07,
+        "imageCostPerToken": 2.5e-06,
+        "imageOutputCostPerToken": 8e-06
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -196,9 +202,10 @@
       "name": "OpenAI: GPT-4o Transcribe",
       "provider": "openai",
       "pricing": {
-        "inputCostPerToken": 2.5e-6,
-        "outputCostPerToken": 1e-5,
-        "audioCostPerToken": 2.5e-6
+        "inputCostPerToken": 2.5e-06,
+        "outputCostPerToken": 1e-05,
+        "audioCostPerToken": 2.5e-06,
+        "inputCostPerSecond": 0.0001
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -217,9 +224,10 @@
       "name": "OpenAI: GPT-4o mini Transcribe",
       "provider": "openai",
       "pricing": {
-        "inputCostPerToken": 1.25e-6,
-        "outputCostPerToken": 5e-6,
-        "audioCostPerToken": 1.25e-6
+        "inputCostPerToken": 1.25e-06,
+        "outputCostPerToken": 5e-06,
+        "audioCostPerToken": 1.25e-06,
+        "inputCostPerSecond": 5e-05
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -240,7 +248,7 @@
       "pricing": {
         "inputCostPerToken": 0,
         "outputCostPerToken": 0,
-        "inputCostPerSecond": 7.5e-5
+        "inputCostPerSecond": 7.5e-05
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -303,7 +311,7 @@
       "pricing": {
         "inputCostPerToken": 0,
         "outputCostPerToken": 0,
-        "inputCostPerCharacter": 0.0001
+        "inputCostPerCharacter": 8e-05
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -324,7 +332,7 @@
       "pricing": {
         "inputCostPerToken": 0,
         "outputCostPerToken": 0,
-        "inputCostPerCharacter": 5e-5
+        "inputCostPerCharacter": 4e-05
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -345,7 +353,7 @@
       "pricing": {
         "inputCostPerToken": 0,
         "outputCostPerToken": 0,
-        "inputCostPerCharacter": 5e-5
+        "inputCostPerCharacter": 4e-05
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -364,11 +372,11 @@
       "name": "OpenAI: GPT Realtime",
       "provider": "openai",
       "pricing": {
-        "inputCostPerToken": 4e-6,
-        "outputCostPerToken": 1.6e-5,
-        "inputCacheReadPerToken": 4e-7,
-        "audioCostPerToken": 3.2e-5,
-        "audioOutputCostPerToken": 6.4e-5
+        "inputCostPerToken": 4e-06,
+        "outputCostPerToken": 1.6e-05,
+        "inputCacheReadPerToken": 4e-07,
+        "audioCostPerToken": 3.2e-05,
+        "audioOutputCostPerToken": 6.4e-05
       },
       "contextLength": 32000,
       "maxCompletionTokens": 4096,
@@ -387,11 +395,11 @@
       "name": "OpenAI: GPT Realtime mini",
       "provider": "openai",
       "pricing": {
-        "inputCostPerToken": 6e-7,
-        "outputCostPerToken": 2.4e-6,
-        "inputCacheReadPerToken": 6e-8,
-        "audioCostPerToken": 1e-5,
-        "audioOutputCostPerToken": 2e-5
+        "inputCostPerToken": 6e-07,
+        "outputCostPerToken": 2.4e-06,
+        "inputCacheReadPerToken": 6e-08,
+        "audioCostPerToken": 1e-05,
+        "audioOutputCostPerToken": 2e-05
       },
       "contextLength": 32000,
       "maxCompletionTokens": 4096,
@@ -433,7 +441,7 @@
       "pricing": {
         "inputCostPerToken": 0,
         "outputCostPerToken": 0,
-        "inputCostPerCharacter": 5e-5
+        "inputCostPerCharacter": 4e-05
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -447,14 +455,98 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": true
     },
+    "elevenlabs/eleven_v4": {
+      "id": "elevenlabs/eleven_v4",
+      "name": "ElevenLabs: v4",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 8e-05
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "ElevenLabs' fourth-generation speech synthesis. Priced per input character, $0.08 per 1k characters (https://elevenlabs.io/pricing/api, list price, verified 2026-10-04).",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "elevenlabs/eleven_v4_turbo": {
+      "id": "elevenlabs/eleven_v4_turbo",
+      "name": "ElevenLabs: v4 Turbo",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 4e-05
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "ElevenLabs' low-latency fourth-generation speech synthesis. Priced per input character, $0.04 per 1k characters (https://elevenlabs.io/pricing/api, list price, verified 2026-10-04).",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "elevenlabs/eleven_v3_conversational": {
+      "id": "elevenlabs/eleven_v3_conversational",
+      "name": "ElevenLabs: v3 Conversational",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 4e-05
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "ElevenLabs' v3 speech synthesis tuned for conversation. Priced per input character, $0.04 per 1k characters (https://elevenlabs.io/pricing/api, list price, verified 2026-10-04).",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "elevenlabs/scribe_v2_realtime": {
+      "id": "elevenlabs/scribe_v2_realtime",
+      "name": "ElevenLabs: Scribe v2 Realtime",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerSecond": 0.00010833333333333333
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->text",
+      "mode": "audio",
+      "description": "ElevenLabs' live speech-to-text. Priced by audio duration at $0.39 per hour (https://elevenlabs.io/pricing/api, list price, verified 2026-10-04), which is $0.39 divided by 3600 per second.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "openai/gpt-audio-mini": {
       "id": "openai/gpt-audio-mini",
       "name": "OpenAI: GPT Audio Mini",
       "provider": "openai",
       "pricing": {
-        "inputCostPerToken": 6e-7,
-        "outputCostPerToken": 2.4e-6,
-        "audioCostPerToken": 1e-5
+        "inputCostPerToken": 6e-07,
+        "outputCostPerToken": 2.4e-06,
+        "audioCostPerToken": 1e-05
       },
       "contextLength": 128000,
       "maxCompletionTokens": 16384,
@@ -473,11 +565,11 @@
       "name": "OpenAI: GPT Realtime 2",
       "provider": "openai",
       "pricing": {
-        "inputCostPerToken": 4e-6,
-        "outputCostPerToken": 2.4e-5,
-        "inputCacheReadPerToken": 4e-7,
-        "audioCostPerToken": 3.2e-5,
-        "audioOutputCostPerToken": 6.4e-5
+        "inputCostPerToken": 4e-06,
+        "outputCostPerToken": 2.4e-05,
+        "inputCacheReadPerToken": 4e-07,
+        "audioCostPerToken": 3.2e-05,
+        "audioOutputCostPerToken": 6.4e-05
       },
       "contextLength": 0,
       "maxCompletionTokens": null,
@@ -496,9 +588,9 @@
       "name": "OpenAI: o3 Deep Research",
       "provider": "openai",
       "pricing": {
-        "inputCostPerToken": 1e-5,
-        "outputCostPerToken": 4e-5,
-        "inputCacheReadPerToken": 2.5e-6,
+        "inputCostPerToken": 1e-05,
+        "outputCostPerToken": 4e-05,
+        "inputCacheReadPerToken": 2.5e-06,
         "webSearchCostPerQuery": 0.01
       },
       "contextLength": 200000,
@@ -518,9 +610,9 @@
       "name": "OpenAI: o4 Mini Deep Research",
       "provider": "openai",
       "pricing": {
-        "inputCostPerToken": 2e-6,
-        "outputCostPerToken": 8e-6,
-        "inputCacheReadPerToken": 5e-7,
+        "inputCostPerToken": 2e-06,
+        "outputCostPerToken": 8e-06,
+        "inputCacheReadPerToken": 5e-07,
         "webSearchCostPerQuery": 0.01
       },
       "contextLength": 200000,
@@ -540,9 +632,9 @@
       "name": "OpenAI: GPT-5.3 Chat",
       "provider": "openai",
       "pricing": {
-        "inputCostPerToken": 1.75e-6,
-        "outputCostPerToken": 1.4e-5,
-        "inputCacheReadPerToken": 1.75e-7,
+        "inputCostPerToken": 1.75e-06,
+        "outputCostPerToken": 1.4e-05,
+        "inputCacheReadPerToken": 1.75e-07,
         "webSearchCostPerQuery": 0.01
       },
       "contextLength": 128000,
@@ -562,9 +654,9 @@
       "name": "Mistral: Devstral 2 2512",
       "provider": "mistralai",
       "pricing": {
-        "inputCostPerToken": 4e-7,
-        "outputCostPerToken": 2e-6,
-        "inputCacheReadPerToken": 4e-8
+        "inputCostPerToken": 4e-07,
+        "outputCostPerToken": 2e-06,
+        "inputCacheReadPerToken": 4e-08
       },
       "contextLength": 262144,
       "maxCompletionTokens": null,
@@ -583,9 +675,9 @@
       "name": "Poolside: Laguna M.1",
       "provider": "poolside",
       "pricing": {
-        "inputCostPerToken": 2e-7,
-        "outputCostPerToken": 4e-7,
-        "inputCacheReadPerToken": 1e-7
+        "inputCostPerToken": 2e-07,
+        "outputCostPerToken": 4e-07,
+        "inputCacheReadPerToken": 1e-07
       },
       "contextLength": 262144,
       "maxCompletionTokens": 32768,
@@ -598,6 +690,27 @@
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
+    },
+    "elevenlabs/eleven_v3": {
+      "id": "elevenlabs/eleven_v3",
+      "name": "eleven_v3",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 8e-05
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
     }
   }
 }
