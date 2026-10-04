@@ -7,6 +7,7 @@ import type {
   PrincipalRef,
   RestCredentialPrincipal,
   RestKeyCredentialPrincipal,
+  RestKeyDoorPrincipal,
   RestOrganizationCredentialPrincipal,
   RestProjectCredentialPrincipal,
   RestProjectIdentity,
@@ -16,6 +17,7 @@ import type {
 import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Context, ErrorHandler } from "hono";
 
+import { ProjectInvalidCredentialsError } from "../errors.ts";
 import type { EndpointVariables, ServiceContext } from "./response.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -164,7 +166,7 @@ export type RestResolvedScimCredential = Readonly<{
 const projectCredentials = new WeakMap<Request, RestResolvedProjectCredential>();
 const organizationCredentials = new WeakMap<Request, RestResolvedOrganizationCredential>();
 const scimCredentials = new WeakMap<Request, RestResolvedScimCredential>();
-const keyCredentials = new WeakMap<Request, RestKeyCredentialPrincipal>();
+const keyCredentials = new WeakMap<Request, RestKeyDoorPrincipal>();
 const browserCallers = new WeakMap<Request, RestBrowserCaller>();
 
 /** The project door states what it resolved, once per request. */
@@ -192,10 +194,7 @@ export function recordScimCredential(
 }
 
 /** The key door states what it resolved, once per request. */
-export function recordKeyCredential(
-  request: Request,
-  credential: RestKeyCredentialPrincipal,
-): void {
+export function recordKeyCredential(request: Request, credential: RestKeyDoorPrincipal): void {
   keyCredentials.set(request, credential);
 }
 
@@ -235,8 +234,8 @@ export function organizationCredentialOfRequest(
   return credential;
 }
 
-/** The same, for the key door. */
-export function keyCredentialOfRequest(request: Request): RestKeyCredentialPrincipal {
+/** The same, for the key door, with a project-bound access token let through as its person. */
+export function keyDoorPrincipalOfRequest(request: Request): RestKeyDoorPrincipal {
   const credential = keyCredentials.get(request);
 
   if (!credential) {
@@ -244,6 +243,14 @@ export function keyCredentialOfRequest(request: Request): RestKeyCredentialPrinc
       "A module bound a fact from the key credential, and this request's door resolved none",
     );
   }
+
+  return credential;
+}
+
+/** The API key the key door resolved. An access token is no API key, so it is refused here. */
+export function keyCredentialOfRequest(request: Request): RestKeyCredentialPrincipal {
+  const credential = keyDoorPrincipalOfRequest(request);
+  if (credential.kind === "cliAccessToken") throw new ProjectInvalidCredentialsError();
 
   return credential;
 }

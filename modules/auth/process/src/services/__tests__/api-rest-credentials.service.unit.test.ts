@@ -281,6 +281,21 @@ describe("a project-bound CLI access token", () => {
     });
   });
 
+  describe("when it arrives at the key door", () => {
+    it("is let in as its person, bound to the one project the token names", async () => {
+      const credential = await tokenDoor(true).identifyKey({ request: bearer });
+
+      expect(credential.principal).toEqual({
+        kind: "cliAccessToken",
+        userId: "user-9",
+        organizationId: "org-1",
+        projectId: "project-1",
+        teamId: "team-1",
+      });
+      expect(credential.organizationId).toBe("org-1");
+    });
+  });
+
   describe("when the person lacks the permission at the bound project", () => {
     it("is refused as a permission denial", async () => {
       expect(

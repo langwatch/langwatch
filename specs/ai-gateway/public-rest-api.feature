@@ -12,7 +12,9 @@ Feature: Public REST API — /api/gateway/v1/*
   without a browser session anywhere in the loop.
 
   The API is exposed by Hono under /api/gateway/v1/*, authenticated by a
-  legacy project API key or a scoped API key (Bearer + X-Project-Id).
+  legacy project API key or a scoped API key (Bearer, X-Project-Id optional
+  on the virtual key and budget routes, where a key that names no project
+  answers for everything it reaches in its organization).
   There is exactly one implementation of every write rule: REST handlers
   route through the SAME service-layer methods and pre-flight asserts as
   the tRPC mutations (VirtualKeyService, GatewayBudgetService,
@@ -43,12 +45,41 @@ Feature: Public REST API — /api/gateway/v1/*
     # The ceiling: effective = key bindings ∩ owning user's current bindings.
 
   @integration @rest @pat
-  Scenario: A login key lists virtual keys and reads their spend in the project it names
+  Scenario: A login key that names no project lists every virtual key it can see
+    Given the organization-scoped API key a CLI login holds
+    And virtual keys scoped to two projects of the organization
+    When it sends `GET /api/gateway/v1/virtual-keys` with no X-Project-Id
+    Then the response status is 200 and lists the keys of both projects
+    When it sends `GET /api/gateway/v1/virtual-keys/:id` and `/:id/spend` with no X-Project-Id
+    Then both response statuses are 200
+    # The same reach the virtual keys page shows a person: the organization, not one project.
+
+  @integration @rest @pat
+  Scenario: A login key narrows the listing to the project it names
     Given the organization-scoped API key a CLI login holds
     When it sends `GET /api/gateway/v1/virtual-keys` naming a project in X-Project-Id
-    Then the response status is 200 and lists that project's virtual keys
+    Then the response status is 200 and lists that project's virtual keys only
     When it sends `GET /api/gateway/v1/virtual-keys/:id/spend` naming the same project
     Then the response status is 200
+
+  @integration @rest @pat
+  Scenario: A key that names no project sees only the virtual keys its grants reach
+    Given an API key granted on one team of the organization only
+    And a virtual key scoped to a project of another team
+    When it sends `GET /api/gateway/v1/virtual-keys` with no X-Project-Id
+    Then the other team's key is not listed
+    When it sends `GET /api/gateway/v1/virtual-keys/:id` for that key
+    Then the response status is 404 with code "virtual_key_not_found"
+
+  @integration @rest @pat
+  Scenario: A key that names no project manages a virtual key by its scopes
+    Given the organization-scoped API key a CLI login holds
+    When it creates a virtual key naming a project scope and no X-Project-Id
+    Then the response status is 201
+    When it disables, enables and revokes that key with no X-Project-Id
+    Then every response status is 200
+    When it creates a virtual key naming neither scopes nor a project
+    Then the response status is 422 and the violation names `scopes`
 
   @integration @rest @pat @unimplemented
   Scenario: A scoped API key fails closed when a linked custom-role row has malformed permissions (583f27ff6)

@@ -18,7 +18,7 @@ import {
 import type {
   AuthzPermission,
   PermissionDecision,
-  RestKeyCredentialPrincipal,
+  RestKeyDoorPrincipal,
   RestProjectIdentity,
   RestResolvedProjectCredential,
 } from "@langwatch/authorization";
@@ -51,7 +51,7 @@ export type ApiOrganizationCredential = Readonly<{
 }>;
 
 export type ApiKeyDoorCredential = Readonly<{
-  principal: RestKeyCredentialPrincipal;
+  principal: RestKeyDoorPrincipal;
   organizationId: string;
   markUsed: () => void;
 }>;
@@ -151,12 +151,22 @@ export class ApiRestCredentialsService {
   /**
    * Any API key, with no project demanded (#8085): a legacy key IS its project, a key that
    * resolves a project still reaches its organization, and one naming no project resolves
-   * through its organization. Only a token that is neither is refused.
+   * through its organization. A project-bound access token is its person in that project.
    */
   async identifyKey(input: { request: Request }): Promise<ApiKeyDoorCredential> {
     const person = await this.#cliAccessCredential(input.request);
     if (person) {
-      throw new ProjectInvalidCredentialsError();
+      return {
+        principal: {
+          kind: "cliAccessToken",
+          userId: person.actsAsPerson.userId,
+          organizationId: person.project.organizationId,
+          projectId: person.project.id,
+          teamId: person.project.teamId,
+        },
+        organizationId: person.project.organizationId,
+        markUsed: person.markUsed,
+      };
     }
 
     const credentials = extractApiKeyRequestCredentials(input.request);

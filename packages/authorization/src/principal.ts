@@ -130,6 +130,14 @@ export type RestKeyCredentialPrincipal =
       resolvedProject?: Readonly<{ id: string; teamId: string }>;
     }>;
 
+/**
+ * Everything the key door lets in: any API key, or a project-bound access token as its person.
+ * A feature that serves API keys only reads the narrower {@link RestKeyCredentialPrincipal}.
+ */
+export type RestKeyDoorPrincipal =
+  | RestKeyCredentialPrincipal
+  | Extract<RestProjectCredentialPrincipal, { kind: "cliAccessToken" }>;
+
 /** What the caller presented: the bearer key, the project it names, and its session's address. */
 export type SessionKeyPresented = Readonly<{
   token: string;

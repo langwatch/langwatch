@@ -1,11 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { runWithCredentialHolder, setResolvedProjectId } from "@/internal/credentialContext";
+import {
+  runWithCredentialHolder,
+  setRequestedProject,
+  setResolvedProjectId,
+} from "@/internal/credentialContext";
 
 import { VirtualKeysApiService } from "../virtual-keys-api.service";
 
 /**
- * The virtual key routes act on one project, so a key that reaches several has to name it.
+ * A key that names no project answers for every virtual key it can see, so only a project the
+ * caller asked for is sent.
  * @see specs/typescript-sdk/cli-cross-project-access.feature
  */
 
@@ -28,6 +33,12 @@ const spendSummary = (): Response =>
     }),
     { status: 200, headers: { "content-type": "application/json" } },
   );
+
+const createdKey = (): Response =>
+  new Response(JSON.stringify({ virtual_key: { id: "vk_1" }, secret: "vk-lw-secret" }), {
+    status: 201,
+    headers: { "content-type": "application/json" },
+  });
 
 /** The X-Project-Id header of the nth fetch, or null when the request sent none. */
 const projectHeaderOf = (call: number): string | null => {
@@ -59,9 +70,9 @@ describe("VirtualKeysApiService project header", () => {
     restore("LANGWATCH_PROJECT_ID", previous.projectId);
   });
 
-  describe("when the request resolved a project", () => {
-    /** @scenario "virtual key commands name the project the login key resolved" */
-    it("names that project when listing", async () => {
+  describe("when the request resolved a project the command line did not name", () => {
+    /** @scenario "virtual key commands answer for everything the login key reaches" */
+    it("names no project when listing, so every visible key is listed", async () => {
       mockFetch.mockResolvedValueOnce(emptyPage());
 
       await runWithCredentialHolder(async () => {
@@ -69,14 +80,54 @@ describe("VirtualKeysApiService project header", () => {
         await new VirtualKeysApiService().list();
       });
 
-      expect(projectHeaderOf(0)).toBe("project_personal");
+      expect(projectHeaderOf(0)).toBeNull();
     });
 
-    /** @scenario "virtual key commands follow --project" */
-    it("names that project when reading a key's spend", async () => {
+    it("names no project when reading a key's spend", async () => {
       mockFetch.mockResolvedValueOnce(spendSummary());
 
       await runWithCredentialHolder(async () => {
+        setResolvedProjectId("project_personal");
+        await new VirtualKeysApiService().spend("vk_1");
+      });
+
+      expect(projectHeaderOf(0)).toBeNull();
+    });
+
+    /** @scenario "a virtual key created with no scope lands in the resolved project" */
+    it("names it when creating a key with no scope", async () => {
+      mockFetch.mockResolvedValueOnce(createdKey());
+
+      await runWithCredentialHolder(async () => {
+        setResolvedProjectId("project_personal");
+        await new VirtualKeysApiService().create({ name: "ci" });
+      });
+
+      expect(projectHeaderOf(0)).toBe("project_personal");
+    });
+
+    it("names no project when creating a key that says its scopes", async () => {
+      mockFetch.mockResolvedValueOnce(createdKey());
+
+      await runWithCredentialHolder(async () => {
+        setResolvedProjectId("project_personal");
+        await new VirtualKeysApiService().create({
+          name: "ci",
+          scopes: [{ scope_type: "team", scope_id: "team_1" }],
+        });
+      });
+
+      expect(projectHeaderOf(0)).toBeNull();
+    });
+  });
+
+  describe("when the command line named a project", () => {
+    /** @scenario "virtual key commands follow --project" */
+    it("names the project it resolved to when reading a key's spend", async () => {
+      mockFetch.mockResolvedValueOnce(spendSummary());
+
+      await runWithCredentialHolder(async () => {
+        setRequestedProject("checkout");
         setResolvedProjectId("proj-b");
         await new VirtualKeysApiService().spend("vk_1");
       });
@@ -89,11 +140,12 @@ describe("VirtualKeysApiService project header", () => {
       mockFetch.mockResolvedValueOnce(emptyPage());
 
       await runWithCredentialHolder(async () => {
-        setResolvedProjectId("project_personal");
+        setRequestedProject("checkout");
+        setResolvedProjectId("proj-b");
         await new VirtualKeysApiService().list();
       });
 
-      expect(projectHeaderOf(0)).toBe("project_personal");
+      expect(projectHeaderOf(0)).toBe("proj-b");
     });
   });
 

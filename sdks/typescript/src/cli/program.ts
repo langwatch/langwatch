@@ -23,6 +23,7 @@ import {
 } from "./utils/output";
 import {
   applyProjectOption,
+  COMMANDS_ACROSS_PROJECTS,
   COMMANDS_WITHOUT_PROJECT,
   commandPath,
   PROJECT_FLAG_HELP,
@@ -316,7 +317,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     // the action runs so `resolveCredentials` reads it without the action
     // having to accept the value and pass it on.
     setRequestedProject(projectSelectorOf(actionCommand));
-    setRunsOutsideProject(commandPath(actionCommand) in COMMANDS_WITHOUT_PROJECT);
+    const path = commandPath(actionCommand);
+    setRunsOutsideProject(path in COMMANDS_WITHOUT_PROJECT || path in COMMANDS_ACROSS_PROJECTS);
   });
 
   registerLoginCommands(program);
@@ -2165,6 +2167,10 @@ function registerModelDefaultCommands(program: Command): void {
   );
 }
 
+/** Help for `--project` on the virtual key commands, where it narrows instead of selecting. */
+const VIRTUAL_KEY_PROJECT_FLAG_HELP =
+  "Project to act in, by id or slug. Without it the command answers for every virtual key your login can see, and a key created with no --scope lands in your personal project";
+
 function registerVirtualKeysCommands(program: Command): void {
   // Add virtual-keys command group (AI Gateway)
   const virtualKeysCmd = program
@@ -2175,7 +2181,7 @@ function registerVirtualKeysCommands(program: Command): void {
   emitsResult(
     virtualKeysCmd
       .command("list")
-      .description("List all virtual keys for the current project")
+      .description("List every virtual key your login can see, or one project's with --project")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async () => {
       const { listVirtualKeysCommand: impl } = await import("./commands/virtual-keys/list.js");
@@ -2369,6 +2375,11 @@ function registerVirtualKeysCommands(program: Command): void {
       return impl(id);
     },
   );
+
+  // A virtual key lives in the scopes it names, not in one project, so the flag narrows here.
+  for (const leaf of virtualKeysCmd.commands) {
+    leaf.option("--project <idOrSlug>", VIRTUAL_KEY_PROJECT_FLAG_HELP);
+  }
 }
 
 function registerGatewayBudgetsCommands(program: Command): void {

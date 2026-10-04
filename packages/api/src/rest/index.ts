@@ -140,6 +140,7 @@ export {
   credentialPrincipalOf,
   credentialPrincipalOfToken,
   keyCredentialOfRequest,
+  keyDoorPrincipalOfRequest,
   organizationCredentialOfRequest,
   organizationCredentialPrincipalOf,
   organizationCredentialPrincipalOfToken,

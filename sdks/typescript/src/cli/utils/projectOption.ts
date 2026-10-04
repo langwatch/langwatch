@@ -154,6 +154,21 @@ export const COMMANDS_WITHOUT_PROJECT: Record<string, string> = {
 };
 
 /**
+ * Commands that answer for everything the login reaches unless `--project` narrows them.
+ * They keep the flag, and nothing tells their user that they read the personal project.
+ */
+export const COMMANDS_ACROSS_PROJECTS: Record<string, string> = {
+  "virtual-keys list": "lists every virtual key the login can see",
+  "virtual-keys get": "acts on a virtual key by id, in whichever scope it lives",
+  "virtual-keys spend": "acts on a virtual key by id, in whichever scope it lives",
+  "virtual-keys update": "acts on a virtual key by id, in whichever scope it lives",
+  "virtual-keys rotate": "acts on a virtual key by id, in whichever scope it lives",
+  "virtual-keys disable": "acts on a virtual key by id, in whichever scope it lives",
+  "virtual-keys enable": "acts on a virtual key by id, in whichever scope it lives",
+  "virtual-keys revoke": "acts on a virtual key by id, in whichever scope it lives",
+};
+
+/**
  * Commands that already declare a `--project` of their own MEANING SOMETHING ELSE. Left exactly as
  * they are: the value is the command's own argument, so reading it as the credential's target would
  * point the command at a project the user did not ask it to run as.

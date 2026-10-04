@@ -6252,6 +6252,21 @@ func (e LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference) Valid() bool
 	}
 }
 
+// Defines values for LangyLocalStartWaitJSONBodyKind.
+const (
+	Question LangyLocalStartWaitJSONBodyKind = "question"
+)
+
+// Valid indicates whether the value is a known member of the LangyLocalStartWaitJSONBodyKind enum.
+func (e LangyLocalStartWaitJSONBodyKind) Valid() bool {
+	switch e {
+	case Question:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LangyLocalReadWait200JSONResponseBodyState.
 const (
 	LangyLocalReadWait200JSONResponseBodyStateAnswered  LangyLocalReadWait200JSONResponseBodyState = "answered"
@@ -10824,6 +10839,90 @@ func (e CreateApiKeyJSONBodyPermissionMode) Valid() bool {
 	}
 }
 
+// Defines values for CreateFullAccessApiKeyJSONBodyBindingsRole.
+const (
+	CreateFullAccessApiKeyJSONBodyBindingsRoleADMIN  CreateFullAccessApiKeyJSONBodyBindingsRole = "ADMIN"
+	CreateFullAccessApiKeyJSONBodyBindingsRoleCUSTOM CreateFullAccessApiKeyJSONBodyBindingsRole = "CUSTOM"
+	CreateFullAccessApiKeyJSONBodyBindingsRoleMEMBER CreateFullAccessApiKeyJSONBodyBindingsRole = "MEMBER"
+	CreateFullAccessApiKeyJSONBodyBindingsRoleVIEWER CreateFullAccessApiKeyJSONBodyBindingsRole = "VIEWER"
+)
+
+// Valid indicates whether the value is a known member of the CreateFullAccessApiKeyJSONBodyBindingsRole enum.
+func (e CreateFullAccessApiKeyJSONBodyBindingsRole) Valid() bool {
+	switch e {
+	case CreateFullAccessApiKeyJSONBodyBindingsRoleADMIN:
+		return true
+	case CreateFullAccessApiKeyJSONBodyBindingsRoleCUSTOM:
+		return true
+	case CreateFullAccessApiKeyJSONBodyBindingsRoleMEMBER:
+		return true
+	case CreateFullAccessApiKeyJSONBodyBindingsRoleVIEWER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateFullAccessApiKeyJSONBodyBindingsScopeType.
+const (
+	CreateFullAccessApiKeyJSONBodyBindingsScopeTypeORGANIZATION CreateFullAccessApiKeyJSONBodyBindingsScopeType = "ORGANIZATION"
+	CreateFullAccessApiKeyJSONBodyBindingsScopeTypePROJECT      CreateFullAccessApiKeyJSONBodyBindingsScopeType = "PROJECT"
+	CreateFullAccessApiKeyJSONBodyBindingsScopeTypeTEAM         CreateFullAccessApiKeyJSONBodyBindingsScopeType = "TEAM"
+)
+
+// Valid indicates whether the value is a known member of the CreateFullAccessApiKeyJSONBodyBindingsScopeType enum.
+func (e CreateFullAccessApiKeyJSONBodyBindingsScopeType) Valid() bool {
+	switch e {
+	case CreateFullAccessApiKeyJSONBodyBindingsScopeTypeORGANIZATION:
+		return true
+	case CreateFullAccessApiKeyJSONBodyBindingsScopeTypePROJECT:
+		return true
+	case CreateFullAccessApiKeyJSONBodyBindingsScopeTypeTEAM:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateFullAccessApiKeyJSONBodyKeyType.
+const (
+	CreateFullAccessApiKeyJSONBodyKeyTypePersonal CreateFullAccessApiKeyJSONBodyKeyType = "personal"
+	CreateFullAccessApiKeyJSONBodyKeyTypeService  CreateFullAccessApiKeyJSONBodyKeyType = "service"
+)
+
+// Valid indicates whether the value is a known member of the CreateFullAccessApiKeyJSONBodyKeyType enum.
+func (e CreateFullAccessApiKeyJSONBodyKeyType) Valid() bool {
+	switch e {
+	case CreateFullAccessApiKeyJSONBodyKeyTypePersonal:
+		return true
+	case CreateFullAccessApiKeyJSONBodyKeyTypeService:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateFullAccessApiKeyJSONBodyPermissionMode.
+const (
+	CreateFullAccessApiKeyJSONBodyPermissionModeAll        CreateFullAccessApiKeyJSONBodyPermissionMode = "all"
+	CreateFullAccessApiKeyJSONBodyPermissionModeReadonly   CreateFullAccessApiKeyJSONBodyPermissionMode = "readonly"
+	CreateFullAccessApiKeyJSONBodyPermissionModeRestricted CreateFullAccessApiKeyJSONBodyPermissionMode = "restricted"
+)
+
+// Valid indicates whether the value is a known member of the CreateFullAccessApiKeyJSONBodyPermissionMode enum.
+func (e CreateFullAccessApiKeyJSONBodyPermissionMode) Valid() bool {
+	switch e {
+	case CreateFullAccessApiKeyJSONBodyPermissionModeAll:
+		return true
+	case CreateFullAccessApiKeyJSONBodyPermissionModeReadonly:
+		return true
+	case CreateFullAccessApiKeyJSONBodyPermissionModeRestricted:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateIngestionApiKeyJSONBodyBindingsRole.
 const (
 	CreateIngestionApiKeyJSONBodyBindingsRoleADMIN  CreateIngestionApiKeyJSONBodyBindingsRole = "ADMIN"
@@ -14496,6 +14595,48 @@ const (
 func (e CancelLangyControlRequest200JSONResponseBodyCancelled) Valid() bool {
 	switch e {
 	case CancelLangyControlRequest200JSONResponseBodyCancelledTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StartLangyConversationTurnJSONBodyMessagesRole.
+const (
+	StartLangyConversationTurnJSONBodyMessagesRoleAssistant StartLangyConversationTurnJSONBodyMessagesRole = "assistant"
+	StartLangyConversationTurnJSONBodyMessagesRoleSystem    StartLangyConversationTurnJSONBodyMessagesRole = "system"
+	StartLangyConversationTurnJSONBodyMessagesRoleUser      StartLangyConversationTurnJSONBodyMessagesRole = "user"
+)
+
+// Valid indicates whether the value is a known member of the StartLangyConversationTurnJSONBodyMessagesRole enum.
+func (e StartLangyConversationTurnJSONBodyMessagesRole) Valid() bool {
+	switch e {
+	case StartLangyConversationTurnJSONBodyMessagesRoleAssistant:
+		return true
+	case StartLangyConversationTurnJSONBodyMessagesRoleSystem:
+		return true
+	case StartLangyConversationTurnJSONBodyMessagesRoleUser:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ContinueLangyConversationTurnJSONBodyMessagesRole.
+const (
+	ContinueLangyConversationTurnJSONBodyMessagesRoleAssistant ContinueLangyConversationTurnJSONBodyMessagesRole = "assistant"
+	ContinueLangyConversationTurnJSONBodyMessagesRoleSystem    ContinueLangyConversationTurnJSONBodyMessagesRole = "system"
+	ContinueLangyConversationTurnJSONBodyMessagesRoleUser      ContinueLangyConversationTurnJSONBodyMessagesRole = "user"
+)
+
+// Valid indicates whether the value is a known member of the ContinueLangyConversationTurnJSONBodyMessagesRole enum.
+func (e ContinueLangyConversationTurnJSONBodyMessagesRole) Valid() bool {
+	switch e {
+	case ContinueLangyConversationTurnJSONBodyMessagesRoleAssistant:
+		return true
+	case ContinueLangyConversationTurnJSONBodyMessagesRoleSystem:
+		return true
+	case ContinueLangyConversationTurnJSONBodyMessagesRoleUser:
 		return true
 	default:
 		return false
@@ -24812,16 +24953,16 @@ func (e GetApiSlackConnections200JSONResponseBodyKind) Valid() bool {
 
 // Defines values for GetApiSlackConnections200JSONResponseBodyScopeType.
 const (
-	GetApiSlackConnections200JSONResponseBodyScopeTypeORGANIZATION GetApiSlackConnections200JSONResponseBodyScopeType = "ORGANIZATION"
-	GetApiSlackConnections200JSONResponseBodyScopeTypePROJECT      GetApiSlackConnections200JSONResponseBodyScopeType = "PROJECT"
+	ORGANIZATION GetApiSlackConnections200JSONResponseBodyScopeType = "ORGANIZATION"
+	PROJECT      GetApiSlackConnections200JSONResponseBodyScopeType = "PROJECT"
 )
 
 // Valid indicates whether the value is a known member of the GetApiSlackConnections200JSONResponseBodyScopeType enum.
 func (e GetApiSlackConnections200JSONResponseBodyScopeType) Valid() bool {
 	switch e {
-	case GetApiSlackConnections200JSONResponseBodyScopeTypeORGANIZATION:
+	case ORGANIZATION:
 		return true
-	case GetApiSlackConnections200JSONResponseBodyScopeTypePROJECT:
+	case PROJECT:
 		return true
 	default:
 		return false
@@ -26237,13 +26378,13 @@ func (e PostApiSuitesByIdDuplicate201JSONResponseBodyKind) Valid() bool {
 
 // Defines values for PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode.
 const (
-	All PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode = "all"
+	PostApiSuitesByIdDuplicate201JSONResponseBodyScope0ModeAll PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode = "all"
 )
 
 // Valid indicates whether the value is a known member of the PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode enum.
 func (e PostApiSuitesByIdDuplicate201JSONResponseBodyScope0Mode) Valid() bool {
 	switch e {
-	case All:
+	case PostApiSuitesByIdDuplicate201JSONResponseBodyScope0ModeAll:
 		return true
 	default:
 		return false
@@ -26501,19 +26642,19 @@ func (e GetApiTeamsByIdMembers200JSONResponseBodyDataRole) Valid() bool {
 
 // Defines values for PostApiTeamsByIdMembersJSONBodyRole.
 const (
-	PostApiTeamsByIdMembersJSONBodyRoleADMIN  PostApiTeamsByIdMembersJSONBodyRole = "ADMIN"
-	PostApiTeamsByIdMembersJSONBodyRoleMEMBER PostApiTeamsByIdMembersJSONBodyRole = "MEMBER"
-	PostApiTeamsByIdMembersJSONBodyRoleVIEWER PostApiTeamsByIdMembersJSONBodyRole = "VIEWER"
+	ADMIN  PostApiTeamsByIdMembersJSONBodyRole = "ADMIN"
+	MEMBER PostApiTeamsByIdMembersJSONBodyRole = "MEMBER"
+	VIEWER PostApiTeamsByIdMembersJSONBodyRole = "VIEWER"
 )
 
 // Valid indicates whether the value is a known member of the PostApiTeamsByIdMembersJSONBodyRole enum.
 func (e PostApiTeamsByIdMembersJSONBodyRole) Valid() bool {
 	switch e {
-	case PostApiTeamsByIdMembersJSONBodyRoleADMIN:
+	case ADMIN:
 		return true
-	case PostApiTeamsByIdMembersJSONBodyRoleMEMBER:
+	case MEMBER:
 		return true
-	case PostApiTeamsByIdMembersJSONBodyRoleVIEWER:
+	case VIEWER:
 		return true
 	default:
 		return false
@@ -34444,8 +34585,28 @@ type LangyLocalWorkspace200JSONResponseBodyCodeAccessPreference string
 // LangyUiActionsDispatchTextBody defines parameters for LangyUiActionsDispatch.
 type LangyUiActionsDispatchTextBody interface{}
 
-// LangyLocalStartWaitTextBody defines parameters for LangyLocalStartWait.
-type LangyLocalStartWaitTextBody interface{}
+// LangyLocalStartWaitJSONBody defines parameters for LangyLocalStartWait.
+type LangyLocalStartWaitJSONBody struct {
+	ConversationId string                          `json:"conversationId"`
+	Kind           LangyLocalStartWaitJSONBodyKind `json:"kind"`
+	Questions      []struct {
+		AllowOther *bool   `json:"allowOther,omitempty"`
+		Bare       *bool   `json:"bare,omitempty"`
+		Header     *string `json:"header,omitempty"`
+		Multiple   *bool   `json:"multiple,omitempty"`
+		Options    []struct {
+			Description *string `json:"description,omitempty"`
+			Label       string  `json:"label"`
+			Quiet       *bool   `json:"quiet,omitempty"`
+		} `json:"options"`
+		Question string `json:"question"`
+	} `json:"questions"`
+	ToolCallId *string `json:"toolCallId,omitempty"`
+	TurnId     string  `json:"turnId"`
+}
+
+// LangyLocalStartWaitJSONBodyKind defines parameters for LangyLocalStartWait.
+type LangyLocalStartWaitJSONBodyKind string
 
 // LangyLocalReadWait200JSONResponseBodyState defines parameters for LangyLocalReadWait.
 type LangyLocalReadWait200JSONResponseBodyState string
@@ -38734,6 +38895,51 @@ type CreateApiKeyJSONBodyKeyType string
 // CreateApiKeyJSONBodyPermissionMode defines parameters for CreateApiKey.
 type CreateApiKeyJSONBodyPermissionMode string
 
+// CreateFullAccessApiKeyJSONBody defines parameters for CreateFullAccessApiKey.
+type CreateFullAccessApiKeyJSONBody struct {
+	// AssignedToUserId Organization admins only: the member who owns the key and whose access caps it. Defaults to the caller.
+	AssignedToUserId *string `json:"assignedToUserId,omitempty"`
+
+	// Bindings What this key may do, and where. Required for a personal key.
+	Bindings *[]struct {
+		// Role CUSTOM grants exactly the listed permissions and requires permissionMode 'restricted'.
+		Role      CreateFullAccessApiKeyJSONBodyBindingsRole      `json:"role"`
+		ScopeId   string                                          `json:"scopeId"`
+		ScopeType CreateFullAccessApiKeyJSONBodyBindingsScopeType `json:"scopeType"`
+	} `json:"bindings,omitempty"`
+	Description *string `json:"description,omitempty"`
+
+	// ExpiresAt ISO 8601 timestamp after which the key stops working
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+
+	// KeyType A personal key acts as the user who created it and needs explicit bindings. A service key is not tied to a user.
+	KeyType *CreateFullAccessApiKeyJSONBodyKeyType `json:"keyType,omitempty"`
+
+	// Name Human-readable name for this key
+	Name string `json:"name"`
+
+	// PermissionMode 'all' and 'readonly' take their meaning from the bindings alone; 'restricted' additionally requires an explicit permissions list.
+	PermissionMode *CreateFullAccessApiKeyJSONBodyPermissionMode `json:"permissionMode,omitempty"`
+
+	// Permissions Restricted mode only: the exact resource:action permissions the key's CUSTOM bindings grant.
+	Permissions *[]string `json:"permissions,omitempty"`
+
+	// ProjectIds Service keys only: restricts the key to these projects
+	ProjectIds *[]string `json:"projectIds,omitempty"`
+}
+
+// CreateFullAccessApiKeyJSONBodyBindingsRole defines parameters for CreateFullAccessApiKey.
+type CreateFullAccessApiKeyJSONBodyBindingsRole string
+
+// CreateFullAccessApiKeyJSONBodyBindingsScopeType defines parameters for CreateFullAccessApiKey.
+type CreateFullAccessApiKeyJSONBodyBindingsScopeType string
+
+// CreateFullAccessApiKeyJSONBodyKeyType defines parameters for CreateFullAccessApiKey.
+type CreateFullAccessApiKeyJSONBodyKeyType string
+
+// CreateFullAccessApiKeyJSONBodyPermissionMode defines parameters for CreateFullAccessApiKey.
+type CreateFullAccessApiKeyJSONBodyPermissionMode string
+
 // CreateIngestionApiKeyJSONBody defines parameters for CreateIngestionApiKey.
 type CreateIngestionApiKeyJSONBody struct {
 	// AssignedToUserId Organization admins only: the member who owns the key and whose access caps it. Defaults to the caller.
@@ -41070,11 +41276,35 @@ type ApproveLangyControlRequestJSONBody struct {
 // CancelLangyControlRequest200JSONResponseBodyCancelled defines parameters for CancelLangyControlRequest.
 type CancelLangyControlRequest200JSONResponseBodyCancelled bool
 
-// StartLangyConversationTurnTextBody defines parameters for StartLangyConversationTurn.
-type StartLangyConversationTurnTextBody interface{}
+// StartLangyConversationTurnJSONBody defines parameters for StartLangyConversationTurn.
+type StartLangyConversationTurnJSONBody struct {
+	AdoptConversationId *bool  `json:"adoptConversationId,omitempty"`
+	IdempotencyKey      string `json:"idempotencyKey"`
+	Messages            []struct {
+		Content *string                                        `json:"content,omitempty"`
+		Parts   *[]map[string]*JsonValue                       `json:"parts,omitempty"`
+		Role    StartLangyConversationTurnJSONBodyMessagesRole `json:"role"`
+	} `json:"messages"`
+	ModelOverride *string `json:"modelOverride,omitempty"`
+}
 
-// ContinueLangyConversationTurnTextBody defines parameters for ContinueLangyConversationTurn.
-type ContinueLangyConversationTurnTextBody interface{}
+// StartLangyConversationTurnJSONBodyMessagesRole defines parameters for StartLangyConversationTurn.
+type StartLangyConversationTurnJSONBodyMessagesRole string
+
+// ContinueLangyConversationTurnJSONBody defines parameters for ContinueLangyConversationTurn.
+type ContinueLangyConversationTurnJSONBody struct {
+	AdoptConversationId *bool  `json:"adoptConversationId,omitempty"`
+	IdempotencyKey      string `json:"idempotencyKey"`
+	Messages            []struct {
+		Content *string                                           `json:"content,omitempty"`
+		Parts   *[]map[string]*JsonValue                          `json:"parts,omitempty"`
+		Role    ContinueLangyConversationTurnJSONBodyMessagesRole `json:"role"`
+	} `json:"messages"`
+	ModelOverride *string `json:"modelOverride,omitempty"`
+}
+
+// ContinueLangyConversationTurnJSONBodyMessagesRole defines parameters for ContinueLangyConversationTurn.
+type ContinueLangyConversationTurnJSONBodyMessagesRole string
 
 // GetApiMeUsageParams defines parameters for GetApiMeUsage.
 type GetApiMeUsageParams struct {
@@ -49151,8 +49381,8 @@ type LangyLocalCreateRequestJSONRequestBody LangyLocalCreateRequestJSONBody
 // LangyUiActionsDispatchTextRequestBody defines body for LangyUiActionsDispatch for text/plain ContentType.
 type LangyUiActionsDispatchTextRequestBody LangyUiActionsDispatchTextBody
 
-// LangyLocalStartWaitTextRequestBody defines body for LangyLocalStartWait for text/plain ContentType.
-type LangyLocalStartWaitTextRequestBody LangyLocalStartWaitTextBody
+// LangyLocalStartWaitJSONRequestBody defines body for LangyLocalStartWait for application/json ContentType.
+type LangyLocalStartWaitJSONRequestBody LangyLocalStartWaitJSONBody
 
 // CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
 type CreateProjectJSONRequestBody CreateProjectJSONBody
@@ -49231,6 +49461,9 @@ type PatchApiAnnotationsIdJSONRequestBody PatchApiAnnotationsIdJSONBody
 
 // CreateApiKeyJSONRequestBody defines body for CreateApiKey for application/json ContentType.
 type CreateApiKeyJSONRequestBody CreateApiKeyJSONBody
+
+// CreateFullAccessApiKeyJSONRequestBody defines body for CreateFullAccessApiKey for application/json ContentType.
+type CreateFullAccessApiKeyJSONRequestBody CreateFullAccessApiKeyJSONBody
 
 // CreateIngestionApiKeyJSONRequestBody defines body for CreateIngestionApiKey for application/json ContentType.
 type CreateIngestionApiKeyJSONRequestBody CreateIngestionApiKeyJSONBody
@@ -49400,11 +49633,11 @@ type RegisterLangyControlSessionJSONRequestBody RegisterLangyControlSessionJSONB
 // ApproveLangyControlRequestJSONRequestBody defines body for ApproveLangyControlRequest for application/json ContentType.
 type ApproveLangyControlRequestJSONRequestBody ApproveLangyControlRequestJSONBody
 
-// StartLangyConversationTurnTextRequestBody defines body for StartLangyConversationTurn for text/plain ContentType.
-type StartLangyConversationTurnTextRequestBody StartLangyConversationTurnTextBody
+// StartLangyConversationTurnJSONRequestBody defines body for StartLangyConversationTurn for application/json ContentType.
+type StartLangyConversationTurnJSONRequestBody StartLangyConversationTurnJSONBody
 
-// ContinueLangyConversationTurnTextRequestBody defines body for ContinueLangyConversationTurn for text/plain ContentType.
-type ContinueLangyConversationTurnTextRequestBody ContinueLangyConversationTurnTextBody
+// ContinueLangyConversationTurnJSONRequestBody defines body for ContinueLangyConversationTurn for application/json ContentType.
+type ContinueLangyConversationTurnJSONRequestBody ContinueLangyConversationTurnJSONBody
 
 // PostApiModelDefaultsJSONRequestBody defines body for PostApiModelDefaults for application/json ContentType.
 type PostApiModelDefaultsJSONRequestBody PostApiModelDefaultsJSONBody
@@ -109178,7 +109411,7 @@ type ClientInterface interface {
 	// LangyLocalStartWaitWithBody request with any body
 	LangyLocalStartWaitWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	LangyLocalStartWaitWithTextBody(ctx context.Context, body LangyLocalStartWaitTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	LangyLocalStartWait(ctx context.Context, body LangyLocalStartWaitJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// LangyLocalReadWait request
 	LangyLocalReadWait(ctx context.Context, waitId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -109405,6 +109638,11 @@ type ClientInterface interface {
 	CreateApiKeyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	CreateApiKey(ctx context.Context, body CreateApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateFullAccessApiKeyWithBody request with any body
+	CreateFullAccessApiKeyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreateFullAccessApiKey(ctx context.Context, body CreateFullAccessApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateIngestionApiKeyWithBody request with any body
 	CreateIngestionApiKeyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -109881,12 +110119,12 @@ type ClientInterface interface {
 	// StartLangyConversationTurnWithBody request with any body
 	StartLangyConversationTurnWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	StartLangyConversationTurnWithTextBody(ctx context.Context, body StartLangyConversationTurnTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	StartLangyConversationTurn(ctx context.Context, body StartLangyConversationTurnJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ContinueLangyConversationTurnWithBody request with any body
 	ContinueLangyConversationTurnWithBody(ctx context.Context, conversationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	ContinueLangyConversationTurnWithTextBody(ctx context.Context, conversationId string, body ContinueLangyConversationTurnTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ContinueLangyConversationTurn(ctx context.Context, conversationId string, body ContinueLangyConversationTurnJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetApiMeProject request
 	GetApiMeProject(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -111223,8 +111461,8 @@ func (c *Client) LangyLocalStartWaitWithBody(ctx context.Context, contentType st
 	return c.Client.Do(req)
 }
 
-func (c *Client) LangyLocalStartWaitWithTextBody(ctx context.Context, body LangyLocalStartWaitTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewLangyLocalStartWaitRequestWithTextBody(c.Server, body)
+func (c *Client) LangyLocalStartWait(ctx context.Context, body LangyLocalStartWaitJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLangyLocalStartWaitRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -112233,6 +112471,30 @@ func (c *Client) CreateApiKeyWithBody(ctx context.Context, contentType string, b
 
 func (c *Client) CreateApiKey(ctx context.Context, body CreateApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateApiKeyRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateFullAccessApiKeyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateFullAccessApiKeyRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreateFullAccessApiKey(ctx context.Context, body CreateFullAccessApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateFullAccessApiKeyRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -114355,8 +114617,8 @@ func (c *Client) StartLangyConversationTurnWithBody(ctx context.Context, content
 	return c.Client.Do(req)
 }
 
-func (c *Client) StartLangyConversationTurnWithTextBody(ctx context.Context, body StartLangyConversationTurnTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewStartLangyConversationTurnRequestWithTextBody(c.Server, body)
+func (c *Client) StartLangyConversationTurn(ctx context.Context, body StartLangyConversationTurnJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStartLangyConversationTurnRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -114379,8 +114641,8 @@ func (c *Client) ContinueLangyConversationTurnWithBody(ctx context.Context, conv
 	return c.Client.Do(req)
 }
 
-func (c *Client) ContinueLangyConversationTurnWithTextBody(ctx context.Context, conversationId string, body ContinueLangyConversationTurnTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewContinueLangyConversationTurnRequestWithTextBody(c.Server, conversationId, body)
+func (c *Client) ContinueLangyConversationTurn(ctx context.Context, conversationId string, body ContinueLangyConversationTurnJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewContinueLangyConversationTurnRequest(c.Server, conversationId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -119489,15 +119751,15 @@ func NewLangyUiActionsDispatchRequestWithBody(server string, contentType string,
 	return req, nil
 }
 
-// NewLangyLocalStartWaitRequestWithTextBody calls the generic LangyLocalStartWait builder with text/plain body
-func NewLangyLocalStartWaitRequestWithTextBody(server string, body LangyLocalStartWaitTextRequestBody) (*http.Request, error) {
+// NewLangyLocalStartWaitRequest calls the generic LangyLocalStartWait builder with application/json body
+func NewLangyLocalStartWaitRequest(server string, body LangyLocalStartWaitJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
-	if stringer, ok := interface{}(body).(fmt.Stringer); ok {
-		bodyReader = strings.NewReader(stringer.String())
-	} else {
-		return nil, fmt.Errorf("text/plain is not supported for complex types, define a String() method on LangyLocalStartWaitTextBody to marshal it as text")
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
 	}
-	return NewLangyLocalStartWaitRequestWithBody(server, "text/plain", bodyReader)
+	bodyReader = bytes.NewReader(buf)
+	return NewLangyLocalStartWaitRequestWithBody(server, "application/json", bodyReader)
 }
 
 // NewLangyLocalStartWaitRequestWithBody generates requests for LangyLocalStartWait with any type of body
@@ -121998,6 +122260,46 @@ func NewCreateApiKeyRequestWithBody(server string, contentType string, body io.R
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/api-keys")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewCreateFullAccessApiKeyRequest calls the generic CreateFullAccessApiKey builder with application/json body
+func NewCreateFullAccessApiKeyRequest(server string, body CreateFullAccessApiKeyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateFullAccessApiKeyRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateFullAccessApiKeyRequestWithBody generates requests for CreateFullAccessApiKey with any type of body
+func NewCreateFullAccessApiKeyRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/api-keys/full-access")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -127491,15 +127793,15 @@ func NewCancelLangyControlRequestRequest(server string, requestId string) (*http
 	return req, nil
 }
 
-// NewStartLangyConversationTurnRequestWithTextBody calls the generic StartLangyConversationTurn builder with text/plain body
-func NewStartLangyConversationTurnRequestWithTextBody(server string, body StartLangyConversationTurnTextRequestBody) (*http.Request, error) {
+// NewStartLangyConversationTurnRequest calls the generic StartLangyConversationTurn builder with application/json body
+func NewStartLangyConversationTurnRequest(server string, body StartLangyConversationTurnJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
-	if stringer, ok := interface{}(body).(fmt.Stringer); ok {
-		bodyReader = strings.NewReader(stringer.String())
-	} else {
-		return nil, fmt.Errorf("text/plain is not supported for complex types, define a String() method on StartLangyConversationTurnTextBody to marshal it as text")
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
 	}
-	return NewStartLangyConversationTurnRequestWithBody(server, "text/plain", bodyReader)
+	bodyReader = bytes.NewReader(buf)
+	return NewStartLangyConversationTurnRequestWithBody(server, "application/json", bodyReader)
 }
 
 // NewStartLangyConversationTurnRequestWithBody generates requests for StartLangyConversationTurn with any type of body
@@ -127531,15 +127833,15 @@ func NewStartLangyConversationTurnRequestWithBody(server string, contentType str
 	return req, nil
 }
 
-// NewContinueLangyConversationTurnRequestWithTextBody calls the generic ContinueLangyConversationTurn builder with text/plain body
-func NewContinueLangyConversationTurnRequestWithTextBody(server string, conversationId string, body ContinueLangyConversationTurnTextRequestBody) (*http.Request, error) {
+// NewContinueLangyConversationTurnRequest calls the generic ContinueLangyConversationTurn builder with application/json body
+func NewContinueLangyConversationTurnRequest(server string, conversationId string, body ContinueLangyConversationTurnJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
-	if stringer, ok := interface{}(body).(fmt.Stringer); ok {
-		bodyReader = strings.NewReader(stringer.String())
-	} else {
-		return nil, fmt.Errorf("text/plain is not supported for complex types, define a String() method on ContinueLangyConversationTurnTextBody to marshal it as text")
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
 	}
-	return NewContinueLangyConversationTurnRequestWithBody(server, conversationId, "text/plain", bodyReader)
+	bodyReader = bytes.NewReader(buf)
+	return NewContinueLangyConversationTurnRequestWithBody(server, conversationId, "application/json", bodyReader)
 }
 
 // NewContinueLangyConversationTurnRequestWithBody generates requests for ContinueLangyConversationTurn with any type of body
@@ -134850,7 +135152,7 @@ type ClientWithResponsesInterface interface {
 	// LangyLocalStartWaitWithBodyWithResponse request with any body
 	LangyLocalStartWaitWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error)
 
-	LangyLocalStartWaitWithTextBodyWithResponse(ctx context.Context, body LangyLocalStartWaitTextRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error)
+	LangyLocalStartWaitWithResponse(ctx context.Context, body LangyLocalStartWaitJSONRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error)
 
 	// LangyLocalReadWaitWithResponse request
 	LangyLocalReadWaitWithResponse(ctx context.Context, waitId string, reqEditors ...RequestEditorFn) (*LangyLocalReadWaitResponse, error)
@@ -135077,6 +135379,11 @@ type ClientWithResponsesInterface interface {
 	CreateApiKeyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateApiKeyResponse, error)
 
 	CreateApiKeyWithResponse(ctx context.Context, body CreateApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateApiKeyResponse, error)
+
+	// CreateFullAccessApiKeyWithBodyWithResponse request with any body
+	CreateFullAccessApiKeyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateFullAccessApiKeyResponse, error)
+
+	CreateFullAccessApiKeyWithResponse(ctx context.Context, body CreateFullAccessApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateFullAccessApiKeyResponse, error)
 
 	// CreateIngestionApiKeyWithBodyWithResponse request with any body
 	CreateIngestionApiKeyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateIngestionApiKeyResponse, error)
@@ -135553,12 +135860,12 @@ type ClientWithResponsesInterface interface {
 	// StartLangyConversationTurnWithBodyWithResponse request with any body
 	StartLangyConversationTurnWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*StartLangyConversationTurnResponse, error)
 
-	StartLangyConversationTurnWithTextBodyWithResponse(ctx context.Context, body StartLangyConversationTurnTextRequestBody, reqEditors ...RequestEditorFn) (*StartLangyConversationTurnResponse, error)
+	StartLangyConversationTurnWithResponse(ctx context.Context, body StartLangyConversationTurnJSONRequestBody, reqEditors ...RequestEditorFn) (*StartLangyConversationTurnResponse, error)
 
 	// ContinueLangyConversationTurnWithBodyWithResponse request with any body
 	ContinueLangyConversationTurnWithBodyWithResponse(ctx context.Context, conversationId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ContinueLangyConversationTurnResponse, error)
 
-	ContinueLangyConversationTurnWithTextBodyWithResponse(ctx context.Context, conversationId string, body ContinueLangyConversationTurnTextRequestBody, reqEditors ...RequestEditorFn) (*ContinueLangyConversationTurnResponse, error)
+	ContinueLangyConversationTurnWithResponse(ctx context.Context, conversationId string, body ContinueLangyConversationTurnJSONRequestBody, reqEditors ...RequestEditorFn) (*ContinueLangyConversationTurnResponse, error)
 
 	// GetApiMeProjectWithResponse request
 	GetApiMeProjectWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiMeProjectResponse, error)
@@ -142852,6 +143159,43 @@ func (r CreateApiKeyResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreateApiKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateFullAccessApiKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		ApiKey struct {
+			CreatedAt time.Time `json:"createdAt"`
+			Id        string    `json:"id"`
+			Name      string    `json:"name"`
+		} `json:"apiKey"`
+		Token string `json:"token"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateFullAccessApiKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateFullAccessApiKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateFullAccessApiKeyResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -159290,8 +159634,8 @@ func (c *ClientWithResponses) LangyLocalStartWaitWithBodyWithResponse(ctx contex
 	return ParseLangyLocalStartWaitResponse(rsp)
 }
 
-func (c *ClientWithResponses) LangyLocalStartWaitWithTextBodyWithResponse(ctx context.Context, body LangyLocalStartWaitTextRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error) {
-	rsp, err := c.LangyLocalStartWaitWithTextBody(ctx, body, reqEditors...)
+func (c *ClientWithResponses) LangyLocalStartWaitWithResponse(ctx context.Context, body LangyLocalStartWaitJSONRequestBody, reqEditors ...RequestEditorFn) (*LangyLocalStartWaitResponse, error) {
+	rsp, err := c.LangyLocalStartWait(ctx, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -160026,6 +160370,23 @@ func (c *ClientWithResponses) CreateApiKeyWithResponse(ctx context.Context, body
 		return nil, err
 	}
 	return ParseCreateApiKeyResponse(rsp)
+}
+
+// CreateFullAccessApiKeyWithBodyWithResponse request with arbitrary body returning *CreateFullAccessApiKeyResponse
+func (c *ClientWithResponses) CreateFullAccessApiKeyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateFullAccessApiKeyResponse, error) {
+	rsp, err := c.CreateFullAccessApiKeyWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateFullAccessApiKeyResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreateFullAccessApiKeyWithResponse(ctx context.Context, body CreateFullAccessApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateFullAccessApiKeyResponse, error) {
+	rsp, err := c.CreateFullAccessApiKey(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateFullAccessApiKeyResponse(rsp)
 }
 
 // CreateIngestionApiKeyWithBodyWithResponse request with arbitrary body returning *CreateIngestionApiKeyResponse
@@ -161559,8 +161920,8 @@ func (c *ClientWithResponses) StartLangyConversationTurnWithBodyWithResponse(ctx
 	return ParseStartLangyConversationTurnResponse(rsp)
 }
 
-func (c *ClientWithResponses) StartLangyConversationTurnWithTextBodyWithResponse(ctx context.Context, body StartLangyConversationTurnTextRequestBody, reqEditors ...RequestEditorFn) (*StartLangyConversationTurnResponse, error) {
-	rsp, err := c.StartLangyConversationTurnWithTextBody(ctx, body, reqEditors...)
+func (c *ClientWithResponses) StartLangyConversationTurnWithResponse(ctx context.Context, body StartLangyConversationTurnJSONRequestBody, reqEditors ...RequestEditorFn) (*StartLangyConversationTurnResponse, error) {
+	rsp, err := c.StartLangyConversationTurn(ctx, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -161576,8 +161937,8 @@ func (c *ClientWithResponses) ContinueLangyConversationTurnWithBodyWithResponse(
 	return ParseContinueLangyConversationTurnResponse(rsp)
 }
 
-func (c *ClientWithResponses) ContinueLangyConversationTurnWithTextBodyWithResponse(ctx context.Context, conversationId string, body ContinueLangyConversationTurnTextRequestBody, reqEditors ...RequestEditorFn) (*ContinueLangyConversationTurnResponse, error) {
-	rsp, err := c.ContinueLangyConversationTurnWithTextBody(ctx, conversationId, body, reqEditors...)
+func (c *ClientWithResponses) ContinueLangyConversationTurnWithResponse(ctx context.Context, conversationId string, body ContinueLangyConversationTurnJSONRequestBody, reqEditors ...RequestEditorFn) (*ContinueLangyConversationTurnResponse, error) {
+	rsp, err := c.ContinueLangyConversationTurn(ctx, conversationId, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -170827,6 +171188,39 @@ func ParseCreateApiKeyResponse(rsp *http.Response) (*CreateApiKeyResponse, error
 	}
 
 	response := &CreateApiKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			ApiKey struct {
+				CreatedAt time.Time `json:"createdAt"`
+				Id        string    `json:"id"`
+				Name      string    `json:"name"`
+			} `json:"apiKey"`
+			Token string `json:"token"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateFullAccessApiKeyResponse parses an HTTP response from a CreateFullAccessApiKeyWithResponse call
+func ParseCreateFullAccessApiKeyResponse(rsp *http.Response) (*CreateFullAccessApiKeyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateFullAccessApiKeyResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

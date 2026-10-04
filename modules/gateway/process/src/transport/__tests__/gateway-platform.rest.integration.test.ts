@@ -15,6 +15,7 @@ import { PermissionDeniedError } from "@langwatch/authorization";
 import {
   type GatewayApi,
   type GatewayKeyCaller,
+  type GatewayVirtualKeyCaller,
   type GatewayBudgetResource,
   type GatewayBudgetWithSeats,
   type GatewayCacheRuleResource,
@@ -33,6 +34,7 @@ import { describe, expect, it, vi } from "vitest";
 import { virtualKeyRow } from "../../app/__tests__/gateway-virtual-key.fixture.ts";
 import {
   gatewayKeyCaller,
+  gatewayVirtualKeyCaller,
   gatewayPlatformRest,
   gatewayRestCredential,
 } from "../gateway-platform.rest.ts";
@@ -48,10 +50,16 @@ const scopedKey: GatewayRequestCredential = {
 };
 
 /** The fixture's caller: the credential stands as the actor, attributed as the composition does. */
-const callerOf: Pick<GatewayApi, "actorForCredential"> = {
+const callerOf: Pick<GatewayApi, "actorForCredential" | "authorizeVirtualKeyCaller"> = {
   actorForCredential: ({ projectId, credential }) => ({
     actor: credential,
     actorUserId: (credential.kind === "apiKey" ? credential.userId : null) ?? `svc_${projectId}`,
+  }),
+  authorizeVirtualKeyCaller: async ({ caller }) => ({
+    organizationId: ORGANIZATION_ID,
+    actor: caller,
+    actorUserId: caller.kind === "project" ? `svc_${caller.projectId}` : (caller.userId ?? "svc"),
+    projectId: PROJECT_ID,
   }),
 };
 
@@ -107,20 +115,31 @@ const ORGANIZATION_KEY_CALLER: GatewayKeyCaller = {
   organizationId: ORGANIZATION_ID,
 };
 
+/** The key a virtual key route is called with in these tests: a scoped key naming its project. */
+const PROJECT_KEY_CALLER: GatewayVirtualKeyCaller = {
+  kind: "apiKey",
+  apiKeyId: "key_1",
+  userId: "user_1",
+  organizationId: ORGANIZATION_ID,
+  resolvedProject: { id: PROJECT_ID, teamId: "team_1" },
+};
+
 /**
  * The family behind both of its doors: project-door routes see the caller's
- * project, key-door routes (the organization-owned rows) the organization,
- * and each fact the declaration names is bound the way the process binds it.
+ * project, key-door routes (virtual keys and the organization-owned rows) the
+ * organization, and each fact the declaration names is bound as the process binds it.
  */
 function mountFamily({
   app,
   idempotency,
   keyCaller = ORGANIZATION_KEY_CALLER,
+  virtualKeyCaller = PROJECT_KEY_CALLER,
   credential = scopedKey,
 }: {
   app: GatewayApi;
   idempotency: IdempotentRunner;
   keyCaller?: GatewayKeyCaller;
+  virtualKeyCaller?: GatewayVirtualKeyCaller;
   credential?: GatewayRequestCredential;
 }) {
   const projectDoor = () => ({
@@ -140,7 +159,11 @@ function mountFamily({
   return runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError,
-    facts: [bindRestMiddleware(gatewayKeyCaller, () => keyCaller), credentialFact(credential)],
+    facts: [
+      bindRestMiddleware(gatewayKeyCaller, () => keyCaller),
+      bindRestMiddleware(gatewayVirtualKeyCaller, () => virtualKeyCaller),
+      credentialFact(credential),
+    ],
   });
 }
 
@@ -446,12 +469,20 @@ function mountAs({
   app,
   credential,
   keyCaller,
+  virtualKeyCaller,
 }: {
   app: GatewayApi;
-  credential: GatewayRequestCredential;
+  credential?: GatewayRequestCredential;
   keyCaller?: GatewayKeyCaller;
+  virtualKeyCaller?: GatewayVirtualKeyCaller;
 }) {
-  const hono = mountFamily({ app, idempotency: passthroughIdempotency, credential, keyCaller });
+  const hono = mountFamily({
+    app,
+    idempotency: passthroughIdempotency,
+    credential,
+    keyCaller,
+    virtualKeyCaller,
+  });
 
   return (path: string, body: unknown) =>
     hono.request(`/api/gateway/v1${path}`, {
@@ -552,17 +583,15 @@ describe("the gateway platform family's caller", () => {
   });
 
   describe("given a scoped API key creating a virtual key", () => {
-    /** @scenario Writes from a scoped API key are attributed to its user */
     it("mints the key as the key's owning user, 201", async () => {
       const createVirtualKey = vi.fn(async () => ({
         virtualKey: virtualKeyRow(),
         secret: "secret_1",
       }));
       const post = mountAs({
-        credential: scopedKey,
+        virtualKeyCaller: PROJECT_KEY_CALLER,
         app: createApiFixture<GatewayApi>({
           ...callerOf,
-          organizationIdForProject: async () => ORGANIZATION_ID,
           authorizeVirtualKeyCreate: async () => {},
           createVirtualKey,
           toVirtualKeySnakeDto: async () => virtualKeyDto,
@@ -580,17 +609,15 @@ describe("the gateway platform family's caller", () => {
 
   describe("given a legacy project key", () => {
     /** @scenario "A legacy project key's own-project key is attributed to the machine principal" */
-    /** @scenario Writes from a legacy project key are attributed to the machine principal */
     it("mints its own project's key as svc_<projectId>, 201", async () => {
       const createVirtualKey = vi.fn(async () => ({
         virtualKey: virtualKeyRow(),
         secret: "secret_1",
       }));
       const post = mountAs({
-        credential: { kind: "legacyProjectKey" },
+        virtualKeyCaller: { kind: "project", projectId: PROJECT_ID },
         app: createApiFixture<GatewayApi>({
           ...callerOf,
-          organizationIdForProject: async () => ORGANIZATION_ID,
           authorizeVirtualKeyCreate: async () => {},
           createVirtualKey,
           toVirtualKeySnakeDto: async () => virtualKeyDto,

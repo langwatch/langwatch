@@ -42,6 +42,12 @@ from .confirm_one_click_unsubscribe_response_200 import ConfirmOneClickUnsubscri
 from .confirm_stored_object_upload_body import ConfirmStoredObjectUploadBody
 from .confirm_stored_object_upload_response_200 import ConfirmStoredObjectUploadResponse200
 from .confirm_stored_object_upload_response_200_audience import ConfirmStoredObjectUploadResponse200Audience
+from .continue_langy_conversation_turn_body import ContinueLangyConversationTurnBody
+from .continue_langy_conversation_turn_body_messages_item import ContinueLangyConversationTurnBodyMessagesItem
+from .continue_langy_conversation_turn_body_messages_item_parts_item import (
+    ContinueLangyConversationTurnBodyMessagesItemPartsItem,
+)
+from .continue_langy_conversation_turn_body_messages_item_role import ContinueLangyConversationTurnBodyMessagesItemRole
 from .create_agent_body_type_0 import CreateAgentBodyType0
 from .create_agent_body_type_0_config import CreateAgentBodyType0Config
 from .create_agent_body_type_0_config_inputs_item import CreateAgentBodyType0ConfigInputsItem
@@ -155,6 +161,14 @@ from .create_api_key_body_key_type import CreateApiKeyBodyKeyType
 from .create_api_key_body_permission_mode import CreateApiKeyBodyPermissionMode
 from .create_api_key_response_201 import CreateApiKeyResponse201
 from .create_api_key_response_201_api_key import CreateApiKeyResponse201ApiKey
+from .create_full_access_api_key_body import CreateFullAccessApiKeyBody
+from .create_full_access_api_key_body_bindings_item import CreateFullAccessApiKeyBodyBindingsItem
+from .create_full_access_api_key_body_bindings_item_role import CreateFullAccessApiKeyBodyBindingsItemRole
+from .create_full_access_api_key_body_bindings_item_scope_type import CreateFullAccessApiKeyBodyBindingsItemScopeType
+from .create_full_access_api_key_body_key_type import CreateFullAccessApiKeyBodyKeyType
+from .create_full_access_api_key_body_permission_mode import CreateFullAccessApiKeyBodyPermissionMode
+from .create_full_access_api_key_response_201 import CreateFullAccessApiKeyResponse201
+from .create_full_access_api_key_response_201_api_key import CreateFullAccessApiKeyResponse201ApiKey
 from .create_grant_body import CreateGrantBody
 from .create_grant_body_principal import CreateGrantBodyPrincipal
 from .create_grant_body_principal_type import CreateGrantBodyPrincipalType
@@ -2409,6 +2423,9 @@ from .langy_local_read_wait_response_200 import LangyLocalReadWaitResponse200
 from .langy_local_read_wait_response_200_answers_item import LangyLocalReadWaitResponse200AnswersItem
 from .langy_local_read_wait_response_200_state import LangyLocalReadWaitResponse200State
 from .langy_local_start_call_response_200 import LangyLocalStartCallResponse200
+from .langy_local_start_wait_body import LangyLocalStartWaitBody
+from .langy_local_start_wait_body_questions_item import LangyLocalStartWaitBodyQuestionsItem
+from .langy_local_start_wait_body_questions_item_options_item import LangyLocalStartWaitBodyQuestionsItemOptionsItem
 from .langy_local_start_wait_response_200 import LangyLocalStartWaitResponse200
 from .langy_local_workspace_response_200 import LangyLocalWorkspaceResponse200
 from .langy_local_workspace_response_200_code_access_preference_type_0 import (
@@ -7627,6 +7644,12 @@ from .span_input_output_type_5 import SpanInputOutputType5
 from .span_input_output_type_6 import SpanInputOutputType6
 from .start_admin_impersonation_body import StartAdminImpersonationBody
 from .start_admin_impersonation_response_200 import StartAdminImpersonationResponse200
+from .start_langy_conversation_turn_body import StartLangyConversationTurnBody
+from .start_langy_conversation_turn_body_messages_item import StartLangyConversationTurnBodyMessagesItem
+from .start_langy_conversation_turn_body_messages_item_parts_item import (
+    StartLangyConversationTurnBodyMessagesItemPartsItem,
+)
+from .start_langy_conversation_turn_body_messages_item_role import StartLangyConversationTurnBodyMessagesItemRole
 from .stop_admin_impersonation_response_200 import StopAdminImpersonationResponse200
 from .stream_relay_frames_response_200 import StreamRelayFramesResponse200
 from .submit_bug_report_body import SubmitBugReportBody
@@ -7843,6 +7866,10 @@ __all__ = (
     "ConfirmStoredObjectUploadBody",
     "ConfirmStoredObjectUploadResponse200",
     "ConfirmStoredObjectUploadResponse200Audience",
+    "ContinueLangyConversationTurnBody",
+    "ContinueLangyConversationTurnBodyMessagesItem",
+    "ContinueLangyConversationTurnBodyMessagesItemPartsItem",
+    "ContinueLangyConversationTurnBodyMessagesItemRole",
     "CreateAgentBodyType0",
     "CreateAgentBodyType0Config",
     "CreateAgentBodyType0ConfigInputsItem",
@@ -7934,6 +7961,14 @@ __all__ = (
     "CreateApiKeyBodyPermissionMode",
     "CreateApiKeyResponse201",
     "CreateApiKeyResponse201ApiKey",
+    "CreateFullAccessApiKeyBody",
+    "CreateFullAccessApiKeyBodyBindingsItem",
+    "CreateFullAccessApiKeyBodyBindingsItemRole",
+    "CreateFullAccessApiKeyBodyBindingsItemScopeType",
+    "CreateFullAccessApiKeyBodyKeyType",
+    "CreateFullAccessApiKeyBodyPermissionMode",
+    "CreateFullAccessApiKeyResponse201",
+    "CreateFullAccessApiKeyResponse201ApiKey",
     "CreateGrantBody",
     "CreateGrantBodyPrincipal",
     "CreateGrantBodyPrincipalType",
@@ -9228,6 +9263,9 @@ __all__ = (
     "LangyLocalReadWaitResponse200AnswersItem",
     "LangyLocalReadWaitResponse200State",
     "LangyLocalStartCallResponse200",
+    "LangyLocalStartWaitBody",
+    "LangyLocalStartWaitBodyQuestionsItem",
+    "LangyLocalStartWaitBodyQuestionsItemOptionsItem",
     "LangyLocalStartWaitResponse200",
     "LangyLocalWorkspaceResponse200",
     "LangyLocalWorkspaceResponse200CodeAccessPreferenceType0",
@@ -11942,6 +11980,10 @@ __all__ = (
     "SpanInputOutputType6",
     "StartAdminImpersonationBody",
     "StartAdminImpersonationResponse200",
+    "StartLangyConversationTurnBody",
+    "StartLangyConversationTurnBodyMessagesItem",
+    "StartLangyConversationTurnBodyMessagesItemPartsItem",
+    "StartLangyConversationTurnBodyMessagesItemRole",
     "StopAdminImpersonationResponse200",
     "StreamRelayFramesResponse200",
     "SubmitBugReportBody",

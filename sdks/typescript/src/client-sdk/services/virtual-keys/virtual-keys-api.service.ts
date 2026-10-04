@@ -13,7 +13,7 @@ import {
 } from "@/client-sdk/services/_shared/mutation-options";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
-import { scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
+import { requestedProject, scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -207,12 +207,20 @@ export class VirtualKeysApiError extends Error {
 export class VirtualKeysApiService {
   private readonly endpoint: string;
   private readonly apiKey: string;
+  /** The project the caller asked for. Sent on every request, where it narrows what is read. */
   private readonly projectId: string | undefined;
+  /** Where a key created with no scope lands: the project asked for, else the one resolved. */
+  private readonly defaultProjectId: string | undefined;
 
   constructor(config?: { endpoint?: string; apiKey?: string; projectId?: string }) {
     this.endpoint = resolveEndpoint(config?.endpoint);
     this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-    this.projectId = config?.projectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
+    const resolved = scopedProjectId();
+    this.projectId =
+      config?.projectId ??
+      (requestedProject() === undefined ? undefined : resolved) ??
+      process.env.LANGWATCH_PROJECT_ID;
+    this.defaultProjectId = this.projectId ?? resolved;
   }
 
   private mergedHeaders(extra: HeadersInit | undefined): Headers {
@@ -226,9 +234,9 @@ export class VirtualKeysApiService {
       ...buildSdkIdentityHeaders(),
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
-      // A key that reaches several projects names the one it acts on here: the project the CLI
-      // resolved for this request (`--project`, else the login's personal project), then the
-      // environment. Absent for project keys, which self-scope.
+      // Only a project the caller asked for (`--project`, then the environment) is named here.
+      // Without one, a key that reaches several projects answers for every virtual key it can
+      // see, and a project key self-scopes.
       ...(this.projectId ? { "X-Project-Id": this.projectId } : {}),
     };
   }
@@ -370,14 +378,16 @@ export class VirtualKeysApiService {
     input: CreateVirtualKeyInput,
     options?: IdempotentCreateOptions,
   ): Promise<VirtualKeyWithSecret | VirtualKeyWithReveal> {
+    const init = idempotentCreateInit(options);
+    const headers = new Headers(init.headers);
+    // A key with no scope defaults to its caller's project, so that project is named.
+    if (input.scopes === undefined && this.defaultProjectId) {
+      headers.set("X-Project-Id", this.defaultProjectId);
+    }
     return this.request<VirtualKeyWithSecret | VirtualKeyWithReveal>(
       "create virtual key",
       "/api/gateway/v1/virtual-keys",
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-        ...idempotentCreateInit(options),
-      },
+      { method: "POST", body: JSON.stringify(input), ...init, headers },
     );
   }
 

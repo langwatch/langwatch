@@ -114,8 +114,11 @@ def sync_detailed(
 ]:
     """List virtual keys
 
-     Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to
-    its team, or to the whole organization. Newest first, paged by cursor.
+     Returns the virtual keys the caller can see. A credential that names a project (a project key, or an
+    API key with X-Project-Id) sees the keys scoped to that project, to its team, or to the whole
+    organization. An API key that names no project sees every key in its organization it holds
+    virtualKeys:view on. Newest first, paged by cursor; a page can hold fewer rows than the limit before
+    the walk is done.
 
     Args:
         cursor (str | Unset):
@@ -159,8 +162,11 @@ def sync(
 ):
     """List virtual keys
 
-     Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to
-    its team, or to the whole organization. Newest first, paged by cursor.
+     Returns the virtual keys the caller can see. A credential that names a project (a project key, or an
+    API key with X-Project-Id) sees the keys scoped to that project, to its team, or to the whole
+    organization. An API key that names no project sees every key in its organization it holds
+    virtualKeys:view on. Newest first, paged by cursor; a page can hold fewer rows than the limit before
+    the walk is done.
 
     Args:
         cursor (str | Unset):
@@ -198,8 +204,11 @@ async def asyncio_detailed(
 ]:
     """List virtual keys
 
-     Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to
-    its team, or to the whole organization. Newest first, paged by cursor.
+     Returns the virtual keys the caller can see. A credential that names a project (a project key, or an
+    API key with X-Project-Id) sees the keys scoped to that project, to its team, or to the whole
+    organization. An API key that names no project sees every key in its organization it holds
+    virtualKeys:view on. Newest first, paged by cursor; a page can hold fewer rows than the limit before
+    the walk is done.
 
     Args:
         cursor (str | Unset):
@@ -241,8 +250,11 @@ async def asyncio(
 ):
     """List virtual keys
 
-     Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to
-    its team, or to the whole organization. Newest first, paged by cursor.
+     Returns the virtual keys the caller can see. A credential that names a project (a project key, or an
+    API key with X-Project-Id) sees the keys scoped to that project, to its team, or to the whole
+    organization. An API key that names no project sees every key in its organization it holds
+    virtualKeys:view on. Newest first, paged by cursor; a page can hold fewer rows than the limit before
+    the walk is done.
 
     Args:
         cursor (str | Unset):

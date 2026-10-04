@@ -381,6 +381,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/api-keys/full-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a full-access API key
+         * @description Mint the caller's own API key for the project their sign-in session is bound to, as `langwatch login --project` does: it can do everything the caller can do in that project (prompts, datasets, evaluations, simulations, traces). Only one shape is accepted: keyType "personal", owned by the caller, one ADMIN binding to that project and permissionMode "all". Name it after the machine; omit expiresAt for a key that never expires. Requires a person's project session holding project:manage; an API key cannot mint one.
+         */
+        post: operations["createFullAccessApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/cli/device-code": {
         parameters: {
             query?: never;
@@ -1782,13 +1802,13 @@ export interface paths {
         };
         /**
          * List virtual keys
-         * @description Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor.
+         * @description Returns the virtual keys the caller can see. A credential that names a project (a project key, or an API key with X-Project-Id) sees the keys scoped to that project, to its team, or to the whole organization. An API key that names no project sees every key in its organization it holds virtualKeys:view on. Newest first, paged by cursor; a page can hold fewer rows than the limit before the walk is done.
          */
         get: operations["getApiGatewayV1VirtualKeys"];
         put?: never;
         /**
          * Create virtual key
-         * @description Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
+         * @description Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to the project the caller names; an API key that names no project must send scopes. Org- and team-scoped keys require virtualKeys:manage at each requested scope.
          */
         post: operations["postApiGatewayV1VirtualKeys"];
         delete?: never;
@@ -9482,6 +9502,97 @@ export interface operations {
                 content?: never;
             };
             /** @description The caller is not a person's sign-in session, lacks traces:create, or asked for any other shape (api_key_scope_violation) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error (validation_error) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createFullAccessApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description A personal key acts as the user who created it and needs explicit bindings. A service key is not tied to a user.
+                     * @default personal
+                     * @enum {string}
+                     */
+                    keyType?: "personal" | "service";
+                    /** @description Human-readable name for this key */
+                    name: string;
+                    description?: string;
+                    /**
+                     * Format: date-time
+                     * @description ISO 8601 timestamp after which the key stops working
+                     */
+                    expiresAt?: string;
+                    /** @description Organization admins only: the member who owns the key and whose access caps it. Defaults to the caller. */
+                    assignedToUserId?: string;
+                    /**
+                     * @description 'all' and 'readonly' take their meaning from the bindings alone; 'restricted' additionally requires an explicit permissions list.
+                     * @default all
+                     * @enum {string}
+                     */
+                    permissionMode?: "all" | "readonly" | "restricted";
+                    /** @description Restricted mode only: the exact resource:action permissions the key's CUSTOM bindings grant. */
+                    permissions?: string[];
+                    /** @description What this key may do, and where. Required for a personal key. */
+                    bindings?: {
+                        /**
+                         * @description CUSTOM grants exactly the listed permissions and requires permissionMode 'restricted'.
+                         * @enum {string}
+                         */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                    /** @description Service keys only: restricts the key to these projects */
+                    projectIds?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        token: string;
+                        apiKey: {
+                            id: string;
+                            name: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The caller is not a person's sign-in session, lacks project:manage, or asked for any other shape (api_key_scope_violation) */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -25860,7 +25971,19 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "text/plain": unknown;
+                "application/json": {
+                    messages: {
+                        /** @enum {string} */
+                        role: "user" | "assistant" | "system";
+                        parts?: {
+                            [key: string]: components["schemas"]["JsonValue"];
+                        }[];
+                        content?: string;
+                    }[];
+                    idempotencyKey: string;
+                    modelOverride?: string;
+                    adoptConversationId?: boolean;
+                };
             };
         };
         responses: {
@@ -25887,7 +26010,19 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "text/plain": unknown;
+                "application/json": {
+                    messages: {
+                        /** @enum {string} */
+                        role: "user" | "assistant" | "system";
+                        parts?: {
+                            [key: string]: components["schemas"]["JsonValue"];
+                        }[];
+                        content?: string;
+                    }[];
+                    idempotencyKey: string;
+                    modelOverride?: string;
+                    adoptConversationId?: boolean;
+                };
             };
         };
         responses: {
@@ -26245,7 +26380,25 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "text/plain": unknown;
+                "application/json": {
+                    conversationId: string;
+                    turnId: string;
+                    toolCallId?: string;
+                    /** @constant */
+                    kind: "question";
+                    questions: {
+                        question: string;
+                        header?: string;
+                        options: {
+                            label: string;
+                            description?: string;
+                            quiet?: boolean;
+                        }[];
+                        multiple?: boolean;
+                        allowOther?: boolean;
+                        bare?: boolean;
+                    }[];
+                };
             };
         };
         responses: {
@@ -27837,7 +27990,6 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        /** @description The report. Either a summary or a session transcript is required. */
         requestBody: {
             content: {
                 "application/json": {
@@ -27877,7 +28029,6 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        /** @description The inner SELECT to explain, and the plan to ask for. */
         requestBody: {
             content: {
                 "application/json": {

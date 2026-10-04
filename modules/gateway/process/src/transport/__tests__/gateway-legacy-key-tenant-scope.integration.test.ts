@@ -2,14 +2,19 @@ import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
-import { ResourceScope } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores";
-import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  * @see specs/ai-gateway/public-rest-api.feature
  */
+import {
+  GroupNotFoundError,
+  MemberNotFoundError,
+  type OrganizationApi,
+} from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
+import type { Encryption } from "@langwatch/process-stores";
+import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
@@ -18,6 +23,7 @@ import { describe, expect, it, vi } from "vitest";
 import { GatewayModule } from "../../app/gateway.app.ts";
 import {
   gatewayKeyCaller,
+  gatewayVirtualKeyCaller,
   gatewayPlatformRest,
   gatewayRestCredential,
 } from "../gateway-platform.rest.ts";
@@ -182,7 +188,15 @@ async function mountAsLegacyProjectKey() {
       evaluators: createApiFixture({}),
       evaluations: createApiFixture({}),
       monitors: createApiFixture({}),
-      organizations: createApiFixture({}),
+      // Neither organization in this store has members or groups, so every lookup refuses.
+      organizations: createApiFixture<OrganizationApi>({
+        getMember: async ({ userId }) => {
+          throw new MemberNotFoundError(userId);
+        },
+        getGroup: async ({ groupId }) => {
+          throw new GroupNotFoundError(groupId);
+        },
+      }),
       featureFlags: createApiFixture({}),
       modelProviders: createApiFixture({}),
       traces: createApiFixture({}),
@@ -233,6 +247,10 @@ async function mountAsLegacyProjectKey() {
     facts: [
       bindRestMiddleware(gatewayRestCredential, () => legacyProjectKey),
       bindRestMiddleware(gatewayKeyCaller, () => ({
+        kind: "project" as const,
+        projectId: PROJECT_A,
+      })),
+      bindRestMiddleware(gatewayVirtualKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_A,
       })),

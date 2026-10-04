@@ -38,6 +38,7 @@ import {
   gatewayRevokeVirtualKeyBodySchema,
   gatewayRetiredProviderBindingBodySchema,
   gatewayKeyCallerSchema,
+  gatewayVirtualKeyCallerSchema,
   gatewayRequestCredentialSchema,
   GatewayProviderBindingsGoneError,
   type GatewayCacheRuleResource,
@@ -79,6 +80,16 @@ export const gatewayRestCredential = defineRestMiddleware(
 /** The key an organization-owned route was called with, as the key door resolved it. */
 export const gatewayKeyCaller = defineRestMiddleware("gatewayKeyCaller", gatewayKeyCallerSchema);
 
+/** Who a virtual key route was called by, as the key door resolved it. */
+export const gatewayVirtualKeyCaller = defineRestMiddleware(
+  "gatewayVirtualKeyCaller",
+  gatewayVirtualKeyCallerSchema,
+);
+
+/** The key door reads the credential; the application asks each route's permission. */
+const VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION =
+  "a virtual key lives in the scopes it names, so the credential is read here and the application asks the route's permission at the caller's project, or for a key that names no project at the scopes of each virtual key";
+
 /** The key door reads any API key; the application asks the permission at the reach needed. */
 const ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION =
   "budgets and cache rules belong to the organization, so any API key is read here and the application asks the route's permission at the key's own reach for a read and at the organization for a write";
@@ -98,11 +109,25 @@ function createdVirtualKeyWire(
   return { virtual_key: virtualKey, secret };
 }
 
+/** A key defaults to its caller's project; a caller that names none must say its scopes. */
 function scopesFromWire(
   scopes: z.infer<typeof gatewayCreateVirtualKeySchema>["scopes"] | undefined,
-  fallbackProjectId: string,
+  fallbackProjectId: string | null,
 ): GatewayVirtualKeyScope[] {
-  if (!scopes) return [{ scopeType: "PROJECT", scopeId: fallbackProjectId }];
+  if (!scopes && fallbackProjectId === null) {
+    throw new RequestValidationError({
+      target: "json",
+      violations: [
+        {
+          field: "scopes",
+          type: "required",
+          message:
+            "Name the scopes the virtual key covers, or the project it belongs to in X-Project-Id.",
+        },
+      ],
+    });
+  }
+  if (!scopes) return [{ scopeType: "PROJECT", scopeId: fallbackProjectId as string }];
   return scopes.map((s) => ({ scopeType: toStoredEnum(s.scope_type), scopeId: s.scope_id }));
 }
 
@@ -233,29 +258,31 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   // ── Virtual keys ─────────────────────────────────────────────────────────
 
   .get("/virtual-keys", "getApiGatewayV1VirtualKeys")
+  .withCredential("api_key")
   .withQuery(gatewayVirtualKeyListQuerySchema)
-  .withPermission("virtualKeys:view")
+  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(
     z.object({ data: z.array(gatewayVirtualKeyDtoSchema), next_cursor: gatewayNextCursorSchema }),
   )
   .withDocs({
     summary: "List virtual keys",
     description:
-      "Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor.",
+      "Returns the virtual keys the caller can see. A credential that names a project (a project key, or an API key with X-Project-Id) sees the keys scoped to that project, to its team, or to the whole organization. An API key that names no project sees every key in its organization it holds virtualKeys:view on. Newest first, paged by cursor; a page can hold fewer rows than the limit before the walk is done.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope }) => {
-    const organizationId = await app.organizationIdForProject(scope.id);
+  .withMiddleware(gatewayVirtualKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const authorized = await app.authorizeVirtualKeyCaller({
+      caller,
+      permission: "virtualKeys:view",
+    });
     const rows = await app.getVirtualKeyPage({
-      organizationId,
+      organizationId: authorized.organizationId,
       limit: input.limit,
       cursor: input.cursor === undefined ? null : decodeCreatedAtIdCursor(input.cursor),
       externalId: input.external_id,
     });
-    const visible = app.visibleToProjectCredential({
-      project: { id: scope.id },
-      virtualKeys: rows,
-    });
+    const visible = await app.visibleToVirtualKeyCaller({ caller: authorized, virtualKeys: rows });
     return {
       data: await app.toVirtualKeySnakeDtos({ virtualKeys: visible }),
       next_cursor: buildNextPageCursor(rows, input.limit, (vk) => [
@@ -266,8 +293,9 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/virtual-keys", "postApiGatewayV1VirtualKeys")
+  .withCredential("api_key")
   .withInput(gatewayCreateVirtualKeySchema)
-  .withPermission("virtualKeys:create")
+  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withStatus(201)
   .withOutput(
     z.object({
@@ -292,21 +320,23 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withDocs({
     summary: "Create virtual key",
     description:
-      "Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.",
+      "Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to the project the caller names; an API key that names no project must send scopes. Org- and team-scoped keys require virtualKeys:manage at each requested scope.",
     responses: { ...canonicalBaseResponses, ...canonicalConflictResponses },
   })
-  .withMiddleware(gatewayRestCredential)
-  .handle(async ({ app, input, scope }, credential) => {
-    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
-    const organizationId = await app.organizationIdForProject(scope.id);
-    const scopes = scopesFromWire(input.scopes, scope.id);
+  .withMiddleware(gatewayVirtualKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const { actor, actorUserId, organizationId, projectId } = await app.authorizeVirtualKeyCaller({
+      caller,
+      permission: "virtualKeys:create",
+    });
+    const scopes = scopesFromWire(input.scopes, projectId);
     await app.authorizeVirtualKeyCreate({
       actor,
       organizationId,
       scopes,
       traceProjectId: input.trace_project_id,
       guardrailAttachments: input.config?.guardrailAttachments,
-      callerProjectId: scope.id,
+      callerProjectId: projectId ?? undefined,
     });
     const minted = await app.createVirtualKey({
       organizationId,
@@ -329,24 +359,30 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .get("/virtual-keys/:id", "getApiGatewayV1VirtualKeysById")
+  .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
-  .withPermission("virtualKeys:view")
+  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({ summary: "Get virtual key", responses: canonicalBaseResponses })
-  .handle(async ({ app, input, scope }) => {
-    const organizationId = await app.organizationIdForProject(scope.id);
-    const vk = await app.getVisibleVirtualKeyForProjectCredential({
-      project: { id: scope.id },
+  .withMiddleware(gatewayVirtualKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const authorized = await app.authorizeVirtualKeyCaller({
+      caller,
+      permission: "virtualKeys:view",
+    });
+    const vk = await app.getVirtualKeyForCaller({
+      caller: authorized,
       id: input.id,
-      organizationId,
+      permission: "virtualKeys:view",
     });
     return { virtual_key: await app.toVirtualKeySnakeDto(vk) };
   })
 
   .get("/virtual-keys/:id/spend", "getApiGatewayV1VirtualKeysByIdSpend")
+  .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withQuery(gatewayVkSpendWindowSchema)
-  .withPermission("gatewayUsage:view")
+  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(gatewaySpendSummaryDtoSchema)
   .withDocs({
     summary: "Read a virtual key's spend",
@@ -354,20 +390,24 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Returns 412 spend_source_unavailable on deploys without a ClickHouse spend source.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope }) => {
-    const organizationId = await app.organizationIdForProject(scope.id);
+  .withMiddleware(gatewayVirtualKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const authorized = await app.authorizeVirtualKeyCaller({
+      caller,
+      permission: "gatewayUsage:view",
+    });
     const { fromDate, toDate } = resolveVirtualKeySpendWindow({
       from: input.from,
       to: input.to,
       now: nowInstant(),
     });
-    const vk = await app.getVisibleVirtualKeyForProjectCredential({
-      project: { id: scope.id },
+    const vk = await app.getVirtualKeyForCaller({
+      caller: authorized,
       id: input.id,
-      organizationId,
+      permission: "gatewayUsage:view",
     });
     const spend = await app.getVirtualKeySpend({
-      organizationId,
+      organizationId: authorized.organizationId,
       virtualKeyId: vk.id,
       window: { fromDate, toDate },
     });
@@ -380,20 +420,23 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .patch("/virtual-keys/:id", "patchApiGatewayV1VirtualKeysById")
+  .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayUpdateVirtualKeySchema)
-  .withPermission("virtualKeys:update")
+  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
     summary: "Update virtual key",
     description: "Partial update: send only the fields you want to change.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayRestCredential)
-  .handle(async ({ app, input, scope }, credential) => {
-    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
-    const organizationId = await app.organizationIdForProject(scope.id);
-    const scopes = input.scopes ? scopesFromWire(input.scopes, scope.id) : undefined;
+  .withMiddleware(gatewayVirtualKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const { actor, actorUserId, organizationId, projectId } = await app.authorizeVirtualKeyCaller({
+      caller,
+      permission: "virtualKeys:update",
+    });
+    const scopes = input.scopes ? scopesFromWire(input.scopes, projectId) : undefined;
     await app.authorizeVirtualKeyUpdate({
       actor,
       organizationId,
@@ -422,9 +465,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/virtual-keys/:id/rotate", "postApiGatewayV1VirtualKeysByIdRotate")
+  .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayRotateVirtualKeyBodySchema)
-  .withPermission("virtualKeys:rotate")
+  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema, secret: z.string() }))
   // Also mints a new secret, so a retried rotate must not mint twice.
   .withIdempotency({ operation: "gateway.v1.virtual-keys.rotate" })
@@ -433,10 +477,12 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Mints a fresh secret for an existing VK. The old secret remains valid for 24h.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayRestCredential)
-  .handle(async ({ app, input, scope }, credential) => {
-    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
-    const organizationId = await app.organizationIdForProject(scope.id);
+  .withMiddleware(gatewayVirtualKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const { actor, actorUserId, organizationId } = await app.authorizeVirtualKeyCaller({
+      caller,
+      permission: "virtualKeys:rotate",
+    });
     await app.authorizeVirtualKeyOperation({
       actor,
       organizationId,
@@ -452,9 +498,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/virtual-keys/:id/disable", "postApiGatewayV1VirtualKeysByIdDisable")
+  .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayDisableVkSchema)
-  .withPermission("virtualKeys:update")
+  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
     summary: "Disable virtual key",
@@ -462,10 +509,12 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Reversible stop: requests on the key are rejected with virtual_key_disabled until it is enabled again. Idempotent.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayRestCredential)
-  .handle(async ({ app, input, scope }, credential) => {
-    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
-    const organizationId = await app.organizationIdForProject(scope.id);
+  .withMiddleware(gatewayVirtualKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const { actor, actorUserId, organizationId } = await app.authorizeVirtualKeyCaller({
+      caller,
+      permission: "virtualKeys:update",
+    });
     await app.authorizeVirtualKeyOperation({
       actor,
       organizationId,
@@ -482,19 +531,22 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/virtual-keys/:id/enable", "postApiGatewayV1VirtualKeysByIdEnable")
+  .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayEnableVirtualKeyBodySchema)
-  .withPermission("virtualKeys:update")
+  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
     summary: "Enable virtual key",
     description: "Reverses disable: the key returns to active exactly as it was. Idempotent.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayRestCredential)
-  .handle(async ({ app, input, scope }, credential) => {
-    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
-    const organizationId = await app.organizationIdForProject(scope.id);
+  .withMiddleware(gatewayVirtualKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const { actor, actorUserId, organizationId } = await app.authorizeVirtualKeyCaller({
+      caller,
+      permission: "virtualKeys:update",
+    });
     await app.authorizeVirtualKeyOperation({
       actor,
       organizationId,
@@ -506,19 +558,22 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/virtual-keys/:id/revoke", "postApiGatewayV1VirtualKeysByIdRevoke")
+  .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayRevokeVirtualKeyBodySchema)
-  .withPermission("virtualKeys:delete")
+  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
     summary: "Revoke virtual key",
     description: "Marks the virtual key as revoked and archives its own budgets. Idempotent.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayRestCredential)
-  .handle(async ({ app, input, scope }, credential) => {
-    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
-    const organizationId = await app.organizationIdForProject(scope.id);
+  .withMiddleware(gatewayVirtualKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const { actor, actorUserId, organizationId } = await app.authorizeVirtualKeyCaller({
+      caller,
+      permission: "virtualKeys:delete",
+    });
     await app.authorizeVirtualKeyOperation({
       actor,
       organizationId,

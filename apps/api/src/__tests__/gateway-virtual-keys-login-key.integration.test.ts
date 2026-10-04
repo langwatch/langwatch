@@ -278,8 +278,13 @@ describe.skipIf(!stores)("given the organization key a CLI login holds", () => {
   let teamId: string;
   let personalProjectId: string;
   let otherProjectId: string;
+  let otherTeamId: string;
+  let billingProjectId: string;
   let loginKey: string;
+  let teamKey: string;
   let virtualKeyId: string;
+  let checkoutKeyId: string;
+  let billingKeyId: string;
 
   beforeAll(async () => {
     const user = await prisma.user.create({
@@ -317,14 +322,18 @@ describe.skipIf(!stores)("given the organization key a CLI login holds", () => {
     });
     teamId = team.id;
     await prisma.teamUser.create({ data: { userId, teamId, role: "ADMIN" } });
-    const project = async (name: string) =>
+    const otherTeam = await prisma.team.create({
+      data: { name: "Payments", slug: `--test-team-payments-${ns}`, organizationId },
+    });
+    otherTeamId = otherTeam.id;
+    const project = async (name: string, inTeamId = teamId) =>
       (
         await prisma.project.create({
           data: {
             name,
             slug: `--test-project-${name}-${ns}`,
             apiKey: `--test-key-${name}-${ns}`,
-            teamId,
+            teamId: inTeamId,
             language: "python",
             framework: "openai",
           },
@@ -332,52 +341,69 @@ describe.skipIf(!stores)("given the organization key a CLI login holds", () => {
       ).id;
     personalProjectId = await project("personal");
     otherProjectId = await project("checkout");
+    billingProjectId = await project("billing", otherTeamId);
 
     installation = await bootInstallation({ clickHouse: await startMigratedClickHouse() });
 
     // The rows a device login leaves once the worker has folded the key's grant.
-    const lookupId = ns
-      .replace(/[^a-z0-9]/g, "")
-      .slice(-16)
-      .padStart(16, "0");
-    const secret = randomBytes(24).toString("hex");
-    loginKey = `${API_KEY_PREFIX}${lookupId}_${secret}`;
-    const apiKey = await prisma.apiKey.create({
-      data: {
-        name: `cli login ${ns}`,
-        lookupId,
-        hashedSecret: createHash("sha256").update(secret).digest("hex"),
-        permissionMode: "all",
-        userId,
-        createdByUserId: userId,
-        organizationId,
-      },
-    });
-    await prisma.grant.create({
-      data: {
-        id: `grant-key-${ns}`,
-        organizationId,
-        principalType: "API_KEY",
-        principalId: apiKey.id,
-        roleKey: "admin",
-        source: "grants-service",
-        scopeType: "ORGANIZATION",
-        scopeId: organizationId,
-        occurredAt: new Date(),
-      },
-    });
+    const seedKey = async ({
+      name,
+      scopeType,
+      scopeId,
+    }: {
+      name: string;
+      scopeType: "ORGANIZATION" | "TEAM";
+      scopeId: string;
+    }) => {
+      const lookupId = randomBytes(8).toString("hex");
+      const secret = randomBytes(24).toString("hex");
+      const apiKey = await prisma.apiKey.create({
+        data: {
+          name: `${name} ${ns}`,
+          lookupId,
+          hashedSecret: createHash("sha256").update(secret).digest("hex"),
+          permissionMode: "all",
+          userId,
+          createdByUserId: userId,
+          organizationId,
+        },
+      });
+      await prisma.grant.create({
+        data: {
+          id: `grant-key-${name}-${ns}`,
+          organizationId,
+          principalType: "API_KEY",
+          principalId: apiKey.id,
+          roleKey: "admin",
+          source: "grants-service",
+          scopeType,
+          scopeId,
+          occurredAt: new Date(),
+        },
+      });
 
-    const created = await installation.send({
-      path: "/virtual-keys",
-      method: "POST",
-      token: loginKey,
-      projectId: personalProjectId,
-      body: { name: `login-key-${ns}` },
-    });
-    if (!created.answer.virtual_key) {
-      throw new Error(`the virtual key was not created: ${JSON.stringify(created)}`);
-    }
-    virtualKeyId = created.answer.virtual_key.id;
+      return `${API_KEY_PREFIX}${lookupId}_${secret}`;
+    };
+    loginKey = await seedKey({ name: "login", scopeType: "ORGANIZATION", scopeId: organizationId });
+    teamKey = await seedKey({ name: "team", scopeType: "TEAM", scopeId: teamId });
+
+    const createIn = async (projectId: string) => {
+      const created = await installation.send({
+        path: "/virtual-keys",
+        method: "POST",
+        token: loginKey,
+        projectId,
+        body: { name: `login-key-${projectId}` },
+      });
+      if (!created.answer.virtual_key) {
+        throw new Error(`the virtual key was not created: ${JSON.stringify(created)}`);
+      }
+
+      return created.answer.virtual_key.id;
+    };
+    virtualKeyId = await createIn(personalProjectId);
+    checkoutKeyId = await createIn(otherProjectId);
+    billingKeyId = await createIn(billingProjectId);
   }, 240_000);
 
   afterAll(async () => {
@@ -388,9 +414,9 @@ describe.skipIf(!stores)("given the organization key a CLI login holds", () => {
       await prisma.grant.deleteMany({ where: { organizationId } });
       await prisma.systemMigrationTenantState.deleteMany({ where: { tenantId: organizationId } });
       await prisma.apiKey.deleteMany({ where: { organizationId } });
-      await prisma.project.deleteMany({ where: { teamId } });
+      await prisma.project.deleteMany({ where: { teamId: { in: [teamId, otherTeamId] } } });
       await prisma.teamUser.deleteMany({ where: { teamId } });
-      await prisma.team.deleteMany({ where: { id: teamId } });
+      await prisma.team.deleteMany({ where: { id: { in: [teamId, otherTeamId] } } });
       await prisma.organizationUser.deleteMany({ where: { organizationId } });
       await prisma.organization.deleteMany({ where: { id: organizationId } });
       await prisma.user.deleteMany({ where: { id: userId } });
@@ -398,9 +424,74 @@ describe.skipIf(!stores)("given the organization key a CLI login holds", () => {
     await connection?.closeOnce();
   });
 
+  describe("when it names no project", () => {
+    /** @scenario "A login key that names no project lists every virtual key it can see" */
+    it("lists the keys of every project and reads one key and its spend", async () => {
+      const listed = await installation.send({ path: "/virtual-keys", token: loginKey });
+      const read = await installation.send({
+        path: `/virtual-keys/${billingKeyId}`,
+        token: loginKey,
+      });
+      const spend = await installation.send({
+        path: `/virtual-keys/${billingKeyId}/spend`,
+        token: loginKey,
+      });
+
+      expect(listed.status).toBe(200);
+      expect(listed.answer.data?.map((key) => key.id).toSorted()).toEqual(
+        [virtualKeyId, checkoutKeyId, billingKeyId].toSorted(),
+      );
+      expect(read).toMatchObject({ status: 200, answer: { virtual_key: { id: billingKeyId } } });
+      expect(spend).toMatchObject({
+        status: 200,
+        answer: { virtual_key_id: billingKeyId, requests: 0 },
+      });
+    });
+
+    /** @scenario "A key that names no project manages a virtual key by its scopes" */
+    it("creates, disables, enables and revokes a key by the scopes it names", async () => {
+      const created = await installation.send({
+        path: "/virtual-keys",
+        method: "POST",
+        token: loginKey,
+        body: {
+          name: `scoped-${ns}`,
+          scopes: [{ scope_type: "project", scope_id: otherProjectId }],
+        },
+      });
+      const id = created.answer.virtual_key?.id;
+      const statuses: number[] = [];
+      for (const step of ["disable", "enable", "revoke"]) {
+        const answered = await installation.send({
+          path: `/virtual-keys/${id}/${step}`,
+          method: "POST",
+          token: loginKey,
+          body: {},
+        });
+        statuses.push(answered.status);
+      }
+      const unscoped = await installation.send({
+        path: "/virtual-keys",
+        method: "POST",
+        token: loginKey,
+        body: { name: `unscoped-${ns}` },
+      });
+
+      expect(created.status).toBe(201);
+      expect(statuses).toEqual([200, 200, 200]);
+      expect(unscoped).toMatchObject({ status: 422, answer: { code: "validation_error" } });
+    });
+
+    it("still tells a project route to name its project", async () => {
+      const refused = await installation.send({ path: "/cache-rules", token: loginKey });
+
+      expect(refused).toMatchObject({ status: 400, answer: { code: "project_required" } });
+    });
+  });
+
   describe("when it names the project it acts on", () => {
-    /** @scenario "A login key lists virtual keys and reads their spend in the project it names" */
-    it("lists the project's virtual keys and reads one key's spend", async () => {
+    /** @scenario "A login key narrows the listing to the project it names" */
+    it("lists that project's virtual keys only and reads one key's spend", async () => {
       const listed = await installation.send({
         path: "/virtual-keys",
         token: loginKey,
@@ -420,30 +511,32 @@ describe.skipIf(!stores)("given the organization key a CLI login holds", () => {
       });
     });
 
-    it("sees no key of a sibling project it did not name", async () => {
-      const listed = await installation.send({
-        path: "/virtual-keys",
+    it("does not read a sibling project's key by id", async () => {
+      const read = await installation.send({
+        path: `/virtual-keys/${checkoutKeyId}`,
         token: loginKey,
-        projectId: otherProjectId,
+        projectId: personalProjectId,
       });
 
-      expect(listed).toMatchObject({ status: 200, answer: { data: [] } });
+      expect(read).toMatchObject({ status: 404, answer: { code: "virtual_key_not_found" } });
     });
   });
 
-  describe("when it names no project", () => {
-    /** @scenario "A key that reaches several projects and names none is told to name one" */
-    it.each([
-      ["list", () => "/virtual-keys"],
-      ["get", () => `/virtual-keys/${virtualKeyId}`],
-      ["spend", () => `/virtual-keys/${virtualKeyId}/spend`],
-    ])("refuses the %s by naming the missing project, not the key", async (_name, path) => {
-      const refused = await installation.send({ path: path(), token: loginKey });
+  describe("given a key granted on one team only, naming no project", () => {
+    /** @scenario "A key that names no project sees only the virtual keys its grants reach" */
+    it("lists its team's keys and answers another team's key as not found", async () => {
+      const listed = await installation.send({ path: "/virtual-keys", token: teamKey });
+      const read = await installation.send({
+        path: `/virtual-keys/${billingKeyId}`,
+        token: teamKey,
+      });
 
-      expect(refused.status).toBe(400);
-      expect(refused.answer.code).toBe("project_required");
-      expect(refused.answer.message).toContain("X-Project-Id");
-      expect(refused.answer.message).toContain("--project");
+      expect(listed.status).toBe(200);
+      expect(listed.answer.data?.map((key) => key.id)).not.toContain(billingKeyId);
+      expect(listed.answer.data?.map((key) => key.id)).toEqual(
+        expect.arrayContaining([virtualKeyId, checkoutKeyId]),
+      );
+      expect(read).toMatchObject({ status: 404, answer: { code: "virtual_key_not_found" } });
     });
   });
 

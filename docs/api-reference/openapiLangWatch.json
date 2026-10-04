@@ -18602,6 +18602,195 @@
         }
       }
     },
+    "/api/v1/api-keys/full-access": {
+      "post": {
+        "operationId": "createFullAccessApiKey",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "apiKey": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "token",
+                    "apiKey"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token",
+            "content": {}
+          },
+          "403": {
+            "description": "The caller is not a person's sign-in session, lacks project:manage, or asked for any other shape (api_key_scope_violation)",
+            "content": {}
+          },
+          "422": {
+            "description": "Validation error (validation_error)",
+            "content": {}
+          }
+        },
+        "description": "Mint the caller's own API key for the project their sign-in session is bound to, as `langwatch login --project` does: it can do everything the caller can do in that project (prompts, datasets, evaluations, simulations, traces). Only one shape is accepted: keyType \"personal\", owned by the caller, one ADMIN binding to that project and permissionMode \"all\". Name it after the machine; omit expiresAt for a key that never expires. Requires a person's project session holding project:manage; an API key cannot mint one.",
+        "summary": "Create a full-access API key",
+        "tags": [
+          "API Keys"
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "project:manage"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "keyType": {
+                    "default": "personal",
+                    "description": "A personal key acts as the user who created it and needs explicit bindings. A service key is not tied to a user.",
+                    "type": "string",
+                    "enum": [
+                      "personal",
+                      "service"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "description": "Human-readable name for this key"
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "expiresAt": {
+                    "description": "ISO 8601 timestamp after which the key stops working",
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "assignedToUserId": {
+                    "description": "Organization admins only: the member who owns the key and whose access caps it. Defaults to the caller.",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "permissionMode": {
+                    "default": "all",
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "readonly",
+                      "restricted"
+                    ],
+                    "description": "'all' and 'readonly' take their meaning from the bindings alone; 'restricted' additionally requires an explicit permissions list."
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-zA-Z0-9_-]*:[a-z][a-zA-Z0-9_-]*$"
+                    },
+                    "description": "Restricted mode only: the exact resource:action permissions the key's CUSTOM bindings grant."
+                  },
+                  "bindings": {
+                    "description": "What this key may do, and where. Required for a personal key.",
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "ADMIN",
+                            "MEMBER",
+                            "VIEWER",
+                            "CUSTOM"
+                          ],
+                          "description": "CUSTOM grants exactly the listed permissions and requires permissionMode 'restricted'."
+                        },
+                        "scopeType": {
+                          "type": "string",
+                          "enum": [
+                            "ORGANIZATION",
+                            "TEAM",
+                            "PROJECT"
+                          ]
+                        },
+                        "scopeId": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "scopeType",
+                        "scopeId"
+                      ]
+                    }
+                  },
+                  "projectIds": {
+                    "description": "Service keys only: restricts the key to these projects",
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/cli/device-code": {
       "post": {
         "operationId": "startCliDeviceCode",
@@ -43915,7 +44104,7 @@
             }
           }
         },
-        "description": "Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor.",
+        "description": "Returns the virtual keys the caller can see. A credential that names a project (a project key, or an API key with X-Project-Id) sees the keys scoped to that project, to its team, or to the whole organization. An API key that names no project sees every key in its organization it holds virtualKeys:view on. Newest first, paged by cursor; a page can hold fewer rows than the limit before the walk is done.",
         "summary": "List virtual keys",
         "security": [
           {
@@ -43927,9 +44116,7 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": [
-            "virtualKeys:view"
-          ]
+          "permissions": []
         },
         "parameters": [
           {
@@ -44497,7 +44684,7 @@
             }
           }
         },
-        "description": "Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.",
+        "description": "Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to the project the caller names; an API key that names no project must send scopes. Org- and team-scoped keys require virtualKeys:manage at each requested scope.",
         "summary": "Create virtual key",
         "parameters": [
           {
@@ -44522,9 +44709,7 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": [
-            "virtualKeys:create"
-          ]
+          "permissions": []
         },
         "requestBody": {
           "required": true,
@@ -45340,9 +45525,7 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": [
-            "virtualKeys:view"
-          ]
+          "permissions": []
         },
         "parameters": [
           {
@@ -46159,9 +46342,7 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": [
-            "virtualKeys:update"
-          ]
+          "permissions": []
         },
         "parameters": [
           {
@@ -46499,9 +46680,7 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": [
-            "gatewayUsage:view"
-          ]
+          "permissions": []
         },
         "parameters": [
           {
@@ -47033,9 +47212,7 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": [
-            "virtualKeys:rotate"
-          ]
+          "permissions": []
         }
       }
     },
@@ -47528,9 +47705,7 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": [
-            "virtualKeys:update"
-          ]
+          "permissions": []
         },
         "parameters": [
           {
@@ -48018,9 +48193,7 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": [
-            "virtualKeys:update"
-          ]
+          "permissions": []
         },
         "parameters": [
           {
@@ -48508,9 +48681,7 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": [
-            "virtualKeys:delete"
-          ]
+          "permissions": []
         },
         "parameters": [
           {
@@ -65796,12 +65967,6 @@
           }
         },
         "description": "Start a Langy conversation with one turn. The turn surface answers 202 with the accepted turn, 200 with the settled reply under Prefer: wait, and a plain 404 when the rollout is dark for the project.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "text/plain": {}
-          }
-        },
         "security": [
           {
             "project_api_key": []
@@ -65815,6 +65980,68 @@
           "permissions": [
             "langy:create"
           ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "messages": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "assistant",
+                            "system"
+                          ]
+                        },
+                        "parts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "$ref": "#/components/schemas/JsonValue"
+                            }
+                          }
+                        },
+                        "content": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "role"
+                      ]
+                    }
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "modelOverride": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "adoptConversationId": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "messages",
+                  "idempotencyKey"
+                ]
+              }
+            }
+          }
         }
       }
     },
@@ -65831,12 +66058,6 @@
           }
         },
         "description": "Continue one Langy conversation with a turn. The turn surface answers 202 with the accepted turn, 200 with the settled reply under Prefer: wait, and a plain 404 when the rollout is dark for the project.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "text/plain": {}
-          }
-        },
         "security": [
           {
             "project_api_key": []
@@ -65861,7 +66082,69 @@
             },
             "required": true
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "messages": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "assistant",
+                            "system"
+                          ]
+                        },
+                        "parts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "$ref": "#/components/schemas/JsonValue"
+                            }
+                          }
+                        },
+                        "content": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "role"
+                      ]
+                    }
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "modelOverride": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "adoptConversationId": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "messages",
+                  "idempotencyKey"
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "/api/langy/ui/actions": {
@@ -66706,12 +66989,6 @@
           }
         },
         "description": "The started wait's own id.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "text/plain": {}
-          }
-        },
         "security": [
           {
             "project_api_key": []
@@ -66723,6 +67000,97 @@
             "project_api_key"
           ],
           "permissions": []
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "turnId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "toolCallId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "question"
+                  },
+                  "questions": {
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "question": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000
+                        },
+                        "header": {
+                          "type": "string",
+                          "maxLength": 60
+                        },
+                        "options": {
+                          "minItems": 1,
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
+                              },
+                              "description": {
+                                "type": "string",
+                                "maxLength": 1000
+                              },
+                              "quiet": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "label"
+                            ]
+                          }
+                        },
+                        "multiple": {
+                          "type": "boolean"
+                        },
+                        "allowOther": {
+                          "type": "boolean"
+                        },
+                        "bare": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "question",
+                        "options"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "conversationId",
+                  "turnId",
+                  "kind",
+                  "questions"
+                ]
+              }
+            }
+          }
         }
       }
     },
@@ -71496,9 +71864,15 @@
         },
         "description": "released CLI and MCP builds parse the intake's own bodies: { id } on 201, { error, details } on a rejected report, { error, code } on a named refusal",
         "summary": "File an issue report from a coding agent",
+        "security": [],
+        "x-access-policy": {
+          "kind": "public",
+          "credential": [
+            "none"
+          ]
+        },
         "requestBody": {
           "required": true,
-          "description": "The report. Either a summary or a session transcript is required.",
           "content": {
             "application/json": {
               "schema": {
@@ -71576,13 +71950,6 @@
               }
             }
           }
-        },
-        "security": [],
-        "x-access-policy": {
-          "kind": "public",
-          "credential": [
-            "none"
-          ]
         }
       }
     },
@@ -71599,9 +71966,15 @@
         },
         "description": "the operator tool reads a status and a message: 401, 400, 502 and 503 and the EXPLAIN rows all keep the exact bodies the agent already parses",
         "summary": "Explain a ClickHouse query as the read-only operator account",
+        "security": [],
+        "x-access-policy": {
+          "kind": "public",
+          "credential": [
+            "none"
+          ]
+        },
         "requestBody": {
           "required": true,
-          "description": "The inner SELECT to explain, and the plan to ask for.",
           "content": {
             "application/json": {
               "schema": {
@@ -71629,13 +72002,6 @@
               }
             }
           }
-        },
-        "security": [],
-        "x-access-policy": {
-          "kind": "public",
-          "credential": [
-            "none"
-          ]
         }
       }
     },

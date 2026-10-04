@@ -1,3 +1,4 @@
+import type { RestIdentity } from "@langwatch/api/hosting";
 /**
  * The AI Gateway's portable capability: operations a process's own doors
  * call, plus the one budget-resolution read the spend graph makes. Replaces
@@ -23,8 +24,10 @@ import type {
 import type { GatewayInternalSpendCommandRecord } from "./gateway-internal.schemas.ts";
 import type {
   GatewayAuthorizedKeyCaller,
+  GatewayAuthorizedVirtualKeyCaller,
   GatewayKeyCaller,
   GatewayKeyCallerReach,
+  GatewayVirtualKeyCaller,
   gatewayRequestCredentialSchema,
 } from "./gateway-platform.schemas.ts";
 import type {
@@ -78,7 +81,6 @@ import type {
   VirtualKeyApiApplicableBudgetsInput,
   VirtualKeyBudgetInput,
 } from "./virtual-key.schemas.ts";
-import type { RestIdentity } from "@langwatch/api/hosting";
 
 /** The REST credential a project door presented, as this module is told about it. */
 export type GatewayRequestCredential = z.infer<typeof gatewayRequestCredentialSchema>;
@@ -647,19 +649,27 @@ export interface GatewayApi extends GatewayInternalProtocol {
     id: string;
   }): Promise<GatewayVirtualKeyRecord>;
   /**
-   * Keys a PROJECT CREDENTIAL may see on a page: org-scoped, its own team's,
-   * its own project's — never a sibling team's. Applied to the page, not the
-   * query, so a page can be shorter than `limit` without the walk done.
+   * Who a virtual key route was called by. A credential acting in one project is asked the
+   * permission there; a key that names no project is asked per key, at that key's scopes.
    */
-  visibleToProjectCredential(input: {
-    project: { id: string };
+  authorizeVirtualKeyCaller(input: {
+    caller: GatewayVirtualKeyCaller;
+    permission: string;
+  }): Promise<GatewayAuthorizedVirtualKeyCaller>;
+  /**
+   * A page narrowed to what the caller reads: for one project, org-scoped keys, its team's and
+   * its own; for a key naming no project, the keys it holds `virtualKeys:view` on. Applied to
+   * the page, not the query, so a page can be shorter than `limit` without the walk done.
+   */
+  visibleToVirtualKeyCaller(input: {
+    caller: GatewayAuthorizedVirtualKeyCaller;
     virtualKeys: readonly GatewayVirtualKeyRecord[];
-  }): GatewayVirtualKeyRecord[];
-  /** One key under that same credential-visibility rule, or the not-found refusal. */
-  getVisibleVirtualKeyForProjectCredential(input: {
-    project: { id: string };
+  }): Promise<GatewayVirtualKeyRecord[]>;
+  /** One key under that same rule, or the not-found refusal. */
+  getVirtualKeyForCaller(input: {
+    caller: GatewayAuthorizedVirtualKeyCaller;
     id: string;
-    organizationId: string;
+    permission: string;
   }): Promise<GatewayVirtualKeyRecord>;
   /** A page of an organization's keys, newest first, for the credentialed listing. */
   getVirtualKeyPage(input: {

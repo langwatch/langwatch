@@ -123,6 +123,8 @@ langwatch vk enable <vk_id>
 langwatch vk revoke <vk_id>
 ```
 
+With a `langwatch login` key, `vk list`, `vk get` and `vk spend` answer for every virtual key the login can see, across projects. Add `--project <id|slug>` to narrow them to one project. A key created with no `--scope` lands in your personal project.
+
 `vk create` also takes `--scope org:<id>`, `--scope team:<id>`, `--trace-project <id>`, `--routing-policy <id>`, `--routing-mode none|fallback_all|policy`, `--principal-user <user_id>`, `--providers-allowed <ids>` and `--reveal-once`, which keeps the secret out of the output and returns a `reveal_id` the app reads exactly once, within 24 hours. `vk update <id>` changes the name, description, scopes, trace project, routing and budget, with `--clear-description`, `--clear-trace-project`, `--clear-routing-policy` and `--clear-budget` to unset them, and `--config-json <json>` or `--config-file <path>` to set the key's configuration.
 
 ## Manage keys over REST
@@ -139,6 +141,8 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/virtual-keys \
     "expires_at": "2026-12-31T23:59:59Z"
   }'
 ```
+
+A project API key acts in its own project. An API key that reaches several projects can name one in the `X-Project-Id` header, and then reads the keys scoped to that project, to its team and to the organization. Without the header it reads every virtual key it holds `virtualKeys:view` on, and a create must name its `scopes`.
 
 The response is `{ "virtual_key": { "id": "vk_..." }, "secret": "vk-lw-..." }`. Send an `Idempotency-Key` header to make the create safe to retry: a replay returns the original response, including the secret. To do that, LangWatch keeps the first response for 24 hours, encrypted with AES-256-GCM under the deployment's `CREDENTIALS_SECRET`, and deletes it when it expires. A replay carries the `X-Idempotent-Replay` header. Send a different key for every distinct create, and treat the key itself as a secret.
 

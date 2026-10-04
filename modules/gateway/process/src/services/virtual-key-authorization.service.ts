@@ -376,6 +376,47 @@ export class VirtualKeyAuthorizationService {
   }
 
   /**
+   * What a credential acting in one project reads keys as: organization-wide keys, its team's and
+   * its own, never a sibling team's. An unknown project reaches organization-wide keys only.
+   */
+  async membershipOfProject(projectId: string): Promise<MembershipSet> {
+    const project = await this.projects.findIdentity(projectId);
+
+    return {
+      isOrgMember: true,
+      isOrgAdmin: false,
+      teamIds: new Set(project ? [project.teamId] : []),
+      projectIds: new Set([projectId]),
+    };
+  }
+
+  /**
+   * Keys an actor holds `permission` on at one of their scopes or more. Read visibility for a key
+   * that names no project: its grants decide, and each distinct scope is asked once.
+   */
+  async heldByActor<Key extends { scopes: Scope[] }>(
+    ctx: ActorContext,
+    keys: readonly Key[],
+    permission: AuthzPermission,
+  ): Promise<Key[]> {
+    const answers = new Map<string, Promise<boolean>>();
+    const holds = (scope: Scope): Promise<boolean> => {
+      const address = `${scope.scopeType}:${scope.scopeId}`;
+      const known = answers.get(address);
+      if (known) return known;
+      const asked = this.actorHasPermissionAtScope(ctx, scope, permission);
+      answers.set(address, asked);
+
+      return asked;
+    };
+    const held = await Promise.all(
+      keys.map(async (key) => (await Promise.all(key.scopes.map(holds))).some(Boolean)),
+    );
+
+    return keys.filter((_key, index) => held[index]);
+  }
+
+  /**
    * Every requested scope must belong to the key's own organization. Proving the caller controls
    * each scope is not the same as proving it lives in this organization: without this, a caller
    * with rights in one org could submit another's id plus a scope from theirs.

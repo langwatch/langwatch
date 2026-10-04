@@ -168,9 +168,10 @@ describe("the key doors' actor", () => {
       });
     });
 
-    it("is refused on the key door", async () => {
-      await expect(actorThrough(identities.api_key, headers)).rejects.toMatchObject({
-        code: "invalid_credentials",
+    it("is the person on the key door, where each feature admits or refuses it", async () => {
+      expect(await actorThrough(identities.api_key, headers)).toEqual({
+        type: "user",
+        id: "user-3",
       });
     });
   });

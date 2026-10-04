@@ -32,6 +32,7 @@ import { z } from "zod";
 import { virtualKeyRow } from "../../app/__tests__/gateway-virtual-key.fixture.ts";
 import {
   gatewayKeyCaller,
+  gatewayVirtualKeyCaller,
   gatewayPlatformRest,
   gatewayRestCredential,
 } from "../gateway-platform.rest.ts";
@@ -94,6 +95,12 @@ function mount(overrides: Partial<GatewayApi> = {}, refuse?: () => never) {
       actor: { kind: "legacyProjectKey" },
       actorUserId: `svc_${PROJECT_ID}`,
     }),
+    authorizeVirtualKeyCaller: async () => ({
+      organizationId: ORGANIZATION_ID,
+      actor: { kind: "legacyProjectKey" },
+      actorUserId: `svc_${PROJECT_ID}`,
+      projectId: PROJECT_ID,
+    }),
     ...overrides,
   });
   const door = ({ request }: { request: Request }) => {
@@ -121,6 +128,10 @@ function mount(overrides: Partial<GatewayApi> = {}, refuse?: () => never) {
         kind: "legacyProjectKey",
       })),
       bindRestMiddleware(gatewayKeyCaller, () => ({
+        kind: "project" as const,
+        projectId: PROJECT_ID,
+      })),
+      bindRestMiddleware(gatewayVirtualKeyCaller, () => ({
         kind: "project" as const,
         projectId: PROJECT_ID,
       })),
@@ -267,7 +278,7 @@ describe("the gateway platform family's public wire", () => {
 
   describe("given list and spend reads", () => {
     const visibleKey = {
-      getVisibleVirtualKeyForProjectCredential: async () => virtualKeyRow(),
+      getVirtualKeyForCaller: async () => virtualKeyRow(),
       getVirtualKeySpend: async () => ({ spentUsd: "0", requests: 0 }),
     };
 
@@ -352,7 +363,7 @@ describe("the gateway platform family's public wire", () => {
     const pagedKeys = () =>
       mount({
         getVirtualKeyPage,
-        visibleToProjectCredential: ({ virtualKeys }) => [...virtualKeys],
+        visibleToVirtualKeyCaller: async ({ virtualKeys }) => [...virtualKeys],
         toVirtualKeySnakeDtos: async ({ virtualKeys }) =>
           virtualKeys.map((row) => ({ ...virtualKeyDto, id: row.id })),
       });
@@ -407,7 +418,7 @@ describe("the gateway platform family's public wire", () => {
     it("answers 404 and never reads a spend figure", async () => {
       const getVirtualKeySpend = vi.fn();
       const answer = await mount({
-        getVisibleVirtualKeyForProjectCredential: async () => {
+        getVirtualKeyForCaller: async () => {
           throw new VirtualKeyNotFoundError();
         },
         getVirtualKeySpend,
@@ -458,7 +469,7 @@ describe("the gateway platform family's public wire", () => {
 
   describe("given a key spend read", () => {
     const visibleKey = {
-      getVisibleVirtualKeyForProjectCredential: async () => virtualKeyRow(),
+      getVirtualKeyForCaller: async () => virtualKeyRow(),
       getVirtualKeySpend: async () => ({ spentUsd: "0", requests: 0 }),
     };
 

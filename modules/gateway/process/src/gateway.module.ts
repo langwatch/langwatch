@@ -3,6 +3,7 @@ import {
   bindRestMiddleware,
   ForbiddenError,
   keyCredentialOfRequest,
+  keyDoorPrincipalOfRequest,
   organizationCredentialOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
@@ -27,6 +28,7 @@ import { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trp
 import { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
 import {
   gatewayKeyCaller,
+  gatewayVirtualKeyCaller,
   gatewayPlatformRest,
   gatewayRestCredential,
 } from "./transport/gateway-platform.rest.ts";
@@ -76,6 +78,10 @@ export const gatewayProcessModule = defineProcessModule("gateway")
       // Organization-owned rows take any API key; the application asks the
       // permission at the reach the operation needs.
       bindRestMiddleware(gatewayKeyCaller, (context) => keyCredentialOfRequest(context.req.raw)),
+      // A virtual key route also serves a project-bound access token, as its person.
+      bindRestMiddleware(gatewayVirtualKeyCaller, (context) =>
+        keyDoorPrincipalOfRequest(context.req.raw),
+      ),
       // The callback arrives publicly and the application verifies the raw bytes
       // against the provider row's own stored secret, so the header is all the
       // transport carries.
