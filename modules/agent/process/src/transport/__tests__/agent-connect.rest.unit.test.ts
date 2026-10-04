@@ -182,7 +182,7 @@ describe("registerConnectedAgentInstance", () => {
           }),
         });
         const body = (await response.json()) as {
-          error?: string;
+          code?: string;
           message?: string;
         };
 
