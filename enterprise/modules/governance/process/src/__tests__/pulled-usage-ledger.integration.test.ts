@@ -15,6 +15,7 @@ import {
   PrismaGatewayAdapter,
   type GatewayService,
 } from "@langwatch/gateway-process/testing";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -279,7 +280,10 @@ describe.skipIf(!databaseUrl)(
       gateway = PrismaGatewayAdapter.create({
         database: prisma,
         projects: suiteProjects(),
-        organizations: {} as never,
+        // The principal belongs to no group, so only the team budget applies.
+        organizations: createApiFixture<OrganizationApi>({
+          listGroupsForMember: async () => [],
+        }),
         evaluators: {} as never,
         monitors: {} as never,
         changes: {} as never,
