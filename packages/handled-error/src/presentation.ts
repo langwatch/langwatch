@@ -2456,6 +2456,13 @@ const presentations = {
     describe: () =>
       "Check the key is current and copied in full. If it was revoked or rotated, create a new one in Settings > API Keys.",
   },
+  project_required: {
+    // The key itself is fine. Saying "not accepted" here sends the caller to
+    // rotate a working credential when all the request lacks is a project.
+    title: "This request needs a project",
+    describe: () =>
+      "The API key reaches more than one project. Send the project id in the X-Project-Id header, or pass --project to the CLI.",
+  },
   credential_class_mismatch: {
     // Both classes are named, because the fix is to swap one for the other
     // and a caller holding several keys cannot otherwise tell which is which.

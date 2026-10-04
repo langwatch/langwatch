@@ -189,6 +189,40 @@ describe("the key door", () => {
   });
 });
 
+/** @see specs/security/api-endpoint-authorization.feature */
+describe("the project door", () => {
+  describe("given a live key that reaches several projects and names none", () => {
+    /** @scenario "A key that reaches several projects and names none is told to name one" */
+    it.each([
+      ["with a permission asked", "authenticate"],
+      ["with none asked", "identify"],
+    ] as const)("is told to name a project, %s", async (_name, method) => {
+      const asked = request({ authorization: "Bearer sk-lw-org" });
+
+      expect(await refusalCode(door[method]({ request: asked, permission: "traces:view" }))).toBe(
+        "project_required",
+      );
+    });
+  });
+
+  describe("given a live key that names a project it does not resolve", () => {
+    it("stays an invalid credential, saying nothing about the project", async () => {
+      const asked = request({ authorization: "Bearer sk-lw-org", "x-project-id": "project-9" });
+
+      expect(await refusalCode(door.identify({ request: asked }))).toBe("invalid_credentials");
+    });
+  });
+
+  describe("given a token no key matches, naming no project", () => {
+    /** @scenario "A token that stands for no key is still an invalid credential when it names no project" */
+    it("is refused as invalid credentials", async () => {
+      const asked = request({ authorization: "Bearer sk-lw-unknown" });
+
+      expect(await refusalCode(door.identify({ request: asked }))).toBe("invalid_credentials");
+    });
+  });
+});
+
 describe("a project-bound CLI access token", () => {
   const asked: { userId: string; projectId: string; permission: string }[] = [];
 

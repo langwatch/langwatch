@@ -42,6 +42,14 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 403
     # The ceiling: effective = key bindings ∩ owning user's current bindings.
 
+  @integration @rest @pat
+  Scenario: A login key lists virtual keys and reads their spend in the project it names
+    Given the organization-scoped API key a CLI login holds
+    When it sends `GET /api/gateway/v1/virtual-keys` naming a project in X-Project-Id
+    Then the response status is 200 and lists that project's virtual keys
+    When it sends `GET /api/gateway/v1/virtual-keys/:id/spend` naming the same project
+    Then the response status is 200
+
   @integration @rest @pat @unimplemented
   Scenario: A scoped API key fails closed when a linked custom-role row has malformed permissions (583f27ff6)
     Given an API key "lwp_broken" linked to a custom role whose `permissions` column is NOT a JSON array

@@ -8,7 +8,8 @@ import { dirname, join, resolve } from "node:path";
 
 import { buildOpenApiDocument, type RestIdentity } from "@langwatch/api/hosting";
 import { RestHost, type RestTransportDeclaration } from "@langwatch/api/rest";
-import { processModules } from "@langwatch/installed-server-modules";
+
+import { processModules } from "./process-modules.generated.ts";
 
 /** Where the SDK and docs builds read the generated document. Ignored by git. */
 export const OPENAPI_DOCUMENT_PATH = "specs/api-reference/openapi-document.json";

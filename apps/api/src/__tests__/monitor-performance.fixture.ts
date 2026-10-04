@@ -9,7 +9,11 @@ import {
   type AnalyticsApi,
   type AnalyticsSeries,
 } from "@langwatch/analytics-contract";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
+import {
+  ClickHouseQueryClient,
+  DEFAULT_CLICKHOUSE_SETTINGS,
+  type QueryDriver,
+} from "@langwatch/clickhouse-client";
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { generate } from "@langwatch/ksuid";
@@ -71,6 +75,37 @@ export async function startMigratedClickHouse(): Promise<ClickHouseClient> {
     }),
   };
   return migrated.client;
+}
+
+/** The process's routed ClickHouse member over the migrated test server. */
+export function routedQueryClient(client: ClickHouseClient): ClickHouseQueryClient {
+  const driver: QueryDriver = {
+    async execute(request) {
+      const result = await client.query({
+        query: request.sql,
+        format: "JSONEachRow",
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+      return { rows: await result.json() };
+    },
+    async insert(request) {
+      await client.insert({
+        table: request.table,
+        values: request.rows,
+        format: "JSONEachRow",
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+    },
+    async command(request) {
+      await client.command({
+        query: request.sql,
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+    },
+  };
+  return new ClickHouseQueryClient({ driver });
 }
 
 /** Deletes one tenant's seeded rows from the shared migrated database. */

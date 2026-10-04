@@ -9,6 +9,8 @@ const SENTENCE_BY_CODE: Record<string, string> = {
   insufficient_permissions: "This credential does not carry the permission this call needs",
   missing_credentials: "This request carried no API key",
   invalid_credentials: "That API key is not valid",
+  project_required:
+    "This API key reaches more than one project, so the request has to name one (CLI: --project <id|slug>)",
   organization_not_found: "That API key does not resolve to an organization on this instance",
   validation_error: "The request did not pass validation",
   custom_role_in_use: "That role is still held by a member or a role binding",

@@ -560,6 +560,7 @@ export const APP_ERROR_CODES = [
   "project_destination_team_not_found",
   "project_not_found",
   "project_permission_denied",
+  "project_required",
   "project_slug_taken",
   "project_visibility_too_wide",
   "prompt_execute_rate_limited",

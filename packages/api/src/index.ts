@@ -17,6 +17,7 @@ export {
   OrganizationPermissionError,
   ProjectInvalidCredentialsError,
   ProjectMissingCredentialsError,
+  ProjectRequiredError,
   ApiVersionConflictError,
   BatchingNotSupportedError,
   createErrorHandler,
@@ -89,4 +90,3 @@ export {
   registerRoutePolicy,
   type RegisteredRoute,
 } from "./route-registry.ts";
-
