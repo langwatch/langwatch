@@ -14,6 +14,7 @@ import {
   reservedTraceMetadataSchema,
   type Span,
 } from "./types";
+import { extractChunkTextualContent } from "./collector/rag";
 import { getRAGChunks, getRAGInfo } from "./utils";
 
 // Define a Trace type that includes annotations for use within this file
@@ -1211,6 +1212,19 @@ const unwrapTypedObject = (v: unknown): unknown => {
   return obj.value;
 };
 
+// Extracts the textual content of a RAGChunk object ({ content, document_id? }).
+// Returns the content string, or undefined when the value is not a RAGChunk.
+// Prevents tryAndConvertTo from stringifying the full JSON envelope when callers
+// ask for "string[]" and the array holds RAGChunk objects rather than bare strings.
+const unwrapRagChunk = (v: unknown): string | undefined => {
+  if (v === null || typeof v !== "object" || Array.isArray(v)) return undefined;
+  if (!("content" in v)) return undefined;
+  const text = extractChunkTextualContent(
+    (v as { content: unknown }).content,
+  );
+  return text.trim().length > 0 ? text : undefined;
+};
+
 export const tryAndConvertTo = <T extends keyof StringTypeToType>(
   value: any,
   type: T,
@@ -1223,9 +1237,12 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
     return undefined;
   }
   if (type === "string") {
-    return (
-      typeof value === "string" ? value : JSON.stringify(value)
-    ) as StringTypeToType[T];
+    if (typeof value === "string") return value as StringTypeToType[T];
+    // A RAGChunk object should contribute its textual content, not its full
+    // JSON envelope — the document_id is metadata, not context for a judge.
+    const ragContent = unwrapRagChunk(value);
+    if (ragContent !== undefined) return ragContent as StringTypeToType[T];
+    return JSON.stringify(value) as StringTypeToType[T];
   }
   if (type === "number") {
     return Number(value) as StringTypeToType[T];

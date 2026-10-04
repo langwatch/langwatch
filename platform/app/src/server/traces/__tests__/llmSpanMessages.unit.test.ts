@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Span } from "../../tracer/types";
-import { chooseLlmSpanForTrace, llmMessagesForTrace } from "../llmSpanMessages";
+import {
+  chooseLlmSpanForTrace,
+  llmMessagesForSpan,
+  llmMessagesForTrace,
+} from "../llmSpanMessages";
 
 const timestamps = {
   started_at: 1_700_000_000_000,
@@ -35,6 +39,59 @@ const chatSpan = ({
     input: { type: "chat_messages", value: input },
     ...(output ? { output: { type: "chat_messages", value: output } } : {}),
   });
+
+describe("llmMessagesForSpan", () => {
+  describe("given a span with gen_ai.system_instructions in params", () => {
+    /**
+     * @scenario "System prompt missing from message views"
+     * Canonicalisation strips the system message from gen_ai.input.messages and
+     * stores it in gen_ai.system_instructions. llmMessagesForSpan must reattach
+     * it so judges can answer questions about system-prompt adherence.
+     */
+    it("prepends the system instruction as a leading system message", () => {
+      const s = span({
+        span_id: "llm-1",
+        type: "llm",
+        input: {
+          type: "chat_messages",
+          value: [{ role: "user", content: "hello" }],
+        },
+        output: {
+          type: "chat_messages",
+          value: [{ role: "assistant", content: "hi" }],
+        },
+        params: { "gen_ai.system_instructions": "Be concise." },
+      } as any);
+      const result = llmMessagesForSpan({ span: s });
+      expect(result.input[0]).toEqual({
+        role: "system",
+        content: "Be concise.",
+      });
+      expect(result.input[1]).toEqual({ role: "user", content: "hello" });
+    });
+
+    it("does not duplicate an existing system message already in the input", () => {
+      const s = span({
+        span_id: "llm-2",
+        type: "llm",
+        input: {
+          type: "chat_messages",
+          value: [
+            { role: "system", content: "Be concise." },
+            { role: "user", content: "hello" },
+          ],
+        },
+        output: {
+          type: "chat_messages",
+          value: [{ role: "assistant", content: "hi" }],
+        },
+        params: { "gen_ai.system_instructions": "Be concise." },
+      } as any);
+      const result = llmMessagesForSpan({ span: s });
+      expect(result.input.filter((m) => m.role === "system")).toHaveLength(1);
+    });
+  });
+});
 
 describe("chooseLlmSpanForTrace", () => {
   describe("given a trace with several LLM spans", () => {

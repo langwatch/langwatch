@@ -5,6 +5,7 @@ import {
 import { splitChatForPanel } from "~/shared/traces/transcript/splitChatForPanel";
 import type { ChatMessage } from "~/shared/traces/transcript/types";
 import type { Span, SpanInputOutput, Trace } from "../tracer/types";
+import { readSystemInstructions } from "../tracer/spanIOStringify";
 
 /**
  * The chat messages of a trace, as the trace drawer's I/O panels show them.
@@ -57,9 +58,27 @@ export function chooseLlmSpanForTrace({
  * lists, because the caller asked about *this* span and "it holds nothing" is
  * the answer. {@link llmMessagesForTrace} is where absence becomes null,
  * because there the question is which span to read at all.
+ *
+ * Canonicalisation moves the system prompt out of `gen_ai.input.messages` into
+ * the separate `gen_ai.system_instructions` span attribute. This function
+ * reattaches it as a leading `system` message so callers (including the LWQL
+ * `llm_messages` function and Instant Eval judges) can answer questions about
+ * system-prompt adherence.
  */
 export function llmMessagesForSpan({ span }: { span: Span }): LlmTraceMessages {
-  const input = spanIOToChatMessages(span.input) ?? [];
+  const rawInput = spanIOToChatMessages(span.input) ?? [];
+
+  // Prepend the system instruction when the canonicaliser moved it out of the
+  // message list and the list does not already carry a system message.
+  const systemText = readSystemInstructions(
+    (span as unknown as { params?: Record<string, unknown> }).params ?? null,
+  );
+  const alreadyHasSystem = rawInput.some((m) => m.role === "system");
+  const input =
+    systemText && !alreadyHasSystem
+      ? [{ role: "system" as const, content: systemText }, ...rawInput]
+      : rawInput;
+
   const output =
     spanIOToChatMessages(span.output) ??
     wrapAsMessage({ text: spanIOToText(span.output), role: "assistant" });

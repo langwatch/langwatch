@@ -149,7 +149,7 @@ secured.access(tracesViewAuth).get("/trace/:id", async (c) => {
     if (format === "digest") {
       return c.json({
         trace_id: traceId,
-        formatted_trace: formatSpansDigest(trace.spans ?? []),
+        formatted_trace: await formatSpansDigest(trace.spans ?? []),
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         evaluations,

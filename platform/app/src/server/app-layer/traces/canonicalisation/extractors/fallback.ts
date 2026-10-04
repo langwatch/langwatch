@@ -39,11 +39,14 @@ export class FallbackExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     // Tool Call Detection
     // Check for tool call indicators (Vercel AI SDK, OTEL GenAI spec)
+    // OTel GenAI semconv uses "execute_tool" for tool spans (not "tool").
     // ─────────────────────────────────────────────────────────────────────────
+    const genAiOpName = attrs.get(ATTR_KEYS.GEN_AI_OPERATION_NAME);
     if (
       attrs.get(ATTR_KEYS.OPERATION_NAME) === "ai.toolCall" ||
       attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME) ||
-      attrs.get(ATTR_KEYS.GEN_AI_OPERATION_NAME) === "tool"
+      genAiOpName === "tool" ||
+      genAiOpName === "execute_tool"
     ) {
       ctx.setAttr(ATTR_KEYS.SPAN_TYPE, "tool");
       ctx.recordRule(`${this.id}:tool`);
@@ -52,9 +55,11 @@ export class FallbackExtractor implements CanonicalAttributesExtractor {
 
     // ─────────────────────────────────────────────────────────────────────────
     // Agent Detection
-    // Check for agent-related attributes
+    // Check for agent-related attributes.
+    // OTel GenAI semconv uses "invoke_agent" for agent spans.
     // ─────────────────────────────────────────────────────────────────────────
     if (
+      genAiOpName === "invoke_agent" ||
       attrs.has(ATTR_KEYS.GEN_AI_AGENT_NAME) ||
       attrs.has(ATTR_KEYS.AGENT_NAME) ||
       attrs.has(ATTR_KEYS.GEN_AI_AGENT)
@@ -66,7 +71,12 @@ export class FallbackExtractor implements CanonicalAttributesExtractor {
 
     // ─────────────────────────────────────────────────────────────────────────
     // LLM Detection
-    // Check for various LLM-related signals
+    // Check for various LLM-related signals.
+    // gen_ai.operation.name is only an LLM signal when it is not one of the
+    // non-LLM operation names already handled above (execute_tool,
+    // invoke_agent). Using has() here would mistype agent and tool spans that
+    // reach this branch because a preceding extractor consumed the agent/tool
+    // attribute before the fallback ran.
     // ─────────────────────────────────────────────────────────────────────────
 
     // Modern GenAI semantic conventions
@@ -77,7 +87,9 @@ export class FallbackExtractor implements CanonicalAttributesExtractor {
       attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES) ||
       attrs.has(ATTR_KEYS.GEN_AI_PROMPT) ||
       attrs.has(ATTR_KEYS.GEN_AI_COMPLETION) ||
-      attrs.has(ATTR_KEYS.GEN_AI_OPERATION_NAME);
+      (genAiOpName !== undefined &&
+        genAiOpName !== "execute_tool" &&
+        genAiOpName !== "invoke_agent");
 
     // Vercel AI SDK signals
     const hasVercelSignals =

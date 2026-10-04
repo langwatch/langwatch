@@ -74,4 +74,25 @@ describe("buildConversationMarkdownChunks", () => {
       expect(joined).toContain("out");
     });
   });
+
+  describe("turn headings", () => {
+    /**
+     * @scenario "Relative time in transcripts"
+     * Turn headings must carry an absolute ISO timestamp, not a relative age
+     * ("2m", "now"), so a rendered transcript is the same regardless of when
+     * it is rendered and judgment caching works across requests.
+     */
+    it("uses an ISO timestamp in the turn heading, not a relative age", () => {
+      const fixedMs = 1_700_000_000_000;
+      const chunks = buildConversationMarkdownChunks({
+        conversationId: "conv-1",
+        turns: [makeTurn({ output: "out", assistantText: "out", timestamp: fixedMs })],
+      });
+      const header = chunks.find((c) => c.id === "turn-1-header");
+      expect(header?.markdown).toContain(new Date(fixedMs).toISOString());
+      // Must NOT contain a relative time token.
+      expect(header?.markdown).not.toMatch(/\b\d+[mhd]\b/);
+      expect(header?.markdown).not.toContain("now");
+    });
+  });
 });

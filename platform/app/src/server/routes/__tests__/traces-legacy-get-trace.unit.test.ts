@@ -92,7 +92,7 @@ vi.mock("~/server/traces/trace-formatting", () => ({
 }));
 
 vi.mock("~/server/tracer/spanToReadableSpan", () => ({
-  formatSpansDigest: vi.fn().mockReturnValue("formatted trace"),
+  formatSpansDigest: vi.fn().mockResolvedValue("formatted trace"),
 }));
 
 // Stub the app-layer (used by share/unshare routes only; not needed for GET).
@@ -229,6 +229,22 @@ describe("legacy GET /api/trace/:id (singular)", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.trace_id).toBe("trace-abc");
+    });
+  });
+
+  describe("when requesting format=digest", () => {
+    it("returns formatted_trace as a string, not a serialised Promise", async () => {
+      // PRE-FIX: formatSpansDigest is async but was called without await, so
+      // formatted_trace was a Promise object that serialised to {}.
+      const res = await makeRequest({
+        traceId: "trace-abc",
+        query: { format: "digest" },
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(typeof body.formatted_trace).toBe("string");
+      expect(body.formatted_trace).toBe("formatted trace");
     });
   });
 });

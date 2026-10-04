@@ -1,4 +1,4 @@
-import { formatDuration, formatRelativeTime } from "~/shared/format/time";
+import { formatDuration } from "~/shared/format/time";
 import { extractSystemText } from "~/shared/traces/transcript/parsing";
 import type { ConversationTurnSource, ParsedTurn } from "./parsedTurns";
 
@@ -103,7 +103,7 @@ function turnChunks({
     {
       id: `turn-${turnNumber}-header`,
       turnNumber,
-      markdown: `## Turn ${turnNumber} — ${formatRelativeTime(turn.timestamp)} · ${model} · ${formatDuration(turn.durationMs)}`,
+      markdown: `## Turn ${turnNumber} — ${new Date(turn.timestamp).toISOString()} · ${model} · ${formatDuration(turn.durationMs)}`,
     },
   ];
 
