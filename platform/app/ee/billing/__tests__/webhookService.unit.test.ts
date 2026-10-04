@@ -30,6 +30,14 @@ vi.mock("../../../src/server/app-layer/app", () => ({
   }),
 }));
 
+const { mockFireSubscriptionStartedAnalytics } = vi.hoisted(() => ({
+  mockFireSubscriptionStartedAnalytics: vi.fn(),
+}));
+
+vi.mock("../subscriptionStarted.analytics", () => ({
+  fireSubscriptionStartedAnalytics: mockFireSubscriptionStartedAnalytics,
+}));
+
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
 import type {
   SubscriptionRepository,
@@ -623,9 +631,51 @@ describe("webhookService", () => {
           }),
         );
       });
+
+      /** @scenario "The first successful payment reports the subscription as started" */
+      it("reports the subscription as started", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockFireSubscriptionStartedAnalytics).toHaveBeenCalledTimes(1);
+        expect(mockFireSubscriptionStartedAnalytics).toHaveBeenCalledWith({
+          organizationId: "org_123",
+          plan: "LAUNCH",
+        });
+      });
     });
 
     describe("when subscription is already active", () => {
+      /** @scenario "A renewal payment does not report the subscription as started" */
+      it("does not report the subscription as started", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockFireSubscriptionStartedAnalytics).not.toHaveBeenCalled();
+      });
+
       /** @scenario Subsequent payment renewals do not re-notify */
       it("does not set startDate and does not notify", async () => {
         subRepo.findByStripeId.mockResolvedValue(
@@ -1387,6 +1437,60 @@ describe("webhookService", () => {
     });
 
     describe("when subscription is active", () => {
+      /** @scenario "A Stripe update that activates a subscription reports it as started" */
+      it("reports a subscription that was not active as started", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.updateQuantities.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleSubscriptionUpdated({
+          subscription: {
+            id: "sub_stripe_1",
+            status: "active",
+            canceled_at: null,
+            ended_at: null,
+            items: { data: [] },
+          } as any,
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockFireSubscriptionStartedAnalytics).toHaveBeenCalledTimes(1);
+        expect(mockFireSubscriptionStartedAnalytics).toHaveBeenCalledWith({
+          organizationId: "org_123",
+          plan: "LAUNCH",
+        });
+      });
+
+      /** @scenario "A Stripe update on an active subscription does not report it as started" */
+      it("does not report an already active subscription as started", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE }),
+        );
+        subRepo.updateQuantities.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleSubscriptionUpdated({
+          subscription: {
+            id: "sub_stripe_1",
+            status: "active",
+            canceled_at: null,
+            ended_at: null,
+            items: { data: [] },
+          } as any,
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockFireSubscriptionStartedAnalytics).not.toHaveBeenCalled();
+      });
+
       /** @scenario Active subscription recalculates quantities from Stripe items */
       /** @scenario Active subscription update clears a trial license */
       it("recalculates quantities and updates", async () => {
