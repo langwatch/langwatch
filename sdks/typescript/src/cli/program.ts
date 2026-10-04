@@ -23,6 +23,7 @@ import {
 } from "./utils/output";
 import {
   applyProjectOption,
+  COMMANDS_ACROSS_PROJECTS,
   COMMANDS_WITHOUT_PROJECT,
   commandPath,
   PROJECT_FLAG_HELP,
@@ -316,7 +317,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     // the action runs so `resolveCredentials` reads it without the action
     // having to accept the value and pass it on.
     setRequestedProject(projectSelectorOf(actionCommand));
-    setRunsOutsideProject(commandPath(actionCommand) in COMMANDS_WITHOUT_PROJECT);
+    const path = commandPath(actionCommand);
+    setRunsOutsideProject(path in COMMANDS_WITHOUT_PROJECT || path in COMMANDS_ACROSS_PROJECTS);
   });
 
   registerLoginCommands(program);

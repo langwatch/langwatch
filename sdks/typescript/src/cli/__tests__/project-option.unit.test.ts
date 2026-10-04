@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { buildProgram } from "../program";
 import {
   COMMANDS_WITH_OWN_PROJECT_FLAG,
+  COMMANDS_ACROSS_PROJECTS,
   COMMANDS_WITHOUT_PROJECT,
   commandPath,
   isProjectScoped,
@@ -82,8 +83,19 @@ describe("given the command tree the CLI runs", () => {
     }
   });
 
+  /** @scenario "virtual key commands answer for everything the login key reaches" */
+  it("keeps --project on the commands that answer across projects, where it narrows", () => {
+    const program = tree();
+    for (const path of Object.keys(COMMANDS_ACROSS_PROJECTS)) {
+      expect(declaresProject(leafAt(program, path)), path).toBe(true);
+      expect(isProjectScoped(leafAt(program, path)), path).toBe(true);
+    }
+    expect(COMMANDS_ACROSS_PROJECTS).not.toHaveProperty("virtual-keys create");
+  });
+
   it("records a reason for every command it exempts", () => {
     const entries = [
+      ...Object.entries(COMMANDS_ACROSS_PROJECTS),
       ...Object.entries(COMMANDS_WITHOUT_PROJECT),
       ...Object.entries(COMMANDS_WITH_OWN_PROJECT_FLAG),
     ];
@@ -95,6 +107,7 @@ describe("given the command tree the CLI runs", () => {
   it("names only commands that exist, so a rename cannot leave a stale exemption", () => {
     const paths = new Set(leafCommands(tree()).map(commandPath));
     const stale = [
+      ...Object.keys(COMMANDS_ACROSS_PROJECTS),
       ...Object.keys(COMMANDS_WITHOUT_PROJECT),
       ...Object.keys(COMMANDS_WITH_OWN_PROJECT_FLAG),
     ].filter((path) => !paths.has(path));
