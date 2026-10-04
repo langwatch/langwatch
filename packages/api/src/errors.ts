@@ -438,6 +438,24 @@ export class ProjectInvalidCredentialsError extends HandledError {
   }
 }
 
+/**
+ * A live key reached a project surface without saying which project. A key bound to exactly one
+ * project names it by itself; one that reaches several, or the whole organization, has to say.
+ */
+export class ProjectRequiredError extends HandledError {
+  declare readonly code: "project_required";
+
+  constructor() {
+    super(
+      "project_required",
+      "This API key is not bound to a single project, so the request has to name one. Send the project id in the X-Project-Id header, or pass --project <id|slug> to the CLI.",
+      { httpStatus: 400, fault: "customer" },
+    );
+
+    this.name = "ProjectRequiredError";
+  }
+}
+
 /** No credential at all reached an organization surface. */
 export class OrganizationMissingCredentialsError extends HandledError {
   declare readonly code: "missing_credentials";

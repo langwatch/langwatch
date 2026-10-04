@@ -13,7 +13,7 @@ import {
 } from "@/client-sdk/services/_shared/mutation-options";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
-import { scopedApiKey } from "@/internal/credentialContext";
+import { scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -212,7 +212,7 @@ export class VirtualKeysApiService {
   constructor(config?: { endpoint?: string; apiKey?: string; projectId?: string }) {
     this.endpoint = resolveEndpoint(config?.endpoint);
     this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-    this.projectId = config?.projectId ?? process.env.LANGWATCH_PROJECT_ID;
+    this.projectId = config?.projectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
   }
 
   private mergedHeaders(extra: HeadersInit | undefined): Headers {
@@ -226,8 +226,9 @@ export class VirtualKeysApiService {
       ...buildSdkIdentityHeaders(),
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
-      // Org-anchored API keys carry no project of their own; the surface
-      // scopes on this header. Absent for project keys, which self-scope.
+      // A key that reaches several projects names the one it acts on here: the project the CLI
+      // resolved for this request (`--project`, else the login's personal project), then the
+      // environment. Absent for project keys, which self-scope.
       ...(this.projectId ? { "X-Project-Id": this.projectId } : {}),
     };
   }

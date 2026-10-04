@@ -262,6 +262,20 @@ Feature: Hono API endpoint authorization and tenant isolation
       Then the credential resolves to that project
 
     @integration
+    Scenario: A key that reaches several projects and names none is told to name one
+      Given an organization API key that reaches more than one project
+      When it calls a project endpoint with no X-Project-Id
+      Then the response status is 400 with code "project_required"
+      And the message names the X-Project-Id header and the CLI's --project flag
+      # A 401 invalid_credentials here sent the holder of a working key to rotate it.
+
+    @unit
+    Scenario: A token that stands for no key is still an invalid credential when it names no project
+      Given a token no API key matches
+      When it calls a project endpoint with no X-Project-Id
+      Then the response status is 401 with code "invalid_credentials"
+
+    @integration
     Scenario: A key for one organization cannot resolve another organization's project
       Given a project API key issued for organization B
       When I use it with the project id of organization A

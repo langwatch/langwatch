@@ -7,6 +7,7 @@ import {
   OrganizationPermissionError,
   ProjectInvalidCredentialsError,
   ProjectMissingCredentialsError,
+  ProjectRequiredError,
 } from "@langwatch/api";
 import {
   ApiKeyPermissionDeniedError,
@@ -112,7 +113,7 @@ export class ApiRestCredentialsService {
     if (!credentials) throw new ProjectMissingCredentialsError();
 
     const resolved = await this.apiKeys.findResolvedToken(credentials);
-    if (!resolved) throw new ProjectInvalidCredentialsError();
+    if (!resolved) throw await this.unresolvedProjectRefusal(credentials);
 
     if (resolved.type === "apiKey") {
       const allowed = await this.isWithinCeiling({ resolved, permission: input.permission });
@@ -136,7 +137,7 @@ export class ApiRestCredentialsService {
     if (!credentials) throw new ProjectMissingCredentialsError();
 
     const resolved = await this.apiKeys.findResolvedToken(credentials);
-    if (!resolved) throw new ProjectInvalidCredentialsError();
+    if (!resolved) throw await this.unresolvedProjectRefusal(credentials);
 
     return {
       project: resolved.project,
@@ -268,6 +269,21 @@ export class ApiRestCredentialsService {
     // the five reasons the vocabulary names is the one that decided a project
     // the key may not reach.
     return { permitted: decision.outcome === "allowed", organizationRole: null };
+  }
+
+  /**
+   * Why a token resolved to no project. A live key that named none is told to name one. A named
+   * project the key cannot reach stays an unknown credential, so a key learns nothing about
+   * projects outside its grants.
+   */
+  private async unresolvedProjectRefusal(
+    credentials: ApiKeyRequestCredentials,
+  ): Promise<HandledError> {
+    if (credentials.projectId) return new ProjectInvalidCredentialsError();
+
+    const key = await this.apiKeys.resolveOrganizationToken({ token: credentials.token });
+
+    return key.ok ? new ProjectRequiredError() : new ProjectInvalidCredentialsError();
   }
 
   private async resolveOrganization(token: string): Promise<ResolvedOrganizationApiKeyToken> {
