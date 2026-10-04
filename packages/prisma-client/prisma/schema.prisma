@@ -6190,6 +6190,30 @@ model GatewayRealtimeSession {
   // what the two are compared against when they disagree.
   vendorCostRaw Json?
 
+  // What the session is and so how it is priced: "realtime", "live",
+  // "convai", "tts_socket" or "stt_socket". NULL on a row an older gateway
+  // booked, which settles the way it did before the column existed.
+  kind String?
+
+  // Who measures the usage: "client" (the caller reports it) or "gateway"
+  // (the gateway relayed or observed the socket and reports every response).
+  metering String?
+
+  // When the minted credential stops opening a socket. With the mint time it
+  // bounds how long an unreported call can have run.
+  credentialExpiresAt DateTime?
+
+  // The catalog id that prices input transcription usage, when the session
+  // declared one.
+  transcriptionModel String?
+
+  // The usage reports recorded while the session ran. Each one is its own
+  // spend record, so these three are a running total for reads and never the
+  // source the ledger is debited from.
+  lastReportAt        DateTime?
+  reportedCostNanoUsd BigInt    @default(0)
+  reportCount         Int       @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
@@ -6203,6 +6227,32 @@ model GatewayRealtimeSession {
   @@index([virtualKeyId, status, mintedAt])
   // The fallback match, and the expiry sweep.
   @@index([projectId, status, mintedAt])
+  // The settlement sweep: metered sessions past the window, across tenants.
+  @@index([status, metering, mintedAt])
+}
+
+// One usage report of a realtime voice session: a model response, a
+// transcription item, the closing report or the estimate for a session that
+// never reported. Each row is one spend record, `<sessionId>.<reportKey>`,
+// and the unique key is what makes a redelivered report count once.
+model GatewayRealtimeSessionReport {
+  id        String @id @default(nanoid())
+  sessionId String
+  reportKey String
+  projectId String
+
+  // The catalog id this report was priced under: the session's own model, or
+  // the transcription model for a transcription item.
+  model String
+
+  // The quantities as rated, in the spend usage vocabulary.
+  usage       Json
+  costNanoUsd BigInt
+
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, reportKey])
+  @@index([projectId])
 }
 
 // One record per (migration, tenant) for the in-place system migrations

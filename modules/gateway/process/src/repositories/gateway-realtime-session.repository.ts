@@ -1,6 +1,8 @@
 import type {
   GatewayRealtimeSession,
+  GatewayRealtimeSessionReport,
   GatewayRealtimeSessionStatus,
+  SpendUsage,
 } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -21,6 +23,21 @@ export type NewGatewayRealtimeSession = {
   model: string;
   traceId: string | null;
   requestedModel: string | null;
+  kind: string | null;
+  metering: string | null;
+  transcriptionModel: string | null;
+  credentialExpiresAt: Instant | null;
+};
+
+/** One usage report as it is written: its key, what it was priced under and what it cost. */
+export type NewGatewayRealtimeSessionReport = {
+  sessionId: string;
+  projectId: string;
+  reportKey: string;
+  model: string;
+  usage: SpendUsage;
+  costNanoUsd: number;
+  recordedAt: Instant;
 };
 
 /**
@@ -34,10 +51,12 @@ export abstract class GatewayRealtimeSessionRepository {
     staleBefore: Instant;
     closeReason: string;
   }): Promise<ReserveResult>;
+  /** Records what the mint learned after booking. Answers whether the session exists. */
   abstract correlate(input: {
     sessionId: string;
     projectId: string;
-    vendorConversationId: string;
+    vendorConversationId?: string;
+    credentialExpiresAt?: Instant;
   }): Promise<boolean>;
   /** Closes a session that never opened. Answers whether one was still open. */
   abstract release(input: {
@@ -85,7 +104,48 @@ export abstract class GatewayRealtimeSessionRepository {
     closedAt: Instant;
     closeReason: string;
     vendorCostRaw?: unknown;
+    /** What the session's own record confirmed, added to its recorded total by the same write. */
+    settledCostNanoUsd?: number;
   }): Promise<number>;
+  abstract findReport(input: {
+    sessionId: string;
+    projectId: string;
+    reportKey: string;
+  }): Promise<GatewayRealtimeSessionReport | null>;
+  /**
+   * Writes one report and, only when it is new, adds it to the session's running total.
+   * Answers whether the report was new: a key already recorded changes nothing.
+   */
+  abstract recordReport(input: { report: NewGatewayRealtimeSessionReport }): Promise<boolean>;
+  abstract findReports(input: {
+    sessionId: string;
+    projectId: string;
+  }): Promise<GatewayRealtimeSessionReport[]>;
+  /** The cost of the reports recorded at or after `since`. */
+  abstract sumReportCostSince(input: {
+    sessionId: string;
+    projectId: string;
+    since: Instant;
+  }): Promise<number>;
+  /**
+   * Open sessions the gateway meters itself that have gone silent: no report, or no mint,
+   * at or after `silentSince`. Their gateway is gone, so nothing is metering the call.
+   */
+  abstract findOrphanedGatewaySessions(input: {
+    kind: string;
+    silentSince: Instant;
+    limit: number;
+  }): Promise<GatewayRealtimeSession[]>;
+  /**
+   * Metered sessions past the open window that nothing closed, oldest first: still OPEN, or
+   * EXPIRED by the window (`expiredReason`). The settlement sweep's read, across every tenant.
+   */
+  abstract findAwaitingSettlement(input: {
+    kinds: readonly string[];
+    mintedBefore: Instant;
+    expiredReason: string;
+    limit: number;
+  }): Promise<GatewayRealtimeSession[]>;
   abstract expireStale(input: {
     virtualKeyId?: string;
     now: Instant;

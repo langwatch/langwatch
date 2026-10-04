@@ -1,5 +1,6 @@
 import type {
   GatewayRealtimeSession,
+  GatewayRealtimeSessionReport,
   GatewayRealtimeSessionStatus,
 } from "@langwatch/gateway-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -7,6 +8,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import {
   GatewayRealtimeSessionRepository,
   type NewGatewayRealtimeSession,
+  type NewGatewayRealtimeSessionReport,
   type ReserveResult,
 } from "../gateway-realtime-session.repository.ts";
 
@@ -19,6 +21,7 @@ export class MemoryGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
   }
 
   readonly rows = new Map<string, GatewayRealtimeSession>();
+  readonly reports: GatewayRealtimeSessionReport[] = [];
 
   private constructor(private readonly maxOpenSessions: Readonly<Record<string, number>>) {
     super();
@@ -55,6 +58,9 @@ export class MemoryGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
       closedAt: null,
       closeReason: null,
       vendorCostRaw: null,
+      lastReportAt: null,
+      reportedCostNanoUsd: 0,
+      reportCount: 0,
       createdAt: now,
       updatedAt: now,
     });
@@ -65,11 +71,16 @@ export class MemoryGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
   async correlate(input: {
     sessionId: string;
     projectId: string;
-    vendorConversationId: string;
+    vendorConversationId?: string;
+    credentialExpiresAt?: Instant;
   }): Promise<boolean> {
     const row = this.owned(input);
     if (!row) return false;
-    this.rows.set(row.id, { ...row, vendorConversationId: input.vendorConversationId });
+    this.rows.set(row.id, {
+      ...row,
+      vendorConversationId: input.vendorConversationId ?? row.vendorConversationId,
+      credentialExpiresAt: input.credentialExpiresAt ?? row.credentialExpiresAt,
+    });
 
     return true;
   }
@@ -169,12 +180,14 @@ export class MemoryGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     closedAt: Instant;
     closeReason: string;
     vendorCostRaw?: unknown;
+    settledCostNanoUsd?: number;
   }): Promise<number> {
     const row = this.owned(input);
     if (row?.status !== "OPEN" && row?.status !== "EXPIRED") return 0;
     this.rows.set(row.id, {
       ...row,
       status: "CLOSED",
+      reportedCostNanoUsd: row.reportedCostNanoUsd + (input.settledCostNanoUsd ?? 0),
       closedAt: input.closedAt,
       closeReason: input.closeReason,
       vendorCostRaw:
@@ -183,6 +196,86 @@ export class MemoryGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     });
 
     return 1;
+  }
+
+  async findReport(input: {
+    sessionId: string;
+    projectId: string;
+    reportKey: string;
+  }): Promise<GatewayRealtimeSessionReport | null> {
+    return this.reportsOf(input).find((report) => report.reportKey === input.reportKey) ?? null;
+  }
+
+  async recordReport({ report }: { report: NewGatewayRealtimeSessionReport }): Promise<boolean> {
+    if (await this.findReport(report)) return false;
+    const { recordedAt, ...stored } = report;
+    this.reports.push({ ...stored, createdAt: recordedAt });
+    const row = this.owned(report);
+    if (row) {
+      this.rows.set(row.id, {
+        ...row,
+        reportCount: row.reportCount + 1,
+        reportedCostNanoUsd: row.reportedCostNanoUsd + report.costNanoUsd,
+        lastReportAt: recordedAt,
+      });
+    }
+
+    return true;
+  }
+
+  async findReports(input: {
+    sessionId: string;
+    projectId: string;
+  }): Promise<GatewayRealtimeSessionReport[]> {
+    return this.reportsOf(input);
+  }
+
+  async sumReportCostSince(input: {
+    sessionId: string;
+    projectId: string;
+    since: Instant;
+  }): Promise<number> {
+    return this.reportsOf(input)
+      .filter((report) => report.createdAt.epochMilliseconds >= input.since.epochMilliseconds)
+      .reduce((total, report) => total + report.costNanoUsd, 0);
+  }
+
+  async findOrphanedGatewaySessions(input: {
+    kind: string;
+    silentSince: Instant;
+    limit: number;
+  }): Promise<GatewayRealtimeSession[]> {
+    return this.all()
+      .filter(
+        (row) =>
+          row.status === "OPEN" &&
+          row.metering === "gateway" &&
+          row.kind === input.kind &&
+          (row.lastReportAt ?? row.mintedAt).epochMilliseconds <
+            input.silentSince.epochMilliseconds,
+      )
+      .toSorted((a, b) => a.mintedAt.epochMilliseconds - b.mintedAt.epochMilliseconds)
+      .slice(0, input.limit);
+  }
+
+  async findAwaitingSettlement(input: {
+    kinds: readonly string[];
+    mintedBefore: Instant;
+    expiredReason: string;
+    limit: number;
+  }): Promise<GatewayRealtimeSession[]> {
+    return this.all()
+      .filter(
+        (row) =>
+          (row.metering === "client" || row.metering === "gateway") &&
+          row.kind !== null &&
+          input.kinds.includes(row.kind) &&
+          row.mintedAt.epochMilliseconds < input.mintedBefore.epochMilliseconds &&
+          (row.status === "OPEN" ||
+            (row.status === "EXPIRED" && row.closeReason === input.expiredReason)),
+      )
+      .toSorted((a, b) => a.mintedAt.epochMilliseconds - b.mintedAt.epochMilliseconds)
+      .slice(0, input.limit);
   }
 
   async expireStale(input: {
@@ -222,6 +315,15 @@ export class MemoryGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
   private owned(input: { sessionId: string; projectId: string }): GatewayRealtimeSession | null {
     const row = this.rows.get(input.sessionId);
     return row?.projectId === input.projectId ? row : null;
+  }
+
+  private reportsOf(input: {
+    sessionId: string;
+    projectId: string;
+  }): GatewayRealtimeSessionReport[] {
+    return this.reports.filter(
+      (report) => report.sessionId === input.sessionId && report.projectId === input.projectId,
+    );
   }
 
   private all(): GatewayRealtimeSession[] {

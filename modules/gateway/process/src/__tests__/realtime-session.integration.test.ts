@@ -1,33 +1,73 @@
 /**
  * @vitest-environment node
  * Real Postgres: the concurrency cap's lock, expiry freeing a slot, match refusing to guess.
+ * Real ClickHouse: each usage report debiting every budget on the key's chain.
  * Spec: specs/ai-gateway/realtime-sessions.feature
  */
-import { fromDate, nowInstant, toDate } from "@langwatch/time";
-
-/** The stored row, as the settlement seam reads it: the same columns, on instants. */
-function toSessionRecord<Row extends { mintedAt: Date }>(row: Row) {
-  return { ...row, mintedAt: fromDate(row.mintedAt) };
-}
+import type { SpendUsage } from "@langwatch/gateway-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { GatewaySpanIngestion, GatewaySpendConfirmation } from "../app/gateway.members.ts";
+import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
+import type {
+  GatewayChangeEvents,
+  GatewaySpanIngestion,
+  GatewaySpendConfirmation,
+} from "../app/gateway.members.ts";
+import { MemoryElevenLabsConversationChannel } from "../channels/memory/memory.elevenlabs-conversation.channel.ts";
+import { writeGatewayDebitsSchema } from "../eventing/gateway-debit.intent.ts";
 import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
+import {
+  createTestClickHouseClient,
+  testClickHouseUrl,
+} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { GatewayBudgetChangeDedupeRepository } from "../repositories/gateway-budget-change-dedupe.repository.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
+import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
+import { GatewayBudgetChangeDedupeService } from "../services/gateway-budget-change-dedupe.service.ts";
+import type { GatewayBudgetCrossingService } from "../services/gateway-budget-crossing.service.ts";
+import { GatewayElevenLabsCredentialService } from "../services/gateway-elevenlabs-credential.service.ts";
+import { GatewayRealtimeSessionMeteringService } from "../services/gateway-realtime-session-metering.service.ts";
+import {
+  GatewayRealtimeSessionReconciliationService,
+  realtimeSessionReconciliationConfig,
+} from "../services/gateway-realtime-session-reconciliation.service.ts";
+import { GatewayRealtimeSessionSweepService } from "../services/gateway-realtime-session-sweep.service.ts";
 import {
   GatewayRealtimeSessionService,
   REALTIME_OPEN_SESSION_WINDOW_MS,
   type GatewayRealtimeSessionCollaborators,
 } from "../services/gateway-realtime-session.service.ts";
+import { GatewaySpendDebitService } from "../services/gateway-spend-debit.service.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
+import { organizationApiOver } from "./support/prisma-organization-api.ts";
 import { raceOnOneRow } from "./support/row-lock-race.ts";
 
+/** The stored row, as the settlement seam reads it: the same columns, on instants. */
+function toSessionRecord<
+  Row extends { mintedAt: Date; credentialExpiresAt: Date | null; lastReportAt: Date | null },
+>(row: Row) {
+  return {
+    ...row,
+    mintedAt: fromDate(row.mintedAt),
+    credentialExpiresAt: row.credentialExpiresAt ? fromDate(row.credentialExpiresAt) : null,
+    lastReportAt: row.lastReportAt ? fromDate(row.lastReportAt) : null,
+  };
+}
+
 const realtimeSessions = GatewayRealtimeSessionService.create();
+const metering = GatewayRealtimeSessionMeteringService.create();
 
 const databaseUrl = process.env.DATABASE_URL;
+const chUrl = testClickHouseUrl();
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -141,6 +181,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
 
   afterAll(async () => {
     if (!databaseUrl) return;
+    await prisma.gatewayRealtimeSessionReport.deleteMany({ where: { projectId: PROJECT_ID } });
     await prisma.gatewayRealtimeSession.deleteMany({
       where: { organizationId: ORG_ID },
     });
@@ -595,7 +636,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
       // shape: a project's keys share its destination. The session id is a
       // gateway request id, which the opener's own response header carries,
       // so it is not a secret.
-      const stolen = await realtimeSessions.reportRealtimeSessionUsage({
+      const stolen = await metering.reportRealtimeSessionUsage({
         sessionId,
         projectId: PROJECT_ID,
         virtualKeyId: other,
@@ -613,15 +654,559 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
       ).toBe("OPEN");
 
       // The key that opened it still closes it.
-      const own = await realtimeSessions.reportRealtimeSessionUsage({
+      const own = await metering.reportRealtimeSessionUsage({
         sessionId,
         projectId: PROJECT_ID,
         virtualKeyId: opener,
         usage: { input_tokens: 10, output_tokens: 5 },
         collaborators,
       });
-      expect(own).toBe("closed");
+      expect(own).toMatchObject({ status: "closed" });
       expect(sentConfirmations).toHaveLength(1);
     });
   });
 });
+
+// ── usage reports against real budgets ────────────────────────────────────
+
+const METERED_ORG_ID = `org-rtm-${suffix}`;
+const METERED_TEAM_ID = `team-rtm-${suffix}`;
+const METERED_USER_ID = `user-rtm-${suffix}`;
+const REALTIME_MODEL = "openai/gpt-realtime-1.5";
+const rating = ModelCatalogGatewaySpendRatingService.create();
+
+/** Output audio tokens that cost one US dollar on the realtime model. */
+const TOKENS_PER_USD = 15_625;
+const USD = 1_000_000_000;
+
+function usd(dollars: number): Partial<SpendUsage> {
+  return { output_audio_tokens: dollars * TOKENS_PER_USD };
+}
+
+let chRepo: GatewayBudgetClickHouseRepository;
+let budgetService: GatewayService;
+const meteredProjectIds: string[] = [];
+const meteredConfirmations: ConfirmSpendCommandData[] = [];
+const meteredSpans: Record<string, any>[] = [];
+
+class SilentCrossings implements Pick<GatewayBudgetCrossingService, "detect"> {
+  async detect(): Promise<void> {}
+}
+
+class DiscardedChanges implements Pick<GatewayChangeEvents, "append"> {
+  async append(): Promise<{ revision: bigint }> {
+    return { revision: 0n };
+  }
+}
+
+class OpenDedupeWindow extends GatewayBudgetChangeDedupeRepository {
+  async claimWindow(): Promise<boolean> {
+    return true;
+  }
+}
+
+/**
+ * Confirms as the spend pipeline's debit process does: an outcome that moved nothing writes
+ * no debit, any other goes to the one debit writer against the real ledger.
+ */
+class DebitingSpendConfirmation implements GatewaySpendConfirmation {
+  async confirmSpend(data: ConfirmSpendCommandData): Promise<void> {
+    meteredConfirmations.push(data);
+    const movedNothing =
+      data.cost_nano_usd === 0 && Object.values(data.usage).every((quantity) => quantity === 0);
+    if (movedNothing) return;
+
+    await GatewaySpendDebitService.create({
+      budgets: budgetService,
+      spend: chRepo,
+      dedupe: GatewayBudgetChangeDedupeService.create(new OpenDedupeWindow()),
+      changes: new DiscardedChanges(),
+      crossings: new SilentCrossings(),
+    }).write(
+      writeGatewayDebitsSchema.parse({
+        gateway_request_id: data.gateway_request_id,
+        project_id: data.tenantId,
+        organization_id: data.organization_id,
+        team_id: data.team_id,
+        virtual_key_id: data.virtual_key_id,
+        principal_user_id: data.principal_user_id,
+        end_user_id: data.end_user_id,
+        model: data.model,
+        model_provider_id: data.model_provider_id,
+        usage: data.usage,
+        cost_nano_usd: data.cost_nano_usd,
+        rate_version: data.rate_version,
+        status: "confirmed",
+        duration_ms: data.duration_ms,
+        occurred_at: data.occurred_at,
+      }),
+    );
+  }
+}
+
+class MeteredSpanIngestion implements GatewaySpanIngestion {
+  async ingestNormalizedSpan(input: any): Promise<void> {
+    meteredSpans.push(input);
+  }
+}
+
+const meteredCollaborators: GatewayRealtimeSessionCollaborators = {
+  sessions: PrismaGatewayRealtimeSessionRepository.create({
+    get database() {
+      return prisma;
+    },
+  }),
+  spendRating: rating,
+  spendConfirmation: new DebitingSpendConfirmation(),
+  spanIngestion: new MeteredSpanIngestion(),
+  attribution: {
+    findSessionAttribution: async ({ virtualKeyId, projectId }) => {
+      const [key, project] = await Promise.all([
+        prisma.virtualKey.findUnique({ where: { id: virtualKeyId } }),
+        prisma.project.findUnique({ where: { id: projectId } }),
+      ]);
+      return { principalUserId: key?.principalUserId ?? null, teamId: project?.teamId ?? null };
+    },
+  },
+  budgets: {
+    checkBudget: (input) => budgetService.checkBudget(input),
+  },
+};
+
+/** A project, a key on it, a 5 USD blocking budget on the key and a 50 USD one on the project. */
+async function budgetedChain() {
+  const tag = nanoid(6);
+  const projectId = `project-rtm-${tag}`;
+  const virtualKeyId = `vk-rtm-${tag}`;
+  const keyBudgetId = `bdg-key-${tag}`;
+  const projectBudgetId = `bdg-proj-${tag}`;
+  await prisma.project.create({
+    data: {
+      id: projectId,
+      name: projectId,
+      slug: projectId,
+      teamId: METERED_TEAM_ID,
+      language: "en",
+      framework: "openai",
+      apiKey: `key-${projectId}`,
+    },
+  });
+  meteredProjectIds.push(projectId);
+  await prisma.virtualKey.create({
+    data: {
+      id: virtualKeyId,
+      organizationId: METERED_ORG_ID,
+      name: virtualKeyId,
+      hashedSecret: `hash-${virtualKeyId}`,
+      displayPrefix: "vk-lw-xxxxxxx",
+      createdById: METERED_USER_ID,
+      traceProjectId: projectId,
+      scopes: { create: [{ scopeType: "PROJECT", scopeId: projectId }] },
+    },
+  });
+  const resetsAt = toDate(nowInstant().add({ hours: 24 * 40 }));
+  await prisma.gatewayBudget.createMany({
+    data: [
+      {
+        id: keyBudgetId,
+        name: keyBudgetId,
+        organizationId: METERED_ORG_ID,
+        scopeType: "VIRTUAL_KEY",
+        scopeId: virtualKeyId,
+        window: "MONTH",
+        limitUsd: "5",
+        onBreach: "BLOCK",
+        createdById: METERED_USER_ID,
+        resetsAt,
+      },
+      {
+        id: projectBudgetId,
+        name: projectBudgetId,
+        organizationId: METERED_ORG_ID,
+        scopeType: "PROJECT",
+        scopeId: projectId,
+        window: "MONTH",
+        limitUsd: "50",
+        onBreach: "BLOCK",
+        createdById: METERED_USER_ID,
+        resetsAt,
+      },
+    ],
+  });
+
+  const sessionId = `sess-rtm-${tag}`;
+  const traceId = `trace-rtm-${tag}`;
+  await realtimeSessions.reserveRealtimeSession({
+    sessionId,
+    projectId,
+    organizationId: METERED_ORG_ID,
+    virtualKeyId,
+    modelProviderId: PROVIDER_ID,
+    vendor: "openai",
+    model: REALTIME_MODEL,
+    traceId,
+    kind: "realtime",
+    metering: "client",
+    collaborators: meteredCollaborators,
+  });
+
+  const report = (input: { usage?: Partial<SpendUsage>; reportKey?: string; final?: boolean }) =>
+    metering.reportRealtimeSessionUsage({
+      sessionId,
+      projectId,
+      virtualKeyId,
+      ...input,
+      collaborators: meteredCollaborators,
+    });
+  /** What the ledger holds for a budget, and how many debits make it up. */
+  const ledger = async (budgetId: string) => {
+    const debits = await chRepo.recentEventsForBudget([projectId], budgetId, 50);
+    const spentNanoUsd = debits.reduce(
+      (total, debit) => total + Math.round(Number(debit.amountUsd) * USD),
+      0,
+    );
+    return { debits: debits.map((debit) => debit.id).toSorted(), spentNanoUsd };
+  };
+  const nextRequest = () =>
+    budgetService.checkBudget({
+      organizationId: METERED_ORG_ID,
+      teamId: METERED_TEAM_ID,
+      projectId,
+      virtualKeyId,
+      principalUserId: null,
+      projectedCostUsd: "0",
+    });
+  const session = () =>
+    prisma.gatewayRealtimeSession.findUniqueOrThrow({ where: { id: sessionId } });
+  const ageSessionPastTheWindow = () =>
+    prisma.gatewayRealtimeSession.update({
+      where: { id: sessionId },
+      data: {
+        mintedAt: toDate(
+          nowInstant().subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS + 60_000 }),
+        ),
+      },
+    });
+  const confirmations = () =>
+    meteredConfirmations.filter((sent) => sent.gateway_request_id.startsWith(sessionId));
+
+  return {
+    projectId,
+    virtualKeyId,
+    keyBudgetId,
+    projectBudgetId,
+    sessionId,
+    traceId,
+    report,
+    ledger,
+    nextRequest,
+    session,
+    ageSessionPastTheWindow,
+    confirmations,
+  };
+}
+
+function reconciler() {
+  return GatewayRealtimeSessionReconciliationService.create({
+    repository: GatewayRealtimeSessionSweepService.create(meteredCollaborators),
+    credentials: GatewayElevenLabsCredentialService.create({
+      modelProviders: createApiFixture<ModelProviderApi>({}),
+    }),
+    conversations: MemoryElevenLabsConversationChannel.create(),
+    logger: { warn: () => void 0, info: () => void 0, error: () => void 0 },
+    config: realtimeSessionReconciliationConfig,
+    clock: { now: () => nowInstant() },
+  });
+}
+
+describe.skipIf(!databaseUrl || !chUrl)(
+  "given a key with a 5 USD blocking budget on a project with a 50 USD one",
+  () => {
+    beforeAll(async () => {
+      chRepo = new GatewayBudgetClickHouseRepository(async () =>
+        createTestClickHouseClient(chUrl!),
+      );
+      await prisma.organization.create({
+        data: { id: METERED_ORG_ID, name: `Org ${suffix}`, slug: METERED_ORG_ID },
+      });
+      await prisma.team.create({
+        data: {
+          id: METERED_TEAM_ID,
+          name: `Team ${suffix}`,
+          slug: METERED_TEAM_ID,
+          organizationId: METERED_ORG_ID,
+        },
+      });
+      await prisma.user.create({
+        data: { id: METERED_USER_ID, email: `${METERED_USER_ID}@acme.test`, name: "ACME Admin" },
+      });
+      budgetService = PrismaGatewayAdapter.create({
+        database: prisma,
+        organizations: organizationApiOver(prisma),
+        projects: createApiFixture<ProjectApi>(
+          { listIdsByOrganization: async () => [...meteredProjectIds] },
+          "MeteredSuiteProjects",
+        ),
+        evaluators: {} as never,
+        monitors: {} as never,
+        changes: {} as never,
+        audit: {} as never,
+        budgetSpend: chRepo,
+      }).build();
+    }, 120_000);
+
+    afterAll(async () => {
+      const client = createTestClickHouseClient(chUrl!);
+      for (const tenantId of meteredProjectIds) {
+        for (const table of ["gateway_budget_ledger_events", "gateway_budget_scope_totals"]) {
+          await client.command({
+            query: `DELETE FROM ${table} WHERE TenantId = {tenantId:String}`,
+            query_params: { tenantId },
+          });
+        }
+      }
+      const connectionForCleanup = createGatewayTestPrismaConnection(databaseUrl!);
+      const cleanup = connectionForCleanup.client as PrismaClient;
+      await cleanup.gatewayRealtimeSessionReport.deleteMany({
+        where: { projectId: { in: meteredProjectIds } },
+      });
+      await cleanup.gatewayRealtimeSession.deleteMany({
+        where: { organizationId: METERED_ORG_ID },
+      });
+      await cleanup.gatewayBudget.deleteMany({ where: { organizationId: METERED_ORG_ID } });
+      await cleanup.virtualKey.deleteMany({ where: { organizationId: METERED_ORG_ID } });
+      await cleanup.project.deleteMany({ where: { teamId: METERED_TEAM_ID } });
+      await cleanup.team.deleteMany({ where: { id: METERED_TEAM_ID } });
+      await cleanup.organization.deleteMany({ where: { id: METERED_ORG_ID } });
+      await cleanup.user.deleteMany({ where: { id: METERED_USER_ID } });
+      await cleanup.$disconnect();
+    }, 120_000);
+
+    describe("when two usage reports arrive, each for its own response", () => {
+      /** @scenario "Each report debits every budget on the key's chain once" */
+      it("grows the recorded cost and debits both budgets once per report", async () => {
+        const chain = await budgetedChain();
+
+        const first = await chain.report({ reportKey: "resp_1", usage: usd(1) });
+        const second = await chain.report({ reportKey: "resp_2", usage: usd(1) });
+
+        expect(first).toMatchObject({
+          status: "recorded",
+          costNanoUsd: USD,
+          sessionCostNanoUsd: USD,
+        });
+        expect(second).toMatchObject({
+          status: "recorded",
+          costNanoUsd: USD,
+          sessionCostNanoUsd: 2 * USD,
+        });
+        const expectedDebits = [`${chain.sessionId}.resp_1`, `${chain.sessionId}.resp_2`];
+        expect(await chain.ledger(chain.keyBudgetId)).toEqual({
+          debits: expectedDebits,
+          spentNanoUsd: 2 * USD,
+        });
+        expect(await chain.ledger(chain.projectBudgetId)).toEqual({
+          debits: expectedDebits,
+          spentNanoUsd: 2 * USD,
+        });
+        const stored = await chain.session();
+        expect(stored.status).toBe("OPEN");
+        expect(stored.reportCount).toBe(2);
+        expect(Number(stored.reportedCostNanoUsd)).toBe(2 * USD);
+      });
+    });
+
+    describe("when the same report is delivered again", () => {
+      /** @scenario "A report delivered twice debits its budgets once" */
+      it("moves neither budget", async () => {
+        const chain = await budgetedChain();
+        await chain.report({ reportKey: "resp_1", usage: usd(1) });
+
+        const again = await chain.report({ reportKey: "resp_1", usage: usd(1) });
+
+        expect(again).toMatchObject({
+          status: "duplicate",
+          costNanoUsd: 0,
+          sessionCostNanoUsd: USD,
+        });
+        expect((await chain.ledger(chain.keyBudgetId)).spentNanoUsd).toBe(USD);
+        expect((await chain.ledger(chain.projectBudgetId)).spentNanoUsd).toBe(USD);
+        expect((await chain.session()).reportCount).toBe(1);
+      });
+    });
+
+    describe("when a report takes the key's budget to its limit", () => {
+      /** @scenario "A breach of the key's budget is flagged in the usage response" */
+      it("flags the key's budget and blocks the key's next request", async () => {
+        const chain = await budgetedChain();
+        const under = await chain.report({ reportKey: "resp_1", usage: usd(2) });
+
+        const breaching = await chain.report({ reportKey: "resp_2", usage: usd(3) });
+
+        expect(under).toMatchObject({ budget: { exceeded: false } });
+        expect(breaching).toMatchObject({
+          budget: { exceeded: true, scope: "virtual_key", budgetId: chain.keyBudgetId },
+        });
+        expect(breaching).not.toHaveProperty("budget.unknown");
+        const next = await chain.nextRequest();
+        expect(next.decision).toBe("hard_block");
+        expect(next.blockedBy.map((blocked) => blocked.budgetId)).toEqual([chain.keyBudgetId]);
+      });
+    });
+
+    describe("when a report takes the project's budget to its limit", () => {
+      /** @scenario "A breach of the project's budget is flagged in the usage response" */
+      it("flags the project's budget and blocks the key's next request", async () => {
+        const chain = await budgetedChain();
+        // Another key on the project spent 48 USD of the project's 50.
+        await chRepo.insertDebitsForBudgets([
+          {
+            tenantId: chain.projectId,
+            budgetId: chain.projectBudgetId,
+            scope: "PROJECT",
+            scopeId: chain.projectId,
+            window: "MONTH",
+            virtualKeyId: "vk-sibling",
+            gatewayRequestId: `grq_${nanoid()}`,
+            amountNanoUsd: 48 * USD,
+            tokensInput: 0,
+            tokensOutput: 0,
+            tokensCacheRead: 0,
+            tokensCacheWrite: 0,
+            model: REALTIME_MODEL,
+            durationMs: 0,
+            status: "SUCCESS",
+            occurredAt: nowInstant(),
+          },
+        ]);
+
+        const breaching = await chain.report({ reportKey: "resp_1", usage: usd(2) });
+
+        expect(breaching).toMatchObject({
+          budget: { exceeded: true, scope: "project", budgetId: chain.projectBudgetId },
+        });
+        const next = await chain.nextRequest();
+        expect(next.decision).toBe("hard_block");
+        expect(next.blockedBy.map((blocked) => blocked.budgetId)).toEqual([chain.projectBudgetId]);
+      });
+    });
+
+    describe("when a session's reports stopped and it outlived the open window", () => {
+      /** @scenario "A session whose reports stopped is closed at what was recorded" */
+      it("closes it with its recorded cost and confirms its own record", async () => {
+        const chain = await budgetedChain();
+        await chain.report({ reportKey: "resp_1", usage: usd(1) });
+        await chain.ageSessionPastTheWindow();
+
+        const tick = await reconciler().poll();
+
+        expect(tick.settled).toBeGreaterThanOrEqual(1);
+        const stored = await chain.session();
+        expect(stored.status).toBe("CLOSED");
+        expect(stored.closeReason).toBe("closed by window; reported usage stands");
+        expect(Number(stored.reportedCostNanoUsd)).toBe(USD);
+        expect(await chain.ledger(chain.keyBudgetId)).toEqual({
+          debits: [`${chain.sessionId}.resp_1`],
+          spentNanoUsd: USD,
+        });
+        // The admitted record is confirmed at no quantities rather than left for the
+        // settlement sweeper to mark cost unknown.
+        expect(chain.confirmations().at(-1)).toMatchObject({
+          gateway_request_id: chain.sessionId,
+          request_type: "realtime_session",
+          cost_nano_usd: 0,
+          usage: EMPTY_SPEND_USAGE,
+        });
+      });
+    });
+
+    describe("when a realtime session never reported and outlived the open window", () => {
+      /** @scenario "An unreported realtime session settles at the estimate" */
+      it("confirms the estimate as its one report, debits it and closes", async () => {
+        const chain = await budgetedChain();
+        await chain.ageSessionPastTheWindow();
+
+        const tick = await reconciler().poll();
+
+        // Ten minutes assumed: 6000 input audio tokens and 6000 output audio tokens.
+        const estimate = rating.rate({
+          model: REALTIME_MODEL,
+          usage: { ...EMPTY_SPEND_USAGE, input_audio_tokens: 6000, output_audio_tokens: 6000 },
+        }).costNanoUsd;
+        expect(estimate).toBeGreaterThan(0);
+        expect(tick.estimated).toBeGreaterThanOrEqual(1);
+        const stored = await chain.session();
+        expect(stored.status).toBe("CLOSED");
+        expect(stored.closeReason).toBe("estimated: no usage report arrived");
+        expect(stored.reportCount).toBe(1);
+        expect(Number(stored.reportedCostNanoUsd)).toBe(estimate);
+        expect(await chain.ledger(chain.keyBudgetId)).toEqual({
+          debits: [`${chain.sessionId}.estimate`],
+          spentNanoUsd: estimate,
+        });
+        expect(await chain.ledger(chain.projectBudgetId)).toEqual({
+          debits: [`${chain.sessionId}.estimate`],
+          spentNanoUsd: estimate,
+        });
+      });
+    });
+
+    describe("when the client posts one usage report with no report key", () => {
+      /** @scenario "A single report with no report key closes the session as it always did" */
+      it("confirms the whole usage on the session's own record and closes", async () => {
+        const chain = await budgetedChain();
+
+        const receipt = await chain.report({ usage: usd(1) });
+
+        expect(receipt).toMatchObject({
+          status: "closed",
+          costNanoUsd: USD,
+          sessionCostNanoUsd: USD,
+        });
+        expect(chain.confirmations()).toHaveLength(1);
+        expect(chain.confirmations()[0]).toMatchObject({
+          gateway_request_id: chain.sessionId,
+          request_type: "realtime_session",
+          cost_nano_usd: USD,
+        });
+        const stored = await chain.session();
+        expect(stored.status).toBe("CLOSED");
+        expect(stored.closeReason).toBe("usage reported by the client");
+        expect(stored.reportCount).toBe(0);
+        expect(await chain.ledger(chain.keyBudgetId)).toEqual({
+          debits: [chain.sessionId],
+          spentNanoUsd: USD,
+        });
+      });
+    });
+
+    describe("when the client posts the session total after keyed reports", () => {
+      /** @scenario "A session total after keyed reports confirms only the remainder" */
+      it("confirms what the reports left out and states the whole total on the span once", async () => {
+        const chain = await budgetedChain();
+        await chain.report({ reportKey: "resp_1", usage: usd(1) });
+        await chain.report({ reportKey: "resp_2", usage: usd(1) });
+
+        const receipt = await chain.report({ usage: usd(3) });
+
+        expect(receipt).toMatchObject({
+          status: "closed",
+          costNanoUsd: USD,
+          sessionCostNanoUsd: 3 * USD,
+        });
+        expect(chain.confirmations().at(-1)).toMatchObject({
+          gateway_request_id: chain.sessionId,
+          cost_nano_usd: USD,
+          usage: { ...EMPTY_SPEND_USAGE, ...usd(1) },
+        });
+        expect((await chain.ledger(chain.keyBudgetId)).spentNanoUsd).toBe(3 * USD);
+        expect(Number((await chain.session()).reportedCostNanoUsd)).toBe(3 * USD);
+
+        const spans = meteredSpans.filter((span) => span.span.traceId === chain.traceId);
+        expect(spans).toHaveLength(1);
+        expect(spanAttr(spans[0]!, "langwatch.span.cost")).toBeCloseTo(3, 9);
+        expect(spanAttr(spans[0]!, "gen_ai.usage.output_audio_tokens")).toBe(3 * TOKENS_PER_USD);
+      });
+    });
+  },
+);

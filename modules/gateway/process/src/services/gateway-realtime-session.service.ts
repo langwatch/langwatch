@@ -7,8 +7,12 @@
 import { createHash } from "crypto";
 
 import type {
+  GatewayBudgetCheckInput,
+  GatewayBudgetCheckResult,
+  GatewayRealtimeMetering,
   GatewayRealtimeSessionRecord,
   GatewayRealtimeSession,
+  GatewayRealtimeSessionReport,
   GatewayRealtimeSessionStatus,
   SpendUsage,
 } from "@langwatch/gateway-contract";
@@ -25,6 +29,7 @@ import type {
   GatewayRealtimeSessionRepository,
   ReserveResult,
 } from "../repositories/gateway-realtime-session.repository.ts";
+import { sumRealtimeUsage } from "../rules/gateway-realtime-session-metering.rules.ts";
 import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
 
 const logger = createLogger("langwatch:gateway:realtime-session");
@@ -37,7 +42,14 @@ const logger = createLogger("langwatch:gateway:realtime-session");
 export const REALTIME_OPEN_SESSION_WINDOW_MS = 60 * 60 * 1000;
 
 /** What a session closed by the window rather than by a report says it closed for. */
-const EXPIRY_CLOSE_REASON = "no vendor report arrived within the longest possible call";
+export const REALTIME_EXPIRY_CLOSE_REASON =
+  "no vendor report arrived within the longest possible call";
+
+/** Who a session's spend is charged to beyond its key: what only the control plane can join. */
+export type GatewayRealtimeSessionAttribution = {
+  principalUserId: string | null;
+  teamId: string | null;
+};
 
 /**
  * Everything this service reaches outside itself, named rather than resolved from a process
@@ -55,6 +67,22 @@ export type GatewayRealtimeSessionCollaborators = {
    * storage: the money still lands, the trace just carries no cost line.
    */
   spanIngestion?: GatewaySpanIngestion | undefined;
+  /**
+   * Joins the key's owner and the project's team onto a confirmation, so their budgets are
+   * debited. Absent, a confirmation names the organization, project and key only.
+   */
+  attribution?:
+    | {
+        findSessionAttribution(input: {
+          virtualKeyId: string;
+          projectId: string;
+        }): Promise<GatewayRealtimeSessionAttribution>;
+      }
+    | undefined;
+  /** The budget read a usage report answers with. Absent, the verdict is unknown. */
+  budgets?:
+    | { checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult> }
+    | undefined;
 };
 
 export interface ReserveInput {
@@ -73,6 +101,10 @@ export interface ReserveInput {
    */
   traceId?: string;
   requestedModel?: string;
+  kind?: string;
+  metering?: GatewayRealtimeMetering;
+  transcriptionModel?: string;
+  credentialExpiresAt?: Instant;
 }
 
 /**
@@ -107,23 +139,33 @@ export class GatewayRealtimeSessionService {
         model: input.model,
         traceId: input.traceId ?? null,
         requestedModel: input.requestedModel ?? null,
+        kind: input.kind ?? null,
+        metering: input.metering ?? null,
+        transcriptionModel: input.transcriptionModel ?? null,
+        credentialExpiresAt: input.credentialExpiresAt ?? null,
       },
       staleBefore: nowInstant().subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS }),
-      closeReason: EXPIRY_CLOSE_REASON,
+      closeReason: REALTIME_EXPIRY_CLOSE_REASON,
     });
   }
 
-  /** Records the vendor's own conversation id against a booked session. */
+  /** Records what the mint learned after booking: the conversation id, the credential's expiry. */
   async correlateRealtimeSession(params: {
     sessionId: string;
     projectId: string;
-    vendorConversationId: string;
+    vendorConversationId?: string;
+    credentialExpiresAt?: Instant;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<boolean> {
     return params.collaborators.sessions.correlate({
       sessionId: params.sessionId,
       projectId: params.projectId,
-      vendorConversationId: params.vendorConversationId,
+      ...(params.vendorConversationId === undefined
+        ? {}
+        : { vendorConversationId: params.vendorConversationId }),
+      ...(params.credentialExpiresAt === undefined
+        ? {}
+        : { credentialExpiresAt: params.credentialExpiresAt }),
     });
   }
 
@@ -217,127 +259,129 @@ export class GatewayRealtimeSessionService {
     occurredAt?: Instant;
     durationMs?: number;
     reason: string;
+    /** Already joined by the caller; otherwise read here. */
+    attribution?: GatewayRealtimeSessionAttribution;
+    /** The session's reports when the caller already read them; otherwise read after the close. */
+    reports?: readonly GatewayRealtimeSessionReport[];
     collaborators: GatewayRealtimeSessionCollaborators;
-  }): Promise<void> {
+  }): Promise<{ closed: boolean; costNanoUsd: number }> {
     const occurredAt = params.occurredAt ?? nowInstant();
     const usage: SpendUsage = { ...EMPTY_SPEND_USAGE, ...params.usage };
+    const { session, collaborators } = params;
 
-    // Confirmation goes first; the row closes only once it has landed — the
-    // other order loses money (closing then failing to confirm leaves a row
-    // saying "handled" while its spend sits admitted until grace settles it
-    // unknown, and no retry looks at it again since it's no longer open).
+    // Confirmation goes first; the row closes only once it has landed. The other order loses
+    // money: a closed row whose confirm failed is never retried, since it is no longer open.
     // Both steps are idempotent, so a repeat confirm/close is a no-op.
-    const rated = params.collaborators.spendRating.rate({
-      model: params.session.model,
+    const rated = collaborators.spendRating.rate({ model: session.model, usage });
+    await this.confirmRealtimeSpend({
+      session,
+      gatewayRequestId: session.id,
+      requestType: "realtime_session",
+      model: session.model,
       usage,
-    });
-    await params.collaborators.spendConfirmation.confirmSpend({
-      gateway_request_id: params.session.id,
-      occurred_at: occurredAt.epochMilliseconds,
-      tenantId: params.session.projectId,
-      model: params.session.model,
-      model_provider_id: params.session.modelProviderId,
-      usage,
-      cost_nano_usd: rated.costNanoUsd,
-      rate_version: rated.rateVersion,
-      duration_ms: params.durationMs ?? 0,
-      // Attribution. A voice confirmation is emitted here rather than by the
-      // gateway, so it has to carry what the gateway would have carried; the
-      // session row recorded it at the mint.
-      organization_id: params.session.organizationId,
-      virtual_key_id: params.session.virtualKeyId,
-      request_type: "realtime_session",
-      admitted_at: params.session.mintedAt.epochMilliseconds,
-      // The mint recorded its own trace id on the session row, so the spend
-      // record and the settlement span name the same trace and the two money
-      // surfaces can be joined. A brokered call runs client to vendor, so no
-      // span reaches us and the mint takes no end-user header; principal and
-      // team are joined by the ingest seam from the virtual key.
-      end_user_id: "",
-      trace_id: params.session.traceId ?? "",
-      principal_user_id: "",
-      team_id: "",
-      labels: [],
-      metadata: "",
+      rated,
+      durationMs: params.durationMs ?? 0,
+      occurredAt,
+      ...(params.attribution ? { attribution: params.attribution } : {}),
+      collaborators,
     });
 
-    const closed = await params.collaborators.sessions.close({
-      sessionId: params.session.id,
-      projectId: params.session.projectId,
+    const closed = await collaborators.sessions.close({
+      sessionId: session.id,
+      projectId: session.projectId,
       closedAt: occurredAt,
       closeReason: params.reason.slice(0, 256),
+      settledCostNanoUsd: rated.costNanoUsd,
       ...(params.vendorCostRaw === undefined ? {} : { vendorCostRaw: params.vendorCostRaw }),
     });
     if (closed === 0) {
       logger.info(
-        { sessionId: params.session.id },
+        { sessionId: session.id },
         "a realtime report arrived for a session that was already closed",
       );
 
-      return;
+      return { closed: false, costNanoUsd: rated.costNanoUsd };
     }
 
-    // One session, one span, emitted by whichever confirmation won the close.
-    // Gating on the close is what makes it exactly once: a resent webhook, a
-    // retried client report, or a late confirmation superseding a settled
-    // record all find the row already CLOSED and add nothing to the trace.
+    // One session, one span, emitted by whichever confirmation won the close, so a resent
+    // webhook or a retried report adds nothing. It states the whole call: every report
+    // recorded while it ran, plus what the session's own record confirmed just now.
+    const reports =
+      params.reports ??
+      (await collaborators.sessions.findReports({
+        sessionId: session.id,
+        projectId: session.projectId,
+      }));
     await recordRealtimeSessionSpan({
-      session: params.session,
-      usage,
-      costNanoUsd: rated.costNanoUsd,
+      session,
+      usage: sumRealtimeUsage({ usages: [...reports.map((report) => report.usage), usage] }),
+      costNanoUsd: reports.reduce((total, report) => total + report.costNanoUsd, rated.costNanoUsd),
       durationMs: params.durationMs ?? 0,
       occurredAt,
-      spanIngestion: params.collaborators.spanIngestion,
+      spanIngestion: collaborators.spanIngestion,
     });
+
+    return { closed: true, costNanoUsd: rated.costNanoUsd };
   }
 
   /**
-   * Closes one session with usage a client read off its own socket. A second report on an already
-   * closed session is a success no-op, since retries and replays are ordinary traffic here. An
-   * expired session still confirms: the sweeper only decided it was not holding a cap slot.
+   * Sends one confirmation for a session into the gateway spend pipeline. Emitted here rather
+   * than by the gateway, so it carries what the gateway would have: the session row recorded
+   * the organization, key and trace at the mint, and the owner and team are joined here.
    */
-  async reportRealtimeSessionUsage(params: {
-    sessionId: string;
-    projectId: string;
-    virtualKeyId: string;
-    usage: Partial<SpendUsage>;
-    now?: Instant;
+  async confirmRealtimeSpend(params: {
+    session: GatewayRealtimeSessionRecord;
+    gatewayRequestId: string;
+    requestType: string;
+    model: string;
+    usage: SpendUsage;
+    rated: { costNanoUsd: number; rateVersion: string };
+    durationMs: number;
+    occurredAt: Instant;
+    attribution?: GatewayRealtimeSessionAttribution;
     collaborators: GatewayRealtimeSessionCollaborators;
-  }): Promise<"closed" | "already_closed" | "not_found"> {
-    // Matched on the key as well as the project. A trace project is shared by
-    // every key scoped to it, so filtering on the project alone would let the
-    // holder of one key close a session another key opened and write arbitrary
-    // usage onto that key's admitted spend record. A session id is a
-    // gateway request id, which the other key's own response header carries.
-    const session = await params.collaborators.sessions.findForReport({
-      sessionId: params.sessionId,
-      projectId: params.projectId,
-      virtualKeyId: params.virtualKeyId,
-    });
-    if (!session) {
-      return "not_found";
-    }
-
-    if (session.status === "CLOSED" || session.status === "FAILED") {
-      logger.info(
-        { sessionId: session.id, status: session.status },
-        "a realtime usage report arrived for a session that is no longer open",
-      );
-
-      return "already_closed";
-    }
-
-    const now = params.now ?? nowInstant();
-    await this.closeAndConfirmRealtimeSession({
-      session,
+  }): Promise<void> {
+    const { session } = params;
+    const attribution =
+      params.attribution ??
+      (await this.findRealtimeSessionAttribution({ session, collaborators: params.collaborators }));
+    await params.collaborators.spendConfirmation.confirmSpend({
+      gateway_request_id: params.gatewayRequestId,
+      occurred_at: params.occurredAt.epochMilliseconds,
+      tenantId: session.projectId,
+      model: params.model,
+      model_provider_id: session.modelProviderId,
       usage: params.usage,
-      occurredAt: now,
-      collaborators: params.collaborators,
-      reason: "usage reported by the client",
-      durationMs: Math.max(0, now.epochMilliseconds - session.mintedAt.epochMilliseconds),
+      cost_nano_usd: params.rated.costNanoUsd,
+      rate_version: params.rated.rateVersion,
+      duration_ms: params.durationMs,
+      organization_id: session.organizationId,
+      virtual_key_id: session.virtualKeyId,
+      request_type: params.requestType,
+      admitted_at: session.mintedAt.epochMilliseconds,
+      // A brokered call runs client to vendor, so the mint takes no end-user header. The trace
+      // is the mint's, so the spend record and the settlement span can be joined.
+      end_user_id: "",
+      trace_id: session.traceId ?? "",
+      principal_user_id: attribution.principalUserId ?? "",
+      team_id: attribution.teamId ?? "",
+      labels: [],
+      metadata: "",
     });
+  }
 
-    return "closed";
+  /** The owner and team a session's spend is also charged to; neither when none is composed. */
+  async findRealtimeSessionAttribution(params: {
+    session: Pick<GatewayRealtimeSessionRecord, "virtualKeyId" | "projectId">;
+    collaborators: GatewayRealtimeSessionCollaborators;
+  }): Promise<GatewayRealtimeSessionAttribution> {
+    const reader = params.collaborators.attribution;
+    if (!reader) return { principalUserId: null, teamId: null };
+
+    return reader.findSessionAttribution({
+      virtualKeyId: params.session.virtualKeyId,
+      projectId: params.session.projectId,
+    });
   }
 
   /**
@@ -356,7 +400,7 @@ export class GatewayRealtimeSessionService {
       ...(params.virtualKeyId ? { virtualKeyId: params.virtualKeyId } : {}),
       now,
       staleBefore: now.subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS }),
-      closeReason: EXPIRY_CLOSE_REASON,
+      closeReason: REALTIME_EXPIRY_CLOSE_REASON,
     });
   }
 }

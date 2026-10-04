@@ -2087,8 +2087,25 @@ export interface LwqlPrismaRows {
     readonly closeReason: "String?";
     readonly traceId: "String?";
     readonly vendorCostRaw: "Json?";
+    readonly kind: "String?";
+    readonly metering: "String?";
+    readonly credentialExpiresAt: "DateTime?";
+    readonly transcriptionModel: "String?";
+    readonly lastReportAt: "DateTime?";
+    readonly reportedCostNanoUsd: "BigInt";
+    readonly reportCount: "Int";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly GatewayRealtimeSessionReport: {
+    readonly id: "String";
+    readonly sessionId: "String";
+    readonly reportKey: "String";
+    readonly projectId: "String";
+    readonly model: "String";
+    readonly usage: "Json";
+    readonly costNanoUsd: "BigInt";
+    readonly createdAt: "DateTime";
   };
   readonly SystemMigrationTenantState: {
     readonly migrationName: "String";

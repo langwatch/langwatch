@@ -1,7 +1,11 @@
-import { parseVirtualKeyConfig } from "@langwatch/gateway-contract";
-import type { GatewayRealtimeSession as GatewayRealtimeSessionRow } from "@langwatch/gateway-contract";
+import { parseVirtualKeyConfig, spendUsageSchema } from "@langwatch/gateway-contract";
+import type {
+  GatewayRealtimeSession as GatewayRealtimeSessionRow,
+  GatewayRealtimeSessionReport as GatewayRealtimeSessionReportRow,
+} from "@langwatch/gateway-contract";
 import {
   type GatewayRealtimeSession,
+  type GatewayRealtimeSessionReport,
   type GatewayRealtimeSessionStatus,
   Prisma,
   type PrismaClient,
@@ -11,13 +15,18 @@ import { fromDate, toDate, type Instant } from "@langwatch/time";
 import {
   GatewayRealtimeSessionRepository,
   type NewGatewayRealtimeSession,
+  type NewGatewayRealtimeSessionReport,
   type ReserveResult,
 } from "../gateway-realtime-session.repository.ts";
 
 /** The client slice realtime sessions are booked and settled through. */
 export type GatewayRealtimeSessionDatabase = Pick<
   PrismaClient,
-  "gatewayRealtimeSession" | "virtualKey" | "$transaction" | "$executeRaw"
+  | "gatewayRealtimeSession"
+  | "gatewayRealtimeSessionReport"
+  | "virtualKey"
+  | "$transaction"
+  | "$executeRaw"
 >;
 
 /**
@@ -83,7 +92,15 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
         }
       }
 
-      await tx.gatewayRealtimeSession.create({ data: { ...session, status: "OPEN" } });
+      await tx.gatewayRealtimeSession.create({
+        data: {
+          ...session,
+          credentialExpiresAt: session.credentialExpiresAt
+            ? toDate(session.credentialExpiresAt)
+            : null,
+          status: "OPEN",
+        },
+      });
 
       return { ok: true as const };
     });
@@ -93,14 +110,21 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     sessionId,
     projectId,
     vendorConversationId,
+    credentialExpiresAt,
   }: {
     sessionId: string;
     projectId: string;
-    vendorConversationId: string;
+    vendorConversationId?: string;
+    credentialExpiresAt?: Instant;
   }): Promise<boolean> {
     const updated = await this.database.gatewayRealtimeSession.updateMany({
       where: { id: sessionId, projectId },
-      data: { vendorConversationId },
+      data: {
+        ...(vendorConversationId === undefined ? {} : { vendorConversationId }),
+        ...(credentialExpiresAt === undefined
+          ? {}
+          : { credentialExpiresAt: toDate(credentialExpiresAt) }),
+      },
     });
 
     return updated.count > 0;
@@ -235,12 +259,14 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     closedAt,
     closeReason,
     vendorCostRaw,
+    settledCostNanoUsd,
   }: {
     sessionId: string;
     projectId: string;
     closedAt: Instant;
     closeReason: string;
     vendorCostRaw?: unknown;
+    settledCostNanoUsd?: number;
   }): Promise<number> {
     // A report carrying no cost payload keeps the one the row already holds.
     const costPayload = vendorCostRaw === undefined ? null : JSON.stringify(vendorCostRaw);
@@ -251,11 +277,142 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
              "closedAt" = ${toDate(closedAt)},
              "closeReason" = ${closeReason},
              "vendorCostRaw" = COALESCE(${costPayload}::jsonb, "vendorCostRaw"),
+             "reportedCostNanoUsd" = "reportedCostNanoUsd" + ${BigInt(settledCostNanoUsd ?? 0)},
              "updatedAt" = now()
        WHERE "id" = ${sessionId}
          AND "projectId" = ${projectId}
          AND "status" IN ('OPEN', 'EXPIRED')
     `;
+  }
+
+  async findReport({
+    sessionId,
+    projectId,
+    reportKey,
+  }: {
+    sessionId: string;
+    projectId: string;
+    reportKey: string;
+  }): Promise<GatewayRealtimeSessionReportRow | null> {
+    const row = await this.database.gatewayRealtimeSessionReport.findFirst({
+      where: { sessionId, projectId, reportKey },
+    });
+
+    return row ? toRealtimeSessionReportRow(row) : null;
+  }
+
+  async recordReport({ report }: { report: NewGatewayRealtimeSessionReport }): Promise<boolean> {
+    const recordedAt = toDate(report.recordedAt);
+
+    return this.database.$transaction(async (tx) => {
+      const inserted = await tx.gatewayRealtimeSessionReport.createMany({
+        data: [
+          {
+            sessionId: report.sessionId,
+            projectId: report.projectId,
+            reportKey: report.reportKey,
+            model: report.model,
+            usage: report.usage,
+            costNanoUsd: BigInt(report.costNanoUsd),
+            createdAt: recordedAt,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      if (inserted.count === 0) return false;
+
+      await tx.gatewayRealtimeSession.updateMany({
+        where: { id: report.sessionId, projectId: report.projectId },
+        data: {
+          reportCount: { increment: 1 },
+          reportedCostNanoUsd: { increment: BigInt(report.costNanoUsd) },
+          lastReportAt: recordedAt,
+        },
+      });
+
+      return true;
+    });
+  }
+
+  async findReports({
+    sessionId,
+    projectId,
+  }: {
+    sessionId: string;
+    projectId: string;
+  }): Promise<GatewayRealtimeSessionReportRow[]> {
+    const rows = await this.database.gatewayRealtimeSessionReport.findMany({
+      where: { sessionId, projectId },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return rows.map(toRealtimeSessionReportRow);
+  }
+
+  async sumReportCostSince({
+    sessionId,
+    projectId,
+    since,
+  }: {
+    sessionId: string;
+    projectId: string;
+    since: Instant;
+  }): Promise<number> {
+    const total = await this.database.gatewayRealtimeSessionReport.aggregate({
+      where: { sessionId, projectId, createdAt: { gte: toDate(since) } },
+      _sum: { costNanoUsd: true },
+    });
+
+    return Number(total._sum.costNanoUsd ?? 0n);
+  }
+
+  async findOrphanedGatewaySessions({
+    kind,
+    silentSince,
+    limit,
+  }: {
+    kind: string;
+    silentSince: Instant;
+    limit: number;
+  }): Promise<GatewayRealtimeSessionRow[]> {
+    const before = { lt: toDate(silentSince) };
+    const rows = await this.database.gatewayRealtimeSession.findMany({
+      where: {
+        status: "OPEN",
+        metering: "gateway",
+        kind,
+        OR: [{ lastReportAt: before }, { lastReportAt: null, mintedAt: before }],
+      },
+      orderBy: { mintedAt: "asc" },
+      take: limit,
+    });
+
+    return rows.map(toRealtimeSessionRow);
+  }
+
+  async findAwaitingSettlement({
+    kinds,
+    mintedBefore,
+    expiredReason,
+    limit,
+  }: {
+    kinds: readonly string[];
+    mintedBefore: Instant;
+    expiredReason: string;
+    limit: number;
+  }): Promise<GatewayRealtimeSessionRow[]> {
+    const rows = await this.database.gatewayRealtimeSession.findMany({
+      where: {
+        metering: { in: ["client", "gateway"] },
+        kind: { in: [...kinds] },
+        mintedAt: { lt: toDate(mintedBefore) },
+        OR: [{ status: "OPEN" }, { status: "EXPIRED", closeReason: expiredReason }],
+      },
+      orderBy: { mintedAt: "asc" },
+      take: limit,
+    });
+
+    return rows.map(toRealtimeSessionRow);
   }
 
   async expireStale({
@@ -309,7 +466,25 @@ function toRealtimeSessionRow(row: GatewayRealtimeSession): GatewayRealtimeSessi
     ...row,
     mintedAt: fromDate(row.mintedAt),
     closedAt: row.closedAt ? fromDate(row.closedAt) : null,
+    credentialExpiresAt: row.credentialExpiresAt ? fromDate(row.credentialExpiresAt) : null,
+    lastReportAt: row.lastReportAt ? fromDate(row.lastReportAt) : null,
+    reportedCostNanoUsd: Number(row.reportedCostNanoUsd),
     createdAt: fromDate(row.createdAt),
     updatedAt: fromDate(row.updatedAt),
+  };
+}
+
+/** A stored report with its Json usage read back into the spend vocabulary. */
+function toRealtimeSessionReportRow(
+  row: GatewayRealtimeSessionReport,
+): GatewayRealtimeSessionReportRow {
+  return {
+    sessionId: row.sessionId,
+    reportKey: row.reportKey,
+    projectId: row.projectId,
+    model: row.model,
+    usage: spendUsageSchema.parse(row.usage),
+    costNanoUsd: Number(row.costNanoUsd),
+    createdAt: fromDate(row.createdAt),
   };
 }

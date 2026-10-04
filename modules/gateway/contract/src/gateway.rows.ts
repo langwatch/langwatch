@@ -5,6 +5,7 @@
  */
 import type { Instant } from "@langwatch/time";
 
+import type { SpendUsage } from "./gateway-spend.schemas.ts";
 import type { GatewayBudgetScopeType, GatewayBudgetWindow } from "./gateway.budget.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */
@@ -145,8 +146,29 @@ export type GatewayRealtimeSession = {
   closeReason: string | null;
   traceId: string | null;
   vendorCostRaw: GatewayJsonValue | null;
+  /** What the session is, and so how it is priced. Null on a row an older gateway booked. */
+  kind: string | null;
+  /** Who measures the usage: `client` or `gateway`. */
+  metering: string | null;
+  credentialExpiresAt: Instant | null;
+  transcriptionModel: string | null;
+  lastReportAt: Instant | null;
+  /** Everything recorded for the session: its reports plus what its own record confirmed. */
+  reportedCostNanoUsd: number;
+  reportCount: number;
   createdAt: Instant;
   updatedAt: Instant;
+};
+
+/** One usage report of a realtime session, priced as its own spend record. */
+export type GatewayRealtimeSessionReport = {
+  sessionId: string;
+  reportKey: string;
+  projectId: string;
+  model: string;
+  usage: SpendUsage;
+  costNanoUsd: number;
+  createdAt: Instant;
 };
 
 /** One place a virtual key is reachable from: an organization, a team or a project. */

@@ -848,6 +848,9 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       commands: spendCommands,
       rating: ModelCatalogGatewaySpendRatingService.create(),
     };
+    const internalStore = PrismaGatewayInternalStoreRepository.create({
+      database: setup.members.prisma,
+    });
     const realtimeSessions: GatewayRealtimeSessionCollaborators = {
       sessions: PrismaGatewayRealtimeSessionRepository.create({ database: setup.members.prisma }),
       spendRating: spend.rating,
@@ -859,6 +862,16 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
           await sender.send(data);
         },
       },
+      attribution: {
+        findSessionAttribution: async ({ virtualKeyId, projectId }) => {
+          const [[key], project] = await Promise.all([
+            internalStore.findVirtualKeysForAttribution([virtualKeyId]),
+            setup.dependencies.projects.findTraceDestination(projectId),
+          ]);
+          return { principalUserId: key?.principalUserId ?? null, teamId: project?.teamId ?? null };
+        },
+      },
+      budgets: controlPlane.budgetDecisions,
     };
     const config = GatewayConfigMaterialiserService.create({
       scopeResolution: controlPlane.internalScopeResolution,
@@ -894,7 +907,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       virtualKeys: controlPlane.internalVirtualKeys,
       projects: setup.dependencies.projects,
       jwt: secrets.jwtSecret ? GatewayJwtService.create({ secret: secrets.jwtSecret }) : void 0,
-      store: PrismaGatewayInternalStoreRepository.create({ database: setup.members.prisma }),
+      store: internalStore,
       changes: controlPlane.internalChanges,
       config,
       budgetSpend: controlPlane.budgetSpend,
@@ -1341,7 +1354,13 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   }
 
   /** One voice reconciliation tick, what the reconcile process manager's intent runs. */
-  reconcileRealtimeSessions(): Promise<{ examined: number; confirmed: number; expired: number }> {
+  reconcileRealtimeSessions(): Promise<{
+    examined: number;
+    confirmed: number;
+    expired: number;
+    settled: number;
+    estimated: number;
+  }> {
     return this.#voice.reconciliation.poll();
   }
 

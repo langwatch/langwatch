@@ -13,4 +13,11 @@ export interface GatewayRealtimeSessionRecord {
   requestedModel: string | null;
   mintedAt: Instant;
   vendorConversationId: string | null;
+  /** Absent on a record built before metering was carried, which reads as null. */
+  kind?: string | null;
+  metering?: string | null;
+  credentialExpiresAt?: Instant | null;
+  transcriptionModel?: string | null;
+  lastReportAt?: Instant | null;
+  reportCount?: number;
 }

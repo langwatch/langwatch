@@ -1,4 +1,7 @@
-import type { GatewayRealtimeSessionRecord } from "@langwatch/gateway-contract";
+import type {
+  GatewayRealtimeSession,
+  GatewayRealtimeSessionRecord,
+} from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { Instant } from "@langwatch/time";
 
@@ -6,6 +9,7 @@ import type {
   ElevenLabsConversationChannel,
   ElevenLabsConversationReport,
 } from "../channels/elevenlabs-conversation.channel.ts";
+import { REALTIME_SETTLEMENT_BATCH_SIZE } from "../rules/gateway-realtime-session-metering.rules.ts";
 
 export interface RealtimeSessionReconciliationLogger {
   warn(context: Record<string, unknown>, message: string): void;
@@ -19,6 +23,22 @@ export interface RealtimeSessionReconciliationClock {
 
 export interface RealtimeSessionReconciliationRepository {
   expireStaleSessions: (input: { now: Instant }) => Promise<number>;
+  /** Open sessions the gateway meters itself whose gateway stopped reporting. */
+  listOrphanedGatewaySessions: (input: {
+    now: Instant;
+    limit: number;
+  }) => Promise<GatewayRealtimeSession[]>;
+  /** Metered sessions past the open window that nothing closed. */
+  listSessionsAwaitingSettlement: (input: {
+    now: Instant;
+    limit: number;
+  }) => Promise<GatewayRealtimeSession[]>;
+  /** Closes one at what was recorded, or at an estimate when nothing was. */
+  settleSession: (input: {
+    session: GatewayRealtimeSession;
+    orphaned: boolean;
+    now: Instant;
+  }) => Promise<"estimated" | "closed">;
   listOpenElevenLabsSessions: (input: {
     mintedBefore: Instant;
     limit: number;
@@ -50,6 +70,8 @@ export interface RealtimeSessionReconciliationConfig {
   tickIntervalMs: number;
   pollAfterMs: number;
   maxSessionsPerTick: number;
+  /** Metered sessions settled per tick, orphaned and past the window each. */
+  maxSettlementsPerTick: number;
   vendorCallTimeoutMs: number;
 }
 
@@ -57,6 +79,7 @@ export const realtimeSessionReconciliationConfig: RealtimeSessionReconciliationC
   tickIntervalMs: 60 * 1000,
   pollAfterMs: 2 * 60 * 1000,
   maxSessionsPerTick: 25,
+  maxSettlementsPerTick: REALTIME_SETTLEMENT_BATCH_SIZE,
   vendorCallTimeoutMs: 10_000,
 };
 
@@ -114,8 +137,11 @@ export class GatewayRealtimeSessionReconciliationService {
     examined: number;
     confirmed: number;
     expired: number;
+    settled: number;
+    estimated: number;
   }> {
     const expired = await this.repository.expireStaleSessions({ now });
+    const settlement = await this.settleMeteredSessions(now);
     const sessions = await this.repository.listOpenElevenLabsSessions({
       mintedBefore: now.subtract({ milliseconds: this.config.pollAfterMs }),
       limit: this.config.maxSessionsPerTick,
@@ -135,7 +161,43 @@ export class GatewayRealtimeSessionReconciliationService {
       }
     }
 
-    return { examined: sessions.length, confirmed, expired };
+    return { examined: sessions.length, confirmed, expired, ...settlement };
+  }
+
+  /**
+   * Closes the metered sessions nothing else will: one whose gateway went silent mid-call, and
+   * one past the open window. Each is settled alone, so one that fails waits for the next tick.
+   */
+  private async settleMeteredSessions(
+    now: Instant,
+  ): Promise<{ settled: number; estimated: number }> {
+    const limit = this.config.maxSettlementsPerTick;
+    const orphaned = await this.repository.listOrphanedGatewaySessions({ now, limit });
+    const overdue = await this.repository.listSessionsAwaitingSettlement({ now, limit });
+    const orphanedIds = new Set(orphaned.map((session) => session.id));
+    const batch = [
+      ...orphaned.map((session) => ({ session, orphaned: true })),
+      ...overdue
+        .filter((session) => !orphanedIds.has(session.id))
+        .map((session) => ({ session, orphaned: false })),
+    ];
+
+    let settled = 0;
+    let estimated = 0;
+    for (const { session, orphaned: lost } of batch) {
+      try {
+        const outcome = await this.repository.settleSession({ session, orphaned: lost, now });
+        settled += 1;
+        if (outcome === "estimated") estimated += 1;
+      } catch (error) {
+        this.logger.warn(
+          { error, sessionId: session.id },
+          "could not settle a metered voice session; it waits for the next tick",
+        );
+      }
+    }
+
+    return { settled, estimated };
   }
 
   private async reconcile(session: GatewayRealtimeSessionRecord): Promise<boolean> {

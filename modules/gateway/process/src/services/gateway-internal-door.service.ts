@@ -30,7 +30,7 @@ import {
   LICENSE_TOKEN_PREFIX,
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import type { z } from "zod";
 
 import { GatewayAuthDecisionService } from "./gateway-auth-decision.service.ts";
@@ -67,6 +67,15 @@ const realtimeSessionNotFound = () =>
     code: "realtime_session_not_found",
     message: "no session with that id belongs to this project",
   });
+
+/** The credential expiry a body carried in epoch milliseconds, as a protocol call takes it. */
+function credentialExpiryOf(body: { credential_expires_at?: number | undefined }): {
+  credentialExpiresAt?: Instant;
+} {
+  return body.credential_expires_at === undefined
+    ? {}
+    : { credentialExpiresAt: Temporal.Instant.fromEpochMilliseconds(body.credential_expires_at) };
+}
 
 /** The body a route reads for itself, or `null` when the bytes were not JSON. */
 function readJson(raw: string): unknown {
@@ -593,6 +602,10 @@ export class GatewayInternalDoorService {
       model: body.model,
       traceId: body.trace_id,
       requestedModel: body.requested_model,
+      kind: body.kind,
+      metering: body.metering,
+      transcriptionModel: body.transcription_model,
+      ...credentialExpiryOf(body),
     });
     if (!result.ok && result.reason === "unavailable") return realtimeSessionsUnavailable();
     if (!result.ok) {
@@ -620,17 +633,19 @@ export class GatewayInternalDoorService {
       return refuse(400, {
         type: "bad_request",
         code: "invalid_session_patch",
-        message: "project_id is required, with a vendor_conversation_id or a terminal status",
+        message:
+          "project_id is required, with a vendor_conversation_id, a credential_expires_at or a terminal status",
       });
     }
 
     const body = parsed.data;
     let applied = false;
-    if (body.vendor_conversation_id) {
+    if (body.vendor_conversation_id || body.credential_expires_at) {
       const correlated = await this.protocol.correlateRealtimeSession({
         sessionId,
         projectId: body.project_id,
         vendorConversationId: body.vendor_conversation_id,
+        ...credentialExpiryOf(body),
       });
       if (correlated === "unavailable") return realtimeSessionsUnavailable();
       applied = correlated === "applied";
@@ -660,18 +675,37 @@ export class GatewayInternalDoorService {
       return refuse(400, {
         type: "bad_request",
         code: "invalid_usage_report",
-        message: "project_id, virtual_key_id and a usage object of integer quantities are required",
+        message:
+          "project_id and virtual_key_id are required, with a usage object of integer quantities unless final is true",
       });
     }
 
+    const body = parsed.data;
     const outcome = await this.protocol.reportRealtimeSessionUsage({
       sessionId,
-      projectId: parsed.data.project_id,
-      virtualKeyId: parsed.data.virtual_key_id,
-      usage: parsed.data.usage,
+      projectId: body.project_id,
+      virtualKeyId: body.virtual_key_id,
+      usage: body.usage,
+      reportKey: body.report_key,
+      model: body.model,
+      pricedAs: body.priced_as,
+      final: body.final,
+      durationMs: body.duration_ms,
+      source: body.source,
     });
     if (outcome === "unavailable") return realtimeSessionsUnavailable();
     if (outcome === "not_found") return realtimeSessionNotFound();
-    return answer({ session_id: sessionId, status: "CLOSED" });
+    return answer({
+      session_id: sessionId,
+      status: outcome.status,
+      cost_nano_usd: outcome.costNanoUsd,
+      session_cost_nano_usd: outcome.sessionCostNanoUsd,
+      budget: {
+        exceeded: outcome.budget.exceeded,
+        ...(outcome.budget.scope ? { scope: outcome.budget.scope } : {}),
+        ...(outcome.budget.budgetId ? { budget_id: outcome.budget.budgetId } : {}),
+        ...(outcome.budget.unknown ? { unknown: true as const } : {}),
+      },
+    });
   }
 }

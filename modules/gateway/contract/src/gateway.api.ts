@@ -376,17 +376,26 @@ export type GatewayRealtimeReservation = {
   model: string;
   traceId?: string;
   requestedModel?: string;
+  kind?: string;
+  metering?: GatewayRealtimeMetering;
+  transcriptionModel?: string;
+  credentialExpiresAt?: Instant;
 };
+
+/** Who measures a session's usage: the caller reporting it, or the gateway observing it. */
+export type GatewayRealtimeMetering = "client" | "gateway";
 
 export type GatewayRealtimeReservationResult =
   | { ok: true }
   | { ok: false; reason: "session_limit"; open: number; limit: number }
   | { ok: false; reason: "unavailable" };
 
+/** What the mint learned after booking: either field alone, or both. */
 export type GatewayRealtimeCorrelation = {
   sessionId: string;
   projectId: string;
-  vendorConversationId: string;
+  vendorConversationId?: string;
+  credentialExpiresAt?: Instant;
 };
 
 export type GatewayRealtimeRelease = {
@@ -403,10 +412,38 @@ export type GatewayRealtimeUsageReport = {
   sessionId: string;
   projectId: string;
   virtualKeyId: string;
-  usage: SpendUsage;
+  /** Absent only on a bare close. */
+  usage?: SpendUsage;
+  /** Names one report. Absent means `usage` is the session total and closes it. */
+  reportKey?: string;
+  /** Prices this report under another catalog id than the session's. */
+  model?: string;
+  /** Prices this report under the session's transcription model, unless `model` names one. */
+  pricedAs?: "transcription";
+  /** Closes the session after recording. */
+  final?: boolean;
+  durationMs?: number;
+  source?: GatewayRealtimeMetering;
 };
 
-export type GatewayRealtimeUsageOutcome = "already_closed" | "closed" | "not_found" | "unavailable";
+/** Whether a blocking budget on the key's chain is at or past its limit. */
+export type GatewayRealtimeBudgetVerdict = {
+  exceeded: boolean;
+  scope?: string;
+  budgetId?: string;
+  /** The budgets could not be read in time, so `exceeded` is not a finding. */
+  unknown?: true;
+};
+
+/** What one usage report did, and where the session's money stands after it. */
+export type GatewayRealtimeUsageReceipt = {
+  status: "recorded" | "duplicate" | "closed" | "already_closed";
+  costNanoUsd: number;
+  sessionCostNanoUsd: number;
+  budget: GatewayRealtimeBudgetVerdict;
+};
+
+export type GatewayRealtimeUsageOutcome = GatewayRealtimeUsageReceipt | "not_found" | "unavailable";
 
 /** Spend of one request type across tenants, in an optional epoch-millisecond window. */
 export type GatewaySpendByRequestTypeQuery = {
