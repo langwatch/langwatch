@@ -15,6 +15,8 @@ export const subscriptionChangedEventDataSchema = z.object({
   organizationId: z.string().min(1),
   memberUserIds: z.array(z.string().min(1)),
   hasSubscription: z.boolean(),
+  /** The plan of the subscription that just became active; absent for any other change. */
+  startedPlan: z.string().nullish(),
 });
 export type SubscriptionChangedEventData = z.infer<typeof subscriptionChangedEventDataSchema>;
 

@@ -3,9 +3,9 @@ import type { EventingCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
 import {
   buildBillingLifecyclePipeline,
+  type BillingLifecyclePipeline,
   type BuildBillingLifecyclePipelineInput,
 } from "../eventing/billing-lifecycle.pipeline.ts";
 
@@ -44,8 +44,13 @@ export class BillingLifecycleAnnouncerService {
     this.#commands = commands;
   }
 
-  subscriptionActivated(input: { organizationId: string }): Promise<void> {
-    return this.#subscriptionChanged({ ...input, hasSubscription: () => Promise.resolve(true) });
+  /** A subscription that was not active became active on `plan`; a renewal never reaches this. */
+  subscriptionActivated(input: { organizationId: string; plan: string }): Promise<void> {
+    return this.#subscriptionChanged({
+      organizationId: input.organizationId,
+      hasSubscription: () => Promise.resolve(true),
+      startedPlan: input.plan,
+    });
   }
 
   /** Whether the organization still holds another live subscription is read after the cancel. */
@@ -74,6 +79,7 @@ export class BillingLifecycleAnnouncerService {
   async #subscriptionChanged(input: {
     organizationId: string;
     hasSubscription: () => Promise<boolean>;
+    startedPlan?: string;
   }): Promise<void> {
     await this.#record(input.organizationId, async (commands) => {
       const members = await this.deps.organizations.getAllMembers({
@@ -85,6 +91,7 @@ export class BillingLifecycleAnnouncerService {
         organizationId: input.organizationId,
         memberUserIds: members.map((member) => member.id),
         hasSubscription: await input.hasSubscription(),
+        ...(input.startedPlan ? { startedPlan: input.startedPlan } : {}),
       });
     });
   }

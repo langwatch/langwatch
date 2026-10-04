@@ -5,12 +5,15 @@
 
 import { defineBrowserModule } from "@langwatch/browser";
 
+import { onboardingFirstTouchAttribution } from "./behavior/first-touch-attribution.capability.ts";
 import { onboardingGuidedPath } from "./features/guided-onboarding/behavior/guided-path-active.capability.ts";
 import { onboardingGuidedTour } from "./features/guided-onboarding/behavior/guided-tour.capability.ts";
 
 export const onboardingWeb = defineBrowserModule("onboarding")
-  // The tour's state for Langy's tour card, and the Home offer a screen draws in its own space.
+  // The tour's state for Langy's tour card, the Home offer a screen draws in its own space,
+  // and first-touch attribution for the shell.
   .withCapabilities({
+    firstTouchAttribution: onboardingFirstTouchAttribution,
     guidedTour: onboardingGuidedTour,
     guidedPathActive: onboardingGuidedPath,
     guidedOnboardingOffer: {

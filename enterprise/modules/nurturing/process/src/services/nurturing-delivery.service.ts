@@ -30,8 +30,14 @@ import {
   integrationMethodFor,
 } from "../rules/nurturing-product-interest-service.rules.ts";
 import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.rules.ts";
-import { fireSignup } from "../rules/nurturing-signup-identification-service.rules.ts";
-import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
+import {
+  fireSignup,
+  fireSignupAnalytics,
+} from "../rules/nurturing-signup-identification-service.rules.ts";
+import {
+  fireSubscriptionStarted,
+  fireSubscriptionSync,
+} from "../rules/nurturing-subscription-sync-service.rules.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
 const nurturingLogger = createLogger("langwatch:nurturing");
@@ -238,7 +244,9 @@ export class NurturingDeliveryService {
       case "evaluation_ran":
         return track({ userId: signal.userId, event: "evaluation_ran" });
       case "signed_up":
-        return track({ userId: signal.userId, event: "signed_up" });
+        return fireSignupAnalytics(signal).forEach((event) => posthog.track(event));
+      case "subscription_changed":
+        return fireSubscriptionStarted(signal).forEach((event) => posthog.track(event));
       case "team_member_invited":
         return track({
           userId: signal.userId,

@@ -605,6 +605,19 @@ export type UiGovernanceSampleChoice = { setSampleChoice(choice: boolean): void 
 /** Onboarding's guided path; `useIsActive` is a hook, call it during render. */
 export type UiGuidedPathActive = { useIsActive(): boolean };
 
+/**
+ * Onboarding's first-touch acquisition attribution, lent to the shell.
+ * `useCapture` is a hook: the shell calls it at its outermost provider position.
+ */
+export type UiFirstTouchAttribution = {
+  useCapture(): void;
+  /**
+   * The stored first-touch fields as analytics event properties, with the UTM
+   * and `ref` params of the current URL on top when it has any.
+   */
+  eventProperties(): Readonly<Record<string, string>>;
+};
+
 export type UiDeclaredCapabilities = {
   addOrEditDatasetDrawer: UiDeclaredComponent<UiAddOrEditDatasetDrawerProps>;
   agentActionsMenu: UiDeclaredComponent<UiAgentActionsMenuProps>;
@@ -638,6 +651,7 @@ export type UiDeclaredCapabilities = {
   evaluatorTracesMapping: UiDeclaredComponent<UiEvaluatorTracesMappingProps>;
   evaluatorSettingsForm: UiDeclaredComponent<UiEvaluatorSettingsFormProps>;
   filterSidebar: UiDeclaredComponent<UiFilterSidebarProps>;
+  firstTouchAttribution: UiFirstTouchAttribution;
   httpConfigEditor: UiDeclaredComponent<UiHttpConfigEditorProps>;
   llmConfigField: UiDeclaredComponent<UiLlmConfigFieldProps>;
   llmConfigPopover: UiDeclaredComponent<UiLlmConfigPopoverProps>;

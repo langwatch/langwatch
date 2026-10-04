@@ -140,6 +140,8 @@ export type CioEventName =
   | "onboarding_path_gateway"
   | "onboarding_path_governance"
   | "guided_onboarding_path_completed"
+  /** Any signed-in usage, at most once per hour per person. */
+  | "app_active"
   | "self_hosted_seats_crossed_threshold"
   | "self_hosted_sustained_ingestion"
   | "self_hosted_licensed_feature_without_license"

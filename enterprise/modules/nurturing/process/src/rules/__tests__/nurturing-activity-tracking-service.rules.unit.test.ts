@@ -15,13 +15,19 @@ describe("fire", () => {
       it("decides to identify them with the moment they were last active", () => {
         const calls = fire({ userId: "user-1" });
 
-        expect(calls).toHaveLength(1);
         const [call] = calls as [
           { type: "identify"; userId: string; traits: { last_active_at: string } },
         ];
         expect(call.type).toBe("identify");
         expect(call.userId).toBe("user-1");
         expect(Date.parse(call.traits.last_active_at)).not.toBeNaN();
+      });
+
+      it("decides to track app_active for them next to the identify", () => {
+        const calls = fire({ userId: "user-1" });
+
+        expect(calls).toHaveLength(2);
+        expect(calls[1]).toEqual({ type: "track", userId: "user-1", event: "app_active" });
       });
     });
   });
@@ -30,10 +36,19 @@ describe("fire", () => {
     describe("when the session callback fires each time", () => {
       /** @scenario "Activity tracking is debounced to avoid excessive API calls" */
       it("decides to identify them once, not once per refresh", () => {
-        expect(fire({ userId: "user-1" })).toHaveLength(1);
+        expect(fire({ userId: "user-1" }).map((call) => call.type)).toEqual(["identify", "track"]);
         expect(fire({ userId: "user-1" })).toHaveLength(0);
         expect(fire({ userId: "user-1" })).toHaveLength(0);
         expect(cacheSize()).toBe(1);
+      });
+
+      /** @scenario Activity tracking fires an app_active event with the same debounce */
+      it("decides to track app_active once, not once per refresh", () => {
+        const tracked = [fire({ userId: "user-1" }), fire({ userId: "user-1" })]
+          .flat()
+          .filter((call) => call.type === "track");
+
+        expect(tracked).toEqual([{ type: "track", userId: "user-1", event: "app_active" }]);
       });
     });
   });

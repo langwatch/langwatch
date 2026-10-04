@@ -214,6 +214,8 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     /** Every member of the organization, each told the trait. */
     memberUserIds: z.array(id),
     hasSubscription: z.boolean(),
+    /** The plan of the subscription that just became active; absent for any other change. */
+    startedPlan: optionalText,
   }),
   z.object({
     kind: z.literal("checkout_completed"),
