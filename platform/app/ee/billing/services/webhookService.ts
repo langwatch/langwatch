@@ -835,35 +835,11 @@ export class EEWebhookService implements WebhookService {
       return;
     }
 
-    // Guard: a $0 invoice generated during cancellation must not reactivate the subscription.
-    // Stripe fires invoice.payment_succeeded for $0 prorated invoices even when the subscription
-    // is being cancelled. Check the authoritative Stripe status before activating.
-    let stripeCanceled = false;
-    try {
-      const stripeSubscription =
-        await this.stripe.subscriptions.retrieve(subscriptionId);
-      stripeCanceled = stripeSubscription.status === "canceled";
-    } catch (err) {
-      logger.warn(
-        { subscriptionId, err },
-        "[stripeWebhook] Failed to verify Stripe subscription status, proceeding with activation",
-      );
-      if (previousSubscription.status === SubscriptionStatus.CANCELLED) {
-        logger.info(
-          { subscriptionId },
-          "[stripeWebhook] Stripe status unavailable and DB is CANCELLED, skipping activation",
-        );
-        return;
-      }
-    }
-
-    if (stripeCanceled) {
-      logger.info(
-        { subscriptionId },
-        "[stripeWebhook] Stripe subscription is canceled, skipping activation from $0 invoice",
-      );
-      return;
-    }
+    const cancelled = await this.isCancelledInStripe({
+      subscriptionId,
+      previousStatus: previousSubscription.status,
+    });
+    if (cancelled) return;
 
     const updatedSubscription = await this.subscriptionRepository.activate({
       id: previousSubscription.id,
@@ -881,32 +857,7 @@ export class EEWebhookService implements WebhookService {
       );
 
       if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-        const oldSubscriptions =
-          await this.subscriptionRepository.migrateToSeatEvent({
-            organizationId: updatedSubscription.organizationId,
-            excludeSubscriptionId: updatedSubscription.id,
-          });
-
-        // Cancel in Stripe after DB is consistent (outside transaction)
-        for (const oldSub of oldSubscriptions) {
-          if (oldSub.stripeSubscriptionId) {
-            try {
-              await this.stripe.subscriptions.cancel(
-                oldSub.stripeSubscriptionId,
-                {
-                  prorate: true,
-                },
-              );
-            } catch (err) {
-              logger.error(
-                { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
-                "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during upgrade. Manual intervention required.",
-              );
-            }
-          }
-        }
-
-        await this.applySeatRetentionPolicy(updatedSubscription.organizationId);
+        await this.migrateOrganizationToSeatEvent(updatedSubscription);
       }
 
       await this.announceSubscriptionStarted(updatedSubscription);
@@ -916,6 +867,76 @@ export class EEWebhookService implements WebhookService {
         hasSubscription: true,
       });
     }
+  }
+
+  /**
+   * Guard: a $0 invoice generated during cancellation must not reactivate the
+   * subscription. Stripe fires invoice.payment_succeeded for $0 prorated
+   * invoices even when the subscription is being cancelled, so the
+   * authoritative Stripe status is checked before activating. When Stripe
+   * cannot be reached, the stored status decides.
+   */
+  private async isCancelledInStripe({
+    subscriptionId,
+    previousStatus,
+  }: {
+    subscriptionId: string;
+    previousStatus: string;
+  }): Promise<boolean> {
+    try {
+      const stripeSubscription =
+        await this.stripe.subscriptions.retrieve(subscriptionId);
+      if (stripeSubscription.status !== "canceled") return false;
+      logger.info(
+        { subscriptionId },
+        "[stripeWebhook] Stripe subscription is canceled, skipping activation from $0 invoice",
+      );
+      return true;
+    } catch (err) {
+      logger.warn(
+        { subscriptionId, err },
+        "[stripeWebhook] Failed to verify Stripe subscription status, proceeding with activation",
+      );
+      if (previousStatus !== SubscriptionStatus.CANCELLED) return false;
+      logger.info(
+        { subscriptionId },
+        "[stripeWebhook] Stripe status unavailable and DB is CANCELLED, skipping activation",
+      );
+      return true;
+    }
+  }
+
+  /**
+   * Moves an organization onto its new seat-event subscription: the older
+   * subscriptions are closed in the database, then cancelled in Stripe, and
+   * the seat retention policies are stamped.
+   */
+  private async migrateOrganizationToSeatEvent(
+    updatedSubscription: SubscriptionWithOrg,
+  ): Promise<void> {
+    const oldSubscriptions =
+      await this.subscriptionRepository.migrateToSeatEvent({
+        organizationId: updatedSubscription.organizationId,
+        excludeSubscriptionId: updatedSubscription.id,
+      });
+
+    // Cancel in Stripe after DB is consistent (outside transaction)
+    for (const oldSub of oldSubscriptions) {
+      if (oldSub.stripeSubscriptionId) {
+        try {
+          await this.stripe.subscriptions.cancel(oldSub.stripeSubscriptionId, {
+            prorate: true,
+          });
+        } catch (err) {
+          logger.error(
+            { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
+            "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during upgrade. Manual intervention required.",
+          );
+        }
+      }
+    }
+
+    await this.applySeatRetentionPolicy(updatedSubscription.organizationId);
   }
 
   /**
@@ -929,43 +950,39 @@ export class EEWebhookService implements WebhookService {
     subscription: Stripe.Subscription;
     plan: SubscriptionWithOrg["plan"];
   }): { usersQuantity: number | null; tracesQuantity: number | null } {
+    const { prices } = this.itemCalculator;
+    const tieredUserPrices = [
+      prices.LAUNCH_USERS,
+      prices.ACCELERATE_USERS,
+      prices.LAUNCH_ANNUAL_USERS,
+      prices.ACCELERATE_ANNUAL_USERS,
+    ];
+    const tieredTracePrices = [
+      prices.ACCELERATE_TRACES_100K,
+      prices.LAUNCH_TRACES_10K,
+      prices.LAUNCH_ANNUAL_TRACES_10K,
+      prices.ACCELERATE_ANNUAL_TRACES_100K,
+    ];
+    const tieredQuantity = (item: Stripe.SubscriptionItem) =>
+      this.itemCalculator.calculateQuantityForPrice({
+        priceId: item.price.id,
+        quantity: item.quantity ?? 0,
+        plan,
+      });
+
     let tracesQuantity: number | null = null;
     let usersQuantity: number | null = null;
 
     for (const item of subscription.items.data) {
-      if (isGrowthSeatPrice(item.price.id)) {
+      const priceId = item.price.id;
+      if (isGrowthSeatPrice(priceId)) {
         usersQuantity = item.quantity ?? 0;
-      } else if (isGrowthEventsPrice(item.price.id)) {
+      } else if (isGrowthEventsPrice(priceId)) {
         // Events price exists on the subscription; traces limit comes from plan limits
-      } else if (
-        item.price.id === this.itemCalculator.prices.LAUNCH_USERS ||
-        item.price.id === this.itemCalculator.prices.ACCELERATE_USERS ||
-        item.price.id === this.itemCalculator.prices.LAUNCH_ANNUAL_USERS ||
-        item.price.id === this.itemCalculator.prices.ACCELERATE_ANNUAL_USERS
-      ) {
-        const calculateQuantity = this.itemCalculator.calculateQuantityForPrice(
-          {
-            priceId: item.price.id,
-            quantity: item.quantity ?? 0,
-            plan,
-          },
-        );
-        usersQuantity = calculateQuantity;
-      } else if (
-        item.price.id === this.itemCalculator.prices.ACCELERATE_TRACES_100K ||
-        item.price.id === this.itemCalculator.prices.LAUNCH_TRACES_10K ||
-        item.price.id === this.itemCalculator.prices.LAUNCH_ANNUAL_TRACES_10K ||
-        item.price.id ===
-          this.itemCalculator.prices.ACCELERATE_ANNUAL_TRACES_100K
-      ) {
-        const calculateQuantity = this.itemCalculator.calculateQuantityForPrice(
-          {
-            priceId: item.price.id,
-            quantity: item.quantity ?? 0,
-            plan,
-          },
-        );
-        tracesQuantity = calculateQuantity;
+      } else if (tieredUserPrices.includes(priceId)) {
+        usersQuantity = tieredQuantity(item);
+      } else if (tieredTracePrices.includes(priceId)) {
+        tracesQuantity = tieredQuantity(item);
       }
     }
 
