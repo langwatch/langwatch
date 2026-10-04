@@ -30,6 +30,7 @@ import type {
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
+import type { BillingSubscriptionStartedAnalyticsService } from "./billing-subscription-started-analytics.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");
@@ -55,6 +56,8 @@ type BillingSubscriptionLifecycleOptions = {
     BillingLifecycleAnnouncerService,
     "subscriptionActivated" | "subscriptionCancelled"
   >;
+  /** Tracks subscription_started in product analytics; absent where none is composed. */
+  startedAnalytics?: Pick<BillingSubscriptionStartedAnalyticsService, "fire">;
 };
 
 /** The two data-retention operations seat provisioning reads and writes. */
@@ -72,6 +75,7 @@ export class BillingSubscriptionLifecycleService {
   private readonly host: BillingWebhookHost;
   private readonly retention: SeatRetentionRules;
   private readonly announcer: BillingSubscriptionLifecycleOptions["announcer"];
+  private readonly startedAnalytics: BillingSubscriptionLifecycleOptions["startedAnalytics"];
   private readonly bestEffort = BestEffortService.create();
 
   private constructor(options: BillingSubscriptionLifecycleOptions) {
@@ -82,6 +86,7 @@ export class BillingSubscriptionLifecycleService {
     this.host = options.host;
     this.retention = options.retention;
     this.announcer = options.announcer;
+    this.startedAnalytics = options.startedAnalytics;
   }
 
   async handleSubscriptionDeleted({
@@ -204,23 +209,33 @@ export class BillingSubscriptionLifecycleService {
       return;
     }
 
+    await this.announceSubscriptionStarted(updatedSubscription);
+  }
+
+  /**
+   * Reports a subscription that just became active: the Slack confirmation, the lifecycle
+   * record for peers, and the subscription_started analytics event. Callers gate this on the
+   * transition to active, so a renewal reports nothing.
+   */
+  private async announceSubscriptionStarted(subscription: SubscriptionWithOrg): Promise<void> {
     await this.bestEffort.run({
       label: "subscription confirmed notification",
-      context: { subscriptionId: updatedSubscription.id },
+      context: { subscriptionId: subscription.id },
       effect: () =>
         this.host.sendSlackSubscriptionEvent({
           type: "confirmed",
-          organizationId: updatedSubscription.organizationId,
-          organizationName: updatedSubscription.organization.name,
-          plan: updatedSubscription.plan,
-          subscriptionId: updatedSubscription.id,
-          startDate: updatedSubscription.startDate,
-          ...planQuantitiesOf(updatedSubscription),
+          organizationId: subscription.organizationId,
+          organizationName: subscription.organization.name,
+          plan: subscription.plan,
+          subscriptionId: subscription.id,
+          startDate: subscription.startDate,
+          ...planQuantitiesOf(subscription),
         }),
     });
-    await this.announcer?.subscriptionActivated({
-      organizationId: updatedSubscription.organizationId,
-      plan: updatedSubscription.plan,
+    await this.announcer?.subscriptionActivated({ organizationId: subscription.organizationId });
+    this.startedAnalytics?.fire({
+      organizationId: subscription.organizationId,
+      plan: subscription.plan,
     });
   }
 
@@ -320,24 +335,7 @@ export class BillingSubscriptionLifecycleService {
         await this.migrateToSeatEventPlan(updatedSubscription);
       }
 
-      await this.bestEffort.run({
-        label: "subscription confirmed notification",
-        context: { subscriptionId: updatedSubscription.id },
-        effect: () =>
-          this.host.sendSlackSubscriptionEvent({
-            type: "confirmed",
-            organizationId: updatedSubscription.organizationId,
-            organizationName: updatedSubscription.organization.name,
-            plan: updatedSubscription.plan,
-            subscriptionId: updatedSubscription.id,
-            startDate: updatedSubscription.startDate,
-            ...planQuantitiesOf(updatedSubscription),
-          }),
-      });
-      await this.announcer?.subscriptionActivated({
-        organizationId: updatedSubscription.organizationId,
-        plan: updatedSubscription.plan,
-      });
+      await this.announceSubscriptionStarted(updatedSubscription);
     }
   }
 

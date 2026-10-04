@@ -37,15 +37,28 @@ describe("onboardingFirstTouchAttribution", () => {
 
     describe("when the current URL carries another campaign", () => {
       /** @scenario UTM params on the current URL are reported on signed_in */
-      it("answers the current URL's params on top of the stored ones", () => {
+      it("answers only the campaign of the current URL, and none of the stored fields", () => {
         setUrl("?utm_campaign=weekly-43&utm_content=cta");
 
         expect(onboardingFirstTouchAttribution.eventProperties()).toEqual({
-          lead_source: "website",
-          utm_source: "newsletter",
-          utm_medium: "email",
           utm_campaign: "weekly-43",
           utm_content: "cta",
+        });
+      });
+
+      it("answers the stored referrer only when the current URL carries no campaign", () => {
+        window.sessionStorage.setItem("lw_attrib.referrer", "https://x.test/");
+        setUrl("?ref=partner");
+
+        expect(onboardingFirstTouchAttribution.eventProperties()).toEqual({
+          lead_source: "partner",
+        });
+
+        setUrl("");
+
+        expect(onboardingFirstTouchAttribution.eventProperties()).toMatchObject({
+          referrer: "https://x.test/",
+          utm_source: "newsletter",
         });
       });
     });

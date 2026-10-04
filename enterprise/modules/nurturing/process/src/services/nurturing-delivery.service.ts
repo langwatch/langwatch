@@ -31,13 +31,10 @@ import {
 } from "../rules/nurturing-product-interest-service.rules.ts";
 import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.rules.ts";
 import {
+  fireOrganizationCreated,
   fireSignup,
-  fireSignupAnalytics,
 } from "../rules/nurturing-signup-identification-service.rules.ts";
-import {
-  fireSubscriptionStarted,
-  fireSubscriptionSync,
-} from "../rules/nurturing-subscription-sync-service.rules.ts";
+import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
 const nurturingLogger = createLogger("langwatch:nurturing");
@@ -97,9 +94,18 @@ export class NurturingDeliveryService {
   async deliver({ key, signal }: { key: string; signal: NurturingSignal }): Promise<void> {
     if (!this.deps.customerIo && !this.deps.posthog) return;
     if (!(await this.deps.claims.claim(`nurturing:${key}`, DELIVERED_WINDOW_SECONDS))) return;
-    if (await this.withinCustomerIoDebounce(signal)) return this.toPostHog(signal);
+    if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
     this.toCustomerIo(signal);
-    this.toPostHog(signal);
+    this.toPostHogSafely(signal);
+  }
+
+  /** A PostHog channel that throws only logs: analytics never fails the delivery. */
+  private toPostHogSafely(signal: NurturingSignal): void {
+    try {
+      this.toPostHog(signal);
+    } catch (error) {
+      reportFailure(error);
+    }
   }
 
   /** True when this tenant's trace/simulation/evaluation update already sent this window. */
@@ -244,9 +250,8 @@ export class NurturingDeliveryService {
       case "evaluation_ran":
         return track({ userId: signal.userId, event: "evaluation_ran" });
       case "signed_up":
-        return fireSignupAnalytics(signal).forEach((event) => posthog.track(event));
-      case "subscription_changed":
-        return fireSubscriptionStarted(signal).forEach((event) => posthog.track(event));
+        track({ userId: signal.userId, event: "signed_up" });
+        return posthog.track(fireOrganizationCreated(signal));
       case "team_member_invited":
         return track({
           userId: signal.userId,

@@ -173,26 +173,6 @@ describe("subscriptionChangedSignal", () => {
       hasSubscription: false,
     });
   });
-
-  it("carries the plan of a subscription that just became active", () => {
-    expect(
-      subscriptionChangedSignal({
-        aggregateId: "org-1",
-        data: {
-          tenantId: "org-1",
-          occurredAt: 8,
-          organizationId: "org-1",
-          memberUserIds: ["user-1"],
-          hasSubscription: true,
-          startedPlan: "GROWTH_SEAT_EVENT",
-        },
-      }),
-    ).toMatchObject({
-      kind: "subscription_changed",
-      sourceEventId: "org-1:subscription:true:8",
-      startedPlan: "GROWTH_SEAT_EVENT",
-    });
-  });
 });
 
 describe("checkoutCompletedSignal", () => {

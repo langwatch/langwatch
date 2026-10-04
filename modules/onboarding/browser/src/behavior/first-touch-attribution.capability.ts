@@ -10,9 +10,9 @@ import { type AttributionField, readAttribution, URL_PARAM_TO_FIELD } from "./at
 import { useAttributionCapture } from "./use-attribution-capture.ts";
 
 /**
- * The stored first-touch fields, with the UTM and `ref` params of the current
- * URL on top when it has any. An email link opened in a tab that already holds
- * first-touch values is still reported under the campaign of that link.
+ * Attribution from one source as a whole, so two campaigns are never mixed:
+ * the UTM and `ref` params of the current URL when it has any, otherwise the
+ * stored first-touch fields.
  */
 function attributionEventProperties(): Readonly<Record<string, string>> {
   if (typeof window === "undefined") return {};
@@ -27,7 +27,7 @@ function attributionEventProperties(): Readonly<Record<string, string>> {
     if (value) fromUrl[field] = value;
   }
 
-  return toAttributionProperties({ ...readAttribution(), ...fromUrl });
+  return toAttributionProperties(Object.keys(fromUrl).length > 0 ? fromUrl : readAttribution());
 }
 
 export const onboardingFirstTouchAttribution: UiFirstTouchAttribution = {

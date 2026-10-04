@@ -28,10 +28,14 @@ import { resetSignedInTracking, useAnalyticsIdentity } from "../use-analytics-id
 class RecordingAnalytics extends UiAnalytics {
   readonly calls: string[] = [];
   readonly tracked: UiAnalyticsEvent[] = [];
+  /** Identify and track calls in the order they were made. */
+  readonly order: string[] = [];
   track(event: UiAnalyticsEvent): void {
     this.tracked.push(event);
+    this.order.push(`track ${event.name}`);
   }
   identify(reader: UiAnalyticsReader): void {
+    this.order.push("identify");
     this.calls.push(`identify ${reader.id} ${reader.email ?? "-"}`);
   }
   group(organization: UiAnalyticsGroup): void {
@@ -204,6 +208,7 @@ describe("the signed_in event the shell sends for an identified person", () => {
     draw(ADA, "org_1", analytics);
     expect(analytics.tracked).toEqual([SIGNED_IN]);
     expect(analytics.calls[0]).toBe("identify user_ada ada@example.com");
+    expect(analytics.order).toEqual(["identify", "track signed_in"]);
   });
 
   /** @scenario signed_in without any attribution carries no attribution properties */
@@ -229,6 +234,17 @@ describe("the signed_in event the shell sends for an identified person", () => {
 
     expect(first.tracked).toEqual([SIGNED_IN]);
     expect(second.tracked).toEqual([]);
+  });
+
+  it("sends it again in a new browser session", () => {
+    const analytics = new RecordingAnalytics();
+    draw(ADA, "org_1", analytics).unmount();
+
+    window.sessionStorage.clear();
+    resetSignedInTracking();
+    draw(ADA, "org_1", analytics);
+
+    expect(analytics.tracked).toEqual([SIGNED_IN, SIGNED_IN]);
   });
 
   it("sends it once per page load when the tab refuses session storage", () => {
@@ -260,6 +276,33 @@ describe("the signed_in event the shell sends for an identified person", () => {
       </UiCapabilityContextProvider>,
     );
     expect(analytics.tracked).toEqual([SIGNED_IN, SIGNED_IN]);
+  });
+
+  /** @scenario A user who already signed in on the tab is not counted again after another user */
+  it("does not send it again for the first person after another signed in and the tab reloads", () => {
+    const analytics = new RecordingAnalytics();
+    draw(ADA, "org_1", analytics).unmount();
+    render(
+      <UiCapabilityContextProvider value={capabilities(BOB, "org_1", analytics)}>
+        <Probe />
+      </UiCapabilityContextProvider>,
+    ).unmount();
+
+    resetSignedInTracking();
+    draw(ADA, "org_1", analytics);
+
+    expect(analytics.tracked).toEqual([SIGNED_IN, SIGNED_IN]);
+  });
+
+  it("sends it once when the stored record of this session is unreadable", () => {
+    window.sessionStorage.setItem("lw_posthog.signed_in", "user_ada");
+    const analytics = new RecordingAnalytics();
+    draw(ADA, "org_1", analytics).unmount();
+
+    resetSignedInTracking();
+    draw(ADA, "org_1", analytics);
+
+    expect(analytics.tracked).toEqual([SIGNED_IN]);
   });
 
   /** @scenario Anonymous visitors track no signed_in event */

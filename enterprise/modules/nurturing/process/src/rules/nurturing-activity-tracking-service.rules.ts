@@ -10,6 +10,12 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 const lastActivitySentAt = new Map<string, number>();
 
 /**
+ * Last time the app_active event was decided for each user. Kept apart from the identify
+ * cache, so the event has its own hourly limit whatever becomes of the identify.
+ */
+const lastAppActiveSentAt = new Map<string, number>();
+
+/**
  * Timestamp of the last sweep pass. Sweeps run at most once per hour
  * to avoid O(n) iteration overhead on every call.
  */
@@ -24,9 +30,11 @@ function sweepExpiredEntries({ now }: { now: number }): void {
     return;
   }
 
-  for (const [cachedUserId, sentAt] of lastActivitySentAt) {
-    if (now - sentAt >= ONE_HOUR_MS) {
-      lastActivitySentAt.delete(cachedUserId);
+  for (const cache of [lastActivitySentAt, lastAppActiveSentAt]) {
+    for (const [cachedUserId, sentAt] of cache) {
+      if (now - sentAt >= ONE_HOUR_MS) {
+        cache.delete(cachedUserId);
+      }
     }
   }
 
@@ -35,7 +43,8 @@ function sweepExpiredEntries({ now }: { now: number }): void {
 
 /**
  * Decides whether a session pushes last_active_at to Customer.io and tracks app_active, the
- * event campaign conversion goals count. Both are debounced together to once per hour.
+ * event campaign conversion goals count. Each is debounced to once per hour per user, on
+ * its own cache.
  */
 export function fire({
   userId,
@@ -51,8 +60,13 @@ export function fire({
 
   const now = nowInstant().epochMilliseconds;
   sweepExpiredEntries({ now });
-  const lastSent = lastActivitySentAt.get(userId);
 
+  return [...identifyLastActive({ userId, now }), ...trackAppActive({ userId, now })];
+}
+
+/** The last_active_at identify, at most once per hour per user. */
+function identifyLastActive({ userId, now }: { userId: string; now: number }): CioBatchCall[] {
+  const lastSent = lastActivitySentAt.get(userId);
   if (lastSent !== undefined && now - lastSent < ONE_HOUR_MS) {
     return [];
   }
@@ -69,8 +83,19 @@ export function fire({
         }),
       },
     },
-    { type: "track", userId, event: "app_active" },
   ];
+}
+
+/** The app_active event, at most once per hour per user. */
+function trackAppActive({ userId, now }: { userId: string; now: number }): CioBatchCall[] {
+  const lastSent = lastAppActiveSentAt.get(userId);
+  if (lastSent !== undefined && now - lastSent < ONE_HOUR_MS) {
+    return [];
+  }
+
+  lastAppActiveSentAt.set(userId, now);
+
+  return [{ type: "track", userId, event: "app_active" }];
 }
 
 /**
@@ -79,6 +104,7 @@ export function fire({
  */
 export function resetCache(): void {
   lastActivitySentAt.clear();
+  lastAppActiveSentAt.clear();
   lastSweepAt = 0;
 }
 
@@ -88,4 +114,12 @@ export function resetCache(): void {
  */
 export function cacheSize(): number {
   return lastActivitySentAt.size;
+}
+
+/**
+ * Returns the size of the app_active debounce cache for testing.
+ * @internal
+ */
+export function appActiveCacheSize(): number {
+  return lastAppActiveSentAt.size;
 }

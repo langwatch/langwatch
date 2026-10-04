@@ -19,6 +19,7 @@ import {
   BillingSubscriptionLifecycleService,
   type SeatRetentionRules,
 } from "./billing-subscription-lifecycle.service.ts";
+import type { BillingSubscriptionStartedAnalyticsService } from "./billing-subscription-started-analytics.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:webhookService");
@@ -103,6 +104,7 @@ export class EEWebhookService implements WebhookService {
     retention,
     connectedBilling,
     announcer,
+    startedAnalytics,
   }: {
     subscriptionRepository: BillingWebhookSubscriptionRepository;
     organizationRepository: BillingWebhookOrganizationRepository;
@@ -116,6 +118,8 @@ export class EEWebhookService implements WebhookService {
     connectedBilling?: ConnectedBillingInvoiceEvents;
     /** Records the checkout and subscription changes for peers; absent where none is composed. */
     announcer?: BillingLifecycleAnnouncerService;
+    /** Tracks subscription_started in product analytics; absent where none is composed. */
+    startedAnalytics?: Pick<BillingSubscriptionStartedAnalyticsService, "fire">;
   }) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
@@ -144,6 +148,7 @@ export class EEWebhookService implements WebhookService {
       host,
       retention,
       ...(announcer ? { announcer } : {}),
+      ...(startedAnalytics ? { startedAnalytics } : {}),
     });
   }
 
@@ -159,6 +164,7 @@ export class EEWebhookService implements WebhookService {
     retention: SeatRetentionRules;
     connectedBilling?: ConnectedBillingInvoiceEvents;
     announcer?: BillingLifecycleAnnouncerService;
+    startedAnalytics?: Pick<BillingSubscriptionStartedAnalyticsService, "fire">;
   }): EEWebhookService {
     return new EEWebhookService(options);
   }

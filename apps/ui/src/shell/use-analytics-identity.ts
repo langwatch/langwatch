@@ -11,18 +11,33 @@ const SIGNED_IN_STORAGE_KEY = "lw_posthog.signed_in";
  */
 const signedInThisPageLoad = new Set<string>();
 
+/** User ids that already sent `signed_in` in this browser session. */
+function readSignedInUserIds(): string[] {
+  const stored = window.sessionStorage.getItem(SIGNED_IN_STORAGE_KEY);
+  if (!stored) return [];
+
+  try {
+    const parsed: unknown = JSON.parse(stored);
+
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Whether `signed_in` still has to be sent for this user in this browser
- * session, marking it as sent. The flag holds the user id, so a different
- * user signing in on the same tab counts as a new sign in.
+ * session, marking it as sent. The record is per user, so several users
+ * signing in on the same tab each count once.
  */
 function claimSignedIn(userId: string): boolean {
   if (signedInThisPageLoad.has(userId)) return false;
   signedInThisPageLoad.add(userId);
 
   try {
-    if (window.sessionStorage.getItem(SIGNED_IN_STORAGE_KEY) === userId) return false;
-    window.sessionStorage.setItem(SIGNED_IN_STORAGE_KEY, userId);
+    const userIds = readSignedInUserIds();
+    if (userIds.includes(userId)) return false;
+    window.sessionStorage.setItem(SIGNED_IN_STORAGE_KEY, JSON.stringify([...userIds, userId]));
   } catch {
     // Storage unavailable: the in-memory set above is the only guard.
   }
@@ -30,7 +45,11 @@ function claimSignedIn(userId: string): boolean {
   return true;
 }
 
-/** Only exposed for testing. @internal */
+/**
+ * Forgets which users sent `signed_in` during this page load, which is what a
+ * reload does. Only exposed for testing.
+ * @internal
+ */
 export function resetSignedInTracking(): void {
   signedInThisPageLoad.clear();
 }

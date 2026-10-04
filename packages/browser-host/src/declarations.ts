@@ -612,8 +612,9 @@ export type UiGuidedPathActive = { useIsActive(): boolean };
 export type UiFirstTouchAttribution = {
   useCapture(): void;
   /**
-   * The stored first-touch fields as analytics event properties, with the UTM
-   * and `ref` params of the current URL on top when it has any.
+   * Attribution as analytics event properties, from one source as a whole: the
+   * UTM and `ref` params of the current URL when it has any, otherwise the
+   * stored first-touch fields.
    */
   eventProperties(): Readonly<Record<string, string>>;
 };
