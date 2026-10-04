@@ -34,6 +34,12 @@ export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>
     describe: () => "Check the address and try again.",
   },
 
+  auth_sign_up_restricted: {
+    title: "Sign-up on this installation is by invitation",
+    describe: () =>
+      "Ask an administrator to invite your email address, then use the link in the invitation to create your account.",
+  },
+
   email_already_registered: {
     // Reached from the sign-up screen, and the reader there is usually looking at their own
     // account: either a previous sign-up created it and could not sign them in, or they were a

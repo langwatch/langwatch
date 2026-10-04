@@ -100,6 +100,24 @@ describe("authFailureMessage", () => {
     });
   });
 
+  describe("when the installation restricts sign-up", () => {
+    /** @scenario "A refused sign-up reads that sign-up is by invitation" */
+    it("says sign-up is by invitation, and never that something broke", () => {
+      const message = authFailureMessage({
+        code: "auth_sign_up_restricted",
+        message: "auth_sign_up_restricted",
+        status: 403,
+      });
+
+      expect(registryCopy("auth_sign_up_restricted")).toBe(
+        "Sign-up on this installation is by invitation",
+      );
+      expect(message).toContain("Sign-up on this installation is by invitation");
+      expect(message).toMatch(/administrator to invite/);
+      expect(message).not.toContain("auth_sign_up_restricted");
+    });
+  });
+
   describe("when nothing recognizable comes back", () => {
     /** @scenario An unexpected failure still says something honest */
     it("falls back rather than putting an identifier on screen", () => {
