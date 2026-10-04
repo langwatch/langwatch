@@ -1620,6 +1620,7 @@
               "api-reference/api-keys/overview",
               "api-reference/api-keys/list-api-keys",
               "api-reference/api-keys/create-api-key",
+              "api-reference/api-keys/create-a-full-access-api-key",
               "api-reference/api-keys/create-an-ingestion-api-key",
               "api-reference/api-keys/get-api-key",
               "api-reference/api-keys/update-api-key",

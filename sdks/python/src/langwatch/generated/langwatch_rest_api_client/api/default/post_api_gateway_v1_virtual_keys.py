@@ -122,7 +122,8 @@ def sync_detailed(
      Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response
     withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24
     hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to
-    the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
+    the project the caller names; an API key that names no project must send scopes. Org- and team-
+    scoped keys require virtualKeys:manage at each requested scope.
 
     Args:
         idempotency_key (str | Unset):
@@ -167,7 +168,8 @@ def sync(
      Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response
     withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24
     hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to
-    the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
+    the project the caller names; an API key that names no project must send scopes. Org- and team-
+    scoped keys require virtualKeys:manage at each requested scope.
 
     Args:
         idempotency_key (str | Unset):
@@ -206,7 +208,8 @@ async def asyncio_detailed(
      Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response
     withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24
     hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to
-    the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
+    the project the caller names; an API key that names no project must send scopes. Org- and team-
+    scoped keys require virtualKeys:manage at each requested scope.
 
     Args:
         idempotency_key (str | Unset):
@@ -249,7 +252,8 @@ async def asyncio(
      Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response
     withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24
     hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to
-    the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
+    the project the caller names; an API key that names no project must send scopes. Org- and team-
+    scoped keys require virtualKeys:manage at each requested scope.
 
     Args:
         idempotency_key (str | Unset):
