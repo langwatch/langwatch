@@ -123,6 +123,18 @@ export class GatewayRealtimeSessionMeteringService {
     const durationMs =
       params.durationMs ?? Math.max(0, now.epochMilliseconds - session.mintedAt.epochMilliseconds);
 
+    // A keyed report that measured nothing is the gateway saying the call is still running:
+    // it moves no money, so it leaves no spend record, only the time it was heard.
+    if (params.reportKey !== undefined && !params.final && isEmptyRealtimeUsage({ usage })) {
+      await collaborators.sessions.markHeardFrom({
+        sessionId: session.id,
+        projectId: session.projectId,
+        at: now,
+      });
+
+      return receipt("recorded", { costNanoUsd: 0 });
+    }
+
     if (keyed) {
       const recorded = await this.recordReport({
         session,

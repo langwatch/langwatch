@@ -223,6 +223,11 @@ export class MemoryGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     return true;
   }
 
+  async markHeardFrom(input: { sessionId: string; projectId: string; at: Instant }): Promise<void> {
+    const row = this.owned(input);
+    if (row) this.rows.set(row.id, { ...row, lastReportAt: input.at });
+  }
+
   async findReports(input: {
     sessionId: string;
     projectId: string;
@@ -241,7 +246,6 @@ export class MemoryGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
   }
 
   async findOrphanedGatewaySessions(input: {
-    kind: string;
     silentSince: Instant;
     limit: number;
   }): Promise<GatewayRealtimeSession[]> {
@@ -250,7 +254,6 @@ export class MemoryGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
         (row) =>
           row.status === "OPEN" &&
           row.metering === "gateway" &&
-          row.kind === input.kind &&
           (row.lastReportAt ?? row.mintedAt).epochMilliseconds <
             input.silentSince.epochMilliseconds,
       )
@@ -267,7 +270,7 @@ export class MemoryGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     return this.all()
       .filter(
         (row) =>
-          (row.metering === "client" || row.metering === "gateway") &&
+          row.metering === "client" &&
           row.kind !== null &&
           input.kinds.includes(row.kind) &&
           row.mintedAt.epochMilliseconds < input.mintedBefore.epochMilliseconds &&
@@ -296,6 +299,7 @@ export class MemoryGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     const stale = this.all().filter(
       (row) =>
         row.status === "OPEN" &&
+        row.metering !== "gateway" &&
         row.mintedAt.epochMilliseconds < input.staleBefore.epochMilliseconds &&
         (input.virtualKeyId === undefined || row.virtualKeyId === input.virtualKeyId),
     );

@@ -3,7 +3,6 @@ import type { Instant } from "@langwatch/time";
 
 import type { ElevenLabsConversationReport } from "../channels/elevenlabs-conversation.channel.ts";
 import {
-  REALTIME_GATEWAY_HELD_KIND,
   REALTIME_ORPHAN_SILENCE_MS,
   REALTIME_SETTLED_KINDS,
 } from "../rules/gateway-realtime-session-metering.rules.ts";
@@ -47,7 +46,6 @@ export class GatewayRealtimeSessionSweepService implements RealtimeSessionReconc
     limit: number;
   }): Promise<GatewayRealtimeSession[]> {
     return this.collaborators.sessions.findOrphanedGatewaySessions({
-      kind: REALTIME_GATEWAY_HELD_KIND,
       silentSince: input.now.subtract({ milliseconds: REALTIME_ORPHAN_SILENCE_MS }),
       limit: input.limit,
     });

@@ -272,7 +272,11 @@ describe("a usage report of a realtime session", () => {
         pricedAs: "transcription",
         usage: { audio_ms: 60_000 },
       });
-      await report({ reportKey: "resp_2", model: "openai/gpt-realtime-2.1", usage: {} });
+      await report({
+        reportKey: "resp_2",
+        model: "openai/gpt-realtime-2.1",
+        usage: { output_tokens: 5 },
+      });
 
       expect(transcribed).toMatchObject({
         costNanoUsd: costOf({ audio_ms: 60_000 }, TRANSCRIPTION_MODEL),
@@ -633,6 +637,33 @@ describe("the reconciler, over metered sessions nothing closed", () => {
 
       expect(await reconciler.poll()).toMatchObject({ settled: 0 });
       expect(row().status).toBe("OPEN");
+    });
+
+    /** @scenario "A gateway-metered call still reporting past the open window stays open" */
+    it("leaves one past the open window open while it keeps reporting", async () => {
+      const { report, reconciler, row, age, collaborators } = await openSession({
+        session: { kind: "live", metering: "gateway" },
+      });
+      age(PAST_WINDOW_MS);
+      await report({ reportKey: "u-3660", usage: { audio_ms: 10_000 } });
+      await operations.expireStaleRealtimeSessions({ collaborators });
+
+      expect(await reconciler.poll()).toMatchObject({ settled: 0 });
+      expect(row().status).toBe("OPEN");
+    });
+
+    /** @scenario "A report that measured nothing only marks the session as heard from" */
+    it("records no spend for a report that measured nothing, and counts it as heard from", async () => {
+      const { spend, sessions, report, row } = await openSession({
+        session: { kind: "realtime", metering: "gateway" },
+      });
+
+      const receipt = await report({ reportKey: "hb-60", usage: {} });
+
+      expect(receipt).toMatchObject({ status: "recorded", costNanoUsd: 0 });
+      expect(spend.sent).toHaveLength(0);
+      expect(sessions.reports).toHaveLength(0);
+      expect(row().lastReportAt).not.toBeNull();
     });
 
     it("leaves a silent session the client meters to the open window", async () => {

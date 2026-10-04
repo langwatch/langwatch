@@ -434,14 +434,14 @@ func (s *session) send(report domain.RealtimeUsageReport) (domain.RealtimeUsageR
 	return receipt, nil
 }
 
-// housekeeping runs on every tick: it retries reports, keeps a quiet Live
+// housekeeping runs on every tick: it retries reports, keeps a quiet
 // session from being taken for a lost one, and checks the key and its budget.
 func (s *session) housekeeping() string {
 	if reason := s.flush(false); reason != "" {
 		return reason
 	}
 	now := time.Now()
-	if s.Kind == domain.RealtimeKindLive && len(s.queue) == 0 &&
+	if len(s.queue) == 0 &&
 		now.Sub(s.lastReported) >= s.manager.timing.KeepAlive {
 		s.enqueue(Observation{ReportKey: fmt.Sprintf("hb-%d", int64(now.Sub(s.StartedAt).Seconds()))})
 		if reason := s.flush(false); reason != "" {

@@ -117,6 +117,12 @@ export abstract class GatewayRealtimeSessionRepository {
    * Answers whether the report was new: a key already recorded changes nothing.
    */
   abstract recordReport(input: { report: NewGatewayRealtimeSessionReport }): Promise<boolean>;
+  /** Marks the session as heard from at `at`, with nothing recorded against it. */
+  abstract markHeardFrom(input: {
+    sessionId: string;
+    projectId: string;
+    at: Instant;
+  }): Promise<void>;
   abstract findReports(input: {
     sessionId: string;
     projectId: string;
@@ -130,9 +136,9 @@ export abstract class GatewayRealtimeSessionRepository {
   /**
    * Open sessions the gateway meters itself that have gone silent: no report, or no mint,
    * at or after `silentSince`. Their gateway is gone, so nothing is metering the call.
+   * The open window never closes one of these: a call still reporting is still running.
    */
   abstract findOrphanedGatewaySessions(input: {
-    kind: string;
     silentSince: Instant;
     limit: number;
   }): Promise<GatewayRealtimeSession[]>;

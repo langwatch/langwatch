@@ -44,8 +44,6 @@ export const REALTIME_ESTIMATE_DEFAULT_DURATION_MS: Readonly<Record<string, numb
 /** The kinds a session past its window is settled for; any other waits on its vendor report. */
 export const REALTIME_SETTLED_KINDS = Object.keys(REALTIME_ESTIMATE_DEFAULT_DURATION_MS);
 
-/** The kind whose socket the gateway holds itself, so a silent one has lost its gateway. */
-export const REALTIME_GATEWAY_HELD_KIND = "live";
 /** How long a gateway-held session may go without a report before it counts as orphaned. */
 export const REALTIME_ORPHAN_SILENCE_MS = 3 * 60_000;
 

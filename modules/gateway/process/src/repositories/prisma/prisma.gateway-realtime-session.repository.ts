@@ -334,6 +334,21 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     });
   }
 
+  async markHeardFrom({
+    sessionId,
+    projectId,
+    at,
+  }: {
+    sessionId: string;
+    projectId: string;
+    at: Instant;
+  }): Promise<void> {
+    await this.database.gatewayRealtimeSession.updateMany({
+      where: { id: sessionId, projectId },
+      data: { lastReportAt: toDate(at) },
+    });
+  }
+
   async findReports({
     sessionId,
     projectId,
@@ -367,11 +382,9 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
   }
 
   async findOrphanedGatewaySessions({
-    kind,
     silentSince,
     limit,
   }: {
-    kind: string;
     silentSince: Instant;
     limit: number;
   }): Promise<GatewayRealtimeSessionRow[]> {
@@ -380,7 +393,6 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
       where: {
         status: "OPEN",
         metering: "gateway",
-        kind,
         OR: [{ lastReportAt: before }, { lastReportAt: null, mintedAt: before }],
       },
       orderBy: { mintedAt: "asc" },
@@ -403,7 +415,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
   }): Promise<GatewayRealtimeSessionRow[]> {
     const rows = await this.database.gatewayRealtimeSession.findMany({
       where: {
-        metering: { in: ["client", "gateway"] },
+        metering: "client",
         kind: { in: [...kinds] },
         mintedAt: { lt: toDate(mintedBefore) },
         OR: [{ status: "OPEN" }, { status: "EXPIRED", closeReason: expiredReason }],
@@ -456,6 +468,7 @@ function expireOpenSessions(
            "updatedAt" = now()
      WHERE "status" = 'OPEN'
        AND "mintedAt" < ${toDate(staleBefore)}
+       AND "metering" IS DISTINCT FROM 'gateway'
        ${keyFilter}
   `;
 }

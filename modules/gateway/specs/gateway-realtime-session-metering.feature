@@ -164,6 +164,20 @@ Feature: Gateway realtime-session metering
       And nothing beyond its recorded reports is charged
 
     @unit
+    Scenario: A gateway-metered call still reporting past the open window stays open
+      Given an open session the gateway meters that was booked over an hour ago
+      And it reported within the last three minutes
+      When stale sessions are expired and the reconciler runs
+      Then the session stays open
+
+    @unit
+    Scenario: A report that measured nothing only marks the session as heard from
+      Given an open session the gateway meters
+      When a keyed report with no quantities arrives
+      Then no spend record is confirmed and no report is stored
+      And the session records when it was last heard from
+
+    @unit
     Scenario: The settlement span states the whole call
       Given a session with recorded reports is closed
       Then the one settlement span carries the reports' summed quantities and cost
