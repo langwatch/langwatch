@@ -853,9 +853,7 @@ export class BillingModule
   }: {
     repositories: Pick<
       BillingRepositories,
-      | "checkpoints"
-      | "reportOrganizations"
-      | "organizationCache"
+      "checkpoints" | "reportOrganizations" | "organizationCache"
     >;
     peers: Pick<ConnectedBillingPeers, "licensing" | "gateway">;
     facts: ConnectedCustomerFactsService;
