@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fireActivityTrackingNurturing,
   getActivityTrackingCacheSize,
+  getAppActiveCacheSize,
   resetActivityTrackingCache,
 } from "./activityTracking";
 
@@ -144,6 +145,22 @@ describe("Activity tracking hook", () => {
 
         // Only user-4 remains (user-1..3 were evicted by sweep)
         expect(getActivityTrackingCacheSize()).toBe(1);
+
+        vi.useRealTimers();
+      });
+
+      it("evicts app_active entries older than one hour as well", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-03-15T12:00:00.000Z"));
+
+        fireActivityTrackingNurturing({ userId: "user-1" });
+        fireActivityTrackingNurturing({ userId: "user-2" });
+        expect(getAppActiveCacheSize()).toBe(2);
+
+        vi.advanceTimersByTime(60 * 60 * 1000 + 1);
+        fireActivityTrackingNurturing({ userId: "user-3" });
+
+        expect(getAppActiveCacheSize()).toBe(1);
 
         vi.useRealTimers();
       });

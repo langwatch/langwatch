@@ -124,3 +124,11 @@ export function resetActivityTrackingCache(): void {
 export function getActivityTrackingCacheSize(): number {
   return lastActivitySentAt.size;
 }
+
+/**
+ * Returns the size of the app_active debounce cache for testing.
+ * @internal
+ */
+export function getAppActiveCacheSize(): number {
+  return lastAppActiveSentAt.size;
+}
