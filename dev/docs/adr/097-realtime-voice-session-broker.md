@@ -189,6 +189,59 @@ Emission is gated on the conditional close. The session row moves to CLOSED only
 
 **Regional residency is preserved.** A customer on an ElevenLabs residency endpoint sets `ELEVENLABS_BASE_URL` on the provider, and both the mint and the reconciler go there. The value is restricted to HTTPS on `elevenlabs.io` on write and again on read, because both paths send the customer's `xi-api-key` to that host.
 
+## Amendment (2026-10-04): metering the client cannot skip, and the brokers that carry it
+
+A consumer voice product puts one virtual key per end user behind a 5 USD monthly budget, under a 50 USD project budget. That is the named requirement gate 4 asked for. It exposed three holes in the broker as built: one report closed a session, so budgets saw nothing during a call; a session that never reported settled as cost unknown, which a per-user budget reads as zero; and nothing could end a call. This amendment closes them and records how far the relay gates moved.
+
+### A usage report is its own spend record
+
+The ledger key `(TenantId, BudgetId, GatewayRequestId)` cannot gain a tick dimension, and the debit process writes one debit per budget per request id. A second confirmation on the session's id updates the spend fold and never reaches a budget.
+
+So the tick goes into the id. Each usage report is confirmed as a spend record of its own, `<session id>.<report key>`, with request type `realtime_response`. The report key is the vendor's `response.id`, a transcription `item_id`, or a duration checkpoint. The confirmation carries its own attribution, so it needs no admission. Redelivery collapses on the aggregate id, which makes a report idempotent per response with no extra machinery, and every budget on the key's chain is debited once per report while the call runs. No ClickHouse table changes.
+
+The session's own record, admitted at the mint, carries money only for a legacy single report, the remainder of a reported total, or an estimate. Reports are also stored in Postgres (`GatewayRealtimeSessionReport`, unique per session and key) so the settlement span can state the session's summed usage exactly once.
+
+The usage answer returns the rated cost and a budget verdict. A brokered client learns from that answer that its budget is spent; a gateway-held session acts on it.
+
+### A session that never reports is charged an estimate
+
+A session the client meters, with no report by the end of the open window, settles at an estimate instead of cost unknown. The assumed duration is the minted credential's lifetime when the vendor states one, else a default per kind, clamped to between one minute and one hour.
+
+| Kind | Estimate |
+| --- | --- |
+| `realtime` (OpenAI Realtime) | 10 input audio tokens per second of the duration, 20 output audio tokens per second for half of it |
+| `live` (OpenAI Live) | the duration, at the per-second rate |
+| `tts_socket` (ElevenLabs speech sockets) | 15 characters per second |
+| `stt_socket`, `stt_batch` (ElevenLabs transcription) | the duration, as audio seconds |
+
+The token rates are OpenAI's published ones: one token per 100 ms of user audio, one per 50 ms of assistant audio. The estimate is a deterrent with a stated basis, and a client that closes its session, even at zero, never meets it. Hosted-agent sessions keep the reconciler, and rows written before this change keep their old behaviour.
+
+A session with reports that was never closed settles at what was recorded.
+
+### Where the gateway meters without the client
+
+Two vendor features make that possible without relaying media.
+
+**OpenAI Live** (`gpt-live-1`) has no client credential at all: a server posts the client's SDP offer to `POST /v1/live/sessions` and returns the answer. The gateway is that server. It then attaches its own socket to the session (`/v1/live/sessions/{id}/attach`), which reports cumulative seconds and delegated backend token usage, and accepts `session.close`.
+
+**OpenAI Realtime over WebRTC** has the same shape through `POST /v1/realtime/calls`: the call id comes back in the `Location` header, a server socket attaches with `?call_id=`, every `response.done` arrives on it, and `POST /v1/realtime/calls/{id}/hangup` ends the call.
+
+In both, media runs client to vendor and the gateway adds one REST hop at call setup. The gateway reports usage as it arrives, ends the call when a budget on the key's chain is exhausted or the key is revoked, and ends it when its own socket cannot be re-attached, because a call the gateway cannot see must not keep running. A session whose gateway pod died is closed by the reconciler at what was recorded.
+
+The mint (`POST /v1/realtime/client_secrets`) stays, for clients that want the vendor's own WebSocket with no gateway involvement after setup. It is client-metered, and the documentation says so.
+
+### ElevenLabs single-use tokens
+
+`POST /v1/single-use-token/{token_type}` mints a 15 minute, single-use token so a phone opens the speech or transcription socket directly. It is booked like the ConvAI mint and metered by client report: characters for speech, audio seconds for transcription. The vendor's sockets report no usage and the history API cannot attribute a generation to one end user when many share a provider key, so vendor read-back is not built. An unreported session takes the estimate above.
+
+### The relay gates
+
+Gate 4 is met by the requirement above. Gate 3 was already closed.
+
+Gate 2, draining, is closed for gateway-held server sockets: the gateway tracks them, stops booking new sessions on SIGTERM, supervises until the calls end or the drain budget runs out, then ends what is left and reports it. Hijacked client sockets are not built yet, so the reconnect signal for relayed clients is not either.
+
+Gate 1 is decided for the server sockets by this dated amendment: gateway pods may dial the OpenAI Realtime and Live hosts directly for an event socket, through the same endpoint policy the mint calls use. The socket carries events and no media, is bounded by the session's own lifetime, and the destination is the provider host the credential names. ADR-053 Track C still governs tenant-selected destinations.
+
 ## References
 
 - Related Nexus pages (internal wiki): `gateway-spend-command-pipeline-adr`, `skai-gateway-replacement-adr`, `bench-gateway-kong`, `feature-ai-gateway`, `feature-gateway-virtual-keys`, `feature-voice-agent-testing`, `pain-voice-agent-testing-cost`

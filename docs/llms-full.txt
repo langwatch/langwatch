@@ -2424,7 +2424,7 @@ Authorization: Bearer vk-lw-<ULID>
 
 Both take OpenAI's request shape and are served by an OpenAI or an ElevenLabs credential, whichever the model resolves to. Any client that speaks OpenAI's audio API works by pointing its base URL at the gateway and its API key at a virtual key.
 
-For ElevenLabs' own paths (`/v1/text-to-speech/{voice_id}`, `/v1/speech-to-text`) and the post-call webhook, see [ElevenLabs](/ai-gateway/api/elevenlabs). For OpenAI Realtime and ElevenLabs Conversational AI, see [Realtime voice](/ai-gateway/api/realtime).
+For ElevenLabs' own paths (`/v1/text-to-speech/{voice_id}` and its `/stream` variants, `/v1/speech-to-text`) and the post-call webhook, see [ElevenLabs](/ai-gateway/api/elevenlabs). For OpenAI Realtime and ElevenLabs Conversational AI, see [Realtime voice](/ai-gateway/api/realtime).
 
 ## Text to speech
 
@@ -2440,7 +2440,7 @@ curl https://gateway.langwatch.ai/v1/audio/speech \
   }' --output hello.mp3
 ```
 
-The response body is the audio bytes, with no JSON envelope. `Content-Type` follows `response_format`:
+The response body is the audio bytes, with no JSON envelope, sent as the provider produces them. `Content-Type` follows `response_format`:
 
 | `response_format` | `Content-Type` |
 | ----------------- | -------------- |
@@ -2453,6 +2453,8 @@ The response body is the audio bytes, with no JSON envelope. `Content-Type` foll
 
 For an ElevenLabs model, put the ElevenLabs voice id in `voice`. `pcm` on ElevenLabs is requested as `pcm_24000`, which matches OpenAI's raw PCM16 at 24 kHz.
 
+OpenAI shuts down `tts-1`, `tts-1-hd` and the dated `gpt-4o-mini-tts` snapshots on 2027-01-06.
+
 ### Parameters the gateway changes or refuses
 
 | Parameter                                           | What the gateway does                                                                                                                           |
@@ -2460,14 +2462,15 @@ For an ElevenLabs model, put the ElevenLabs voice id in `voice`. `pcm` on Eleven
 | `model`                                             | Resolved through the key's aliases, allowlist and routing policy. Missing: `400 missing_model`. Outside the allowlist: `400 model_not_allowed`. |
 | `input`                                             | Required. Missing: `400 bad_request`.                                                                                                           |
 | `voice`, `instructions`, `response_format`, `speed` | Forwarded.                                                                                                                                      |
-| Every other field                                   | Not forwarded.                                                                                                                                  |
+| `stream_format`                                     | `audio` (default) or `sse`. `sse` is served on OpenAI and Azure OpenAI credentials only; elsewhere: `400 unsupported_parameter`. See [Streaming](#streaming). |
+| Every other field                                   | Forwarded as written on OpenAI and Azure OpenAI credentials. Not forwarded on other providers.                                                  |
 
 ## Transcription
 
 ```bash
 curl https://gateway.langwatch.ai/v1/audio/transcriptions \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
-  -F "model=openai/whisper-1" \
+  -F "model=openai/gpt-transcribe" \
   -F "file=@call-recording.wav"
 ```
 
@@ -2477,6 +2480,8 @@ curl https://gateway.langwatch.ai/v1/audio/transcriptions \
 
 The response is JSON with `text`, plus the duration or token usage the provider reports.
 
+OpenAI shuts down `whisper-1` and the `gpt-4o-transcribe` family on 2027-02-26. `gpt-transcribe` is the replacement on this route.
+
 ### Parameters the gateway changes or refuses
 
 | Form part                                              | What the gateway does                                                                                                                                                                                            |
@@ -2484,19 +2489,88 @@ The response is JSON with `text`, plus the duration or token usage the provider 
 | `file`                                                 | Required. Missing: `400 bad_request`. The whole upload is capped at 26 MB, which is OpenAI's 25 MB audio limit plus the multipart framing; over the cap: `413 payload_too_large`, before any provider is called. |
 | `model`                                                | Required, as a form part. Missing: `400 missing_model`. Resolved through the key's aliases and allowlist.                                                                                                        |
 | `language`, `prompt`, `response_format`, `temperature` | Forwarded.                                                                                                                                                                                                       |
+| `include[]`, `timestamp_granularities[]`               | Forwarded. Each is accepted with or without the `[]` suffix.                                                                                                                                                     |
+| `chunking_strategy`, `languages[]`, `keywords[]`, `known_speaker_names[]`, `known_speaker_references[]` | Forwarded on OpenAI and Azure OpenAI credentials. Not forwarded on other providers.                                                                             |
+| `stream`                                               | `true` streams the transcript as events. Served on OpenAI and Azure OpenAI credentials only; elsewhere: `400 unsupported_parameter`. See [Streaming](#streaming).                                                |
 | Every other part                                       | Not forwarded.                                                                                                                                                                                                   |
 
 ## Request and response headers
 
 The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
 
-Both routes return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error. `X-LangWatch-Handled-Error` carries the `error.code` when the gateway wrote the error itself, and is removed from a forwarded provider response.
+Both routes return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, and `X-LangWatch-Provider` on a forwarded provider error. `X-LangWatch-Heartbeat-Active` applies to a transcription that does not stream. The provider's `Content-Type` and request id headers are passed on. `X-LangWatch-Handled-Error` carries the `error.code` when the gateway wrote the error itself, and is removed from a forwarded provider response.
 
 ## Streaming
 
-Neither route streams. The audio bytes and the transcript are returned complete.
+### Speech
+
+`POST /v1/audio/speech` always answers with a chunked body. Each chunk is written and flushed as the provider sends it, so playback can start before synthesis ends. Read the body as a stream:
+
+```bash
+curl -N https://gateway.langwatch.ai/v1/audio/speech \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-4o-mini-tts",
+    "voice": "nova",
+    "input": "Hello from the gateway.",
+    "response_format": "pcm"
+  }' --output - | ffplay -f s16le -ar 24000 -i -
+```
+
+OpenAI, Azure OpenAI (API key credentials) and ElevenLabs stream. Other providers return the audio in one chunk once synthesis is complete.
+
+With `"stream_format": "sse"` the response is `text/event-stream`. The provider's `speech.audio.delta` and `speech.audio.done` events are relayed unchanged; the audio is base64 in each delta. OpenAI does not serve `sse` on `tts-1` or `tts-1-hd`.
+
+```bash
+curl -N https://gateway.langwatch.ai/v1/audio/speech \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "openai/gpt-4o-mini-tts", "voice": "nova", "input": "Hello.", "stream_format": "sse"}'
+```
+
+```
+data: {"type":"speech.audio.delta","audio":"//PkxAAAAAAAAAAA..."}
+
+data: {"type":"speech.audio.done","usage":{"input_tokens":14,"output_tokens":101,"total_tokens":115}}
+```
+
+### Transcription
+
+With `stream=true` the response is `text/event-stream`. The provider's `transcript.text.delta`, `transcript.text.segment` and `transcript.text.done` events are relayed unchanged.
+
+```bash
+curl -N https://gateway.langwatch.ai/v1/audio/transcriptions \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -F "model=openai/gpt-transcribe" \
+  -F "stream=true" \
+  -F "file=@call-recording.wav"
+```
+
+```
+data: {"type":"transcript.text.delta","delta":"Hello"}
+
+data: {"type":"transcript.text.done","text":"Hello from the gateway.","usage":{"type":"duration","seconds":2}}
+```
+
+A model that ignores `stream` (`whisper-1`) answers with the usual JSON body.
+
+### When a stream ends early
+
+If the provider stops an event stream before its final event, the gateway appends an `event: error` frame. A raw audio stream that fails is closed without the terminating chunk, so the HTTP client reports a truncated body.
 
 ## Metering
+
+| Call | Charged by |
+| --- | --- |
+| Speech, raw audio | Unicode characters of `input`. The provider states no usage with raw audio. |
+| Speech, `stream_format: "sse"` | Characters of `input`, plus the token usage on `speech.audio.done`. |
+| Transcription | The seconds or tokens the provider reports, on the JSON body or on `transcript.text.done`. |
+| Transcription stream that ends before `transcript.text.done` | The duration of the uploaded file. |
+
+You are charged for the characters once the provider accepts the request. If you disconnect mid-stream, you still pay for the full text, because the provider bills it.
+
+The gateway reads the duration of an upload from WAV, FLAC, Ogg, MP4 and M4A headers, and from an MP3's Xing header or constant bitrate. For any other container, WebM included, it estimates the duration from the file size at 64 kbps.
 
 Providers that report token usage fill the standard `gen_ai.usage.*` token attributes on the trace. Character-priced synthesis and duration-priced transcription are measured by two attributes:
 
@@ -2507,7 +2581,7 @@ Providers that report token usage fill the standard `gen_ai.usage.*` token attri
 
 ## Errors
 
-Codes these routes raise before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `bad_request` (all `400`) and `payload_too_large` (`413`). A provider's own error, for example an unknown voice id, is forwarded with its status and body. The full table is on [Errors](/ai-gateway/api/errors).
+Codes these routes raise before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `unsupported_parameter`, `bad_request` (all `400`) and `payload_too_large` (`413`). A provider's own error, for example an unknown voice id, is forwarded with its status and body. The full table is on [Errors](/ai-gateway/api/errors).
 
 ---
 
@@ -2639,7 +2713,7 @@ A provider's own error is forwarded with the provider's status and body, under `
 
 ---
 title: ElevenLabs API paths
-description: ElevenLabs' own synthesis, transcription and post-call webhook paths, served by the LangWatch AI Gateway so an ElevenLabs SDK is metered by changing only its base URL and key.
+description: ElevenLabs' own synthesis, transcription, single-use token and post-call webhook paths, served by the LangWatch AI Gateway so an ElevenLabs SDK is metered by changing only its base URL and key.
 sidebarTitle: ElevenLabs
 ---
 
@@ -2647,16 +2721,19 @@ sidebarTitle: ElevenLabs
 
 ```
 POST /v1/text-to-speech/{voice_id}
+POST /v1/text-to-speech/{voice_id}/stream
+POST /v1/text-to-speech/{voice_id}/stream/with-timestamps
 POST /v1/speech-to-text
+POST /v1/single-use-token/{token_type}
 POST /v1/convai/webhook/{model_provider_id}
 xi-api-key: vk-lw-<ULID>
 ```
 
-The two audio paths mirror ElevenLabs' own, with ElevenLabs' own request bodies. Point the ElevenLabs SDK at the gateway with `base_url="https://gateway.langwatch.ai"` and the virtual key in place of the ElevenLabs key. The key goes in the `xi-api-key` header the SDK already sends.
+The audio paths mirror ElevenLabs' own, with ElevenLabs' own request bodies. Point the ElevenLabs SDK at the gateway with `base_url="https://gateway.langwatch.ai"` and the virtual key in place of the ElevenLabs key. The key goes in the `xi-api-key` header the SDK already sends.
 
 The ElevenLabs key itself stays on the organization's ElevenLabs model provider. An SDK that still sends it gets `401 invalid_api_key`, because the gateway reads that header as a virtual key.
 
-Both audio paths are served only by an ElevenLabs credential. A key that cannot reach ElevenLabs answers `400 model_provider_not_bound` and no provider is called. There is no fallback to another provider.
+The audio paths are served only by an ElevenLabs credential. A key that cannot reach ElevenLabs answers `400 model_provider_not_bound` and no provider is called. There is no fallback to another provider.
 
 ## Text to speech
 
@@ -2668,16 +2745,36 @@ curl "https://gateway.langwatch.ai/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL?output
   --output hello.mp3
 ```
 
-The response is ElevenLabs' audio bytes and headers, unchanged.
+The response is ElevenLabs' audio bytes and headers, unchanged, relayed as ElevenLabs sends them.
+
+`/stream` and `/stream/with-timestamps` take the same body and query string and reach the same paths on ElevenLabs. They are gated and metered exactly like the plain path.
+
+```bash
+curl -N "https://gateway.langwatch.ai/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL/stream?output_format=mp3_44100_128" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello from the gateway.", "model_id": "eleven_flash_v2_5"}' \
+  --output - | ffplay -i -
+```
+
+`/stream/with-timestamps` answers with a stream of JSON objects, each carrying `audio_base64`, `alignment` and `normalized_alignment`:
+
+```bash
+curl -N "https://gateway.langwatch.ai/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL/stream/with-timestamps" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello from the gateway.", "model_id": "eleven_flash_v2_5"}' \
+  --output -
+```
 
 | Parameter | What the gateway does |
 |---|---|
-| `text` | Required. Missing: `400 bad_request`. Metered as Unicode characters. |
+| `text` | Required. Missing: `400 bad_request`. Metered as Unicode characters, from the moment ElevenLabs accepts the request. A caller that disconnects mid-stream is still charged the full text. |
 | `model_id` | Resolved through the key's aliases and allowlist, then rewritten to the bare model id ElevenLabs knows. Absent: billed and gated as `eleven_multilingual_v2`, the vendor's own default. Outside the allowlist: `400 model_not_allowed`. |
 | Query string (`output_format`, `enable_logging`, latency settings) | Forwarded as written. |
 | Every other body field (voice settings, and the rest) | Forwarded as written. |
 
-The body is capped at 1 MB; over the cap: `413 payload_too_large`.
+The request body is capped at 1 MB; over the cap: `413 payload_too_large`. The audio response is capped at 32 MiB, counted as it is relayed: a longer response is cut at the cap.
 
 ## Speech to text
 
@@ -2701,11 +2798,92 @@ The response is ElevenLabs' transcript JSON, unchanged. Transcription is metered
 
 The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
 
-Both audio paths return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers), plus ElevenLabs' own response headers. A forwarded ElevenLabs error carries `X-LangWatch-Provider: elevenlabs` and the vendor's `Retry-After` when it sent one.
+The audio paths return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers), plus ElevenLabs' own response headers. A forwarded ElevenLabs error carries `X-LangWatch-Provider: elevenlabs` and the vendor's `Retry-After` when it sent one.
 
 ## Streaming
 
-Neither audio path streams. The audio bytes and the transcript are returned complete.
+All three text to speech paths answer with a chunked body that is written and flushed as ElevenLabs sends it. If ElevenLabs fails mid-stream the connection is closed without the terminating chunk, so the HTTP client reports a truncated body.
+
+Speech to text does not stream. The transcript is returned complete.
+
+## Single-use tokens
+
+```bash
+curl -X POST "https://gateway.langwatch.ai/v1/single-use-token/tts_websocket?model_id=eleven_flash_v2_5" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY"
+```
+
+```json
+{
+  "token": "sutkn_...",
+  "langwatch": { "session_id": "req_01K6Y3M8QF7W2VZ4N9DXTB5C0A" }
+}
+```
+
+The path is ElevenLabs' own. The gateway checks the key's budgets and its open-session cap, mints the token with the stored ElevenLabs key, and returns ElevenLabs' body with `langwatch.session_id` added. The same id is on the `X-LangWatch-Session-Id` response header. A token is valid for 15 minutes and opens one socket.
+
+The socket runs from your client to ElevenLabs and does not pass through the gateway. The gateway does not see what the socket used, so your client reports it.
+
+| `token_type` | Opens | Default `model_id` |
+|---|---|---|
+| `tts_websocket` | A text to speech socket (`stream-input`, `multi-stream-input`) | `eleven_multilingual_v2` |
+| `ttd_websocket` | The Text to Dialogue socket | `eleven_v3_conversational` |
+| `realtime_scribe` | The realtime speech to text socket | `scribe_v2_realtime` |
+| `batch_scribe` | One `POST /v1/speech-to-text` call made directly to ElevenLabs | `scribe_v2` |
+
+Any other `token_type` answers `400 bad_request`.
+
+ElevenLabs' token route takes no model, so the gateway reads one from the `model_id` query parameter. It is resolved through the key's aliases and allowlist and is the model the session is billed under. Pass the model your socket will use. Outside the allowlist: `400 model_not_allowed`. `model_id` is not forwarded to ElevenLabs.
+
+The route is served only by an ElevenLabs credential, and a customer on a residency host is minted on that host.
+
+### Opening the socket
+
+The query parameter that carries the token differs per socket.
+
+| Socket | Token type | Query parameter |
+|---|---|---|
+| `wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream-input` | `tts_websocket` | `single_use_token` |
+| `wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/multi-stream-input` | `tts_websocket` | `single_use_token` |
+| `wss://api.elevenlabs.io/v1/text-to-dialogue/stream-input` | `ttd_websocket` | `single_use_token` |
+| `wss://api.elevenlabs.io/v1/speech-to-text/realtime` | `realtime_scribe` | `token` |
+| `POST https://api.elevenlabs.io/v1/speech-to-text` | `batch_scribe` | `token` |
+
+```js
+const ws = new WebSocket(
+  `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input` +
+    `?model_id=eleven_flash_v2_5&single_use_token=${token}`,
+);
+```
+
+`eleven_v3` and `eleven_v4` models run on the Text to Dialogue socket, not on `stream-input`. Mint a `ttd_websocket` token for it. ElevenLabs' API accepts that token type and its reference does not list it. Opening the Text to Dialogue socket with either token type is not verified end to end.
+
+### Reporting usage and closing
+
+ElevenLabs sockets send no usage. Count it in your client and post it to the session:
+
+```bash
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/usage" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"id": "flush-1", "usage": {"characters": 123}}'
+```
+
+| Socket | Usage to report |
+|---|---|
+| Text to speech | `{"usage":{"characters":N}}`: the characters of text sent for synthesis. |
+| Speech to text | `{"usage":{"audio_seconds":N}}`: the seconds of audio sent. |
+
+`id` names the report. Reports with different ids add up, and a report resent with the same id is recorded once. A report with no `id` and no `final` is read as the session total and closes the session. Add `"final": true` to any report to close the session after it is recorded.
+
+To close without usage:
+
+```bash
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/close" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY"
+```
+
+The response body and the charge for a session that never reports are described on [Realtime voice](/ai-gateway/api/realtime#the-usage-response).
 
 ## Post-call webhook
 
@@ -3882,7 +4060,7 @@ The gateway mints the vendor's own session credential. Your client asks the gate
 
 The audio never passes through the gateway. The media socket runs from your client straight to the vendor, so the gateway does not add to turn latency and cannot see, record or end a call in progress.
 
-One session is one spend record: admitted at the mint, settled when the call's usage arrives.
+A session is admitted at the mint. Its spend is recorded as usage arrives: one record per report your client posts, or one at the end when the vendor reports the call.
 
 <Note>
   Because the gateway is not in the audio path, a voice budget admits at session start and
@@ -3924,6 +4102,10 @@ A session neither of them closes settles as cost unknown, and a report arriving 
 
 Only the `post_call_transcription` event is applied. `post_call_audio` and `call_initiation_failure` are acknowledged and not applied: they name the conversation and carry no duration.
 
+## ElevenLabs speech and transcription sockets
+
+`POST /v1/single-use-token/{token_type}` mints a token that opens one ElevenLabs speech or transcription socket. See [ElevenLabs](/ai-gateway/api/elevenlabs#single-use-tokens) for the mint and for how each socket takes the token. Usage is reported and the session is closed with the same two routes as an OpenAI session, described below.
+
 ## OpenAI Realtime
 
 Mint an ephemeral client secret.
@@ -3932,13 +4114,15 @@ Mint an ephemeral client secret.
 curl -X POST "https://gateway.langwatch.ai/v1/realtime/client_secrets" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"session":{"type":"realtime","model":"gpt-realtime"},
+  -d '{"session":{"type":"realtime","model":"gpt-realtime-2.1"},
        "expires_after":{"anchor":"created_at","seconds":600}}'
 ```
 
 This is OpenAI's own path and its own body. The gateway reads `session.model` as the model and forwards your declaration as you wrote it, with two edits: the resolved model is written back into `session.model`, and `expires_after.seconds` is held between 10 and 7200. A body that names no expiry is forwarded untouched, so OpenAI's own default applies. The voice, the tools, the turn detection and the audio formats reach OpenAI unchanged. The request body is capped at 256 KiB.
 
 The answer is OpenAI's own body plus `langwatch.session_id`, and the same id is on `X-LangWatch-Session-Id`.
+
+If the session declares input transcription at `session.audio.input.transcription.model`, the gateway records that model at the mint. Transcription usage you report later is priced under it.
 
 Open the socket with the returned secret. Which form you use depends on where the code runs, because a browser `WebSocket` takes only a URL and a subprotocol list and cannot set request headers.
 
@@ -3947,7 +4131,7 @@ From a server, with the `ws` package or any Node websocket client that accepts h
 ```js
 import WebSocket from "ws";
 
-const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", {
+const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime-2.1", {
   headers: { Authorization: `Bearer ${clientSecret.value}` },
 });
 ```
@@ -3955,40 +4139,103 @@ const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", 
 From a browser, as a subprotocol:
 
 ```js
-const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", [
+const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime-2.1", [
   "realtime",
   `openai-insecure-api-key.${clientSecret.value}`,
 ]);
 ```
 
-### Closing an OpenAI session
+### Reporting OpenAI usage
 
-OpenAI reports usage over the socket, in `response.done`, and that socket does not pass through the gateway. Post what you read back:
+OpenAI reports usage over the socket, and that socket does not pass through the gateway. Post what you read back to the session. `SESSION_ID` is the `X-LangWatch-Session-Id` from the mint.
+
+Forward each `response.done` event as it arrives:
 
 ```bash
 curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/usage" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"usage":{"input_tokens":1204,"output_tokens":318,
-       "input_token_details":{"cached_tokens":900,"text_tokens":104,"audio_tokens":1100},
-       "output_token_details":{"text_tokens":18,"audio_tokens":300}}}'
+  -d '{"type":"response.done","response":{"id":"resp_001",
+       "usage":{"input_tokens":132,"output_tokens":121,
+         "input_token_details":{"text_tokens":119,"audio_tokens":13,"cached_tokens":64,
+           "cached_tokens_details":{"text_tokens":64,"audio_tokens":0}},
+         "output_token_details":{"text_tokens":30,"audio_tokens":91}}}}'
 ```
 
 ```json
-{ "received": true }
+{
+  "session_id": "req_01K6Y3M8QF7W2VZ4N9DXTB5C0A",
+  "status": "recorded",
+  "cost_usd": 0.007206,
+  "session_cost_usd": 0.0412,
+  "budget": { "exceeded": false }
+}
 ```
 
-The status is `202`. `SESSION_ID` is the `X-LangWatch-Session-Id` from the mint. Three body shapes are accepted, so you can forward the frame unchanged: the bare usage object, an object with a `usage` key, and the whole `response.done` event. The rest of the event is not read, and no transcript content is looked at. The body is capped at 64 KiB.
+Each report is its own spend record, so the key's budgets see the call while it runs. The session stays open until you close it.
 
-Audio tokens are taken out of the text totals before pricing, because audio tokens cost several times what text tokens cost.
+A report key is stored as letters, digits, `_` and `-`, up to 128 characters. OpenAI's response and item ids fit as they are.
 
-A session that never reports settles as cost unknown when the settlement grace expires, and a report arriving after that replaces the settled record.
+| Body | Report key | What it does |
+|---|---|---|
+| A whole `response.done` event | `response.id` | Records that response. Sending it again records nothing new. |
+| A whole `conversation.item.input_audio_transcription.completed` event | `item_id` | Records input transcription, priced under the session's transcription model. Its `usage` may be `{"type":"tokens", ...}` or `{"type":"duration","seconds":N}`. An event with no `usage` answers `200` with status `no_usage`. |
+| `{"events":[ ... ]}` | One per event | A batch of the two events above, at most 100, recorded in order. A `response.done` in a batch must carry `response.id`. |
+| A usage object, or `{"usage":{...}}`, with no `id` | None | The session total. Closes the session. If keyed reports came first, only the part they did not cover is charged. |
+| `{"id":"...","usage":{...}}` | Your `id` | Records one report under an id you choose. |
+
+Add `"final": true` at the top level of any body to close the session after it is recorded. Add `"duration_ms"` beside it to state how long the call ran. A usage object with no `id` and `"final": true` is recorded as one more amount on top of the earlier reports, not as the session total.
+
+Only ids and usage counts are read. Transcripts and prompts on a forwarded event are not looked at. The body is capped at 1 MiB.
+
+Audio tokens are taken out of the text totals before pricing, because audio tokens cost several times what text tokens cost. When the usage carries `cached_tokens_details`, cached text tokens are priced at the cache-read rate and cached audio tokens are priced at the full audio input rate.
+
+### The usage response
+
+Every usage post and every close answers `200` with this body:
+
+| Field | Meaning |
+|---|---|
+| `session_id` | The session the report was recorded against. |
+| `status` | `recorded`, `duplicate` (that report key was already recorded), `closed` (the report closed the session), `already_closed` (the session was closed before, nothing recorded), or `no_usage` (the body carried nothing to record). For a batch, the status of its last report. |
+| `cost_usd` | What this post added, in US dollars. For a batch, the sum. |
+| `session_cost_usd` | Everything recorded for the session so far. |
+| `budget.exceeded` | `true` when a blocking budget on the key is at or past its limit, counting this session. `budget.scope` and `budget.budget_id` name it. |
+| `budget.unknown` | Present and `true` when the budgets could not be read. `exceeded` is then `false` and means no verdict, not within budget. |
+
+The gateway cannot end a call. When `budget.exceeded` is `true`, close the socket from your client.
+
+### Closing a session
+
+```bash
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/close" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"duration_ms": 42000}'
+```
+
+The body is optional. A close records no usage: what the reports already recorded stands. Closing frees the key's open-session slot.
+
+### Sessions that never report
+
+A session past its open window with no close is settled by LangWatch:
+
+- **It sent reports.** It is closed and the reported usage stands.
+- **It sent none.** It is charged an estimate and closed. The assumed duration is the credential's lifetime, or the default below when the lifetime is not known, held between 60 seconds and 60 minutes.
+
+| Session | Estimate | Default duration |
+|---|---|---|
+| OpenAI Realtime | 10 input audio tokens per second, plus 20 output audio tokens per second for half the duration | 600 s |
+| ElevenLabs speech socket | 15 characters per second | 300 s |
+| ElevenLabs transcription socket or batch | Audio for the whole duration | 300 s |
+
+An ElevenLabs Conversational AI session is not estimated. It settles from the vendor's own report, or as cost unknown.
 
 ## Limiting how many calls a key runs at once
 
 Set **max open sessions** on the virtual key. The request-rate limits do not bound voice: one mint is a single request that opens a call billing for as long as it runs, so a key at 60 requests per minute can hold sixty ten-minute calls without tripping anything.
 
-A mint over the cap answers `429 realtime_session_limit`, and the refusal is recorded in the spend surface. A slot frees when the call's report arrives. A session older than the longest call a vendor allows stops holding a slot, which matters for OpenAI, whose socket never signals that it closed.
+A mint over the cap answers `429 realtime_session_limit`, and the refusal is recorded in the spend surface. A slot frees when the session closes. A session older than the longest call a vendor allows stops holding a slot, which matters for OpenAI, whose socket never signals that it closed.
 
 ## What the broker does not do
 
@@ -4002,13 +4249,14 @@ Turn-level transcripts and latency reach LangWatch through the SDK in your own a
 
 | Code                            | Status | Cause                                                                                                                        |
 | ------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `bad_request`                   | 400    | `agent_id` is missing on the ElevenLabs mint, a session id is missing on the usage report, or the usage body does not parse. |
+| `bad_request`                   | 400    | `agent_id` is missing on the ElevenLabs mint, the token type is unknown, or the usage body is not one of the accepted shapes. |
+| `not_found`                     | 404    | No session with that id belongs to this key.                                                                                 |
 | `model_provider_not_bound`      | 400    | The key has no credential for the vendor this route serves.                                                                  |
 | `budget_exceeded`               | 402    | A budget that applies to the key is over its limit.                                                                          |
 | `realtime_session_limit`        | 429    | The key holds its maximum of open voice sessions. Retry when a call ends.                                                    |
 | `realtime_registry_unavailable` | 503    | LangWatch could not record the session, so no session was minted. Retry.                                                     |
 
-Each mint route serves one vendor: `/v1/realtime/client_secrets` needs an OpenAI credential, and `/v1/convai/conversation/get-signed-url` needs an ElevenLabs one. A mint never falls back to a second credential, because a session credential is bound to one account and a fallback would sign for an agent that does not exist there.
+Each mint route serves one vendor: `/v1/realtime/client_secrets` needs an OpenAI credential, and `/v1/convai/conversation/get-signed-url` and `/v1/single-use-token/{token_type}` need an ElevenLabs one. A mint never falls back to a second credential, because a session credential is bound to one account and a fallback would sign for an agent that does not exist there.
 
 **Also check:** [ElevenLabs](/ai-gateway/api/elevenlabs), [Budgets](/ai-gateway/budgets), [Errors](/ai-gateway/api/errors).
 
@@ -4271,7 +4519,7 @@ Webhook deliveries and the REST routes carry the same envelope: `{ "id", "type",
 | `organization_id`, `project_id`                      | The organization, and the trace project of the virtual key.                                                                                                                                                                                                |
 | `virtual_key_id`, `principal_user_id`, `end_user_id` | The key, the person behind a personal key or `null`, the end user of your product or `null`.                                                                                                                                                               |
 | `trace_id`                                           | The trace in Trace Explorer.                                                                                                                                                                                                                               |
-| `model`, `model_provider_id`, `request_type`         | The model the gateway resolved, the provider credential that served it, and `chat`, `messages`, `embeddings`, `responses`, `speech`, `transcription`, `image_generation`, `image_edit`, `realtime_session` or `passthrough`.                              |
+| `model`, `model_provider_id`, `request_type`         | The model the gateway resolved, the provider credential that served it, and `chat`, `messages`, `embeddings`, `responses`, `speech`, `transcription`, `image_generation`, `image_edit`, `realtime_session`, `realtime_response` or `passthrough`. A voice session emits one `realtime_response` event per usage report and one `realtime_session` event when it closes.                              |
 | `usage`                                              | `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`, `input_image_tokens`, `output_image_tokens`, `image_count`, always present and 0 when unused. Each priced quantity is charged once at its own rate, and `input_tokens` excludes the cached, audio and image tokens. `reasoning_tokens` is a subset of `output_tokens`, and `image_count` counts images, so no rate prices either and neither belongs in a cost sum. An `image_generation` row reports `output_tokens` 0 with its render under `output_image_tokens`. `null` on `settled` and `admitted`. |
 | `cost`                                               | `total_usd` as a decimal string, `nano_usd` as an integer (1 USD is 1,000,000,000 nano USD), and `rate_version`, for example `registry@2026-08-01`. `null` on `settled` and `admitted`.                                                                    |
 | `status`                                             | `success`, `error`, `settled` or `admitted`.                                                                                                                                                                                                               |
