@@ -16,7 +16,10 @@ import {
 } from "../../../src/server/data-retention/retentionPolicy.schema";
 import { bestEffort } from "../bestEffort";
 import { SubscriptionRecordNotFoundError } from "../errors";
-import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
+import {
+  fireSubscriptionStartedAnalytics,
+  fireSubscriptionSyncNurturing,
+} from "../nurturing/hooks/subscriptionSync";
 import { SubscriptionStatus } from "../planTypes";
 import { applyAnnualEventsBillingThreshold } from "../stripe/annualEventsBillingThreshold";
 import {
@@ -851,6 +854,10 @@ export class EEWebhookService implements WebhookService {
               maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
             }),
         });
+        fireSubscriptionStartedAnalytics({
+          organizationId: updatedSubscription.organizationId,
+          plan: updatedSubscription.plan,
+        });
       }
     }
   }
@@ -973,6 +980,10 @@ export class EEWebhookService implements WebhookService {
       fireSubscriptionSyncNurturing({
         organizationId: updatedSubscription.organizationId,
         hasSubscription: true,
+      });
+      fireSubscriptionStartedAnalytics({
+        organizationId: updatedSubscription.organizationId,
+        plan: updatedSubscription.plan,
       });
     }
   }

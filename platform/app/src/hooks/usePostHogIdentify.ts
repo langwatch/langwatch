@@ -1,8 +1,65 @@
 import posthog from "posthog-js";
 import { useEffect, useRef } from "react";
 import { parseOnboardingVariant } from "~/server/schemas/sign-up-data.schema";
+import {
+  type AttributionField,
+  readAttribution,
+  toAttributionProperties,
+  URL_PARAM_TO_FIELD,
+} from "~/utils/attribution";
 import { registerOnboardingExperiment } from "~/utils/onboardingExperimentRegistration";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
+
+const SIGNED_IN_STORAGE_KEY = "lw_posthog.signed_in";
+
+/**
+ * User ids that already sent `signed_in` from this page load. Keeps the event
+ * at one per load when sessionStorage is unavailable (private browsing).
+ */
+const signedInThisPageLoad = new Set<string>();
+
+/**
+ * Whether `signed_in` still has to be sent for this user in this browser
+ * session, marking it as sent. The flag holds the user id, so a different
+ * user signing in on the same tab counts as a new sign in.
+ */
+function claimSignedIn(userId: string): boolean {
+  if (signedInThisPageLoad.has(userId)) return false;
+  signedInThisPageLoad.add(userId);
+  try {
+    if (window.sessionStorage.getItem(SIGNED_IN_STORAGE_KEY) === userId) {
+      return false;
+    }
+    window.sessionStorage.setItem(SIGNED_IN_STORAGE_KEY, userId);
+  } catch {
+    // Storage unavailable: the in-memory set above is the only guard.
+  }
+  return true;
+}
+
+/**
+ * Attribution for the `signed_in` event: the stored first-touch fields, with
+ * the UTM and `ref` params of the current URL on top when it has any. An
+ * email link opened in a tab that already holds first-touch values is still
+ * reported under the campaign of that link.
+ */
+function signedInAttribution(): Record<string, string> {
+  const params = new URLSearchParams(window.location.search);
+  const fromUrl: Partial<Record<AttributionField, string>> = {};
+  for (const [urlParam, field] of Object.entries(URL_PARAM_TO_FIELD) as [
+    string,
+    AttributionField,
+  ][]) {
+    const value = params.get(urlParam);
+    if (value) fromUrl[field] = value;
+  }
+  return toAttributionProperties({ ...readAttribution(), ...fromUrl });
+}
+
+/** Only exposed for testing. @internal */
+export function resetSignedInTracking(): void {
+  signedInThisPageLoad.clear();
+}
 
 export function usePostHogIdentify({
   session,
@@ -36,6 +93,12 @@ export function usePostHogIdentify({
       email: session?.user?.email ?? undefined,
     });
     prevUserIdRef.current = userId;
+
+    // One `signed_in` per browser session for an identified user: the step
+    // between an email click and the later sign up or payment milestones.
+    if (claimSignedIn(userId)) {
+      posthog.capture("signed_in", signedInAttribution());
+    }
   }, [session?.user?.id, session?.user?.email]);
 
   // 2. Group by organization (re-runs on org switch)

@@ -34,7 +34,8 @@ function sweepExpiredEntries({ now }: { now: number }): void {
 }
 
 /**
- * Pushes last_active_at to Customer.io for inactivity detection.
+ * Pushes last_active_at to Customer.io for inactivity detection, and tracks
+ * an app_active event for campaign conversion goals.
  *
  * Debounced to at most once per hour per user to avoid excessive API calls.
  * Fire-and-forget: never throws, never blocks the session callback.
@@ -70,6 +71,12 @@ export function fireActivityTrackingNurturing({
       lastActivitySentAt.delete(userId);
       captureException(error);
     });
+
+  // Independent of the identify above: a failed track is reported and
+  // neither retried nor allowed to reset the debounce.
+  void nurturing
+    .trackEvent({ userId, event: "app_active" })
+    .catch(captureException);
 }
 
 /**

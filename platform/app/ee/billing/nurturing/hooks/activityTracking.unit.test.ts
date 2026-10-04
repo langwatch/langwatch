@@ -79,6 +79,28 @@ describe("Activity tracking hook", () => {
         vi.useRealTimers();
       });
 
+      /** @scenario 'Activity tracking fires an app_active event with the same debounce' */
+      it("tracks one app_active event per hour", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-03-15T12:00:00.000Z"));
+
+        fireActivityTrackingNurturing({ userId: "user-1" });
+        fireActivityTrackingNurturing({ userId: "user-1" });
+
+        expect(mockNurturing.trackEvent).toHaveBeenCalledTimes(1);
+        expect(mockNurturing.trackEvent).toHaveBeenCalledWith({
+          userId: "user-1",
+          event: "app_active",
+        });
+
+        vi.advanceTimersByTime(60 * 60 * 1000 + 1);
+        fireActivityTrackingNurturing({ userId: "user-1" });
+
+        expect(mockNurturing.trackEvent).toHaveBeenCalledTimes(2);
+
+        vi.useRealTimers();
+      });
+
       it("allows a new call after one hour has passed", () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date("2026-03-15T12:00:00.000Z"));
@@ -171,6 +193,25 @@ describe("Activity tracking hook", () => {
         });
       });
 
+      /** @scenario 'A failed app_active event does not affect the last_active_at identify' */
+      it("keeps the identify and the debounce when the app_active track fails", async () => {
+        const { captureException } = await import(
+          "../../../../src/utils/posthogErrorCapture"
+        );
+        const error = new Error("CIO track unavailable");
+        mockNurturing.trackEvent.mockRejectedValueOnce(error);
+
+        expect(() =>
+          fireActivityTrackingNurturing({ userId: "user-1" }),
+        ).not.toThrow();
+
+        await vi.waitFor(() => {
+          expect(captureException).toHaveBeenCalledWith(error);
+        });
+        expect(mockNurturing.identifyUser).toHaveBeenCalledTimes(1);
+        expect(getActivityTrackingCacheSize()).toBe(1);
+      });
+
       it("clears the cache entry on rejection so the next call can retry", async () => {
         mockNurturing.identifyUser.mockRejectedValueOnce(
           new Error("CIO unavailable"),
@@ -206,6 +247,7 @@ describe("Activity tracking hook", () => {
         });
 
         expect(mockNurturing.identifyUser).not.toHaveBeenCalled();
+        expect(mockNurturing.trackEvent).not.toHaveBeenCalled();
       });
 
       it("does not populate the debounce cache", () => {
