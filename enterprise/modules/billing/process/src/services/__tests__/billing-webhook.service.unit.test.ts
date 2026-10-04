@@ -7,13 +7,11 @@ import { traced } from "@langwatch/observability/node";
 import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
-import type { RecordSubscriptionChangedCommandData } from "../../eventing/billing-lifecycle.events.ts";
 import { type BillingWebhookHost, type SubscriptionWithOrg } from "../../index.ts";
 import { type BillingWebhookOrganizationRepository } from "../../repositories/billing-webhook-organization.repository.ts";
 import { type BillingWebhookSubscriptionRepository } from "../../repositories/billing-webhook-subscription.repository.ts";
 import { type BillingSubscriptionRecord } from "../../repositories/subscription.repository.ts";
 import { ANNUAL_EVENTS_BILLING_THRESHOLD } from "../annual-events-billing-threshold.service.ts";
-import { BillingLifecycleAnnouncerService } from "../billing-lifecycle-announcer.service.ts";
 import { EEWebhookService } from "../billing-stripe-webhook.service.ts";
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
@@ -1570,10 +1568,10 @@ describe("EEWebhookService", () => {
 });
 
 /** @see specs/analytics/posthog-campaign-conversion.feature */
-describe("EEWebhookService with the lifecycle announcer composed", () => {
+describe("EEWebhookService with the started-subscription analytics composed", () => {
   let subRepo: ReturnType<typeof createMockBillingSubscription>;
   let service: EEWebhookService;
-  let changes: RecordSubscriptionChangedCommandData[];
+  const fireStartedAnalytics = vi.fn();
 
   const activeStripeSubscription = {
     id: "sub_stripe_1",
@@ -1586,31 +1584,11 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    changes = [];
     subRepo = createMockBillingSubscription();
     const active = makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE });
     subRepo.activate.mockResolvedValue({ outcome: "activated", subscription: active });
     subRepo.updateQuantities.mockResolvedValue({ outcome: "updated", subscription: active });
 
-    const unused = {
-      sendBatch: async () => {},
-      close: async () => {},
-      waitUntilReady: async () => {},
-    };
-    const announcer = BillingLifecycleAnnouncerService.create({
-      subscriptions: subRepo,
-      organizations: { getAllMembers: async () => [{ id: "user-1" }] },
-      resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
-    });
-    announcer.connect({
-      recordSubscriptionChanged: {
-        send: async (payload) => {
-          changes.push(payload);
-        },
-        ...unused,
-      },
-      recordCheckoutCompleted: { send: async () => {}, ...unused },
-    });
     service = EEWebhookService.create({
       subscriptionRepository: subRepo,
       organizationRepository: createMockOrganizationRepository(),
@@ -1618,7 +1596,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       itemCalculator: createMockItemCalculator(),
       host: createMockHost(),
       retention,
-      announcer,
+      startedAnalytics: { fire: fireStartedAnalytics },
     });
   });
 
@@ -1631,28 +1609,23 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
     await work;
   };
 
-  const started = [
-    expect.objectContaining({
-      organizationId: "org_123",
-      hasSubscription: true,
-      startedPlan: "LAUNCH",
-    }),
-  ];
+  const started = { organizationId: "org_123", plan: "LAUNCH" };
 
   describe("when an invoice payment succeeds", () => {
     /** @scenario The first successful payment reports the subscription as started */
-    it("records the started plan when the subscription was not active before", async () => {
+    it("reports the subscription as started when it was not active before", async () => {
       subRepo.findByStripeId.mockResolvedValue(
         makeSubscription({ status: SubscriptionStatus.PENDING }),
       );
 
       await settled(service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_1" }));
 
-      expect(changes).toEqual(started);
+      expect(fireStartedAnalytics).toHaveBeenCalledTimes(1);
+      expect(fireStartedAnalytics).toHaveBeenCalledWith(started);
     });
 
     /** @scenario A renewal payment does not report the subscription as started */
-    it("records nothing when an active subscription renews", async () => {
+    it("reports nothing when an active subscription renews", async () => {
       subRepo.findByStripeId.mockResolvedValue(
         makeSubscription({ status: SubscriptionStatus.ACTIVE }),
       );
@@ -1660,24 +1633,25 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       await settled(service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_1" }));
 
       expect(subRepo.activate).toHaveBeenCalledTimes(1);
-      expect(changes).toEqual([]);
+      expect(fireStartedAnalytics).not.toHaveBeenCalled();
     });
   });
 
   describe("when Stripe reports the subscription as active", () => {
     /** @scenario A Stripe update that activates a subscription reports it as started */
-    it("records the started plan when the subscription was not active before", async () => {
+    it("reports the subscription as started when it was not active before", async () => {
       subRepo.findByStripeId.mockResolvedValue(
         makeSubscription({ status: SubscriptionStatus.PENDING }),
       );
 
       await settled(service.handleSubscriptionUpdated({ subscription: activeStripeSubscription }));
 
-      expect(changes).toEqual(started);
+      expect(fireStartedAnalytics).toHaveBeenCalledTimes(1);
+      expect(fireStartedAnalytics).toHaveBeenCalledWith(started);
     });
 
     /** @scenario A Stripe update on an active subscription does not report it as started */
-    it("records nothing when the subscription was already active", async () => {
+    it("reports nothing when the subscription was already active", async () => {
       subRepo.findByStripeId.mockResolvedValue(
         makeSubscription({ status: SubscriptionStatus.ACTIVE }),
       );
@@ -1685,7 +1659,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       await settled(service.handleSubscriptionUpdated({ subscription: activeStripeSubscription }));
 
       expect(subRepo.updateQuantities).toHaveBeenCalledTimes(1);
-      expect(changes).toEqual([]);
+      expect(fireStartedAnalytics).not.toHaveBeenCalled();
     });
   });
 });

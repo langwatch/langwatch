@@ -44,13 +44,8 @@ export class BillingLifecycleAnnouncerService {
     this.#commands = commands;
   }
 
-  /** A subscription that was not active became active on `plan`; a renewal never reaches this. */
-  subscriptionActivated(input: { organizationId: string; plan: string }): Promise<void> {
-    return this.#subscriptionChanged({
-      organizationId: input.organizationId,
-      hasSubscription: () => Promise.resolve(true),
-      startedPlan: input.plan,
-    });
+  subscriptionActivated(input: { organizationId: string }): Promise<void> {
+    return this.#subscriptionChanged({ ...input, hasSubscription: () => Promise.resolve(true) });
   }
 
   /** Whether the organization still holds another live subscription is read after the cancel. */
@@ -79,7 +74,6 @@ export class BillingLifecycleAnnouncerService {
   async #subscriptionChanged(input: {
     organizationId: string;
     hasSubscription: () => Promise<boolean>;
-    startedPlan?: string;
   }): Promise<void> {
     await this.#record(input.organizationId, async (commands) => {
       const members = await this.deps.organizations.getAllMembers({
@@ -91,7 +85,6 @@ export class BillingLifecycleAnnouncerService {
         organizationId: input.organizationId,
         memberUserIds: members.map((member) => member.id),
         hasSubscription: await input.hasSubscription(),
-        ...(input.startedPlan ? { startedPlan: input.startedPlan } : {}),
       });
     });
   }

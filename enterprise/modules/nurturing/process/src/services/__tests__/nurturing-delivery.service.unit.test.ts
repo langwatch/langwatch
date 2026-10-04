@@ -9,6 +9,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import { PostHogChannel } from "../../channels/posthog.channel.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
 
@@ -383,113 +384,92 @@ describe("NurturingDeliveryService", () => {
   });
 
   describe("when an organization's sign-up is delivered", () => {
+    const signedUp: NurturingSignalOf<"signed_up"> = {
+      kind: "signed_up",
+      sourceEventId: "event-20",
+      ...source,
+      userId: "user-1",
+      organizationId: "org-1",
+      organizationName: "Acme Corp",
+      signUpData: { utmSource: "newsletter", utmCampaign: "weekly-42" },
+    };
+
     /** @scenario Initializing an organization through the procedure tracks organization_created */
-    it("tracks signed_up and organization_created in PostHog with the attribution", async () => {
+    it("tracks organization_created in PostHog with the attribution", async () => {
       const { posthog, delivery } = deliveryOverBothSinks();
 
-      await delivery.deliver({
-        key: "signed_up:event-20",
-        signal: {
-          kind: "signed_up",
-          sourceEventId: "event-20",
-          ...source,
-          userId: "user-1",
-          organizationId: "org-1",
-          organizationName: "Acme Corp",
-          signUpData: { utmSource: "newsletter", utmCampaign: "weekly-42" },
-        },
-      });
+      await delivery.deliver({ key: "signed_up:event-20", signal: signedUp });
       await settle();
 
       const attribution = { utm_source: "newsletter", utm_campaign: "weekly-42" };
-      expect(posthog.tracked).toEqual([
-        { userId: "user-1", event: "signed_up", properties: attribution },
-        {
-          userId: "user-1",
-          event: "organization_created",
-          properties: expect.objectContaining({
-            ...attribution,
-            organization_id: "org-1",
-            $set_once: { signup_utm_source: "newsletter", signup_utm_campaign: "weekly-42" },
-          }),
+      expect(posthog.tracked.find(({ event }) => event === "organization_created")).toEqual({
+        userId: "user-1",
+        event: "organization_created",
+        properties: {
+          ...attribution,
+          organization_id: "org-1",
+          $groups: { organization: "org-1" },
+          $set_once: { signup_utm_source: "newsletter", signup_utm_campaign: "weekly-42" },
         },
-      ]);
-    });
-  });
-
-  describe("when a subscription change is delivered", () => {
-    const changed: Omit<NurturingSignalOf<"subscription_changed">, "sourceEventId"> = {
-      kind: "subscription_changed",
-      ...source,
-      organizationId: "org-1",
-      memberUserIds: ["user-1", "user-2"],
-      hasSubscription: true,
-    };
-
-    it("tracks subscription_started for every member when a subscription just started", async () => {
-      const { posthog, cio, delivery } = deliveryOverBothSinks();
-
-      await delivery.deliver({
-        key: "subscription_changed:event-21",
-        signal: { ...changed, sourceEventId: "event-21", startedPlan: "GROWTH_SEAT_EVENT" },
       });
-      await settle();
-
-      expect(posthog.tracked.map(({ userId, event }) => [userId, event])).toEqual([
-        ["user-1", "subscription_started"],
-        ["user-2", "subscription_started"],
-      ]);
-      expect(posthog.tracked[0]?.properties).toEqual({
-        plan: "GROWTH_SEAT_EVENT",
-        organization_id: "org-1",
-        $groups: { organization: "org-1" },
-      });
-      expect(cio.sent.map((call) => call.path)).toEqual(["/v1/identify", "/v1/identify"]);
     });
 
-    /** @scenario A redelivered subscription change tracks subscription_started once */
-    it("tracks subscription_started once when the same change is delivered twice", async () => {
+    it("tracks the signed_up milestone with no attribution", async () => {
       const { posthog, delivery } = deliveryOverBothSinks();
-      const signal = { ...changed, sourceEventId: "event-22", startedPlan: "GROWTH_SEAT_EVENT" };
 
-      await delivery.deliver({ key: "subscription_changed:event-22", signal });
-      await delivery.deliver({ key: "subscription_changed:event-22", signal });
+      await delivery.deliver({ key: "signed_up:event-20", signal: signedUp });
       await settle();
 
-      expect(posthog.tracked).toHaveLength(2);
+      expect(posthog.tracked.map(({ event }) => event)).toEqual([
+        "signed_up",
+        "organization_created",
+      ]);
+      expect(posthog.tracked[0]).toEqual({ userId: "user-1", event: "signed_up", properties: {} });
     });
 
-    it("tracks nothing in PostHog when no subscription started", async () => {
-      const { posthog, cio, delivery } = deliveryOverBothSinks();
-
-      await delivery.deliver({
-        key: "subscription_changed:event-23",
-        signal: { ...changed, sourceEventId: "event-23" },
-      });
-      await settle();
-
-      expect(posthog.tracked).toEqual([]);
-      expect(cio.sent).toHaveLength(2);
-    });
-
-    /** @scenario subscription_started is skipped when PostHog is not configured */
-    it("sends Customer.io alone when the deployment named no PostHog key", async () => {
+    /** @scenario A failure while tracking organization_created does not fail onboarding */
+    it("does not throw when tracking the event throws, and still tells Customer.io", async () => {
+      class ThrowingPostHogChannel extends PostHogChannel {
+        track(): void {
+          throw new Error("bad PostHog configuration");
+        }
+        groupIdentify(): void {}
+      }
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
         customerIo: cio.service,
-        posthog: undefined,
+        posthog: new ThrowingPostHogChannel(),
       });
 
       await expect(
-        delivery.deliver({
-          key: "subscription_changed:event-25",
-          signal: { ...changed, sourceEventId: "event-25", startedPlan: "GROWTH_SEAT_EVENT" },
-        }),
+        delivery.deliver({ key: "signed_up:event-20", signal: signedUp }),
       ).resolves.toBeUndefined();
       await settle();
 
+      expect(cio.sent.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when a subscription change is delivered", () => {
+    it("tells Customer.io every member's trait and tracks nothing in PostHog", async () => {
+      const { posthog, cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "subscription_changed:event-21",
+        signal: {
+          kind: "subscription_changed",
+          sourceEventId: "event-21",
+          ...source,
+          organizationId: "org-1",
+          memberUserIds: ["user-1", "user-2"],
+          hasSubscription: true,
+        },
+      });
+      await settle();
+
+      expect(posthog.tracked).toEqual([]);
       expect(cio.sent.map((call) => call.path)).toEqual(["/v1/identify", "/v1/identify"]);
     });
   });
@@ -529,8 +509,18 @@ describe("NurturingDeliveryService", () => {
       ).resolves.toBeUndefined();
       await settle();
 
-      expect(sent).toContain("/v1/identify");
+      expect(sent).toEqual(expect.arrayContaining(["/v1/identify", "/v1/track"]));
       expect(reported.length).toBeGreaterThan(0);
+
+      // The failed track keeps its hourly limit: a second session sends nothing more.
+      const sentBefore = sent.length;
+      await delivery.deliver({
+        key: "session_started:event-27",
+        signal: { ...sessionStarted, sourceEventId: "event-27", userId: "user-track-fails" },
+      });
+      await settle();
+
+      expect(sent).toHaveLength(sentBefore);
     });
 
     it("sends Customer.io last_active_at and the app_active event", async () => {

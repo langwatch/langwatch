@@ -5,8 +5,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  fireOrganizationCreated,
   fireSignup,
-  fireSignupAnalytics,
 } from "../nurturing-signup-identification-service.rules.ts";
 
 const SIGNUP = {
@@ -162,41 +162,33 @@ describe("fireSignup", () => {
   });
 });
 
-describe("fireSignupAnalytics", () => {
+describe("fireOrganizationCreated", () => {
   describe("given a sign-up that arrived from a campaign", () => {
-    const events = fireSignupAnalytics({
-      userId: "user-1",
-      organizationId: "org-1",
-      signUpData: {
-        yourRole: "engineer",
-        leadSource: "website",
-        utmSource: "newsletter",
-        utmMedium: "email",
-        utmCampaign: "weekly-42",
-        utmTerm: null,
-        utmContent: "cta",
-      },
-    });
-    const attribution = {
-      lead_source: "website",
-      utm_source: "newsletter",
-      utm_medium: "email",
-      utm_campaign: "weekly-42",
-      utm_content: "cta",
-    };
-
-    /** @scenario The organization sign-up tracks signed_up in PostHog with its attribution */
-    it("decides a signed_up carrying the attribution and none of the other answers", () => {
-      expect(events[0]).toEqual({ userId: "user-1", event: "signed_up", properties: attribution });
-    });
-
     /** @scenario Organization creation tracks sign-up attribution in PostHog */
     it("decides an organization_created that sets the attribution once on the person", () => {
-      expect(events[1]).toEqual({
+      const event = fireOrganizationCreated({
+        userId: "user-1",
+        organizationId: "org-1",
+        signUpData: {
+          leadSource: "website",
+          utmSource: "newsletter",
+          utmMedium: "email",
+          utmCampaign: "weekly-42",
+          utmTerm: null,
+          utmContent: "",
+          referrer: "https://example.com/",
+        },
+      });
+
+      expect(event).toEqual({
         userId: "user-1",
         event: "organization_created",
         properties: {
-          ...attribution,
+          lead_source: "website",
+          utm_source: "newsletter",
+          utm_medium: "email",
+          utm_campaign: "weekly-42",
+          referrer: "https://example.com/",
           organization_id: "org-1",
           $groups: { organization: "org-1" },
           $set_once: {
@@ -204,21 +196,35 @@ describe("fireSignupAnalytics", () => {
             signup_utm_source: "newsletter",
             signup_utm_medium: "email",
             signup_utm_campaign: "weekly-42",
-            signup_utm_content: "cta",
+            signup_referrer: "https://example.com/",
           },
         },
       });
+    });
+
+    it("leaves every other sign-up answer out of the event", () => {
+      const { properties } = fireOrganizationCreated({
+        userId: "user-1",
+        organizationId: "org-1",
+        signUpData: { utmSource: "newsletter", yourRole: "engineer", companySize: "1-10" },
+      });
+
+      expect(Object.keys(properties ?? {}).toSorted()).toEqual([
+        "$groups",
+        "$set_once",
+        "organization_id",
+        "utm_source",
+      ]);
     });
   });
 
   describe("given a sign-up with no attribution at all", () => {
     /** @scenario Organization creation without attribution tracks no attribution properties */
-    it("decides both events with no attribution key", () => {
-      const events = fireSignupAnalytics({ userId: "user-1", organizationId: "org-1" });
-
-      expect(events).toEqual([
-        { userId: "user-1", event: "signed_up", properties: {} },
-        {
+    it("decides an organization_created with only the organization id and no person property", () => {
+      for (const signUpData of [undefined, null]) {
+        expect(
+          fireOrganizationCreated({ userId: "user-1", organizationId: "org-1", signUpData }),
+        ).toEqual({
           userId: "user-1",
           event: "organization_created",
           properties: {
@@ -226,8 +232,8 @@ describe("fireSignupAnalytics", () => {
             $groups: { organization: "org-1" },
             $set_once: {},
           },
-        },
-      ]);
+        });
+      }
     });
   });
 });
