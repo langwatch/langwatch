@@ -132,11 +132,14 @@ func TestPacketsAndTableOrderByWork(t *testing.T) {
 
 func TestRunTrpcInventoryWritesRunsAndRemovesScript(t *testing.T) {
 	dir := t.TempDir()
-	contractDir := filepath.Join(dir, "packages", "api", "src", "contract")
+	contractDir := filepath.Join(dir, "packages", "module", "src", "contract")
 	if err := os.MkdirAll(contractDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(contractDir, "trpc-contract.ts"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "packages", "api"), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	out := filepath.Join(t.TempDir(), "trpc.json")

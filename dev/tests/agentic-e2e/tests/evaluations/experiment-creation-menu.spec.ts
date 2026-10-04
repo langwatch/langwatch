@@ -1,12 +1,15 @@
 import { getProjectSlug } from "../helpers";
 import { expect, test } from "../test.ts";
 
+/** A page header's one primary action is solid; every other button is outline. */
+const PRIMARY_ACTION = "rgb(221, 107, 32)";
+
 test("experiment creation keeps the SDK workflow discoverable", async ({ page }, testInfo) => {
   const projectSlug = await getProjectSlug(page);
 
   await page.goto(`/${projectSlug}/evaluations`);
   const newExperiment = page.getByRole("button", { name: "New Experiment" }).first();
-  await expect(newExperiment).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(newExperiment).toHaveCSS("background-color", PRIMARY_ACTION);
   await newExperiment.click();
   const sdkExperiment = page.getByRole("menuitem", {
     name: /New Experiment via SDK/,
@@ -26,7 +29,7 @@ test("experiment creation keeps the SDK workflow discoverable", async ({ page },
   );
   await expect(page.getByRole("button", { name: "New Online Evaluation" }).first()).toHaveCSS(
     "background-color",
-    "rgb(255, 255, 255)",
+    PRIMARY_ACTION,
   );
   await expect(page.getByRole("heading", { name: "No online evaluations yet" })).toBeVisible();
   await page.screenshot({

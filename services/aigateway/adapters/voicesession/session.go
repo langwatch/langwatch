@@ -292,7 +292,7 @@ func (s *session) onEvent(l *link, event Event) (reason string, ended bool) {
 	if s.record(event) {
 		return ReasonVendorClosed, true
 	}
-	if reason := s.flush(false); reason != "" {
+	if reason := s.flush(); reason != "" {
 		return s.endCall(l, reason), true
 	}
 	return "", false
@@ -370,7 +370,7 @@ func (s *session) report(observation Observation) domain.RealtimeUsageReport {
 
 // flush sends what is waiting and answers why the call must end, if it must.
 // A report that fails stays where it is and is sent again on the next flush.
-func (s *session) flush(force bool) string {
+func (s *session) flush() string {
 	sent, reason := 0, ""
 	for len(s.queue) > 0 {
 		receipt, err := s.send(s.queue[0])
@@ -381,7 +381,7 @@ func (s *session) flush(force bool) string {
 		sent++
 		reason = firstReason(reason, receiptReason(receipt))
 	}
-	if delta, ok := s.meter.Pending(time.Now(), s.manager.timing.UsageInterval, force); ok {
+	if delta, ok := s.meter.Pending(time.Now(), s.manager.timing.UsageInterval, false); ok {
 		receipt, err := s.send(s.report(delta))
 		if err != nil {
 			return reason
@@ -439,14 +439,14 @@ func (s *session) send(report domain.RealtimeUsageReport) (domain.RealtimeUsageR
 // housekeeping runs on every tick: it retries reports, keeps a quiet
 // session from being taken for a lost one, and checks the key and its budget.
 func (s *session) housekeeping() string {
-	if reason := s.flush(false); reason != "" {
+	if reason := s.flush(); reason != "" {
 		return reason
 	}
 	now := time.Now()
 	if len(s.queue) == 0 &&
 		now.Sub(s.lastReported) >= s.manager.timing.KeepAlive {
 		s.enqueue(Observation{ReportKey: fmt.Sprintf("hb-%d", int64(now.Sub(s.StartedAt).Seconds()))})
-		if reason := s.flush(false); reason != "" {
+		if reason := s.flush(); reason != "" {
 			return reason
 		}
 	}

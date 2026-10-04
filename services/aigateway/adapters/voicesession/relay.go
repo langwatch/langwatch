@@ -252,7 +252,7 @@ func (r *relay) supervise() (string, pumpEnd) {
 		select {
 		case event := <-r.events:
 			s.record(event)
-			if reason := s.flush(false); reason != "" {
+			if reason := s.flush(); reason != "" {
 				return reason, pumpEnd{}
 			}
 		case end := <-r.ended:

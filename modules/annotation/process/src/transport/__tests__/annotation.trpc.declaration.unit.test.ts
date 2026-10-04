@@ -147,7 +147,7 @@ describe("the annotation tRPC declaration", () => {
       ]) {
         for (const specifier of valueImports(sourceOf(relative))) {
           expect([specifier, relative]).toEqual([
-            expect.stringMatching(/^(?:zod|@langwatch\/api\/contract|\.\/)/),
+            expect.stringMatching(/^(?:zod|@langwatch\/module|\.\/)/),
             relative,
           ]);
         }

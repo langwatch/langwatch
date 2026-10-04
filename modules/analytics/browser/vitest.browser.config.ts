@@ -6,4 +6,9 @@
 
 import { defineBrowserVitestConfig } from "@langwatch/vitest-config/browser";
 
-export default defineBrowserVitestConfig();
+export default {
+  ...defineBrowserVitestConfig(),
+  // Vite finds this one late on a cold cache; the reload it triggers then
+  // leaves the page with two copies of React and the run fails.
+  optimizeDeps: { include: ["@monaco-editor/react"] },
+};

@@ -35,7 +35,7 @@ type InventoryFailed struct {
 const inventoryScriptName = ".apidiff-trpc-inventory.mjs"
 
 var inventoryLayouts = []inventoryCandidate{
-	{"packages/api/src/contract/trpc-contract.ts", inventoryLayout{script: "inventory/branch-trpc.mjs", subdir: "packages/api", command: []string{"node", "--experimental-transform-types"}}},
+	{"packages/module/src/contract/trpc-contract.ts", inventoryLayout{script: "inventory/branch-trpc.mjs", subdir: "packages/api", command: []string{"node", "--experimental-transform-types"}}},
 	{"platform/app/src/server/api/root.ts", inventoryLayout{script: "inventory/main-trpc.mjs", subdir: "platform/app", command: []string{"pnpm", "exec", "tsx"}}},
 }
 

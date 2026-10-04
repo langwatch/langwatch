@@ -192,7 +192,12 @@ describe("a peer subscriber", () => {
 
       expect(handle).toHaveBeenCalledWith(
         { ownerId: "owner-3" },
-        { tenantId: "project-1", aggregateId: "owner-3", occurredAt: 1 },
+        {
+          tenantId: "project-1",
+          aggregateId: "owner-3",
+          occurredAt: 1,
+          eventId: "event-owner-3",
+        },
       );
     });
   });

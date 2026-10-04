@@ -641,8 +641,13 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/authorization run test
 
+      # This job has no Postgres service. The repository contract suite runs
+      # its postgres leg wherever a database URL is set, so the URL is blanked
+      # here; package-suites runs that leg against a real database.
       - name: Run @langwatch/authz-process unit tests
         if: matrix.app == 'platform-api'
+        env:
+          DATABASE_URL: ""
         run: pnpm --filter @langwatch/authz-process run test
 
       # @langwatch/identity-contract is the pure identity core (ADR-115) and
