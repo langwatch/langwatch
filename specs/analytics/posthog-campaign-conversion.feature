@@ -25,6 +25,7 @@ Feature: PostHog campaign conversion events
     And the current URL has utm_source "newsletter" and utm_content "cta"
     When an identified user loads the app
     Then the "signed_in" event carries utm_source "newsletter" and utm_content "cta"
+    And it carries none of the stored attribution
 
   @unit
   Scenario: signed_in without any attribution carries no attribution properties
@@ -43,6 +44,12 @@ Feature: PostHog campaign conversion events
     Given user A tracked "signed_in" in this browser session
     When user B is identified on the same tab
     Then a "signed_in" event is captured for user B
+
+  @unit
+  Scenario: A user who already signed in on the tab is not counted again after another user
+    Given user A and then user B tracked "signed_in" in this browser session
+    When the tab reloads and user A is identified again
+    Then no further "signed_in" event is captured
 
   @unit
   Scenario: Anonymous visitors track no signed_in event
@@ -69,7 +76,8 @@ Feature: PostHog campaign conversion events
   Scenario: Organization creation without attribution tracks no attribution properties
     Given a user completes onboarding with no attribution
     When the organization is initialized
-    Then the "organization_created" event carries only the organization id
+    Then the "organization_created" event carries no attribution properties
+    And no person property is set
 
   @unit
   Scenario: Initializing an organization through the procedure tracks organization_created

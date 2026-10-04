@@ -18,19 +18,35 @@ const SIGNED_IN_STORAGE_KEY = "lw_posthog.signed_in";
  */
 const signedInThisPageLoad = new Set<string>();
 
+/** User ids that already sent `signed_in` in this browser session. */
+function readSignedInUserIds(): string[] {
+  const stored = window.sessionStorage.getItem(SIGNED_IN_STORAGE_KEY);
+  if (!stored) return [];
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed)
+      ? parsed.filter((id): id is string => typeof id === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Whether `signed_in` still has to be sent for this user in this browser
- * session, marking it as sent. The flag holds the user id, so a different
- * user signing in on the same tab counts as a new sign in.
+ * session, marking it as sent. The record is per user, so several users
+ * signing in on the same tab each count once.
  */
 function claimSignedIn(userId: string): boolean {
   if (signedInThisPageLoad.has(userId)) return false;
   signedInThisPageLoad.add(userId);
   try {
-    if (window.sessionStorage.getItem(SIGNED_IN_STORAGE_KEY) === userId) {
-      return false;
-    }
-    window.sessionStorage.setItem(SIGNED_IN_STORAGE_KEY, userId);
+    const userIds = readSignedInUserIds();
+    if (userIds.includes(userId)) return false;
+    window.sessionStorage.setItem(
+      SIGNED_IN_STORAGE_KEY,
+      JSON.stringify([...userIds, userId]),
+    );
   } catch {
     // Storage unavailable: the in-memory set above is the only guard.
   }
@@ -38,10 +54,11 @@ function claimSignedIn(userId: string): boolean {
 }
 
 /**
- * Attribution for the `signed_in` event: the stored first-touch fields, with
- * the UTM and `ref` params of the current URL on top when it has any. An
- * email link opened in a tab that already holds first-touch values is still
- * reported under the campaign of that link.
+ * Attribution for the `signed_in` event, taken from one source as a whole so
+ * two campaigns are never mixed: the UTM and `ref` params of the current URL
+ * when it has any, otherwise the stored first-touch fields. An email link
+ * opened in a tab that already holds first-touch values is reported under
+ * the campaign of that link only.
  */
 function signedInAttribution(): Record<string, string> {
   const params = new URLSearchParams(window.location.search);
@@ -53,14 +70,25 @@ function signedInAttribution(): Record<string, string> {
     const value = params.get(urlParam);
     if (value) fromUrl[field] = value;
   }
-  return toAttributionProperties({ ...readAttribution(), ...fromUrl });
+  return toAttributionProperties(
+    Object.keys(fromUrl).length > 0 ? fromUrl : readAttribution(),
+  );
 }
 
-/** Only exposed for testing. @internal */
+/**
+ * Forgets which users sent `signed_in` during this page load, which is what a
+ * reload does. Only exposed for testing.
+ * @internal
+ */
 export function resetSignedInTracking(): void {
   signedInThisPageLoad.clear();
 }
 
+/**
+ * Keeps PostHog in step with the session: identifies the user, groups by
+ * organization, registers the onboarding variant, and captures `signed_in`
+ * and `upgrade_modal_shown`.
+ */
 export function usePostHogIdentify({
   session,
   organization,

@@ -16,12 +16,10 @@ import {
 } from "../../../src/server/data-retention/retentionPolicy.schema";
 import { bestEffort } from "../bestEffort";
 import { SubscriptionRecordNotFoundError } from "../errors";
-import {
-  fireSubscriptionStartedAnalytics,
-  fireSubscriptionSyncNurturing,
-} from "../nurturing/hooks/subscriptionSync";
+import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
 import { SubscriptionStatus } from "../planTypes";
 import { applyAnnualEventsBillingThreshold } from "../stripe/annualEventsBillingThreshold";
+import { fireSubscriptionStartedAnalytics } from "../subscriptionStarted.analytics";
 import {
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,
@@ -835,11 +833,35 @@ export class EEWebhookService implements WebhookService {
       return;
     }
 
-    const cancelled = await this.isCancelledInStripe({
-      subscriptionId,
-      previousStatus: previousSubscription.status,
-    });
-    if (cancelled) return;
+    // Guard: a $0 invoice generated during cancellation must not reactivate the subscription.
+    // Stripe fires invoice.payment_succeeded for $0 prorated invoices even when the subscription
+    // is being cancelled. Check the authoritative Stripe status before activating.
+    let stripeCanceled = false;
+    try {
+      const stripeSubscription =
+        await this.stripe.subscriptions.retrieve(subscriptionId);
+      stripeCanceled = stripeSubscription.status === "canceled";
+    } catch (err) {
+      logger.warn(
+        { subscriptionId, err },
+        "[stripeWebhook] Failed to verify Stripe subscription status, proceeding with activation",
+      );
+      if (previousSubscription.status === SubscriptionStatus.CANCELLED) {
+        logger.info(
+          { subscriptionId },
+          "[stripeWebhook] Stripe status unavailable and DB is CANCELLED, skipping activation",
+        );
+        return;
+      }
+    }
+
+    if (stripeCanceled) {
+      logger.info(
+        { subscriptionId },
+        "[stripeWebhook] Stripe subscription is canceled, skipping activation from $0 invoice",
+      );
+      return;
+    }
 
     const updatedSubscription = await this.subscriptionRepository.activate({
       id: previousSubscription.id,
@@ -857,7 +879,32 @@ export class EEWebhookService implements WebhookService {
       );
 
       if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-        await this.migrateOrganizationToSeatEvent(updatedSubscription);
+        const oldSubscriptions =
+          await this.subscriptionRepository.migrateToSeatEvent({
+            organizationId: updatedSubscription.organizationId,
+            excludeSubscriptionId: updatedSubscription.id,
+          });
+
+        // Cancel in Stripe after DB is consistent (outside transaction)
+        for (const oldSub of oldSubscriptions) {
+          if (oldSub.stripeSubscriptionId) {
+            try {
+              await this.stripe.subscriptions.cancel(
+                oldSub.stripeSubscriptionId,
+                {
+                  prorate: true,
+                },
+              );
+            } catch (err) {
+              logger.error(
+                { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
+                "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during upgrade. Manual intervention required.",
+              );
+            }
+          }
+        }
+
+        await this.applySeatRetentionPolicy(updatedSubscription.organizationId);
       }
 
       await this.announceSubscriptionStarted(updatedSubscription);
@@ -867,76 +914,6 @@ export class EEWebhookService implements WebhookService {
         hasSubscription: true,
       });
     }
-  }
-
-  /**
-   * Guard: a $0 invoice generated during cancellation must not reactivate the
-   * subscription. Stripe fires invoice.payment_succeeded for $0 prorated
-   * invoices even when the subscription is being cancelled, so the
-   * authoritative Stripe status is checked before activating. When Stripe
-   * cannot be reached, the stored status decides.
-   */
-  private async isCancelledInStripe({
-    subscriptionId,
-    previousStatus,
-  }: {
-    subscriptionId: string;
-    previousStatus: string;
-  }): Promise<boolean> {
-    try {
-      const stripeSubscription =
-        await this.stripe.subscriptions.retrieve(subscriptionId);
-      if (stripeSubscription.status !== "canceled") return false;
-      logger.info(
-        { subscriptionId },
-        "[stripeWebhook] Stripe subscription is canceled, skipping activation from $0 invoice",
-      );
-      return true;
-    } catch (err) {
-      logger.warn(
-        { subscriptionId, err },
-        "[stripeWebhook] Failed to verify Stripe subscription status, proceeding with activation",
-      );
-      if (previousStatus !== SubscriptionStatus.CANCELLED) return false;
-      logger.info(
-        { subscriptionId },
-        "[stripeWebhook] Stripe status unavailable and DB is CANCELLED, skipping activation",
-      );
-      return true;
-    }
-  }
-
-  /**
-   * Moves an organization onto its new seat-event subscription: the older
-   * subscriptions are closed in the database, then cancelled in Stripe, and
-   * the seat retention policies are stamped.
-   */
-  private async migrateOrganizationToSeatEvent(
-    updatedSubscription: SubscriptionWithOrg,
-  ): Promise<void> {
-    const oldSubscriptions =
-      await this.subscriptionRepository.migrateToSeatEvent({
-        organizationId: updatedSubscription.organizationId,
-        excludeSubscriptionId: updatedSubscription.id,
-      });
-
-    // Cancel in Stripe after DB is consistent (outside transaction)
-    for (const oldSub of oldSubscriptions) {
-      if (oldSub.stripeSubscriptionId) {
-        try {
-          await this.stripe.subscriptions.cancel(oldSub.stripeSubscriptionId, {
-            prorate: true,
-          });
-        } catch (err) {
-          logger.error(
-            { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
-            "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during upgrade. Manual intervention required.",
-          );
-        }
-      }
-    }
-
-    await this.applySeatRetentionPolicy(updatedSubscription.organizationId);
   }
 
   /**

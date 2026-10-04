@@ -34,8 +34,7 @@ const { mockFireSubscriptionStartedAnalytics } = vi.hoisted(() => ({
   mockFireSubscriptionStartedAnalytics: vi.fn(),
 }));
 
-vi.mock("../nurturing/hooks/subscriptionSync", () => ({
-  fireSubscriptionSyncNurturing: vi.fn(),
+vi.mock("../subscriptionStarted.analytics", () => ({
   fireSubscriptionStartedAnalytics: mockFireSubscriptionStartedAnalytics,
 }));
 

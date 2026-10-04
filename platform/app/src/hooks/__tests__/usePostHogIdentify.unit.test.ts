@@ -123,7 +123,7 @@ describe("usePostHogIdentify", () => {
     });
 
     /** @scenario "UTM params on the current URL are reported on signed_in" */
-    it("reports the UTM params of the current URL over the stored ones", () => {
+    it("reports only the campaign of the current URL when it has one", () => {
       window.sessionStorage.setItem("lw_attrib.utmSource", "google");
       window.sessionStorage.setItem("lw_attrib.utmMedium", "cpc");
       setUrl("?utm_source=newsletter&utm_content=cta");
@@ -131,14 +131,7 @@ describe("usePostHogIdentify", () => {
       renderIdentified();
 
       expect(signedInCalls()).toEqual([
-        [
-          "signed_in",
-          {
-            utm_source: "newsletter",
-            utm_medium: "cpc",
-            utm_content: "cta",
-          },
-        ],
+        ["signed_in", { utm_source: "newsletter", utm_content: "cta" }],
       ]);
     });
 
@@ -190,6 +183,16 @@ describe("usePostHogIdentify", () => {
       );
 
       rerender({ userId: "user-2" });
+
+      expect(signedInCalls()).toHaveLength(2);
+    });
+
+    /** @scenario "A user who already signed in on the tab is not counted again after another user" */
+    it("does not capture signed_in again for the first user after a reload", () => {
+      renderIdentified("user-1").unmount();
+      renderIdentified("user-2").unmount();
+      resetSignedInTracking();
+      renderIdentified("user-1");
 
       expect(signedInCalls()).toHaveLength(2);
     });

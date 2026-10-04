@@ -229,6 +229,21 @@ describe("Activity tracking hook", () => {
         fireActivityTrackingNurturing({ userId: "user-1" });
         expect(mockNurturing.identifyUser).toHaveBeenCalledTimes(2);
       });
+
+      it("does not track app_active again when a failed identify is retried", async () => {
+        mockNurturing.identifyUser.mockRejectedValueOnce(
+          new Error("CIO unavailable"),
+        );
+
+        fireActivityTrackingNurturing({ userId: "user-1" });
+        await vi.waitFor(() => {
+          expect(getActivityTrackingCacheSize()).toBe(0);
+        });
+        fireActivityTrackingNurturing({ userId: "user-1" });
+
+        expect(mockNurturing.identifyUser).toHaveBeenCalledTimes(2);
+        expect(mockNurturing.trackEvent).toHaveBeenCalledTimes(1);
+      });
     });
   });
 

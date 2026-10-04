@@ -15,6 +15,11 @@ import {
   toAttributionProperties,
 } from "~/utils/attribution";
 
+/**
+ * Tracks organization_created for the user who completed onboarding, with
+ * the attribution fields of the sign-up data as event properties and as
+ * set-once person properties.
+ */
 export function trackOrganizationCreated({
   userId,
   organizationId,
