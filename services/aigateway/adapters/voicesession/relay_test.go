@@ -610,11 +610,17 @@ func TestRelayCountsTranscriptionAudio(t *testing.T) {
 
 	require.NoError(t, client.Close(websocket.StatusNormalClosure, ""))
 	assert.Equal(t, ReasonClientClosed, r.metrics.awaitEnded(t))
+	// The first frame may be reported before the second is counted; the sum is what is billed.
 	reports := r.registry.snapshot()
-	require.Len(t, reports, 2)
-	assert.Equal(t, "a-3000", reports[0].ReportKey)
-	assert.InDelta(t, 3.0, reports[0].Usage.AudioSeconds, 0.0001)
-	assert.True(t, reports[1].Final)
+	require.GreaterOrEqual(t, len(reports), 2)
+	usage, last := reports[:len(reports)-1], reports[len(reports)-1]
+	var seconds float64
+	for _, report := range usage {
+		seconds += report.Usage.AudioSeconds
+	}
+	assert.Equal(t, "a-3000", usage[len(usage)-1].ReportKey)
+	assert.InDelta(t, 3.0, seconds, 0.0001)
+	assert.True(t, last.Final)
 }
 
 func TestSpeechCharactersAreCountedPerField(t *testing.T) {
