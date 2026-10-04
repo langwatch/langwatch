@@ -3,6 +3,7 @@ import { expect, test } from "../test.ts";
 
 /** A page header's one primary action is solid; every other button is outline. */
 const PRIMARY_ACTION = "rgb(221, 107, 32)";
+const OUTLINE_ACTION = "rgba(0, 0, 0, 0)";
 
 test("experiment creation keeps the SDK workflow discoverable", async ({ page }, testInfo) => {
   const projectSlug = await getProjectSlug(page);
@@ -25,7 +26,7 @@ test("experiment creation keeps the SDK workflow discoverable", async ({ page },
   await page.goto(`/${projectSlug}/online-evaluations`);
   await expect(page.getByRole("button", { name: "Set up Guardrail" }).first()).toHaveCSS(
     "background-color",
-    "rgb(255, 255, 255)",
+    OUTLINE_ACTION,
   );
   await expect(page.getByRole("button", { name: "New Online Evaluation" }).first()).toHaveCSS(
     "background-color",

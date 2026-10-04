@@ -36,7 +36,8 @@ const note = ({ target, base = process.cwd() }) => {
   } catch {
     return;
   }
-  if (!absolute.startsWith(root + path.sep)) return;
+  // The hook's own frames sit in every recorded stack, so stack tooling opens this file.
+  if (absolute === __filename || !absolute.startsWith(root + path.sep)) return;
   if (absolute === packageRoot || absolute.startsWith(packageRoot + path.sep)) return;
   const relative = path.relative(root, absolute);
   if (ignored.test(relative) || relative === last) return;

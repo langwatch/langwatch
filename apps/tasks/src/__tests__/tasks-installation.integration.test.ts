@@ -156,6 +156,8 @@ describe("the tasks process installation", () => {
         "dataset-content-backfill",
         "demo-data",
         "model-registry-sync",
+        "model-provider-migrate-credentials",
+        "model-provider-migrate-custom-models",
         "process-manager-purge",
         "grant-platform-operator",
         "backfill-project-created",

@@ -2363,7 +2363,11 @@ describe("prefetchWithFixture, given an http target and a project holding secret
         findById: vi.fn().mockResolvedValue({
           id: "agent_http",
           type: "http",
-          config: { url: "https://api.test/chat", method: "POST" },
+          config: {
+            url: "https://api.test/chat",
+            method: "POST",
+            headers: [{ key: "Authorization", value: "Bearer {{ secrets.AGENT_TOKEN }}" }],
+          },
         }),
       },
       projectSecretsFetcher: {
@@ -2393,7 +2397,15 @@ describe("prefetchWithFixture, given a run carrying secret parameter values", ()
         findById: vi.fn().mockResolvedValue({
           id: "agent_http",
           type: "http",
-          config: { url: "https://api.test/chat", method: "POST" },
+          config: {
+            url: "https://api.test/chat",
+            method: "POST",
+            // The prefetch reads only the project secrets the config names.
+            headers: Object.keys(secrets).map((name) => ({
+              key: `X-${name}`,
+              value: `{{ secrets.${name} }}`,
+            })),
+          },
         }),
       },
       projectSecretsFetcher: {

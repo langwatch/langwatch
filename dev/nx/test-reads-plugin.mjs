@@ -28,7 +28,6 @@ export const reads = {
     "docs/self-hosting/connect.mdx",
   ],
   "@langwatch/csv": sourceRoots,
-  "@langwatch/handled-error": sourceRoots,
   "@langwatch/scenario-contract": sourceRoots,
   "@langwatch/analytics-process": [
     "dev/docs/**/*",
@@ -56,6 +55,10 @@ export const reads = {
     "go.work.sum",
   ],
   "@langwatch/internal-slack": ["modules/automation/**/*", ".oxlintrc.jsonc"],
+  "@langwatch/oxlint-rules": [
+    ".oxlintrc.jsonc",
+    "packages/architecture-enforcer/oxlint.architecture.jsonc",
+  ],
   "@langwatch/identity-process": ["modules/auth/**/*"],
   "@langwatch/clickhouse-client": ["packages/clickhouse-migrations/**/*"],
   "@langwatch/evaluator-contract": [
