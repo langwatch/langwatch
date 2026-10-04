@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -50,6 +51,17 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 	}
 	session.SessionID = call.Meta.GatewayRequestID()
 
+	slot, err := a.admitBrokeredCall(ctx, call, session)
+	if err != nil {
+		return nil, err
+	}
+	handedOver := false
+	defer func() {
+		if !handedOver {
+			slot.Release()
+		}
+	}()
+
 	reservation := domain.RealtimeReservation{
 		SessionID:       session.SessionID,
 		ProjectID:       call.Bundle.ProjectID,
@@ -61,7 +73,9 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 		Model:           resolvedModelID(call.Request),
 		RequestedModel:  call.Request.Model,
 		TraceID:         customerTraceID(ctx),
+		Kind:            session.Kind(),
 	}
+	meterRealtimeReservation(&reservation, session, call.Request.Body)
 	if err := a.reserveRealtimeSession(ctx, reservation); err != nil {
 		return nil, err
 	}
@@ -83,10 +97,16 @@ func (a *App) dispatchRealtimeSession(ctx context.Context, call *pipeline.Call) 
 		return nil, stampUpstreamProvider(err, cred)
 	}
 
-	if err := a.correlateRealtimeSession(ctx, reservation, resp.RealtimeConversationID); err != nil {
+	brokered := brokeredCall(call, cred, resp)
+	brokered.EndUserID = customertracebridge.EndUserID(ctx)
+	if err := a.correlateRealtimeSession(ctx, reservation, resp); err != nil {
+		handedOver = true
+		slot.Abandon(ctx, brokered)
 		return nil, a.refuseUncorrelatedMint(ctx, reservation)
 	}
 	a.metrics.RecordRealtimeMint(string(session.Vendor), "minted")
+	handedOver = true
+	slot.Start(brokered)
 	return resp, nil
 }
 
@@ -157,8 +177,27 @@ func (a *App) reserveRealtimeSession(ctx context.Context, reservation domain.Rea
 	return err
 }
 
-// correlateRealtimeSession records the vendor's own conversation id on the
-// booking, and reports whether that record was written.
+// meterRealtimeReservation states who reports the session's usage and what
+// the mint already knows about pricing it.
+//
+// A hosted agent is left unmetered: the vendor reports its cost after the
+// call. Every other session is reported by the client that holds the socket.
+func meterRealtimeReservation(reservation *domain.RealtimeReservation, session *domain.RealtimeSessionRequest, body []byte) {
+	switch {
+	case session.Broker != "":
+		reservation.Metering = domain.RealtimeMeteringGateway
+		reservation.TranscriptionModel = domain.RealtimeTranscriptionModel(body)
+	case session.Vendor == domain.RealtimeVendorOpenAI:
+		reservation.Metering = domain.RealtimeMeteringClient
+		reservation.TranscriptionModel = domain.RealtimeTranscriptionModel(body)
+	case session.TokenType != "":
+		reservation.Metering = domain.RealtimeMeteringClient
+		reservation.CredentialExpiresAt = time.Now().Add(domain.ElevenLabsSingleUseTokenLifetime)
+	}
+}
+
+// correlateRealtimeSession records what the mint answer said on the booking:
+// the vendor's conversation id and the credential's expiry.
 //
 // A mint that reported no conversation id still stands: the post-call report
 // is matched by the session id echoed back in the conversation's variables,
@@ -171,26 +210,42 @@ func (a *App) reserveRealtimeSession(ctx context.Context, reservation domain.Rea
 // conversation would bill as cost-unknown forever. Losing the credential
 // costs the caller a retry; keeping it costs the customer a call nobody can
 // price.
-func (a *App) correlateRealtimeSession(ctx context.Context, reservation domain.RealtimeReservation, conversationID string) error {
-	if a.realtime == nil || conversationID == "" {
+//
+// An expiry that could not be stored is logged and the mint stands. It only
+// sizes the estimate for a session that never reports, which falls back to
+// the kind's default duration.
+func (a *App) correlateRealtimeSession(ctx context.Context, reservation domain.RealtimeReservation, resp *domain.Response) error {
+	conversationID, expiresAt := resp.RealtimeConversationID, resp.RealtimeCredentialExpiresAt
+	if a.realtime == nil || (conversationID == "" && expiresAt.IsZero()) {
 		return nil
 	}
-	if err := a.realtime.Correlate(ctx, domain.RealtimeCorrelation{
+	err := a.realtime.Correlate(ctx, domain.RealtimeCorrelation{
 		SessionID:            reservation.SessionID,
 		ProjectID:            reservation.ProjectID,
 		VendorConversationID: conversationID,
-	}); err != nil {
-		a.metrics.RecordRealtimeRegistryError("correlate")
-		a.logger.Warn("realtime session minted but its vendor conversation id was not recorded; the mint is being refused",
+		CredentialExpiresAt:  expiresAt,
+	})
+	if err == nil {
+		return nil
+	}
+	a.metrics.RecordRealtimeRegistryError("correlate")
+	if conversationID == "" {
+		a.logger.Warn("realtime session minted but its credential expiry was not recorded; the mint stands",
 			zap.String("session_id", reservation.SessionID),
 			zap.String("project_id", reservation.ProjectID),
 			zap.String("vendor", string(reservation.Vendor)),
-			zap.String("vendor_conversation_id", conversationID),
 			zap.Error(err),
 		)
-		return err
+		return nil
 	}
-	return nil
+	a.logger.Warn("realtime session minted but its vendor conversation id was not recorded; the mint is being refused",
+		zap.String("session_id", reservation.SessionID),
+		zap.String("project_id", reservation.ProjectID),
+		zap.String("vendor", string(reservation.Vendor)),
+		zap.String("vendor_conversation_id", conversationID),
+		zap.Error(err),
+	)
+	return err
 }
 
 // releaseRealtimeSession closes a booking whose mint never produced a
@@ -237,47 +292,118 @@ func resolvedModelID(req *domain.Request) string {
 	return req.Model
 }
 
-// ReportRealtimeUsage closes an OpenAI voice session with the usage the
-// client read off the socket.
+// ReportRealtimeUsage records what a client read off its own socket.
 //
-// OpenAI sends response.done over the socket, and that socket runs client to
-// vendor, so this is the only path by which those numbers reach billing. The
-// gateway makes the audio and text counts disjoint before forwarding them,
-// exactly as it does for every other lane, because audio tokens price around
-// eight times text tokens and a total charged at the text rate is a
-// fraction of the real bill.
+// The media socket runs client to vendor, so this is the only path by which
+// those numbers reach billing. One post carries one socket event, a batch of
+// them, a usage total, or a close. Each event is its own report, keyed by the
+// vendor's id for it, so a client can report after every response and a
+// resend is recorded once.
 //
-// A session that never reports still closes: the settlement sweeper settles
-// it as cost-unknown at the grace, and a report arriving after that
-// supersedes the settled row.
-func (a *App) ReportRealtimeUsage(ctx context.Context, bundle *domain.Bundle, report RealtimeUsagePost) error {
+// The gateway makes the audio and text counts disjoint before forwarding
+// them, exactly as it does for every other lane, because audio tokens price
+// around eight times text tokens.
+//
+// A session that never reports still closes: the control plane settles it at
+// an estimate for its kind once the open window has passed.
+func (a *App) ReportRealtimeUsage(ctx context.Context, bundle *domain.Bundle, report RealtimeUsagePost) (RealtimeUsageAnswer, error) {
+	if err := a.requireRealtimeSession(ctx, report.SessionID); err != nil {
+		return RealtimeUsageAnswer{}, err
+	}
+	post, err := domain.ParseRealtimeUsagePost(report.Body)
+	if err != nil {
+		return RealtimeUsageAnswer{}, herr.New(ctx, domain.ErrBadRequest, herr.M{
+			"message": "could not read the usage report: " + err.Error(),
+			"fault":   "customer",
+		})
+	}
+	return a.recordRealtimeUsage(ctx, realtimeClientReports(bundle, report.SessionID, post))
+}
+
+// CloseRealtimeSession ends a session with no usage to add. What its reports
+// already recorded stands.
+func (a *App) CloseRealtimeSession(ctx context.Context, bundle *domain.Bundle, closing RealtimeSessionClose) (RealtimeUsageAnswer, error) {
+	if err := a.requireRealtimeSession(ctx, closing.SessionID); err != nil {
+		return RealtimeUsageAnswer{}, err
+	}
+	return a.recordRealtimeUsage(ctx, realtimeClientReports(bundle, closing.SessionID, domain.RealtimeUsagePost{
+		Final:      true,
+		DurationMS: max(closing.DurationMS, 0),
+	}))
+}
+
+// requireRealtimeSession refuses a report this gateway cannot record.
+func (a *App) requireRealtimeSession(ctx context.Context, sessionID string) error {
 	if a.realtime == nil {
 		return herr.New(ctx, domain.ErrRealtimeRegistryUnavailable, herr.M{
 			"message": "realtime voice sessions are not available on this gateway: no session registry is configured",
 			"fault":   "gateway",
 		})
 	}
-	if report.SessionID == "" {
+	if sessionID == "" {
 		return herr.New(ctx, domain.ErrBadRequest, herr.M{
 			"message": "a session id is required to report usage against",
 			"fault":   "customer",
 		})
 	}
-	usage, err := domain.ParseRealtimeUsage(report.Body)
-	if err != nil {
-		return herr.New(ctx, domain.ErrBadRequest, herr.M{
-			"message": "could not read the usage report: " + err.Error(),
-			"fault":   "customer",
-		})
+	return nil
+}
+
+// recordRealtimeUsage sends the reports of one post to the registry in order
+// and answers the last receipt with the costs of the whole post summed.
+//
+// A post that fails part way is safe to resend: every report before the
+// failure is keyed, and the registry records a key once.
+func (a *App) recordRealtimeUsage(ctx context.Context, reports realtimeReports) (RealtimeUsageAnswer, error) {
+	answer := RealtimeUsageAnswer{SessionID: reports.sessionID, Status: domain.RealtimeReportNoUsage}
+	for i := range reports.items {
+		receipt, err := a.realtime.ReportUsage(ctx, reports.items[i])
+		if err != nil {
+			a.metrics.RecordRealtimeRegistryError("usage")
+			return RealtimeUsageAnswer{}, err
+		}
+		answer.Status = receipt.Status
+		answer.CostNanoUSD += receipt.CostNanoUSD
+		answer.SessionCostNanoUSD = receipt.SessionCostNanoUSD
+		answer.Budget = receipt.Budget
 	}
-	if err := a.realtime.ReportUsage(ctx, domain.RealtimeUsageReport{
-		SessionID:    report.SessionID,
+	return answer, nil
+}
+
+// realtimeReports is one post's reports, bound to the session they are for.
+type realtimeReports struct {
+	sessionID string
+	items     []domain.RealtimeUsageReport
+}
+
+// realtimeClientReports turns a client's post into registry reports.
+//
+// The close rides on the last report, and a post that is only a close is one
+// report with no usage. A report with no key and no close is the session
+// total; with a close it is one more amount, recorded before the session ends.
+func realtimeClientReports(bundle *domain.Bundle, sessionID string, post domain.RealtimeUsagePost) realtimeReports {
+	blank := domain.RealtimeUsageReport{
+		SessionID:    sessionID,
 		ProjectID:    bundle.ProjectID,
 		VirtualKeyID: bundle.VirtualKeyID,
-		Usage:        usage,
-	}); err != nil {
-		a.metrics.RecordRealtimeRegistryError("usage")
-		return err
+		Source:       domain.RealtimeMeteringClient,
 	}
-	return nil
+	items := make([]domain.RealtimeUsageReport, 0, len(post.Entries)+1)
+	for i := range post.Entries {
+		report := blank
+		report.ReportKey = post.Entries[i].ReportKey
+		report.PricedAs = post.Entries[i].PricedAs
+		report.Usage = &post.Entries[i].Usage
+		items = append(items, report)
+	}
+	switch {
+	case !post.Final:
+	case len(items) == 0:
+		blank.Final, blank.DurationMS = true, post.DurationMS
+		items = append(items, blank)
+	default:
+		last := &items[len(items)-1]
+		last.Final, last.DurationMS = true, post.DurationMS
+	}
+	return realtimeReports{sessionID: sessionID, items: items}
 }

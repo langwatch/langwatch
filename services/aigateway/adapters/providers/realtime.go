@@ -32,6 +32,9 @@ const (
 	openAIClientSecretsPath = "/v1/realtime/client_secrets"
 	// elevenLabsSignedURLPath mints a signed URL bound to one agent.
 	elevenLabsSignedURLPath = "/v1/convai/conversation/get-signed-url"
+	// elevenLabsSingleUseTokenPath mints a token that opens one speech or
+	// transcription socket. The token type follows it.
+	elevenLabsSingleUseTokenPath = "/v1/single-use-token/"
 
 	// realtimeMintTimeout bounds the mint call. It is a small REST request,
 	// and a caller waiting on it is a person waiting to start talking.
@@ -98,10 +101,16 @@ func (r *BifrostRouter) dispatchRealtimeSession(
 			"message": "realtime session dispatch reached the provider router with no session parameters",
 		})
 	}
+	if session.Broker != "" {
+		return r.dispatchVoiceBroker(ctx, req, cred)
+	}
 	switch session.Vendor {
 	case domain.RealtimeVendorOpenAI:
 		return r.mintOpenAIClientSecret(ctx, req, cred)
 	case domain.RealtimeVendorElevenLabs:
+		if session.TokenType != "" {
+			return r.mintElevenLabsSingleUseToken(ctx, cred, session)
+		}
 		return r.mintElevenLabsSignedURL(ctx, cred, session)
 	default:
 		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
@@ -144,7 +153,46 @@ func (r *BifrostRouter) mintOpenAIClientSecret(
 	// exists until the socket opens, and it opens without us. This vendor's
 	// session is closed by the usage report the caller posts back, keyed by
 	// the LangWatch session id it is handed here.
+	if expiresAt := gjson.GetBytes(resp.Body, "expires_at").Int(); expiresAt > 0 {
+		resp.RealtimeCredentialExpiresAt = time.Unix(expiresAt, 0)
+	}
 	resp.Body = withLangWatchSessionEcho(resp.Body, req.RealtimeSession.SessionID)
+	return resp, nil
+}
+
+// mintElevenLabsSingleUseToken asks ElevenLabs for a token that opens one
+// speech or transcription socket without the workspace key.
+//
+// The vendor call takes no body and no model: the socket names its own model
+// when it opens. The answer is {"token": "..."} and carries no conversation
+// id, so the session is closed by the usage its client reports.
+func (r *BifrostRouter) mintElevenLabsSingleUseToken(
+	ctx context.Context,
+	cred domain.Credential,
+	session *domain.RealtimeSessionRequest,
+) (*domain.Response, error) {
+	if _, ok := domain.ParseElevenLabsTokenType(string(session.TokenType)); !ok {
+		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
+			"message": fmt.Sprintf("unsupported single-use token type %q", string(session.TokenType)),
+			"fault":   "customer",
+		})
+	}
+	endpoint := realtimeEndpoint(cred, elevenLabsRealtimeDefaultBaseURL,
+		elevenLabsSingleUseTokenPath+url.PathEscape(string(session.TokenType)))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, nil)
+	if err != nil {
+		return nil, herr.New(ctx, domain.ErrProviderError, herr.M{"reason": err.Error()})
+	}
+	httpReq.Header.Set("xi-api-key", cred.APIKey)
+
+	resp, err := r.doRealtimeMint(ctx, httpReq)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		return resp, nil
+	}
+	resp.Body = withLangWatchSessionEcho(resp.Body, session.SessionID)
 	return resp, nil
 }
 
@@ -223,6 +271,16 @@ func (r *BifrostRouter) doRealtimeMint(
 	ctx context.Context,
 	httpReq *http.Request,
 ) (*domain.Response, error) {
+	resp, _, err := r.doRealtimeCall(ctx, httpReq)
+	return resp, err
+}
+
+// doRealtimeCall is doRealtimeMint with the vendor's response headers beside
+// the answer, for a call setup whose id arrives in one.
+func (r *BifrostRouter) doRealtimeCall(
+	ctx context.Context,
+	httpReq *http.Request,
+) (*domain.Response, http.Header, error) {
 	client := r.realtimeClient
 	if client == nil {
 		client = fallbackRealtimeClient(r.endpointPolicy)
@@ -235,7 +293,7 @@ func (r *BifrostRouter) doRealtimeMint(
 	// address and then a private one cannot slip through either.
 	httpResp, err := client.Do(httpReq)
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrProviderError, herr.M{
+		return nil, nil, herr.New(ctx, domain.ErrProviderError, herr.M{
 			"reason": "realtime session mint failed: " + err.Error(),
 			"fault":  "provider",
 		})
@@ -248,13 +306,13 @@ func (r *BifrostRouter) doRealtimeMint(
 	// status, and the conversation-id read would silently find nothing.
 	raw, err := io.ReadAll(io.LimitReader(httpResp.Body, realtimeMintMaxResponseBytes+1))
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrProviderError, herr.M{
+		return nil, nil, herr.New(ctx, domain.ErrProviderError, herr.M{
 			"reason": "realtime session mint response could not be read: " + err.Error(),
 			"fault":  "provider",
 		})
 	}
 	if len(raw) > realtimeMintMaxResponseBytes {
-		return nil, herr.New(ctx, domain.ErrProviderError, herr.M{
+		return nil, nil, herr.New(ctx, domain.ErrProviderError, herr.M{
 			"reason": fmt.Sprintf(
 				"realtime session mint response exceeded %d bytes, which is a wrong endpoint rather than a session",
 				realtimeMintMaxResponseBytes,
@@ -266,7 +324,7 @@ func (r *BifrostRouter) doRealtimeMint(
 		Body:       raw,
 		StatusCode: httpResp.StatusCode,
 		Headers:    forwardableUpstreamHeaders(headerMap(httpResp.Header)),
-	}, nil
+	}, httpResp.Header, nil
 }
 
 // realtimeEndpoint resolves the vendor host for this credential. A customer
@@ -277,7 +335,12 @@ func realtimeEndpoint(cred domain.Credential, defaultBaseURL, path string) strin
 	if configured := strings.TrimSpace(cred.Extra["base_url"]); configured != "" {
 		base = configured
 	}
-	return strings.TrimSuffix(base, "/") + path
+	base = strings.TrimSuffix(base, "/")
+	// An OpenAI base URL is usually stored with its /v1, which the path has too.
+	if strings.HasPrefix(path, "/v1/") {
+		base = strings.TrimSuffix(base, "/v1")
+	}
+	return base + path
 }
 
 // clampOpenAIExpiry holds expires_after.seconds inside OpenAI's own bounds.

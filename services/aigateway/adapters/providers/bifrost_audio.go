@@ -9,6 +9,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
+	"github.com/tidwall/sjson"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -130,7 +131,18 @@ func (r *BifrostRouter) dispatchTranscription(
 		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": "missing required field: file"})
 	}
 
-	params := &bfschemas.TranscriptionParameters{}
+	// OpenAI and Azure OpenAI speak this wire themselves, so they are dialed
+	// directly: every form part reaches the provider, and its body comes back
+	// unchanged whatever the response format.
+	call := audioCall{req: req, model: model, cred: cred}
+	if endpoint, ok := r.directAudioEndpoint(call, "transcriptions"); ok {
+		return r.dispatchTranscriptionDirect(ctx, call, endpoint)
+	}
+
+	params := &bfschemas.TranscriptionParameters{
+		TimestampGranularities: upload.Values("timestamp_granularities"),
+		Include:                upload.Values("include"),
+	}
 	if v := upload.Params["language"]; v != "" {
 		params.Language = &v
 	}
@@ -165,12 +177,22 @@ func (r *BifrostRouter) dispatchTranscription(
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
-	body, _ := sonic.Marshal(resp)
 	return &domain.Response{
-		Body:       body,
+		Body:       transcriptionWireBody(resp),
 		StatusCode: http.StatusOK,
 		Usage:      extractTranscriptionUsage(resp),
 	}, nil
+}
+
+// transcriptionWireBody marshals the transcript without Bifrost's
+// extra_fields, which hold the provider's raw response and its response
+// headers. Those name the provider account and never belong on a response.
+func transcriptionWireBody(resp *bfschemas.BifrostTranscriptionResponse) []byte {
+	body, _ := sonic.Marshal(resp)
+	if stripped, err := sjson.DeleteBytes(body, "extra_fields"); err == nil {
+		return stripped
+	}
+	return body
 }
 
 // extractSpeechUsage maps Bifrost speech usage onto the domain measure. TTS

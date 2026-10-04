@@ -92,6 +92,12 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 				if err != nil {
 					return nil, err
 				}
+				// Synthesized speech is audio bytes: there is no text in a
+				// chunk for a guardrail to judge, and the request text was
+				// judged above.
+				if call.Request.Type == domain.RequestTypeSpeech {
+					return iter, nil
+				}
 				return &guardrailStreamWrapper{
 					inner:  iter,
 					chunk:  chunk,
@@ -213,6 +219,10 @@ func (w *guardrailStreamWrapper) Chunk() []byte       { return w.inner.Chunk() }
 func (w *guardrailStreamWrapper) Usage() domain.Usage { return w.inner.Usage() }
 func (w *guardrailStreamWrapper) Err() error          { return w.inner.Err() }
 func (w *guardrailStreamWrapper) Close() error        { return w.inner.Close() }
+
+// Unwrap exposes the wrapped iterator so its optional extensions stay
+// reachable (domain.StreamHeadersOf).
+func (w *guardrailStreamWrapper) Unwrap() domain.StreamIterator { return w.inner }
 
 // RawFraming delegates to the inner iterator so writers can still
 // detect raw-framed (Gemini passthrough) streams through wrapper chains.

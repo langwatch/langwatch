@@ -560,6 +560,15 @@ export const goErrorCodes = {
    */
   virtual_key_revoked: { service: "aigateway", httpStatus: 403 },
   /**
+   * ErrVoiceBrokerUnavailable — means this gateway cannot take another
+   * brokered call right now: it is draining, or it already supervises as many
+   * calls as it is configured to hold. Nothing was booked and nothing was
+   * created.
+   *
+   * @source services/aigateway/domain/voice_broker.go
+   */
+  voice_broker_unavailable: { service: "aigateway", httpStatus: 503 },
+  /**
    * ErrWorkerNotReady — signals a freshly spawned worker did not become ready
    * within LANGY_READINESS_TIMEOUT_MS.
    *

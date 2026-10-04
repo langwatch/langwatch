@@ -555,6 +555,14 @@ Feature: Gateway service — public HTTP surface and operational basics
       Then helm template fails and names the grace period the drain would need
       And raising terminationGracePeriodSeconds to that number renders
 
+    @unit
+    Scenario: the voice call drain reaches the pod and fits its grace period
+      Given a values file sets shutdown.voiceDrainSeconds
+      Then the pod receives it as LW_GATEWAY_VOICE_DRAIN_SECONDS
+      And helm template fails when terminationGracePeriodSeconds cannot cover it plus 30s to end the remaining calls and 5s of slack
+      # Brokered voice calls run on their own clock from the same SIGTERM, so
+      # a deploy does not cut a call off at the request timeout.
+
     Scenario: stuck handler beyond timeout is force-killed
       Given a handler that blocks past the shutdown timeout
       When SIGTERM drain reaches the timeout

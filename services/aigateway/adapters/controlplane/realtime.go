@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"time"
@@ -42,6 +43,20 @@ type reserveRequest struct {
 	Vendor          string `json:"vendor"`
 	AgentID         string `json:"agent_id,omitempty"`
 	Model           string `json:"model"`
+	// The four below say how the session is metered. Each is left off the
+	// wire when the mint does not know it.
+	Kind                string `json:"kind,omitempty"`
+	Metering            string `json:"metering,omitempty"`
+	TranscriptionModel  string `json:"transcription_model,omitempty"`
+	CredentialExpiresAt int64  `json:"credential_expires_at,omitempty"`
+}
+
+// epochMillis is the wire form of an instant, zero when it is not known.
+func epochMillis(at time.Time) int64 {
+	if at.IsZero() {
+		return 0
+	}
+	return at.UnixMilli()
 }
 
 // realtimeUsageWire is the quantity vocabulary the spend wire already
@@ -54,6 +69,51 @@ type realtimeUsageWire struct {
 	InputAudioTokens  int `json:"input_audio_tokens"`
 	OutputAudioTokens int `json:"output_audio_tokens"`
 	AudioMS           int `json:"audio_ms"`
+	InputChars        int `json:"input_chars"`
+}
+
+// usageWire maps the gateway's usage onto the spend wire, with the cached
+// tokens taken out of the input count and the audio duration in milliseconds.
+func usageWire(usage *domain.Usage) *realtimeUsageWire {
+	if usage == nil {
+		return nil
+	}
+	return &realtimeUsageWire{
+		InputTokens:       usage.BillableInputTokens(),
+		OutputTokens:      usage.CompletionTokens,
+		CacheReadTokens:   usage.CacheReadTokens,
+		InputAudioTokens:  usage.InputAudioTokens,
+		OutputAudioTokens: usage.OutputAudioTokens,
+		AudioMS:           int(math.Round(usage.AudioSeconds * 1000)),
+		InputChars:        usage.InputChars,
+	}
+}
+
+// reportUsageRequest is one usage report on the internal wire. Optional
+// fields are left off so a report with no key reads as the session total.
+type reportUsageRequest struct {
+	ProjectID    string             `json:"project_id"`
+	VirtualKeyID string             `json:"virtual_key_id"`
+	Usage        *realtimeUsageWire `json:"usage,omitempty"`
+	ReportKey    string             `json:"report_key,omitempty"`
+	PricedAs     string             `json:"priced_as,omitempty"`
+	Model        string             `json:"model,omitempty"`
+	Final        bool               `json:"final,omitempty"`
+	DurationMS   int64              `json:"duration_ms,omitempty"`
+	Source       string             `json:"source,omitempty"`
+}
+
+// reportUsageAnswer is what the control plane answers a recorded report with.
+type reportUsageAnswer struct {
+	Status             string `json:"status"`
+	CostNanoUSD        int64  `json:"cost_nano_usd"`
+	SessionCostNanoUSD int64  `json:"session_cost_nano_usd"`
+	Budget             struct {
+		Exceeded bool   `json:"exceeded"`
+		Scope    string `json:"scope"`
+		BudgetID string `json:"budget_id"`
+		Unknown  bool   `json:"unknown"`
+	} `json:"budget"`
 }
 
 // Reserve books a session, or answers why it may not open.
@@ -69,6 +129,11 @@ func (c *Client) Reserve(ctx context.Context, r domain.RealtimeReservation) erro
 		Vendor:          string(r.Vendor),
 		AgentID:         r.AgentID,
 		Model:           r.Model,
+
+		Kind:                string(r.Kind),
+		Metering:            string(r.Metering),
+		TranscriptionModel:  r.TranscriptionModel,
+		CredentialExpiresAt: epochMillis(r.CredentialExpiresAt),
 	})
 	if err != nil {
 		return realtimeRegistryUnavailable(ctx, 0, err)
@@ -101,11 +166,17 @@ func (c *Client) Reserve(ctx context.Context, r domain.RealtimeReservation) erro
 	}
 }
 
-// Correlate records the vendor's own conversation id against a booking.
+// Correlate records what the mint answer said about a booking: the vendor's
+// own conversation id, when the credential expires, or both.
 func (c *Client) Correlate(ctx context.Context, correlation domain.RealtimeCorrelation) error {
-	payload, err := json.Marshal(map[string]string{
-		"project_id":             correlation.ProjectID,
-		"vendor_conversation_id": correlation.VendorConversationID,
+	payload, err := json.Marshal(struct {
+		ProjectID            string `json:"project_id"`
+		VendorConversationID string `json:"vendor_conversation_id,omitempty"`
+		CredentialExpiresAt  int64  `json:"credential_expires_at,omitempty"`
+	}{
+		ProjectID:            correlation.ProjectID,
+		VendorConversationID: correlation.VendorConversationID,
+		CredentialExpiresAt:  epochMillis(correlation.CredentialExpiresAt),
 	})
 	if err != nil {
 		return err
@@ -126,46 +197,71 @@ func (c *Client) Release(ctx context.Context, release domain.RealtimeRelease) er
 	return c.realtimePatch(ctx, release.SessionID, payload)
 }
 
-// ReportUsage closes a session with the quantities its socket reported.
-func (c *Client) ReportUsage(ctx context.Context, report domain.RealtimeUsageReport) error {
-	payload, err := json.Marshal(struct {
-		ProjectID    string            `json:"project_id"`
-		VirtualKeyID string            `json:"virtual_key_id"`
-		Usage        realtimeUsageWire `json:"usage"`
-	}{
+// ReportUsage records one usage report against a booked session and answers
+// what the control plane made of it: the rated cost, the session's running
+// total, and whether a blocking budget is now spent.
+func (c *Client) ReportUsage(ctx context.Context, report domain.RealtimeUsageReport) (domain.RealtimeUsageReceipt, error) {
+	var receipt domain.RealtimeUsageReceipt
+	payload, err := json.Marshal(reportUsageRequest{
 		ProjectID:    report.ProjectID,
 		VirtualKeyID: report.VirtualKeyID,
-		Usage: realtimeUsageWire{
-			InputTokens:       report.Usage.BillableInputTokens(),
-			OutputTokens:      report.Usage.CompletionTokens,
-			CacheReadTokens:   report.Usage.CacheReadTokens,
-			InputAudioTokens:  report.Usage.InputAudioTokens,
-			OutputAudioTokens: report.Usage.OutputAudioTokens,
-		},
+		Usage:        usageWire(report.Usage),
+		ReportKey:    report.ReportKey,
+		PricedAs:     report.PricedAs,
+		Model:        report.Model,
+		Final:        report.Final,
+		DurationMS:   report.DurationMS,
+		Source:       string(report.Source),
 	})
 	if err != nil {
-		return realtimeRegistryUnavailable(ctx, 0, err)
+		return receipt, realtimeRegistryUnavailable(ctx, 0, err)
 	}
 	path, err := url.JoinPath(realtimeSessionsPath, url.PathEscape(report.SessionID), "usage")
 	if err != nil {
-		return realtimeRegistryUnavailable(ctx, 0, err)
+		return receipt, realtimeRegistryUnavailable(ctx, 0, err)
 	}
-	status, _, err := c.realtimeCall(ctx, realtimeRequest{
+	status, body, err := c.realtimeCall(ctx, realtimeRequest{
 		method: http.MethodPost, path: path, payload: payload,
 	})
 	if err != nil {
-		return realtimeRegistryUnavailable(ctx, 0, err)
+		return receipt, realtimeRegistryUnavailable(ctx, 0, err)
 	}
 	if status == http.StatusNotFound {
-		return herr.New(ctx, domain.ErrNotFound, herr.M{
+		return receipt, herr.New(ctx, domain.ErrNotFound, herr.M{
 			"message": "no open realtime session with that id belongs to this key",
 			"fault":   "customer",
 		})
 	}
 	if status < 200 || status >= 300 {
-		return realtimeRegistryUnavailable(ctx, status, nil)
+		return receipt, realtimeRegistryUnavailable(ctx, status, nil)
 	}
-	return nil
+	return usageReceipt(body), nil
+}
+
+// usageReceipt reads the control plane's answer. A body that does not parse
+// still means the report landed, so it reads as recorded with no figures
+// rather than as a failure the caller would retry.
+func usageReceipt(body []byte) domain.RealtimeUsageReceipt {
+	var answer reportUsageAnswer
+	if err := json.Unmarshal(body, &answer); err != nil || answer.Status == "" {
+		return domain.RealtimeUsageReceipt{Status: domain.RealtimeReportRecorded}
+	}
+	// A control plane one release behind answers the session's own state.
+	status := domain.RealtimeReportStatus(answer.Status)
+	if answer.Status == "CLOSED" {
+		status = domain.RealtimeReportClosed
+	}
+	return domain.RealtimeUsageReceipt{
+		Status:             status,
+		CostNanoUSD:        answer.CostNanoUSD,
+		SessionCostNanoUSD: answer.SessionCostNanoUSD,
+		Budget: domain.RealtimeBudgetState{
+			Exceeded: answer.Budget.Exceeded,
+			Scope:    answer.Budget.Scope,
+			BudgetID: answer.Budget.BudgetID,
+			Unknown:  answer.Budget.Unknown,
+		},
+	}
 }
 
 // realtimePatch updates one session record. Transport failures come back as

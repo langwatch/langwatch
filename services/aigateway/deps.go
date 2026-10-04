@@ -34,6 +34,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/adapters/providers"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ratelimit"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/spendemitter"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/voicesession"
 )
 
 // Deps holds validated infrastructure adapters needed by the gateway.
@@ -48,12 +49,14 @@ type Deps struct {
 	Providers     *providers.BifrostRouter
 	RateLimiter   *ratelimit.Limiter
 	BudgetChecker *budget.Checker
-	Policy        *policy.Matcher
-	Cache         *cacherules.Evaluator
-	Models        *modelresolver.Resolver
-	Health        *health.Registry
-	Metrics       *gatewaymetrics.Recorder
-	Breaker       *breaker.Registry
+	// Voice supervises brokered voice calls and ends them on shutdown.
+	Voice   *voicesession.Manager
+	Policy  *policy.Matcher
+	Cache   *cacherules.Evaluator
+	Models  *modelresolver.Resolver
+	Health  *health.Registry
+	Metrics *gatewaymetrics.Recorder
+	Breaker *breaker.Registry
 	// Spend emission (nil when LW_GATEWAY_SPEND_ENABLED is off).
 	SpendEmitter *spendemitter.Emitter
 	SpendSpool   *spendemitter.Spool
@@ -190,6 +193,17 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Buckets: budget.NewCachedBucketSpend(cpClient),
 	})
 
+	voice := voicesession.NewManager(voicesession.Options{
+		Registry:    cpClient,
+		Vendor:      voicesession.NewOpenAIVendor(router.VoiceHTTPClient(), providers.OpenAIVoiceEndpoint),
+		Budget:      budgetChecker.Precheck,
+		Keys:        authSvc,
+		Metrics:     metrics,
+		Logger:      logger,
+		MaxSessions: cfg.Voice.MaxSupervisedSessions,
+		DrainBudget: time.Duration(cfg.Voice.DrainSeconds) * time.Second,
+	})
+
 	// Per-credential circuit breaker. A provider that keeps failing is
 	// skipped outright rather than costing every request another dead
 	// round-trip, and its state is published so operators can see which
@@ -286,6 +300,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Providers:     router,
 		RateLimiter:   limiter,
 		BudgetChecker: budgetChecker,
+		Voice:         voice,
 		Policy:        policy.NewMatcher(),
 		Cache:         cacherules.NewEvaluator(),
 		Models:        modelresolver.New(),

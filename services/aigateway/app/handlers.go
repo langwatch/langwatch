@@ -60,11 +60,13 @@ func (a *App) HandleEmbeddings(ctx context.Context, bundle *domain.Bundle, body 
 	return a.pipeline.Sync(ctx, bundle, &domain.Request{Type: domain.RequestTypeEmbeddings, Model: model, BodyReader: body})
 }
 
-// HandleSpeech dispatches POST /v1/audio/speech (OpenAI-wire TTS). Same
-// pipeline as every sync call; the response body is binary audio with the
-// Content-Type attached by the dispatcher.
-func (a *App) HandleSpeech(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string) (*CompletionResult, error) {
-	return a.pipeline.Sync(ctx, bundle, &domain.Request{Type: domain.RequestTypeSpeech, Model: model, BodyReader: body})
+// HandleSpeechStream dispatches POST /v1/audio/speech (OpenAI-wire TTS). The
+// iterator yields the provider's body as it arrives: audio bytes, or the
+// provider's SSE when the caller asked for stream_format "sse".
+//
+//nolint:revive // argument-limit: the same four values every Handle method beside it takes.
+func (a *App) HandleSpeechStream(ctx context.Context, bundle *domain.Bundle, body []byte, model string) (*StreamResult, error) {
+	return a.pipeline.Stream(ctx, bundle, &domain.Request{Type: domain.RequestTypeSpeech, Model: model, Body: body})
 }
 
 // HandleTranscription dispatches POST /v1/audio/transcriptions (OpenAI-wire
@@ -74,6 +76,20 @@ func (a *App) HandleSpeech(ctx context.Context, bundle *domain.Bundle, body io.R
 // framing.
 func (a *App) HandleTranscription(ctx context.Context, bundle *domain.Bundle, upload *domain.TranscriptionUpload, model string) (*CompletionResult, error) {
 	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:          domain.RequestTypeTranscription,
+		Model:         model,
+		Body:          modelOnlyBody("model", model),
+		Transcription: upload,
+	})
+}
+
+// HandleTranscriptionStream dispatches POST /v1/audio/transcriptions with
+// stream=true. The iterator yields the provider's transcript events as they
+// arrive, unchanged.
+//
+//nolint:revive // argument-limit: the same four values HandleTranscription beside it takes.
+func (a *App) HandleTranscriptionStream(ctx context.Context, bundle *domain.Bundle, upload *domain.TranscriptionUpload, model string) (*StreamResult, error) {
+	return a.pipeline.Stream(ctx, bundle, &domain.Request{
 		Type:          domain.RequestTypeTranscription,
 		Model:         model,
 		Body:          modelOnlyBody("model", model),
@@ -107,13 +123,13 @@ func (a *App) HandleImageEdit(ctx context.Context, bundle *domain.Bundle, upload
 	})
 }
 
-// HandleElevenLabsSpeech dispatches POST /v1/text-to-speech/{voice_id},
-// ElevenLabs' own synthesis path. Same request type, pipeline and metering as
-// the OpenAI-wire TTS route: only the wire differs, and the vendor reads that
-// wire directly. The response body is binary audio.
-func (a *App) HandleElevenLabsSpeech(ctx context.Context, bundle *domain.Bundle, in ElevenLabsAudioDispatch) (*CompletionResult, error) {
+// HandleElevenLabsSpeechStream dispatches ElevenLabs' own synthesis paths:
+// POST /v1/text-to-speech/{voice_id} and its /stream variants. Same request
+// type, pipeline and metering as the OpenAI-wire TTS route: only the wire
+// differs, and the vendor reads that wire directly.
+func (a *App) HandleElevenLabsSpeechStream(ctx context.Context, bundle *domain.Bundle, in ElevenLabsAudioDispatch) (*StreamResult, error) {
 	route := in.Route
-	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+	return a.pipeline.Stream(ctx, bundle, &domain.Request{
 		Type:       domain.RequestTypeSpeech,
 		Model:      in.Model,
 		Body:       in.Body,
@@ -255,10 +271,28 @@ type RealtimeMintDispatch struct {
 	Surface domain.Surface
 }
 
-// RealtimeUsagePost is a usage report a client read off its own socket.
+// RealtimeUsagePost is what a client posts against its session: usage it
+// read off its own socket, a close, or both.
 type RealtimeUsagePost struct {
 	SessionID string
 	Body      []byte
+}
+
+// RealtimeSessionClose ends a session with no usage to add.
+type RealtimeSessionClose struct {
+	SessionID string
+	// DurationMS is how long the call ran, when the client knows.
+	DurationMS int64
+}
+
+// RealtimeUsageAnswer is what a usage post or a close did: the last report's
+// status, what this post added, and where the session and its budgets stand.
+type RealtimeUsageAnswer struct {
+	SessionID          string
+	Status             domain.RealtimeReportStatus
+	CostNanoUSD        int64
+	SessionCostNanoUSD int64
+	Budget             domain.RealtimeBudgetState
 }
 
 func PeekStream(body []byte) bool {

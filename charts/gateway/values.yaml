@@ -230,9 +230,19 @@ containerSecurityContext:
 # terminationGracePeriodSeconds (pod spec) MUST exceed preDrainWaitSeconds +
 # timeoutSeconds + a few seconds of slack, or the kubelet force-kills the
 # pod mid-drain.
+#
+# voiceDrainSeconds is how long brokered voice calls (/v1/live/sessions,
+# /v1/realtime/calls) keep running on a pod after SIGTERM. Media never passes
+# through the pod, so the calls only need it to keep metering them. When the
+# time is up the pod ends the calls still open and sends their final usage
+# reports, which takes up to 30s more. terminationGracePeriodSeconds must
+# cover voiceDrainSeconds + 30 + 5s of slack. To let calls run to their
+# natural end across a deploy, raise both (the gateway's own default is 570,
+# sized for a 600s grace period).
 shutdown:
   preDrainWaitSeconds: 5
   timeoutSeconds: 60
+  voiceDrainSeconds: 40
 # terminationGracePeriodSeconds is the kubelet's SIGKILL clock. 75 is a plain
 # default that happens to cover the drain settings above (5 + 60 + 10s slack),
 # not a value derived from them: raising preDrainWaitSeconds or timeoutSeconds

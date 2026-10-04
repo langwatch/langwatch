@@ -884,11 +884,11 @@ func extractOutputMessages(body []byte, reqType aitrace.RequestType) string {
 		}
 		return geminiOutputFromJSON(body)
 	case aitrace.RequestTypeTranscription:
-		// STT: the transcript is the meaningful output. The response is the
-		// OpenAI transcription JSON; anything without a text field (or a
-		// non-JSON body) renders as empty rather than as raw bytes.
-		if t := gjson.GetBytes(body, "text"); t.Exists() && t.String() != "" {
-			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(t.String()))
+		// STT: the transcript is the meaningful output. It arrives as JSON
+		// with a text field, as SSE, or as the body itself for the text, srt
+		// and vtt formats.
+		if text := transcriptText(body); text != "" {
+			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(text))
 		}
 		return ""
 	case aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit:
@@ -928,6 +928,39 @@ func looksLikeSSE(body []byte) bool {
 		}
 	}
 	return false
+}
+
+// transcriptText reads the transcript out of a transcription response in any
+// of the shapes the route returns.
+func transcriptText(body []byte) string {
+	switch {
+	case looksLikeSSE(body):
+		return transcriptFromSSE(body)
+	case gjson.ValidBytes(body):
+		return gjson.GetBytes(body, "text").String()
+	default:
+		return strings.TrimSpace(string(body))
+	}
+}
+
+// transcriptFromSSE reads the transcript out of a streamed transcription:
+// the text on transcript.text.done, or the deltas joined when the stream was
+// cut before that event.
+func transcriptFromSSE(body []byte) string {
+	var deltas strings.Builder
+	final := ""
+	walkStreamEvents(body, func(data []byte) {
+		switch gjson.GetBytes(data, "type").String() {
+		case "transcript.text.done":
+			final = gjson.GetBytes(data, "text").String()
+		case "transcript.text.delta":
+			deltas.WriteString(gjson.GetBytes(data, "delta").String())
+		}
+	})
+	if final != "" {
+		return final
+	}
+	return deltas.String()
 }
 
 func openAIChatOutputFromJSON(body []byte) string {

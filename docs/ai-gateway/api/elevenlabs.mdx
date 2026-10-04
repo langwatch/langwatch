@@ -1,6 +1,6 @@
 ---
 title: ElevenLabs API paths
-description: ElevenLabs' own synthesis, transcription and post-call webhook paths, served by the LangWatch AI Gateway so an ElevenLabs SDK is metered by changing only its base URL and key.
+description: ElevenLabs' own synthesis, transcription, single-use token and post-call webhook paths, served by the LangWatch AI Gateway so an ElevenLabs SDK is metered by changing only its base URL and key.
 sidebarTitle: ElevenLabs
 ---
 
@@ -8,16 +8,19 @@ sidebarTitle: ElevenLabs
 
 ```
 POST /v1/text-to-speech/{voice_id}
+POST /v1/text-to-speech/{voice_id}/stream
+POST /v1/text-to-speech/{voice_id}/stream/with-timestamps
 POST /v1/speech-to-text
+POST /v1/single-use-token/{token_type}
 POST /v1/convai/webhook/{model_provider_id}
 xi-api-key: vk-lw-<ULID>
 ```
 
-The two audio paths mirror ElevenLabs' own, with ElevenLabs' own request bodies. Point the ElevenLabs SDK at the gateway with `base_url="https://gateway.langwatch.ai"` and the virtual key in place of the ElevenLabs key. The key goes in the `xi-api-key` header the SDK already sends.
+The audio paths mirror ElevenLabs' own, with ElevenLabs' own request bodies. Point the ElevenLabs SDK at the gateway with `base_url="https://gateway.langwatch.ai"` and the virtual key in place of the ElevenLabs key. The key goes in the `xi-api-key` header the SDK already sends.
 
 The ElevenLabs key itself stays on the organization's ElevenLabs model provider. An SDK that still sends it gets `401 invalid_api_key`, because the gateway reads that header as a virtual key.
 
-Both audio paths are served only by an ElevenLabs credential. A key that cannot reach ElevenLabs answers `400 model_provider_not_bound` and no provider is called. There is no fallback to another provider.
+The audio paths are served only by an ElevenLabs credential. A key that cannot reach ElevenLabs answers `400 model_provider_not_bound` and no provider is called. There is no fallback to another provider.
 
 ## Text to speech
 
@@ -29,16 +32,36 @@ curl "https://gateway.langwatch.ai/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL?output
   --output hello.mp3
 ```
 
-The response is ElevenLabs' audio bytes and headers, unchanged.
+The response is ElevenLabs' audio bytes and headers, unchanged, relayed as ElevenLabs sends them.
+
+`/stream` and `/stream/with-timestamps` take the same body and query string and reach the same paths on ElevenLabs. They are gated and metered exactly like the plain path.
+
+```bash
+curl -N "https://gateway.langwatch.ai/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL/stream?output_format=mp3_44100_128" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello from the gateway.", "model_id": "eleven_flash_v2_5"}' \
+  --output - | ffplay -i -
+```
+
+`/stream/with-timestamps` answers with a stream of JSON objects, each carrying `audio_base64`, `alignment` and `normalized_alignment`:
+
+```bash
+curl -N "https://gateway.langwatch.ai/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL/stream/with-timestamps" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello from the gateway.", "model_id": "eleven_flash_v2_5"}' \
+  --output -
+```
 
 | Parameter | What the gateway does |
 |---|---|
-| `text` | Required. Missing: `400 bad_request`. Metered as Unicode characters. |
+| `text` | Required. Missing: `400 bad_request`. Metered as Unicode characters, from the moment ElevenLabs accepts the request. A caller that disconnects mid-stream is still charged the full text. |
 | `model_id` | Resolved through the key's aliases and allowlist, then rewritten to the bare model id ElevenLabs knows. Absent: billed and gated as `eleven_multilingual_v2`, the vendor's own default. Outside the allowlist: `400 model_not_allowed`. |
 | Query string (`output_format`, `enable_logging`, latency settings) | Forwarded as written. |
 | Every other body field (voice settings, and the rest) | Forwarded as written. |
 
-The body is capped at 1 MB; over the cap: `413 payload_too_large`.
+The request body is capped at 1 MB; over the cap: `413 payload_too_large`. The audio response is capped at 32 MiB, counted as it is relayed: a longer response is cut at the cap.
 
 ## Speech to text
 
@@ -62,11 +85,92 @@ The response is ElevenLabs' transcript JSON, unchanged. Transcription is metered
 
 The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
 
-Both audio paths return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers), plus ElevenLabs' own response headers. A forwarded ElevenLabs error carries `X-LangWatch-Provider: elevenlabs` and the vendor's `Retry-After` when it sent one.
+The audio paths return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers), plus ElevenLabs' own response headers. A forwarded ElevenLabs error carries `X-LangWatch-Provider: elevenlabs` and the vendor's `Retry-After` when it sent one.
 
 ## Streaming
 
-Neither audio path streams. The audio bytes and the transcript are returned complete.
+All three text to speech paths answer with a chunked body that is written and flushed as ElevenLabs sends it. If ElevenLabs fails mid-stream the connection is closed without the terminating chunk, so the HTTP client reports a truncated body.
+
+Speech to text does not stream. The transcript is returned complete.
+
+## Single-use tokens
+
+```bash
+curl -X POST "https://gateway.langwatch.ai/v1/single-use-token/tts_websocket?model_id=eleven_flash_v2_5" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY"
+```
+
+```json
+{
+  "token": "sutkn_...",
+  "langwatch": { "session_id": "req_01K6Y3M8QF7W2VZ4N9DXTB5C0A" }
+}
+```
+
+The path is ElevenLabs' own. The gateway checks the key's budgets and its open-session cap, mints the token with the stored ElevenLabs key, and returns ElevenLabs' body with `langwatch.session_id` added. The same id is on the `X-LangWatch-Session-Id` response header. A token is valid for 15 minutes and opens one socket.
+
+The socket runs from your client to ElevenLabs and does not pass through the gateway. The gateway does not see what the socket used, so your client reports it.
+
+| `token_type` | Opens | Default `model_id` |
+|---|---|---|
+| `tts_websocket` | A text to speech socket (`stream-input`, `multi-stream-input`) | `eleven_multilingual_v2` |
+| `ttd_websocket` | The Text to Dialogue socket | `eleven_v3_conversational` |
+| `realtime_scribe` | The realtime speech to text socket | `scribe_v2_realtime` |
+| `batch_scribe` | One `POST /v1/speech-to-text` call made directly to ElevenLabs | `scribe_v2` |
+
+Any other `token_type` answers `400 bad_request`.
+
+ElevenLabs' token route takes no model, so the gateway reads one from the `model_id` query parameter. It is resolved through the key's aliases and allowlist and is the model the session is billed under. Pass the model your socket will use. Outside the allowlist: `400 model_not_allowed`. `model_id` is not forwarded to ElevenLabs.
+
+The route is served only by an ElevenLabs credential, and a customer on a residency host is minted on that host.
+
+### Opening the socket
+
+The query parameter that carries the token differs per socket.
+
+| Socket | Token type | Query parameter |
+|---|---|---|
+| `wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream-input` | `tts_websocket` | `single_use_token` |
+| `wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/multi-stream-input` | `tts_websocket` | `single_use_token` |
+| `wss://api.elevenlabs.io/v1/text-to-dialogue/stream-input` | `ttd_websocket` | `single_use_token` |
+| `wss://api.elevenlabs.io/v1/speech-to-text/realtime` | `realtime_scribe` | `token` |
+| `POST https://api.elevenlabs.io/v1/speech-to-text` | `batch_scribe` | `token` |
+
+```js
+const ws = new WebSocket(
+  `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input` +
+    `?model_id=eleven_flash_v2_5&single_use_token=${token}`,
+);
+```
+
+`eleven_v3` and `eleven_v4` models run on the Text to Dialogue socket, not on `stream-input`. Mint a `ttd_websocket` token for it. ElevenLabs' API accepts that token type and its reference does not list it. Opening the Text to Dialogue socket with either token type is not verified end to end.
+
+### Reporting usage and closing
+
+ElevenLabs sockets send no usage. Count it in your client and post it to the session:
+
+```bash
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/usage" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"id": "flush-1", "usage": {"characters": 123}}'
+```
+
+| Socket | Usage to report |
+|---|---|
+| Text to speech | `{"usage":{"characters":N}}`: the characters of text sent for synthesis. |
+| Speech to text | `{"usage":{"audio_seconds":N}}`: the seconds of audio sent. |
+
+`id` names the report. Reports with different ids add up, and a report resent with the same id is recorded once. A report with no `id` and no `final` is read as the session total and closes the session. Add `"final": true` to any report to close the session after it is recorded.
+
+To close without usage:
+
+```bash
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/close" \
+  -H "xi-api-key: $LANGWATCH_VIRTUAL_KEY"
+```
+
+The response body and the charge for a session that never reports are described on [Realtime voice](/ai-gateway/api/realtime#the-usage-response).
 
 ## Post-call webhook
 

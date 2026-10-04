@@ -141,6 +141,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.100.0
 	github.com/aws/smithy-go v1.27.5
 	github.com/bytedance/sonic v1.15.3
+	github.com/coder/websocket v1.8.14
 	github.com/crewjam/saml v0.5.1
 	github.com/emersion/go-message v0.18.2
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6

@@ -9,7 +9,7 @@ The gateway mints the vendor's own session credential. Your client asks the gate
 
 The audio never passes through the gateway. The media socket runs from your client straight to the vendor, so the gateway does not add to turn latency and cannot see, record or end a call in progress.
 
-One session is one spend record: admitted at the mint, settled when the call's usage arrives.
+A session is admitted at the mint. Its spend is recorded as usage arrives: one record per report your client posts, or one at the end when the vendor reports the call.
 
 <Note>
   Because the gateway is not in the audio path, a voice budget admits at session start and
@@ -51,6 +51,10 @@ A session neither of them closes settles as cost unknown, and a report arriving 
 
 Only the `post_call_transcription` event is applied. `post_call_audio` and `call_initiation_failure` are acknowledged and not applied: they name the conversation and carry no duration.
 
+## ElevenLabs speech and transcription sockets
+
+`POST /v1/single-use-token/{token_type}` mints a token that opens one ElevenLabs speech or transcription socket. See [ElevenLabs](/ai-gateway/api/elevenlabs#single-use-tokens) for the mint and for how each socket takes the token. Usage is reported and the session is closed with the same two routes as an OpenAI session, described below.
+
 ## OpenAI Realtime
 
 Mint an ephemeral client secret.
@@ -59,13 +63,15 @@ Mint an ephemeral client secret.
 curl -X POST "https://gateway.langwatch.ai/v1/realtime/client_secrets" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"session":{"type":"realtime","model":"gpt-realtime"},
+  -d '{"session":{"type":"realtime","model":"gpt-realtime-2.1"},
        "expires_after":{"anchor":"created_at","seconds":600}}'
 ```
 
 This is OpenAI's own path and its own body. The gateway reads `session.model` as the model and forwards your declaration as you wrote it, with two edits: the resolved model is written back into `session.model`, and `expires_after.seconds` is held between 10 and 7200. A body that names no expiry is forwarded untouched, so OpenAI's own default applies. The voice, the tools, the turn detection and the audio formats reach OpenAI unchanged. The request body is capped at 256 KiB.
 
 The answer is OpenAI's own body plus `langwatch.session_id`, and the same id is on `X-LangWatch-Session-Id`.
+
+If the session declares input transcription at `session.audio.input.transcription.model`, the gateway records that model at the mint. Transcription usage you report later is priced under it.
 
 Open the socket with the returned secret. Which form you use depends on where the code runs, because a browser `WebSocket` takes only a URL and a subprotocol list and cannot set request headers.
 
@@ -74,7 +80,7 @@ From a server, with the `ws` package or any Node websocket client that accepts h
 ```js
 import WebSocket from "ws";
 
-const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", {
+const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime-2.1", {
   headers: { Authorization: `Bearer ${clientSecret.value}` },
 });
 ```
@@ -82,44 +88,176 @@ const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", 
 From a browser, as a subprotocol:
 
 ```js
-const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime", [
+const ws = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-realtime-2.1", [
   "realtime",
   `openai-insecure-api-key.${clientSecret.value}`,
 ]);
 ```
 
-### Closing an OpenAI session
+### Reporting OpenAI usage
 
-OpenAI reports usage over the socket, in `response.done`, and that socket does not pass through the gateway. Post what you read back:
+OpenAI reports usage over the socket, and that socket does not pass through the gateway. Post what you read back to the session. `SESSION_ID` is the `X-LangWatch-Session-Id` from the mint.
+
+Forward each `response.done` event as it arrives:
 
 ```bash
 curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/usage" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"usage":{"input_tokens":1204,"output_tokens":318,
-       "input_token_details":{"cached_tokens":900,"text_tokens":104,"audio_tokens":1100},
-       "output_token_details":{"text_tokens":18,"audio_tokens":300}}}'
+  -d '{"type":"response.done","response":{"id":"resp_001",
+       "usage":{"input_tokens":132,"output_tokens":121,
+         "input_token_details":{"text_tokens":119,"audio_tokens":13,"cached_tokens":64,
+           "cached_tokens_details":{"text_tokens":64,"audio_tokens":0}},
+         "output_token_details":{"text_tokens":30,"audio_tokens":91}}}}'
 ```
 
 ```json
-{ "received": true }
+{
+  "session_id": "req_01K6Y3M8QF7W2VZ4N9DXTB5C0A",
+  "status": "recorded",
+  "cost_usd": 0.007206,
+  "session_cost_usd": 0.0412,
+  "budget": { "exceeded": false }
+}
 ```
 
-The status is `202`. `SESSION_ID` is the `X-LangWatch-Session-Id` from the mint. Three body shapes are accepted, so you can forward the frame unchanged: the bare usage object, an object with a `usage` key, and the whole `response.done` event. The rest of the event is not read, and no transcript content is looked at. The body is capped at 64 KiB.
+Each report is its own spend record, so the key's budgets see the call while it runs. The session stays open until you close it.
 
-Audio tokens are taken out of the text totals before pricing, because audio tokens cost several times what text tokens cost.
+A report key is stored as letters, digits, `_` and `-`, up to 128 characters. OpenAI's response and item ids fit as they are.
 
-A session that never reports settles as cost unknown when the settlement grace expires, and a report arriving after that replaces the settled record.
+| Body | Report key | What it does |
+|---|---|---|
+| A whole `response.done` event | `response.id` | Records that response. Sending it again records nothing new. |
+| A whole `conversation.item.input_audio_transcription.completed` event | `item_id` | Records input transcription, priced under the session's transcription model. Its `usage` may be `{"type":"tokens", ...}` or `{"type":"duration","seconds":N}`. An event with no `usage` answers `200` with status `no_usage`. |
+| `{"events":[ ... ]}` | One per event | A batch of the two events above, at most 100, recorded in order. A `response.done` in a batch must carry `response.id`. |
+| A usage object, or `{"usage":{...}}`, with no `id` | None | The session total. Closes the session. If keyed reports came first, only the part they did not cover is charged. |
+| `{"id":"...","usage":{...}}` | Your `id` | Records one report under an id you choose. |
+
+Add `"final": true` at the top level of any body to close the session after it is recorded. Add `"duration_ms"` beside it to state how long the call ran. A usage object with no `id` and `"final": true` is recorded as one more amount on top of the earlier reports, not as the session total.
+
+Only ids and usage counts are read. Transcripts and prompts on a forwarded event are not looked at. The body is capped at 1 MiB.
+
+Audio tokens are taken out of the text totals before pricing, because audio tokens cost several times what text tokens cost. When the usage carries `cached_tokens_details`, cached text tokens are priced at the cache-read rate and cached audio tokens are priced at the full audio input rate.
+
+### The usage response
+
+Every usage post and every close answers `200` with this body:
+
+| Field | Meaning |
+|---|---|
+| `session_id` | The session the report was recorded against. |
+| `status` | `recorded`, `duplicate` (that report key was already recorded), `closed` (the report closed the session), `already_closed` (the session was closed before, nothing recorded), or `no_usage` (the body carried nothing to record). For a batch, the status of its last report. |
+| `cost_usd` | What this post added, in US dollars. For a batch, the sum. |
+| `session_cost_usd` | Everything recorded for the session so far. |
+| `budget.exceeded` | `true` when a blocking budget on the key is at or past its limit, counting this session. `budget.scope` and `budget.budget_id` name it. |
+| `budget.unknown` | Present and `true` when the budgets could not be read. `exceeded` is then `false` and means no verdict, not within budget. |
+
+The gateway cannot end a call. When `budget.exceeded` is `true`, close the socket from your client.
+
+### Closing a session
+
+```bash
+curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/close" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"duration_ms": 42000}'
+```
+
+The body is optional. A close records no usage: what the reports already recorded stands. Closing frees the key's open-session slot.
+
+### Sessions that never report
+
+A session past its open window with no close is settled by LangWatch:
+
+- **It sent reports.** It is closed and the reported usage stands.
+- **It sent none.** It is charged an estimate and closed. The assumed duration is the credential's lifetime, or the default below when the lifetime is not known, held between 60 seconds and 60 minutes.
+
+| Session | Estimate | Default duration |
+|---|---|---|
+| OpenAI Realtime | 10 input audio tokens per second, plus 20 output audio tokens per second for half the duration | 600 s |
+| ElevenLabs speech socket | 15 characters per second | 300 s |
+| ElevenLabs transcription socket or batch | Audio for the whole duration | 300 s |
+
+An ElevenLabs Conversational AI session is not estimated. It settles from the vendor's own report, or as cost unknown.
+
+## OpenAI Live
+
+`POST /v1/live/sessions` creates an OpenAI Live session over WebRTC. Send the body you would send to OpenAI: the `session`, and a `transport` of type `webrtc` carrying your SDP offer. The gateway resolves `session.model`, creates the session with the provider key and returns OpenAI's answer with its own status.
+
+```bash
+curl -X POST "$LANGWATCH_GATEWAY_URL/v1/live/sessions" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session": { "model": "openai/gpt-live", "voice": "marin" },
+    "transport": { "type": "webrtc", "sdp": "v=0..." }
+  }'
+```
+
+The answer is OpenAI's body with `langwatch.session_id` added. The same id is on the `X-LangWatch-Session-Id` header. Set `transport.sdp` from the answer as the remote description. Audio then runs from the browser to OpenAI and does not pass through the gateway.
+
+The gateway meters this session itself. It attaches to the session's event socket at OpenAI with the provider key and records usage while the call runs:
+
+- **Duration.** OpenAI states the session's cumulative seconds. The gateway reports the difference since its last report, at most every 10 seconds and once more when the session closes.
+- **Delegated responses.** A session that sets `session.delegation.responses.model` runs those responses on another model. Each completed response is recorded once, under that model's token prices.
+
+Your client reports nothing and does not close the session.
+
+Only the `webrtc` transport is served; any other `transport.type` answers `400 bad_request`. The model in `session.delegation.responses.model` has to pass the key's allowed models and policy rules, or the request answers `400 model_not_allowed`.
+
+## WebRTC calls with gateway-side metering
+
+`POST /v1/realtime/calls` creates an OpenAI Realtime call the same way. Use it in place of a client secret when the gateway should meter the call and be able to end it. The route takes both forms OpenAI's own route takes.
+
+Multipart, with the offer and the session declaration:
+
+```bash
+curl -X POST "$LANGWATCH_GATEWAY_URL/v1/realtime/calls" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -F "sdp=<offer.sdp;type=application/sdp" \
+  -F 'session={"type":"realtime","model":"openai/gpt-realtime"};type=application/json'
+```
+
+Raw SDP, with the model in the query string:
+
+```bash
+curl -X POST "$LANGWATCH_GATEWAY_URL/v1/realtime/calls?model=openai/gpt-realtime" \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/sdp" \
+  --data-binary @offer.sdp
+```
+
+The response is OpenAI's SDP answer, unchanged, with OpenAI's `Location` header (`/v1/realtime/calls/{call_id}`) and `X-LangWatch-Session-Id`.
+
+The gateway records every `response.done` and every input transcription the call produces, each once. Do not post these to `/v1/realtime/sessions/{session_id}/usage` as well. The session closes when OpenAI ends the call.
+
+### When the gateway ends a call
+
+The gateway ends a call it created on either route, without the client, when:
+
+| Reason            | Trigger                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| `budget_exceeded` | A budget that applies to the key is over its limit. Checked on every usage report and every 30 seconds.      |
+| `key_revoked`     | The virtual key was revoked, deleted or expired. Noticed within 60 seconds.                                   |
+| `sideband_lost`   | The gateway lost its event socket and could not attach again within 2 minutes, so it can no longer meter.     |
+| `drain`           | The gateway instance is shutting down and the call outlived its drain time.                                   |
+| `session_closed`  | LangWatch already closed the session, for example because it passed the open session window.                  |
+
+A Live session is asked to close on its socket, then hung up if OpenAI does not confirm. A Realtime call is hung up on `/v1/realtime/calls/{call_id}/hangup`. The usage recorded up to that point stands. A Live session whose event socket never attached is charged 15 seconds.
+
+The client sees the peer connection close. It is not told the reason; the reason is on the `gateway_voice_sessions_ended_total` metric.
+
+Each gateway instance supervises a bounded number of calls (`LW_GATEWAY_VOICE_MAX_SUPERVISED_SESSIONS`, default 2000). A request to an instance that is full or shutting down answers `503 voice_broker_unavailable` with `Retry-After`, before anything is booked. On shutdown an instance keeps metering its calls for `LW_GATEWAY_VOICE_DRAIN_SECONDS` (default 570; the Helm chart sets `shutdown.voiceDrainSeconds`), then ends the ones still open.
 
 ## Limiting how many calls a key runs at once
 
 Set **max open sessions** on the virtual key. The request-rate limits do not bound voice: one mint is a single request that opens a call billing for as long as it runs, so a key at 60 requests per minute can hold sixty ten-minute calls without tripping anything.
 
-A mint over the cap answers `429 realtime_session_limit`, and the refusal is recorded in the spend surface. A slot frees when the call's report arrives. A session older than the longest call a vendor allows stops holding a slot, which matters for OpenAI, whose socket never signals that it closed.
+A mint over the cap answers `429 realtime_session_limit`, and the refusal is recorded in the spend surface. A slot frees when the session closes. A session older than the longest call a vendor allows stops holding a slot, which matters for OpenAI, whose socket never signals that it closed.
 
 ## What the broker does not do
 
-- **It does not proxy the voice socket.** There is no frame-level tracing, and no way to end a call in progress.
+- **It does not proxy the voice socket.** There is no frame-level tracing. A session minted as a client secret, signed URL or single-use token cannot be ended in progress; a call created on `/v1/live/sessions` or `/v1/realtime/calls` can.
 - **It does not enforce the session's tools.** A hosted agent's tools live at the vendor, and an OpenAI session declares its own.
 - **Guardrails do not run on a mint.** The body is a session declaration, not a prompt, and the conversation never reaches the gateway. The response says so on `X-LangWatch-Guardrails-Not-Applied: realtime_session` instead of reporting a check that could not mean anything.
 
@@ -129,12 +267,15 @@ Turn-level transcripts and latency reach LangWatch through the SDK in your own a
 
 | Code                            | Status | Cause                                                                                                                        |
 | ------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `bad_request`                   | 400    | `agent_id` is missing on the ElevenLabs mint, a session id is missing on the usage report, or the usage body does not parse. |
+| `bad_request`                   | 400    | `agent_id` is missing on the ElevenLabs mint, the token type is unknown, or the usage body is not one of the accepted shapes. |
+| `not_found`                     | 404    | No session with that id belongs to this key.                                                                                 |
 | `model_provider_not_bound`      | 400    | The key has no credential for the vendor this route serves.                                                                  |
 | `budget_exceeded`               | 402    | A budget that applies to the key is over its limit.                                                                          |
 | `realtime_session_limit`        | 429    | The key holds its maximum of open voice sessions. Retry when a call ends.                                                    |
 | `realtime_registry_unavailable` | 503    | LangWatch could not record the session, so no session was minted. Retry.                                                     |
+| `model_not_allowed`             | 400    | The session model, or the model a Live session delegates responses to, is outside the key's allowed models.                  |
+| `voice_broker_unavailable`      | 503    | The gateway instance is full or shutting down. No call was created. Retry after `Retry-After`.                               |
 
-Each mint route serves one vendor: `/v1/realtime/client_secrets` needs an OpenAI credential, and `/v1/convai/conversation/get-signed-url` needs an ElevenLabs one. A mint never falls back to a second credential, because a session credential is bound to one account and a fallback would sign for an agent that does not exist there.
+Each mint route serves one vendor: `/v1/realtime/client_secrets` needs an OpenAI credential, and `/v1/convai/conversation/get-signed-url` and `/v1/single-use-token/{token_type}` need an ElevenLabs one. A mint never falls back to a second credential, because a session credential is bound to one account and a fallback would sign for an agent that does not exist there.
 
 **Also check:** [ElevenLabs](/ai-gateway/api/elevenlabs), [Budgets](/ai-gateway/budgets), [Errors](/ai-gateway/api/errors).

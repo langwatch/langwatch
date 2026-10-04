@@ -531,3 +531,32 @@ func clearGatewayEnv(t *testing.T) {
 		t.Setenv(k, "")
 	}
 }
+
+func TestLoadConfig_VoiceDefaultsAndOverrides(t *testing.T) {
+	clearGatewayEnv(t)
+	t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+	t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Voice.DrainSeconds != 570 || cfg.Voice.MaxSupervisedSessions != 2000 {
+		t.Fatalf("voice defaults = %+v, want a 570s drain and 2000 calls", cfg.Voice)
+	}
+
+	t.Setenv("LW_GATEWAY_VOICE_DRAIN_SECONDS", "40")
+	t.Setenv("LW_GATEWAY_VOICE_MAX_SUPERVISED_SESSIONS", "50")
+	cfg, err = LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Voice.DrainSeconds != 40 || cfg.Voice.MaxSupervisedSessions != 50 {
+		t.Fatalf("voice overrides = %+v, want a 40s drain and 50 calls", cfg.Voice)
+	}
+
+	t.Setenv("LW_GATEWAY_VOICE_DRAIN_SECONDS", "-1")
+	if _, err = LoadConfig(context.Background()); err == nil {
+		t.Fatal("a negative voice drain was accepted")
+	}
+}

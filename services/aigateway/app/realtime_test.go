@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,13 @@ type mockRealtimeRegistry struct {
 	correlated   []domain.RealtimeCorrelation
 	released     []domain.RealtimeRelease
 	reportedUse  []domain.RealtimeUsageReport
+	reportErr    error
+	// receipts answers the reports in order; past its end a report reads as
+	// recorded at no cost.
+	receipts []domain.RealtimeUsageReceipt
+	// events is the order the registry was called in, so a test can place
+	// the booking against the vendor call.
+	events []string
 }
 
 func (m *mockRealtimeRegistry) Reserve(_ context.Context, r domain.RealtimeReservation) error {
@@ -29,6 +37,7 @@ func (m *mockRealtimeRegistry) Reserve(_ context.Context, r domain.RealtimeReser
 		return m.reserveErr
 	}
 	m.reserved = append(m.reserved, r)
+	m.events = append(m.events, "reserve")
 	return nil
 }
 
@@ -45,9 +54,16 @@ func (m *mockRealtimeRegistry) Release(_ context.Context, r domain.RealtimeRelea
 	return nil
 }
 
-func (m *mockRealtimeRegistry) ReportUsage(_ context.Context, r domain.RealtimeUsageReport) error {
+func (m *mockRealtimeRegistry) ReportUsage(_ context.Context, r domain.RealtimeUsageReport) (domain.RealtimeUsageReceipt, error) {
+	if m.reportErr != nil {
+		return domain.RealtimeUsageReceipt{}, m.reportErr
+	}
 	m.reportedUse = append(m.reportedUse, r)
-	return nil
+	m.events = append(m.events, "report")
+	if len(m.receipts) >= len(m.reportedUse) {
+		return m.receipts[len(m.reportedUse)-1], nil
+	}
+	return domain.RealtimeUsageReceipt{Status: domain.RealtimeReportRecorded}, nil
 }
 
 // elevenLabsBundle is a key that can serve the signed-URL route.
@@ -333,7 +349,7 @@ func TestAUsageReportCarriesItsVirtualKey(t *testing.T) {
 	registry := &mockRealtimeRegistry{}
 	application := New(WithRealtimeSessions(registry), WithLogger(zap.NewNop()))
 
-	err := application.ReportRealtimeUsage(
+	_, err := application.ReportRealtimeUsage(
 		context.Background(),
 		elevenLabsBundle(),
 		RealtimeUsagePost{
@@ -350,4 +366,353 @@ func TestAUsageReportCarriesItsVirtualKey(t *testing.T) {
 	require.Len(t, registry.reportedUse, 1)
 	assert.Equal(t, "vk-test", registry.reportedUse[0].VirtualKeyID)
 	assert.Equal(t, "proj-test", registry.reportedUse[0].ProjectID)
+}
+
+// tokenMint is the dispatch the single-use token route builds.
+func tokenMint(tokenType domain.ElevenLabsTokenType) RealtimeMintDispatch {
+	return RealtimeMintDispatch{
+		Body:  []byte(`{"model":"` + tokenType.DefaultModel() + `"}`),
+		Model: tokenType.DefaultModel(),
+		Session: domain.RealtimeSessionRequest{
+			Vendor:    domain.RealtimeVendorElevenLabs,
+			TokenType: tokenType,
+		},
+		Surface: domain.ElevenLabsSingleUseTokenSurface(),
+	}
+}
+
+// mintingApp answers every mint with the given vendor response.
+func mintingApp(registry *mockRealtimeRegistry, resp *domain.Response) *App {
+	return New(
+		WithProviders(&mockProvider{
+			dispatchFn: func(context.Context, *domain.Request, domain.Credential) (*domain.Response, error) {
+				registry.events = append(registry.events, "vendor")
+				return resp, nil
+			},
+		}),
+		WithRealtimeSessions(registry),
+		WithLogger(zap.NewNop()),
+	)
+}
+
+// @scenario "A single-use token session is booked before the vendor is called"
+func TestATokenMintBooksItsSessionBeforeTheVendorCall(t *testing.T) {
+	t.Parallel()
+
+	kinds := map[domain.ElevenLabsTokenType]domain.RealtimeSessionKind{
+		domain.ElevenLabsTokenTTSWebsocket:   domain.RealtimeKindTTSSocket,
+		domain.ElevenLabsTokenTTDWebsocket:   domain.RealtimeKindTTSSocket,
+		domain.ElevenLabsTokenRealtimeScribe: domain.RealtimeKindSTTSocket,
+		domain.ElevenLabsTokenBatchScribe:    domain.RealtimeKindSTTBatch,
+	}
+	for tokenType, kind := range kinds {
+		t.Run(string(tokenType), func(t *testing.T) {
+			t.Parallel()
+			registry := &mockRealtimeRegistry{}
+			application := mintingApp(registry, &domain.Response{StatusCode: 200, Body: []byte(`{"token":"sutkn_x"}`)})
+
+			before := time.Now()
+			_, err := application.HandleRealtimeSession(context.Background(), elevenLabsBundle(), tokenMint(tokenType))
+			require.NoError(t, err)
+
+			assert.Equal(t, []string{"reserve", "vendor"}, registry.events,
+				"the booking is what makes the per-key cap real, so it comes first")
+			require.Len(t, registry.reserved, 1)
+			booked := registry.reserved[0]
+			assert.Equal(t, kind, booked.Kind)
+			assert.Equal(t, domain.RealtimeMeteringClient, booked.Metering)
+			assert.Equal(t, tokenType.DefaultModel(), booked.Model)
+			assert.WithinDuration(t, before.Add(15*time.Minute), booked.CredentialExpiresAt, time.Minute,
+				"the token opens a socket for the fifteen minutes the vendor documents")
+			assert.Empty(t, registry.correlated, "a token mint answers no conversation id to record")
+		})
+	}
+}
+
+// @scenario "A token mint the vendor rejects releases its booking"
+func TestATokenMintTheVendorRejectsReleasesItsBooking(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{}
+	application := mintingApp(registry, &domain.Response{StatusCode: 401, Body: []byte(`{"detail":"bad key"}`)})
+
+	_, err := application.HandleRealtimeSession(
+		context.Background(), elevenLabsBundle(), tokenMint(domain.ElevenLabsTokenTTSWebsocket))
+	require.Error(t, err)
+
+	require.Len(t, registry.released, 1)
+	assert.Equal(t, "FAILED", registry.released[0].Status)
+	assert.Equal(t, registry.reserved[0].SessionID, registry.released[0].SessionID)
+}
+
+// @scenario "The single-use token route is served only by an ElevenLabs credential"
+func TestTheTokenRouteRefusesAKeyWithNoElevenLabsCredential(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{}
+	application := mintingApp(registry, &domain.Response{StatusCode: 200, Body: []byte(`{"token":"sutkn_x"}`)})
+	bundle := elevenLabsBundle(domain.Credential{ID: "openai_1", ProviderID: domain.ProviderOpenAI})
+
+	_, err := application.HandleRealtimeSession(
+		context.Background(), bundle, tokenMint(domain.ElevenLabsTokenRealtimeScribe))
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrProviderNotBound))
+	assert.Empty(t, registry.events, "nothing is booked and no vendor is called")
+}
+
+// @scenario "An OpenAI mint books what metering needs"
+func TestAnOpenAIMintBooksItsKindAndTranscriptionModel(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{}
+	expiresAt := time.Unix(1786873895, 0)
+	application := mintingApp(registry, &domain.Response{
+		StatusCode:                  200,
+		Body:                        []byte(`{"value":"ek_x","expires_at":1786873895}`),
+		RealtimeCredentialExpiresAt: expiresAt,
+	})
+	bundle := elevenLabsBundle(domain.Credential{ID: "openai_1", ProviderID: domain.ProviderOpenAI})
+
+	_, err := application.HandleRealtimeSession(context.Background(), bundle, RealtimeMintDispatch{
+		Body: []byte(`{"session":{"type":"realtime","model":"gpt-realtime-2.1",` +
+			`"audio":{"input":{"transcription":{"model":"gpt-transcribe"}}}}}`),
+		Model:   "gpt-realtime-2.1",
+		Session: domain.RealtimeSessionRequest{Vendor: domain.RealtimeVendorOpenAI},
+		Surface: domain.OpenAIRealtimeSurface(),
+	})
+	require.NoError(t, err)
+
+	require.Len(t, registry.reserved, 1)
+	booked := registry.reserved[0]
+	assert.Equal(t, domain.RealtimeKindRealtime, booked.Kind)
+	assert.Equal(t, domain.RealtimeMeteringClient, booked.Metering)
+	assert.Equal(t, "openai/gpt-transcribe", booked.TranscriptionModel)
+	assert.True(t, booked.CredentialExpiresAt.IsZero(), "the vendor states the expiry only in its answer")
+
+	require.Len(t, registry.correlated, 1, "the expiry is recorded once the vendor has answered")
+	assert.Equal(t, expiresAt, registry.correlated[0].CredentialExpiresAt)
+	assert.Empty(t, registry.correlated[0].VendorConversationID)
+}
+
+func TestAHostedAgentMintIsBookedAsVendorReported(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{}
+	application := mintingApp(registry, &domain.Response{StatusCode: 200, Body: []byte(`{"signed_url":"wss://x"}`)})
+
+	_, err := application.HandleRealtimeSession(context.Background(), elevenLabsBundle(), signedURLMint())
+	require.NoError(t, err)
+
+	assert.Equal(t, domain.RealtimeKindConvAI, registry.reserved[0].Kind)
+	assert.Empty(t, registry.reserved[0].Metering, "the vendor's post-call report prices a hosted agent")
+}
+
+func TestAnExpiryThatCannotBeRecordedDoesNotRefuseTheMint(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{correlateErr: errors.New("the control plane is away")}
+	application := mintingApp(registry, &domain.Response{
+		StatusCode:                  200,
+		Body:                        []byte(`{"value":"ek_x"}`),
+		RealtimeCredentialExpiresAt: time.Unix(1786873895, 0),
+	})
+	bundle := elevenLabsBundle(domain.Credential{ID: "openai_1", ProviderID: domain.ProviderOpenAI})
+
+	_, err := application.HandleRealtimeSession(context.Background(), bundle, RealtimeMintDispatch{
+		Body:    []byte(`{"session":{"type":"realtime","model":"gpt-realtime-2.1"}}`),
+		Model:   "gpt-realtime-2.1",
+		Session: domain.RealtimeSessionRequest{Vendor: domain.RealtimeVendorOpenAI},
+		Surface: domain.OpenAIRealtimeSurface(),
+	})
+	require.NoError(t, err, "the expiry only sizes an estimate, so losing it costs no call")
+	assert.Empty(t, registry.released)
+}
+
+func postUsage(t *testing.T, registry *mockRealtimeRegistry, body string) RealtimeUsageAnswer {
+	t.Helper()
+	application := New(WithRealtimeSessions(registry), WithLogger(zap.NewNop()))
+	answer, err := application.ReportRealtimeUsage(context.Background(), elevenLabsBundle(),
+		RealtimeUsagePost{SessionID: "req_1", Body: []byte(body)})
+	require.NoError(t, err)
+	return answer
+}
+
+// @scenario "A response.done event is recorded under its response id"
+func TestAResponseDoneEventIsReportedUnderItsResponseID(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{}
+	postUsage(t, registry, `{"type":"response.done","response":{"id":"resp_1",`+
+		`"usage":{"input_tokens":10,"output_tokens":4}}}`)
+
+	require.Len(t, registry.reportedUse, 1)
+	report := registry.reportedUse[0]
+	assert.Equal(t, "resp_1", report.ReportKey)
+	assert.False(t, report.Final, "a keyed report leaves the session open for the next response")
+	assert.Equal(t, domain.RealtimeMeteringClient, report.Source)
+	assert.Equal(t, "req_1", report.SessionID)
+	require.NotNil(t, report.Usage)
+	assert.Equal(t, 10, report.Usage.PromptTokens)
+}
+
+// @scenario "A batch of events is reported in order"
+func TestABatchIsReportedInOrderAndAnswersTheSum(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{receipts: []domain.RealtimeUsageReceipt{
+		{Status: domain.RealtimeReportRecorded, CostNanoUSD: 100, SessionCostNanoUSD: 100},
+		{Status: domain.RealtimeReportDuplicate, SessionCostNanoUSD: 100},
+		{
+			Status: domain.RealtimeReportClosed, CostNanoUSD: 50, SessionCostNanoUSD: 150,
+			Budget: domain.RealtimeBudgetState{Exceeded: true, Scope: "virtual_key", BudgetID: "bud_1"},
+		},
+	}}
+	answer := postUsage(t, registry, `{"final":true,"duration_ms":42000,"events":[`+
+		`{"type":"response.done","response":{"id":"resp_1","usage":{"input_tokens":10,"output_tokens":4}}},`+
+		`{"type":"response.done","response":{"id":"resp_1","usage":{"input_tokens":10,"output_tokens":4}}},`+
+		`{"type":"conversation.item.input_audio_transcription.completed","item_id":"item_9",`+
+		`"usage":{"type":"duration","seconds":4}}]}`)
+
+	require.Len(t, registry.reportedUse, 3)
+	assert.Equal(t, "resp_1", registry.reportedUse[0].ReportKey)
+	assert.Equal(t, "item_9", registry.reportedUse[2].ReportKey)
+	assert.Equal(t, domain.RealtimePricedAsTranscription, registry.reportedUse[2].PricedAs)
+	assert.False(t, registry.reportedUse[0].Final)
+	assert.True(t, registry.reportedUse[2].Final, "the close rides on the last report")
+	assert.Equal(t, int64(42000), registry.reportedUse[2].DurationMS)
+
+	assert.Equal(t, domain.RealtimeReportClosed, answer.Status, "the last report's status")
+	assert.Equal(t, int64(150), answer.CostNanoUSD, "the sum of what this post added")
+	assert.Equal(t, int64(150), answer.SessionCostNanoUSD)
+	assert.True(t, answer.Budget.Exceeded)
+	assert.Equal(t, "bud_1", answer.Budget.BudgetID)
+}
+
+// @scenario "A usage total with no id closes the session"
+func TestAUsageTotalWithNoKeyIsTheLegacyClosingReport(t *testing.T) {
+	t.Parallel()
+
+	for name, body := range map[string]string{
+		"bare":          `{"input_tokens":10,"output_tokens":5}`,
+		"under usage":   `{"usage":{"input_tokens":10,"output_tokens":5}}`,
+		"elevenlabs":    `{"usage":{"characters":123}}`,
+		"audio seconds": `{"usage":{"audio_seconds":3.2}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			registry := &mockRealtimeRegistry{}
+			postUsage(t, registry, body)
+
+			require.Len(t, registry.reportedUse, 1)
+			report := registry.reportedUse[0]
+			assert.Empty(t, report.ReportKey, "no key tells the control plane this is the session total")
+			assert.False(t, report.Final, "a total closes the session by itself")
+			assert.Equal(t, domain.RealtimeMeteringClient, report.Source)
+			require.NotNil(t, report.Usage)
+		})
+	}
+}
+
+func TestAFinalReportWithNoKeyKeepsItsCloseFlag(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{}
+	postUsage(t, registry, `{"usage":{"characters":50},"final":true,"duration_ms":9000}`)
+
+	require.Len(t, registry.reportedUse, 1)
+	report := registry.reportedUse[0]
+	assert.Empty(t, report.ReportKey)
+	assert.True(t, report.Final, "the control plane records it as one more amount, then closes")
+	assert.Equal(t, int64(9000), report.DurationMS)
+	assert.Equal(t, 50, report.Usage.InputChars)
+}
+
+// @scenario "An ElevenLabs socket client reports characters and audio seconds"
+func TestAnElevenLabsReportCarriesCharactersOrSeconds(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{}
+	postUsage(t, registry, `{"id":"chunk-1","usage":{"characters":123}}`)
+	postUsage(t, registry, `{"id":"chunk-2","usage":{"audio_seconds":3.2},"final":true}`)
+
+	require.Len(t, registry.reportedUse, 2)
+	assert.Equal(t, "chunk-1", registry.reportedUse[0].ReportKey)
+	assert.Equal(t, 123, registry.reportedUse[0].Usage.InputChars)
+	assert.False(t, registry.reportedUse[0].Final)
+	assert.InDelta(t, 3.2, registry.reportedUse[1].Usage.AudioSeconds, 0.0001)
+	assert.True(t, registry.reportedUse[1].Final)
+}
+
+// @scenario "A transcription event with no usage records nothing"
+func TestATranscriptionEventWithNoUsageCallsNoRegistry(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{}
+	answer := postUsage(t, registry,
+		`{"type":"conversation.item.input_audio_transcription.completed","item_id":"item_1","transcript":"hi"}`)
+
+	assert.Empty(t, registry.reportedUse)
+	assert.Equal(t, domain.RealtimeReportNoUsage, answer.Status)
+	assert.Equal(t, "req_1", answer.SessionID)
+}
+
+// @scenario "A close ends the session with no usage"
+func TestACloseIsAFinalReportWithNoUsage(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{receipts: []domain.RealtimeUsageReceipt{
+		{Status: domain.RealtimeReportClosed, SessionCostNanoUSD: 900},
+	}}
+	application := New(WithRealtimeSessions(registry), WithLogger(zap.NewNop()))
+
+	answer, err := application.CloseRealtimeSession(context.Background(), elevenLabsBundle(),
+		RealtimeSessionClose{SessionID: "req_1", DurationMS: 42000})
+	require.NoError(t, err)
+
+	require.Len(t, registry.reportedUse, 1)
+	report := registry.reportedUse[0]
+	assert.Nil(t, report.Usage)
+	assert.True(t, report.Final)
+	assert.Empty(t, report.ReportKey)
+	assert.Equal(t, int64(42000), report.DurationMS)
+	assert.Equal(t, "vk-test", report.VirtualKeyID)
+	assert.Equal(t, domain.RealtimeReportClosed, answer.Status)
+	assert.Equal(t, int64(900), answer.SessionCostNanoUSD)
+}
+
+// @scenario "A usage body that is not a report is refused"
+func TestAnUnreadableUsagePostIsRefusedBeforeTheRegistry(t *testing.T) {
+	t.Parallel()
+
+	for name, body := range map[string]string{
+		"not json":           `nope`,
+		"no usage, no close": `{}`,
+		"unknown event":      `{"events":[{"type":"session.created"}]}`,
+		"unkeyed in a batch": `{"events":[{"type":"response.done","response":{"usage":{"input_tokens":1,"output_tokens":1}}}]}`,
+		"events not a list":  `{"events":{}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			registry := &mockRealtimeRegistry{}
+			application := New(WithRealtimeSessions(registry), WithLogger(zap.NewNop()))
+
+			_, err := application.ReportRealtimeUsage(context.Background(), elevenLabsBundle(),
+				RealtimeUsagePost{SessionID: "req_1", Body: []byte(body)})
+			require.Error(t, err)
+			assert.True(t, herr.IsCode(err, domain.ErrBadRequest))
+			assert.Empty(t, registry.reportedUse)
+		})
+	}
+}
+
+func TestARegistryFailureOnAReportIsReturned(t *testing.T) {
+	t.Parallel()
+
+	registry := &mockRealtimeRegistry{reportErr: herr.New(context.Background(), domain.ErrNotFound, nil)}
+	application := New(WithRealtimeSessions(registry), WithLogger(zap.NewNop()))
+
+	_, err := application.ReportRealtimeUsage(context.Background(), elevenLabsBundle(),
+		RealtimeUsagePost{SessionID: "req_1", Body: []byte(`{"input_tokens":1,"output_tokens":1}`)})
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrNotFound))
 }

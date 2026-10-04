@@ -30,10 +30,10 @@ const (
 	elevenLabsTextToSpeechPath = "/v1/text-to-speech/"
 	elevenLabsSpeechToTextPath = "/v1/speech-to-text"
 
-	// elevenLabsAudioMaxResponseBytes caps a synthesis answer. Ten minutes of
-	// mp3 is under 10 MiB, so this leaves room for the longest text the vendor
-	// accepts and still refuses a body that is a wrong endpoint rather than
-	// audio.
+	// elevenLabsAudioMaxResponseBytes caps a synthesis answer, counted as the
+	// bytes are relayed. Ten minutes of mp3 is under 10 MiB, so this leaves
+	// room for the longest text the vendor accepts and still stops a body
+	// that is a wrong endpoint rather than audio.
 	elevenLabsAudioMaxResponseBytes = 32 << 20
 
 	// elevenLabsSTTFileField is the multipart part the vendor reads the audio
@@ -52,8 +52,17 @@ func newElevenLabsAudioClient(policy customerEndpointPolicy) *http.Client {
 	timeout := ProviderRequestTimeoutSeconds * time.Second
 	dialer := policyDialer(policy, timeout)
 	return &http.Client{
-		Timeout:   timeout,
-		Transport: &http.Transport{DialContext: dialer.DialContext},
+		Timeout: timeout,
+		// Kept-alive connections are what keep a streamed call's first byte
+		// from paying a TLS handshake. Compression is off so the provider's
+		// bytes are relayed as sent and never held back for a gzip window.
+		Transport: &http.Transport{
+			DialContext:         dialer.DialContext,
+			ForceAttemptHTTP2:   true,
+			MaxIdleConnsPerHost: 64,
+			IdleConnTimeout:     90 * time.Second,
+			DisableCompression:  true,
+		},
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
@@ -73,19 +82,17 @@ var fallbackElevenLabsAudioClient = func() func(customerEndpointPolicy) *http.Cl
 	}
 }()
 
-// dispatchElevenLabsSpeech posts the caller's own synthesis body to
-// ElevenLabs and returns the audio bytes verbatim.
+// dispatchElevenLabsSpeechStream posts the caller's own synthesis body to
+// ElevenLabs and relays the answer as it arrives. The route variant picks the
+// vendor path: plain, /stream, or /stream/with-timestamps.
 //
-// The body is the caller's, forwarded as they wrote it apart from the model
-// id, which the resolver already rewrote to what the virtual key's aliases
-// and allowlist settled on. Voice settings, language, seed, the
-// previous/next text fields and everything else are theirs and reach the
-// vendor untouched.
-func (r *BifrostRouter) dispatchElevenLabsSpeech(
+// The body is the caller's apart from the model id, which the resolver
+// already rewrote to what the virtual key's aliases and allowlist settled on.
+func (r *BifrostRouter) dispatchElevenLabsSpeechStream(
 	ctx context.Context,
 	req *domain.Request,
 	cred domain.Credential,
-) (*domain.Response, error) {
+) (domain.StreamIterator, error) {
 	route := req.ElevenLabs
 	if route == nil || route.VoiceID == "" {
 		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
@@ -93,25 +100,19 @@ func (r *BifrostRouter) dispatchElevenLabsSpeech(
 			"fault":   "customer",
 		})
 	}
-	endpoint := elevenLabsAudioEndpoint(
-		cred, elevenLabsTextToSpeechPath+url.PathEscape(route.VoiceID), route.RawQuery)
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(req.Body))
-	if err != nil {
-		return nil, herr.New(ctx, domain.ErrProviderError, herr.M{"reason": err.Error()})
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("xi-api-key", cred.APIKey)
-
-	resp, err := r.doElevenLabsAudio(ctx, httpReq)
+	//nolint:bodyclose // the returned stream owns the body and closes it
+	resp, err := r.postAudioJSON(ctx, elevenLabsSpeechEndpoint(cred,
+		url.PathEscape(route.VoiceID)+string(route.Variant), route.RawQuery), req.Body)
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode >= 400 {
-		return resp, nil
-	}
-	resp.Usage = domain.Usage{InputChars: elevenLabsSynthesizedChars(req.Body)}
-	return resp, nil
+	// Charged from here on, whatever the caller does with the stream: the
+	// vendor bills the text it accepted.
+	iter := newAudioStream(resp, forwardedAudioHeaders(resp.Header), &audioMeter{
+		cut: domain.Usage{InputChars: elevenLabsSynthesizedChars(req.Body)},
+	})
+	iter.limit = elevenLabsAudioMaxResponseBytes
+	return iter, nil
 }
 
 // dispatchElevenLabsTranscription posts the caller's audio to ElevenLabs and

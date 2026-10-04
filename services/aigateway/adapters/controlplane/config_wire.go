@@ -57,6 +57,9 @@ type configWire struct {
 	// field a control plane older than it never sent, which are different
 	// answers: see keyExpiry.
 	ExpiresAt json.RawMessage `json:"expires_at"`
+	// Status is "active" or "revoked". Empty from a control plane older than
+	// the field, which reads as active.
+	Status string `json:"status"`
 }
 
 // keyExpiry reads the key's own expiration date off the wire as the tri-state

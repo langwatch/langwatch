@@ -105,8 +105,13 @@ func addManagedServices(g *lifecycle.Group, deps *Deps, own ownServices) {
 	g.Add(
 		lifecycle.Worker("auth", deps.Auth.Start, deps.Auth.Stop),
 		lifecycle.Worker("statusprobe", own.Status.Start, own.Status.Stop),
-		lifecycle.ListenServer("http", own.HTTP),
 	)
+	// After auth and before the listener: a supervised call re-reads its key
+	// until it ends, and the listener stops first so no call is admitted late.
+	if deps.Voice != nil {
+		g.Add(deps.Voice)
+	}
+	g.Add(lifecycle.ListenServer("http", own.HTTP))
 }
 
 // warnIfGracefulShutdownTooShort surfaces the two ways a graceful window can

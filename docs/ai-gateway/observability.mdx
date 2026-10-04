@@ -168,6 +168,9 @@ sum by (code) (rate(gateway_client_rejects_total{vk_id="<vk-id>"}[15m]))
 | `gateway_realtime_mints_total`                | counter | `vendor`, `outcome` | Voice session mint attempts. `outcome` is `minted`, `session_limit`, `registry_unavailable` or `provider_error`. `minted` counts sessions admitted at mint time; the vendor's later report decides what a session cost |
 | `gateway_realtime_session_limit_blocks_total` | counter | none                | Mints refused because a key already held its maximum open sessions. A rise means the cap is too low for the key's traffic, or its sessions stay open. The key is in the trace and the log line                         |
 | `gateway_realtime_registry_errors_total`      | counter | `operation`         | Failed calls to the voice-session record, by `reserve`, `correlate`, `release` or `usage`. A `reserve` failure refuses the mint; a `correlate` failure costs the session its exact join to the vendor's report         |
+| `gateway_voice_sessions_supervised`           | gauge   | `kind`              | Brokered voice calls this pod meters from its own server-side socket, by `live` or `realtime`. Media does not pass through the pod |
+| `gateway_voice_sessions_ended_total`          | counter | `kind`, `reason`    | Supervised calls that ended. `reason` is `vendor_closed`, `budget_exceeded`, `key_revoked`, `sideband_lost`, `drain` or `session_closed`. Every reason but `vendor_closed` is the gateway ending the call |
+| `gateway_voice_usage_reports_total`           | counter | `outcome`           | Usage reports sent for supervised calls. `outcome` is `recorded`, `duplicate`, `closed`, `already_closed`, `error` or `dropped`. `error` is retried; `dropped` is usage lost because one call's retry queue was full |
 
 ### Control plane
 

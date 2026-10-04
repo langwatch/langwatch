@@ -26,6 +26,7 @@ type Config struct {
 	LangyMirror                   LangyMirrorConfig         `env:"LANGY_MIRROR"`
 	SpendEmitter                  SpendEmitterConfig        `env:"LW_GATEWAY_SPEND"`
 	OTel                          config.OTel               `env:"OTEL"`
+	Voice                         VoiceConfig               `env:"LW_GATEWAY_VOICE"`
 	// NonStreamingHeartbeatIntervalSeconds sets how often (in seconds) a
 	// non-streaming response writes a keep-alive byte while dispatch is
 	// still in flight. 0 falls back to config.DefaultNonStreamingHeartbeatInterval;
@@ -69,6 +70,18 @@ type SpendEmitterConfig struct {
 	// IngestBaseURL overrides where batches ship. Empty defaults to
 	// ControlPlane.BaseURL.
 	IngestBaseURL string `env:"INGEST_BASE_URL"`
+}
+
+// VoiceConfig governs the brokered voice calls this process supervises.
+type VoiceConfig struct {
+	// DrainSeconds is how long supervised calls may keep running after
+	// SIGTERM before the gateway ends them and sends their final reports.
+	// It runs from the signal, beside the HTTP drain, and must fit inside the
+	// pod's terminationGracePeriodSeconds with about 30 seconds to spare.
+	DrainSeconds int64 `env:"DRAIN_SECONDS"`
+	// MaxSupervisedSessions caps the calls one process supervises. A setup
+	// request past it is refused with 503 before anything is booked.
+	MaxSupervisedSessions int `env:"MAX_SUPERVISED_SESSIONS"`
 }
 
 // ControlPlaneConfig holds control plane connection settings.
@@ -190,6 +203,12 @@ func defaultConfig() Config {
 		SpendEmitter: SpendEmitterConfig{
 			Enabled: true,
 		},
+		// 570 fits the 620 second termination grace period production runs
+		// with. The chart sets it from shutdown.voiceDrainSeconds.
+		Voice: VoiceConfig{
+			DrainSeconds:          570,
+			MaxSupervisedSessions: 2000,
+		},
 		OTel: config.OTel{
 			// Left unset so an operator-supplied ratio is distinguishable from
 			// the default; resolved in LoadConfig.
@@ -263,6 +282,7 @@ func validateSecondsFields(cfg Config) error {
 	}{
 		{env: "SERVER_GRACEFUL_SECONDS", value: int64(cfg.Server.GracefulSeconds), rejectNegative: true},
 		{env: "SERVER_DRAIN_DELAY_SECONDS", value: int64(cfg.Server.DrainDelaySeconds), rejectNegative: true},
+		{env: "LW_GATEWAY_VOICE_DRAIN_SECONDS", value: cfg.Voice.DrainSeconds, rejectNegative: true},
 		{env: "NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS", value: cfg.NonStreamingHeartbeatIntervalSeconds},
 		{env: "LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS", value: cfg.AuthCache.SoftBumpSeconds},
 		{env: "LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", value: cfg.AuthCache.HardGraceSeconds},

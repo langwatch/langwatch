@@ -96,6 +96,25 @@ go run ./services/aigateway/loadtest \
 
 See `services/aigateway/loadtest/` for the full harness and analysis scripts.
 
+## Streaming audio: time to first audio byte
+
+`POST /v1/audio/speech` relays the provider's audio as it arrives. The test below times the first audio byte on the same local provider, dialed directly and through the gateway, over real loopback sockets. It runs 300 alternating rounds after 20 warm-up rounds and fails when the p50 overhead reaches 20 ms.
+
+```bash
+cd services/aigateway
+go test ./adapters/httpapi/ -run TestAudioSpeechStream_FirstByteOverhead -count=1 -v
+```
+
+Three runs on an Apple M3 Pro (`arm64`, Go 1.27.1):
+
+| Run | Direct p50 | Direct p95 | Gateway p50 | Gateway p95 | Overhead p50 | Overhead p95 |
+| --- | ---------: | ---------: | ----------: | ----------: | -----------: | -----------: |
+| 1   |     192 µs |     393 µs |      565 µs |     1.04 ms |       373 µs |       652 µs |
+| 2   |     184 µs |     408 µs |      523 µs |     1.08 ms |       338 µs |       674 µs |
+| 3   |     100 µs |     461 µs |      276 µs |     1.19 ms |       176 µs |       729 µs |
+
+The gateway side runs the whole request path: auth, model resolution, the spend and trace interceptors, the provider dial on a kept-alive connection, and the first flushed chunk. The provider is local, so the numbers exclude provider latency and TLS.
+
 ## Improvement opportunities
 
 See `services/aigateway/PERF-ROADMAP.md` for the prioritised list of optimisations.

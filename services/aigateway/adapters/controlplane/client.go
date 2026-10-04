@@ -393,6 +393,7 @@ func (c *Client) FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (dom
 		ETag:                  resp.Header.Get("ETag"),
 		VirtualKeyExpiresAt:   keyExpiry,
 		VirtualKeyExpiryKnown: keyExpiryKnown,
+		KeyInactive:           wire.Status != "" && wire.Status != "active",
 	}, nil
 }
 

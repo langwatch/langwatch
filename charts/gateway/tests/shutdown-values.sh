@@ -160,8 +160,42 @@ test_the_default_grace_period_covers_the_default_drain() {
   fi
 }
 
+# @scenario "the voice call drain reaches the pod and fits its grace period"
+test_the_voice_drain_reaches_the_pod_and_fits_the_grace_period() {
+  local voice err
+  voice=$(configmap_value_of "" "LW_GATEWAY_VOICE_DRAIN_SECONDS")
+  if [ "$voice" != "40" ]; then
+    fail "voice drain" "LW_GATEWAY_VOICE_DRAIN_SECONDS is '${voice:-<absent>}', expected the shutdown.voiceDrainSeconds default of 40"
+  else
+    echo "ok   [voice drain] LW_GATEWAY_VOICE_DRAIN_SECONDS=$voice"
+  fi
+
+  # 570 + 30 + 5 needs 605 against the default 75: the kubelet would kill
+  # the pod with calls still open and their final reports unsent.
+  err=$(render_error "--set shutdown.voiceDrainSeconds=570")
+  case "$err" in
+    *"terminationGracePeriodSeconds"*"shutdown.voiceDrainSeconds"*605*)
+      echo "ok   [voice drain override] render refused, naming the 605s it needs"
+      ;;
+    "")
+      fail "voice drain override" "shutdown.voiceDrainSeconds=570 rendered against a 75s grace period"
+      ;;
+    *)
+      fail "voice drain override" "render failed without naming the required grace period: $err"
+      ;;
+  esac
+
+  voice=$(configmap_value_of "--set shutdown.voiceDrainSeconds=570 --set terminationGracePeriodSeconds=605" "LW_GATEWAY_VOICE_DRAIN_SECONDS")
+  if [ "$voice" != "570" ]; then
+    fail "voice drain matched override" "LW_GATEWAY_VOICE_DRAIN_SECONDS is '${voice:-<absent>}' after raising both values"
+  else
+    echo "ok   [voice drain matched override] LW_GATEWAY_VOICE_DRAIN_SECONDS=$voice"
+  fi
+}
+
 test_drain_timing_reaches_the_configmap
 test_the_duration_string_keys_are_refused
+test_the_voice_drain_reaches_the_pod_and_fits_the_grace_period
 test_an_unsurvivable_drain_budget_is_refused
 test_the_default_grace_period_covers_the_default_drain
 

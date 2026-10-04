@@ -138,15 +138,25 @@ type RealtimeSessionRegistry interface {
 	// transaction. It answers ErrRealtimeSessionLimit when the key is at
 	// its cap and ErrRealtimeRegistryUnavailable when it cannot decide.
 	Reserve(ctx context.Context, req domain.RealtimeReservation) error
-	// Correlate records the vendor's own conversation id against a
-	// reserved session, so the post-call report matches exactly.
+	// Correlate records what the mint answer said about a reserved session:
+	// the vendor's conversation id, so the post-call report matches exactly,
+	// and when the credential expires.
 	Correlate(ctx context.Context, correlation domain.RealtimeCorrelation) error
 	// Release closes a reserved session that never opened, so a failed
 	// mint stops counting against the cap immediately.
 	Release(ctx context.Context, release domain.RealtimeRelease) error
-	// ReportUsage closes a session with the quantities its socket reported,
-	// which is what confirms the spend record.
-	ReportUsage(ctx context.Context, report domain.RealtimeUsageReport) error
+	// ReportUsage records one usage report against a session and answers the
+	// rated cost and the budget state. A report with a key leaves the session
+	// open unless it is final; one without is the session total and closes it.
+	// Client reports and gateway-measured ones both come through here.
+	ReportUsage(ctx context.Context, report domain.RealtimeUsageReport) (domain.RealtimeUsageReceipt, error)
+}
+
+// VoiceSupervisor holds the brokered voice calls of this process. A call is
+// admitted before it is booked, so a gateway that is draining or full
+// refuses it with ErrVoiceBrokerUnavailable and nothing is created.
+type VoiceSupervisor interface {
+	Admit(ctx context.Context, kind domain.RealtimeSessionKind) (domain.VoiceSlot, error)
 }
 
 // CircuitBreaker preempts dispatch to a credential that has been failing,

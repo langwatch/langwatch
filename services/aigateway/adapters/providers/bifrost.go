@@ -86,6 +86,9 @@ type BifrostRouter struct {
 	// above, with the gateway-wide provider timeout because synthesis and
 	// transcription are real work rather than a mint.
 	elevenLabsClient *http.Client
+	// openAIBaseURL overrides OpenAI's host for the direct audio lanes
+	// (tests only), the same override the Bifrost account carries.
+	openAIBaseURL string
 }
 
 // BifrostOptions configures the bifrost router.
@@ -165,6 +168,7 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 		realtimeClient:  newRealtimeClient(endpointPolicy),
 
 		elevenLabsClient: newElevenLabsAudioClient(endpointPolicy),
+		openAIBaseURL:    opts.OpenAIBackendURL,
 	}, nil
 }
 
@@ -232,7 +236,11 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		if req.Type == domain.RequestTypeTranscription {
 			return r.dispatchElevenLabsTranscription(ctx, req, cred)
 		}
-		return r.dispatchElevenLabsSpeech(ctx, req, cred)
+		iter, err := r.dispatchElevenLabsSpeechStream(ctx, req, cred)
+		if err != nil {
+			return nil, err
+		}
+		return drainAudioStream(ctx, iter)
 	}
 
 	model := req.Model
@@ -381,7 +389,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		}
 	}
 
-	body, _ := sonic.Marshal(resp)
+	body := publicWireBody(resp)
 	// Translated-lane response contract: a 200 must carry at least one
 	// choice, and a policy drop must be visible on the envelope. Scoped to
 	// the translated lanes: an OpenAI-compatible target can legitimately
@@ -484,7 +492,7 @@ func (r *BifrostRouter) dispatchResponses(
 		}, nil
 	}
 
-	body, _ := sonic.Marshal(resp)
+	body := publicWireBody(resp)
 	return &domain.Response{
 		Body:       body,
 		StatusCode: http.StatusOK,
@@ -523,7 +531,7 @@ func (r *BifrostRouter) dispatchEmbeddings(
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
-	body, _ := sonic.Marshal(resp)
+	body := publicWireBody(resp)
 	return &domain.Response{
 		Body:       body,
 		StatusCode: http.StatusOK,
@@ -646,6 +654,24 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
 			"message": "streaming image generation is not supported",
 		})
+	}
+
+	// ElevenLabs' own synthesis paths, relayed from the vendor as they arrive.
+	if elevenLabsNativeRoute(req) {
+		if req.Type != domain.RequestTypeSpeech {
+			return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
+				"message": "this ElevenLabs route does not stream",
+			})
+		}
+		return r.dispatchElevenLabsSpeechStream(ctx, req, cred)
+	}
+
+	// The OpenAI-wire audio routes. See audio_dispatch.go.
+	if req.Type == domain.RequestTypeSpeech {
+		return r.dispatchSpeechStream(ctx, audioCall{req: req, model: model, cred: cred})
+	}
+	if req.Type == domain.RequestTypeTranscription {
+		return r.dispatchTranscriptionStream(ctx, audioCall{req: req, model: model, cred: cred})
 	}
 
 	// Codex bypasses Bifrost entirely: a direct SSE proxy to OpenAI's codex
@@ -1928,7 +1954,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 		}
 		if chunk.BifrostChatResponse != nil {
 			it.ensureLeadingRoleDelta(chunk.BifrostChatResponse)
-			data, _ := sonic.Marshal(chunk.BifrostChatResponse)
+			data := publicWireBody(chunk.BifrostChatResponse)
 			if chunk.BifrostChatResponse.Usage != nil {
 				it.usage = extractUsage(chunk.BifrostChatResponse)
 				// The usage-bearing final chunk carries the policy drop
@@ -1943,7 +1969,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			// Marshal verbatim — clients using the OpenAI Responses SDK
 			// decode these by `type`. Final usage appears on the
 			// response.completed event's nested Response object.
-			data, _ := sonic.Marshal(chunk.BifrostResponsesStreamResponse)
+			data := publicWireBody(chunk.BifrostResponsesStreamResponse)
 			it.current = data
 			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
 			if resp := chunk.BifrostResponsesStreamResponse.Response; resp != nil && resp.Usage != nil {

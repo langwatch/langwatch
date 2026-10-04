@@ -4757,6 +4757,12 @@ const presentations = {
     title: "Couldn't start the voice session",
     describe: () => "No session was created. Try again in a moment.",
   },
+  voice_broker_unavailable: {
+    // No call was created. This instance is full or shutting down, and
+    // another one answers the retry.
+    title: "Couldn't start the voice call",
+    describe: () => "No call was created. Try again in a few seconds.",
+  },
   guardrail_blocked: {
     title: "Blocked by a guardrail",
     describe: () => "This request didn't pass one of your configured policies.",
