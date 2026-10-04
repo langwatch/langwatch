@@ -3,7 +3,10 @@ import type {
   CioPersonTraits,
   NurturingSignalOf,
 } from "@langwatch/enterprise-nurturing-contract";
+import { toAttributionProperties } from "@langwatch/onboarding-contract";
 import { nowInstant } from "@langwatch/time";
+
+import type { PostHogEventInput } from "../channels/posthog.channel.ts";
 
 type SignUpData = NurturingSignalOf<"signed_up">["signUpData"];
 
@@ -94,6 +97,38 @@ export function fireSignup({
         ...signUpData,
         primary_intent: primaryIntent?.toLowerCase(),
       }),
+    },
+  ];
+}
+
+/**
+ * Decides the PostHog events of an organization's sign-up, the first point the server knows
+ * the campaign. signed_up carries it; organization_created also sets it once on the person
+ * as `signup_*`, so events tracked without attribution can be filtered by sign-up campaign.
+ */
+export function fireSignupAnalytics({
+  userId,
+  organizationId,
+  signUpData,
+}: Pick<
+  NurturingSignalOf<"signed_up">,
+  "userId" | "organizationId" | "signUpData"
+>): PostHogEventInput[] {
+  const attribution = toAttributionProperties(signUpData ?? {});
+
+  return [
+    { userId, event: "signed_up", properties: attribution },
+    {
+      userId,
+      event: "organization_created",
+      properties: {
+        ...attribution,
+        organization_id: organizationId,
+        $groups: { organization: organizationId },
+        $set_once: Object.fromEntries(
+          Object.entries(attribution).map(([name, value]) => [`signup_${name}`, value]),
+        ),
+      },
     },
   ];
 }

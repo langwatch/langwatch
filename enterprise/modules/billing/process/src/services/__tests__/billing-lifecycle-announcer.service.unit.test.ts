@@ -44,7 +44,7 @@ describe("BillingLifecycleAnnouncerService", () => {
   it("records an activation for every member of the organization", async () => {
     const { service, changed } = announcerOver({ remaining: false });
 
-    await service.subscriptionActivated({ organizationId: "org-1" });
+    await service.subscriptionActivated({ organizationId: "org-1", plan: "GROWTH_SEAT_EVENT" });
 
     expect(changed).toEqual([
       expect.objectContaining({
@@ -53,6 +53,17 @@ describe("BillingLifecycleAnnouncerService", () => {
         hasSubscription: true,
       }),
     ]);
+  });
+
+  it("records the plan a subscription started on, and none for a cancellation", async () => {
+    const started = announcerOver({ remaining: false });
+    const cancelled = announcerOver({ remaining: true });
+
+    await started.service.subscriptionActivated({ organizationId: "org-1", plan: "LAUNCH" });
+    await cancelled.service.subscriptionCancelled({ organizationId: "org-1" });
+
+    expect(started.changed[0]?.startedPlan).toBe("LAUNCH");
+    expect(cancelled.changed[0]).not.toHaveProperty("startedPlan");
   });
 
   it("records a cancellation as no subscription only when none remains", async () => {
@@ -84,6 +95,29 @@ describe("BillingLifecycleAnnouncerService", () => {
     ]);
   });
 
+  /** @scenario A failed member lookup does not break the webhook */
+  it("never throws and records nothing when the member lookup fails", async () => {
+    const changed: RecordSubscriptionChangedCommandData[] = [];
+    const service = BillingLifecycleAnnouncerService.create({
+      subscriptions: { findLastNonCancelled: async () => null },
+      organizations: {
+        getAllMembers: async () => {
+          throw new Error("member lookup failed");
+        },
+      },
+      resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
+    });
+    service.connect({
+      recordSubscriptionChanged: recorder(changed),
+      recordCheckoutCompleted: recorder<RecordCheckoutCompletedCommandData>([]),
+    });
+
+    await expect(
+      service.subscriptionActivated({ organizationId: "org-1", plan: "LAUNCH" }),
+    ).resolves.toBeUndefined();
+    expect(changed).toEqual([]);
+  });
+
   it("never throws when its senders are not connected", async () => {
     const service = BillingLifecycleAnnouncerService.create({
       subscriptions: { findLastNonCancelled: async () => null },
@@ -92,7 +126,7 @@ describe("BillingLifecycleAnnouncerService", () => {
     });
 
     await expect(
-      service.subscriptionActivated({ organizationId: "org-1" }),
+      service.subscriptionActivated({ organizationId: "org-1", plan: "LAUNCH" }),
     ).resolves.toBeUndefined();
   });
 });

@@ -62,6 +62,22 @@ function UiPendingProvider({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** What a build without the onboarding module mounts: nothing to capture. */
+const NO_ATTRIBUTION_CAPTURE = () => void 0;
+
+/**
+ * First-touch attribution capture, at the outermost provider position so it
+ * reads every landing URL before a navigation can drop its query string.
+ */
+const useAttributionCapture =
+  installedUiDeclarations.declared("firstTouchAttribution")[0]?.capability.useCapture ??
+  NO_ATTRIBUTION_CAPTURE;
+
+function UiAttributionCapture({ children }: { children: ReactNode }) {
+  useAttributionCapture();
+  return <>{children}</>;
+}
+
 /** The SaaS footer has not moved here yet, and self-hosted never had one. */
 function UiNoFooter() {
   return null;
@@ -189,7 +205,7 @@ class BrowserUiShell extends UiShell {
           },
         },
         providers: {
-          attribution: UiPendingProvider,
+          attribution: UiAttributionCapture,
           session: UiPendingProvider,
           transport: UiPendingProvider,
           graphicsQuality: GraphicsQualityProvider,

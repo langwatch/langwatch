@@ -4,7 +4,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { fireSignup } from "../nurturing-signup-identification-service.rules.ts";
+import {
+  fireSignup,
+  fireSignupAnalytics,
+} from "../nurturing-signup-identification-service.rules.ts";
 
 const SIGNUP = {
   userId: "user-1",
@@ -155,6 +158,76 @@ describe("fireSignup", () => {
           expect(traits).not.toHaveProperty(key);
         }
       });
+    });
+  });
+});
+
+describe("fireSignupAnalytics", () => {
+  describe("given a sign-up that arrived from a campaign", () => {
+    const events = fireSignupAnalytics({
+      userId: "user-1",
+      organizationId: "org-1",
+      signUpData: {
+        yourRole: "engineer",
+        leadSource: "website",
+        utmSource: "newsletter",
+        utmMedium: "email",
+        utmCampaign: "weekly-42",
+        utmTerm: null,
+        utmContent: "cta",
+      },
+    });
+    const attribution = {
+      lead_source: "website",
+      utm_source: "newsletter",
+      utm_medium: "email",
+      utm_campaign: "weekly-42",
+      utm_content: "cta",
+    };
+
+    /** @scenario The organization sign-up tracks signed_up in PostHog with its attribution */
+    it("decides a signed_up carrying the attribution and none of the other answers", () => {
+      expect(events[0]).toEqual({ userId: "user-1", event: "signed_up", properties: attribution });
+    });
+
+    /** @scenario Organization creation tracks sign-up attribution in PostHog */
+    it("decides an organization_created that sets the attribution once on the person", () => {
+      expect(events[1]).toEqual({
+        userId: "user-1",
+        event: "organization_created",
+        properties: {
+          ...attribution,
+          organization_id: "org-1",
+          $groups: { organization: "org-1" },
+          $set_once: {
+            signup_lead_source: "website",
+            signup_utm_source: "newsletter",
+            signup_utm_medium: "email",
+            signup_utm_campaign: "weekly-42",
+            signup_utm_content: "cta",
+          },
+        },
+      });
+    });
+  });
+
+  describe("given a sign-up with no attribution at all", () => {
+    /** @scenario Organization creation without attribution tracks no attribution properties */
+    it("decides both events with no attribution key", () => {
+      const events = fireSignupAnalytics({ userId: "user-1", organizationId: "org-1" });
+
+      expect(events).toEqual([
+        { userId: "user-1", event: "signed_up", properties: {} },
+        {
+          userId: "user-1",
+          event: "organization_created",
+          properties: {
+            organization_id: "org-1",
+            $groups: { organization: "org-1" },
+            $set_once: {},
+          },
+        },
+      ]);
     });
   });
 });

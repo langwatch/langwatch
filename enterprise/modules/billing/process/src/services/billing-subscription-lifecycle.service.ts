@@ -220,6 +220,7 @@ export class BillingSubscriptionLifecycleService {
     });
     await this.announcer?.subscriptionActivated({
       organizationId: updatedSubscription.organizationId,
+      plan: updatedSubscription.plan,
     });
   }
 
@@ -335,6 +336,7 @@ export class BillingSubscriptionLifecycleService {
       });
       await this.announcer?.subscriptionActivated({
         organizationId: updatedSubscription.organizationId,
+        plan: updatedSubscription.plan,
       });
     }
   }

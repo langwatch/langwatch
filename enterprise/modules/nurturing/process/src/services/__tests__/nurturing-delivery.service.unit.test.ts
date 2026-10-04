@@ -3,7 +3,7 @@
  * @vitest-environment node
  * @see enterprise/modules/nurturing/specs/nurturing.feature
  */
-import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
+import type { NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -377,6 +377,182 @@ describe("NurturingDeliveryService", () => {
             subscriptionCreatedAt: "2026-09-29T00:00:00.000Z",
             hasActiveSubscription: true,
           },
+        },
+      ]);
+    });
+  });
+
+  describe("when an organization's sign-up is delivered", () => {
+    /** @scenario Initializing an organization through the procedure tracks organization_created */
+    it("tracks signed_up and organization_created in PostHog with the attribution", async () => {
+      const { posthog, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "signed_up:event-20",
+        signal: {
+          kind: "signed_up",
+          sourceEventId: "event-20",
+          ...source,
+          userId: "user-1",
+          organizationId: "org-1",
+          organizationName: "Acme Corp",
+          signUpData: { utmSource: "newsletter", utmCampaign: "weekly-42" },
+        },
+      });
+      await settle();
+
+      const attribution = { utm_source: "newsletter", utm_campaign: "weekly-42" };
+      expect(posthog.tracked).toEqual([
+        { userId: "user-1", event: "signed_up", properties: attribution },
+        {
+          userId: "user-1",
+          event: "organization_created",
+          properties: expect.objectContaining({
+            ...attribution,
+            organization_id: "org-1",
+            $set_once: { signup_utm_source: "newsletter", signup_utm_campaign: "weekly-42" },
+          }),
+        },
+      ]);
+    });
+  });
+
+  describe("when a subscription change is delivered", () => {
+    const changed: Omit<NurturingSignalOf<"subscription_changed">, "sourceEventId"> = {
+      kind: "subscription_changed",
+      ...source,
+      organizationId: "org-1",
+      memberUserIds: ["user-1", "user-2"],
+      hasSubscription: true,
+    };
+
+    it("tracks subscription_started for every member when a subscription just started", async () => {
+      const { posthog, cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "subscription_changed:event-21",
+        signal: { ...changed, sourceEventId: "event-21", startedPlan: "GROWTH_SEAT_EVENT" },
+      });
+      await settle();
+
+      expect(posthog.tracked.map(({ userId, event }) => [userId, event])).toEqual([
+        ["user-1", "subscription_started"],
+        ["user-2", "subscription_started"],
+      ]);
+      expect(posthog.tracked[0]?.properties).toEqual({
+        plan: "GROWTH_SEAT_EVENT",
+        organization_id: "org-1",
+        $groups: { organization: "org-1" },
+      });
+      expect(cio.sent.map((call) => call.path)).toEqual(["/v1/identify", "/v1/identify"]);
+    });
+
+    /** @scenario A redelivered subscription change tracks subscription_started once */
+    it("tracks subscription_started once when the same change is delivered twice", async () => {
+      const { posthog, delivery } = deliveryOverBothSinks();
+      const signal = { ...changed, sourceEventId: "event-22", startedPlan: "GROWTH_SEAT_EVENT" };
+
+      await delivery.deliver({ key: "subscription_changed:event-22", signal });
+      await delivery.deliver({ key: "subscription_changed:event-22", signal });
+      await settle();
+
+      expect(posthog.tracked).toHaveLength(2);
+    });
+
+    it("tracks nothing in PostHog when no subscription started", async () => {
+      const { posthog, cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "subscription_changed:event-23",
+        signal: { ...changed, sourceEventId: "event-23" },
+      });
+      await settle();
+
+      expect(posthog.tracked).toEqual([]);
+      expect(cio.sent).toHaveLength(2);
+    });
+
+    /** @scenario subscription_started is skipped when PostHog is not configured */
+    it("sends Customer.io alone when the deployment named no PostHog key", async () => {
+      const cio = customerIo();
+      const delivery = NurturingDeliveryService.create({
+        claims: claims(),
+        users: users(),
+        customerIo: cio.service,
+        posthog: undefined,
+      });
+
+      await expect(
+        delivery.deliver({
+          key: "subscription_changed:event-25",
+          signal: { ...changed, sourceEventId: "event-25", startedPlan: "GROWTH_SEAT_EVENT" },
+        }),
+      ).resolves.toBeUndefined();
+      await settle();
+
+      expect(cio.sent.map((call) => call.path)).toEqual(["/v1/identify", "/v1/identify"]);
+    });
+  });
+
+  describe("when a member's session is delivered", () => {
+    const sessionStarted = {
+      kind: "session_started",
+      ...source,
+      hasOrganization: true,
+    } as const;
+
+    /** @scenario A failed app_active event does not affect the last_active_at identify */
+    it("still identifies with last_active_at when the app_active track fails", async () => {
+      const sent: string[] = [];
+      const reported: Error[] = [];
+      const service = NurturingService.create({
+        config: { customerIoApiKey: "key", customerIoRegion: "us" },
+        fetchFn: async (url) => {
+          const path = new URL(url instanceof Request ? url.url : url).pathname;
+          sent.push(path);
+          return new Response(null, { status: path === "/v1/track" ? 500 : 200 });
+        },
+        errorReporter: { capture: (error) => reported.push(error) },
+      });
+      const delivery = NurturingDeliveryService.create({
+        claims: claims(),
+        users: users(),
+        customerIo: service,
+        posthog: undefined,
+      });
+
+      await expect(
+        delivery.deliver({
+          key: "session_started:event-26",
+          signal: { ...sessionStarted, sourceEventId: "event-26", userId: "user-track-fails" },
+        }),
+      ).resolves.toBeUndefined();
+      await settle();
+
+      expect(sent).toContain("/v1/identify");
+      expect(reported.length).toBeGreaterThan(0);
+    });
+
+    it("sends Customer.io last_active_at and the app_active event", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "session_started:event-24",
+        signal: { ...sessionStarted, sourceEventId: "event-24", userId: "user-app-active" },
+      });
+      await settle();
+
+      expect(cio.sent).toEqual([
+        {
+          path: "/v1/identify",
+          body: expect.objectContaining({
+            userId: "user-app-active",
+            traits: { last_active_at: expect.any(String) },
+          }),
+        },
+        {
+          path: "/v1/track",
+          body: expect.objectContaining({ userId: "user-app-active", event: "app_active" }),
         },
       ]);
     });

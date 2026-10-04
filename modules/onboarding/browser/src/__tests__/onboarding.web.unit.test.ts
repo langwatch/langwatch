@@ -3,6 +3,7 @@
 import { createUi } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
+import { onboardingFirstTouchAttribution } from "../behavior/first-touch-attribution.capability.ts";
 import { onboardingGuidedPath } from "../features/guided-onboarding/behavior/guided-path-active.capability.ts";
 import { onboardingWeb } from "../onboarding.web.ts";
 
@@ -67,6 +68,14 @@ describe("given a browser that installs onboarding", () => {
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
+    });
+  });
+
+  describe("when the shell reads first-touch attribution", () => {
+    it("lends the capture and the event properties as firstTouchAttribution", () => {
+      expect(onboardingWeb.installation.capabilities.firstTouchAttribution).toBe(
+        onboardingFirstTouchAttribution,
+      );
     });
   });
 

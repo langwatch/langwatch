@@ -33,7 +33,10 @@ function sweepExpiredEntries({ now }: { now: number }): void {
   lastSweepAt = now;
 }
 
-/** Decides whether a session pushes last_active_at to Customer.io, debounced to once per hour. */
+/**
+ * Decides whether a session pushes last_active_at to Customer.io and tracks app_active, the
+ * event campaign conversion goals count. Both are debounced together to once per hour.
+ */
 export function fire({
   userId,
   hasOrganization = true,
@@ -66,6 +69,7 @@ export function fire({
         }),
       },
     },
+    { type: "track", userId, event: "app_active" },
   ];
 }
 

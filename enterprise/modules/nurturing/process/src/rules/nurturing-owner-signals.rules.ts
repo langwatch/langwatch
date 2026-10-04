@@ -151,6 +151,7 @@ export function subscriptionChangedSignal({
     organizationId: data.organizationId,
     memberUserIds: data.memberUserIds,
     hasSubscription: data.hasSubscription,
+    startedPlan: data.startedPlan,
   };
 }
 
