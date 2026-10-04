@@ -189,7 +189,7 @@ curl -X POST "$LANGWATCH_GATEWAY_URL/v1/live/sessions" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "session": { "model": "openai/gpt-live", "voice": "marin" },
+    "session": { "model": "openai/gpt-live-1", "voice": "marin" },
     "transport": { "type": "webrtc", "sdp": "v=0..." }
   }'
 ```
@@ -215,13 +215,13 @@ Multipart, with the offer and the session declaration:
 curl -X POST "$LANGWATCH_GATEWAY_URL/v1/realtime/calls" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -F "sdp=<offer.sdp;type=application/sdp" \
-  -F 'session={"type":"realtime","model":"openai/gpt-realtime"};type=application/json'
+  -F 'session={"type":"realtime","model":"openai/gpt-realtime-2.1"};type=application/json'
 ```
 
 Raw SDP, with the model in the query string:
 
 ```bash
-curl -X POST "$LANGWATCH_GATEWAY_URL/v1/realtime/calls?model=openai/gpt-realtime" \
+curl -X POST "$LANGWATCH_GATEWAY_URL/v1/realtime/calls?model=openai/gpt-realtime-2.1" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/sdp" \
   --data-binary @offer.sdp

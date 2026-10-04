@@ -647,6 +647,7 @@
               "ai-gateway/billing-events",
               "features/webhooks",
               "ai-gateway/cookbooks/metering-and-rebilling",
+              "ai-gateway/cookbooks/consumer-voice-app",
               "ai-gateway/demo-agent-platform"
             ]
           },

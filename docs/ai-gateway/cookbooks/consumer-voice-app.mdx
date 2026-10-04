@@ -1,0 +1,148 @@
+---
+title: "Voice in a consumer app: one budget per end user"
+description: Give each end user of a voice app a spend cap, keep the audio path client to vendor, and let the gateway mint the credentials, meter the calls and stop them at the limit.
+sidebarTitle: Consumer voice app
+keywords: voice, realtime, webrtc, text to speech, speech to text, per-user budget, end users, virtual keys
+---
+
+This page is for an app where each signed-in person talks to a voice model: a phone or browser client, a monthly allowance per person, and a cap on the whole product. The audio runs from the client to the vendor. The gateway holds the provider keys, admits each call against the budgets, meters it and stops it at the limit.
+
+## Pick how you cap each person
+
+There are two ways to give each end user an allowance. Both work on every route on this page.
+
+| | One virtual key per end user | One key, one per-end-user budget |
+|---|---|---|
+| What you create | A virtual key with a `budget` for each person, when they sign up | One virtual key and one `attributed_user` budget, once |
+| What the client sends | Its own key | The shared key, held by your backend, plus `X-LangWatch-End-User-Id` |
+| Where the key can live | On the device | On your backend only |
+| Revoke one person | Revoke their key | Block them in your backend |
+| Cap on concurrent calls | Per person (`max open sessions` on the key) | Shared by everyone on the key |
+| Needs | Nothing extra | The ClickHouse spend ledger |
+
+Use a key per end user when the client calls the gateway directly. The key is the person's credential: it carries their budget and their concurrency cap, and it is revoked alone.
+
+Use the per-end-user budget when every request already passes through your backend. Your backend holds one key and names the person on each request.
+
+The product-wide cap is a `project` budget in both cases. A request is checked against every budget that applies, so a person at 5 USD is stopped by their own cap and the product at 50 USD is stopped by the project's.
+
+## Set up a key per end user
+
+Create the project budget once:
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": { "kind": "project", "project_id": "'$PROJECT_ID'" },
+    "name": "voice app monthly cap",
+    "window": "month",
+    "limit_usd": "50",
+    "on_breach": "block"
+  }'
+```
+
+Create a key when a person signs up. Send an `Idempotency-Key` so a retry returns the same key:
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/virtual-keys \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Idempotency-Key: signup-$USER_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "user-'$USER_ID'",
+    "budget": { "limit_usd": "5", "window": "month", "on_breach": "block" },
+    "config": { "realtime": { "maxOpenSessions": 1 } }
+  }'
+```
+
+The response carries the secret once. Hand it to that person's client over your own authenticated channel and store it in the platform keychain. See [Virtual keys](/ai-gateway/virtual-keys#manage-keys-over-rest) for the full body.
+
+## Set up one per-end-user budget
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scope": { "kind": "attributed_user", "anchor_virtual_key_id": "vk_..." },
+    "name": "per person monthly cap",
+    "window": "month",
+    "limit_usd": "5",
+    "on_breach": "block"
+  }'
+```
+
+Your backend sends `X-LangWatch-End-User-Id: <your user id>` on every request, voice session creates included. A voice session keeps the end user it was created with: every usage report of that session counts against that person's bucket. See [Budgets](/ai-gateway/budgets#per-end-user).
+
+## Which route for which feature
+
+| Feature | Route | Audio path | Who meters |
+|---|---|---|---|
+| Speech in, speech out, lowest latency | [`POST /v1/live/sessions`](/ai-gateway/api/realtime#openai-live) or [`POST /v1/realtime/calls`](/ai-gateway/api/realtime#webrtc-calls-with-gateway-side-metering) | WebRTC, client to OpenAI | The gateway |
+| OpenAI Realtime over a WebSocket from the client | [`POST /v1/realtime/client_secrets`](/ai-gateway/api/realtime#openai-realtime) | Client to OpenAI | Your client reports each `response.done` |
+| ElevenLabs speech or transcription socket | [`POST /v1/single-use-token/{token_type}`](/ai-gateway/api/elevenlabs#single-use-tokens) | Client to ElevenLabs | Your client reports characters or seconds |
+| Speak a reply as it is generated | [`POST /v1/audio/speech`](/ai-gateway/api/audio#speech) or [`POST /v1/text-to-speech/{voice_id}/stream`](/ai-gateway/api/elevenlabs#streaming) | Through the gateway, streamed | The gateway |
+| Transcribe a recording | [`POST /v1/audio/transcriptions`](/ai-gateway/api/audio#transcription) | Through the gateway | The gateway |
+
+Prefer the routes the gateway meters. A client that reports its own usage can stop reporting, and the gateway then charges an estimate for the session instead of what it used.
+
+## A call, end to end
+
+The client creates its WebRTC offer and posts it to the gateway with its key:
+
+```js
+const pc = new RTCPeerConnection();
+pc.addTrack((await navigator.mediaDevices.getUserMedia({ audio: true })).getTracks()[0]);
+pc.ontrack = (event) => (audioElement.srcObject = event.streams[0]);
+const events = pc.createDataChannel("oai-events");
+await pc.setLocalDescription(await pc.createOffer());
+
+const response = await fetch(`${GATEWAY_URL}/v1/live/sessions`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${virtualKey}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    session: { model: "openai/gpt-live-1", voice: "marin" },
+    transport: { type: "webrtc", sdp: pc.localDescription.sdp },
+  }),
+});
+
+if (response.status === 402) return showOutOfCredit(await response.json());
+if (response.status === 429) return showAlreadyInACall();
+
+const { transport } = await response.json();
+await pc.setRemoteDescription({ type: "answer", sdp: transport.sdp });
+```
+
+The gateway adds one HTTP round trip before the call starts and nothing after it: the audio does not pass through it.
+
+What the client has to handle:
+
+| Signal | Meaning | What to do |
+|---|---|---|
+| `402 budget_exceeded` on the create | A budget is at its limit. `error.meta.budget_scope` says which: `virtual_key` or `attributed_user` is the person's own, `project` is the product's. | Show the out of credit screen. |
+| `429 realtime_session_limit` | The key already has its maximum open calls. | Offer to end the other call. |
+| `503 voice_broker_unavailable` | That gateway instance is full or restarting. | Retry after `Retry-After`. |
+| The peer connection closes during a call | The call was ended: by the vendor, or by the gateway because the budget ran out, the key was revoked or the instance was replaced. | Create a new session. A `402` on that create means the budget ended the call. |
+
+## How far past the limit a call can go
+
+A budget is checked when the call is created and again while it runs.
+
+- **Calls the gateway meters** are ended by the gateway. It checks on every usage report and every 30 seconds, so a call runs at most about one minute past the limit.
+- **Sessions the client meters** cannot be ended by the gateway. Each usage report answers with `budget.exceeded`; close the socket when it is `true`. A client that ignores it is bounded by the credential lifetime and the vendor's maximum session length, and the next mint answers `402`.
+
+See [Budgets](/ai-gateway/budgets#voice-and-realtime-sessions).
+
+## See what each person spent
+
+```bash
+langwatch virtual-keys spend <vk_id>
+langwatch gateway-budgets list --scope-type virtual_key
+```
+
+With the per-end-user budget, read one person's spend with `GET /api/gateway/v1/end-users/:id/spend`. Signed spend events for your own ledger are described in [Metering and rebilling](/ai-gateway/cookbooks/metering-and-rebilling).
