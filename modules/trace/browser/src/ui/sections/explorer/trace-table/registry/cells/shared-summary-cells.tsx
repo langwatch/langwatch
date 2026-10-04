@@ -18,12 +18,7 @@ export function createCostCell<T extends { totalCost: number }>(
     label: "Cost",
     render: ({ row }) => <MonoCell>{formatCost(row.totalCost)}</MonoCell>,
     renderComfortable: ({ row }) => (
-      <Text
-        textStyle={comfortableTextStyle}
-        color="fg.muted"
-        textAlign="right"
-        whiteSpace="nowrap"
-      >
+      <Text textStyle={comfortableTextStyle} color="fg.muted" textAlign="right" whiteSpace="nowrap">
         {formatCost(row.totalCost)}
       </Text>
     ),
