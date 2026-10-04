@@ -80,6 +80,12 @@ Feature: PostHog campaign conversion events
     And no person property is set
 
   @unit
+  Scenario: A failure while tracking organization_created does not fail onboarding
+    Given tracking the event throws
+    When the organization is initialized
+    Then the error is captured and nothing is thrown
+
+  @unit
   Scenario: Initializing an organization through the procedure tracks organization_created
     Given a user submits the onboarding form with utm_source "newsletter"
     When the initializeOrganization procedure succeeds
@@ -105,6 +111,12 @@ Feature: PostHog campaign conversion events
   @unit
   Scenario: A failed member lookup does not break the webhook
     Given the organization member lookup fails
+    When a subscription becomes active
+    Then the error is captured and nothing is thrown
+
+  @unit
+  Scenario: A PostHog client that cannot be built does not break the webhook
+    Given building the PostHog client throws
     When a subscription becomes active
     Then the error is captured and nothing is thrown
 

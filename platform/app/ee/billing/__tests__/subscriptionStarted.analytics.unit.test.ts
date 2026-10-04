@@ -112,6 +112,7 @@ describe("Subscription started analytics", () => {
   });
 
   describe("when the PostHog client cannot be built", () => {
+    /** @scenario "A PostHog client that cannot be built does not break the webhook" */
     it("captures the error and does not throw", async () => {
       const { captureException } = await import(
         "../../../src/utils/posthogErrorCapture"

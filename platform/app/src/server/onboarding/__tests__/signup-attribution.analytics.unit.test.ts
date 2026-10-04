@@ -105,6 +105,7 @@ describe("trackOrganizationCreated()", () => {
   });
 
   describe("when tracking throws", () => {
+    /** @scenario "A failure while tracking organization_created does not fail onboarding" */
     it("captures the error and does not throw", () => {
       const error = new Error("bad PostHog configuration");
       trackServerEvent.mockImplementationOnce(() => {
