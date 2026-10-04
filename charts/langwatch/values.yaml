@@ -2316,10 +2316,12 @@ gateway:
   ## @param gateway.security.blockLocalHTTPCalls [default: false] Reject tenant-supplied provider endpoints resolving to local/private networks. Keep false for local/self-hosted installs that intentionally use private services; set true for SaaS together with a restrictive gateway NetworkPolicy.
   ## @param gateway.security.requireHTTPSCustomEndpoints [default: false] Require HTTPS for customer-configured provider endpoints. Hosted-cloud hardening; disabled by default for self-hosted compatibility.
   ## @param gateway.security.allowedProxyHosts [array, default: []] Exact private endpoint hostnames allowed when blockLocalHTTPCalls is enabled. Cloud metadata remains blocked.
+  ## @param gateway.security.corsAllowedOrigins [array, default: []] Browser origins allowed to call the gateway /v1 routes directly (CORS). Exact origins such as https://app.example.com, or a single "*". Empty sends no CORS headers.
   security:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    corsAllowedOrigins: []
 
   # Trace export is OFF by default to keep the chart safe to install
   # without out-of-band auth-token plumbing. Earlier defaults pointed

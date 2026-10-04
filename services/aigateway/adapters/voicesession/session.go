@@ -108,6 +108,8 @@ func (s *session) attachOnce(ticker *time.Ticker, retry *reattach) (reason strin
 		return "", true
 	}
 	s.attached = true
+	s.manager.logger.Info("voice_session_attached",
+		zap.String("session_id", s.SessionID), zap.String("kind", string(s.Kind)), zap.Int("attempt", retry.attempt))
 	reason, lost := s.pump(s.open(conn), ticker)
 	if lost {
 		*retry = reattach{lostAt: time.Now(), attempt: 1, wait: backoff(timing, 0)}

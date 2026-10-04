@@ -143,7 +143,7 @@ const ws = new WebSocket(
 );
 ```
 
-`eleven_v3` and `eleven_v4` models run on the Text to Dialogue socket, not on `stream-input`. Mint a `ttd_websocket` token for it. ElevenLabs' API accepts that token type and its reference does not list it. Opening the Text to Dialogue socket with either token type is not verified end to end.
+`eleven_v3` and `eleven_v4` models run on the Text to Dialogue socket, not on `stream-input`. Mint a `ttd_websocket` token for it. ElevenLabs' reference does not list that token type, and the Text to Dialogue socket accepts no other: a `tts_websocket` token is refused with close code `1008` and `invalid_token_type`.
 
 ### Reporting usage and closing
 

@@ -102,8 +102,8 @@ def sync_detailed(
 ]:
     """List provider bindings
 
-     Retired. Gateway provider bindings are model-provider rows now; list them at GET
-    /api/gateway/v1/model-providers.
+     Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/model-
+    providers.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -136,8 +136,8 @@ def sync(
 ):
     """List provider bindings
 
-     Retired. Gateway provider bindings are model-provider rows now; list them at GET
-    /api/gateway/v1/model-providers.
+     Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/model-
+    providers.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -165,8 +165,8 @@ async def asyncio_detailed(
 ]:
     """List provider bindings
 
-     Retired. Gateway provider bindings are model-provider rows now; list them at GET
-    /api/gateway/v1/model-providers.
+     Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/model-
+    providers.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -197,8 +197,8 @@ async def asyncio(
 ):
     """List provider bindings
 
-     Retired. Gateway provider bindings are model-provider rows now; list them at GET
-    /api/gateway/v1/model-providers.
+     Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/model-
+    providers.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -77,6 +77,9 @@ type RouterDeps struct {
 	// answer 503: a gateway that cannot observe its control plane must not
 	// report itself healthy to a public status page.
 	Status StatusReporter
+	// CORSAllowedOrigins are the browser origins allowed to call /v1, from
+	// ParseCORSAllowedOrigins. Empty sends no CORS headers at all.
+	CORSAllowedOrigins []string
 	// ControlPlaneBaseURL is the resolved control-plane target this
 	// gateway process ships spend, budget and auth traffic to. Surfaced
 	// read-only on GET /debug/control-plane so dev tooling can tell a
@@ -160,6 +163,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/debug/control-plane", debugControlPlaneHandler(deps.ControlPlaneBaseURL))
 
 	r.Route("/v1", func(v1 chi.Router) {
+		// Opt-in, and first so a preflight never reaches auth and a refusal
+		// (401, 402, 429) still carries the headers a page needs to read it.
+		if len(deps.CORSAllowedOrigins) > 0 {
+			v1.Use(CORSMiddleware(deps.CORSAllowedOrigins))
+		}
 		// The ElevenLabs post-call webhook, and the one route under /v1 that
 		// carries no virtual key. The caller is ElevenLabs, which has no key
 		// and never will; the delivery authenticates itself with the HMAC the

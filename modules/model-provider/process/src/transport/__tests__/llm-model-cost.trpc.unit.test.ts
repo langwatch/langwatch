@@ -93,7 +93,7 @@ describe("the llmModelCost tRPC namespace", () => {
       const listed = await caller.getAllForProject({ projectId: PROJECT_ID });
 
       const catalogue = getStaticModelCostRates();
-      expect(catalogue).toHaveLength(434);
+      expect(catalogue).toHaveLength(438);
       expect(listed).toHaveLength(2 + catalogue.length);
       expect(listed.slice(0, 2).map((row) => ("id" in row ? row.id : null))).toEqual([
         "cost-project",

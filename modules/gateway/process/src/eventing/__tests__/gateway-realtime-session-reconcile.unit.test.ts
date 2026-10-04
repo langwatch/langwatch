@@ -46,6 +46,7 @@ async function reconcileOnce(modelProviders: Pick<ModelProviderApi, "getCustomKe
     sessions,
     spendRating: ModelCatalogGatewaySpendRatingService.create(),
     spendConfirmation,
+    spanIngestion: { ingestNormalizedSpan: async () => {} },
   };
   const operations = GatewayRealtimeSessionService.create();
   await operations.reserveRealtimeSession({

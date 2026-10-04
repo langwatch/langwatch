@@ -11866,6 +11866,57 @@
               "available": true
             },
             {
+              "name": "Kind",
+              "type": "Nullable(String)",
+              "description": "Kind",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Metering",
+              "type": "Nullable(String)",
+              "description": "Metering",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TranscriptionModel",
+              "type": "Nullable(String)",
+              "description": "TranscriptionModel",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "LastReportAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "LastReportAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ReportedCostNanoUsd",
+              "type": "Int64",
+              "description": "ReportedCostNanoUsd",
+              "unit": null,
+              "gates": [
+                "costs",
+                "cost:view"
+              ],
+              "available": true
+            },
+            {
+              "name": "ReportCount",
+              "type": "Int32",
+              "description": "ReportCount",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
               "name": "CreatedAt",
               "type": "DateTime64(3)",
               "description": "CreatedAt",

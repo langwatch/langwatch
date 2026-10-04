@@ -10,6 +10,7 @@ import type {
 } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi, type Mock } from "vitest";
 
@@ -210,6 +211,7 @@ describe("the gateway internal control plane", () => {
       const commands = testSpendCommandSenders();
       const app = mountGatewayInternalRest({
         store: {} as GatewayInternalStoreRepository,
+        projects: createApiFixture<ProjectApi>({}),
         spend: { commands, rating: ModelCatalogGatewaySpendRatingService.create() },
       });
 

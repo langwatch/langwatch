@@ -207,12 +207,12 @@ The usage answer returns the rated cost and a budget verdict. A brokered client 
 
 A session the client meters, with no report by the end of the open window, settles at an estimate instead of cost unknown. The assumed duration is the minted credential's lifetime when the vendor states one, else a default per kind, clamped to between one minute and one hour.
 
-| Kind | Estimate |
-| --- | --- |
-| `realtime` (OpenAI Realtime) | 10 input audio tokens per second of the duration, 20 output audio tokens per second for half of it |
-| `live` (OpenAI Live) | the duration, at the per-second rate |
-| `tts_socket` (ElevenLabs speech sockets) | 15 characters per second |
-| `stt_socket`, `stt_batch` (ElevenLabs transcription) | the duration, as audio seconds |
+| Kind                                                 | Estimate                                                                                           |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `realtime` (OpenAI Realtime)                         | 10 input audio tokens per second of the duration, 20 output audio tokens per second for half of it |
+| `live` (OpenAI Live)                                 | the duration, at the per-second rate                                                               |
+| `tts_socket` (ElevenLabs speech sockets)             | 15 characters per second                                                                           |
+| `stt_socket`, `stt_batch` (ElevenLabs transcription) | the duration, as audio seconds                                                                     |
 
 The token rates are OpenAI's published ones: one token per 100 ms of user audio, one per 50 ms of assistant audio. The estimate is a deterrent with a stated basis, and a client that closes its session, even at zero, never meets it. Hosted-agent sessions keep the reconciler, and rows written before this change keep their old behaviour.
 

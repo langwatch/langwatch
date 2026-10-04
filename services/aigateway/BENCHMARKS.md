@@ -125,10 +125,10 @@ go test ./services/aigateway/adapters/voicesession/ -run xxx -bench BenchmarkRel
 
 Apple M3 Pro, loopback, 2026-10-04, median of three runs:
 
-| Frame | Direct round trip p50 / p95 | Relayed round trip p50 / p95 | Overhead per frame p50 / p95 |
-| --- | --- | --- | --- |
-| Text event, 230 bytes | 16.7 us / 23.7 us | 38.8 us / 49.4 us | 11 us / 13 us |
-| Binary, 4 KiB | 26.5 us / 42.2 us | 47.2 us / 82.1 us | 10 us / 20 us |
+| Frame                 | Direct round trip p50 / p95 | Relayed round trip p50 / p95 | Overhead per frame p50 / p95 |
+| --------------------- | --------------------------- | ---------------------------- | ---------------------------- |
+| Text event, 230 bytes | 16.7 us / 23.7 us           | 38.8 us / 49.4 us            | 11 us / 13 us                |
+| Binary, 4 KiB         | 26.5 us / 42.2 us           | 47.2 us / 82.1 us            | 10 us / 20 us                |
 
 The target is under 5 ms at p50 in-region. The relay's own cost is three orders of magnitude below it, so the hop a client sees is the network distance to the gateway. A message up to 1 MiB is relayed as one frame from one buffer; a larger one is streamed in 32 KiB chunks.
 

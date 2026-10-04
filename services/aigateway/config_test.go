@@ -498,6 +498,7 @@ func clearGatewayEnv(t *testing.T) {
 		"LW_GATEWAY_AUTH_CACHE_HARD_GRACE",
 		"LW_GATEWAY_AUTH_CACHE_CONFIG_TTL",
 		"CUSTOMER_TRACE_BRIDGE_BASE_URL",
+		"LW_GATEWAY_CORS_ALLOWED_ORIGINS",
 		"LW_GATEWAY_SPEND_ENABLED",
 		"LW_GATEWAY_SPEND_SPOOL_DIR",
 		"LW_GATEWAY_SPEND_SPOOL_MAX_BYTES",
@@ -558,5 +559,72 @@ func TestLoadConfig_VoiceDefaultsAndOverrides(t *testing.T) {
 	t.Setenv("LW_GATEWAY_VOICE_DRAIN_SECONDS", "-1")
 	if _, err = LoadConfig(context.Background()); err == nil {
 		t.Fatal("a negative voice drain was accepted")
+	}
+}
+
+// CORS is opt-in: unset sends no headers, and a malformed origin stops boot.
+//
+// @scenario "A malformed allowed origin stops the gateway at boot"
+func TestLoadConfig_CORSAllowedOrigins(t *testing.T) {
+	load := func(t *testing.T, value string) (Config, error) {
+		t.Helper()
+		clearGatewayEnv(t)
+		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+		if value != "" {
+			t.Setenv("LW_GATEWAY_CORS_ALLOWED_ORIGINS", value)
+		}
+		return LoadConfig(context.Background())
+	}
+
+	t.Run("off by default", func(t *testing.T) {
+		cfg, err := load(t, "")
+		if err != nil {
+			t.Fatalf("LoadConfig: %v", err)
+		}
+		if got := cfg.CORS.AllowedOriginList(); len(got) != 0 {
+			t.Errorf("AllowedOriginList = %v, want none", got)
+		}
+	})
+
+	t.Run("a list of exact origins", func(t *testing.T) {
+		cfg, err := load(t, "https://app.example.com, http://localhost:5173")
+		if err != nil {
+			t.Fatalf("LoadConfig: %v", err)
+		}
+		got := strings.Join(cfg.CORS.AllowedOriginList(), "|")
+		if got != "https://app.example.com|http://localhost:5173" {
+			t.Errorf("AllowedOriginList = %q", got)
+		}
+	})
+
+	t.Run("any origin", func(t *testing.T) {
+		cfg, err := load(t, "*")
+		if err != nil {
+			t.Fatalf("LoadConfig: %v", err)
+		}
+		if got := cfg.CORS.AllowedOriginList(); len(got) != 1 || got[0] != "*" {
+			t.Errorf("AllowedOriginList = %v, want [*]", got)
+		}
+	})
+
+	for _, bad := range []string{
+		"app.example.com",
+		"https://app.example.com/",
+		"https://app.example.com/path",
+		"https://*.example.com",
+		"https://user:pw@app.example.com",
+		"null",
+		"*,https://app.example.com",
+	} {
+		t.Run("refuses "+bad, func(t *testing.T) {
+			_, err := load(t, bad)
+			if err == nil {
+				t.Fatalf("LoadConfig accepted %q", bad)
+			}
+			if !strings.Contains(err.Error(), "LW_GATEWAY_CORS_ALLOWED_ORIGINS") {
+				t.Errorf("error does not name the variable: %v", err)
+			}
+		})
 	}
 }

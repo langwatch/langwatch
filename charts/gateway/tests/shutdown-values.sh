@@ -193,7 +193,26 @@ test_the_voice_drain_reaches_the_pod_and_fits_the_grace_period() {
   fi
 }
 
+# @scenario "the allowed browser origins an operator sets reach the pod"
+test_cors_allowed_origins_reach_the_configmap() {
+  local origins
+  origins=$(configmap_value_of "" "LW_GATEWAY_CORS_ALLOWED_ORIGINS")
+  if [ -n "$origins" ]; then
+    fail "cors default" "LW_GATEWAY_CORS_ALLOWED_ORIGINS is '$origins', expected empty so CORS stays off"
+  else
+    echo "ok   [cors default] LW_GATEWAY_CORS_ALLOWED_ORIGINS is empty"
+  fi
+
+  origins=$(configmap_value_of "--set security.corsAllowedOrigins={https://app.example.com,http://localhost:5173}" "LW_GATEWAY_CORS_ALLOWED_ORIGINS")
+  if [ "$origins" != "https://app.example.com,http://localhost:5173" ]; then
+    fail "cors override" "LW_GATEWAY_CORS_ALLOWED_ORIGINS is '${origins:-<absent>}', expected the two origins comma-joined"
+  else
+    echo "ok   [cors override] LW_GATEWAY_CORS_ALLOWED_ORIGINS=$origins"
+  fi
+}
+
 test_drain_timing_reaches_the_configmap
+test_cors_allowed_origins_reach_the_configmap
 test_the_duration_string_keys_are_refused
 test_the_voice_drain_reaches_the_pod_and_fits_the_grace_period
 test_an_unsurvivable_drain_budget_is_refused

@@ -82,7 +82,15 @@ function createSuiteProjects(): ProjectApi {
         const project = await projects.findTraceDestination(projectId);
         return project ? { outcome: "resolved", project } : { outcome: "unknown" };
       },
-      listIdsByOrganization: async () => [],
+      async listIdsByOrganization(
+        input: Parameters<ProjectApi["listIdsByOrganization"]>[0],
+      ): ReturnType<ProjectApi["listIdsByOrganization"]> {
+        const rows = await prisma.project.findMany({
+          where: { team: { organizationId: input.organizationId } },
+          select: { id: true },
+        });
+        return rows.map((row) => row.id);
+      },
     },
     "SuiteProjectService",
   );

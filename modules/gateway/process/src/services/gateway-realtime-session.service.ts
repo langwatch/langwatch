@@ -63,10 +63,10 @@ export type GatewayRealtimeSessionCollaborators = {
   /** Sends the confirmation into the gateway spend pipeline. */
   spendConfirmation: GatewaySpendConfirmation;
   /**
-   * Writes the settlement span. Absent where the deployment composes no trace
-   * storage: the money still lands, the trace just carries no cost line.
+   * Writes the settlement span. Required: a composition that leaves it out
+   * settles money with no cost line on the trace, and nothing else reports it.
    */
-  spanIngestion?: GatewaySpanIngestion | undefined;
+  spanIngestion: GatewaySpanIngestion;
   /**
    * Joins the key's owner and the project's team onto a confirmation, so their budgets are
    * debited. Absent, a confirmation names the organization, project and key only.

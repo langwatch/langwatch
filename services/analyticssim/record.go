@@ -129,7 +129,7 @@ type Activity struct {
 	LastName        string     `json:"lastName"`
 }
 
-// activity summarises the records, counting those received at or after since as recent.
+// activity totals the records, counting those received at or after since as recent.
 // ponytail: O(n) scan of the ring (5000 by default) per status call; keep running counters in add if it shows.
 func (s *store) activity(since time.Time) Activity {
 	s.mu.Lock()

@@ -57,6 +57,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		HeartbeatInterval:     time.Duration(cfg.NonStreamingHeartbeatIntervalSeconds) * time.Second,
 		Status:                statusMon,
 		ControlPlaneBaseURL:   cfg.ControlPlane.BaseURL,
+		CORSAllowedOrigins:    cfg.CORS.AllowedOriginList(),
 		WebhookRelay:          deps.ControlPlane,
 		VoiceRelay:            deps.Voice,
 	})

@@ -688,6 +688,14 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       CloseReason: { source: "closeReason", content: "output" },
       TraceId: { source: "traceId" },
       VendorCostRaw: { source: "vendorCostRaw", access: { allOf: ["cost:view"] } },
+      Kind: { source: "kind" },
+      Metering: { source: "metering" },
+      credentialExpiresAt: "omit", // named as secret material by the exposure rule
+      TranscriptionModel: { source: "transcriptionModel" },
+      endUserId: "omit", // raw external-person identity
+      LastReportAt: { source: "lastReportAt" },
+      ReportedCostNanoUsd: { source: "reportedCostNanoUsd", access: { allOf: ["cost:view"] } },
+      ReportCount: { source: "reportCount" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },

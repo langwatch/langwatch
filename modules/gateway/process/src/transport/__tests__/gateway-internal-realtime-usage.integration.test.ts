@@ -32,7 +32,12 @@ function door() {
   const sessions = MemoryGatewayRealtimeSessionRepository.create();
   const spend = new RecordingSpendConfirmation();
   const app = mountGatewayInternalRest({
-    realtimeSessions: { sessions, spendRating: rating, spendConfirmation: spend },
+    realtimeSessions: {
+      sessions,
+      spendRating: rating,
+      spendConfirmation: spend,
+      spanIngestion: { ingestNormalizedSpan: async () => {} },
+    },
   });
   const send = async (input: { method: string; path: string; body: unknown }) => {
     const response = await app.fetch(signedGatewayRequest(input));
@@ -85,7 +90,7 @@ describe("the internal realtime reserve route", () => {
     it("refuses an end user id longer than a spend record may carry", async () => {
       const { sessions, reserve } = door();
 
-      const refused = await reserve({ end_user_id: "a".repeat(257) });
+      const refused = await reserve({ end_user_id: "a".repeat(513) });
 
       expect(refused.status).toBe(400);
       expect(sessions.rows.size).toBe(0);

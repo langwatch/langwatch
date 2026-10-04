@@ -42,3 +42,5 @@ data:
   BLOCK_LOCAL_HTTP_CALLS: {{ .Values.security.blockLocalHTTPCalls | quote }}
   REQUIRE_HTTPS_CUSTOM_ENDPOINTS: {{ .Values.security.requireHTTPSCustomEndpoints | quote }}
   ALLOWED_PROXY_HOSTS: {{ join "," .Values.security.allowedProxyHosts | quote }}
+  # Empty leaves CORS off: the gateway reads an empty value as unset.
+  LW_GATEWAY_CORS_ALLOWED_ORIGINS: {{ join "," .Values.security.corsAllowedOrigins | quote }}

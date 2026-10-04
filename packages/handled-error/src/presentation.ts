@@ -354,10 +354,6 @@ const presentations = {
     title: "This query read too much data",
     describe: () => "Narrow the time range or add filters so the query reads less.",
   },
-  time_range_too_wide: {
-    title: "Time range is too wide",
-    describe: () => "Pick a shorter range and try again.",
-  },
   page_too_deep: {
     title: "That page is too deep to open by number",
     describe: () => "Narrow the time range or filters, or step forward with Next.",
@@ -2790,6 +2786,12 @@ const presentations = {
     describe: () =>
       "The service asked for a secret it never declared. This is a fault on our side.",
   },
+  secret_unreadable: {
+    title: "A project secret cannot be read",
+    describe: (error) =>
+      `The stored value of "${safeProse(str(error, "name", "")) || "this secret"}" cannot be ` +
+      "decrypted on this deployment. Save the secret again with its value.",
+  },
   secrets_preflight_failed: {
     title: "The service isn't configured correctly",
     describe: () =>
@@ -4205,6 +4207,13 @@ const presentations = {
     describe: () =>
       "Say what it sends — a dashboard, a graph or a trace query — and the " +
       "schedule it sends on.",
+  },
+
+  web_push_endpoint_refused: {
+    title: "This browser cannot receive push notifications",
+    describe: () =>
+      "Its push service is not one LangWatch sends to. Notifications still " +
+      "appear in the open tab.",
   },
 
   webhook_header_values_required: {

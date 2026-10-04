@@ -76,6 +76,7 @@ gateway:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    corsAllowedOrigins: [] # browser origins allowed to call /v1
 
   # OTLP/HTTP endpoint for the gateway's own spans. Empty disables export.
   otel:
@@ -144,6 +145,7 @@ The chart passes these environment variables to the container. Every other key i
 | `BLOCK_LOCAL_HTTP_CALLS`                               | `security.blockLocalHTTPCalls`                                       | Refuse provider endpoints on private addresses |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS`                       | `security.requireHTTPSCustomEndpoints`                               | Refuse `http://` provider endpoints            |
 | `ALLOWED_PROXY_HOSTS`                                  | `security.allowedProxyHosts`, comma-joined                           | Private hostnames exempt from the block        |
+| `LW_GATEWAY_CORS_ALLOWED_ORIGINS`                      | `security.corsAllowedOrigins`, comma-joined                          | Browser origins allowed to call `/v1`          |
 | `LW_GATEWAY_INTERNAL_SECRET`                           | Secret `secrets.existingSecretName`, key `secrets.internalSecretKey` | HMAC secret for control plane calls            |
 | `LW_GATEWAY_JWT_SECRET`                                | Secret `secrets.existingSecretName`, key `secrets.jwtSecretKey`      | JWT verification secret                        |
 | `LW_GATEWAY_JWT_SECRET_PREVIOUS`                       | Secret, key `secrets.jwtSecretPreviousKey`, only when set            | Previous JWT secret during rotation            |

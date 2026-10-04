@@ -523,6 +523,19 @@ condition = "AND"
 paths = ['''platform/app/ee/admin/backoffice/resources/instances/types\.ts''']
 regexes = ['''^scenario_runs_28d$''']
 
+# The ElevenLabs model id a token type bills under by default, in a map keyed by
+# a constant whose name contains `Token`: the `token: "<value>"` shape
+# `generic-api-key` fires on. A public model id, not a credential.
+#
+# Scoped by VALUE and ANCHORED as well as by path, matched with AND, so any
+# other high-entropy string in that file is still reported.
+[[allowlists]]
+description = "A public ElevenLabs model id beside a token type constant"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^services/aigateway/domain/realtime\.go$''']
+regexes = ['''^eleven_v3_conversational$''']
+
 # Test literals and public handles that `generic-api-key` reads as credentials:
 # `0123456789abcdef...` gateway secrets, `tok_abc123def456` reset tokens,
 # `conversation-1` process keys, `sk-lw-...` echoes. None was issued by anyone.

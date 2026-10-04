@@ -656,3 +656,85 @@ Feature: Gateway service — public HTTP surface and operational basics
       When the Helm chart's rendered value and the self-hosting docs are read
       Then all three state the same number of bytes
       And changing any one of them alone fails the build
+
+  Rule: Browser pages call /v1 only from the origins an operator allows
+
+    # A browser voice client holds its own virtual key and posts the call
+    # setup from the page. CORS is opt-in through
+    # LW_GATEWAY_CORS_ALLOWED_ORIGINS: exact origins, or "*".
+
+    @unit
+    Scenario: A gateway with no allowed origins sends no CORS headers
+      Given no allowed origins are configured
+      When a page posts to /v1/chat/completions with an Origin header
+      Then the response carries no Access-Control header
+      And a preflight OPTIONS is answered 405 as before
+
+    @unit
+    Scenario: A request from an allowed origin is answered with that origin
+      Given "https://app.example.com" is an allowed origin
+      When that page posts to /v1/chat/completions with a valid key
+      Then the response is 200 with Access-Control-Allow-Origin "https://app.example.com"
+      And the response varies on Origin
+      And the response has no Access-Control-Allow-Credentials header
+
+    @unit
+    Scenario: A page can read the session id and the other gateway headers
+      Given "https://app.example.com" is an allowed origin
+      When that page calls /v1
+      Then Access-Control-Expose-Headers names X-LangWatch-Session-Id and X-LangWatch-Gateway-Request-Id
+      And it names Location, Retry-After, X-LangWatch-Budget-Warning and X-LangWatch-Guardrails-Not-Applied
+
+    @unit
+    Scenario: A refusal carries the CORS headers so the page can read it
+      Given "https://app.example.com" is an allowed origin
+      When that page is refused with 401 or 402
+      Then the refusal carries Access-Control-Allow-Origin "https://app.example.com"
+
+    @unit
+    Scenario: A preflight is answered without a key and without running the request
+      Given "https://app.example.com" is an allowed origin
+      When that page sends a preflight OPTIONS for a /v1 route with no key
+      Then the response is 204 with Access-Control-Allow-Methods and Access-Control-Max-Age "600"
+      And Access-Control-Allow-Headers reflects the requested headers
+      And neither auth nor the request pipeline runs
+
+    @unit
+    Scenario: A request from an origin that is not allowed gets no CORS headers
+      Given "https://app.example.com" is an allowed origin
+      When a page on another origin posts to /v1/chat/completions
+      Then the request is served as it is with CORS off
+      And the response carries no Access-Control header
+
+    @unit
+    Scenario: A gateway that allows every origin answers with a wildcard
+      Given the allowed origins are "*"
+      When a page on any origin calls /v1
+      Then the response has Access-Control-Allow-Origin "*"
+      And the response has no Access-Control-Allow-Credentials header
+
+    @unit
+    Scenario: Routes outside /v1 never send CORS headers
+      Given the allowed origins are "*"
+      When a page requests a health or debug route
+      Then the response carries no Access-Control header
+
+    @unit
+    Scenario: A WebSocket handshake is left untouched
+      Given "https://app.example.com" is an allowed origin
+      When that page opens a WebSocket under /v1
+      Then the handshake passes through with no CORS header added
+
+    @unit
+    Scenario: A malformed allowed origin stops the gateway at boot
+      Given LW_GATEWAY_CORS_ALLOWED_ORIGINS holds a value that is not scheme://host[:port]
+      When the gateway loads its configuration
+      Then it refuses to start and names the variable
+
+    # Binding: charts/gateway/tests/shutdown-values.sh.
+    @unit
+    Scenario: the allowed browser origins an operator sets reach the pod
+      Given a values file that sets security.corsAllowedOrigins
+      When the gateway chart is rendered
+      Then the ConfigMap carries them comma-joined as LW_GATEWAY_CORS_ALLOWED_ORIGINS
+      And the default render leaves the value empty

@@ -18,7 +18,7 @@ There are two ways to give each end user an allowance. Both work on every route 
 | Where the key can live | On the device | On your backend only |
 | Revoke one person | Revoke their key | Block them in your backend |
 | Cap on concurrent calls | Per person (`max open sessions` on the key) | Shared by everyone on the key |
-| Needs | Nothing extra | The ClickHouse spend ledger |
+| Needs | No extra service | The ClickHouse spend ledger |
 
 Use a key per end user when the client calls the gateway directly. The key is the person's credential: it carries their budget and their concurrency cap, and it is revoked alone.
 
@@ -90,6 +90,8 @@ Prefer the routes the gateway meters. A client that reports its own usage can st
 
 ## A call, end to end
 
+To call from a browser, list your page's origin in `LW_GATEWAY_CORS_ALLOWED_ORIGINS` on the gateway. See [Calling the gateway from a browser](/ai-gateway/security#calling-the-gateway-from-a-browser).
+
 The client creates its WebRTC offer and posts it to the gateway with its key:
 
 ```js
@@ -106,7 +108,7 @@ const response = await fetch(`${GATEWAY_URL}/v1/live/sessions`, {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    session: { model: "openai/gpt-live-1", voice: "marin" },
+    session: { model: "openai/gpt-live-1", audio: { output: { voice: "marin" } } },
     transport: { type: "webrtc", sdp: pc.localDescription.sdp },
   }),
 });
@@ -118,7 +120,7 @@ const { transport } = await response.json();
 await pc.setRemoteDescription({ type: "answer", sdp: transport.sdp });
 ```
 
-The gateway adds one HTTP round trip before the call starts and nothing after it: the audio does not pass through it.
+The gateway adds one HTTP round trip before the call starts. The audio does not pass through it, so the call itself gains no latency.
 
 What the client has to handle:
 
@@ -127,7 +129,7 @@ What the client has to handle:
 | `402 budget_exceeded` on the create | A budget is at its limit. `error.meta.budget_scope` says which: `virtual_key` or `attributed_user` is the person's own, `project` is the product's. | Show the out of credit screen. |
 | `429 realtime_session_limit` | The key already has its maximum open calls. | Offer to end the other call. |
 | `503 voice_broker_unavailable` | That gateway instance is full or restarting. | Retry after `Retry-After`. |
-| The peer connection closes during a call | The call was ended: by the vendor, or by the gateway because the budget ran out, the key was revoked or the instance was replaced. | Create a new session. A `402` on that create means the budget ended the call. |
+| The `oai-events` data channel closes during a call (a Live call receives `session.closed` on it first). The peer connection itself can stay `connected` for some seconds more, so watch the data channel. | The call was ended: by the vendor, or by the gateway because the budget ran out, the key was revoked or the instance was replaced. | Create a new session. A `402` on that create means the budget ended the call. |
 
 ## How far past the limit a call can go
 

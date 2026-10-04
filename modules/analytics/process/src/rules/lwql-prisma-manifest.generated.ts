@@ -2091,6 +2091,7 @@ export interface LwqlPrismaRows {
     readonly metering: "String?";
     readonly credentialExpiresAt: "DateTime?";
     readonly transcriptionModel: "String?";
+    readonly endUserId: "String?";
     readonly lastReportAt: "DateTime?";
     readonly reportedCostNanoUsd: "BigInt";
     readonly reportCount: "Int";

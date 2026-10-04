@@ -270,6 +270,10 @@ security:
   # Exact, case-insensitive hostnames allowed to use private egress while the
   # guard is enabled. Cloud metadata/link-local destinations remain blocked.
   allowedProxyHosts: []
+  # Browser origins allowed to call /v1 directly (CORS). Exact origins such
+  # as https://app.example.com, or a single "*" for any origin. Empty sends
+  # no CORS headers. The gateway refuses to start on a malformed origin.
+  corsAllowedOrigins: []
 
   # HTTP server slowloris protection. ReadHeaderTimeout catches the
   # classic TLS-handshake-then-stall; ReadTimeout bounds the whole body

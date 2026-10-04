@@ -87,6 +87,9 @@ const GLOBAL_MODELS = [
   "WebPushSubscription",
   // The installation's one VAPID key pair, like InstanceIdentity.
   "WebPushVapidKey",
+  // Whether a person is deactivated or erased, keyed by user id like Passkey:
+  // it holds for the person in every organisation, so there is no tenant column.
+  "AuthzUserStanding",
 ] as const;
 
 /**

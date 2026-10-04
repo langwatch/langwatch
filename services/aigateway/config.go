@@ -9,6 +9,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/httpapi"
 )
 
 // Config is the top-level service configuration.
@@ -27,6 +28,7 @@ type Config struct {
 	SpendEmitter                  SpendEmitterConfig        `env:"LW_GATEWAY_SPEND"`
 	OTel                          config.OTel               `env:"OTEL"`
 	Voice                         VoiceConfig               `env:"LW_GATEWAY_VOICE"`
+	CORS                          CORSConfig                `env:"LW_GATEWAY_CORS"`
 	// NonStreamingHeartbeatIntervalSeconds sets how often (in seconds) a
 	// non-streaming response writes a keep-alive byte while dispatch is
 	// still in flight. 0 falls back to config.DefaultNonStreamingHeartbeatInterval;
@@ -82,6 +84,19 @@ type VoiceConfig struct {
 	// MaxSupervisedSessions caps the calls one process supervises. A setup
 	// request past it is refused with 503 before anything is booked.
 	MaxSupervisedSessions int `env:"MAX_SUPERVISED_SESSIONS"`
+}
+
+// CORSConfig lets browser pages call the public /v1 routes directly.
+type CORSConfig struct {
+	// AllowedOrigins is a comma separated list of exact origins
+	// (https://app.example.com), or "*" alone. Empty sends no CORS headers.
+	AllowedOrigins string `env:"ALLOWED_ORIGINS"`
+}
+
+// AllowedOriginList is AllowedOrigins parsed; LoadConfig has validated it.
+func (c CORSConfig) AllowedOriginList() []string {
+	origins, _ := httpapi.ParseCORSAllowedOrigins(c.AllowedOrigins)
+	return origins
 }
 
 // ControlPlaneConfig holds control plane connection settings.
@@ -240,6 +255,9 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		return Config{}, err
 	}
 	if err := validateSecondsFields(cfg); err != nil {
+		return Config{}, err
+	}
+	if _, err := httpapi.ParseCORSAllowedOrigins(cfg.CORS.AllowedOrigins); err != nil {
 		return Config{}, err
 	}
 	if cfg.CustomerTraceBridge.BaseURL == "" {

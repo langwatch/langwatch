@@ -22791,6 +22791,15 @@
           "documentation": ""
         },
         {
+          "name": "endUserId",
+          "columnName": "endUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "lastReportAt",
           "columnName": "lastReportAt",
           "type": "DateTime",

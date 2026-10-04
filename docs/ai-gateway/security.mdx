@@ -89,6 +89,35 @@ A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to s
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuses a customer-configured provider endpoint that is plain HTTP                                                            |
 | `ALLOWED_PROXY_HOSTS`            | Exact hostnames that may use a private address while the guard is on. Cloud metadata and link-local destinations stay refused |
 
+## Calling the gateway from a browser
+
+The gateway sends no CORS headers by default, so a browser page cannot call it. Set `LW_GATEWAY_CORS_ALLOWED_ORIGINS` (chart value `security.corsAllowedOrigins`) to allow it.
+
+| Value                                               | Effect                                                    |
+| --------------------------------------------------- | --------------------------------------------------------- |
+| empty                                               | No CORS headers. The default                              |
+| `https://app.example.com,https://beta.example.com`  | Those exact origins may call `/v1`                        |
+| `*`                                                 | Any origin may call `/v1`. It cannot be mixed with a list |
+
+An origin is `scheme://host[:port]` with no path and no trailing slash. The gateway refuses to start on any other form.
+
+With the setting on, the gateway answers requests to `/v1` as follows:
+
+| Request                               | Answer                                                                                                |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| From an allowed origin                | `Access-Control-Allow-Origin` with that origin, on success and on refusals such as `401`, `402`, `429` |
+| Preflight `OPTIONS`, allowed origin   | `204` with the allowed methods and the requested headers. No key is needed                            |
+| From any other origin                 | No CORS headers, so the browser blocks the call                                                       |
+| WebSocket connection                  | Unchanged. Browsers do not apply CORS to WebSockets                                                   |
+
+Your page can read these response headers: `X-LangWatch-Session-Id`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Budget-Warning`, `X-LangWatch-Guardrails-Not-Applied`, `Location` and `Retry-After`. Health, metrics and internal routes never send CORS headers.
+
+The gateway never sends `Access-Control-Allow-Credentials`. It authenticates by the key in the request, not by cookies, so an allowed origin cannot call the gateway without a key.
+
+The person using a page can read any virtual key that page holds. Give each end user their own virtual key with its own budget. Never put a key shared by several users, or a key with a project-wide budget, in browser code.
+
+CORS limits which pages a browser lets call the gateway. A person can still use their own key outside the browser, so the key's budget is the limit that counts.
+
 ## Network policy on Kubernetes
 
 The gateway Helm chart ships a deny-by-default `NetworkPolicy`. Turn it on with `networkPolicy.enabled: true`.

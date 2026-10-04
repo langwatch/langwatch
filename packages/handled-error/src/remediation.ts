@@ -84,9 +84,6 @@ const registry = {
   filter_field_unknown: {
     tips: ["Use one of the fields listed in meta.knownFields", "Field names are case-sensitive"],
   },
-  time_range_too_wide: {
-    tips: ["Query in smaller windows and paginate through the results"],
-  },
   lwql_unparseable: {
     tips: [
       "Read `meta.violations`; each entry carries the line and column the parser stopped at",

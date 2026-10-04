@@ -2894,7 +2894,7 @@ const ws = new WebSocket(
 );
 ```
 
-`eleven_v3` and `eleven_v4` models run on the Text to Dialogue socket, not on `stream-input`. Mint a `ttd_websocket` token for it. ElevenLabs' API accepts that token type and its reference does not list it. Opening the Text to Dialogue socket with either token type is not verified end to end.
+`eleven_v3` and `eleven_v4` models run on the Text to Dialogue socket, not on `stream-input`. Mint a `ttd_websocket` token for it. ElevenLabs' reference does not list that token type, and the Text to Dialogue socket accepts no other: a `tts_websocket` token is refused with close code `1008` and `invalid_token_type`.
 
 ### Reporting usage and closing
 
@@ -4262,7 +4262,7 @@ A report key is stored as letters, digits, `_` and `-`, up to 128 characters. Op
 
 | Body | Report key | What it does |
 |---|---|---|
-| A whole `response.done` event | `response.id` | Records that response. Sending it again records nothing new. |
+| A whole `response.done` event | `response.id` | Records that response. Sending it again is not recorded twice. |
 | A whole `conversation.item.input_audio_transcription.completed` event | `item_id` | Records input transcription, priced under the session's transcription model. Its `usage` may be `{"type":"tokens", ...}` or `{"type":"duration","seconds":N}`. An event with no `usage` answers `200` with status `no_usage`. |
 | `{"events":[ ... ]}` | One per event | A batch of the two events above, at most 100, recorded in order. A `response.done` in a batch must carry `response.id`. |
 | A usage object, or `{"usage":{...}}`, with no `id` | None | The session total. Closes the session. If keyed reports came first, only the part they did not cover is charged. |
@@ -4281,7 +4281,7 @@ Every usage post and every close answers `200` with this body:
 | Field | Meaning |
 |---|---|
 | `session_id` | The session the report was recorded against. |
-| `status` | `recorded`, `duplicate` (that report key was already recorded), `closed` (the report closed the session), `already_closed` (the session was closed before, nothing recorded), or `no_usage` (the body carried nothing to record). For a batch, the status of its last report. |
+| `status` | `recorded`, `duplicate` (that report key was already recorded), `closed` (the report closed the session), `already_closed` (the session was closed before and this post was not recorded), or `no_usage` (the body carried no usage). For a batch, the status of its last report. |
 | `cost_usd` | What this post added, in US dollars. For a batch, the sum. |
 | `session_cost_usd` | Everything recorded for the session so far. |
 | `budget.exceeded` | `true` when a blocking budget on the key is at or past its limit, counting this session. `budget.scope` and `budget.budget_id` name it. |
@@ -4324,7 +4324,7 @@ curl -X POST "$LANGWATCH_GATEWAY_URL/v1/live/sessions" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "session": { "model": "openai/gpt-live-1", "voice": "marin" },
+    "session": { "model": "openai/gpt-live-1", "audio": { "output": { "voice": "marin" } } },
     "transport": { "type": "webrtc", "sdp": "v=0..." }
   }'
 ```
@@ -4336,7 +4336,7 @@ The gateway meters this session itself. It attaches to the session's event socke
 - **Duration.** OpenAI states the session's cumulative seconds. The gateway reports the difference since its last report, at most every 10 seconds and once more when the session closes.
 - **Delegated responses.** A session that sets `session.delegation.responses.model` runs those responses on another model. Each completed response is recorded once, under that model's token prices.
 
-Your client reports nothing and does not close the session.
+Your client sends no usage report and does not close the session.
 
 Only the `webrtc` transport is served; any other `transport.type` answers `400 bad_request`. The model in `session.delegation.responses.model` has to pass the key's allowed models and policy rules, or the request answers `400 model_not_allowed`.
 
@@ -4380,7 +4380,7 @@ The gateway ends a call it created on either route, without the client, when:
 
 A Live session is asked to close on its socket, then hung up if OpenAI does not confirm. A Realtime call is hung up on `/v1/realtime/calls/{call_id}/hangup`. The usage recorded up to that point stands. A Live session whose event socket never attached is charged 15 seconds.
 
-The client sees the peer connection close. It is not told the reason; the reason is on the `gateway_voice_sessions_ended_total` metric.
+A Live client receives `session.closed` with reason `close_requested` on its data channel. A Realtime client sees its data channel close. Neither is told why the gateway ended the call; the reason is on the `gateway_voice_sessions_ended_total` metric and in the gateway log (`voice_session_ended`).
 
 Each gateway instance supervises a bounded number of calls (`LW_GATEWAY_VOICE_MAX_SUPERVISED_SESSIONS`, default 2000). A request to an instance that is full or shutting down answers `503 voice_broker_unavailable` with `Retry-After`, before anything is booked. On shutdown an instance keeps metering its calls for `LW_GATEWAY_VOICE_DRAIN_SECONDS` (default 570; the Helm chart sets `shutdown.voiceDrainSeconds`), then ends the ones still open.
 
@@ -4390,7 +4390,7 @@ OpenAI's WebSocket transport needs the real API key on the socket, so a client o
 
 WebRTC through `/v1/live/sessions` and `/v1/realtime/calls` stays the default, because media then runs client to OpenAI. The relay adds one hop to every frame. Measured on loopback, that hop costs about 11 microseconds per frame at the median and 20 at the 95th percentile, before network distance to the gateway.
 
-The relay meters the session itself, like a brokered call. Your client reports nothing.
+The relay meters the session itself, like a brokered call. Your client sends no usage report.
 
 ### OpenAI Realtime
 
@@ -5484,7 +5484,7 @@ There are two ways to give each end user an allowance. Both work on every route 
 | Where the key can live | On the device | On your backend only |
 | Revoke one person | Revoke their key | Block them in your backend |
 | Cap on concurrent calls | Per person (`max open sessions` on the key) | Shared by everyone on the key |
-| Needs | Nothing extra | The ClickHouse spend ledger |
+| Needs | No extra service | The ClickHouse spend ledger |
 
 Use a key per end user when the client calls the gateway directly. The key is the person's credential: it carries their budget and their concurrency cap, and it is revoked alone.
 
@@ -5556,6 +5556,8 @@ Prefer the routes the gateway meters. A client that reports its own usage can st
 
 ## A call, end to end
 
+To call from a browser, list your page's origin in `LW_GATEWAY_CORS_ALLOWED_ORIGINS` on the gateway. See [Calling the gateway from a browser](/ai-gateway/security#calling-the-gateway-from-a-browser).
+
 The client creates its WebRTC offer and posts it to the gateway with its key:
 
 ```js
@@ -5572,7 +5574,7 @@ const response = await fetch(`${GATEWAY_URL}/v1/live/sessions`, {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    session: { model: "openai/gpt-live-1", voice: "marin" },
+    session: { model: "openai/gpt-live-1", audio: { output: { voice: "marin" } } },
     transport: { type: "webrtc", sdp: pc.localDescription.sdp },
   }),
 });
@@ -5584,7 +5586,7 @@ const { transport } = await response.json();
 await pc.setRemoteDescription({ type: "answer", sdp: transport.sdp });
 ```
 
-The gateway adds one HTTP round trip before the call starts and nothing after it: the audio does not pass through it.
+The gateway adds one HTTP round trip before the call starts. The audio does not pass through it, so the call itself gains no latency.
 
 What the client has to handle:
 
@@ -5593,7 +5595,7 @@ What the client has to handle:
 | `402 budget_exceeded` on the create | A budget is at its limit. `error.meta.budget_scope` says which: `virtual_key` or `attributed_user` is the person's own, `project` is the product's. | Show the out of credit screen. |
 | `429 realtime_session_limit` | The key already has its maximum open calls. | Offer to end the other call. |
 | `503 voice_broker_unavailable` | That gateway instance is full or restarting. | Retry after `Retry-After`. |
-| The peer connection closes during a call | The call was ended: by the vendor, or by the gateway because the budget ran out, the key was revoked or the instance was replaced. | Create a new session. A `402` on that create means the budget ended the call. |
+| The `oai-events` data channel closes during a call (a Live call receives `session.closed` on it first). The peer connection itself can stay `connected` for some seconds more, so watch the data channel. | The call was ended: by the vendor, or by the gateway because the budget ran out, the key was revoked or the instance was replaced. | Create a new session. A `402` on that create means the budget ended the call. |
 
 ## How far past the limit a call can go
 
@@ -10559,6 +10561,35 @@ A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to s
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuses a customer-configured provider endpoint that is plain HTTP                                                            |
 | `ALLOWED_PROXY_HOSTS`            | Exact hostnames that may use a private address while the guard is on. Cloud metadata and link-local destinations stay refused |
 
+## Calling the gateway from a browser
+
+The gateway sends no CORS headers by default, so a browser page cannot call it. Set `LW_GATEWAY_CORS_ALLOWED_ORIGINS` (chart value `security.corsAllowedOrigins`) to allow it.
+
+| Value                                               | Effect                                                    |
+| --------------------------------------------------- | --------------------------------------------------------- |
+| empty                                               | No CORS headers. The default                              |
+| `https://app.example.com,https://beta.example.com`  | Those exact origins may call `/v1`                        |
+| `*`                                                 | Any origin may call `/v1`. It cannot be mixed with a list |
+
+An origin is `scheme://host[:port]` with no path and no trailing slash. The gateway refuses to start on any other form.
+
+With the setting on, the gateway answers requests to `/v1` as follows:
+
+| Request                               | Answer                                                                                                |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| From an allowed origin                | `Access-Control-Allow-Origin` with that origin, on success and on refusals such as `401`, `402`, `429` |
+| Preflight `OPTIONS`, allowed origin   | `204` with the allowed methods and the requested headers. No key is needed                            |
+| From any other origin                 | No CORS headers, so the browser blocks the call                                                       |
+| WebSocket connection                  | Unchanged. Browsers do not apply CORS to WebSockets                                                   |
+
+Your page can read these response headers: `X-LangWatch-Session-Id`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Budget-Warning`, `X-LangWatch-Guardrails-Not-Applied`, `Location` and `Retry-After`. Health, metrics and internal routes never send CORS headers.
+
+The gateway never sends `Access-Control-Allow-Credentials`. It authenticates by the key in the request, not by cookies, so an allowed origin cannot call the gateway without a key.
+
+The person using a page can read any virtual key that page holds. Give each end user their own virtual key with its own budget. Never put a key shared by several users, or a key with a project-wide budget, in browser code.
+
+CORS limits which pages a browser lets call the gateway. A person can still use their own key outside the browser, so the key's budget is the limit that counts.
+
 ## Network policy on Kubernetes
 
 The gateway Helm chart ships a deny-by-default `NetworkPolicy`. Turn it on with `networkPolicy.enabled: true`.
@@ -10623,6 +10654,12 @@ These apply to the base URLs customers configure on their own provider credentia
 | `BLOCK_LOCAL_HTTP_CALLS`         | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address                                     |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
 | `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed to resolve to a private address while `BLOCK_LOCAL_HTTP_CALLS` is on |
+
+## Browser access
+
+| Var                               | Default | Purpose                                                                                                                                                                                                                                              |
+| --------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LW_GATEWAY_CORS_ALLOWED_ORIGINS` | empty   | Comma-separated exact origins (`https://app.example.com`) allowed to call `/v1` from a browser, or `*` alone for any origin. Empty sends no CORS headers. A malformed origin stops the gateway at boot. See [Security](/ai-gateway/security#calling-the-gateway-from-a-browser) |
 
 ## Auth cache
 
@@ -11169,6 +11206,7 @@ gateway:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    corsAllowedOrigins: [] # browser origins allowed to call /v1
 
   # OTLP/HTTP endpoint for the gateway's own spans. Empty disables export.
   otel:
@@ -11237,6 +11275,7 @@ The chart passes these environment variables to the container. Every other key i
 | `BLOCK_LOCAL_HTTP_CALLS`                               | `security.blockLocalHTTPCalls`                                       | Refuse provider endpoints on private addresses |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS`                       | `security.requireHTTPSCustomEndpoints`                               | Refuse `http://` provider endpoints            |
 | `ALLOWED_PROXY_HOSTS`                                  | `security.allowedProxyHosts`, comma-joined                           | Private hostnames exempt from the block        |
+| `LW_GATEWAY_CORS_ALLOWED_ORIGINS`                      | `security.corsAllowedOrigins`, comma-joined                          | Browser origins allowed to call `/v1`          |
 | `LW_GATEWAY_INTERNAL_SECRET`                           | Secret `secrets.existingSecretName`, key `secrets.internalSecretKey` | HMAC secret for control plane calls            |
 | `LW_GATEWAY_JWT_SECRET`                                | Secret `secrets.existingSecretName`, key `secrets.jwtSecretKey`      | JWT verification secret                        |
 | `LW_GATEWAY_JWT_SECRET_PREVIOUS`                       | Secret, key `secrets.jwtSecretPreviousKey`, only when set            | Previous JWT secret during rotation            |

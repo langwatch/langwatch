@@ -133,7 +133,7 @@ A report key is stored as letters, digits, `_` and `-`, up to 128 characters. Op
 
 | Body | Report key | What it does |
 |---|---|---|
-| A whole `response.done` event | `response.id` | Records that response. Sending it again records nothing new. |
+| A whole `response.done` event | `response.id` | Records that response. Sending it again is not recorded twice. |
 | A whole `conversation.item.input_audio_transcription.completed` event | `item_id` | Records input transcription, priced under the session's transcription model. Its `usage` may be `{"type":"tokens", ...}` or `{"type":"duration","seconds":N}`. An event with no `usage` answers `200` with status `no_usage`. |
 | `{"events":[ ... ]}` | One per event | A batch of the two events above, at most 100, recorded in order. A `response.done` in a batch must carry `response.id`. |
 | A usage object, or `{"usage":{...}}`, with no `id` | None | The session total. Closes the session. If keyed reports came first, only the part they did not cover is charged. |
@@ -152,7 +152,7 @@ Every usage post and every close answers `200` with this body:
 | Field | Meaning |
 |---|---|
 | `session_id` | The session the report was recorded against. |
-| `status` | `recorded`, `duplicate` (that report key was already recorded), `closed` (the report closed the session), `already_closed` (the session was closed before, nothing recorded), or `no_usage` (the body carried nothing to record). For a batch, the status of its last report. |
+| `status` | `recorded`, `duplicate` (that report key was already recorded), `closed` (the report closed the session), `already_closed` (the session was closed before and this post was not recorded), or `no_usage` (the body carried no usage). For a batch, the status of its last report. |
 | `cost_usd` | What this post added, in US dollars. For a batch, the sum. |
 | `session_cost_usd` | Everything recorded for the session so far. |
 | `budget.exceeded` | `true` when a blocking budget on the key is at or past its limit, counting this session. `budget.scope` and `budget.budget_id` name it. |
@@ -195,7 +195,7 @@ curl -X POST "$LANGWATCH_GATEWAY_URL/v1/live/sessions" \
   -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "session": { "model": "openai/gpt-live-1", "voice": "marin" },
+    "session": { "model": "openai/gpt-live-1", "audio": { "output": { "voice": "marin" } } },
     "transport": { "type": "webrtc", "sdp": "v=0..." }
   }'
 ```
@@ -207,7 +207,7 @@ The gateway meters this session itself. It attaches to the session's event socke
 - **Duration.** OpenAI states the session's cumulative seconds. The gateway reports the difference since its last report, at most every 10 seconds and once more when the session closes.
 - **Delegated responses.** A session that sets `session.delegation.responses.model` runs those responses on another model. Each completed response is recorded once, under that model's token prices.
 
-Your client reports nothing and does not close the session.
+Your client sends no usage report and does not close the session.
 
 Only the `webrtc` transport is served; any other `transport.type` answers `400 bad_request`. The model in `session.delegation.responses.model` has to pass the key's allowed models and policy rules, or the request answers `400 model_not_allowed`.
 
@@ -251,7 +251,7 @@ The gateway ends a call it created on either route, without the client, when:
 
 A Live session is asked to close on its socket, then hung up if OpenAI does not confirm. A Realtime call is hung up on `/v1/realtime/calls/{call_id}/hangup`. The usage recorded up to that point stands. A Live session whose event socket never attached is charged 15 seconds.
 
-The client sees the peer connection close. It is not told the reason; the reason is on the `gateway_voice_sessions_ended_total` metric.
+A Live client receives `session.closed` with reason `close_requested` on its data channel. A Realtime client sees its data channel close. Neither is told why the gateway ended the call; the reason is on the `gateway_voice_sessions_ended_total` metric and in the gateway log (`voice_session_ended`).
 
 Each gateway instance supervises a bounded number of calls (`LW_GATEWAY_VOICE_MAX_SUPERVISED_SESSIONS`, default 2000). A request to an instance that is full or shutting down answers `503 voice_broker_unavailable` with `Retry-After`, before anything is booked. On shutdown an instance keeps metering its calls for `LW_GATEWAY_VOICE_DRAIN_SECONDS` (default 570; the Helm chart sets `shutdown.voiceDrainSeconds`), then ends the ones still open.
 
@@ -261,7 +261,7 @@ OpenAI's WebSocket transport needs the real API key on the socket, so a client o
 
 WebRTC through `/v1/live/sessions` and `/v1/realtime/calls` stays the default, because media then runs client to OpenAI. The relay adds one hop to every frame. Measured on loopback, that hop costs about 11 microseconds per frame at the median and 20 at the 95th percentile, before network distance to the gateway.
 
-The relay meters the session itself, like a brokered call. Your client reports nothing.
+The relay meters the session itself, like a brokered call. Your client sends no usage report.
 
 ### OpenAI Realtime
 

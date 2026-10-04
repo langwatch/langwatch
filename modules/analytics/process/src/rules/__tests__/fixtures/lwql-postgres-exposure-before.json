@@ -454,6 +454,12 @@
     ["CloseReason", "closeReason", ["output"]],
     ["TraceId", "traceId", []],
     ["VendorCostRaw", "vendorCostRaw", ["cost:view"]],
+    ["Kind", "kind", []],
+    ["Metering", "metering", []],
+    ["TranscriptionModel", "transcriptionModel", []],
+    ["LastReportAt", "lastReportAt", []],
+    ["ReportedCostNanoUsd", "reportedCostNanoUsd", ["cost:view"]],
+    ["ReportCount", "reportCount", []],
     ["CreatedAt", "createdAt", []],
     ["UpdatedAt", "updatedAt", []]
   ],
