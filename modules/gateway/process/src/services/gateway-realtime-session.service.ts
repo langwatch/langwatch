@@ -104,6 +104,7 @@ export interface ReserveInput {
   kind?: string;
   metering?: GatewayRealtimeMetering;
   transcriptionModel?: string;
+  endUserId?: string;
   credentialExpiresAt?: Instant;
 }
 
@@ -142,6 +143,7 @@ export class GatewayRealtimeSessionService {
         kind: input.kind ?? null,
         metering: input.metering ?? null,
         transcriptionModel: input.transcriptionModel ?? null,
+        endUserId: input.endUserId || null,
         credentialExpiresAt: input.credentialExpiresAt ?? null,
       },
       staleBefore: nowInstant().subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS }),
@@ -359,9 +361,8 @@ export class GatewayRealtimeSessionService {
       virtual_key_id: session.virtualKeyId,
       request_type: params.requestType,
       admitted_at: session.mintedAt.epochMilliseconds,
-      // A brokered call runs client to vendor, so the mint takes no end-user header. The trace
-      // is the mint's, so the spend record and the settlement span can be joined.
-      end_user_id: "",
+      end_user_id: session.endUserId ?? "",
+      // The trace is the mint's, so the spend record and the settlement span can be joined.
       trace_id: session.traceId ?? "",
       principal_user_id: attribution.principalUserId ?? "",
       team_id: attribution.teamId ?? "",

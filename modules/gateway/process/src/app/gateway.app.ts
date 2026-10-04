@@ -144,7 +144,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
-import { TraceApi } from "@langwatch/trace-contract";
+import { recordSpanCommandDataSchema, TraceApi } from "@langwatch/trace-contract";
 // The billing envelope and the subscription grammar are the webhook
 // platform's, and a reconciliation pull has to answer the same bytes a push
 // delivers, so both ARRIVE from that module rather than being restated here.
@@ -872,6 +872,17 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
         },
       },
       budgets: controlPlane.budgetDecisions,
+      // The settled span rides the trace module's ingress command, like any collected span.
+      spanIngestion: {
+        ingestNormalizedSpan: async (input) => {
+          await setup.dependencies.traces.recordSpan(
+            recordSpanCommandDataSchema.parse({
+              ...input,
+              occurredAt: nowInstant().epochMilliseconds,
+            }),
+          );
+        },
+      },
     };
     const config = GatewayConfigMaterialiserService.create({
       scopeResolution: controlPlane.internalScopeResolution,

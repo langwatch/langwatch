@@ -2581,6 +2581,7 @@ export const prismaModelFieldCatalogue = {
     "metering",
     "credentialExpiresAt",
     "transcriptionModel",
+    "endUserId",
     "lastReportAt",
     "reportedCostNanoUsd",
     "reportCount",

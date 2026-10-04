@@ -39,6 +39,7 @@ const KEY_ID = "key-1";
 const SESSION_ID = "session-1";
 const MODEL = "openai/gpt-realtime-1.5";
 const TRANSCRIPTION_MODEL = "elevenlabs/scribe_v1";
+const END_USER_ID = "end-user-1";
 
 const rating = ModelCatalogGatewaySpendRatingService.create();
 const operations = GatewayRealtimeSessionService.create();
@@ -70,7 +71,9 @@ class RecordingSpanIngestion implements GatewaySpanIngestion {
 class LedgerBudgetCheck {
   readonly asked: GatewayBudgetCheckInput[] = [];
 
-  constructor(private readonly budget: { limitNanoUsd: number; ledgerNanoUsd: number }) {}
+  constructor(
+    private readonly budget: { limitNanoUsd: number; ledgerNanoUsd: number; scope?: string },
+  ) {}
 
   async checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult> {
     this.asked.push(input);
@@ -78,7 +81,7 @@ class LedgerBudgetCheck {
     const blocked = this.budget.ledgerNanoUsd + projectedNanoUsd >= this.budget.limitNanoUsd;
     const line = {
       budgetId: "budget-key",
-      scope: "virtual_key",
+      scope: this.budget.scope ?? "virtual_key",
       scopeId: KEY_ID,
       window: "month",
       limitUsd: "5",
@@ -339,6 +342,53 @@ describe("a usage report of a realtime session", () => {
   });
 });
 
+describe("the end user a session's spend is recorded under", () => {
+  describe("when the mint named an end user", () => {
+    /** @scenario "Every spend record of a session carries the mint's end user" */
+    it("carries it on a keyed report's record and on the session's own record", async () => {
+      const { spend, report, row } = await openSession({ session: { endUserId: END_USER_ID } });
+
+      await report({ reportKey: "resp_1", usage: { output_audio_tokens: 50 } });
+      await report({ usage: { output_audio_tokens: 80 } });
+
+      expect(row().endUserId).toBe(END_USER_ID);
+      expect(spend.sent.map((sent) => sent.gateway_request_id)).toEqual([
+        `${SESSION_ID}.resp_1`,
+        SESSION_ID,
+      ]);
+      expect(spend.sent.map((sent) => sent.end_user_id)).toEqual([END_USER_ID, END_USER_ID]);
+    });
+
+    /** @scenario "An estimate is attributed to the mint's end user" */
+    it("carries it on the estimate of a session that never reported", async () => {
+      const { spend, collaborators, row } = await openSession({
+        session: { endUserId: END_USER_ID },
+      });
+
+      const settled = await metering.settleUnreportedRealtimeSession({
+        session: row(),
+        collaborators,
+      });
+
+      expect(settled).toBe("estimated");
+      expect(spend.sent.length).toBeGreaterThan(0);
+      expect(spend.sent.every((sent) => sent.end_user_id === END_USER_ID)).toBe(true);
+    });
+  });
+
+  describe("when the mint named no end user", () => {
+    /** @scenario "A session minted with no end user records none" */
+    it("records an empty end user id", async () => {
+      const { spend, report, row } = await openSession();
+
+      await report({ reportKey: "resp_1", usage: { output_audio_tokens: 50 } });
+
+      expect(row().endUserId).toBeNull();
+      expect(spend.sent[0]?.end_user_id).toBe("");
+    });
+  });
+});
+
 describe("a session total, reported with no report key", () => {
   /** @scenario "A session total with no earlier reports confirms the whole total" */
   it("confirms the whole usage on the session's own record and closes", async () => {
@@ -422,6 +472,32 @@ describe("the budget verdict a usage report answers with", () => {
       principalUserId: "user-1",
       providerKey: "provider-1",
     });
+  });
+
+  /** @scenario "A report that exhausts the end user's budget says so" */
+  it("reads the budgets for the session's end user and names the attributed_user scope", async () => {
+    const budgets = new LedgerBudgetCheck({
+      limitNanoUsd: costOf(usage),
+      ledgerNanoUsd: 0,
+      scope: "attributed_user",
+    });
+    const { report } = await openSession({ budgets, session: { endUserId: END_USER_ID } });
+
+    const receipt = await report({ reportKey: "resp_1", usage });
+
+    expect(budgets.asked[0]).toMatchObject({ virtualKeyId: KEY_ID, endUserId: END_USER_ID });
+    expect(receipt).toMatchObject({
+      budget: { exceeded: true, scope: "attributed_user", budgetId: "budget-key" },
+    });
+  });
+
+  it("reads the budgets with no end user for a session minted without one", async () => {
+    const budgets = new LedgerBudgetCheck({ limitNanoUsd: costOf(usage), ledgerNanoUsd: 0 });
+    const { report } = await openSession({ budgets });
+
+    await report({ reportKey: "resp_1", usage });
+
+    expect(budgets.asked[0]?.endUserId).toBeNull();
   });
 
   /** @scenario "The session's recent reports count before the ledger holds them" */

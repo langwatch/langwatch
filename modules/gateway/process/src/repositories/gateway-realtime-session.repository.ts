@@ -26,6 +26,7 @@ export type NewGatewayRealtimeSession = {
   kind: string | null;
   metering: string | null;
   transcriptionModel: string | null;
+  endUserId: string | null;
   credentialExpiresAt: Instant | null;
 };
 

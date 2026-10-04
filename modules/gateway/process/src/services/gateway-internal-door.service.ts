@@ -605,6 +605,7 @@ export class GatewayInternalDoorService {
       kind: body.kind,
       metering: body.metering,
       transcriptionModel: body.transcription_model,
+      endUserId: body.end_user_id,
       ...credentialExpiryOf(body),
     });
     if (!result.ok && result.reason === "unavailable") return realtimeSessionsUnavailable();

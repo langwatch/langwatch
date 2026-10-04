@@ -18,6 +18,7 @@ export interface GatewayRealtimeSessionRecord {
   metering?: string | null;
   credentialExpiresAt?: Instant | null;
   transcriptionModel?: string | null;
+  endUserId?: string | null;
   lastReportAt?: Instant | null;
   reportCount?: number;
 }

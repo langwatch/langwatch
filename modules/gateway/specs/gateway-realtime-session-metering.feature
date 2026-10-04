@@ -108,6 +108,40 @@ Feature: Gateway realtime-session metering
       Then the report is still recorded
       And the answer marks the budget verdict unknown and not exceeded
 
+  Rule: A session's spend belongs to the end user its mint named
+
+    @unit
+    Scenario: Every spend record of a session carries the mint's end user
+      Given a realtime session whose mint named an end user
+      When a keyed report, then the session total, are recorded
+      Then each spend record carries that end user id
+
+    @unit
+    Scenario: A session minted with no end user records none
+      Given a realtime session whose mint named no end user
+      When a usage report is recorded
+      Then its spend record carries an empty end user id
+
+    @unit
+    Scenario: An estimate is attributed to the mint's end user
+      Given a client-metered session whose mint named an end user and that never reported
+      When the session is settled
+      Then the estimate's spend record carries that end user id
+
+    @unit
+    Scenario: A report that exhausts the end user's budget says so
+      Given a per-end-user budget on the key
+      And a realtime session whose mint named an end user
+      When a report's cost takes that end user's bucket to its limit
+      Then the budget read names the session's end user
+      And the answer flags the budget as exceeded with scope attributed_user
+
+    @integration
+    Scenario: The internal reserve route stores the end user the gateway sends
+      When the gateway books a session with an end user id and reports usage on it
+      Then the session row holds that end user id
+      And the report's spend record carries it
+
   Rule: A session that stops reporting is still settled
 
     @unit

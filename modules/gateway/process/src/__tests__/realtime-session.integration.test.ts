@@ -774,7 +774,7 @@ const meteredCollaborators: GatewayRealtimeSessionCollaborators = {
 };
 
 /** A project, a key on it, a 5 USD blocking budget on the key and a 50 USD one on the project. */
-async function budgetedChain() {
+async function budgetedChain(options: { endUserId?: string } = {}) {
   const tag = nanoid(6);
   const projectId = `project-rtm-${tag}`;
   const virtualKeyId = `vk-rtm-${tag}`;
@@ -847,6 +847,7 @@ async function budgetedChain() {
     traceId,
     kind: "realtime",
     metering: "client",
+    endUserId: options.endUserId,
     collaborators: meteredCollaborators,
   });
 
@@ -867,15 +868,35 @@ async function budgetedChain() {
     );
     return { debits: debits.map((debit) => debit.id).toSorted(), spentNanoUsd };
   };
-  const nextRequest = () =>
+  const nextRequest = (from: { endUserId?: string } = {}) =>
     budgetService.checkBudget({
       organizationId: METERED_ORG_ID,
       teamId: METERED_TEAM_ID,
       projectId,
       virtualKeyId,
       principalUserId: null,
+      endUserId: from.endUserId ?? null,
       projectedCostUsd: "0",
     });
+  /** A blocking budget on the key that gives each end user their own allowance. */
+  const perEndUserBudget = async ({ limitUsd }: { limitUsd: string }) => {
+    const id = `bdg-enduser-${tag}`;
+    await prisma.gatewayBudget.create({
+      data: {
+        id,
+        name: id,
+        organizationId: METERED_ORG_ID,
+        scopeType: "ATTRIBUTED_USER",
+        scopeId: virtualKeyId,
+        window: "MONTH",
+        limitUsd,
+        onBreach: "BLOCK",
+        createdById: METERED_USER_ID,
+        resetsAt,
+      },
+    });
+    return id;
+  };
   const session = () =>
     prisma.gatewayRealtimeSession.findUniqueOrThrow({ where: { id: sessionId } });
   const ageSessionPastTheWindow = () =>
@@ -900,6 +921,7 @@ async function budgetedChain() {
     report,
     ledger,
     nextRequest,
+    perEndUserBudget,
     session,
     ageSessionPastTheWindow,
     confirmations,
@@ -1051,6 +1073,40 @@ describe.skipIf(!databaseUrl || !chUrl)(
         const next = await chain.nextRequest();
         expect(next.decision).toBe("hard_block");
         expect(next.blockedBy.map((blocked) => blocked.budgetId)).toEqual([chain.keyBudgetId]);
+      });
+    });
+
+    describe("when the mint named an end user on a key with a per-end-user budget", () => {
+      /** @scenario "A report debits the bucket of the end user the mint named" */
+      it("debits that end user's bucket, flags it and blocks only that end user", async () => {
+        const chain = await budgetedChain({ endUserId: "alice" });
+        const endUserBudgetId = await chain.perEndUserBudget({ limitUsd: "2" });
+
+        // 0.4 USD, then 1.6 USD: the second takes the end user's 2 USD and leaves the key's 5.
+        const under = await chain.report({
+          reportKey: "resp_1",
+          usage: { output_audio_tokens: 0.4 * TOKENS_PER_USD },
+        });
+        const breaching = await chain.report({
+          reportKey: "resp_2",
+          usage: { output_audio_tokens: 1.6 * TOKENS_PER_USD },
+        });
+
+        expect((await chain.session()).endUserId).toBe("alice");
+        expect(chain.confirmations().map((sent) => sent.end_user_id)).toEqual(["alice", "alice"]);
+        expect(await chain.ledger(endUserBudgetId)).toEqual({
+          debits: [`${chain.sessionId}.resp_1`, `${chain.sessionId}.resp_2`],
+          spentNanoUsd: 2 * USD,
+        });
+        expect(under).toMatchObject({ budget: { exceeded: false } });
+        expect(breaching).toMatchObject({
+          budget: { exceeded: true, scope: "attributed_user", budgetId: endUserBudgetId },
+        });
+        const sameEndUser = await chain.nextRequest({ endUserId: "alice" });
+        expect(sameEndUser.decision).toBe("hard_block");
+        expect(sameEndUser.blockedBy.map((blocked) => blocked.budgetId)).toEqual([endUserBudgetId]);
+        const otherEndUser = await chain.nextRequest({ endUserId: "bob" });
+        expect(otherEndUser.blockedBy).toEqual([]);
       });
     });
 

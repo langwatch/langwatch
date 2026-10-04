@@ -379,6 +379,7 @@ export type GatewayRealtimeReservation = {
   kind?: string;
   metering?: GatewayRealtimeMetering;
   transcriptionModel?: string;
+  endUserId?: string;
   credentialExpiresAt?: Instant;
 };
 

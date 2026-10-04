@@ -19,8 +19,11 @@ export const REALTIME_ESTIMATE_REPORT_KEY = "estimate";
 export const REALTIME_SETTLEMENT_BATCH_SIZE = 25;
 /** How recent a report must be for the budget ledger to possibly not hold its debit yet. */
 export const REALTIME_LEDGER_LAG_MS = 60_000;
-/** How long a usage report waits on the budget read before it answers unknown. */
-export const REALTIME_BUDGET_READ_TIMEOUT_MS = 2_000;
+/**
+ * How long a usage report waits on the budget read before it answers unknown. The gateway
+ * gives the whole report 3 s, so the read leaves room for the writes around it.
+ */
+export const REALTIME_BUDGET_READ_TIMEOUT_MS = 1_000;
 /** The shortest call an estimate assumes. */
 export const REALTIME_ESTIMATE_MIN_DURATION_MS = 60_000;
 /** The longest call an estimate assumes. */

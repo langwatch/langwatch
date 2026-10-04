@@ -94,6 +94,8 @@ export const gatewayInternalReserveSessionSchema = z.object({
   kind: z.string().min(1).max(32).optional(),
   metering: z.enum(["client", "gateway"]).optional(),
   transcription_model: z.string().min(1).max(512).optional(),
+  /** The end user the mint was attributed to; every spend record of the session carries it. */
+  end_user_id: z.string().max(512).optional(),
   /** Epoch milliseconds at which the minted credential stops opening a socket. */
   credential_expires_at: z.number().int().positive().optional(),
 });

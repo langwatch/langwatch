@@ -152,6 +152,8 @@ export type GatewayRealtimeSession = {
   metering: string | null;
   credentialExpiresAt: Instant | null;
   transcriptionModel: string | null;
+  /** The end user the mint was attributed to. Null when the mint named none. */
+  endUserId: string | null;
   lastReportAt: Instant | null;
   /** Everything recorded for the session: its reports plus what its own record confirmed. */
   reportedCostNanoUsd: number;

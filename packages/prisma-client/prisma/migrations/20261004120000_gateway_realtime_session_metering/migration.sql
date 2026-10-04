@@ -1,7 +1,8 @@
 -- Realtime voice metering the client cannot skip, owned by gateway (ADR-097).
 --
 -- GatewayRealtimeSession gains what the session is (kind), who measures it
--- (metering), how long its credential lives and a running total of the usage
+-- (metering), the end user it is attributed to, how long its credential lives
+-- and a running total of the usage
 -- reports recorded while it ran. GatewayRealtimeSessionReport holds one row
 -- per report, unique per (session, report key), so a redelivered report
 -- counts once.
@@ -16,7 +17,7 @@
 --   DROP TABLE "GatewayRealtimeSessionReport";
 --   DROP INDEX "GatewayRealtimeSession_status_metering_mintedAt_idx";
 --   ALTER TABLE "GatewayRealtimeSession" DROP COLUMN "kind", DROP COLUMN "metering",
---     DROP COLUMN "credentialExpiresAt", DROP COLUMN "transcriptionModel",
+--     DROP COLUMN "credentialExpiresAt", DROP COLUMN "transcriptionModel", DROP COLUMN "endUserId",
 --     DROP COLUMN "lastReportAt", DROP COLUMN "reportedCostNanoUsd", DROP COLUMN "reportCount";
 
 ALTER TABLE "GatewayRealtimeSession"
@@ -24,6 +25,7 @@ ALTER TABLE "GatewayRealtimeSession"
     ADD COLUMN "metering" TEXT,
     ADD COLUMN "credentialExpiresAt" TIMESTAMP(3),
     ADD COLUMN "transcriptionModel" TEXT,
+    ADD COLUMN "endUserId" TEXT,
     ADD COLUMN "lastReportAt" TIMESTAMP(3),
     ADD COLUMN "reportedCostNanoUsd" BIGINT NOT NULL DEFAULT 0,
     ADD COLUMN "reportCount" INTEGER NOT NULL DEFAULT 0;

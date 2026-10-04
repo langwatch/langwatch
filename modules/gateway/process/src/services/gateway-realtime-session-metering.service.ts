@@ -325,6 +325,7 @@ export class GatewayRealtimeSessionMeteringService {
         projectId: session.projectId,
         virtualKeyId: session.virtualKeyId,
         principalUserId: params.attribution.principalUserId,
+        endUserId: session.endUserId || null,
         projectedCostUsd: (pendingNanoUsd / NANO_USD_PER_USD).toFixed(9),
         providerKey: session.modelProviderId || null,
       });

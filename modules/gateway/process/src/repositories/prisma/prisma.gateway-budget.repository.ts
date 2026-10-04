@@ -220,6 +220,7 @@ export type BudgetCheckInput = {
   projectId: string | null;
   virtualKeyId: string;
   principalUserId?: string | null;
+  endUserId?: string | null;
   projectedCostUsd: number | string;
   /**
    * The provider this request would dispatch to, when known. Given it, provider-filtered
@@ -1231,6 +1232,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
           projectId: input.projectId,
           virtualKeyId: input.virtualKeyId,
           principalUserId: input.principalUserId,
+          endUserId: input.endUserId,
           memberGroupIds: input.memberGroupIds,
         },
       })

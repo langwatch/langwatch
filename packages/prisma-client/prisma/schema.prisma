@@ -6207,6 +6207,10 @@ model GatewayRealtimeSession {
   // declared one.
   transcriptionModel String?
 
+  // The end user the mint was attributed to. Every spend record of the
+  // session carries it, so a per-end-user budget is debited by voice usage.
+  endUserId String?
+
   // The usage reports recorded while the session ran. Each one is its own
   // spend record, so these three are a running total for reads and never the
   // source the ledger is debited from.

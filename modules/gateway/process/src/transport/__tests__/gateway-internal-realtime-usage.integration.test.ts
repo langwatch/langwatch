@@ -64,6 +64,35 @@ function door() {
   return { sessions, spend, send, reserve, usage };
 }
 
+describe("the internal realtime reserve route", () => {
+  describe("when the gateway books a session with an end user id", () => {
+    /** @scenario "The internal reserve route stores the end user the gateway sends" */
+    it("stores it on the row and carries it on the report's spend record", async () => {
+      const { sessions, spend, reserve, usage } = door();
+
+      const booked = await reserve({ kind: "realtime", metering: "client", end_user_id: "alice" });
+      await usage({ report_key: "resp_1", usage: { output_audio_tokens: 50 } });
+
+      expect(booked.status).toBe(200);
+      expect(sessions.rows.get("session-1")?.endUserId).toBe("alice");
+      expect(spend.sent).toHaveLength(1);
+      expect(spend.sent[0]).toMatchObject({
+        gateway_request_id: "session-1.resp_1",
+        end_user_id: "alice",
+      });
+    });
+
+    it("refuses an end user id longer than a spend record may carry", async () => {
+      const { sessions, reserve } = door();
+
+      const refused = await reserve({ end_user_id: "a".repeat(257) });
+
+      expect(refused.status).toBe(400);
+      expect(sessions.rows.size).toBe(0);
+    });
+  });
+});
+
 describe("the internal realtime usage route", () => {
   describe("when the gateway posts a keyed usage report", () => {
     /** @scenario "The internal usage route answers what the report did and what it cost" */
