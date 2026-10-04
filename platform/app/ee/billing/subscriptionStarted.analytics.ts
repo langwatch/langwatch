@@ -1,6 +1,6 @@
 import { prisma } from "../../src/server/db";
 import { getPostHogInstance, trackServerEvent } from "../../src/server/posthog";
-import { captureException } from "../../src/utils/posthogErrorCapture";
+import { captureException, toError } from "../../src/utils/posthogErrorCapture";
 
 /**
  * Tracks the PostHog subscription_started event for every member of an
@@ -21,11 +21,16 @@ export function fireSubscriptionStartedAnalytics({
   organizationId: string;
   plan: string;
 }): void {
-  if (!getPostHogInstance()) return;
+  try {
+    if (!getPostHogInstance()) return;
 
-  void trackSubscriptionStarted({ organizationId, plan }).catch(
-    captureException,
-  );
+    void trackSubscriptionStarted({ organizationId, plan }).catch(
+      captureException,
+    );
+  } catch (error) {
+    // Building the PostHog client can throw on a bad configuration.
+    captureException(toError(error));
+  }
 }
 
 async function trackSubscriptionStarted({

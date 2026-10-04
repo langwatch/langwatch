@@ -110,4 +110,26 @@ describe("Subscription started analytics", () => {
       expect(mockTrackServerEvent).not.toHaveBeenCalled();
     });
   });
+
+  describe("when the PostHog client cannot be built", () => {
+    it("captures the error and does not throw", async () => {
+      const { captureException } = await import(
+        "../../../src/utils/posthogErrorCapture"
+      );
+      const error = new Error("bad PostHog configuration");
+      mockGetPostHogInstance.mockImplementation(() => {
+        throw error;
+      });
+
+      expect(() =>
+        fireSubscriptionStartedAnalytics({
+          organizationId: "org-123",
+          plan: "LAUNCH",
+        }),
+      ).not.toThrow();
+
+      expect(captureException).toHaveBeenCalledWith(error);
+      expect(mockFindMany).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -9,9 +9,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { trackOrganizationCreated } from "../signup-attribution.analytics";
 
-const { trackServerEvent } = vi.hoisted(() => ({ trackServerEvent: vi.fn() }));
+const { trackServerEvent, captureException } = vi.hoisted(() => ({
+  trackServerEvent: vi.fn(),
+  captureException: vi.fn(),
+}));
 
 vi.mock("~/server/posthog", () => ({ trackServerEvent }));
+vi.mock("~/utils/posthogErrorCapture", () => ({
+  captureException,
+  toError: (e: unknown) => (e instanceof Error ? e : new Error(String(e))),
+}));
 
 describe("trackOrganizationCreated()", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -93,6 +100,27 @@ describe("trackOrganizationCreated()", () => {
           $groups: { organization: "org_1" },
           $set_once: {},
         },
+      });
+    });
+  });
+
+  describe("when tracking throws", () => {
+    it("captures the error and does not throw", () => {
+      const error = new Error("bad PostHog configuration");
+      trackServerEvent.mockImplementationOnce(() => {
+        throw error;
+      });
+
+      expect(() =>
+        trackOrganizationCreated({
+          userId: "user_1",
+          organizationId: "org_1",
+          signUpData: null,
+        }),
+      ).not.toThrow();
+
+      expect(captureException).toHaveBeenCalledWith(error, {
+        extra: { origin: "trackOrganizationCreated", organizationId: "org_1" },
       });
     });
   });
