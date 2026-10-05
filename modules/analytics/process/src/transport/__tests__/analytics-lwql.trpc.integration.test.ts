@@ -5,6 +5,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
@@ -42,6 +43,7 @@ async function callerFor({ switchOn, held }: { switchOn: boolean; held: readonly
       authz: createApiFixture<AuthzApi>(),
       dataPrivacy: createApiFixture<DataPrivacyApi>(),
       projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "org-1" }),
+      organizations: createApiFixture<OrganizationApi>(),
       plans: createApiFixture<EntitlementApi>(),
       traces: createApiFixture<TraceApi>(),
       retention: createApiFixture<DataRetentionApi>(),

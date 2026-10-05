@@ -10,6 +10,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -57,6 +58,7 @@ async function harness() {
         getOrganizationId: async (projectId) =>
           projectId === "project-enterprise" ? "org-enterprise" : "org-free",
       }),
+      organizations: createApiFixture<OrganizationApi>(),
       plans: createApiFixture<EntitlementApi>({
         requestBound: ({ key, organizationId }) =>
           Promise.resolve(resolveRequestBound(key, TIER_PLAN_TYPE[organizationId] ?? "FREE")),

@@ -54,6 +54,7 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -174,6 +175,8 @@ export interface AnalyticsAppDependencies {
   dataPrivacy: DataPrivacyApi;
   /** The SAME project peer the rollout gate and the run-caller's identity read. */
   projects: ProjectApi;
+  /** The organization's own Instant Evals switch, read when the flag says no. */
+  organizations: OrganizationApi;
   /** The per-project window every LangWatchQL execution is counted against. */
   lwqlBounds: LangWatchQLBoundsService;
   /** The peer every app-function value is read and rendered through. */
@@ -200,6 +203,7 @@ type AnalyticsDependencies = Readonly<{
   authz: typeof AuthzApi;
   dataPrivacy: typeof DataPrivacyApi;
   projects: typeof ProjectApi;
+  organizations: typeof OrganizationApi;
   /** The plan the LangWatchQL execution window resolves through. */
   plans: typeof EntitlementApi;
   /** Every app-function value is one of this peer's traces, rendered by it. */
@@ -362,6 +366,7 @@ export class AnalyticsModule
     authz: AuthzApi,
     dataPrivacy: DataPrivacyApi,
     projects: ProjectApi,
+    organizations: OrganizationApi,
     plans: EntitlementApi,
     /** Every app-function value is one of this peer's traces, rendered by it. */
     traces: TraceApi,
@@ -454,6 +459,7 @@ export class AnalyticsModule
         authz: setup.dependencies.authz,
         dataPrivacy: setup.dependencies.dataPrivacy,
         projects: setup.dependencies.projects,
+        organizations: setup.dependencies.organizations,
         lwqlBounds: LangWatchQLBoundsService.create({
           entitlement: setup.dependencies.plans,
           projects: setup.dependencies.projects,
@@ -751,6 +757,7 @@ export class AnalyticsModule
       featureFlags: this.#dependencies.featureFlags,
       projectId,
       projects: this.#dependencies.projects,
+      organizations: this.#dependencies.organizations,
     });
   }
 

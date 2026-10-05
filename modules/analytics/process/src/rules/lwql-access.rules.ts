@@ -1,4 +1,5 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 /**
@@ -39,24 +40,29 @@ export async function lwqlEnabled({
 }
 
 /**
- * Whether this project may call an eval function. Asked of the project, like
- * the surface gate above, and fails closed when the project names no
- * organization.
+ * Whether this project may call an eval function: the flag, or the
+ * organization's own switch. The flag is asked first and the switch only
+ * when it says no; fails closed when the project names no organization.
  */
 export async function instantEvalsEnabled({
   featureFlags,
   projectId,
   projects,
+  organizations,
 }: {
   featureFlags: FeatureFlagApi;
   projectId: string;
   projects: ProjectApi;
+  organizations: Pick<OrganizationApi, "isInstantEvalsOptedIn">;
 }): Promise<boolean> {
   const organizationId = await projects.getOrganizationId(projectId);
 
-  return featureFlags.isEnabled(INSTANT_EVALS_FLAG, {
+  const released = await featureFlags.isEnabled(INSTANT_EVALS_FLAG, {
     kind: "project",
     projectId,
     organizationId,
   });
+  if (released) return true;
+  if (!organizationId) return false;
+  return organizations.isInstantEvalsOptedIn({ organizationId });
 }

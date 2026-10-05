@@ -5,6 +5,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -30,8 +31,9 @@ const ORGANIZATION_ID = "org-judging";
  * identity is provisioned, which the schema read does not need and an
  * execution answers `lwql_unavailable` from.
  */
-async function harness(flagAnswer: boolean) {
+async function harness(flagAnswer: boolean, { optedIn = false }: { optedIn?: boolean } = {}) {
   const flagReads: { key: string; target: FeatureFlagTarget }[] = [];
+  const optInReads: string[] = [];
   const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>({
@@ -45,6 +47,13 @@ async function harness(flagAnswer: boolean) {
       dataPrivacy: createApiFixture<DataPrivacyApi>(),
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: () => Promise.resolve(ORGANIZATION_ID),
+      }),
+      organizations: createApiFixture<OrganizationApi>({
+        isInstantEvalsOptedIn: ({ organizationId }) => {
+          optInReads.push(organizationId);
+
+          return Promise.resolve(optedIn);
+        },
       }),
       plans: createApiFixture<EntitlementApi>({
         requestBound: ({ key }) => Promise.resolve(resolveRequestBound(key, "ENTERPRISE")),
@@ -84,7 +93,7 @@ async function harness(flagAnswer: boolean) {
       })
       .catch(() => void 0);
 
-  return { app, execute, flagReads };
+  return { app, execute, flagReads, optInReads };
 }
 
 const appFunction = (schema: LangWatchQLSchema, name: string) =>
@@ -114,9 +123,23 @@ describe("AnalyticsModule.describeLangWatchQLSchema", () => {
     });
   });
 
+  describe("given the flag is off and the organization switched Instant Evals on itself", () => {
+    it("publishes the eval functions as available", async () => {
+      const { app, optInReads } = await harness(false, { optedIn: true });
+
+      const schema = await app.describeLangWatchQLSchema({
+        projectId: PROJECT_ID,
+        protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+      });
+
+      expect(appFunction(schema, "eval")?.available).toBe(true);
+      expect(optInReads).toEqual([ORGANIZATION_ID]);
+    });
+  });
+
   describe("given the Instant Evals flag is on for the project", () => {
     it("publishes the eval functions as available", async () => {
-      const { app, flagReads } = await harness(true);
+      const { app, flagReads, optInReads } = await harness(true);
 
       const schema = await app.describeLangWatchQLSchema({
         projectId: PROJECT_ID,
@@ -130,6 +153,7 @@ describe("AnalyticsModule.describeLangWatchQLSchema", () => {
           target: { kind: "project", projectId: PROJECT_ID, organizationId: ORGANIZATION_ID },
         },
       ]);
+      expect(optInReads).toEqual([]);
     });
   });
 });

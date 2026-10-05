@@ -15,6 +15,7 @@ import {
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
@@ -115,6 +116,9 @@ async function appOver(input: {
             data: [...input.listed],
             pagination: { page: 1, limit, total: input.listed.length },
           }),
+      }),
+      organizations: createApiFixture<OrganizationApi>({
+        isInstantEvalsOptedIn: () => Promise.resolve(false),
       }),
       plans: createApiFixture<EntitlementApi>({
         requestBound: ({ key }) => Promise.resolve(resolveRequestBound(key, "ENTERPRISE")),
