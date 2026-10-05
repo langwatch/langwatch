@@ -57,6 +57,40 @@ function harness() {
 }
 
 describe("handleTraceAlertTriggerMatch", () => {
+  describe("given a project with one active trace automation", () => {
+    describe("when an ingested trace reaches the alert subscriber", () => {
+      /** @scenario "A trace alert is matched and recorded from the worker" */
+      it("records one match through the recorder naming the trigger, its action and the action class", async () => {
+        const matches: Parameters<
+          Parameters<typeof handleTraceAlertTriggerMatch>[0]["triggerMatches"]["send"]
+        >[0][] = [];
+
+        await handleTraceAlertTriggerMatch(
+          {
+            triggers: {
+              findActiveTraceTriggersForProject: async () => [
+                { ...trigger("only-automation", {}), action: "ADD_TO_DATASET" },
+              ],
+            },
+            triggerMatches: { send: async (match) => void matches.push(match) },
+            metrics: { countRecorded: () => undefined },
+          },
+          { occurredAt: 2_000 },
+          { tenantId: "project-1", aggregateId: "trace-9" },
+        );
+
+        expect(matches).toHaveLength(1);
+        expect(matches[0]).toMatchObject({
+          tenantId: "project-1",
+          traceId: "trace-9",
+          triggerId: "only-automation",
+          action: "ADD_TO_DATASET",
+          actionClass: "persist",
+        });
+      });
+    });
+  });
+
   describe("given a trace-only automation and one that reads evaluations", () => {
     describe("when trace hands over a settled trace", () => {
       /** @scenario "An origin-guarded trace records a match per trace trigger that reads no evaluation" */
