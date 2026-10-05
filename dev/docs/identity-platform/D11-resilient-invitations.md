@@ -2,6 +2,12 @@
 
 Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 (identifiers) only · Invite changes additive
 
+> **Historical (marked 2026-10-05):** written against main's monolith, before `platform/app` was
+> deleted. Paths under `src/server/`, `server/app-layer/` and `packages/authz*` describe that tree.
+> Today a feature is a module (ARCHITECTURE.md §3), pipelines are `definePipeline` in
+> `modules/<name>/process/src/eventing` (§9), and the permission registry is
+> `packages/authorization/src/registry.ts`. Check the current tree before treating a path below as live.
+
 # Overview
 
 The direct fix for the invitation dead-end support load — pulled ahead of the router because it needs only identifiers, not routing. Acceptance works via any verified method, the inviter can resend in one click, and expiry becomes a visible, recoverable state instead of a silent dead end.

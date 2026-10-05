@@ -1,10 +1,10 @@
 # Prisma ownership: day-one proposal
 
-Research snapshot: 2026-09-07, branch `feat/strict-feature-layout-v0`, HEAD `0ac73e1e82` plus the shared working tree. This is an inventory and proposal, not an accepted ADR or an enforced migration. No production source or schema changed for this report.
+Research snapshot: 2026-09-07, branch `feat/strict-feature-layout-v0`, HEAD `0ac73e1e82` plus the shared working tree. This is an inventory and proposal, not an accepted ADR or an enforced migration. No production source or schema changed for this report. Historical (marked 2026-10-05): where it differs, table ownership is ruled by ARCHITECTURE.md §3 (a repository belongs to one module).
 
 ## Recommendation
 
-Keep one feature owner per physical model. Group the child tables that share a domain lifecycle under that owner. Retain existing feature boundaries and introduce narrow, named compatibility exceptions for existing joins and transactions; do not manufacture a giant tenant feature to legalize every current query. Claims should live on private repositories; `.withApp(...)` can collect inert metadata without a second Prisma table list on the installer.
+Keep one feature owner per physical model. Group the child tables that share a domain lifecycle under that owner. Retain existing feature boundaries and introduce narrow, named compatibility exceptions for existing joins and transactions; do not manufacture a giant tenant feature to legalize every current query. Claims should live on private repositories; the installer (then `.withApp(...)`, a spelling §15 deletes) can collect inert metadata without a second Prisma table list on the installer.
 
 All **125 models** are assigned once below: **40 existing feature owners and 3 platform owners**. Multiple repositories inside a feature may use the same model. A compatibility exception grants bounded access, never a second ownership claim. Platform persistence belongs to its existing framework, not a fabricated feature or an arbitrary Ops catch-all.
 

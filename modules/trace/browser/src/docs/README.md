@@ -6,7 +6,7 @@ Single source of truth for project status, history, and roadmap.
 
 **Phase 2 (Lens Engine) complete + Phase 3A wiring in progress.**
 
-Phase 1 + 2 mock UI is done. Phase 3A real-data wiring (tRPC routers, app-layer hooks, projections) has landed: `tracesV2.list`, `tracesV2.header`, `tracesV2.spanTree`, `tracesV2.evals`, the trace-level prompt rollup projection, and `tracesV2.aiAction` for the AI composer.
+Phase 1 + 2 mock UI is done. Phase 3A real-data wiring (tRPC routers, the module's services and repositories, projections) has landed: `tracesV2.list`, `tracesV2.header`, `tracesV2.spanTree`, `tracesV2.evals`, the trace-level prompt rollup projection, and `tracesV2.aiAction` for the AI composer.
 
 ## Timeline
 

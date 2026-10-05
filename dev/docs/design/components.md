@@ -109,39 +109,33 @@ import {
 </Dialog.Root>
 ```
 
-## Drawer Navigation (useDrawer Hook)
+## Drawer Navigation
 
-LangWatch uses a centralized drawer system with URL-based state management. Drawers can navigate to other drawers while maintaining back button functionality.
+Drawers are URL-routed singletons with a navigation stack (`dev/docs/ARCHITECTURE.md` §10). The open drawer and its params live in the URL (`?drawer.open=<name>`, `drawer.<key>`); the drawers beneath it live in `history.state`, so Back closes the top one and a reload restores the stack.
 
 ### Architecture
 
-The system consists of two parts:
+1. **`CurrentDrawer`** - mounted once by the shell; reads the URL and renders the open drawer.
+2. **The declaration** - the owning module registers each drawer in its `<name>.web.ts` with `.drawer(Token, { load })`.
+3. **`useDrawer`** - the host service (from `@langwatch/browser-host/drawer`) a screen uses to open, close and go back.
 
-1. **`CurrentDrawer`** - A global component, mounted once near the app root, that reads URL params and renders the appropriate drawer
-2. **`useDrawer`** - A hook (from `@langwatch/browser-host/drawer`) for opening/closing drawers and managing navigation
+**Important:** Don't render drawers explicitly in pages - `CurrentDrawer` renders whatever the URL names. This keeps Back working, keeps drawer state shareable, and avoids duplicate mounts.
 
-**Important:** Don't render drawers explicitly in pages - `CurrentDrawer` handles rendering automatically based on URL state. This ensures:
+### Tokens, not bare names
 
-- Browser back/forward buttons work naturally
-- URLs are shareable (drawer state is in the URL)
-- No duplicate drawer rendering
+A drawer another module opens is a typed token in its owner's contract (§10.1). Exemplar: dataset's contract (`modules/dataset/contract/src`) declares `SelectDatasetDrawerToken`, and `modules/dataset/browser/src/dataset.web.ts` registers it with `.drawer(SelectDatasetDrawerToken, { load })`. A drawer only its owner opens keeps its token in the owner's own `model/`. Opening a drawer by a bare name is a deleted spelling (§15); `navigateToDrawer` is the address door for code that only has an address.
 
 ### Basic Usage
 
 ```tsx
+import { SelectDatasetDrawerToken } from "@langwatch/dataset-contract";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 
 function MyComponent() {
-  const { openDrawer, closeDrawer, canGoBack, goBack, currentDrawer } = useDrawer();
+  const { openDrawer, closeDrawer, canGoBack, goBack } = useDrawer();
 
-  // Open a drawer
-  openDrawer("promptEditor", { promptId: "abc123" });
-
-  // Navigate to another drawer (adds to stack)
-  openDrawer("promptList");
-
-  // Go back to previous drawer
-  goBack();
+  // Open the owner's drawer; props are typed by the token
+  openDrawer(SelectDatasetDrawerToken, { onSelect: handleSelect, onClose: goBack });
 
   // Close drawer entirely (clears stack)
   closeDrawer();
@@ -150,50 +144,32 @@ function MyComponent() {
 
 ### Hook API
 
-| Function/Property                    | Description                                       |
-| ------------------------------------ | ------------------------------------------------- |
-| `openDrawer(type, props?, options?)` | Open a drawer with optional props                 |
-| `closeDrawer()`                      | Close drawer and clear navigation stack           |
-| `goBack()`                           | Return to previous drawer in stack                |
-| `canGoBack`                          | Boolean - true if there's history to go back to   |
-| `currentDrawer`                      | Currently open drawer type                        |
-| `setFlowCallbacks(type, callbacks)`  | Register callbacks that persist across navigation |
-| `getFlowCallbacks(type)`             | Retrieve persisted callbacks                      |
+| Function/Property                     | Description                                       |
+| ------------------------------------- | ------------------------------------------------- |
+| `openDrawer(Token, props?, options?)` | Open the token's drawer with typed props          |
+| `closeDrawer()`                       | Close drawer and clear navigation stack           |
+| `goBack()`                            | Return to previous drawer in stack                |
+| `canGoBack`                           | Boolean - true if there's history to go back to   |
+| `setFlowCallbacks(Token, callbacks)`  | Register callbacks that persist across navigation |
+| `getFlowCallbacks(Token)`             | Retrieve persisted callbacks                      |
 
 ### Options
 
 ```tsx
 // Replace current drawer instead of pushing to stack
-openDrawer("promptEditor", { promptId: "abc" }, { replace: true });
+openDrawer(SelectDatasetDrawerToken, {}, { replace: true });
 
 // Reset stack (no back button will show)
-openDrawer("targetTypeSelector", {}, { resetStack: true });
+openDrawer(SelectDatasetDrawerToken, {}, { resetStack: true });
 ```
 
 ### Flow Callbacks
 
-For callbacks that need to persist across drawer navigation:
-
-```tsx
-// In parent component - set callbacks before opening first drawer
-const { setFlowCallbacks, openDrawer } = useDrawer();
-
-const handleSelectPrompt = (prompt) => {
-  // Handle selection
-};
-
-setFlowCallbacks("promptList", { onSelect: handleSelectPrompt });
-openDrawer("targetTypeSelector");
-
-// In PromptListDrawer - retrieve the callback
-const { getFlowCallbacks } = useDrawer();
-const callbacks = getFlowCallbacks("promptList");
-callbacks?.onSelect?.(selectedPrompt);
-```
+A sub-flow passes `onClose` (usually `goBack`) rather than letting the target call `closeDrawer`, which clears the whole stack. For callbacks that must survive several drawer hops, register them against the token with `setFlowCallbacks(Token, callbacks)` and read them in the target with `getFlowCallbacks(Token)`.
 
 ### Registered Drawers
 
-A drawer is registered by the feature that owns it, not in one shared file. Each feature's `web` package exports a `UiDrawerRegistry` (built with `lazyDrawer` from `@langwatch/browser-host/drawer`), and `apps/ui/src/features/installed-ui-drawers.ts` composes every feature's registry into the one the application serves. See `dev/docs/best_practices/drawers.md` ("Adding a new drawer") for the full walkthrough, including the `withHost` wrapping step that happens in `apps/ui`'s own `*-drawers.tsx` files.
+A drawer is registered by the module that owns it, in its declaration (`.drawer(Token, { load })`), never in one shared file. The browser runtime folds every installed declaration into one registry (`installedDrawerLoaders`) and refuses a name two modules claim. Drawer names are the wire: they ride shared links and REST `platformUrl` fields, so a renamed drawer is a regression.
 
 ## Page Layout Components
 

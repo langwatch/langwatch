@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: "Everything on the browser side of a LangWatch module: createUi and the shell, a module's browser-half layer order (model/behavior/ui), host services vs components (browser-host vs design-system), where shared code goes now that kits are gone (record §3.4), building a new browser module end to end (defineBrowserModule, screens, drawers, lends, the module's *HostApi, the derived tRPC client), drawers as routed singletons, and frontend testing (colocated __tests__, jsdom docblock, component tests as integration level). Use whenever someone is building a screen, drawer, or shell chrome; writing or extending a module's browser/ package; asking how a screen reads session/navigation without importing the router or browser-host directly; sharing a component, hook or data with another module (design system, contract, `<name>-client`); or writing/reviewing a component test."
+description: "Everything on the browser side of a LangWatch module: createUi and the shell, a module's browser-half layer order (model/behavior/ui), host services vs components (browser-host vs design-system), where shared code goes now that kits are gone (record §3.4), building a new browser module end to end (defineBrowserModule, screens, drawers, lends, the module's *HostApi, the derived tRPC client), drawers as routed singletons, and frontend testing (colocated __tests__, jsdom docblock, component tests as integration level). Use whenever someone is building a screen, drawer, or shell chrome; writing or extending a module's browser/ package; asking how a screen reads host services (tokens, its own `*HostApi`); sharing a component, hook or data with another module (design system, contract, `<name>-client`); or writing/reviewing a component test."
 user-invocable: true
 argument-hint: "<question or frontend task>"
 ---
@@ -41,12 +41,13 @@ package that outgrows one `ui/sections/` folder does not invent a layer, it
 nests: `features/<name>/` repeats `model/behavior/ui` inside itself, and a
 feature that is one component is a section, not a feature — behaviour lives
 in the feature that owns it, not a package-wide `behavior/` bucket every
-feature reaches into. A screen declares a `*HostApi` (`model/<name>-host.ts`)
-the **shell** implements from `@langwatch/browser-host` host services — a
-screen component never imports `browser-host` or a router itself, and an
-unmounted `*HostApi` is refused by `createUi` at install, by name, before any
-component renders. The whole half is declared once, with `defineBrowserModule`
-(screens, drawers, lends, mounts, capabilities), and the package's
+feature reaches into. A screen reads host services directly, typed by
+tokens: `useLent`, `openDrawer`, `useReleaseFlag` (§3.4, §10.1). A `*HostApi`
+(`model/<name>-host.ts`) keeps only the module's own host needs, which the
+**shell** implements from `@langwatch/browser-host`; an unmounted `*HostApi` is
+refused by `createUi` at install, by name, before any component renders. The
+whole half is declared once, with `defineBrowserModule` (screens, drawers,
+publications, host mounts), and the package's
 `exports` map lists that declaration and nothing else — `surfaces/` and
 `screens/` are deleted browser folders (record §15). A module capability the
 composition root needs (not a screen) travels through the same declaration's
@@ -54,9 +55,9 @@ composition root needs (not a screen) travels through the same declaration's
 list installs the declaration, the same way `processModules` are generated
 for the backend — no hand-written file in `apps/ui` names either list.
 
-The tRPC client is derived from the contract's declarations via
-`browser-trpc` (`ContractApiMap<typeof <name>Trpc>`) — never hand-written,
-never `AppRouter` (ADR-130). A procedure another module owns and this package
+The tRPC client is derived from the contract's declarations by
+`createModuleApi` (`@langwatch/api/web`) and lives in the module's
+`<name>-client` package — never hand-written, never `AppRouter` (ADR-130). A procedure another module owns and this package
 still calls is the one hand-written exception, in a `BorrowedProcedures` type
 that says so until that module's own contract declares it.
 
@@ -108,28 +109,33 @@ boundaries; a violation there is the finding, not a judgement call.
 
 ## Creating a new browser module, end to end
 
-**Copy `modules/annotation`**'s browser package as the shape reference. This
+**Copy `modules/annotation`**'s browser package as the shape reference
+(`modules/annotation/browser/src/annotation.web.ts` is the declaration). This
 assumes the module's **contract** already exists (see the `backend` skill's
 "Creating a new process module" for the shared contract steps — a
 browser-only module still needs a contract package if it owns any config or
 schema, even with zero process operations).
 
 ```
-src/<name>s.ts              flat entry: screens map, re-exported *Api token
-src/declaration.ts          export default defineBrowserModule("<name>")…
-src/model/<name>-host.ts    abstract <Name>HostApi + React context
-src/behavior/<name>-api.ts  createModuleApi<<Name>ApiMap>() over browser-trpc
-src/behavior/use-<name>s.ts hooks over the api binding
+src/<name>.web.ts           the declaration: defineBrowserModule("<name>")…
+src/model/<name>-host.ts    abstract <Name>HostApi + React context (own host needs only)
+src/behavior/use-<name>s.ts hooks over the module's <name>-client
 src/ui/elements/…  ui/blocks/…  ui/sections/<name>s-screen.tsx
 src/testing.tsx             Stub<Name>Host + render harness
 ```
 
 ```ts
-// declaration.ts — the one file the generated browserModules list installs,
+// <name>.web.ts — the one file the generated browserModules list installs,
 // and the exports map's only entry (./declaration)
-export default defineBrowserModule("<name>")
-  .withScreens({ <name>s: () => import("./ui/sections/<name>s-screen.tsx") })
-  .withDrawers({ ... })         // if any
+export const <name>Web = defineBrowserModule("<name>")
+  .withScreens({
+    "pages/[project]/<name>s": {
+      path: "/:project/<name>s", within: "project", label: "<Name>s",
+      requires: "<name>s:view",   // the router guards it (§10)
+      load: () => import("./ui/sections/<name>s-screen.tsx"),
+    },
+  })
+  .drawer(<Name>DrawerToken, { load: ... })  // if any; the token is the owner's (§10.1)
   .withHosts({ requires: [...], mounts: [...] })  // *HostApi names read/provided —
                                 // an unmounted one is refused by createUi at install
   .withCapabilities({ ... });   // if the composition root needs an impl this module owns

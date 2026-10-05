@@ -166,23 +166,28 @@ import { Menu } from "@langwatch/design-system/menu";
 
 ## Nested Drawer Navigation
 
-Pattern for multi-step flows (e.g., type → list → editor). See `dev/docs/best_practices/drawers.md` ("Going to another drawer and back") for the canonical walkthrough.
+Pattern for multi-step flows (e.g., type → list → editor). Drawers are opened by their owner's token (`dev/docs/ARCHITECTURE.md` §10.1); `components.md` ("Drawer Navigation") has the hook API.
 
 ```tsx
 import { Button, HStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+// Tokens declared once by the drawers' owner (ARCHITECTURE.md §10.1)
+import {
+  CategorySelectorDrawerToken,
+  ItemSelectorDrawerToken,
+} from "../../model/selector-drawer-tokens.ts";
 
 // Parent: Set callbacks and start flow
 export function StartFlow() {
   const { openDrawer, setFlowCallbacks } = useDrawer();
 
   const handleStart = () => {
-    setFlowCallbacks("itemSelector", {
+    setFlowCallbacks(ItemSelectorDrawerToken, {
       onSelect: (item) => console.log("Selected:", item),
     });
-    openDrawer("categorySelector");
+    openDrawer(CategorySelectorDrawerToken);
   };
 
   return <Button onClick={handleStart}>Select Item</Button>;
@@ -207,7 +212,7 @@ export function CategoryDrawer() {
           </HStack>
         </Drawer.Header>
         <Drawer.Body>
-          <Button onClick={() => openDrawer("itemSelector", { categoryId: "1" })}>
+          <Button onClick={() => openDrawer(ItemSelectorDrawerToken, { categoryId: "1" })}>
             Category 1
           </Button>
         </Drawer.Body>
@@ -219,7 +224,7 @@ export function CategoryDrawer() {
 // Final drawer: retrieve callbacks
 export function ItemDrawer() {
   const { closeDrawer, canGoBack, goBack, getFlowCallbacks } = useDrawer();
-  const callbacks = getFlowCallbacks("itemSelector");
+  const callbacks = getFlowCallbacks(ItemSelectorDrawerToken);
 
   const handleSelect = (item) => {
     callbacks?.onSelect?.(item);

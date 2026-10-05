@@ -342,8 +342,9 @@ validation body, that is the fix working, not a regression to chase.
 A finding qualifies as `error_improved` iff BOTH hold:
 
 1. **Main's answer is unowned.** Status 5xx (unowned by construction,
-   whatever the body says — `apps/api/src/app/api-canonical-error.ts`'s
-   `handledErrorEnvelope` forces the generic `internal_error` code onto
+   whatever the body says — the branch's error envelope, written when it
+   was `apps/api/src/app/api-canonical-error.ts` (since deleted; the mapping
+   is now `canonicalErrorFor` in `packages/api/src/rest/response.ts`), forces the generic `internal_error` code onto
    every 5xx it emits, discarding even a `HandledError`'s own code), or a
    body reporting that same generic code at some other status.
 2. **The branch's answer is a handled refusal at least as good.** A 4xx

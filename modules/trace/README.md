@@ -25,7 +25,7 @@ event/link mapping, offloaded event-log resolution, and the IO extractor. The
 next move must compose all of those once behind the same `TraceService`; it
 must not point a route at a partial replacement.
 
-The app-layer span-storage repository remains the single full-span and
+The span-storage repository (`process/src/repositories/span-storage.repository.ts`) remains the single full-span and
 whole-tree-anchor reader until that complete migration. It no longer owns the
 paged tree or row-version delta queries.
 

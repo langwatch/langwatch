@@ -2,6 +2,12 @@
 
 Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D04 + **authz precondition checklist (hard)** · Flag: `SELF_SERVE_SSO` (per-org)
 
+> **Historical (marked 2026-10-05):** written against main's monolith, before `platform/app` was
+> deleted. Paths under `src/server/`, `server/app-layer/` and `packages/authz*` describe that tree.
+> Today a feature is a module (ARCHITECTURE.md §3), pipelines are `definePipeline` in
+> `modules/<name>/process/src/eventing` (§9), and the permission registry is
+> `packages/authorization/src/registry.ts`. Check the current tree before treating a path below as live.
+
 # Overview
 
 Enterprise SSO onboarding stops being a support ticket. Org admins register and verify their own connections in Settings; LangWatch ops approves domain claims; and both support surfaces ship — the platform-ops identity lookup (the designated replacement for DB surgery) and the org-admin surface (link confirmations, member-identifier view). Permissions are real registry entries from day one — no seam.

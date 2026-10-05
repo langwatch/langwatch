@@ -64,7 +64,10 @@ any other through SSE hints (§10, "A write makes reads stale through the key").
 `organization-api.ts` is `createModuleApi<…>()` over the contract's declared
 procedures, never `AppRouter`. The declaration names it:
 `.withApi(organizationApi, { contracts: [organizationTrpc, planTrpc] })`, which
-is how a contract's cache policy reaches the browser.
+installs the client (`installedModuleApis`, §10.1). There is no per-read cache
+policy: every read is mirrored to disk by default (§10.2). Organization predates
+the `<name>-client` packages; a new module puts its derived hooks in
+`modules/<name>/client` (§3.4).
 
 A read takes an opaque id plus its tenant scope (`projectId`,
 `organizationId`), never a slug alone. A query never returns a credential; a

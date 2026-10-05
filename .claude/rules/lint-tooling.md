@@ -21,10 +21,10 @@ Load the `lint-rule` skill to add or change a rule.
   what to use instead.
 - `@langwatch/architecture-enforcer`: whole-tree policies (package boundaries,
   cycles, frontend/server separation, table ownership, memory-twin drift, dead
-  exports) from one registry (`--list-policies`). No policy reads a baseline (two ruled transitions, §7's event-table access and
-  §10.1's framework-module-contracts, hold shrink-only lists under
-  `packages/architecture-enforcer/tests/baselines/`; every peer cycle is refused,
-  §17); a policy whose anchor file is missing refuses the run by name. CI runs the zero-finding
+  exports) from one registry (`--list-policies`). No policy reads a baseline (ruled transitions hold shrink-only lists under
+  `packages/architecture-enforcer/tests/baselines/`, each checked by a test: §7's
+  `eventing-table-access.json`, §10.1's `framework-module-contracts.json` and §15's
+  `deleted-spellings.json`; every peer cycle is refused, §17); a policy whose anchor file is missing refuses the run by name. CI runs the zero-finding
   policies by id.
 - TypeScript 7's root `typescript` export is a version constant. The compiler
   API lives behind `typescript/unstable/*`; sessions go through

@@ -3,14 +3,14 @@
 Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D03 · Flag: `SSOCONN_ROUTING` (shadow → enforce)
 
 > **Amendment 2026-09-03:** `platform/app` is deleted. Enterprise SSO now
-> lives in `enterprise/modules/sso/{contract,server,web}`; the
-> BetterAuth provider adapter is
-> `enterprise/modules/sso/process/src/adapters/better-auth.better-auth.adapter.ts`.
+> lives in `enterprise/modules/sso/{contract,process,browser}`; the
+> BetterAuth provider adapter this note first named has since moved (re-pointed
+> 2026-10-05): read `enterprise/modules/sso/process/src` for the current shape.
 > Verify current shape against that tree before treating paths below as live.
 
 # Overview
 
-Enterprise SSO stops being two hand-set strings on `Organization` and becomes a first-class event-sourced aggregate: `SsoConnection` per (org, IdP), with domains, IdP metadata, and a guarded lifecycle. Existing orgs are grandfathered in; the router's domain lookup flips from strings to the projection behind a shadow flag. Super-admin/backoffice parity only — self-service UI is D05.
+Enterprise SSO stops being two hand-set strings on `Organization` and becomes a first-class event-sourced aggregate: `SsoConnection` per (org, IdP), with domains, IdP metadata, and a guarded lifecycle. Existing orgs are grandfathered in; the router's domain lookup flips from strings to the projection behind a shadow flag. Super-admin and Ops instance admin parity only (§3.5) — self-service UI is D05.
 
 # Requirements
 
@@ -53,7 +53,7 @@ stateDiagram-v2
 - **Amended by D05: a fourth verification method, `operator-attested`.** See the amendment section below.
 - Grandfathering rides `@langwatch/system-migrations` as a `SystemMigration` named `identity-d04-connection-grandfather`: existing `Organization.ssoDomain/ssoProvider` orgs get backfill events producing VERIFIED/ACTIVE connections (event payloads note `legacy-grandfathered` source); legacy `auth0`/`okta` Account rows re-pointed (`connectionId`) to the grandfathered connections. Proof for `finalized`: the connection-based routing decision matches the string-based one for every domain the org carries — the same comparison `SSOCONN_ROUTING` shadow mode runs, evaluated per tenant.
 - Router integration: `SSOCONN_ROUTING` shadow-compares connection-based routing vs string-based routing on every login; then enforce; then `ssoDomain` writes stop and the columns become derived/legacy.
-- Backoffice edits connections (parity with today's super-admin string-setting).
+- Ops instance admin edits connections (parity with today's super-admin string-setting).
 
 # Data structures
 
@@ -161,7 +161,7 @@ been written method-agnostically in a way this could break).
 2. Grandfather backfill (idempotency keys `grandfather:<orgId>`).
 3. Process managers: teardown grace timer; break-glass expiry warnings (14/7/1-day wakes) once bindings exist.
 4. Router domain lookup switches to projection behind `SSOCONN_ROUTING`; shadow bake; flip.
-5. Backoffice connection CRUD via commands (never raw table edits).
+5. Ops instance admin connection CRUD via commands (never raw table edits).
 6. SAML engine evaluation: `@better-auth/sso@1.6.23` (its `ssoProvider` table treated as protocol state only) vs genericOAuth-with-SAML; record the decision in ADR-3.
 
 # Exit gate / rollback

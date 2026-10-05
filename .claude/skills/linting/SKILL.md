@@ -12,10 +12,10 @@ document disagree, the finding is right and the document is the defect.
 
 ## Two tools
 
-| Tool | Runs | Looks at | Reference |
-| --- | --- | --- | --- |
-| oxlint + the `langwatch` plugin | `pnpm lint`, `pnpm lint:changed` | One file at a time: names, imports, layers, comments | `dev/docs/lint-rules.md` (generated, every rule) |
-| architecture enforcer | `pnpm lint:architecture` | The whole tree: package graph, ownership, cycles, dead exports | `packages/architecture-enforcer/README.md` |
+| Tool                            | Runs                             | Looks at                                                       | Reference                                        |
+| ------------------------------- | -------------------------------- | -------------------------------------------------------------- | ------------------------------------------------ |
+| oxlint + the `langwatch` plugin | `pnpm lint`, `pnpm lint:changed` | One file at a time: names, imports, layers, comments           | `dev/docs/lint-rules.md` (generated, every rule) |
+| architecture enforcer           | `pnpm lint:architecture`         | The whole tree: package graph, ownership, cycles, dead exports | `packages/architecture-enforcer/README.md`       |
 
 The plugin lives in `packages/oxlint-rules` (rules under `src/rules/`, grammar
 tables under `grammar/`). `.oxlintrc.jsonc` extends
@@ -38,11 +38,12 @@ scenarios live in.
 5. **The grammar file is the authority on file names**, not the record (§3.2):
    `packages/oxlint-rules/grammar/feature-layout-policy.mjs`. Layer imports
    are `grammar/module-layers.mjs`.
-6. **Baselines only shrink.** No policy reads a baseline except the ruled
-   ones under `packages/architecture-enforcer/tests/baselines/`
-   (`peer-cycle-edges.json`, `eventing-table-access.json`,
-   `framework-module-contracts.json`). Growth inside a key is refused, and so is
-   a listed finding that has gone (§17). Remove an edge in the change that cuts it.
+6. **Baselines only shrink.** No policy reads a baseline. The ruled shrink-only
+   lists sit under `packages/architecture-enforcer/tests/baselines/`
+   (`eventing-table-access.json`, `framework-module-contracts.json`,
+   `deleted-spellings.json` for §15), each held by a test. Growth inside a key is
+   refused, and so is a listed finding that has gone (§17). Every peer cycle is
+   refused outright; there is no peer-cycle list. Remove an edge in the change that cuts it.
 7. **A finding carries its scenario.** Rule docs list `Spec:`
    (`specs/tooling/lint-<rule>.feature`); policies list theirs via
    `--list-policies`. If you disagree with a finding, read the scenario, then
@@ -91,11 +92,11 @@ The installer stem is `<f>.module.ts` (`modules/monitor/process/src/monitor.modu
 
 ## Which finding comes from where
 
-| Finding looks like | Source |
-| --- | --- |
-| `langwatch/<rule>` with file and line | the plugin; `dev/docs/lint-rules.md` |
-| `<policy-id>` with a package or edge, no line | an enforcer policy |
-| a name you cannot find in the generated doc | the policy id; grep `src/policies/index.ts` |
+| Finding looks like                             | Source                                        |
+| ---------------------------------------------- | --------------------------------------------- |
+| `langwatch/<rule>` with file and line          | the plugin; `dev/docs/lint-rules.md`          |
+| `<policy-id>` with a package or edge, no line  | an enforcer policy                            |
+| a name you cannot find in the generated doc    | the policy id; grep `src/policies/index.ts`   |
 | `import/no-cycle`, `typescript/*`, `unicorn/*` | stock oxlint, configured in `.oxlintrc.jsonc` |
 
 ## Traps
