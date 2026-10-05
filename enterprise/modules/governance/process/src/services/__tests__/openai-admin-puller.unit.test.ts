@@ -32,7 +32,10 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => logged,
 }));
 
-import { OPENAI_ADMIN_ADAPTER_ID } from "@langwatch/enterprise-governance-contract";
+import {
+  OPENAI_ADMIN_ADAPTER_ID,
+  type PullResult,
+} from "@langwatch/enterprise-governance-contract";
 import type * as observabilityModule from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
@@ -903,6 +906,68 @@ describe("given an OpenAI Admin cost source", () => {
       const requestedStart = Number(requestedUrl(0).searchParams.get("start_time"));
       const storedStart = Math.floor(Date.parse(BUCKET_START_ISO) / 1000);
       expect(requestedStart).toBeLessThan(storedStart);
+    });
+  });
+
+  describe("when a read stops before the end of a period needing more than one page", () => {
+    function expectGatheredMoneyKeptAndPeriodUnfinished(result: PullResult, pagesRead: number) {
+      expect(result.events).toHaveLength(pagesRead);
+      for (const event of result.events) {
+        expect(event.cost_usd).toBe("0.0025945");
+        const record = buildPulledUsageRecord({
+          event,
+          source: SOURCE,
+          governanceProjectId: GOV_PROJECT_ID,
+          observedAt: OBSERVED_AT,
+        });
+        expect(record?.costNanoMinor).toBe(2_594_500);
+      }
+      expect(result.completeness).toBe("truncated");
+      expect(JSON.parse(result.cursor!).page).not.toBeNull();
+    }
+
+    /** @scenario "A read that stops before the end keeps the money it already gathered" */
+    it("keeps the money of the pages read when a later page fails", async () => {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(page({ nextPage: "page_2", hasMore: true })))
+        .mockResolvedValueOnce(new Response("upstream unavailable", { status: 503 }));
+
+      const result = await makePuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      expectGatheredMoneyKeptAndPeriodUnfinished(result, 1);
+      expect(JSON.parse(result.cursor!).page).toBe("page_2");
+    });
+
+    /** @scenario "A read that stops before the end keeps the money it already gathered" */
+    it("keeps the money of the pages read when the page limit of one run is reached", async () => {
+      let served = 0;
+      fetchMock.mockImplementation(async () => {
+        served += 1;
+        return jsonResponse(page({ nextPage: `page_${served + 1}`, hasMore: true }));
+      });
+
+      const result = await makePuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      expect(served).toBeGreaterThan(1);
+      expectGatheredMoneyKeptAndPeriodUnfinished(result, served);
+      expect(JSON.parse(result.cursor!).page).toBe(`page_${served + 1}`);
+    });
+
+    /** @scenario "A read that stops before the end keeps the money it already gathered" */
+    it("keeps the money of the pages read when the run runs out of time", async () => {
+      fetchMock.mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        return jsonResponse(page({ nextPage: "page_2", hasMore: true }));
+      });
+
+      const result = await makePuller().runOnce(
+        { ...RUN_OPTIONS, deadlineMs: Date.now() + 100 },
+        CONFIG,
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expectGatheredMoneyKeptAndPeriodUnfinished(result, 1);
+      expect(JSON.parse(result.cursor!).page).toBe("page_2");
     });
   });
 

@@ -49,6 +49,8 @@ const harness = vi.hoisted(() => ({
   dailyByProvider: undefined as unknown,
   /** Not yet implemented: the records behind one day at one provider. */
   periodRecords: undefined as unknown,
+  /** When set, the billed lane exactly as the summary read answers it. */
+  billedLane: undefined as unknown,
 }));
 
 vi.mock("../../../../behavior/governance-api.ts", () => ({
@@ -89,25 +91,27 @@ vi.mock("../../../../behavior/governance-api.ts", () => ({
             providers: harness.providers,
             // In the DTO's own shape: the US dollar line IS the lane's dollar
             // figure, and a lane that reported nothing has no line at all.
-            billed: harness.lanesReport
-              ? {
-                  amountUsd: 123.45,
-                  cellsWithoutAmount: 0,
-                  currenciesWithoutUsdAmount: [],
-                  currencyTotals: [
-                    {
-                      currencyCode: "USD",
-                      amount: 123.45,
-                      cellsWithoutAmount: 0,
-                    },
-                  ],
-                }
-              : {
-                  amountUsd: null,
-                  cellsWithoutAmount: 0,
-                  currenciesWithoutUsdAmount: [],
-                  currencyTotals: [],
-                },
+            billed:
+              harness.billedLane ??
+              (harness.lanesReport
+                ? {
+                    amountUsd: 123.45,
+                    cellsWithoutAmount: 0,
+                    currenciesWithoutUsdAmount: [],
+                    currencyTotals: [
+                      {
+                        currencyCode: "USD",
+                        amount: 123.45,
+                        cellsWithoutAmount: 0,
+                      },
+                    ],
+                  }
+                : {
+                    amountUsd: null,
+                    cellsWithoutAmount: 0,
+                    currenciesWithoutUsdAmount: [],
+                    currencyTotals: [],
+                  }),
             gateway: harness.lanesReport
               ? {
                   amountUsd: 67.89,
@@ -181,6 +185,7 @@ beforeEach(() => {
   harness.providers = [];
   harness.dailyByProvider = undefined;
   harness.periodRecords = undefined;
+  harness.billedLane = undefined;
   harness.modelSpend = undefined;
   harness.modelSpendFails = false;
 });
@@ -473,6 +478,24 @@ describe("the cost breakdown panels", () => {
       expect(screen.getByText("databricks")).toBeInTheDocument();
     });
 
+    /** @scenario "The cost screen shows who spent the pulled money" */
+    it("lists the spender with their window total, apart from the metered cost-by-person panel", () => {
+      renderScreen();
+
+      const panel = screen
+        .getByText("Provider-reported spend by user")
+        .closest('[data-testid="cost-panel"]') as HTMLElement;
+      const billedBySpender = within(panel);
+      expect(billedBySpender.getAllByText("ada@acme.test")).toHaveLength(2);
+      expect(billedBySpender.getByText("$4")).toBeInTheDocument();
+      expect(billedBySpender.getByText("$6")).toBeInTheDocument();
+      const metered = screen
+        .getByText("Metered spend by person")
+        .closest('[data-testid="cost-panel"]') as HTMLElement;
+      expect(metered).not.toBe(panel);
+      expect(panel).not.toContainElement(metered);
+    });
+
     /** @scenario "The provider-reported breakdown names users and keeps unattributed spend" */
     it("labels the returned users without presenting them as API keys", () => {
       renderScreen();
@@ -481,6 +504,22 @@ describe("the cost breakdown panels", () => {
       expect(screen.queryByText("Billed spend by API key")).not.toBeInTheDocument();
       expect(screen.getByText("Unattributed spend")).toBeInTheDocument();
       expect(screen.getByText("Metered spend by person")).toBeInTheDocument();
+    });
+  });
+
+  describe("given billed and gateway totals that differ from each other", () => {
+    /** @scenario "Each lane renders its own labeled total" */
+    it("labels each lane's figure and takes it from that lane's own data", () => {
+      renderScreen();
+
+      const billed = within(screen.getByTestId("cost-lane-billed"));
+      const gateway = within(screen.getByTestId("cost-lane-gateway"));
+      expect(billed.getByText("Billed by provider")).toBeInTheDocument();
+      expect(billed.getByText("$123.45")).toBeInTheDocument();
+      expect(billed.queryByText("$67.89")).toBeNull();
+      expect(gateway.getByText("Metered by gateway")).toBeInTheDocument();
+      expect(gateway.getByText("$67.89")).toBeInTheDocument();
+      expect(gateway.queryByText("$123.45")).toBeNull();
     });
   });
 
@@ -652,7 +691,7 @@ describe("the cost breakdown panels", () => {
 
       const billed = within(screen.getByTestId("cost-lane-billed"));
       expect(billed.getByText("USD amount unavailable")).toBeInTheDocument();
-      expect(billed.getByText(/-\$12\.50|−\$12\.50|\(\$12\.50\)/)).toBeInTheDocument();
+      expect(billed.getByText("-$12.50")).toBeInTheDocument();
       expect(billed.queryByText("$0.00")).toBeNull();
     });
   });
@@ -694,6 +733,80 @@ describe("the cost breakdown panels", () => {
       // Names WHO withheld, so a reader knows which bill to go and look at.
       expect(note).toHaveTextContent(/Anthropic/);
       expect(note).not.toHaveTextContent(/OpenAI/);
+    });
+  });
+
+  describe("given the billed lane's dollar total is withheld because part of it has no dollar figure", () => {
+    /** @scenario "A lane with no total says why instead of showing a figure" */
+    it("shows the lane no dollar amount and says we hold no dollar figure for part of it", () => {
+      harness.billedLane = {
+        amountUsd: null,
+        cellsWithoutAmount: 2,
+        currenciesWithoutUsdAmount: [],
+        currencyTotals: [],
+      };
+      renderScreen();
+
+      const billed = within(screen.getByTestId("cost-lane-billed"));
+      expect(billed.queryByText(/\$\d/)).toBeNull();
+      expect(
+        billed.getByText(/We hold no dollar figure for part of what this lane covers/),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given a billed day whose total is negative", () => {
+    /** @scenario "A refund-heavy billed day renders negative as reported" */
+    it("shows the billed lane the negative amount as reported", () => {
+      harness.billedLane = {
+        amountUsd: -250,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
+        currencyTotals: [{ currencyCode: "USD", amount: -250, cellsWithoutAmount: 0 }],
+      };
+      renderScreen();
+
+      const billed = within(screen.getByTestId("cost-lane-billed"));
+      expect(billed.getByText("-$250.00")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a window holding spend billed in dollars and spend billed in euros", () => {
+    /** @scenario "A window billed in two currencies shows one total per currency" */
+    it("shows a separate total for each currency and none that combines them", () => {
+      harness.billedLane = {
+        amountUsd: 100,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: ["EUR"],
+        currencyTotals: [
+          { currencyCode: "USD", amount: 100, cellsWithoutAmount: 0 },
+          { currencyCode: "EUR", amount: 80, cellsWithoutAmount: 0 },
+        ],
+      };
+      renderScreen();
+
+      const billed = within(screen.getByTestId("cost-lane-billed"));
+      expect(billed.getByText("$100.00")).toBeInTheDocument();
+      expect(billed.getByText("EUR 80.00")).toBeInTheDocument();
+      expect(billed.queryByText(/180/)).toBeNull();
+    });
+  });
+
+  describe("given spend billed only in a currency the provider published no dollar figure for", () => {
+    /** @scenario "A currency nobody converted still totals in the currency it was billed in" */
+    it("totals that currency on its own and does not read the window as unbilled", () => {
+      harness.billedLane = {
+        amountUsd: null,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: ["EUR"],
+        currencyTotals: [{ currencyCode: "EUR", amount: 80, cellsWithoutAmount: 0 }],
+      };
+      renderScreen();
+
+      const billed = within(screen.getByTestId("cost-lane-billed"));
+      expect(billed.getByText("EUR 80.00")).toBeInTheDocument();
+      expect(billed.queryByText(/\$\d/)).toBeNull();
+      expect(screen.queryByText(/nothing here is real/i)).toBeNull();
     });
   });
 

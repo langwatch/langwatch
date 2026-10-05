@@ -467,6 +467,7 @@ describe.skipIf(!databaseUrl)(
 
     describe("given a team whose spending is already at its limit", () => {
       /** @scenario "Pulled cost never blocks spending" */
+      /** @scenario "A homed pulled row still never counts against spending limits" */
       it("records the pulled cost, does not trip the limit with it, and still allows the team's requests", async () => {
         // The team is at $0.99 of a $1 limit through the gateway.
         await writeGatewayDebit(NEARLY_SPENT_NANO);

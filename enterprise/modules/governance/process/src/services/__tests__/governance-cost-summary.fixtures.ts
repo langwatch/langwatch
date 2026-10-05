@@ -9,6 +9,7 @@ import type {
   GovernanceSeatReportRow,
   OcsfSeatReportReader,
 } from "../../repositories/clickhouse/clickhouse.ocsf-events.repository.ts";
+import type { IngestionSourceRepository } from "../../repositories/ingestion-source.repository.ts";
 import {
   type MemoryGovernanceCostCell,
   MemoryGovernanceCostRollupRepository,
@@ -79,8 +80,12 @@ export function setup({
   governed = true,
   gatewayDays = async () => [],
   seats = async () => [],
+  noticeSources = (sources) => sources,
 }: {
   governed?: boolean;
+  noticeSources?: (
+    sources: MemoryIngestionSourceRepository,
+  ) => Pick<IngestionSourceRepository, "findAll" | "findUnpricedUsageWindows">;
   gatewayDays?: GatewayApi["findSpendDaysForOrganizationProjects"];
   seats?: OcsfSeatReportReader["findLatestSeatReports"];
 } = {}) {
@@ -102,7 +107,7 @@ export function setup({
     projects,
     gateway,
     seats: { findLatestSeatReports: seats },
-    notices: GovernanceCostNoticesService.create({ sources, costRollup }),
+    notices: GovernanceCostNoticesService.create({ sources: noticeSources(sources), costRollup }),
   });
   const read = () => service.summary({ organizationId: "org_1", windowDays: 30, now: NOW });
   return { costRollup, sources, service, gatewayAsked, read };
