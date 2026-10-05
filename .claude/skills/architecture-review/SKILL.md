@@ -80,8 +80,8 @@ check after `.withAccess(anyAuthenticated(...))` is a bypass.
 
 - Find: a permission or role check in a handler, middleware, `*Api` implementation or service
   that a route reaches with `.withAccess(...)`; an audit row written by hand where the transport
-  audits. Merge L7b's stop is the precedent: the enable audit stays the framework's project-level
-  row, no hand-rolled write, until E10 (§16, open) is ruled.
+  audits. An organization-level row is declared with `.withAudit({ target: "organization", via })`
+  (E10, record §8, Alex 2026-10-05), as `traces.instantEval.enable` does; never a hand-rolled write.
 - A framework option used for the first time, or in a new arity: ask for a test that reads the
   built declaration, not the type. `.withPermission("x", { via })` type-checked badly and dropped
   `via` at runtime, answering 500, until c4ee0b12d0.

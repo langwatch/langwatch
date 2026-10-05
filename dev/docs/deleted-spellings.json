@@ -480,19 +480,11 @@
       "note": "Only the peer-lend use is deleted; `withCapabilities` itself stays (§10.1 slot table)."
     },
     {
-      "spelling": "useFeatureFlag",
-      "kind": "identifier",
-      "pattern": "\\buseFeatureFlag\\b",
-      "replacement": "`useReleaseFlag(flag)`",
-      "section": "§3.4, §10.1",
-      "ruled": "2026-10-01"
-    },
-    {
       "spelling": "per-module `use-feature-flag.ts` copies",
       "kind": "file",
       "path": "(?:^|/)use-feature-flag\\.tsx?$",
       "pattern": "\\buse-feature-flag\\.ts\\b",
-      "replacement": "`useReleaseFlag(flag)`",
+      "replacement": "`useFeatureFlag(flag, { projectId | organizationId })` from `@langwatch/browser-host`",
       "section": "§3.4, §10.1",
       "ruled": "2026-10-01"
     },
@@ -500,7 +492,7 @@
       "spelling": "UiSession.featureFlag / isFeatureEnabled",
       "kind": "call",
       "pattern": "\\bUiSession\\.(?:featureFlag|isFeatureEnabled)\\b",
-      "replacement": "`useReleaseFlag(flag)`",
+      "replacement": "`useFeatureFlag(flag, { projectId | organizationId })` from `@langwatch/browser-host`",
       "section": "§10.1",
       "ruled": "2026-10-01",
       "note": "Matched on `UiSession` only: `isFeatureEnabled` alone also names live server calls."

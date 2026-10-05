@@ -28,7 +28,7 @@
     {
       "id": 5,
       "prompt": "Main's instant-evals enable wrote its own audit row naming the organization. Our tRPC framework audits only the project, so the lane added an audit write in InstantEvalService naming the organization. Review.",
-      "expected_output": "A finding under checklist C citing §8 and the L7 ruling: no hand-rolled audit write; the enable audit stays the framework's project-level row until E10 (a declared audit target in packages/api) is ruled, and E10 is listed in §16 as open, a proposal, not a rule. Fix: remove the service write, report the gap as a wire or audit difference with its reason (checklist D). Does not treat the §16 proposal as ruled.",
+      "expected_output": "A finding under checklist C citing §8: no hand-rolled audit write. E10 is built (Alex, 2026-10-05): the procedure declares .withAudit({ target: \"organization\", via: \"projectId\" }) and the door records the organization, as traces-instant-eval.trpc.ts already does. Fix: remove the service write and use the declared target.",
       "files": []
     },
     {

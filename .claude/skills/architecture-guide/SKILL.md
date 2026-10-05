@@ -108,27 +108,32 @@ For `Secret.load`, capabilities and entitlements, the `module-dependencies` skil
 ## Known disagreements between the record and the tree
 
 Prefer the tree for names and the linter for rules; report, do not fix a record
-you do not own. Current list:
+you do not own. Current list (brought current 2026-10-05, after Alex's evening answers):
 
-- §3.2/§5 put the module class in `<f>.module.ts`; no `<f>.module.ts` holds it yet and all 62 classes sit in
-  `app/<f>.app.ts`, which the grammar accepts; §16 has no row yet (awaiting a ruling; counted 2026-10-05).
-- `useReleaseFlag` (§3.4, §10.1) is the target; code spells `useFeatureFlag` (deleted, §15; 54 files), no §16 row.
-- `requestDelivery` (ADR-167, §9) has no code hits and no §16 row naming today's spelling.
+- Members: removal is ruled now (Alex, 2026-10-05; §3.3 says where each kind goes), but the
+  deleted (§15) `ProcessContainer.withMember` still exists (only tests call it) and the grammar
+  still accepts the deleted (§15) `app/<f>.members.ts` and `-composition.build.ts` (8 and 10 files
+  left, from 36).
+- §7's "no mixing" is unenforced: a module's own `withMemoryRepositories` (deleted, §15) still wins
+  over the stores' tier. The fail-closed tier and the skipped surface (§4, §7) have landed.
+- §7 gives each module its own event store handle (Alex, 2026-10-05); identity, ops and scim still
+  hold the shared `EventSourcing` client.
+- §10.1's `UiFlags` host service is not in the tree: `useFeatureFlag` (kept, off §15's deleted list, Alex 2026-10-05) in
+  `packages/browser-host/src/feature-flag.ts` queries `featureFlag.isEnabled` itself.
+- `requestDelivery` (ADR-167, §9) is ruled to be built now on the outbox (Alex, 2026-10-05); no code
+  spells it yet.
 - §8/§17's guard rules that accept a justified disable are not built yet: `defineRule({ escape })` exists,
-  but no rule opts in, so today every `langwatch/*` disable is refused (2026-10-05).
+  but no rule opts in, so today every `langwatch/*` disable is refused.
 - §5 expects no peer cycle; the `peer-cycles` policy stays red until the last is cut (ruled, not drift).
-- §7's `LANGWATCH_STORES` knob is not in the code, and `packages/process/src/tiers.ts` makes a missing tier
-  select memory, the opposite of §7; no §16 row.
-- §4 says a process skips an unselected surface; the container still refuses with `<module> needs
-surface.<protocol>` (`packages/process/src/process-container.ts`), and §4 contradicts itself on it.
-- `ProcessContainer.withMember` still exists though §4 and §15 delete it; the grammar still accepts
-  `app/<f>.members.ts` and `-composition.build.ts` (36 files) and nothing shrinks the count.
-- github declares its secret handles in the process half (`github.app.ts`); §6 puts them in the contract.
-- §10 has project lend `projectSwitcher` through `withCapabilities`, which §15 deletes for a peer lend.
+- github declares its secret handles in the process half (`github.app.ts`); §6 and Alex (2026-10-05)
+  put them in the contract.
+- §10 has project lend `projectSwitcher` by token; it still sits in `withCapabilities` (ruled to move,
+  Alex 2026-10-05).
 - §2 makes `@langwatch/module` a contract's only framework import; analytics and trace contracts import
-  `@langwatch/api/dates` and gateway's imports `@langwatch/api/hosting`.
-- Open items are proposals, not rules: §16 "Open for Alex" (usage-named files, E1 to E9 questions, L6b R3,
-  E10). Do not build or teach them as ruled.
+  `@langwatch/api/dates` and gateway's imports `@langwatch/api/hosting` until the helpers move and the
+  lint lands (Alex, 2026-10-05).
+- Open items are proposals, not rules: §16 "Open for Alex" (the E1 to E8 questions). Do not build or
+  teach them as ruled.
 
 ## Links
 

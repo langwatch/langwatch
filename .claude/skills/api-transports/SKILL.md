@@ -31,7 +31,11 @@ anything; the process mounts every installed module's declarations.
 5. **The framework owns validation.** Never hand-check a body, a content type or a param. Tighten the
    schema. Unparseable input is the 400 `malformed_request`; parsed but failing the schema is the 422
    `validation_error`. A REST request is authenticated before its body is read, so a bad key is 401/403,
-   never 422 or 413.
+   never 422 or 413. A route that reads its raw body names its media type,
+   `.withRawBody("text", { mediaType })`; any other `Content-Type` is refused after the door with 415
+   `unsupported_media_type`. Only the `*-legacy` family and the collector add
+   `mismatch: "malformed_request"`, keeping main's 400 (record §8, E9, Alex 2026-10-05;
+   `modules/evaluation/process/src/transport/evaluations-legacy.rest.ts`).
 6. **Every wire schema imports from the module's own contract.** No schema declared in the transport file.
 7. **Docs live on the route.** `.withDocs({ tags, description, errors? })` in the same `*.rest.ts` file.
    Never a `*-openapi.rules.ts`. An extra status or non-JSON body goes through `documentedResponses()`.
@@ -52,8 +56,13 @@ anything; the process mounts every installed module's declarations.
    **Middleware never does the framework's work** (record §8, 2026-10-05): middleware that
    authenticates or parses a JSON body, and a route opened to any authenticated or unauthenticated
    caller, are drift that lint rules catch; the guard list is
-   `dev/docs/plans/api-framework-bypass-2026-10-05.md`. The framework extensions E1 to E9 in that plan
-   are shapes first: Alex approves the signature and one example route before any is built.
+   `dev/docs/plans/api-framework-bypass-2026-10-05.md`. The framework extensions E1 to E8 in that plan
+   are shapes first: Alex approves the signature and one example route before any is built. E9 (above)
+   and E10 (below) are built (record §8).
+   **The audit is declared too.** A mutation whose row names the organization holding the project its
+   input names declares `.withAudit({ target: "organization", via: "projectId" })` (record §8, E10,
+   Alex 2026-10-05; `modules/trace/process/src/transport/traces-instant-eval.trpc.ts`). The door resolves
+   the organization; never write an audit row by hand.
 10. **A query never returns a credential.** Secrets come back only from a mutation.
 
 ## Worked example: one contract, one tRPC binding, one REST route

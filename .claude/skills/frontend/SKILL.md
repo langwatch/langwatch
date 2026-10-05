@@ -42,7 +42,7 @@ nests: `features/<name>/` repeats `model/behavior/ui` inside itself, and a
 feature that is one component is a section, not a feature — behaviour lives
 in the feature that owns it, not a package-wide `behavior/` bucket every
 feature reaches into. A screen reads host services directly, typed by
-tokens: `useLent`, `openDrawer`, `useReleaseFlag` (§3.4, §10.1). A `*HostApi`
+tokens: `useLent`, `openDrawer`, `useFeatureFlag` (§3.4, §10.1; kept and off §15's deleted list, Alex 2026-10-05). A `*HostApi`
 (`model/<name>-host.ts`) keeps only the module's own host needs, which the
 **shell** implements from `@langwatch/browser-host`; an unmounted `*HostApi` is
 refused by `createUi` at install, by name, before any component renders. The

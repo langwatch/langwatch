@@ -7,7 +7,8 @@ user-invocable: true
 # Spec-binding review: does the test prove the scenario?
 
 Feature parity binds every scenario (record §13, Alex, 2026-10-05), and a bind is a claim that the
-product does what the scenario says. `check:feature-parity` proves only that a title sits on a test
+product does what the scenario says. §13 states the rubric in one paragraph (Alex, 2026-10-05); this
+skill keeps the detail and the cases. `check:feature-parity` proves only that a title sits on a test
 call. This rubric is the reading it cannot do. Writing the test belongs to the `testing` skill;
 this skill judges a bind someone made.
 

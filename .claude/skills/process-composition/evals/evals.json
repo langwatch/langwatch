@@ -34,13 +34,13 @@
     {
       "id": 6,
       "prompt": "Locally I want the api on memory stores. I set LANGWATCH_STORES=memory but it still tries to connect to Postgres. Is that a bug?",
-      "expected_output": "Explains §7's ruling (one knob by the word, refused in production, absence refuses) and then that the knob has not landed: no code reads LANGWATCH_STORES, and packages/process/src/tiers.ts states the opposite default. Reports it as a record/tree disagreement rather than inventing a fallback; tests reach memory by handing memoryStores() to bootInstalledProcess.",
+      "expected_output": "Not a bug: §7 has no tier knob (Alex, 2026-10-05) and nothing reads LANGWATCH_STORES. Store tiers fail closed: opened stores state live, and memory runs only when a test or dev harness hands memoryStores() (for example to bootInstalledProcess); a module with repositories whose tier nobody stated refuses boot with StoreTierUnstatedError. Does not invent a knob or a fallback.",
       "files": []
     },
     {
       "id": 7,
       "prompt": "boot() fails with 'trace needs surface.rest' in a process I'm writing that only serves tRPC. The record says unselected surfaces are skipped. Should I patch the container?",
-      "expected_output": "Identifies the D3 disagreement: §4 says an unselected surface's declarations are skipped, while packages/process/src/process-container.ts still refuses an omitted declared transport by name. Does not patch the framework from a lane; reports it, and either selects .rest() in exposeTransports or asks for the D3 change as its own task.",
+      "expected_output": "The refusal is gone from the tree: since 4a47d24a4a the api container installs a module whose transport needs an unselected surface and skips that transport (§4 D3, Alex 2026-10-05). The message comes from an older build; rebuild or pull. Does not patch the container.",
       "files": []
     }
   ]

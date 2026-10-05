@@ -22,8 +22,8 @@ repositories, channels and the module class stay thin.
 process/src/
 ├── index.ts                    installer + transport declarations, nothing else
 ├── monitor.module.ts           the installer
-├── app/monitor.app.ts          the module class (`MonitorModule`); §3.2's target is
-│                               `monitor.module.ts`, beside the installer
+├── app/monitor.app.ts          the module class (`MonitorModule`), where §3.2 puts it
+│                               (Alex, 2026-10-05)
 ├── services/*.service.ts       behaviour, one class per entity
 ├── repositories/
 │   ├── monitor.repository.ts           interface
@@ -62,7 +62,11 @@ accepts it; no module has moved yet.
    bundles `requires = []` so tests need no Docker.
 4. **Never a raw client inside a module class or service.** Raw clients cross
    in exactly one place, a registry or channel factory, and arrive as
-   repositories and channels (§3.2).
+   repositories and channels (§3.2). The cipher is a registry input: the live
+   registry `requires` `encryption` and the live Prisma repository seals and
+   opens; memory twins hold plaintext and services never seal. A rate limiter is
+   a named `<module>-rate-limit.repository.ts` with a memory fixed-window twin
+   (record §3.3, coordinator members wave, 2026-10-05).
 5. **A channel is one interface per subject, a class per tier, a memory twin
    and a registry.** Organization's invitation mail:
    `channels/organization-invite-mail.channel.ts` (abstract class),

@@ -57,7 +57,7 @@ anywhere and returns the runtime for the test to drive (see Testing, below).
 ## A module's process half (record §3.2)
 
 ```ts
-// modules/<name>/process/src/<name>.module.ts — installer AND class, one file
+// modules/<name>/process/src/<name>.module.ts — the installer; the class is app/<name>.app.ts (§3.2)
 export const <name>ProcessModule = defineProcessModule("<name>")
   .withRepositories(<name>Repositories)   // registry: { live, memory }
   .withChannels(<name>Channels)           // registry: { live, memory }; only if it has channels
@@ -209,7 +209,8 @@ copy that record §15 lists is deleted: write its replacement, not the copy.
    `presentation.ts`, same change.
 4. **Process** (`@langwatch/<name>-process`): repositories first (interface,
    `prisma/`, `memory/`, `defineRepositories({ live, memory })`), channels
-   the same way if it talks to anything it does not own, then `services/`, then the one `<name>.module.ts` installer+class file above.
+   the same way if it talks to anything it does not own, then `services/`, then the `<name>.module.ts` installer above and the module class in
+   `app/<name>.app.ts` (record §3.2, Alex 2026-10-05).
 5. **`pnpm generate:modules`** regenerates `processModules` from the
    catalogue — no process file changes, no hand-written module list.
 6. **The installation test** (below) proves the whole chain resolves over

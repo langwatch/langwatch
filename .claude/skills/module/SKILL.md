@@ -53,6 +53,7 @@ Each rule lives in the record or CLAUDE.md; this table only points at it.
 | 3    | `contract/src/monitor.errors.ts`               | `HandledError` subclasses                             |
 | 4    | `contract/src/monitor.trpc.ts`                 | every procedure declared once                         |
 | 5    | `process/src/monitor.module.ts`                | the installer: repositories, module class, transports |
+| 5a   | `process/src/app/monitor.app.ts`               | the module class, `MonitorModule` (§3.2)              |
 | 6    | `process/src/transport/monitor.{rest,trpc}.ts` | permission and handler per route                      |
 | 7    | `process/src/repositories/`                    | interface, `prisma/`, `memory/`, registry             |
 | 8    | `process/src/services/monitor.service.ts`      | behaviour over the repository                         |

@@ -15,16 +15,30 @@ behind each rule. Where none exists it says `unbacked`.
 
 Every dependency a module has is exactly one of these. Sort it before you write anything.
 
-| The thing you need                                          | It is                                     | Where it goes                                                                                                                     |
-| ----------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Derivable from an opened store (tenant resolver, actor row) | a repository or channel inside the module | the module's `{ live, memory }` registry, which `requires` the store client (§5)                                                  |
-| Another module's capability                                 | a peer                                    | the `*Api` token in `static dependencies`; `create()` receives the typed implementation                                           |
-| A deployment fact (signing key, base URL)                   | config or a secret                        | the contract's `<name>.config.ts`: `Config.define` leaves and `Secret.load` handles; process facts are picked from `processFacts` |
-| Whether this deployment has it at all                       | an availability decision                  | decided inside the module from its own config and secrets; off refuses by name with a stable code (§6)                            |
+| The thing you need                                          | It is                                     | Where it goes                                                                                                                      |
+| ----------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Derivable from an opened store (tenant resolver, actor row) | a repository or channel inside the module | the module's `{ live, memory }` registry, which `requires` the store client (§5)                                                   |
+| Another module's capability                                 | a peer                                    | the `*Api` token in `static dependencies`; `create()` receives the typed implementation                                            |
+| A deployment fact (signing key, base URL)                   | config or a secret                        | the contract's `<name>.config.ts`: `Config.define` leaves and `Secret.load` handles; a shared fact is the shared leaf by name (§6) |
+| Whether this deployment has it at all                       | an availability decision                  | decided inside the module from its own config and secrets; off refuses by name with a stable code (§6)                             |
 
 A module class receives `repositories`, `channels`, `dependencies`, `config`, `secrets`, `role`
 and `resources`, never a bag of clients or facts. Members and supply tokens are deleted (§3.3,
 §15); a test stubs a peer with `createApiFixture` (§13).
+
+Members are removed now, before other module work (Alex, 2026-10-05). Where each kind goes (record
+§3.3, coordinator members wave, 2026-10-05):
+
+| A member that was                                  | Becomes                                                                                                             |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `encryption`                                       | a registry input: the live registry `requires` it and the live Prisma repository seals; memory twins hold plaintext |
+| `rateLimiter`                                      | `<module>-rate-limit.repository.ts` with a memory fixed-window twin, wrapping the store's limiter (keys unchanged)  |
+| `publicBaseUrl`, `nlpServiceUrl`, `serviceVersion` | the shared leaf from `@langwatch/config`, added to the contract's config (§6)                                       |
+| `nlpInternalSecret`                                | the shared handle from `@langwatch/secrets`                                                                         |
+| `logger`                                           | `createLogger("langwatch:<module>[:<part>]")` inside the module                                                     |
+| `processName`                                      | the role (deleted, §15)                                                                                             |
+| `clock`                                            | `@langwatch/time`; memory twins take it in their registry                                                           |
+| anything another module answers                    | a peer `*Api` in `static dependencies`                                                                              |
 
 When two modules both want a config fact, one of them usually owns it and the other should ask
 (§6). When a module owns the value, others read the owner contract's exported leaf (§16, "Homes
