@@ -215,6 +215,11 @@ vi.mock("~/utils/api", () => ({
       dismissOffer: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
+      admitAutomatically: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+    invite: {
+      pendingForMe: { useQuery: () => ({ data: [], isPending: false }) },
+      acceptInvite: { useMutation: () => ({ mutate: vi.fn() }) },
     },
     useUtils: () => ({
       user: { secureAccountNudge: { invalidate: vi.fn() } },
