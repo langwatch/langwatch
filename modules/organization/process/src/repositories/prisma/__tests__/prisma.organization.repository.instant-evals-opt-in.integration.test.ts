@@ -31,7 +31,10 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository Instant Evals opt-in", ()
     logger: createLogger("langwatch:organization:test:instant-evals-opt-in"),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
-  const repository = PrismaOrganizationRepository.create(prisma);
+  const repository = PrismaOrganizationRepository.create({
+    database: prisma,
+    cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+  });
 
   beforeAll(async () => {
     await prisma.organization.create({

@@ -120,7 +120,6 @@ function visibility(granted: readonly string[], permissions = testPermissions(gr
       findMemberById: (input) => membership.findMemberById(input),
     },
     permissions: createApiFixture<AuthzApi>(permissions),
-    secrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
     demoProject: { userId: "", projectId: "" },
   });
 }

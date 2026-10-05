@@ -58,6 +58,7 @@ describe.skipIf(!DB_URL)(
       prisma = connection.client as PrismaClient;
       repository = PrismaOrganizationMembershipRepository.create({
         database: prisma,
+        cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
         grants: noopGrantsWriter,
       });
 

@@ -123,7 +123,6 @@ import {
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type PaginatedProjects, type Project } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
@@ -144,9 +143,6 @@ import {
 } from "../eventing/seat-limit.pipeline.ts";
 import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
-import { PrismaOrganizationInviteRepository } from "../repositories/prisma/prisma.organization-invite.repository.ts";
-import { PrismaOrganizationSeatRepository } from "../repositories/prisma/prisma.organization-seat.repository.ts";
-import { PrismaOrganizationUserDirectoryRepository } from "../repositories/prisma/prisma.organization-user-directory.repository.ts";
 import { grantCallerOf } from "../rules/grant-caller.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
@@ -194,7 +190,6 @@ import type { OrganizationSignals } from "../services/organization-signals.servi
 import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
 import type { OrganizationDemoProject } from "../services/organization-visibility.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
-import type { OrganizationSettingsSecret } from "../services/organization.service.ts";
 import {
   PersonalTeamScopeService,
   type PersonalTeamScopeReader,
@@ -269,20 +264,12 @@ export interface ServerOrganizationAppDependencies {
   apiKeys: ApiKeyApi;
 }
 
-/**
- * What the process still hands this module beside its registries: the store client the invitation,
- * seat and user-directory reads are built over, the settings cipher, and the public base URL until
- * its shared leaf lands. The demo project is `authz`'s, asked of that peer.
- */
-type OrganizationMembers = MembersRead<readonly ["prisma", "encryption"]> &
-  Readonly<{ publicBaseUrl: string | undefined }>;
-
 /** The module's own logger; a part names itself after the colon. */
 const logger = createLogger("langwatch:organization");
 
 type OrganizationSetup = FeatureSetup<
   typeof OrganizationModule.dependencies,
-  OrganizationMembers,
+  never,
   OrganizationServerConfig,
   OrganizationRepositories
 >;
@@ -291,7 +278,6 @@ export type OrganizationInfrastructure = Readonly<{
   identities: PersonalWorkspaceIdentity;
   teamIdentities: TeamIdentity;
   groupIdentities: GroupIdentity;
-  settingsSecrets: OrganizationSettingsSecret;
   diagnostics?: PersonalWorkspaceDiagnostics;
   prompts: OrganizationPromptSeed;
   seats: OrganizationSeatLicense;
@@ -355,9 +341,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     /** Sends the invitation mails; notification owns the gateway. */
     notifications: NotificationService,
   };
-  /** Named raw: no registry carries these yet (see the members-organization handoff). */
-  static readonly reads = ["prisma", "encryption", "publicBaseUrl"] as const;
-  /** The sign-up policy's settings (specs/auth/sign-up-restriction.feature). */
+  /** Sign-up policy settings (specs/auth/sign-up-restriction.feature) and the public origin. */
   static readonly config = organizationServerConfig;
   /** LangWatch's own sign-ups Slack webhook, shared with billing, auth and identity (ADR-132). */
   static readonly secrets = { internalSlackSignupsWebhook } as const;
@@ -369,7 +353,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       (webhookUrl) =>
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
-          publicBaseUrl: setup.members.publicBaseUrl,
+          publicBaseUrl: setup.config.publicBaseUrl,
           logger,
         }),
     );
@@ -386,7 +370,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       groupIdentities: infrastructure.groupIdentities,
       authz: setup.dependencies.permissions,
       grants: setup.dependencies.permissions,
-      settingsSecrets: infrastructure.settingsSecrets,
       diagnostics: infrastructure.diagnostics,
       notices: infrastructure.lifecycle,
     });
@@ -436,7 +419,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         findMemberById: (input) => membership.findMemberById(input),
       },
       permissions: setup.dependencies.permissions,
-      secrets: infrastructure.settingsSecrets,
       demoProject: infrastructure.demoProject,
     });
     application.#scopeGraph = OrganizationScopeGraphService.create({
@@ -527,7 +509,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         findMemberById: (input) => dependencies.membership.findMemberById(input),
       },
       permissions: dependencies.permissions,
-      secrets: infrastructure.settingsSecrets,
       demoProject: infrastructure.demoProject,
     });
     application.#scopeGraph = OrganizationScopeGraphService.create({
@@ -577,13 +558,12 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     signupAnnouncements: SignupAnnouncementService;
   }): OrganizationInfrastructure {
     const { dependencies } = setup;
-    const prisma = setup.members.prisma;
-    const baseHost = setup.members.publicBaseUrl ?? "";
-    const seatCounts = PrismaOrganizationSeatRepository.create(prisma);
-    const userDirectory = PrismaOrganizationUserDirectoryRepository.create(prisma);
+    const baseHost = setup.config.publicBaseUrl ?? "";
+    const seatCounts = setup.repositories.seats;
+    const userDirectory = setup.repositories.userDirectory;
     const signals = OrganizationSignalsService.create({ logger, signupAnnouncements });
     const seatLimits = SeatLimitNoticeService.create({ signals });
-    const invites = PrismaOrganizationInviteRepository.create({ database: prisma });
+    const invites = setup.repositories.invite;
     const throttle = InviteSendThrottleService.create(setup.repositories.inviteRateLimit);
     const inviteService = InviteService.create({
       invites,
@@ -602,9 +582,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       identities: PersonalWorkspaceIdentityService.create(),
       teamIdentities: TeamIdentityService.create(),
       groupIdentities: GroupIdentityService.create(),
-      // An organization's stored settings and a project's stored secret are
-      // encrypted by ONE algorithm under ONE key: the process's own cipher.
-      settingsSecrets: setup.members.encryption,
       diagnostics: PersonalWorkspaceDiagnosticsService.create(logger),
       prompts: OrganizationPromptSeedService.create({ role: setup.role ?? "unknown role", logger }),
       seats: OrganizationSeatLicenseService.create({
@@ -1019,7 +996,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       userId: string;
       admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
     }>,
-  ): Promise<"created" | "already-present"> {
+  ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
     return this.#dependencies.membership.createMembership(input);
   }
 

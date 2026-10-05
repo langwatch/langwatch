@@ -69,7 +69,11 @@ beforeEach(() => {
   changeBindingRole.mockResolvedValue(undefined);
   revokeBindings.mockResolvedValue(undefined);
   revokeBindingsWhere.mockResolvedValue(0);
-  repository = PrismaOrganizationMembershipRepository.create({ database: prisma, grants: writer });
+  repository = PrismaOrganizationMembershipRepository.create({
+    database: prisma,
+    grants: writer,
+    cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+  });
 });
 
 describe("given a member whose removal is under way", () => {

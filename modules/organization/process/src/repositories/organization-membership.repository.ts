@@ -320,6 +320,7 @@ export abstract class OrganizationMembershipRepository {
     organizationId: string,
   ): Promise<{ userId: string; organizationName: string }[]>;
 
+  /** Each organization with its and its projects' S3 endpoint and access key opened. */
   abstract findAllForUser(params: {
     userId: string;
     isDemo: boolean;

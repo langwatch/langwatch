@@ -61,6 +61,7 @@ beforeEach(() => {
   auditLogCreate.mockResolvedValue({});
   repository = PrismaOrganizationMembershipRepository.create({
     database: prisma,
+    cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
     grants: createApiFixture<AuthzGrantsService>({}),
   });
 });

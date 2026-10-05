@@ -38,7 +38,6 @@ export type {
 } from "./repositories/organization-membership.repository.ts";
 export type { PersonalWorkspaceDiagnostics } from "./services/personal-workspace-diagnostics.service.ts";
 export type { PersonalWorkspaceIdentity } from "./services/personal-workspace-identity.service.ts";
-export type { OrganizationSettingsSecret } from "./services/organization.service.ts";
 export type { GroupIdentity } from "./services/group-identity.service.ts";
 export type { TeamIdentity } from "./services/team-identity.service.ts";
 export type {

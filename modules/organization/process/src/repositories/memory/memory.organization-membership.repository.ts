@@ -11,7 +11,6 @@ import {
   OrganizationSlugTakenError,
   OrganizationUserRole,
   TeamNotFoundError,
-  type Organization,
   type OrganizationFounding,
   type OrganizationIntent,
   type TeamUserRole,
@@ -46,53 +45,14 @@ import type {
   UpdateMemberRoleResult,
   UpdateTeamMemberRoleInput,
 } from "../organization-membership.repository.ts";
-import type {
-  MemoryAuditLogRow,
-  MemoryOrganizationDatabase,
-  MemoryOrganizationRow,
-  MemoryTeamRow,
-  MemoryUserRow,
+import {
+  organizationOfRow,
+  type MemoryAuditLogRow,
+  type MemoryOrganizationDatabase,
+  type MemoryOrganizationRow,
+  type MemoryTeamRow,
+  type MemoryUserRow,
 } from "./memory.organization.database.ts";
-
-function toOrganization(row: MemoryOrganizationRow): Organization {
-  return {
-    id: row.id,
-    name: row.name,
-    phoneNumber: null,
-    slug: row.slug,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    usageSpendingMaxLimit: null,
-    maxSessionDurationDays: 30,
-    mfaRequired: false,
-    signupData: null,
-    signedDPA: false,
-    elasticsearchNodeUrl: null,
-    elasticsearchApiKey: null,
-    useCustomElasticsearch: false,
-    s3Endpoint: row.s3Endpoint,
-    s3AccessKeyId: row.s3AccessKeyId,
-    s3SecretAccessKey: row.s3SecretAccessKey,
-    s3Bucket: row.s3Bucket,
-    useCustomS3: false,
-    sentPlanLimitAlert: null,
-    ssoDomain: null,
-    ssoProvider: null,
-    domainJoin: "invite_only",
-    joinDomains: [],
-    presenceEnabled: row.presenceEnabled,
-    traceSharingEnabled: row.traceSharingEnabled,
-    supportContact: row.supportContact,
-    primaryIntent: row.primaryIntent,
-    promoCode: null,
-    stripeCustomerId: row.stripeCustomerId,
-    currency: "USD",
-    pricingModel: "SEAT_EVENT",
-    license: null,
-    licenseExpiresAt: null,
-    licenseLastValidatedAt: null,
-  };
-}
 
 function toUser(row: MemoryUserRow): User {
   return {
@@ -378,7 +338,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       })
       .map((row) => this.memberWithUser(row));
 
-    return { ...toOrganization(organization), members };
+    return { ...organizationOfRow(organization), members };
   }
 
   async findMemberById(params: {
@@ -912,7 +872,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
         };
       });
 
-    return { ...toOrganization(organization), members, teams };
+    return { ...organizationOfRow(organization), members, teams };
   }
 
   private memberSummaryAsOrganizationUser(row: {

@@ -125,7 +125,6 @@ async function teamsReceived({
       })),
       listBindingsForSynthesis: vi.fn(async () => bindings),
     }),
-    secrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
     demoProject: { userId: "", projectId: "" },
   });
   const [organization] = await service.listVisible({ isDemo: false }, CALLER);

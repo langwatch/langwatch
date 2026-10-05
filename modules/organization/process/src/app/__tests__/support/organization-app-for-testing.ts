@@ -13,7 +13,6 @@ import type { OrganizationLifecycleNoticeService } from "../../../services/organ
 import type { OrganizationPromptSeed } from "../../../services/organization-prompt-seed.service.ts";
 import type { OrganizationSeatLicense } from "../../../services/organization-seat-license.service.ts";
 import type { OrganizationSignals } from "../../../services/organization-signals.service.ts";
-import type { OrganizationSettingsSecret } from "../../../services/organization.service.ts";
 import type { PersonalTeamScopeReader } from "../../../services/personal-team-scope.service.ts";
 import type { PersonalWorkspaceIdentity } from "../../../services/personal-workspace-identity.service.ts";
 import type { SeatLimitNoticeService } from "../../../services/seat-limit-notice.service.ts";
@@ -48,7 +47,6 @@ export function organizationAppForTesting(setup: {
     lifecycle: createApiFixture<OrganizationLifecycleNoticeService>({}, "lifecycle notices"),
     ceremony: createApiFixture<OrganizationCeremony>({}, "sign-up ceremony"),
     directory: createApiFixture<OrganizationDirectory>({}, "identity directory"),
-    settingsSecrets: createApiFixture<OrganizationSettingsSecret>({}, "settings cipher"),
     demoProject: { userId: "", projectId: "" },
     seatCounts: createApiFixture<OrganizationSeatRepository>({}, "seat counts"),
     invitations: null,

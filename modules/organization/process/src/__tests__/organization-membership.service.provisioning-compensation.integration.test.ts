@@ -81,6 +81,7 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
   const prisma = connection.client as PrismaClient;
   const repo = PrismaOrganizationMembershipRepository.create({
     database: prisma,
+    cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
     grants: noopGrantsWriter,
   });
 

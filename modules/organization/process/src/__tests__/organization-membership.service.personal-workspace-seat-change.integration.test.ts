@@ -73,6 +73,7 @@ describe.skipIf(!DB_URL)(
     const memberships = OrganizationMembershipService.create({
       repository: PrismaOrganizationMembershipRepository.create({
         database: prisma,
+        cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
         grants: recordingGrantsWriter,
       }),
       prompts,

@@ -354,7 +354,6 @@ function createService(
     groupIdentities: {} as GroupIdentity,
     authz: authzApi,
     grants: authzApi,
-    settingsSecrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
   });
 }
 
@@ -493,8 +492,7 @@ describe("OrganizationService", () => {
       updatedAt: new Date(2),
     };
 
-    // The stub's settingsSecrets is the identity function, so the decrypted
-    // answer equals the stored row byte for byte.
+    // The repository opens the stored settings, so the answer is the row it returns.
     await expect(createService(repository).getSettings({ organizationId: "org" })).resolves.toEqual(
       repository.storedSettings,
     );

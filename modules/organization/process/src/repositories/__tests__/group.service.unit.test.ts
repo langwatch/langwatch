@@ -145,7 +145,6 @@ function buildService(options?: {
     } as GroupIdentity,
     authz: authzApi,
     grants: authzApi,
-    settingsSecrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
   });
 
   return { service, groupRepository, teamRepository, authz, grants };

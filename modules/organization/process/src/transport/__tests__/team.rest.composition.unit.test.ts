@@ -23,7 +23,6 @@ import type {
 import { OrganizationMembershipService } from "../../services/organization-membership.service.ts";
 import type { OrganizationPromptSeed } from "../../services/organization-prompt-seed.service.ts";
 import type { OrganizationSeatLicense } from "../../services/organization-seat-license.service.ts";
-import type { OrganizationSettingsSecret } from "../../services/organization.service.ts";
 import { OrganizationService } from "../../services/organization.service.ts";
 import { PersonalWorkspaceIdentityService } from "../../services/personal-workspace-identity.service.ts";
 import { TeamIdentityService } from "../../services/team-identity.service.ts";
@@ -46,11 +45,6 @@ const ARCHIVED_TEAM_ID = "team_archived";
 const COLLEAGUE_ID = "user-colleague";
 const OUTSIDER_ID = "user-outsider";
 const NOW = Temporal.Instant.from("2026-09-01T00:00:00.000Z");
-
-const passthroughSecrets: OrganizationSettingsSecret = {
-  encrypt: (value) => value,
-  decrypt: (value) => value,
-};
 
 /**
  * The membership half of the application. The teams family never reaches it —
@@ -239,7 +233,6 @@ function application() {
     groupIdentities: GroupIdentityService.create(),
     authz: permissions,
     grants: permissions,
-    settingsSecrets: passthroughSecrets,
   });
 
   const membership = OrganizationMembershipService.create({

@@ -15,7 +15,6 @@ import {
 
 import { userCanOpenTeam } from "../rules/team-visibility.rules.ts";
 import { OrganizationMembershipService } from "./organization-membership.service.ts";
-import type { OrganizationSettingsSecret } from "./organization.service.ts";
 
 /** The demo organization's person and project, or empty strings when unset. */
 export type OrganizationDemoProject = Readonly<{ userId: string; projectId: string }>;
@@ -41,7 +40,6 @@ export interface OrganizationVisibilityReader {
 export interface OrganizationVisibilityDependencies {
   readonly reader: OrganizationVisibilityReader;
   readonly permissions: AuthzApi;
-  readonly secrets: OrganizationSettingsSecret;
   readonly demoProject: OrganizationDemoProject;
 }
 
@@ -170,24 +168,16 @@ export class OrganizationVisibilityService {
   /**
    * A query never carries a credential, because every query is cached, to the
    * browser's disk too. The S3 secret, the project base key and the LangWatchQL
-   * key go to nobody; the base key is revealed by a mutation.
+   * key go to nobody; the base key is revealed by a mutation. The repository opened the rest.
    */
   #redactStoredCredentials(organization: FullyLoadedOrganization): void {
-    const decrypt = (value: string) => this.deps.secrets.decrypt(value);
-
     for (const project of organization.teams.flatMap((team) => team.projects)) {
-      if (project.s3AccessKeyId) project.s3AccessKeyId = decrypt(project.s3AccessKeyId);
       project.s3SecretAccessKey = null;
-      if (project.s3Endpoint) project.s3Endpoint = decrypt(project.s3Endpoint);
-
       project.apiKey = "";
       project.lwqlKey = "";
     }
 
-    if (organization.s3AccessKeyId)
-      organization.s3AccessKeyId = decrypt(organization.s3AccessKeyId);
     organization.s3SecretAccessKey = null;
-    if (organization.s3Endpoint) organization.s3Endpoint = decrypt(organization.s3Endpoint);
 
     // The row still carries the retired Elasticsearch columns, kept for deploy
     // safety until a migration drops them. The stored ciphertext never ships.

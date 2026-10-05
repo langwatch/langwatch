@@ -400,8 +400,8 @@ export class OrganizationMembershipService {
   }
 
   /**
-   * Returns fully loaded organizations for a user. Returns raw (encrypted) records;
-   * the router applies decryption before sending to the client.
+   * Returns fully loaded organizations for a user, their S3 endpoint and access key opened by the
+   * repository; the visibility service redacts the rest before anything leaves.
    */
   async getAllForUser(params: {
     userId: string;

@@ -26,7 +26,10 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository.claimBillingCustomerId", 
     logger: createLogger("langwatch:organization:test:claim-billing-customer"),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client;
-  const organizations = PrismaOrganizationRepository.create(prisma);
+  const organizations = PrismaOrganizationRepository.create({
+    database: prisma,
+    cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+  });
   let organizationId: string;
 
   beforeAll(async () => {

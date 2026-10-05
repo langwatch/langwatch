@@ -33,7 +33,11 @@ beforeEach(() => {
   auditLogFindMany.mockResolvedValue([]);
   auditLogCount.mockResolvedValue(0);
   userFindMany.mockResolvedValue([]);
-  repository = PrismaOrganizationMembershipRepository.create({ database: prisma, grants: writer });
+  repository = PrismaOrganizationMembershipRepository.create({
+    database: prisma,
+    grants: writer,
+    cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+  });
 });
 
 /** Every predicate the built query carries, flattened out of its AND / OR tree. */

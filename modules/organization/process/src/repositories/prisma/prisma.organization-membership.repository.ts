@@ -88,6 +88,7 @@ import type {
   UpdateMemberRoleResult,
   UpdateTeamMemberRoleInput,
 } from "../organization-membership.repository.ts";
+import type { OrganizationSettingsCipher } from "../organization.repository.ts";
 
 /**
  * The team's name for a refusal or a report, both of which are read by somebody
@@ -860,13 +861,20 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
      * The grant ledger every membership write states its access on.
      */
     grants: AuthzGrantsService;
+    /** Opens the stored S3 endpoint and access key an organization read carries. */
+    cipher: OrganizationSettingsCipher;
   }): PrismaOrganizationMembershipRepository {
-    return new PrismaOrganizationMembershipRepository(options.database, options.grants);
+    return new PrismaOrganizationMembershipRepository(
+      options.database,
+      options.grants,
+      options.cipher,
+    );
   }
 
   private constructor(
     private readonly prisma: PrismaClient,
     private readonly writer: AuthzGrantsService,
+    private readonly cipher: OrganizationSettingsCipher,
   ) {}
 
   findPersonalTeamsInScopes(params: {
@@ -1282,7 +1290,27 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         },
       },
     });
-    return organizations.map(fullyLoadedOrganizationFromRecord);
+    return organizations.map((record) =>
+      this.#openStoredSettings(fullyLoadedOrganizationFromRecord(record)),
+    );
+  }
+
+  /** The S3 endpoint and access key the organization and its projects store, opened. */
+  #openStoredSettings(organization: FullyLoadedOrganization): FullyLoadedOrganization {
+    const open = (value: string | null) => (value ? this.cipher.decrypt(value) : value);
+    return {
+      ...organization,
+      s3Endpoint: open(organization.s3Endpoint),
+      s3AccessKeyId: open(organization.s3AccessKeyId),
+      teams: organization.teams.map((team) => ({
+        ...team,
+        projects: team.projects.map((project) => ({
+          ...project,
+          s3Endpoint: open(project.s3Endpoint),
+          s3AccessKeyId: open(project.s3AccessKeyId),
+        })),
+      })),
+    };
   }
 
   async findOrganizationWithMembers(params: {

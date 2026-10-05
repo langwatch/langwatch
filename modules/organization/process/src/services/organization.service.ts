@@ -77,11 +77,6 @@ import {
 } from "./personal-workspace.service.ts";
 import type { TeamIdentity } from "./team-identity.service.ts";
 
-export interface OrganizationSettingsSecret {
-  encrypt(value: string): string;
-  decrypt(value: string): string;
-}
-
 export class OrganizationService extends OrganizationServiceContract {
   private readonly repository: OrganizationRepository;
   private readonly teams: TeamRepository;
@@ -92,7 +87,6 @@ export class OrganizationService extends OrganizationServiceContract {
   private readonly authz: AuthzApi;
   private readonly grants: AuthzApi;
   private readonly diagnostics: PersonalWorkspaceDiagnostics | undefined;
-  private readonly settingsSecrets: OrganizationSettingsSecret;
 
   private constructor({
     repository,
@@ -104,7 +98,6 @@ export class OrganizationService extends OrganizationServiceContract {
     authz,
     grants,
     diagnostics,
-    settingsSecrets,
     notices,
   }: {
     repository: OrganizationRepository;
@@ -116,7 +109,6 @@ export class OrganizationService extends OrganizationServiceContract {
     authz: AuthzApi;
     grants: AuthzApi;
     diagnostics: PersonalWorkspaceDiagnostics | undefined;
-    settingsSecrets: OrganizationSettingsSecret;
     notices: PersonalWorkspaceNotices | undefined;
   }) {
     super();
@@ -129,7 +121,6 @@ export class OrganizationService extends OrganizationServiceContract {
     this.authz = authz;
     this.grants = grants;
     this.diagnostics = diagnostics;
-    this.settingsSecrets = settingsSecrets;
     this.groupService = OrganizationGroupService.create({
       groups,
       groupIdentities,
@@ -218,19 +209,6 @@ export class OrganizationService extends OrganizationServiceContract {
     return organizationId;
   }
 
-  /** The stored row, decrypted: the cipher is this service's dependency, not the repository's. */
-  private decryptSettings(stored: { s3Endpoint: string | null; s3AccessKeyId: string | null }): {
-    s3Endpoint: string | null;
-    s3AccessKeyId: string | null;
-  } {
-    return {
-      s3Endpoint: stored.s3Endpoint ? this.settingsSecrets.decrypt(stored.s3Endpoint) : null,
-      s3AccessKeyId: stored.s3AccessKeyId
-        ? this.settingsSecrets.decrypt(stored.s3AccessKeyId)
-        : null,
-    };
-  }
-
   async getSettings(input: { organizationId: string }): Promise<OrganizationSettings> {
     const parsed = getOrganizationSettingsInputSchema.parse(input);
     const stored = await this.repository.findStoredSettings(parsed.organizationId);
@@ -238,7 +216,7 @@ export class OrganizationService extends OrganizationServiceContract {
       throw new OrganizationNotFoundError();
     }
 
-    return { ...stored, ...this.decryptSettings(stored) };
+    return stored;
   }
 
   /** How colleagues on a matching domain get in, where the organization keeps it. */
@@ -295,24 +273,9 @@ export class OrganizationService extends OrganizationServiceContract {
         ? (await this.repository.findStoredSettings(parsed.organizationId))?.traceSharingEnabled ===
           true
         : false;
-    await this.repository.updateSettings({
-      ...parsed,
-      ...(parsed.s3Endpoint !== undefined
-        ? { s3Endpoint: this.encryptOrNull(parsed.s3Endpoint) }
-        : {}),
-      ...(parsed.s3AccessKeyId !== undefined
-        ? { s3AccessKeyId: this.encryptOrNull(parsed.s3AccessKeyId) }
-        : {}),
-      ...(parsed.s3SecretAccessKey !== undefined
-        ? { s3SecretAccessKey: this.encryptOrNull(parsed.s3SecretAccessKey) }
-        : {}),
-    });
+    await this.repository.updateSettings(parsed);
 
     return { traceShareRevocationRequired: wasSharingEnabled };
-  }
-
-  private encryptOrNull(value: string | null): string | null {
-    return value ? this.settingsSecrets.encrypt(value) : null;
   }
 
   static create(options: {
@@ -325,7 +288,6 @@ export class OrganizationService extends OrganizationServiceContract {
     authz: AuthzApi;
     grants: AuthzApi;
     diagnostics?: PersonalWorkspaceDiagnostics;
-    settingsSecrets: OrganizationSettingsSecret;
     /** Where a newly created personal workspace is recorded, so project records its project. */
     notices?: PersonalWorkspaceNotices;
   }): OrganizationService {
@@ -339,7 +301,6 @@ export class OrganizationService extends OrganizationServiceContract {
       authz: options.authz,
       grants: options.grants,
       diagnostics: options.diagnostics,
-      settingsSecrets: options.settingsSecrets,
       notices: options.notices,
     });
   }

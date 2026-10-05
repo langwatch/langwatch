@@ -49,6 +49,12 @@ export type StoredOrganizationSettings = {
   updatedAt: OrganizationSettings["updatedAt"];
 };
 
+/** The deployment's cipher: the live repositories seal and open stored S3 settings with it. */
+export abstract class OrganizationSettingsCipher {
+  abstract encrypt(value: string): string;
+  abstract decrypt(value: string): string;
+}
+
 /**
  * Persistence owned by the Organization module: the organization's settings
  * row and the personal workspace it hosts. It never crosses into a caller.
@@ -60,14 +66,11 @@ export abstract class OrganizationRepository {
   abstract countUsage(input: {
     organizationIds: readonly string[];
   }): Promise<OrganizationUsageCount>;
+  /** The settings row with its S3 endpoint and access key opened. */
   abstract findStoredSettings(organizationId: string): Promise<StoredOrganizationSettings | null>;
   /** Whether a storage secret is held; the ciphertext itself never leaves the repository. */
   abstract hasStoredS3Secret(organizationId: string): Promise<boolean>;
-  /**
-   * Persists already-encrypted `s3Endpoint`/`s3AccessKeyId`/`s3SecretAccessKey`
-   * values: encryption is the caller's decision, made with the settings
-   * cipher before this is called.
-   */
+  /** Seals `s3Endpoint`, `s3AccessKeyId` and `s3SecretAccessKey` as it stores them; blank: none. */
   abstract updateSettings(input: {
     organizationId: string;
     name?: string;

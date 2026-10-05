@@ -44,9 +44,13 @@ describe.skipIf(!DB_URL)(
     const prisma = connection.client as PrismaClient;
     const membershipRepository = PrismaOrganizationMembershipRepository.create({
       database: prisma,
+      cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
       grants: noopGrantsWriter,
     });
-    const organizationRepository = PrismaOrganizationRepository.create(prisma);
+    const organizationRepository = PrismaOrganizationRepository.create({
+      database: prisma,
+      cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+    });
 
     async function createUser() {
       const user = await prisma!.user.create({

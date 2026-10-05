@@ -201,10 +201,10 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       organization.traceSharingEnabled = input.traceSharingEnabled;
     }
     if (input.primaryIntent !== undefined) organization.primaryIntent = input.primaryIntent;
-    if (input.s3Endpoint !== undefined) organization.s3Endpoint = input.s3Endpoint;
-    if (input.s3AccessKeyId !== undefined) organization.s3AccessKeyId = input.s3AccessKeyId;
+    if (input.s3Endpoint !== undefined) organization.s3Endpoint = input.s3Endpoint || null;
+    if (input.s3AccessKeyId !== undefined) organization.s3AccessKeyId = input.s3AccessKeyId || null;
     if (input.s3SecretAccessKey !== undefined) {
-      organization.s3SecretAccessKey = input.s3SecretAccessKey;
+      organization.s3SecretAccessKey = input.s3SecretAccessKey || null;
     }
     if (input.s3Bucket !== undefined) organization.s3Bucket = input.s3Bucket || null;
     organization.updatedAt = nowInstant();

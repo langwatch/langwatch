@@ -45,9 +45,13 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
   const prisma = connection.client as PrismaClient;
   const membershipRepository = PrismaOrganizationMembershipRepository.create({
     database: prisma,
+    cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
     grants: noopGrantsWriter,
   });
-  const organizationRepository = PrismaOrganizationRepository.create(prisma);
+  const organizationRepository = PrismaOrganizationRepository.create({
+    database: prisma,
+    cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+  });
 
   async function ensureLeaverWorkspace() {
     const resources = identities.create({ userId: leaverUserId, organizationId });

@@ -60,7 +60,6 @@ function application({ failKeys = 0 }: { failKeys?: number } = {}) {
     groupIdentities: GroupIdentityService.create(),
     authz: permissions,
     grants: permissions,
-    settingsSecrets: { encrypt: (value) => value, decrypt: (value) => value },
   });
 
   const membership = OrganizationMembershipService.create({
