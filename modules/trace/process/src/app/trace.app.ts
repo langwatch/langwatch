@@ -650,7 +650,7 @@ const TRACE_FALLBACK_VISIBILITY_DAYS = 14;
  * The store members this process opens, plus the two facts the process itself
  * knows: its public origin and its own name. Neither is a deployment fact.
  */
-type TraceMembers = MembersRead<readonly ["clickhouse", "logger", "redis", "rateLimiter"]> &
+type TraceMembers = MembersRead<readonly ["clickhouse", "redis", "rateLimiter"]> &
   Readonly<{
     publicBaseUrl: string | undefined;
     processName: string;
@@ -669,12 +669,11 @@ export class TraceModule implements TraceApi, CollectorApp {
   static readonly dependencies = traceDependencies;
   static readonly config = traceConfig;
   /**
-   * Every name is from the process's vocabulary; boot refuses by name. ClickHouse holds every span,
-   * `eventing` stages commands, and the logger names the process in a blob read's refusal.
+   * Every name is from the process's vocabulary; boot refuses by name. ClickHouse holds every span
+   * and Redis the ingest dedup claims and export slots. The logger is the module's own.
    */
   static readonly reads = [
     "clickhouse",
-    "logger",
     "redis",
     "rateLimiter",
     "publicBaseUrl",
@@ -697,7 +696,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       commands,
       dedup: RedisTraceSpanDedupRepository.create({
         connection: input.members.redis,
-        logger: input.members.logger,
+        logger: createLogger("langwatch:trace:span-dedup"),
       }),
     });
     const app = new TraceModule({

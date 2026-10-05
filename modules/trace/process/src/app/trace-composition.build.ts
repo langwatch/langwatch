@@ -7,7 +7,7 @@ import { type FoldProjectionStore, createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { LogApi } from "@langwatch/log-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { createLogger, type Logger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
@@ -122,7 +122,6 @@ type TraceCollaborators = Readonly<{
 /** Exactly the process members {@link buildTraceCollaborators} reads. */
 type TraceBuildMembers = Readonly<{
   clickhouse: ClickHouseQueryClient;
-  logger: Logger;
 }>;
 
 /** The config slice the deployment states for this module. */
@@ -159,7 +158,7 @@ export function buildTraceCollaborators(input: {
         resolveS3Client: () => Promise.reject(refuse("a v1 spool object read")),
       }),
       resolveClickHouseClient,
-      logger: members.logger,
+      logger: createLogger("langwatch:trace:blob-store"),
     }),
     commands: input.commands,
     dedup: input.dedup,
