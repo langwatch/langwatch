@@ -1,14 +1,13 @@
 import { defineRepositories } from "@langwatch/process";
 
+import { LiveModelProviderRepositories } from "./live/live.model-provider.repositories.ts";
 import { MemoryModelProviderRepositories } from "./memory/memory.model-provider.repositories.ts";
-import { PostgresModelProviderRepositories } from "./prisma/prisma.model-provider.repositories.ts";
 
 /**
- * Postgres asks the process for the deployment's credential codec as well as
- * its Prisma client: a stored credential is written and read through the
- * deployment's own cipher, and the row format is shared between processes.
+ * Live asks the process for the deployment's cipher beside its Prisma client and Redis: a stored
+ * credential is sealed and opened by the provider store, and the row format is shared by processes.
  */
 export const modelProviderRepositories = defineRepositories({
-  live: PostgresModelProviderRepositories,
+  live: LiveModelProviderRepositories,
   memory: MemoryModelProviderRepositories,
 });

@@ -8,7 +8,40 @@ import {
 } from "@langwatch/model-provider-contract";
 import { z } from "zod";
 
-import { ModelProviderCredentialPolicy } from "../app/model-provider.members.ts";
+/**
+ * Provider-specific credential rules. Encryption belongs to the codec above;
+ * this policy validates writes, preserves masked values, and redacts reads.
+ */
+export abstract class ModelProviderCredentialPolicy {
+  abstract normalizeKeys(
+    provider: string,
+    value: Record<string, unknown> | null,
+  ): Record<string, unknown> | null;
+  abstract merge(input: {
+    incoming: Record<string, unknown> | null;
+    stored: Record<string, unknown> | null;
+  }): Record<string, unknown>;
+  abstract toMaskedKeys(value: Record<string, unknown> | null): Record<string, unknown> | null;
+  abstract hasUsableReplacement(value: Record<string, unknown> | null): boolean;
+  abstract assertCredentialsCanBeSaved(input: {
+    provider: string;
+    incoming: Record<string, unknown> | null;
+    stored: Record<string, unknown> | null;
+    storedCredentialsUnreadable: boolean;
+  }): void;
+  /** Whether a credential write names an endpoint other than the stored one. */
+  abstract endpointMoved(input: {
+    incoming: Record<string, unknown> | null;
+    stored: Record<string, unknown> | null;
+  }): boolean;
+  /** A masked header value is restored only while the endpoint stays where it was. */
+  abstract mergeHeaders(input: {
+    incoming: { key: string; value: string }[];
+    stored: { key: string; value: string }[];
+    endpointMoved: boolean;
+  }): { key: string; value: string }[];
+  abstract maskHeaders(value: { key: string; value: string }[]): { key: string; value: string }[];
+}
 
 type Header = { key: string; value: string };
 

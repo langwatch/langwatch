@@ -1,6 +1,23 @@
 import {
+  allFeatures,
+  buildProviderOnboardingDefaultPlan,
+  classifyRoutingHandleProblem,
+  CODING_ASSISTANT_SURFACES_ONLY_NEEDLE,
+  expandLatestAlias,
+  findFeatureByKey,
+  findModelProviderDefinition,
+  findProviderDeprecation,
   getProviderModelOptions,
+  getStaticModelCostRates,
+  isLatestAlias,
+  isModelAllowedAsRoleDefault,
+  isModelAllowedForFeature,
+  isModelRole,
+  ModelDefaultValidationError,
   modelProviders,
+  normalizeRoutingHandle,
+  type ModelCostRate,
+  type ModelDefaultFeature,
   type ModelProviderApiKeyValidation,
   type ModelProviderCredentialVerdict,
   type ModelProviderSummary,
@@ -8,11 +25,160 @@ import {
 import { Temporal, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import {
-  type ModelProviderManagedGateway,
-  ModelProviderCatalog,
-  type ModelProviderCredentialProbe,
-} from "../app/model-provider.members.ts";
+import type { ModelProviderCredentialProbe } from "./http-model-provider-credential-probe.service.ts";
+import type { ModelProviderManagedGateway } from "./managed-model-provider-gateway.service.ts";
+
+/** Registry/SDK boundary. Provider SDKs and environment configuration stay behind this port. */
+export abstract class ModelProviderCatalog {
+  exists(provider: string): boolean {
+    return findModelProviderDefinition(provider) !== null;
+  }
+  abstract systemProviders(input: {
+    projectId?: string;
+    organizationId?: string;
+    referenceCreatedAt: Instant;
+  }): Promise<ModelProviderSummary[]>;
+  abstract validateApiKey(
+    provider: string,
+    customKeys: Record<string, unknown>,
+  ): Promise<ModelProviderApiKeyValidation>;
+  /**
+   * Probes a stored credential and reports which of the three verdicts it is. Abstract rather
+   * than derived from `validateApiKey`, whose default let "could not check" arrive as a pass.
+   */
+  abstract testConnection(
+    provider: string,
+    customKeys: Record<string, unknown>,
+  ): Promise<ModelProviderCredentialVerdict>;
+  metadata(provider: string): {
+    models: string[];
+    embeddingsModels: string[];
+    disabledByDefault?: boolean;
+  } {
+    const definition = findModelProviderDefinition(provider);
+
+    return {
+      models: getProviderModelOptions(provider, "chat").map((model) => model.value),
+      embeddingsModels: getProviderModelOptions(provider, "embedding").map((model) => model.value),
+      disabledByDefault: definition?.type === "safety",
+    };
+  }
+  defaultFeatures(): ModelDefaultFeature[] {
+    return allFeatures().map(({ key, role, displayName, description }) => ({
+      key,
+      role,
+      displayName,
+      description,
+    }));
+  }
+  /** Expand aliases and reject models that are not valid for a feature/role. */
+  normalizeDefaultModel(input: { key: string; model: string }): string | null {
+    const model = expandLatestAlias(input.model);
+    if (isLatestAlias(input.model) && model === input.model) {
+      return null;
+    }
+
+    const allowed = isModelRole(input.key)
+      ? isModelAllowedAsRoleDefault(model, input.key)
+      : Boolean(
+          findFeatureByKey(input.key)[0] &&
+          isModelAllowedForFeature({ modelId: model, featureKey: input.key }),
+        );
+
+    return allowed ? model : null;
+  }
+  /** Optional onboarding suggestion used when no configured default exists. */
+  inferredDefaultsForProvider(provider: string): Record<string, string> {
+    const plan = buildProviderOnboardingDefaultPlan(provider);
+    return Object.fromEntries(
+      Object.entries(plan).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
+    );
+  }
+  /** Immutable platform registry rates; custom overrides are span attributes. */
+  staticCostRates(): readonly ModelCostRate[] {
+    return getStaticModelCostRates();
+  }
+  sanitizeDefaultConfig(input: Record<string, unknown>): Record<string, string> {
+    const valid = new Set<string>([
+      "DEFAULT",
+      "FAST",
+      "LANGY",
+      "EMBEDDINGS",
+      ...allFeatures().map((feature) => feature.key),
+    ]);
+    const clean: Record<string, string> = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (!valid.has(key) || typeof value !== "string" || value.length === 0) {
+        continue;
+      }
+
+      const allowed = isModelRole(key)
+        ? isModelAllowedAsRoleDefault(value, key)
+        : Boolean(
+            findFeatureByKey(key)[0] &&
+            isModelAllowedForFeature({ modelId: value, featureKey: key }),
+          );
+      if (!allowed) {
+        throw new ModelDefaultValidationError(
+          `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
+        );
+      }
+
+      clean[key] = value;
+    }
+
+    return clean;
+  }
+  normalizeRoutingHandle(input: string | null): string | null {
+    return normalizeRoutingHandle(input);
+  }
+  classifyRoutingHandleProblem(handle: string | null): "shape" | "reserved" | null {
+    return classifyRoutingHandleProblem(handle);
+  }
+  pickProviderDeprecation(provider: string): { replacement?: string } | null {
+    const deprecation = findProviderDeprecation(provider)[0];
+    return deprecation ? { replacement: deprecation.replacedBy } : null;
+  }
+  isManagedProvider(_input: { organizationId: string; provider: string }): boolean {
+    return false;
+  }
+  prepareExecution(input: {
+    parameters: Record<string, string>;
+    projectId: string;
+    model: string;
+    provider: string;
+  }): Promise<Record<string, string>> {
+    return Promise.resolve(input.parameters);
+  }
+  /**
+   * Reads a provider execution value from its stored credentials or injected
+   * process configuration. The package never reaches into environment state.
+   */
+  abstract pickExecutionValue(input: {
+    customKeys: Record<string, unknown> | null;
+    key: string;
+  }): string | null;
+  pickStoredExecutionValue(input: {
+    customKeys: Record<string, unknown> | null;
+    key: string;
+  }): string | null {
+    const value = input.customKeys?.[input.key];
+    return typeof value === "string" && value.length > 0 ? value : null;
+  }
+  pickExecutionDefinition(input: {
+    provider: string;
+  }): { apiKey: string; endpointKey: string | null } | null {
+    const definition = findModelProviderDefinition(input.provider);
+    return definition
+      ? {
+          apiKey: definition.apiKey,
+          endpointKey: definition.endpointKey ?? null,
+        }
+      : null;
+  }
+}
 
 const customKeysSchema = z.record(z.string(), z.string());
 

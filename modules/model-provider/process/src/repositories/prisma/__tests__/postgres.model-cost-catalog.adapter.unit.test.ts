@@ -2,7 +2,9 @@ import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaModelCostCatalogRepository } from "../../../model-provider.module.ts";
+import { ModelCostCatalogService } from "../../../services/model-cost-catalog.service.ts";
+import { ModelProviderProjectScopeService } from "../../../services/model-provider-project-scope.service.ts";
+import { PrismaModelCostRepository } from "../prisma.model-cost.repository.ts";
 
 /**
  * Spec: modules/model-provider/specs/model-cost-catalog-seam.feature
@@ -54,14 +56,14 @@ function catalogue(options: { project?: unknown } = {}) {
   return {
     findMany,
     projects,
-    built: PrismaModelCostCatalogRepository.create({
-      database: prismaDouble({ customLLMModelCost: { findMany } }),
-      projects: projects as never,
-    }).build(),
+    built: ModelCostCatalogService.create({
+      costs: PrismaModelCostRepository.create(prismaDouble({ customLLMModelCost: { findMany } })),
+      scopes: ModelProviderProjectScopeService.create({ projects: projects as never }),
+    }),
   };
 }
 
-describe("PostgresModelCostCatalogAdapter", () => {
+describe("ModelCostCatalogService over Postgres", () => {
   describe("given a Prisma client and one project read", () => {
     describe("when a project's costs are listed", () => {
       /** @scenario "The cost catalogue composes from a database and one project read" */

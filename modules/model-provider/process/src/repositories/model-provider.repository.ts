@@ -5,6 +5,28 @@ import type {
   ModelProviderUsageCount,
 } from "@langwatch/model-provider-contract";
 
+/** How a ModelProvider's `customKeys` column read back. */
+export interface CustomKeysRead {
+  state: "absent" | "read" | "unreadable";
+  keys: Record<string, unknown>;
+}
+
+/** Credential encoding is supplied by the application boundary. */
+export abstract class ModelProviderCredentialCodec {
+  abstract encode(value: Record<string, unknown> | null): unknown;
+  abstract decode(value: unknown): CustomKeysRead;
+}
+
+/**
+ * The at-rest cipher a stored credential is written and read through. A port, not an
+ * implementation: the key is the deployment's own `CREDENTIALS_SECRET`, and rows written by
+ * one process are read by another, so every process must share this one cipher.
+ */
+export abstract class ModelProviderCredentialCipher {
+  abstract encrypt(value: string): string;
+  abstract decrypt(value: string): string;
+}
+
 /** The provider row as it is stored: the contract's own shape, whole. */
 export type ModelProviderRecord = ModelProvider;
 
@@ -17,10 +39,10 @@ export interface ModelProviderLegacyColumns {
   customEmbeddingsModels: unknown;
 }
 
-/** The migrated columns, written verbatim: `customKeys` arrives already encrypted. */
+/** The migrated columns: `customKeys` arrives in plaintext and the store seals it. */
 export interface ModelProviderLegacyColumnsUpdate {
   id: string;
-  customKeys?: string;
+  customKeys?: Record<string, unknown>;
   customModels?: CustomModelEntry[];
   customEmbeddingsModels?: CustomModelEntry[];
 }
@@ -64,6 +86,6 @@ export interface ModelProviderRepository {
   }): Promise<string[]>;
   /** Every project-scoped row, raw, in one query of this table; never a project listing. */
   findProjectScopedLegacyColumns(): Promise<ModelProviderLegacyColumns[]>;
-  /** Writes migrated columns as given, bypassing the credential codec. */
+  /** Writes migrated columns as given, sealing `customKeys` with the credential codec. */
   updateLegacyColumns(input: ModelProviderLegacyColumnsUpdate): Promise<void>;
 }

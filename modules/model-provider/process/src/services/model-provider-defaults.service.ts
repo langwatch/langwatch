@@ -13,12 +13,12 @@ import {
   type ModelDefaultSnapshotInput,
 } from "@langwatch/model-provider-contract";
 
-import type { ModelProviderCatalog } from "../app/model-provider.members.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 import { inheritedChain, projectChain } from "../rules/model-default-scope-chain.rules.ts";
 import type { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
+import type { ModelProviderCatalog } from "./registry-model-provider-catalog.service.ts";
 
 type DefaultScope = { id: string; name: string };
 type DefaultProjectScope = DefaultScope & { teamId: string };

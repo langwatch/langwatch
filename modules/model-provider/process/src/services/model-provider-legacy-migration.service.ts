@@ -4,8 +4,6 @@
 
 import { isLegacyCustomModels, type CustomModelEntry } from "@langwatch/model-provider-contract";
 
-import type { ModelProviderCredentialCipher } from "../app/model-provider.members.ts";
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -121,6 +119,11 @@ interface ModelProviderCredentialRow {
   customKeys: unknown;
 }
 
+/** What the credential migration does with one row: seal its plaintext keys, or leave it. */
+export type ModelProviderKeysSeal =
+  | Readonly<{ outcome: "seal"; keys: Record<string, unknown> }>
+  | Readonly<{ outcome: "unchanged" }>;
+
 /**
  * Whether a `customKeys` value has already been encrypted.
  */
@@ -175,24 +178,23 @@ export class ModelProviderLegacyMigrationService {
   }
 
   /**
-   * The ciphertext one row's `customKeys` becomes, or `null` when the row needs
-   * no update — already encrypted, or holding nothing.
+   * Whether one row's `customKeys` still holds plaintext for the store to seal, or is left as
+   * stored: already encrypted, or holding nothing.
    */
-  encodeModelProviderKeysRow({
-    row,
-    cipher,
-  }: {
-    row: ModelProviderCredentialRow;
-    cipher: ModelProviderCredentialCipher;
-  }): string | null {
+  planModelProviderKeysSeal({ row }: { row: ModelProviderCredentialRow }): ModelProviderKeysSeal {
     if (row.customKeys == null) {
-      return null;
+      return { outcome: "unchanged" };
     }
 
-    if (isAlreadyEncrypted(row.customKeys)) {
-      return null;
+    // A value that is not a key bag reads as unreadable sealed or not, so it is left as stored.
+    if (
+      isAlreadyEncrypted(row.customKeys) ||
+      typeof row.customKeys !== "object" ||
+      Array.isArray(row.customKeys)
+    ) {
+      return { outcome: "unchanged" };
     }
 
-    return cipher.encrypt(JSON.stringify(row.customKeys));
+    return { outcome: "seal", keys: { ...row.customKeys } };
   }
 }

@@ -1,35 +1,28 @@
-/**
- * The Postgres bundle. Hand-written rather than `prismaRepositories(...)` because the provider
- * store's credential codec is built here from the `encryption` member — `requires` may only
- * name `ProcessMembers` keys, and no `"credentials"` entry exists among them.
- */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { ModelProviderCredentialCipher } from "../../app/model-provider.members.ts";
 import type { ModelProviderRepositories } from "../model-provider.repositories.ts";
+import type { ModelProviderCredentialCipher } from "../model-provider.repository.ts";
 import { PrismaModelCostRepository } from "./prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "./prisma.model-default.repository.ts";
 import { PrismaModelProviderCredentialMapper } from "./prisma.model-provider-credential.mapper.ts";
 import { PrismaModelProviderEvidenceRepository } from "./prisma.model-provider-evidence.repository.ts";
 import { PrismaModelProviderRepository } from "./prisma.model-provider.repository.ts";
 
+/** The Postgres stores; the provider store seals and opens credentials with the cipher. */
 export class PostgresModelProviderRepositories {
-  static readonly requires = ["prisma", "encryption"] as const;
-
-  static create(
-    members: Readonly<{
-      prisma: PrismaClient;
-      encryption: ModelProviderCredentialCipher;
-    }>,
-  ): ModelProviderRepositories {
-    const credentials = PrismaModelProviderCredentialMapper.create({
-      cipher: members.encryption,
-    });
+  static create({
+    prisma,
+    encryption,
+  }: Readonly<{
+    prisma: PrismaClient;
+    encryption: ModelProviderCredentialCipher;
+  }>): Omit<ModelProviderRepositories, "rateLimits"> {
+    const credentials = PrismaModelProviderCredentialMapper.create({ cipher: encryption });
     return {
-      providers: PrismaModelProviderRepository.create(members.prisma, credentials),
-      defaults: PrismaModelDefaultRepository.create(members.prisma),
-      costs: PrismaModelCostRepository.create(members.prisma),
-      evidence: PrismaModelProviderEvidenceRepository.create(members.prisma),
+      providers: PrismaModelProviderRepository.create(prisma, credentials),
+      defaults: PrismaModelDefaultRepository.create(prisma),
+      costs: PrismaModelCostRepository.create(prisma),
+      evidence: PrismaModelProviderEvidenceRepository.create(prisma),
     };
   }
 }

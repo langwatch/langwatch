@@ -8,8 +8,8 @@ import {
 } from "@langwatch/model-provider-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ModelProviderEgress } from "../../app/model-provider.members.ts";
 import { HttpModelProviderCredentialProbeService } from "../http-model-provider-credential-probe.service.ts";
+import type { ModelProviderEgress } from "../ssrf-model-provider-egress.service.ts";
 
 // Mocks the guarded egress port, not `global.fetch` — the real SSRF fence would make every
 // assertion about DNS. The redirect refusal still uses the egress's real error type.

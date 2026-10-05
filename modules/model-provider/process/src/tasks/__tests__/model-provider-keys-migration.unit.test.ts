@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 
 /**
  * @vitest-environment node
- * The one-off walk that encrypts model-provider keys already sitting in the
- * clear. Drives the walk itself: it writes only rows that need it, counts
- * what it did, and can run again without re-encrypting an encrypted row.
+ * The one-off walk that encrypts model-provider keys still in the clear: it writes only rows
+ * that need it, counts what it did, and never re-encrypts. The stand-in store seals through
+ * the provider store's own credential codec.
  */
-import type { ModelProviderCredentialCipher } from "../../app/model-provider.members.ts";
+import type { ModelProviderCredentialCipher } from "../../repositories/model-provider.repository.ts";
+import { PrismaModelProviderCredentialMapper } from "../../repositories/prisma/prisma.model-provider-credential.mapper.ts";
 import type { ModelProviderMigrationDatabase } from "../../rules/model-provider-migration.rules.ts";
 import { runModelProviderKeysMigration } from "../model-provider-credentials-migrate.task.ts";
 
@@ -28,7 +29,11 @@ function cipher(): ModelProviderCredentialCipher & { decrypted: string[] } {
   } as ModelProviderCredentialCipher & { decrypted: string[] };
 }
 
-function databaseOver(rows: { id: string; customKeys: unknown }[]) {
+function databaseOver(
+  rows: { id: string; customKeys: unknown }[],
+  secrets: ModelProviderCredentialCipher = cipher(),
+) {
+  const credentials = PrismaModelProviderCredentialMapper.create({ cipher: secrets });
   const writes: { id: string; customKeys: unknown }[] = [];
   const stored = rows.map((row) => ({ ...row }));
 
@@ -41,10 +46,11 @@ function databaseOver(rows: { id: string; customKeys: unknown }[]) {
         customEmbeddingsModels: null,
       })),
     updateLegacyColumns: async ({ id, customKeys }) => {
-      writes.push({ id, customKeys });
+      const sealed = customKeys === undefined ? undefined : credentials.encode(customKeys);
+      writes.push({ id, customKeys: sealed });
       const row = stored.find((candidate) => candidate.id === id);
       if (row) {
-        row.customKeys = customKeys;
+        row.customKeys = sealed;
       }
     },
   };
@@ -57,13 +63,16 @@ describe("runModelProviderKeysMigration()", () => {
     describe("when the migration runs", () => {
       /** @scenario "Migration encrypts existing plaintext keys" */
       it("encrypts every plaintext row and reports how many it updated", async () => {
-        const { database, writes, stored } = databaseOver([
-          { id: "mp_1", customKeys: { OPENAI_API_KEY: "sk-one" } },
-          { id: "mp_2", customKeys: { ANTHROPIC_API_KEY: "sk-two" } },
-        ]);
         const secrets = cipher();
+        const { database, writes, stored } = databaseOver(
+          [
+            { id: "mp_1", customKeys: { OPENAI_API_KEY: "sk-one" } },
+            { id: "mp_2", customKeys: { ANTHROPIC_API_KEY: "sk-two" } },
+          ],
+          secrets,
+        );
 
-        const outcome = await runModelProviderKeysMigration({ database, cipher: secrets });
+        const outcome = await runModelProviderKeysMigration({ database });
 
         expect(outcome).toEqual({ updated: 2, skipped: 0 });
         expect(writes).toHaveLength(2);
@@ -81,7 +90,7 @@ describe("runModelProviderKeysMigration()", () => {
       it("leaves a row with no keys alone", async () => {
         const { database, writes } = databaseOver([{ id: "mp_1", customKeys: null }]);
 
-        const outcome = await runModelProviderKeysMigration({ database, cipher: cipher() });
+        const outcome = await runModelProviderKeysMigration({ database });
 
         expect(outcome).toEqual({ updated: 0, skipped: 1 });
         expect(writes).toEqual([]);
@@ -95,12 +104,13 @@ describe("runModelProviderKeysMigration()", () => {
       it("skips them, writes nothing, and leaves the rows decryptable", async () => {
         const secrets = cipher();
         const alreadyEncrypted = secrets.encrypt(JSON.stringify({ OPENAI_API_KEY: "sk-one" }));
-        const { database, writes, stored } = databaseOver([
-          { id: "mp_1", customKeys: alreadyEncrypted },
-        ]);
+        const { database, writes, stored } = databaseOver(
+          [{ id: "mp_1", customKeys: alreadyEncrypted }],
+          secrets,
+        );
 
-        const first = await runModelProviderKeysMigration({ database, cipher: secrets });
-        const second = await runModelProviderKeysMigration({ database, cipher: secrets });
+        const first = await runModelProviderKeysMigration({ database });
+        const second = await runModelProviderKeysMigration({ database });
 
         expect(first).toEqual({ updated: 0, skipped: 1 });
         expect(second).toEqual({ updated: 0, skipped: 1 });
@@ -115,10 +125,9 @@ describe("runModelProviderKeysMigration()", () => {
         const { database, writes } = databaseOver([
           { id: "mp_1", customKeys: { OPENAI_API_KEY: "sk-one" } },
         ]);
-        const secrets = cipher();
 
-        const first = await runModelProviderKeysMigration({ database, cipher: secrets });
-        const second = await runModelProviderKeysMigration({ database, cipher: secrets });
+        const first = await runModelProviderKeysMigration({ database });
+        const second = await runModelProviderKeysMigration({ database });
 
         expect(first).toEqual({ updated: 1, skipped: 0 });
         expect(second).toEqual({ updated: 0, skipped: 1 });

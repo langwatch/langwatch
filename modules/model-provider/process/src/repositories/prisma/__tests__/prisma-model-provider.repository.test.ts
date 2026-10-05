@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ModelProviderCredentialCodec,
   type CustomKeysRead,
-} from "../../../app/model-provider.members.ts";
+} from "../../model-provider.repository.ts";
 import { PrismaModelProviderRepository } from "../prisma.model-provider.repository.ts";
 
 class Credentials extends ModelProviderCredentialCodec {

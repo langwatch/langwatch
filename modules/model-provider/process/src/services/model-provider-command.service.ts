@@ -25,18 +25,16 @@ import {
 } from "@langwatch/model-provider-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
-import type {
-  ModelProviderCatalog,
-  ModelProviderConnectionRateLimiter,
-  ModelProviderCredentialPolicy,
-  ModelProviderIdService,
-} from "../app/model-provider.members.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 import type { ModelProviderConnectionPingService } from "./model-provider-connection-ping.service.ts";
+import type { ModelProviderCredentialPolicy } from "./model-provider-keys.service.ts";
 import type { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 import type { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
+import type { ModelProviderIdService } from "./prefixed-model-provider-id.service.ts";
+import type { ModelProviderCatalog } from "./registry-model-provider-catalog.service.ts";
+import type { ModelProviderConnectionRateLimiter } from "./windowed-model-provider-connection-rate-limiter.service.ts";
 
 type ModelProviderCommandOptions = {
   repository: ModelProviderRepository;

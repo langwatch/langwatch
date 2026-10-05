@@ -1,5 +1,5 @@
 /**
- * Tests that ModelProviderModule.create builds collaborators from declared members and config,
+ * Tests that ModelProviderModule.create builds collaborators from its registry, peers and config,
  * not from hand-composed infrastructure. Regression: before regaining build step, calls
  * crashed on undefined errors (defaultFeatures, systemProviders, exists).
  */
@@ -7,31 +7,17 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import { ModelProviderModule } from "../model-provider.app.ts";
-import { ModelProviderCredentialCipher } from "../model-provider.members.ts";
 import {
   createModelProviderTestDataPrivacy,
   createModelProviderTestManagedProviders,
 } from "./model-provider.fixture.ts";
-
-/** A cipher with the deployment's shape and none of its cryptography. */
-class ReversingCipher extends ModelProviderCredentialCipher {
-  encrypt(value: string): string {
-    return `encrypted:${value}`;
-  }
-
-  decrypt(value: string): string {
-    return value.replace(/^encrypted:/, "");
-  }
-}
 
 function testProject(id: string) {
   return projectWithTeamSchema.parse({
@@ -103,15 +89,6 @@ function createFullModelProviderTestOrganizations(): OrganizationApi {
   });
 }
 
-/** The `redis` member, scripted to the three calls this module's connection counter makes. */
-function fakeRedis(): RedisConnection {
-  return redisDouble({
-    incr: async () => 1,
-    expire: async () => 1,
-    ttl: async () => 0,
-  });
-}
-
 /**
  * Builds the app exactly the way boot does: through `create`, not test-only
  * `createForTesting`.
@@ -129,9 +106,7 @@ function createRealModelProviderApp(
       managed: createModelProviderTestManagedProviders(),
     },
     members: {
-      redis: fakeRedis(),
       nlpServiceUrl: undefined,
-      encryption: new ReversingCipher(),
       nlpInternalSecret: undefined,
     },
     config: {
@@ -156,7 +131,7 @@ function createRealModelProviderApp(
 }
 
 describe("ModelProviderModule.create", () => {
-  describe("given only the process's own redis and secrets members", () => {
+  describe("given the memory registry, peers and an empty secrets chain", () => {
     it("answers the default-models feature catalogue instead of crashing on undefined defaultFeatures", async () => {
       const app = await createRealModelProviderApp();
 

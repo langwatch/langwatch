@@ -29,11 +29,11 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import {
-  ModelProviderCatalog,
   ModelProviderCredentialCodec,
   type CustomKeysRead,
-} from "../../app/model-provider.members.ts";
+} from "../../repositories/model-provider.repository.ts";
 import { PrefixedModelProviderIdService } from "../../services/prefixed-model-provider-id.service.ts";
+import { ModelProviderCatalog } from "../../services/registry-model-provider-catalog.service.ts";
 
 export const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

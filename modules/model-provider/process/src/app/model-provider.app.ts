@@ -70,13 +70,23 @@ import {
 } from "@langwatch/model-provider-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { openAiApiKey, Secret } from "@langwatch/secrets";
 
+import { modelProviderConnectionPingChannels } from "../channels/model-provider-connection-ping-channels.registry.ts";
 import type { ModelProviderConnectionPing } from "../channels/model-provider-connection-ping.channel.ts";
 import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
 import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
+import { CodexAccountService } from "../services/codex-account.service.ts";
+import {
+  CodexOAuthModelProviderTokenRefresherService,
+  type CodexTokenRefresher,
+} from "../services/codex-oauth-model-provider-token-refresher.service.ts";
+import {
+  HttpModelProviderCredentialProbeService,
+  type ModelProviderCredentialProbe,
+} from "../services/http-model-provider-credential-probe.service.ts";
+import { ManagedModelProviderGatewayService } from "../services/managed-model-provider-gateway.service.ts";
 import {
   ModelCostPreviewService,
   type ModelCostPreviewSpanReader,
@@ -93,14 +103,20 @@ import { ModelProviderTextGenerationService } from "../services/model-provider-t
 import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
 import { ModelProviderService as ModelProviderGateway } from "../services/model-provider.service.ts";
 import { PlatformProviderChainService } from "../services/platform-provider-chain.service.ts";
-import { buildModelProviderInfrastructure } from "./model-provider-composition.build.ts";
-import type {
-  CodexTokenRefresher,
-  ModelProviderCatalog,
-  ModelProviderConnectionRateLimiter,
-  ModelProviderCredentialProbe,
-  ModelTranslation,
-} from "./model-provider.members.ts";
+import { PrefixedModelProviderIdService } from "../services/prefixed-model-provider-id.service.ts";
+import {
+  RegistryModelProviderCatalogService,
+  type ModelProviderCatalog,
+} from "../services/registry-model-provider-catalog.service.ts";
+import { SsrfModelProviderEgressService } from "../services/ssrf-model-provider-egress.service.ts";
+import {
+  VercelAiModelTranslationService,
+  type ModelTranslation,
+} from "../services/vercel-ai-model-translation.service.ts";
+import {
+  WindowedModelProviderConnectionRateLimiterService,
+  type ModelProviderConnectionRateLimiter,
+} from "../services/windowed-model-provider-connection-rate-limiter.service.ts";
 
 export type { ModelProviderCaller } from "@langwatch/model-provider-contract";
 
@@ -115,9 +131,9 @@ const TRANSLATE_FEATURE_KEY = "translate.text";
 export type SpanReader = unknown;
 
 /**
- * The technical members this module asks the process for. Each is a deployment's own answer
- * — its registry, egress fence, identifier format, OAuth issuer, counters, span reader — and
- * none of them is another module's service.
+ * The collaborators the module composes in `create`: its registry, egress fence, identifier
+ * format, OAuth issuer, counters and span reader. None is another module's service; a test
+ * hands its own through `createForTesting`.
  */
 export interface ModelProviderInfrastructure {
   /** The provider registry, and the system credentials this deployment holds. */
@@ -161,9 +177,11 @@ export interface ModelProviderCodexDeviceFlow {
   ): Promise<ModelProviderCodexDeviceApproval>;
 }
 
-/** The engine address and its credential are the process's facts, not this module's spellings. */
-type ModelProviderMembers = MembersRead<readonly ["redis", "encryption"]> &
-  Readonly<{ nlpServiceUrl: string | undefined; nlpInternalSecret: string | undefined }>;
+/** The engine address and its credential: process facts until their shared leaves land. */
+type ModelProviderMembers = Readonly<{
+  nlpServiceUrl: string | undefined;
+  nlpInternalSecret: string | undefined;
+}>;
 
 type ModelProviderSetup = FeatureSetup<
   typeof ModelProviderModule.dependencies,
@@ -182,9 +200,8 @@ const UNCONFIGURED_EXECUTION_PROXY = "http://nlp-engine-not-configured.invalid";
 const EXECUTION_PROXY_PATH = "/go/proxy/v1";
 
 /**
- * What {@link buildModelProviderInfrastructure} composes over, derived from
- * the contract's own config slice at `create()` rather than declared as a
- * second schema.
+ * What `create` composes the infrastructure over, derived from the contract's
+ * own config slice rather than declared as a second schema.
  */
 export type ModelProviderBuildConfig = Readonly<{
   egress: Readonly<{ blockLocal: boolean; allowedHosts: string[]; verifyTls: boolean }>;
@@ -246,7 +263,7 @@ export class ModelProviderModule implements ModelProviderApi {
     ...ModelProviderModule.platformCredentials,
     ...ModelProviderModule.operationalSecrets,
   } as const;
-  static readonly reads = ["redis", "encryption", "nlpServiceUrl", "nlpInternalSecret"] as const;
+  static readonly reads = ["nlpServiceUrl", "nlpInternalSecret"] as const;
 
   static async create(setup: ModelProviderSetup): Promise<ModelProviderModule> {
     return ModelProviderModule.withPlatformChain(
@@ -289,19 +306,66 @@ export class ModelProviderModule implements ModelProviderApi {
       probeBaseUrls: config.probeBaseUrls,
       isSaas: false,
     };
-    const infrastructure = buildModelProviderInfrastructure({
-      members,
+    const infrastructure = ModelProviderModule.#composeInfrastructure({
+      repositories,
       config: buildConfig,
       dependencies,
     });
     return new ModelProviderModule({
       repositories,
       dependencies,
-      members: infrastructure,
+      infrastructure,
       executionProxyBaseUrl,
       nlpInternalSecret: members.nlpInternalSecret,
       platformChain,
     });
+  }
+
+  /** The collaborators `create` builds over this deployment's config, peers and registry. */
+  static #composeInfrastructure({
+    repositories,
+    config,
+    dependencies,
+  }: {
+    repositories: ModelProviderRepositories;
+    config: ModelProviderBuildConfig;
+    dependencies: Pick<ModelProviderSetup["dependencies"], "projects" | "managed">;
+  }): ModelProviderInfrastructure {
+    // The catalogue's probe and `credentialProbe` are one behaviour behind the fence: one instance.
+    const probe = HttpModelProviderCredentialProbeService.create({
+      egress: SsrfModelProviderEgressService.create({ policy: config.egress }),
+      environment: config.environment,
+      deployedBaseUrls: config.probeBaseUrls,
+    });
+
+    return {
+      catalog: RegistryModelProviderCatalogService.create({
+        managed: ManagedModelProviderGatewayService.create({
+          managed: dependencies.managed,
+          projects: dependencies.projects,
+        }),
+        probe,
+        systemProviderEnvironment: config.environment,
+        isSaas: config.isSaas,
+      }),
+      translation: VercelAiModelTranslationService.create({
+        projects: dependencies.projects,
+        executionProxyBaseUrl: config.executionProxyBaseUrl,
+      }),
+      connectionPing: modelProviderConnectionPingChannels.live.create({
+        executionProxyBaseUrl: config.executionProxyBaseUrl,
+        nlpInternalSecret: config.nlpInternalSecret,
+      }),
+      ids: PrefixedModelProviderIdService.create(),
+      codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
+      connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({
+        limiter: repositories.rateLimits,
+      }),
+      credentialProbe: probe,
+      codexAccounts: CodexAccountService.create(),
+      // No trace read stack is composed here: the transport supplies the request's span reader.
+      spans: undefined,
+    };
   }
 
   /**
@@ -312,14 +376,14 @@ export class ModelProviderModule implements ModelProviderApi {
   static createForTesting(setup: {
     repositories: ModelProviderRepositories;
     dependencies: ModelProviderSetup["dependencies"];
-    members: ModelProviderInfrastructure;
+    infrastructure: ModelProviderInfrastructure;
     executionProxyBaseUrl?: string;
     platformChain?: PlatformProviderChainService;
   }): ModelProviderModule {
     return new ModelProviderModule({
       repositories: setup.repositories,
       dependencies: setup.dependencies,
-      members: setup.members,
+      infrastructure: setup.infrastructure,
       executionProxyBaseUrl:
         setup.executionProxyBaseUrl ?? "http://nlp-engine-not-configured.invalid",
       nlpInternalSecret: void 0,
@@ -362,14 +426,14 @@ export class ModelProviderModule implements ModelProviderApi {
   private constructor({
     repositories,
     dependencies,
-    members,
+    infrastructure,
     executionProxyBaseUrl,
     nlpInternalSecret,
     platformChain,
   }: {
     repositories: ModelProviderRepositories;
     dependencies: ModelProviderSetup["dependencies"];
-    members: ModelProviderInfrastructure;
+    infrastructure: ModelProviderInfrastructure;
     executionProxyBaseUrl: string;
     nlpInternalSecret: string | undefined;
     platformChain: PlatformProviderChainService;
@@ -384,19 +448,19 @@ export class ModelProviderModule implements ModelProviderApi {
       organizations: dependencies.organizations,
       authorization: dependencies.permissions,
       credentialPolicy: ModelProviderKeysService.create(),
-      catalog: members.catalog,
-      translation: members.translation,
-      connectionPing: members.connectionPing,
-      ids: members.ids,
-      codexTokenRefresher: members.codexTokenRefresher,
-      connectionRateLimiter: members.connectionRateLimiter,
+      catalog: infrastructure.catalog,
+      translation: infrastructure.translation,
+      connectionPing: infrastructure.connectionPing,
+      ids: infrastructure.ids,
+      codexTokenRefresher: infrastructure.codexTokenRefresher,
+      connectionRateLimiter: infrastructure.connectionRateLimiter,
     });
     this.#providerAuthorization = ModelProviderWriteAuthorizationService.create(
       ModelProviderAuthorizationService.create(dependencies.permissions),
     );
-    this.#credentialProbe = members.credentialProbe;
-    this.#codexAccounts = members.codexAccounts;
-    this.#spans = members.spans;
+    this.#credentialProbe = infrastructure.credentialProbe;
+    this.#codexAccounts = infrastructure.codexAccounts;
+    this.#spans = infrastructure.spans;
     // The same always-empty fallback map `ModelProviderBuildConfig.environment` carries.
     this.#evaluatorModelEnv = ModelProviderEvaluatorModelEnvService.create({
       modelProviders: this,

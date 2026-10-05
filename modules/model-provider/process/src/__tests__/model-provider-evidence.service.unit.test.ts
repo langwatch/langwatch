@@ -11,10 +11,12 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
-import { ModelCostProject } from "../app/model-provider.members.ts";
 import { PrismaModelProviderEvidenceRepository } from "../repositories/prisma/prisma.model-provider-evidence.repository.ts";
 import { ModelProviderEvidenceService } from "../services/model-provider-evidence.service.ts";
-import { ModelProviderProjectScopeService } from "../services/model-provider-project-scope.service.ts";
+import {
+  ModelCostProject,
+  ModelProviderProjectScopeService,
+} from "../services/model-provider-project-scope.service.ts";
 
 const PROJECT_ID = "project-1";
 const TEAM_ID = "team-1";

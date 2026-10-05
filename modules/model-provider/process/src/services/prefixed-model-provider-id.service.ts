@@ -1,6 +1,9 @@
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
 
-import { ModelProviderIdService } from "../app/model-provider.members.ts";
+/** Generates identifiers for records owned by Model Provider. */
+export abstract class ModelProviderIdService {
+  abstract generate(input: { type: "provider" | "default" | "cost" }): string;
+}
 
 /**
  * New ids are KSUIDs under their resource prefix: main's `provider_…` and `mdcfg_…`, and

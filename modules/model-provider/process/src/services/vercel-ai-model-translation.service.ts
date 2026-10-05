@@ -1,11 +1,22 @@
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { generateText } from "ai";
 
-import { ModelTranslation } from "../app/model-provider.members.ts";
 import {
   ModelProviderExecutionHandleService,
   type ModelProviderExecutionHandleOptions,
 } from "./model-provider-execution-handle.service.ts";
+
+export abstract class ModelTranslation {
+  abstract translate(input: {
+    projectId: string;
+    text: string;
+    model: string;
+    modelProviders: Pick<
+      ModelProviderApi,
+      "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders"
+    >;
+  }): Promise<string>;
+}
 
 /**
  * One model call, asked to say the same thing in English.

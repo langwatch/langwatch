@@ -1,7 +1,13 @@
 import { CodexAuthError, type CodexTokenKeys } from "@langwatch/model-provider-contract";
 
-import { CodexTokenRefresher } from "../app/model-provider.members.ts";
 import { CodexAccountService } from "./codex-account.service.ts";
+
+/** OAuth exchange boundary owned by the application runtime. */
+export abstract class CodexTokenRefresher {
+  abstract refresh(input: {
+    tokens: CodexTokenKeys;
+  }): Promise<{ status: "refreshed"; tokens: CodexTokenKeys } | { status: "session_expired" }>;
+}
 
 /**
  * The Codex refresher, over the device-flow account service above.
