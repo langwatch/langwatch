@@ -39,8 +39,8 @@ const dspyInitParamsSchema = z
      * Optimization Studio workflow to read it from. `dataset_id` wins when
      * both are sent.
      */
-    dataset_id: z.string().optional(),
-    dataset_slug: z.string().optional(),
+    dataset_id: z.string().min(1).optional(),
+    dataset_slug: z.string().min(1).optional(),
   })
   .refine((data) => {
     if (!data.experiment_id && !data.experiment_slug) {

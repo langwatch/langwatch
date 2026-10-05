@@ -575,8 +575,8 @@ const dspyInitParamsSchema = z
     ]),
     experiment_name: z.string().optional(),
     workflowId: z.string().optional(),
-    dataset_id: z.string().optional(),
-    dataset_slug: z.string().optional(),
+    dataset_id: z.string().min(1).optional(),
+    dataset_slug: z.string().min(1).optional(),
   })
   .refine((data) => {
     if (!data.experiment_id && !data.experiment_slug) return false;
