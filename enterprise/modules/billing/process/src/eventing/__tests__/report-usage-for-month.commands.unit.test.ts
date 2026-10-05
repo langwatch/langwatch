@@ -589,6 +589,43 @@ describe("ReportUsageForMonthCommand", () => {
     });
   });
 
+  describe("given the Instant Eval checkpoint reported 1.0000 dollars and the month is now 1.5000", () => {
+    /** @scenario "A second report sends only the delta since the checkpoint" */
+    it("sends 0.5000 under an identifier naming the meter, the month and both totals", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockImplementation(
+        async ({ meter }: { meter: string }) =>
+          meter === "langwatch_instant_eval_usd"
+            ? { lastReportedTotal: 10_000, pendingReportedTotal: null, consecutiveFailures: 0 }
+            : null,
+      );
+      mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 15_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [
+            expect.objectContaining({
+              eventName: "langwatch_instant_eval_usd",
+              identifier: "org-1:2026-02:langwatch_instant_eval_usd:from:10000:to:15000",
+              value: 0.5,
+            }),
+          ],
+        }),
+      );
+      expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
+        meter: "langwatch_instant_eval_usd",
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        lastReportedTotal: 15_000,
+      });
+    });
+  });
+
   describe("given the events meter throws before Stripe is reached", () => {
     /** @scenario "The Instant Eval meter keeps its own checkpoint" */
     it("still reports the Instant Evals meter, and owes another tick", async () => {

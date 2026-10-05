@@ -5,12 +5,14 @@ import { Temporal } from "@langwatch/time";
 import Stripe from "stripe";
 import { describe, expect, it } from "vitest";
 
+import { billingProcessModule } from "../../billing.module.ts";
 import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.billing-webhook-host.channel.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
 import type { SeatRetentionRules } from "../../services/billing-subscription-lifecycle.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
 import { StripeWebhookSignatureService } from "../../services/stripe-webhook-signature.service.ts";
 import type { UsageWarningService } from "../../services/usage-warning.service.ts";
+import { billingStripeWebhookRest } from "../../transport/billing-stripe-webhook.rest.ts";
 import { type ConnectedBillingPeers, BillingModule } from "../billing.app.ts";
 
 const ACME = "org-acme";
@@ -363,6 +365,30 @@ describe("the Stripe callback BillingModule answers", () => {
       await expect(app.receiveStripeWebhook({ rawBody, signature })).rejects.toMatchObject({
         status: 400,
       });
+    });
+  });
+
+  describe("given the module's declaration and a deployment that bills or does not", () => {
+    /** @scenario "The Stripe webhook route is declared on a deployment that bills" */
+    it("declares the callback in the module whichever deployment composes it", async () => {
+      const billing = billingApp({
+        isSaas: true,
+        stripeSecretKey: "sk_test_fixture",
+        webhookSecret: "whsec_fixture",
+      });
+      const notBilling = billingApp({ isSaas: false, stripeSecretKey: undefined });
+      const signature = Stripe.webhooks.generateTestHeaderString({
+        payload,
+        secret: "whsec_fixture",
+      });
+
+      expect(billingProcessModule.transports).toContain(billingStripeWebhookRest);
+      await expect(billing.app.receiveStripeWebhook({ rawBody, signature })).resolves.toEqual({
+        received: true,
+      });
+      await expect(
+        notBilling.app.receiveStripeWebhook({ rawBody, signature }),
+      ).rejects.toMatchObject({ status: 404 });
     });
   });
 
