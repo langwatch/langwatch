@@ -957,6 +957,73 @@ describe("POST /api/experiments/execute", () => {
     ]);
   });
 
+  describe("when the run API is asked for a run the page started", () => {
+    const pageRun = async () => {
+      const made = await harness({
+        experiments: { isActive: async () => true },
+        redis: true,
+        worker,
+      });
+      const frames = (await framesOf(await made.execute(request))) as {
+        type: string;
+        runId?: string;
+      }[];
+      const runId = frames.find((frame) => frame.type === "execution_started")?.runId;
+      if (runId === undefined) throw new Error("the page's stream never named its run");
+
+      return { ...made, runId };
+    };
+    const ended = (runId: string, overrides: Partial<ExperimentRunProgressState>) =>
+      folded({ runId, status: "completed", finishedAt: 20, ...overrides });
+
+    /** @scenario "A run started from the open page is readable by the run API" */
+    it("reports its progress, and its summary once it ends", async () => {
+      const { request: poll, folds, runId } = await pageRun();
+
+      expect(await (await poll(`/runs/${runId}`)).json()).toMatchObject({
+        runId,
+        status: "running",
+      });
+
+      const summary = { ...doneSummary(runId), runUrl: `https://app.test/acme/${runId}` };
+      await folds.writeProgress({ state: ended(runId, { summary }) });
+
+      expect(await (await poll(`/runs/${runId}`)).json()).toMatchObject({
+        runId,
+        status: "completed",
+        summary,
+      });
+    });
+
+    /** @scenario "A run started from the open page is readable by the run API" */
+    it("reads a stopped run as stopped, and a failed one by its code alone", async () => {
+      const { request: poll, folds, runId } = await pageRun();
+
+      await folds.writeProgress({ state: ended(runId, { status: "stopped" }) });
+      expect(await (await poll(`/runs/${runId}`)).json()).toMatchObject({
+        status: "stopped",
+        finishedAt: 20,
+      });
+
+      await folds.writeProgress({
+        state: ended(runId, { status: "failed", error: "boom_code", traceId: "trace-1" }),
+      });
+      const failed = await (await poll(`/runs/${runId}`)).json();
+      expect(failed).toMatchObject({ status: "failed", error: "boom_code" });
+      expect(Object.keys(failed)).not.toContain("message");
+    });
+
+    /** @scenario "A run started from the open page is readable by the run API" */
+    it("still answers run_not_found for a run id nothing knows", async () => {
+      const { request: poll } = await pageRun();
+
+      const response = await poll("/runs/run-nothing-knows");
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ code: "run_not_found" });
+    });
+  });
+
   /** @scenario "A streamed workbench run subscribes to its frames, then starts on the run's pipeline" */
   /** @scenario "Browser execution authenticates by user session" */
   it("starts the run with its plan, credited to the person who started it", async () => {
