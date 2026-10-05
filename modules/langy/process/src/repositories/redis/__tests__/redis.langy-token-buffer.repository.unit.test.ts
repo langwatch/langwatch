@@ -58,6 +58,7 @@ describe("LangyTokenBufferRedisRepository hybrid flush", () => {
 
   describe("given a turn that starts producing text", () => {
     describe("when the first delta arrives", () => {
+      /** @scenario "The first token of a turn renders immediately" */
       it("flushes it to the stream immediately, without waiting for a batch", async () => {
         const { redis, entries } = makeRedis();
         const buffer = LangyTokenBufferRedisRepository.create({ redis });
@@ -69,6 +70,7 @@ describe("LangyTokenBufferRedisRepository hybrid flush", () => {
     });
 
     describe("when later tokens trickle in below the batch size", () => {
+      /** @scenario "Buffered tokens flush on a short clock, not only on volume" */
       it("flushes the pending text on the clock instead of holding it for the batch", async () => {
         const { redis, entries } = makeRedis();
         const buffer = LangyTokenBufferRedisRepository.create({ redis });
@@ -89,6 +91,7 @@ describe("LangyTokenBufferRedisRepository hybrid flush", () => {
         ]);
       });
 
+      /** @scenario "Buffered tokens flush on a short clock, not only on volume" */
       it("arms the clock once per pending batch, keeping stream write volume bounded", async () => {
         const { redis, entries } = makeRedis();
         const buffer = LangyTokenBufferRedisRepository.create({ redis });

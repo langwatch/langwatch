@@ -105,6 +105,17 @@ describe("a tool call refused on a plan limit", () => {
       expect(screen.getByRole("button", { name: /upgrade plan/i })).toBeTruthy();
     });
 
+    /** @scenario "Someone who can change the plan is offered the upgrade" */
+    it("offers the upgrade, opens the plan page in-app and clears the floating panel", () => {
+      useLangyStore.setState({ panelMode: "floating", isOpen: true });
+      renderTurn();
+
+      screen.getByRole("button", { name: /upgrade plan/i }).click();
+
+      expect(push).toHaveBeenCalledWith("/settings/subscription");
+      expect(useLangyStore.getState().isOpen).toBe(false);
+    });
+
     it("navigates in-app rather than reloading the page", () => {
       renderTurn();
       screen.getByRole("button", { name: /upgrade plan/i }).click();
@@ -152,6 +163,16 @@ describe("a tool call refused on a plan limit", () => {
       expect(screen.getByRole("alert").textContent).toContain(
         "Ask whoever manages your organization's plan to raise the scenarios limit.",
       );
+    });
+
+    /** @scenario "Someone who cannot change the plan is told who to ask" */
+    it("tells them who to ask and offers no action they would be refused at", () => {
+      renderTurn();
+
+      expect(screen.getByRole("alert").textContent).toContain(
+        "Ask whoever manages your organization's plan to raise the scenarios limit.",
+      );
+      expect(screen.queryByRole("button", { name: /upgrade plan/i })).toBeNull();
     });
 
     it("navigates nowhere on its own", () => {

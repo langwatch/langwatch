@@ -985,6 +985,7 @@ describe("LangyTurnRelayAdapter", () => {
       );
     });
 
+    /** @scenario "A live-watched failure shows the same card a reload shows" */
     it("marks the stream error with the CLASSIFIED domain error, not the raw prose", async () => {
       const { relay, buffer, conversations } = makeRelay();
       const out = await relay.handle(
@@ -1119,6 +1120,7 @@ describe("LangyTurnRelayAdapter", () => {
 describe("LangyTurnRelayAdapter", () => {
   describe("given the run-token handoff races the projection", () => {
     describe("when a frame arrives before the projection has landed", () => {
+      /** @scenario "The first frames of a new turn authenticate against the handoff before the projection lands" */
       it("authenticates it against the handoff token", async () => {
         // First-turn reality: the async RunToken projection is still queued
         // (null), but the synchronous handoff carries the token the worker
@@ -1171,6 +1173,7 @@ describe("LangyTurnRelayAdapter", () => {
     });
 
     describe("when the first lookup misses and a later frame arrives", () => {
+      /** @scenario "A transient runToken miss does not poison the whole connection" */
       it("re-reads the token instead of reusing the cached miss", async () => {
         // No handoff wired; the projection is null on the first read, then lands.
         const conversations = fakeConversations();

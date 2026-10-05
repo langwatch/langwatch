@@ -243,12 +243,14 @@ describe("buildResourceHref, given a row-level deep link", () => {
   // A scenario is not a simulation RUN. The Simulations index is the run
   // history, where a scenario that was just written does not appear at all.
   describe("when the resource is a scenario", () => {
+    /** @scenario "A scenario card links to the scenario library" */
     it("points the surface link at the scenario library", () => {
       expect(buildSurfaceHref({ surface: "scenarios", projectSlug: "acme" })).toBe(
         "/acme/simulations/scenarios",
       );
     });
 
+    /** @scenario "A scenario card with an id opens that scenario" */
     it("opens the scenario in the library", () => {
       expect(
         buildResourceHref({

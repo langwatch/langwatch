@@ -26,6 +26,7 @@ function tool(
 
 describe("langyPlan", () => {
   describe("given a message with no todo list", () => {
+    /** @scenario "No plan means today's rendering, unchanged" */
     it("returns null so the message renders as it does today", () => {
       const message = {
         parts: [tool("bash", "c1"), { type: "text", text: "hi" }],
@@ -35,6 +36,7 @@ describe("langyPlan", () => {
   });
 
   describe("given several full-list rewrites in one turn", () => {
+    /** @scenario "The latest full list wins" */
     it("reflects the most recent full list, not an earlier one", () => {
       const message = {
         parts: [

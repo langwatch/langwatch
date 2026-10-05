@@ -274,6 +274,7 @@ describe("LangyConversationStateFoldProjection", () => {
     });
 
     describe("when a STALE failure arrives after the turn already completed", () => {
+      /** @scenario "A late failure never overwrites a completed answer" */
       it("keeps the completed answer — idle status, no error", () => {
         const completed = fold.apply(
           started,

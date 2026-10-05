@@ -31,6 +31,7 @@ function service(redis: LangyFeedbackPromptRedis | null, now = NOW): LangyFeedba
 
 describe("LangyFeedbackPromptService", () => {
   /** @scenario "feedback prompt keeps its existing cadence" */
+  /** @scenario "Langy never asks under a conversation's first answer" */
   it("does not ask before two assistant answers", async () => {
     await expect(
       service(memoryRedis()).shouldAsk({
@@ -41,6 +42,7 @@ describe("LangyFeedbackPromptService", () => {
     ).resolves.toBe(false);
   });
 
+  /** @scenario "Langy asks once a conversation has a couple of answers" */
   it("asks after two answers when there is no prior record", async () => {
     await expect(
       service(memoryRedis()).shouldAsk({
@@ -52,6 +54,7 @@ describe("LangyFeedbackPromptService", () => {
   });
 
   /** @scenario "feedback prompt keeps its existing cadence" */
+  /** @scenario "Showing the ask starts the quiet period even when it is ignored" */
   it("keeps a user quiet for three days after the card is shown", async () => {
     const redis = memoryRedis();
     await service(redis).markShown({ userId: "u1", conversationId: "c1" });
@@ -72,6 +75,7 @@ describe("LangyFeedbackPromptService", () => {
   });
 
   /** @scenario "feedback prompt keeps its existing cadence" */
+  /** @scenario "A long conversation may ask once more despite the quiet period" */
   it("allows one long-conversation exception in another conversation", async () => {
     const redis = memoryRedis();
     await service(redis).markShown({ userId: "u1", conversationId: "c1" });

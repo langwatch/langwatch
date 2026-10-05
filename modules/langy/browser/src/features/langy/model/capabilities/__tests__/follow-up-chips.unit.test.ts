@@ -33,6 +33,7 @@ const CARRIED_ALERT = {
 describe("deriveFollowUpChips", () => {
   describe("given a trace search that found traces", () => {
     describe("when the search carried free text", () => {
+      /** @scenario "The traces card suggests alerting on the search" */
       it("offers to alert on the search, carrying the text as the alert's subject", () => {
         const chips = deriveFollowUpChips({
           call: traceSearch(),
@@ -42,6 +43,7 @@ describe("deriveFollowUpChips", () => {
         expect(chips).toContainEqual(CARRIED_ALERT);
       });
 
+      /** @scenario "The graphing offer never claims to carry what the graph cannot hold" */
       it("keeps the graph offer honest — analytics cannot hold the text, so it only opens the surface", () => {
         const chips = deriveFollowUpChips({
           call: traceSearch(),
@@ -82,6 +84,7 @@ describe("deriveFollowUpChips", () => {
        * is no subject to alert on, so no offer may claim to carry one. The
        * offers still resolve, as plain navigation to real surfaces.
        */
+      /** @scenario "A search with no filters and no text suggests nothing to carry" */
       it("offers the surfaces as plain chips with real destinations", () => {
         const chips = deriveFollowUpChips({
           call: traceSearch({
@@ -159,6 +162,7 @@ describe("deriveFollowUpChips", () => {
   });
 
   describe("given a search that matched nothing", () => {
+    /** @scenario "A search that matched nothing offers no dataset suggestion" */
     it("offers nothing — there is no 'these' to act on", () => {
       const chips = deriveFollowUpChips({
         call: traceSearch({

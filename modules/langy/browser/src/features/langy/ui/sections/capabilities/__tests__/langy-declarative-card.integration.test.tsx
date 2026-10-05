@@ -237,6 +237,7 @@ describe("LangyDeclarativeCard", () => {
 
   describe("given a collection read that matched nothing", () => {
     describe("when the card renders", () => {
+      /** @scenario "A genuinely empty read still earns its card" */
       it("says there are none — a real answer, not a failure", () => {
         renderCard({
           name: "langwatch.evaluator.list",
@@ -454,6 +455,15 @@ describe("LangyDeclarativeCard", () => {
 
         expect(screen.getByText(/Couldn.t read this result/)).toBeTruthy();
         expect(screen.queryByText("No evaluators yet.")).toBeNull();
+      });
+
+      /** @scenario "Any card that cannot read its result says so" */
+      it("says it could not read the result, invents no rows and keeps the way into the surface", () => {
+        renderCard({ name: "langwatch.evaluator.list", output: truncated });
+
+        expect(screen.getByText(/Couldn.t read this result/)).toBeTruthy();
+        expect(screen.queryByText("No evaluators yet.")).toBeNull();
+        expect(screen.getByText(/Open in Evaluators/)).toBeTruthy();
       });
 
       it("still offers the way into the surface", () => {

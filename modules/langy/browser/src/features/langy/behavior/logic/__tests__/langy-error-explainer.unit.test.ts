@@ -502,6 +502,7 @@ describe("explainLangyError", () => {
   });
 
   describe("given the turn stopped because GitHub is not connected", () => {
+    /** @scenario "Langy reaches for GitHub and the user has not connected it" */
     it("suppresses the red card and offers the connect-github action", () => {
       // The panel keys on exactly this shape (render suppress + connect-github)
       // to draw the install card in the message flow and re-drive the turn once

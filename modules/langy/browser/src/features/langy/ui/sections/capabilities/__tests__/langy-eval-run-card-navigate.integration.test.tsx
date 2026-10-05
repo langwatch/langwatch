@@ -98,6 +98,7 @@ describe("Feature: the platform's link for a resource addresses that resource, n
   describe("given a card's open link is the platform's link for the resource it shows", () => {
     describe("given Langy fetched one scenario run and shows its card", () => {
       /** @scenario "A scenario card links to the run it shows, not the simulations list" */
+      /** @scenario "The platform link for a simulation run lands on that run" */
       it("targets that specific run, not the simulations index page", () => {
         renderCard({
           scenarioRunId: "run_1",

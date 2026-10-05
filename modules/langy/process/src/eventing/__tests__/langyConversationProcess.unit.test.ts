@@ -107,6 +107,7 @@ describe("LangyConversationProcess", () => {
         await deliver(startedTurnHistory());
       });
 
+      /** @scenario "A started turn creates one process intent" */
       it("records the turn as running", async () => {
         expect(await state()).toMatchObject({
           currentTurnId: "turn_1",
@@ -114,6 +115,7 @@ describe("LangyConversationProcess", () => {
         });
       });
 
+      /** @scenario "A started turn creates one process intent" */
       it("records exactly one typed worker-dispatch intent", async () => {
         const messages = await store.findMessagesByRef({ ref });
         const dispatches = messages.filter(
@@ -132,6 +134,7 @@ describe("LangyConversationProcess", () => {
     });
 
     describe("when durable tool and plan activity arrives in order", () => {
+      /** @scenario "Durable activity alone cannot decide worker liveness" */
       it("makes no process decision from turn-progress events", async () => {
         await deliver(startedTurnHistory());
         const runningState = await state();
@@ -261,6 +264,7 @@ describe("LangyConversationProcess", () => {
   });
 
   describe("given duplicate event delivery", () => {
+    /** @scenario "Duplicate process delivery does not duplicate work" */
     it("consumes a redelivered agent-response-started event once", async () => {
       await deliver(startedTurnHistory());
       const [redelivery] = await deliver([
@@ -333,6 +337,7 @@ describe("LangyConversationProcess", () => {
       expect(titles.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:title:turn_2`]);
     });
 
+    /** @scenario "Automatic title generation occurs only at the first logical completion" */
     it("does not title a second successful turn while the first request is still in flight", async () => {
       // title:turn_1 was requested but title_generated has not landed yet —
       // titleSource is still "derived". The one-shot latch must hold.
@@ -348,6 +353,7 @@ describe("LangyConversationProcess", () => {
       expect(titles.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:title:turn_1`]);
     });
 
+    /** @scenario "Automatic title generation occurs only at the first logical completion" */
     it("never retitles once titleSource is auto, regardless of later turns", async () => {
       const events: LangyConversationProcessingEvent[] = [
         conversationStartedEvent({ id: "evt_conv", occurredAt: T0 }),
@@ -370,6 +376,7 @@ describe("LangyConversationProcess", () => {
       expect(titles.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:title:turn_1`]);
     });
 
+    /** @scenario "A manual title remains authoritative" */
     it("records no automatic title after the user renamed the conversation", async () => {
       await deliver([
         conversationStartedEvent({ id: "evt_conv", occurredAt: T0 }),

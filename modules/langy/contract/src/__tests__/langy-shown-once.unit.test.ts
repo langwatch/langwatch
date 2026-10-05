@@ -46,6 +46,7 @@ function text(value: string) {
 }
 
 describe("given a turn that said its lines and then wrote them again", () => {
+  /** @scenario "A line Langy wrote is shown once" */
   it("keeps the said lines and empties the reply that repeated them", () => {
     const parts = partsShownOnce([
       say(PULL_REQUEST, "say_1"),
@@ -83,6 +84,7 @@ describe("given a turn that said its lines and then wrote them again", () => {
 });
 
 describe("given a proposal that was both said and asked on a card", () => {
+  /** @scenario "A line Langy wrote is shown once" */
   it("drops the said copy and leaves the card to ask it", () => {
     const parts = partsShownOnce([say(PROPOSAL), question(PROPOSAL), text("")]);
 

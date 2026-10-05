@@ -4,6 +4,7 @@ import {
   type AuthzEffectivePermissionsInput,
   type AuthzEffectivePermissionsOutput,
 } from "@langwatch/authz-contract";
+import { LangySessionKeyScopeError } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -218,6 +219,100 @@ describe("LangySessionKeyService", () => {
     // does not hold it, so the intersection Langy mints must not either.
     expect(LANGY_CANDIDATE_PERMISSIONS).toContain("experiments:delete");
     expect(granted).not.toContain("experiments:delete");
+  });
+
+  describe("given the permissions the person holds in the project", () => {
+    const holding = (held: AuthzEffectivePermissionsOutput) => {
+      const apiKeyCreate: ApiKeyApi["create"] = vi.fn(async () => {
+        const apiKey = Object.assign(Object.create(null), { id: "key-1" });
+        return { token: "session-token", apiKey };
+      });
+      const apiKeys: ApiKeyApi = Object.create(null);
+      apiKeys.create = apiKeyCreate;
+      const authz: AuthzService = createApiFixture<AuthzService>();
+      authz.effectivePermissions = vi.fn(async () => held);
+      const service = createService({
+        repository: new SessionKeyRepository(),
+        apiKeys,
+        authz,
+        metrics: new SessionKeyMetrics(),
+      });
+      const mint = () =>
+        service.mint({
+          session: { user: { id: "user-1" } },
+          projectId: "project-1",
+          organizationId: "organization-1",
+        });
+
+      return {
+        mint,
+        granted: async () => {
+          await mint();
+          return (apiKeyCreate as ReturnType<typeof vi.fn>).mock.calls[0]![0]
+            .permissions as string[];
+        },
+      };
+    };
+
+    /** @scenario "Creating asks for permission to create" */
+    it("grants create to a holder who can create but not delete", async () => {
+      const granted = await holding(["project:view", "scenarios:create"]).granted();
+
+      expect(granted).toContain("scenarios:create");
+      expect(granted).not.toContain("scenarios:delete");
+    });
+
+    /** @scenario "Being able to manage still lets you create" */
+    it("grants manage to a holder who can manage", async () => {
+      const granted = await holding(["project:view", "scenarios:manage"]).granted();
+
+      expect(granted).toContain("scenarios:manage");
+    });
+
+    /** @scenario "Langy can do what the person asking can do" */
+    it("grants create to a holder who can create and manage", async () => {
+      const granted = await holding([
+        "project:view",
+        "scenarios:create",
+        "scenarios:manage",
+      ]).granted();
+
+      expect(granted).toEqual(expect.arrayContaining(["scenarios:create", "scenarios:manage"]));
+    });
+
+    /** @scenario "Langy cannot do what the person asking cannot do" */
+    it("grants read and no create to a holder who can only view", async () => {
+      const granted = await holding(["project:view", "scenarios:view"]).granted();
+
+      expect(granted).toContain("scenarios:view");
+      expect(granted).not.toContain("scenarios:create");
+      expect(granted).not.toContain("scenarios:manage");
+    });
+
+    /** @scenario "Langy is never granted access outside its own remit" */
+    it("leaves out organization administration, stored secrets and public sharing for an admin", async () => {
+      const outsideRemit = [
+        "organization:manage",
+        "organization:delete",
+        "team:manage",
+        "project:manage",
+        "secrets:manage",
+        "secrets:view",
+        "traces:share",
+      ] as const;
+      const granted = await holding([...LANGY_CANDIDATE_PERMISSIONS, ...outsideRemit]).granted();
+
+      for (const permission of outsideRemit) {
+        expect(granted, permission).not.toContain(permission);
+      }
+    });
+
+    /** @scenario "A person with no relevant access gets no key at all" */
+    it("mints no key for a holder of none of the permissions Langy uses", async () => {
+      const { mint } = holding(["organization:view"]);
+
+      await expect(mint()).rejects.toBeInstanceOf(LangySessionKeyScopeError);
+    });
   });
 
   it("refuses a non-Langy key and reaps only expired session keys", async () => {

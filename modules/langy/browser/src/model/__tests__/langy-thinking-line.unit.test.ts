@@ -54,6 +54,7 @@ describe("langyThinkingLine", () => {
 
   describe("given a card holding the turn and a folder shared from a terminal", () => {
     /** @scenario "The panel names the terminal while the ask is open there too" */
+    /** @scenario "A permission ask open in the terminal says the approval is waited for there" */
     it("names the terminal as well, because the same ask is open there", () => {
       const line = langyThinkingLine({
         messages: [user, assistant([])],
@@ -286,6 +287,7 @@ describe("langyThinkingLine", () => {
   });
 
   describe("given the model's reasoning is streaming live, with no prose and no tool yet", () => {
+    /** @scenario "Live reasoning reads as thinking, not as starting up" */
     it("says the model is thinking — never that Langy is still starting up", () => {
       // Reasoning deltas are live-edge only (they never become message parts),
       // so the messages look empty. The signal is what proves work is real.

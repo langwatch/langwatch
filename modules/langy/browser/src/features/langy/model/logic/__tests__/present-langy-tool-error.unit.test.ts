@@ -71,6 +71,7 @@ describe("presentLangyToolError", () => {
   });
 
   describe("given a denial that named no permission", () => {
+    /** @scenario "A refused permission reads as a permissions problem" */
     it("still says the access does not cover it, with no invented detail", () => {
       const presentation = present(
         failureDocument({
@@ -116,6 +117,7 @@ describe("presentLangyToolError", () => {
       expect(present(atLimit).message).not.toContain("access");
     });
 
+    /** @scenario "A plan limit says what the plan includes and what is in use" */
     it("reports what ran out in the customer's words, never limitType", () => {
       expect(present(atLimit).limit).toMatchObject({
         label: "scenarios",
@@ -155,6 +157,7 @@ describe("presentLangyToolError", () => {
   });
 
   describe("given a 403 that is neither a denial nor a limit", () => {
+    /** @scenario "A refusal on the same status for a different reason keeps its own words" */
     it("keeps the platform's own sentence rather than blaming access", () => {
       const blocked = failureDocument({
         code: "policy_violation",
@@ -343,6 +346,51 @@ describe("presentLangyToolError", () => {
 
       expect(presentation.code).toBeUndefined();
       expect(presentation.detail).toContain("gh auth login");
+    });
+  });
+
+  describe("given the failures the card reads in whole", () => {
+    /** @scenario "A failure with nothing to add still says something useful" */
+    it("names what failed, shows the text it was given and claims no code", () => {
+      const presentation = present("✖ Failed to reach the API: socket hang up (ECONNRESET)");
+
+      expect(presentation.title).toBe("Creating scenario failed");
+      expect(presentation.detail).toBe("Failed to reach the API: socket hang up (ECONNRESET)");
+      expect(presentation.code).toBeUndefined();
+    });
+
+    /** @scenario "A failure the card has copy for still shows its code" */
+    it("explains a known failure in its words and still shows the platform's code", () => {
+      const presentation = present(
+        failureDocument({
+          code: "dataset_not_found",
+          message: "Dataset support-questions does not exist",
+          httpStatus: 404,
+          meta: {},
+          isHandled: true,
+        }),
+        "Loading dataset",
+      );
+
+      expect(presentation.message).toBe("Dataset support-questions does not exist");
+      expect(presentation.code).toBe("dataset_not_found");
+    });
+
+    /** @scenario "A failure the card has no copy for names itself" */
+    it("shows what the platform said about an unseen failure and its code", () => {
+      const presentation = present(
+        failureDocument({
+          code: "clickhouse_unavailable",
+          message: "Analytics storage is temporarily unavailable.",
+          httpStatus: 503,
+          meta: {},
+          isHandled: false,
+        }),
+        "Counting traces",
+      );
+
+      expect(presentation.message).toBe("Analytics storage is temporarily unavailable.");
+      expect(presentation.code).toBe("clickhouse_unavailable");
     });
   });
 });
