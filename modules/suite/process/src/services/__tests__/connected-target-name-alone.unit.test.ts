@@ -81,9 +81,7 @@ describe("given a name registered in development and in production", () => {
   });
 
   describe("when a process is connected in production only", () => {
-    /** @scenario
-     * "A name with no environment falls back to the one other environment with a process connected"
-     */
+    /** @scenario "A name with no environment falls back to the one other environment with a process connected" */
     it("resolves to the production agent", async () => {
       const rows: Row[] = [
         { id: "agent_dev", environment: "development", online: false },
@@ -95,9 +93,7 @@ describe("given a name registered in development and in production", () => {
   });
 
   describe("when no process is connected anywhere", () => {
-    /** @scenario
-     * "A name with no environment is refused when no process is connected anywhere"
-     */
+    /** @scenario "A name with no environment is refused when no process is connected anywhere" */
     it("refuses with agent_environment_unresolved, naming the environments it is registered in", async () => {
       const rows: Row[] = [
         { id: "agent_dev", environment: "development", online: false },
@@ -117,10 +113,7 @@ describe("given a name registered in development and in production", () => {
 
 describe("given a name registered in staging and in production", () => {
   describe("when a process is connected in both", () => {
-    /** @scenario
-     * "A name with no environment is refused when several other environments have a process
-     * connected"
-     */
+    /** @scenario "A name with no environment is refused when several other environments have a process connected" */
     it("refuses with agent_environment_unresolved, naming the environments that are online", async () => {
       const rows: Row[] = [
         { id: "agent_staging", environment: "staging", online: true },
