@@ -707,6 +707,10 @@ export class SsoConnectionGuardsService {
    */
   async activateConnection(data: ActivateConnectionCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, ACTIVATE_CONNECTION_COMMAND_TYPE);
+    // Going live twice costs nothing and states nothing (sso-activation.feature).
+    if (state.state === "ACTIVE") {
+      return [];
+    }
     const hasOwnershipProof = state.verifiedDomains.some(
       (domain) => qualifySsoDomainOwnership({ state, domain }).status === "QUALIFIED",
     );

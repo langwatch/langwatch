@@ -120,7 +120,8 @@ const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifec
   // connection routes nothing and a TEARDOWN_PENDING one is on its way out.
   [RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE]: ["VERIFIED", "ACTIVE"],
   [RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE]: ["VERIFIED", "ACTIVE"],
-  [ACTIVATE_CONNECTION_COMMAND_TYPE]: ["VERIFIED"],
+  // ACTIVE too, so going live again is the verb's silent no-op, not a refusal.
+  [ACTIVATE_CONNECTION_COMMAND_TYPE]: ["VERIFIED", "ACTIVE"],
   [SUSPEND_CONNECTION_COMMAND_TYPE]: ["ACTIVE"],
   [RESUME_CONNECTION_COMMAND_TYPE]: ["SUSPENDED"],
   // TEARDOWN_PENDING too: asking again brings the date forward, and runs the
