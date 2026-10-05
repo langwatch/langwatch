@@ -24,8 +24,8 @@ describe("given annotations across the install", () => {
       await repositories.annotations.create(annotation("a2", "p1"));
       await repositories.annotations.create(annotation("a3", "other"));
 
-      const counted = await repositories.usage.countUsage({ projectIds: ["p1"] });
-      const later = await repositories.usage.countUsage({
+      const counted = await repositories.count.countUsage({ projectIds: ["p1"] });
+      const later = await repositories.count.countUsage({
         projectIds: ["p1"],
         since: Date.now() + 60_000,
       });

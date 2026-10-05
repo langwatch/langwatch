@@ -125,7 +125,7 @@ export class DatasetModule implements DatasetApi {
   #attachmentUploads: DatasetAttachmentUploadService;
   #normalization: DatasetNormalizeService;
   #batchEvaluations: DatasetRepositories["batchEvaluations"];
-  #usage: DatasetRepositories["usage"];
+  #count: DatasetRepositories["count"];
   #experiments: ExperimentApi;
   #permissions: AuthzApi;
   readonly #publicBaseUrl: string | undefined;
@@ -175,7 +175,7 @@ export class DatasetModule implements DatasetApi {
       storedObjects: dependencies.storedObjects,
     });
     this.#batchEvaluations = repositories.batchEvaluations;
-    this.#usage = repositories.usage;
+    this.#count = repositories.count;
     this.#experiments = dependencies.experiments;
     this.#permissions = dependencies.permissions;
     this.#publicBaseUrl = members.publicBaseUrl;
@@ -488,7 +488,7 @@ export class DatasetModule implements DatasetApi {
    * serves this family but named no public origin refuses by name.
    */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount> {
-    return this.#usage.countUsage(input);
+    return this.#count.countUsage(input);
   }
 
   platformUrl(input: { projectSlug: string; path: string }): string {

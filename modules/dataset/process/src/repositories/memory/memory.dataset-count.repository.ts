@@ -1,9 +1,9 @@
 import type { DatasetUsageCount } from "@langwatch/dataset-contract";
 
-import type { DatasetUsageRepository } from "../dataset-usage.repository.ts";
+import type { DatasetCountRepository } from "../dataset-count.repository.ts";
 import type { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
-export class MemoryDatasetUsageRepository implements DatasetUsageRepository {
+export class MemoryDatasetCountRepository implements DatasetCountRepository {
   #database: MemoryDatasetDatabase;
 
   private constructor(database: MemoryDatasetDatabase) {
@@ -12,8 +12,8 @@ export class MemoryDatasetUsageRepository implements DatasetUsageRepository {
 
   static create(
     input: Readonly<{ database: MemoryDatasetDatabase }>,
-  ): MemoryDatasetUsageRepository {
-    return new MemoryDatasetUsageRepository(input.database);
+  ): MemoryDatasetCountRepository {
+    return new MemoryDatasetCountRepository(input.database);
   }
 
   async countUsage({

@@ -1,19 +1,19 @@
 import type { AnnotationUsageCount } from "@langwatch/annotation-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 
-import type { AnnotationUsageRepository } from "../annotation-usage.repository.ts";
+import type { AnnotationCountRepository } from "../annotation-count.repository.ts";
 
 /** Project-scoped reads; the caller never passes an empty project list. */
-export class PrismaAnnotationUsageRepository
+export class PrismaAnnotationCountRepository
   extends PrismaRepository.for(
     "Annotation",
     "AnnotationQueue",
     "AnnotationQueueItem",
     "AnnotationScore",
   )
-  implements AnnotationUsageRepository
+  implements AnnotationCountRepository
 {
-  static readonly create = this.factory((prisma) => new PrismaAnnotationUsageRepository(prisma));
+  static readonly create = this.factory((prisma) => new PrismaAnnotationCountRepository(prisma));
 
   async countUsage({
     projectIds,

@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { DatasetRow } from "../dataset.repository.ts";
-import { MemoryDatasetUsageRepository } from "../memory/memory.dataset-usage.repository.ts";
+import { MemoryDatasetCountRepository } from "../memory/memory.dataset-count.repository.ts";
 import { MemoryDatasetDatabase } from "../memory/memory.dataset.database.ts";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -48,10 +48,10 @@ describe("given datasets across the install", () => {
           datasetOn({ projectId: "p1", at: NOW - DAY }),
           datasetOn({ projectId: "other", at: NOW - 60 * DAY }),
         );
-      const usage = MemoryDatasetUsageRepository.create({ database });
+      const count = MemoryDatasetCountRepository.create({ database });
 
-      const lifetime = await usage.countUsage({ projectIds: ["p1"] });
-      const lastWeek = await usage.countUsage({ projectIds: ["p1"], since: NOW - 7 * DAY });
+      const lifetime = await count.countUsage({ projectIds: ["p1"] });
+      const lastWeek = await count.countUsage({ projectIds: ["p1"], since: NOW - 7 * DAY });
 
       expect(lifetime).toEqual({
         datasets: 2,

@@ -1,10 +1,10 @@
 import type { AnnotationUsageCount } from "@langwatch/annotation-contract";
 
-import type { AnnotationUsageRepository } from "../annotation-usage.repository.ts";
+import type { AnnotationCountRepository } from "../annotation-count.repository.ts";
 import type { AnnotationRepository } from "../annotation.repository.ts";
 import type { MemoryAnnotationQueueDatabase } from "./memory.annotation-queue.database.ts";
 
-export class MemoryAnnotationUsageRepository implements AnnotationUsageRepository {
+export class MemoryAnnotationCountRepository implements AnnotationCountRepository {
   private constructor(
     private readonly deps: {
       annotations: AnnotationRepository;
@@ -15,8 +15,8 @@ export class MemoryAnnotationUsageRepository implements AnnotationUsageRepositor
   static create(deps: {
     annotations: AnnotationRepository;
     database: MemoryAnnotationQueueDatabase;
-  }): MemoryAnnotationUsageRepository {
-    return new MemoryAnnotationUsageRepository(deps);
+  }): MemoryAnnotationCountRepository {
+    return new MemoryAnnotationCountRepository(deps);
   }
 
   async countUsage({

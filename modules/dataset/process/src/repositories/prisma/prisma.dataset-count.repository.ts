@@ -1,14 +1,14 @@
 import type { DatasetUsageCount } from "@langwatch/dataset-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 
-import type { DatasetUsageRepository } from "../dataset-usage.repository.ts";
+import type { DatasetCountRepository } from "../dataset-count.repository.ts";
 
 /** Project-scoped reads; the caller never passes an empty project list. */
-export class PrismaDatasetUsageRepository
+export class PrismaDatasetCountRepository
   extends PrismaRepository.for("Dataset", "DatasetRecord", "BatchEvaluation")
-  implements DatasetUsageRepository
+  implements DatasetCountRepository
 {
-  static readonly create = this.factory((prisma) => new PrismaDatasetUsageRepository(prisma));
+  static readonly create = this.factory((prisma) => new PrismaDatasetCountRepository(prisma));
 
   async countUsage({
     projectIds,

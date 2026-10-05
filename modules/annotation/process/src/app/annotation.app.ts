@@ -117,7 +117,7 @@ export class AnnotationModule implements AnnotationApi {
   #annotations: AnnotationService;
   #scores: AnnotationScoreService;
   #queues: AnnotationQueueService;
-  #usage: AnnotationRepositories["usage"];
+  #count: AnnotationRepositories["count"];
   #projects: ProjectApi;
   #organizations: OrganizationApi;
   #users: UserApi;
@@ -137,7 +137,7 @@ export class AnnotationModule implements AnnotationApi {
       items: repositories.queueItems,
     });
 
-    this.#usage = repositories.usage;
+    this.#count = repositories.count;
     this.#projects = dependencies.projects;
     this.#organizations = dependencies.organizations;
     this.#users = dependencies.users;
@@ -333,7 +333,7 @@ export class AnnotationModule implements AnnotationApi {
     projectIds: readonly string[];
     since?: number;
   }): Promise<AnnotationUsageCount> {
-    return this.#usage.countUsage(input);
+    return this.#count.countUsage(input);
   }
 
   async queueTraces(
