@@ -265,6 +265,7 @@ registries themselves, not written here.
 | `react/static-components`                 | oxlint built-in | React Compiler correctness rule, registered and set to `off` until the findings it reports are fixed (ruling 2026-09-30).                                                   |
 | `react/use-memo`                          | oxlint built-in | React Compiler correctness rule, registered and set to `off` until the findings it reports are fixed (ruling 2026-09-30).                                                   |
 | `react/void-use-memo`                     | oxlint built-in | React Compiler correctness rule, registered and set to `off` until the findings it reports are fixed (ruling 2026-09-30).                                                   |
+| `langwatch/suppression-states-why`        | plugin          | A disable directive naming a house rule is an error; a rule that opts in through `defineRule({ escape })` accepts one only with a `-- reason` of at least five real words.  |
 
 The native rules scoped by an `overrides` block are listed here for the reader;
 the guard reads only the workspace-wide `rules` blocks, so they are not a

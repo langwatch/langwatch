@@ -35,6 +35,7 @@
     "langwatch/unresolved-relative-import": "error",
     "langwatch/cognitive-complexity": ["error", { "max": 15 }],
     "langwatch/comment-block-size": "error",
+    "langwatch/suppression-states-why": "error",
     // Two calls joined by `&&` read fine; three calls, four operators, a nested
     // ternary or a deep chain that also combines are what a reader trips on.
     "langwatch/condition-shape": ["error", { "maxCalls": 2, "maxOperators": 3, "maxHops": 3 }],

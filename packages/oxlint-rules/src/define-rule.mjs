@@ -10,6 +10,11 @@ import { classify } from "./classify.mjs";
  */
 
 /**
+ * A rule opting in to a justified disable names the framework the disable must say it cannot use.
+ * @typedef {{ framework: string }} EscapeDefinition
+ */
+
+/**
  * @typedef {{ type: "integer"|"number"|"string"|"boolean", minimum?: number,
  *   default?: unknown, description?: string }} OptionDefinition
  */
@@ -19,11 +24,39 @@ export function renderTemplate({ fix, what }) {
   return `${what.trim()} ${fix.trim()}`.trim();
 }
 
+/** The one sentence an escapable rule prints after `what` + `fix`. */
+export function renderEscapeTail({ framework }) {
+  return (
+    `If ${framework} genuinely cannot express this case, extend it, or disable this line with` +
+    " `-- <why it cannot>`; if the case is confusing, stop and ask the human before disabling."
+  );
+}
+
+function escapeFor(escape) {
+  if (escape === undefined) return undefined;
+  if (typeof escape?.framework !== "string" || escape.framework.trim() === "") {
+    throw new TypeError("defineRule: `escape.framework` names the framework a disable cannot use.");
+  }
+
+  return { framework: escape.framework.trim() };
+}
+
 /** Substitutes `{{name}}` from `data`, the way oxlint and ESLint do. */
 export function renderMessage(template, data = {}) {
   return template.replace(/\{\{\s*([\w$]+)\s*\}\}/g, (whole, key) =>
     Object.hasOwn(data, key) ? String(data[key]) : whole,
   );
+}
+
+/** Each message's printed template; an escapable rule's ends with the escape sentence. */
+function templatesFor({ escapable, messages }) {
+  const tail = escapable ? ` ${renderEscapeTail(escapable)}` : "";
+  const templates = {};
+  for (const [id, definition] of Object.entries(messages)) {
+    templates[id] = `${renderTemplate(definition)}${tail}`;
+  }
+
+  return templates;
 }
 
 function schemaFor(options) {
@@ -62,21 +95,21 @@ function defaultsFor(options) {
  * @param {(file: import("./classify.mjs").FileClassification) => boolean} [declaration.applies]
  * @param {Record<string, MessageDefinition>} declaration.messages
  * @param {Record<string, OptionDefinition>} [declaration.options]
+ * @param {EscapeDefinition} [declaration.escape] Accept a disable that gives a reason.
  * @param {(context: object, file: object, options: object) => object} declaration.create
  */
 export function defineRule({
   applies,
   create,
+  escape,
   fixable,
   kind = "problem",
   messages,
   name,
   options,
 }) {
-  const templates = {};
-  for (const [id, definition] of Object.entries(messages)) {
-    templates[id] = renderTemplate(definition);
-  }
+  const escapable = escapeFor(escape);
+  const templates = templatesFor({ escapable, messages });
 
   const defaults = defaultsFor(options);
   // Options arrive as the same object for every file, so the merge is done once per object.
@@ -105,6 +138,7 @@ export function defineRule({
 
   if (schema) rule.meta.schema = schema;
   if (fixable) rule.meta.fixable = fixable;
+  if (escapable) rule.meta.docs.escape = escapable;
 
   return rule;
 }

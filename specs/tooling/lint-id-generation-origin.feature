@@ -21,6 +21,13 @@ Feature: The id-generation-origin lint rule
     Then it reports randomUuid once per call
 
   @unit
+  Scenario: The feature-flag visitor id is the one named UUID exception
+    Given generateId in modules/feature-flag/browser/src/behavior/anonymous-id.ts calling crypto.randomUUID()
+    When the id-generation-origin rule runs over it
+    Then it reports nothing, because the feature-flag contract types the visitor id as a UUID
+    And the same call in any other function of that file, or in any other file, is still reported
+
+  @unit
   Scenario: A ksuid import is left alone
     Given a strict feature module importing generate from @langwatch/ksuid
     When the id-generation-origin rule runs over it

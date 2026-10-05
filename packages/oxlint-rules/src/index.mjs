@@ -63,6 +63,7 @@ import { sharedSetupIsAHookRule } from "./rules/shared-setup-is-a-hook.rule.mjs"
 import { signatureMirrorRule } from "./rules/signature-mirror.rule.mjs";
 import { standInCastRule } from "./rules/stand-in-cast.rule.mjs";
 import { storeContainmentRule } from "./rules/store-containment.rule.mjs";
+import { suppressionStatesWhyRuleFor } from "./rules/suppression-states-why.rule.mjs";
 import { temporalOnlyRule } from "./rules/temporal-only.rule.mjs";
 import { testDescriptionIsAnActionRule } from "./rules/test-description-is-an-action.rule.mjs";
 import { transportDeclaresRule } from "./rules/transport-declares.rule.mjs";
@@ -79,7 +80,7 @@ import { zodObjectIntersectionRule } from "./rules/zod-object-intersection.rule.
 import { zodSchemaPerCallRule } from "./rules/zod-schema-per-call.rule.mjs";
 import { zodValidateForBooleanRule } from "./rules/zod-validate-for-boolean.rule.mjs";
 
-const RULES = [
+const HOUSE_RULES = [
   enterpriseLicenseHeaderRule,
   eventingRolePurityRule,
   signatureMirrorRule,
@@ -147,10 +148,15 @@ const RULES = [
   queryDataInStateRule,
 ];
 
+/** Judges disables of the house rules above, so it is built from them rather than listed. */
+const suppressionStatesWhyRule = suppressionStatesWhyRuleFor({ houseRules: HOUSE_RULES });
+const RULES = [...HOUSE_RULES, suppressionStatesWhyRule];
+
 /** Every registered rule, keyed by the name its own `defineRule` declaration carries. */
 export const rules = Object.fromEntries(RULES.map((rule) => [rule.meta.docs.name, rule]));
 
 export {
+  suppressionStatesWhyRule,
   browserStoreContainmentRule,
   effectDerivesStateRule,
   noReduxRule,

@@ -4,13 +4,18 @@ import { idGenerationOriginRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { process: {}, contract: {} } } },
+  features: {
+    agent: { layoutVersion: 0, roles: { process: {}, contract: {} } },
+    "feature-flag": { layoutVersion: 0, roles: { browser: {}, contract: {} } },
+  },
 });
 
 afterAll(() => workspace.cleanup());
 
 const SERVICE = "modules/agent/process/src/services/agent.service.ts";
 const APPLICATION = "apps/api/src/features/agent/agent.composition.ts";
+const ANONYMOUS_ID = "modules/feature-flag/browser/src/behavior/anonymous-id.ts";
+const VISITOR_ID_MINT = "function generateId() {\n  return crypto.randomUUID();\n}\n";
 const TEST = "modules/agent/process/src/services/__tests__/agent.unit.test.ts";
 
 function report(code, filename = SERVICE) {
@@ -55,6 +60,30 @@ describe("given a strict feature or process source", () => {
       );
 
       expect(found.map((entry) => entry.messageId)).toEqual(["randomUuid", "randomUuid"]);
+    });
+  });
+
+  describe("when the feature-flag visitor id is minted as the UUID its contract types", () => {
+    /** @scenario "The feature-flag visitor id is the one named UUID exception" */
+    it("reports nothing for generateId in anonymous-id.ts", () => {
+      expect(report(VISITOR_ID_MINT, ANONYMOUS_ID)).toEqual([]);
+    });
+
+    /** @scenario "The feature-flag visitor id is the one named UUID exception" */
+    it("still reports the same call in another function of that file", () => {
+      const found = report(VISITOR_ID_MINT.replace("generateId", "mintOther"), ANONYMOUS_ID);
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["randomUuid"]);
+    });
+
+    /** @scenario "The feature-flag visitor id is the one named UUID exception" */
+    it("still reports a generateId of the same shape in another file", () => {
+      const found = report(
+        VISITOR_ID_MINT,
+        "modules/feature-flag/browser/src/behavior/other-id.ts",
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["randomUuid"]);
     });
   });
 

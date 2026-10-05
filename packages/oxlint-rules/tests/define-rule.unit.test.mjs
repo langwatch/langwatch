@@ -1,6 +1,11 @@
 import { afterAll, describe, expect, it } from "vitest";
 
-import { defineRule, renderMessage, renderTemplate } from "../src/define-rule.mjs";
+import {
+  defineRule,
+  renderEscapeTail,
+  renderMessage,
+  renderTemplate,
+} from "../src/define-rule.mjs";
 import { createFixtureWorkspace, runRule } from "../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
@@ -129,6 +134,46 @@ describe("given a rule declared through defineRule", () => {
       });
 
       expect(found).toHaveLength(1);
+    });
+  });
+
+  describe("when a rule opts in to a justified disable", () => {
+    const escapable = (escape) =>
+      defineRule({
+        name: "escapable-rule",
+        escape,
+        messages: { drift: { what: "The binding parses the body.", fix: "Use `.withInput`." } },
+        create: () => ({}),
+      });
+
+    /** @scenario "An escapable rule's message ends with the one escape sentence" */
+    it("appends the escape sentence after what and fix", () => {
+      const rule = escapable({ framework: "the API framework" });
+
+      expect(rule.meta.messages.drift).toBe(
+        "The binding parses the body. Use `.withInput`. If the API framework genuinely cannot" +
+          " express this case, extend it, or disable this line with `-- <why it cannot>`; if the" +
+          " case is confusing, stop and ask the human before disabling.",
+      );
+      expect(rule.meta.docs.escape).toEqual({ framework: "the API framework" });
+    });
+
+    it("renders the tail as one sentence naming the framework", () => {
+      expect(renderEscapeTail({ framework: "X" })).toMatch(/^If X genuinely cannot[^.]*\.$/);
+    });
+
+    it("refuses an escape that names no framework", () => {
+      expect(() => escapable({ framework: " " })).toThrow(/escape\.framework/);
+    });
+  });
+
+  describe("when a rule does not opt in", () => {
+    /** @scenario "A house rule's message carries no escape sentence" */
+    it("prints what and fix alone and records no escape", () => {
+      const rule = ruleReportingOn("FunctionDeclaration");
+
+      expect(rule.meta.messages.named).not.toMatch(/disable/);
+      expect(rule.meta.docs.escape).toBeUndefined();
     });
   });
 });
