@@ -704,6 +704,7 @@ describe("identity lookup, detaching a sign-in method", () => {
   });
 
   /** @scenario "Detaching somebody's last way in is refused" */
+  /** @scenario 'A refused repair says what to do about it, never "unknown"' */
   it("refuses olive's detachment of their only working method, in words registered for the code", async () => {
     const heads = new InMemoryHeads();
     heads.heads.set(USER, headsWith(fact({ identifierId: "idf_work", value: "sam@acme.com" })));
@@ -738,6 +739,7 @@ describe("identity lookup, detaching a sign-in method", () => {
     const copy = explainAnyError(refusal);
     expect(copy.isRegistered).toBe(true);
     expect(copy.title).not.toBe(UNKNOWN_ERROR_PRESENTATION.title);
+    expect(copy.description).not.toBe(UNKNOWN_ERROR_PRESENTATION.description);
     expect(ledger.commits).toHaveLength(0);
     expect(heads.heads.get(USER)?.identifiers.idf_work?.state).toBe("VERIFIED");
   });

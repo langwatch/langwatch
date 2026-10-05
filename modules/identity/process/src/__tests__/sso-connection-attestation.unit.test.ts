@@ -147,6 +147,7 @@ describe("operator attestation", () => {
     });
 
     /** @scenario "An organization administrator can never attest their own domain" */
+    /** @scenario "A customer proving their own domain is the whole point of this tier" */
     it("refuses an organization administrator and states no fact", async () => {
       await expect(
         guards.attestDomain({ ...identity, ...EVIDENCE, actor: ANA, domain: "acme.com" }),

@@ -115,6 +115,60 @@ describe("given an OIDC connection whose credentials the vault holds", () => {
     });
   });
 
+  /** @scenario "Two organizations may both call their provider okta" */
+  it("keeps each organization's own row when both name their provider okta", async () => {
+    const store = MemoryIdentityStore.create();
+    const credentials = MemorySsoCredentialRepository.create(store);
+    const service = await serviceOver(store);
+    const organizations = [
+      { organizationId: "org_acme", connectionId: "ssoc_acme", issuer: "https://idp.acme.test" },
+      {
+        organizationId: "org_globex",
+        connectionId: "ssoc_globex",
+        issuer: "https://idp.globex.test",
+      },
+    ];
+
+    for (const { organizationId, connectionId, issuer } of organizations) {
+      const clientIdRef = await credentials.put({
+        organizationId,
+        connectionId,
+        kind: "oidc-client-id",
+        value: `client-${organizationId}`,
+      });
+      const secretRef = await credentials.put({
+        organizationId,
+        connectionId,
+        kind: "oidc-client-secret",
+        value: `secret-${organizationId}`,
+      });
+      await service.project({
+        connection: connectionOf({
+          connectionId,
+          organizationId,
+          claimedDomains: [`${organizationId}.test`],
+          approvedDomains: [`${organizationId}.test`],
+          verifiedDomains: [`${organizationId}.test`],
+          idpMetadata: { issuer, providerId: "okta", clientIdRef, secretRef, certRefs: [] },
+        }),
+      });
+    }
+
+    expect([...store.ssoEngineProviders.keys()].toSorted()).toEqual(["ssoc_acme", "ssoc_globex"]);
+    for (const { organizationId, connectionId, issuer } of organizations) {
+      const row = store.ssoEngineProviders.get(connectionId);
+      expect(row).toMatchObject({
+        id: connectionId,
+        providerId: connectionId,
+        organizationId,
+        issuer,
+      });
+      expect(JSON.parse(cipher.open(row?.oidcConfig ?? "")).clientId).toBe(
+        `client-${organizationId}`,
+      );
+    }
+  });
+
   /** @scenario "A Microsoft Entra ID connection stored with a trailing slash signs in after the upgrade" */
   it("writes an Entra ID issuer stored with a trailing slash the way its tokens carry it", async () => {
     const entra = "https://login.microsoftonline.com/8f3c2a8e-1b7d-4c0f-9a51-3e6f2d7b9c10/v2.0";
