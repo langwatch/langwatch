@@ -131,6 +131,17 @@ describe("the grants pipeline registered by a producer-only process", () => {
       expect(() => AuthzCommandDispatcherService.sendersFrom(registered.commands)).not.toThrow();
     });
 
+    /** @scenario "The API process registers the packaged grants pipeline, not a copy" */
+    it("registers the packaged pipeline once and refuses a second registration of it", () => {
+      const { eventSourcing } = producerRuntime();
+
+      const registered = eventSourcing.register(buildAuthz().pipeline);
+
+      expect(registered.metadata.name).toBe(AUTHZ_GRANT_PIPELINE_NAME);
+      expect(registered.constructor.name).not.toBe("DisabledPipeline");
+      expect(() => eventSourcing.register(buildAuthz().pipeline)).toThrow(/already registered/);
+    });
+
     /** @scenario "A produced command carries the consuming process's routing key" */
     it("stamps the routing key the consuming process's registry claims", async () => {
       const { queue, eventSourcing } = producerRuntime();

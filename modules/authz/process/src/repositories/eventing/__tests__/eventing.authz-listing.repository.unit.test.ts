@@ -472,6 +472,7 @@ describe("EventingAuthzListingRepository", () => {
 
   describe("when the role editor's roles are listed", () => {
     /** @scenario "A cut-over organization's role editor lists roles from the ledger's head" */
+    /** @scenario A role listing reads current role facts */
     it("serves the Role head's rows in the CustomRole column shape, business time first", async () => {
       const { prisma, repository } = prismaWith({
         roles: [
@@ -659,6 +660,67 @@ describe("EventingAuthzListingRepository", () => {
       expect(where.AND).toContainEqual({
         OR: [{ principalType: "USER", principalId: "alice" }],
       });
+    });
+  });
+});
+
+describe("EventingAuthzListingRepository over the grants head alone", () => {
+  const listingWith = (grants: ReturnType<typeof grantRow>[]) => {
+    const roleBindingRead = vi.fn().mockResolvedValue([]);
+    const repository = EventingAuthzListingRepository.create(
+      prismaDouble({
+        grant: { findMany: vi.fn().mockResolvedValue(grants) },
+        user: {
+          findMany: vi
+            .fn()
+            .mockResolvedValue([{ id: "alice", name: "Alice", email: "a@x.io", image: null }]),
+        },
+        group: { findMany: vi.fn().mockResolvedValue([]) },
+        apiKey: { findMany: vi.fn().mockResolvedValue([]) },
+        role: { findMany: vi.fn().mockResolvedValue([]) },
+        roleBinding: { findMany: roleBindingRead },
+      }),
+    );
+    return { repository, roleBindingRead };
+  };
+
+  describe("when the member has a live grant at a project", () => {
+    /** @scenario A grants listing returns current binding facts */
+    it("lists that grant for the organization's Access page", async () => {
+      const { repository, roleBindingRead } = listingWith([
+        grantRow({
+          id: "g-chatbot",
+          principalType: "USER",
+          principalId: "alice",
+          roleKey: "member",
+          scopeType: "PROJECT",
+          scopeId: "chatbot",
+        }),
+      ]);
+
+      const rows = await repository.findOrganizationBindings({ organizationId: ORG });
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        id: "g-chatbot",
+        userId: "alice",
+        role: "MEMBER",
+        scopeType: "PROJECT",
+        scopeId: "chatbot",
+      });
+      expect(roleBindingRead).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the member has no live grant for the project", () => {
+    /** @scenario A grants listing excludes legacy-only rows */
+    it("synthesizes no binding, and reads no legacy binding table", async () => {
+      const { repository, roleBindingRead } = listingWith([]);
+
+      const rows = await repository.findOrganizationBindings({ organizationId: ORG });
+
+      expect(rows).toEqual([]);
+      expect(roleBindingRead).not.toHaveBeenCalled();
     });
   });
 });

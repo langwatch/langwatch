@@ -12,6 +12,7 @@ import {
 } from "@langwatch/api/rest";
 import {
   RoleBindingNotFoundError,
+  permissionsConferred,
   type AuthzManagedOrganizationBinding,
 } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
@@ -200,6 +201,37 @@ describe("given the /api/role-bindings family", () => {
           },
         ],
       });
+    });
+
+    /** @scenario Binding a role to an API key succeeds */
+    it("answers 201 for a viewer key on a project, a role that reads and never writes", async () => {
+      const { send } = world();
+
+      const response = await send("/api/role-bindings", {
+        method: "POST",
+        body: { apiKeyId: "key-1", role: "VIEWER", scopeType: "PROJECT", scopeId: "project-1" },
+      });
+      const listed = await send("/api/role-bindings?apiKeyId=key-1");
+
+      expect(response.status).toBe(201);
+      expect(await listed.json()).toMatchObject({
+        bindings: [
+          {
+            principal: { type: "apiKey", id: "key-1" },
+            role: "VIEWER",
+            scopeType: "PROJECT",
+            scopeId: "project-1",
+          },
+        ],
+      });
+      const conferred = permissionsConferred({
+        role: "VIEWER",
+        scopeType: "PROJECT",
+        customPermissions: [],
+      });
+      expect(conferred).toContain("project:view");
+      expect(conferred).not.toContain("project:update");
+      expect(conferred.filter((permission) => !permission.endsWith(":view"))).toEqual([]);
     });
 
     /** @scenario The first explicit binding for a legacy user is created normally */
