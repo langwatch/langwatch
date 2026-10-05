@@ -1137,6 +1137,15 @@ export class InviteService {
    * secret from the mail, so the caller hands in verified addresses only and
    * this never falls back to anything softer. Lowercased the way an invite
    * is stored. Nothing is asked when there is nothing to ask about.
+   *
+   * One `findFirst` per address rather than one `findMany` over them all:
+   * invitations span organizations by definition, and the tenancy guard
+   * admits a read bounded by subject only in the shape the sign-up policy
+   * already uses, a single address answered with at most one row. A
+   * `findMany` naming several addresses is refused outright, which this
+   * lookup learned the hard way: the refusal was invisible for as long as
+   * the address list arrived empty. The oldest pending invitation per
+   * address is the one offered.
    */
   async findPendingForAddresses({
     addresses,
@@ -1154,33 +1163,34 @@ export class InviteService {
     ].filter(Boolean);
     if (normalized.length === 0) return [];
 
+    const now = new Date();
     // Invitations are stored as the administrator typed the address, so the
     // match is case-insensitive like every other address lookup here.
-    const invites = await this.prisma.organizationInvite.findMany({
-      where: {
-        status: "PENDING",
-        AND: [
-          {
-            OR: normalized.map((address) => ({
-              email: { equals: address, mode: "insensitive" as const },
-            })),
+    const invites = await Promise.all(
+      normalized.map((address) =>
+        this.prisma.organizationInvite.findFirst({
+          where: {
+            email: { equals: address, mode: "insensitive" as const },
+            status: "PENDING",
+            OR: [{ expiration: null }, { expiration: { gt: now } }],
           },
-          { OR: [{ expiration: null }, { expiration: { gt: new Date() } }] },
-        ],
-      },
-      select: {
-        inviteCode: true,
-        role: true,
-        organization: { select: { name: true } },
-      },
-      orderBy: { createdAt: "asc" },
-    });
+          select: {
+            inviteCode: true,
+            role: true,
+            organization: { select: { name: true } },
+          },
+          orderBy: { createdAt: "asc" },
+        }),
+      ),
+    );
 
-    return invites.map((invite) => ({
-      inviteCode: invite.inviteCode,
-      organizationName: invite.organization.name,
-      role: invite.role,
-    }));
+    return invites
+      .filter((invite) => invite !== null)
+      .map((invite) => ({
+        inviteCode: invite.inviteCode,
+        organizationName: invite.organization.name,
+        role: invite.role,
+      }));
   }
 
   /**

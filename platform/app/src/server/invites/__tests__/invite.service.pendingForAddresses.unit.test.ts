@@ -14,25 +14,29 @@ import { InviteService } from "../invite.service";
  * verified, lowercases them the way the invite was stored, and never falls
  * back to anything softer.
  *
+ * The read is one `findFirst` per address, never one `findMany` over them
+ * all: that is the only subject-bounded shape the tenancy guard admits on
+ * invitations, and a `findMany` naming several addresses is refused at
+ * runtime (which no mock would have shown).
+ *
  * Spec: specs/identity/join-before-create.feature
  */
 describe("InviteService.findPendingForAddresses()", () => {
+  const findFirst = vi.fn();
   const findMany = vi.fn();
   const prisma = {
-    organizationInvite: { findMany },
+    organizationInvite: { findFirst, findMany },
   } as unknown as PrismaClient;
   const service = new InviteService(prisma, {} as never, {} as never);
 
   describe("when the account holds a verified address an invitation was sent to", () => {
     /** @scenario A pending invitation is offered before asking to join */
     it("answers the invitation with the organisation's name and the seat it names", async () => {
-      findMany.mockResolvedValueOnce([
-        {
-          inviteCode: "code_1",
-          role: "DEVELOPER",
-          organization: { name: "Acme" },
-        },
-      ]);
+      findFirst.mockResolvedValueOnce({
+        inviteCode: "code_1",
+        role: "DEVELOPER",
+        organization: { name: "Acme" },
+      });
 
       const pending = await service.findPendingForAddresses({
         addresses: ["Sam@Acme.com"],
@@ -41,34 +45,49 @@ describe("InviteService.findPendingForAddresses()", () => {
       expect(pending).toEqual([
         { inviteCode: "code_1", organizationName: "Acme", role: "DEVELOPER" },
       ]);
-      // PENDING, unexpired, on one of the proven addresses, matched however
+      // PENDING, unexpired, on ONE proven address per read, matched however
       // the administrator capitalised it when inviting.
-      expect(findMany).toHaveBeenCalledWith(
+      expect(findFirst).toHaveBeenCalledTimes(1);
+      expect(findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
+            email: { equals: "sam@acme.com", mode: "insensitive" },
             status: "PENDING",
-            AND: expect.arrayContaining([
-              {
-                OR: [
-                  { email: { equals: "sam@acme.com", mode: "insensitive" } },
-                ],
-              },
-            ]),
           }),
         }),
       );
+      expect(findMany).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A pending invitation is offered before asking to join */
+    it("asks once per distinct proven address and keeps only the addresses that hold one", async () => {
+      findFirst.mockClear();
+      findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        inviteCode: "code_2",
+        role: "MEMBER",
+        organization: { name: "Acme" },
+      });
+
+      const pending = await service.findPendingForAddresses({
+        addresses: ["sam@acme.com", "SAM@acme.com", "sam@other.example"],
+      });
+
+      expect(findFirst).toHaveBeenCalledTimes(2);
+      expect(pending).toEqual([
+        { inviteCode: "code_2", organizationName: "Acme", role: "MEMBER" },
+      ]);
     });
   });
 
   describe("when the account has proved no address", () => {
     /** @scenario An invitation is only offered to somebody who proved the address */
     it("asks nothing and answers nothing", async () => {
-      findMany.mockClear();
+      findFirst.mockClear();
 
       const pending = await service.findPendingForAddresses({ addresses: [] });
 
       expect(pending).toEqual([]);
-      expect(findMany).not.toHaveBeenCalled();
+      expect(findFirst).not.toHaveBeenCalled();
     });
   });
 });
