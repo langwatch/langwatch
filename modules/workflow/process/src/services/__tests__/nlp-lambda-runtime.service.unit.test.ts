@@ -102,6 +102,52 @@ describe("the per-project NLP Lambda runtime", () => {
     });
   });
 
+  describe("when the same project is asked for again under an unchanged image", () => {
+    /** @scenario "An unchanged desired configuration keeps serving from cache, no spurious invalidation" */
+    it("returns the cached ARN without resolving again or dropping the entry", async () => {
+      const cache = new SharedCache();
+      const { resolver, resolve } = awsResolver();
+      await runtime({ cache, resolver }).resolveArn(PROJECT);
+      const before = cache.entries.get("lambda_arn:projectA")?.value;
+
+      const again = await runtime({ cache, resolver }).resolveArn(PROJECT);
+
+      expect(again).toBe(ARN);
+      expect(resolve).toHaveBeenCalledTimes(1);
+      expect(cache.deleted).toEqual([]);
+      expect(cache.entries.get("lambda_arn:projectA")?.value).toBe(before);
+    });
+  });
+
+  describe("when two projects resolve", () => {
+    /** @scenario "Different projects do not share cache slots" */
+    it("files each under its own key and never answers one with the other's", async () => {
+      const cache = new SharedCache();
+      const resolve = vi.fn(
+        async (input: { projectId: string; imageUri: string }) =>
+          `arn:aws:lambda:eu-central-1:1:function:langwatch_nlp-${input.projectId}`,
+      );
+      const resolver = new (class implements NlpLambdaArnResolver {
+        resolve = resolve;
+      })();
+      const engine = runtime({ cache, resolver });
+
+      const arnA = await engine.resolveArn("projectA");
+      const arnB = await engine.resolveArn("projectB");
+      const arnAAgain = await engine.resolveArn("projectA");
+
+      expect(arnA).not.toBe(arnB);
+      expect(arnAAgain).toBe(arnA);
+      expect([...cache.entries.keys()].toSorted()).toEqual([
+        "lambda_arn:projectA",
+        "lambda_arn:projectB",
+      ]);
+      expect(JSON.parse(cache.entries.get("lambda_arn:projectA")!.value).arn).toBe(arnA);
+      expect(JSON.parse(cache.entries.get("lambda_arn:projectB")!.value).arn).toBe(arnB);
+      expect(resolve).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe("when a burst of callers miss together on one pod", () => {
     /** @scenario "A concurrent local miss has one AWS resolution" */
     it("collapses them onto one resolution and answers all of them with it", async () => {

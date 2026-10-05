@@ -4,10 +4,17 @@
  *
  * @see modules/workflow/specs/studio-lambda-stream.feature
  */
-import { CreateFunctionCommand, UpdateFunctionConfigurationCommand } from "@aws-sdk/client-lambda";
+import {
+  CreateFunctionCommand,
+  UpdateFunctionCodeCommand,
+  UpdateFunctionConfigurationCommand,
+} from "@aws-sdk/client-lambda";
 import { describe, expect, it } from "vitest";
 
-import type { StudioLambdaConfig } from "../../rules/nlp-lambda-config.rules.ts";
+import {
+  buildStudioLambdaEnvironment,
+  type StudioLambdaConfig,
+} from "../../rules/nlp-lambda-config.rules.ts";
 import { AwsNlpLambdaArnResolverChannel } from "../aws.nlp-lambda-arn-resolver.channel.ts";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:langwatch_nlp-project-1";
@@ -44,6 +51,8 @@ type Sent = { name: string; input: Record<string, unknown> };
 function resolver(options: {
   /** Answers each GetFunction in turn; the last answer repeats. */
   reads: readonly unknown[];
+  /** What UpdateFunctionConfiguration rejects with, when AWS refuses it. */
+  rejectUpdateWith?: Error;
 }) {
   const sent: Sent[] = [];
   let read = 0;
@@ -51,7 +60,12 @@ function resolver(options: {
     send: (command: { constructor: { name: string }; input: Record<string, unknown> }) => {
       sent.push({ name: command.constructor.name, input: command.input });
       if (command instanceof CreateFunctionCommand) return Promise.resolve(READY);
-      if (command instanceof UpdateFunctionConfigurationCommand) return Promise.resolve(READY);
+      if (command instanceof UpdateFunctionCodeCommand) return Promise.resolve(READY);
+      if (command instanceof UpdateFunctionConfigurationCommand) {
+        return options.rejectUpdateWith
+          ? Promise.reject(options.rejectUpdateWith)
+          : Promise.resolve(READY);
+      }
 
       const answer = options.reads[Math.min(read, options.reads.length - 1)];
       read += 1;
@@ -130,6 +144,156 @@ describe("given a project whose studio engine needs a function", () => {
         NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: "600",
       });
       expect(sent.some((call) => call.name === "CreateFunctionCommand")).toBe(false);
+    });
+  });
+
+  describe("when the function's configuration has drifted from the deployment's", () => {
+    const desired = buildStudioLambdaEnvironment(CONFIG);
+    const deployed = (overrides: Record<string, unknown>) => ({
+      ...READY,
+      Environment: { Variables: desired },
+      ...overrides,
+    });
+    const updates = (sent: Sent[]) =>
+      sent.filter((call) => call.name === "UpdateFunctionConfigurationCommand");
+
+    /** @scenario "A pre-existing Lambda carrying a stale env var is reconciled without clobbering unmanaged vars" */
+    it("issues one update that fixes the stale variable and keeps the unmanaged one", async () => {
+      const stale = deployed({
+        Environment: {
+          Variables: { ...desired, CACHE_BUCKET: "old-bucket", UNMANAGED: "keep-me" },
+        },
+      });
+      const { sent, subject } = resolver({
+        reads: [
+          { Configuration: stale },
+          { Code: { ImageUri: CONFIG.imageUri }, Configuration: stale },
+          { Configuration: READY },
+        ],
+      });
+
+      await subject.resolve({ projectId: "project-1" });
+
+      expect(updates(sent)).toHaveLength(1);
+      const variables = (
+        updates(sent)[0]!.input.Environment as { Variables: Record<string, string> }
+      ).Variables;
+      expect(variables).toEqual({ ...desired, UNMANAGED: "keep-me" });
+      expect(variables.CACHE_BUCKET).toBe("langwatch-nlp-cache");
+    });
+
+    /** @scenario "A Lambda still on the old 1024 MB default is raised to 2048" */
+    it("raises a 1024 MB function to 2048", async () => {
+      const small = deployed({ MemorySize: 1024 });
+      const { sent, subject } = resolver({
+        reads: [
+          { Configuration: small },
+          { Code: { ImageUri: CONFIG.imageUri }, Configuration: small },
+          { Configuration: READY },
+        ],
+      });
+
+      await subject.resolve({ projectId: "project-1" });
+
+      expect(updates(sent)).toHaveLength(1);
+      expect(updates(sent)[0]!.input).toMatchObject({ MemorySize: 2048 });
+    });
+
+    /** @scenario "No drift means no AWS write at all — the common path" */
+    it("writes nothing when the environment and memory already match", async () => {
+      const current = deployed({});
+      const { sent, subject } = resolver({
+        reads: [
+          { Configuration: current },
+          { Code: { ImageUri: CONFIG.imageUri }, Configuration: current },
+          { Configuration: READY },
+        ],
+      });
+
+      const arn = await subject.resolve({ projectId: "project-1" });
+
+      expect(arn).toBe(ARN);
+      expect(updates(sent)).toHaveLength(0);
+      expect(sent.some((call) => call.name === "CreateFunctionCommand")).toBe(false);
+      expect(sent.some((call) => call.name === "UpdateFunctionCodeCommand")).toBe(false);
+    });
+
+    /** @scenario "The code update lands and is polled to completion before the config update is sent" */
+    it("waits for the image update to finish before it sends the configuration", async () => {
+      const drifted = deployed({ MemorySize: 1024 });
+      const { sent, subject } = resolver({
+        reads: [
+          { Configuration: drifted },
+          { Code: { ImageUri: "registry/nlp:v8" }, Configuration: drifted },
+          { Configuration: { ...READY, LastUpdateStatus: "InProgress" } },
+          { Configuration: READY },
+        ],
+      });
+
+      await subject.resolve({ projectId: "project-1" });
+
+      const names = sent.map((call) => call.name);
+      const code = names.indexOf("UpdateFunctionCodeCommand");
+      const config = names.indexOf("UpdateFunctionConfigurationCommand");
+      expect(code).toBeGreaterThanOrEqual(0);
+      expect(sent[code]!.input).toMatchObject({ ImageUri: CONFIG.imageUri });
+      expect(config).toBeGreaterThan(code);
+      expect(names.slice(code + 1, config)).toEqual(["GetFunctionCommand", "GetFunctionCommand"]);
+    });
+
+    const drift = () => {
+      const drifted = deployed({ MemorySize: 1024 });
+      return [
+        { Configuration: drifted },
+        { Code: { ImageUri: CONFIG.imageUri }, Configuration: drifted },
+        { Configuration: READY },
+      ];
+    };
+
+    /** @scenario "A concurrent update makes AWS reject the reconcile but resolution still succeeds" */
+    it("still answers with the ARN when AWS says an update is in progress", async () => {
+      const { sent, subject } = resolver({
+        reads: drift(),
+        rejectUpdateWith: new Error("An update is in progress for resource"),
+      });
+
+      const arn = await subject.resolve({ projectId: "project-1" });
+
+      expect(arn).toBe(ARN);
+      expect(updates(sent)).toHaveLength(1);
+    });
+
+    /** @scenario "AWS errors are matched by exception name, not message text" */
+    it("recognises a ResourceConflictException by its name whatever its message says", async () => {
+      class Conflict extends Error {
+        override readonly name = "ResourceConflictException";
+      }
+      const { subject } = resolver({
+        reads: drift(),
+        rejectUpdateWith: new Conflict("the message is not the point"),
+      });
+
+      await expect(subject.resolve({ projectId: "project-1" })).resolves.toBe(ARN);
+    });
+
+    /** @scenario "AWS errors are matched by exception name, not message text" */
+    it("falls back to the message when the error carries no recognised name", async () => {
+      const { subject } = resolver({
+        reads: drift(),
+        rejectUpdateWith: new Error("An update is in progress"),
+      });
+
+      await expect(subject.resolve({ projectId: "project-1" })).resolves.toBe(ARN);
+    });
+
+    /** @scenario "AWS errors are matched by exception name, not message text" */
+    it("rethrows an unrelated error", async () => {
+      const { subject } = resolver({
+        reads: drift(),
+        rejectUpdateWith: new Error("Access denied"),
+      });
+
+      await expect(subject.resolve({ projectId: "project-1" })).rejects.toThrow("Access denied");
     });
   });
 });
