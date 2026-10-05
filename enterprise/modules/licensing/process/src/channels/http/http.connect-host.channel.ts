@@ -10,7 +10,11 @@ import {
   ConnectUnreachableError,
   HostedServiceUnavailableError,
 } from "@langwatch/enterprise-licensing-contract";
-import { type HandledError, handledErrorFromHerr } from "@langwatch/handled-error";
+import {
+  type HandledError,
+  handledErrorFaultSchema,
+  handledErrorFromHerr,
+} from "@langwatch/handled-error";
 import { z } from "zod";
 
 /**
@@ -28,7 +32,7 @@ const refusalBodySchema = z.object({
   code: z.string().optional(),
   message: z.string(),
   meta: z.record(z.string(), z.unknown()).optional(),
-  fault: z.enum(["customer", "platform", "provider"]).optional(),
+  fault: handledErrorFaultSchema.optional(),
   retryable: z.boolean().optional(),
   tips: z.array(z.string()).optional(),
   docs_url: z.string().optional(),

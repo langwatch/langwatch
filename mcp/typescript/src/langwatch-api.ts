@@ -176,7 +176,12 @@ interface ParsedErrorBody {
   reasons?: SerializedReason[];
 }
 
-const VALID_FAULTS: readonly HandledErrorFault[] = ["customer", "platform", "provider"];
+const VALID_FAULTS: readonly HandledErrorFault[] = [
+  "customer",
+  "platform",
+  "provider",
+  "presumed_platform",
+];
 
 /**
  * Parses an error response body as a handled-error envelope.

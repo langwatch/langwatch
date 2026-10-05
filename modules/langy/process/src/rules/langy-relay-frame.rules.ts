@@ -4,6 +4,7 @@
 import {
   type HandledError,
   type HerrEnvelope,
+  handledErrorFaultSchema,
   handledErrorFromHerr,
 } from "@langwatch/handled-error";
 import { cliToolResultSchema } from "@langwatch/langy-contract";
@@ -33,7 +34,7 @@ const herrEnvelopeWireSchema: z.ZodType<HerrEnvelope> = z.lazy(() =>
     meta: z.record(z.string(), z.unknown()).optional(),
     trace_id: z.string().optional(),
     span_id: z.string().optional(),
-    fault: z.enum(["customer", "platform", "provider"]).optional(),
+    fault: handledErrorFaultSchema.optional(),
     retryable: z.boolean().optional(),
     tips: z.array(z.string()).optional(),
     docs_url: z.string().optional(),
