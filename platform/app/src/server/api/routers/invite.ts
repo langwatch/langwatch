@@ -142,6 +142,31 @@ function assertInvitePending(invite: InviteWithOrganization): void {
   }
 }
 
+/**
+ * Every address the session user has PROVEN. Identifiers answer first; a user
+ * not on identifiers yet keeps the legacy `User.email` column, counted only
+ * where better-auth marked it verified. This is the rule the join door applies
+ * to the same person (`verifiedEmailFor` in joinRequests.ts): reading the two
+ * differently let the automatic door admit somebody whose invitation this
+ * lookup could not see.
+ */
+async function provenAddressesOf({
+  prisma,
+  userId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+}): Promise<string[]> {
+  const proven = await identityEmail().verifiedEmailsOf({ userId });
+  if (proven !== null) return proven.map(({ value }) => value);
+
+  const row = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, emailVerified: true },
+  });
+  return row?.emailVerified && row.email ? [row.email] : [];
+}
+
 async function matchInviteAcceptor({
   invite,
   session,
@@ -360,10 +385,13 @@ export const inviteRouter = createTRPCRouter({
    * to ask to join, so an administrator who already invited somebody is not
    * asked the question twice.
    *
-   * VERIFIED addresses only, with no fall-back to the session address: the
-   * answer carries the invitation code, which is the secret from the mail,
-   * and it is handed over only to somebody who has proved they hold the
-   * address it was sent to. A user not yet on identifiers answers nothing.
+   * VERIFIED addresses only, with no fall-back to an unproven session
+   * address: the answer carries the invitation code, which is the secret from
+   * the mail, and it is handed over only to somebody who has proved they hold
+   * the address it was sent to. A user not yet on identifiers is read from
+   * the legacy column, and only where it is marked verified: the same answer
+   * the join door reads for the same person, so an invitation can never stay
+   * hidden behind a door that opens on that very address.
    */
   pendingForMe: protectedProcedure
     .input(z.object({}))
@@ -371,14 +399,14 @@ export const inviteRouter = createTRPCRouter({
       reason:
         "answers for the session user's own VERIFIED addresses; the caller belongs to no organization yet, and nothing about anybody else's invitations is reachable",
     })
-    .query(async ({ ctx }) => {
-      const proven = await identityEmail().verifiedEmailsOf({
-        userId: ctx.session.user.id,
-      });
-      return InviteService.create(ctx.prisma).findPendingForAddresses({
-        addresses: (proven ?? []).map(({ value }) => value),
-      });
-    }),
+    .query(async ({ ctx }) =>
+      InviteService.create(ctx.prisma).findPendingForAddresses({
+        addresses: await provenAddressesOf({
+          prisma: ctx.prisma,
+          userId: ctx.session.user.id,
+        }),
+      }),
+    ),
 
   /**
    * The invitation waiting for the signed-in user, on an installation where

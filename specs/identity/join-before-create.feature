@@ -84,12 +84,16 @@ Feature: Join before create - the choice happens before an organization is minte
   # takeover sits on every dashboard, and an invitation offer or an automatic
   # admission there would cover a page somebody is working on, or quietly add
   # a member of one organization to another. Only VERIFIED addresses count,
-  # with no fall-back to the session address: the invitation code is the
-  # secret from the mail, and it is handed over only to somebody who has
-  # proved they hold the address it was sent to. On an installation where
-  # accounts are created by invitation only, the invitation screen already
-  # runs before the welcome screen (specs/auth/sign-up-restriction.feature),
-  # and nothing here is reached.
+  # with no fall-back to an unproven session address: the invitation code is
+  # the secret from the mail, and it is handed over only to somebody who has
+  # proved they hold the address it was sent to. An account not yet on
+  # identifiers is read from the legacy column, and only where it is marked
+  # verified, which is exactly the answer the join door reads for the same
+  # person: the two lookups must agree, or the door admits somebody whose
+  # invitation the screen could not see. On an installation where accounts
+  # are created by invitation only, the invitation screen already runs before
+  # the welcome screen (specs/auth/sign-up-restriction.feature), and nothing
+  # here is reached.
 
   @integration
   Scenario: A pending invitation is offered before asking to join
@@ -136,6 +140,15 @@ Feature: Join before create - the choice happens before an organization is minte
     And "sam" signed in with an account whose "sam@acme.com" address is not verified
     When "sam" reaches the welcome screen
     Then no invitation is offered
+
+  @integration
+  Scenario: An account not yet on identifiers is matched on its verified legacy address
+    Given "ana" invited "sam@acme.com" to "acme"
+    And "acme" admits verified colleagues on "acme.com" automatically
+    And "sam"'s account is not on identifiers yet, with "sam@acme.com" verified on the legacy column
+    When "sam" reaches the welcome screen
+    Then accepting the invitation to "acme" is the leading action
+    And "sam" is not admitted to "acme" through the automatic door behind it
 
   @integration
   Scenario: The welcome screen honours an automatic door

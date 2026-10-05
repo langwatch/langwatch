@@ -382,11 +382,13 @@ describe("invite.acceptInvite", () => {
  * Spec: specs/identity/join-before-create.feature
  */
 describe("invite.pendingForMe", () => {
-  let findManyMock: ReturnType<typeof vi.fn>;
+  let findFirstMock: ReturnType<typeof vi.fn>;
+  let findUserMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    findManyMock = vi.fn().mockResolvedValue([]);
+    findFirstMock = vi.fn().mockResolvedValue(null);
+    findUserMock = vi.fn().mockResolvedValue(null);
   });
 
   function createCaller(email = "sam@acme.com") {
@@ -398,7 +400,8 @@ describe("invite.pendingForMe", () => {
     });
     (ctx as any).prisma = {
       $connect: vi.fn(),
-      organizationInvite: { findMany: findManyMock },
+      organizationInvite: { findFirst: findFirstMock },
+      user: { findUnique: findUserMock },
     };
     return inviteRouter.createCaller(ctx);
   }
@@ -406,12 +409,34 @@ describe("invite.pendingForMe", () => {
   describe("when the session address has an invitation but is not yet proved", () => {
     /** @scenario An invitation is only offered to somebody who proved the address */
     it("answers nothing and asks the database nothing", async () => {
-      // Not on identifiers at all: the only address known is the session's.
+      // Not on identifiers at all, and the legacy column is not verified
+      // either: the only address known is the session's, unproven.
       verifiedEmailsOfMock.mockResolvedValueOnce(null);
+      findUserMock.mockResolvedValueOnce({
+        email: "sam@acme.com",
+        emailVerified: false,
+      });
 
       await expect(createCaller().pendingForMe({})).resolves.toEqual([]);
 
-      expect(findManyMock).not.toHaveBeenCalled();
+      expect(findFirstMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario An account not yet on identifiers is matched on its verified legacy address */
+    it("reads the legacy verified address for somebody not on identifiers yet, as the join door does", async () => {
+      verifiedEmailsOfMock.mockResolvedValueOnce(null);
+      findUserMock.mockResolvedValueOnce({
+        email: "sam@acme.com",
+        emailVerified: true,
+      });
+
+      await createCaller("sam@acme.com").pendingForMe({});
+
+      expect(findUserMock).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "user-1" } }),
+      );
+      const where = findFirstMock.mock.calls[0]?.[0]?.where;
+      expect(JSON.stringify(where)).toContain("sam@acme.com");
     });
 
     /** @scenario An invitation is only offered to somebody who proved the address */
@@ -420,7 +445,7 @@ describe("invite.pendingForMe", () => {
 
       await createCaller("sam@acme.com").pendingForMe({});
 
-      const where = findManyMock.mock.calls[0]?.[0]?.where;
+      const where = findFirstMock.mock.calls[0]?.[0]?.where;
       expect(JSON.stringify(where)).toContain("ana@acme.com");
       expect(JSON.stringify(where)).not.toContain("sam@acme.com");
     });
