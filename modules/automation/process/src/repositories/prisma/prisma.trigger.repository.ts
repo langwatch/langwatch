@@ -9,7 +9,11 @@ import {
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { AutomationClock } from "../automation.repositories.ts";
-import { TriggerRepository, type ReportScheduleTarget } from "../trigger.repository.ts";
+import {
+  TriggerRepository,
+  type ReportScheduleTarget,
+  type TriggerSecretCipher,
+} from "../trigger.repository.ts";
 import { mapTriggerRow } from "./prisma.trigger.mapper.ts";
 
 function toPrismaJsonValue(value: unknown): Prisma.InputJsonValue | null {
@@ -46,11 +50,23 @@ export class PrismaTriggerRepository extends TriggerRepository {
   private constructor(
     private readonly database: TriggerDatabase,
     private readonly clock: AutomationClock,
+    private readonly cipher: TriggerSecretCipher,
   ) {
     super();
   }
-  static create(database: TriggerDatabase, clock: AutomationClock): PrismaTriggerRepository {
-    return new PrismaTriggerRepository(database, clock);
+  static create(
+    database: TriggerDatabase,
+    clock: AutomationClock,
+    cipher: TriggerSecretCipher,
+  ): PrismaTriggerRepository {
+    return new PrismaTriggerRepository(database, clock, cipher);
+  }
+  /** A process without the key holds a refusing cipher, so only this use refuses. */
+  openSecret({ sealed }: { sealed: string }): string {
+    return this.cipher.decrypt(sealed);
+  }
+  sealSecret({ plain }: { plain: string }): string {
+    return this.cipher.encrypt(plain);
   }
   async countUsage({
     projectIds,

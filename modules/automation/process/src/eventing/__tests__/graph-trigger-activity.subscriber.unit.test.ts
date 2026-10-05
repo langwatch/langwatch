@@ -76,7 +76,7 @@ describe("createGraphTriggerActivityHandler", () => {
       const clock = frozenAt(FROZEN_NOW);
       const delivery = new RecordingDelivery();
       const crypto = { encrypt: (value: string) => value, decrypt: (value: string) => value };
-      const triggers = PrismaTriggerRepository.create(database.prisma, clock);
+      const triggers = PrismaTriggerRepository.create(database.prisma, clock, crypto);
       const handler = createGraphTriggerActivityHandler(
         AutomationGraphActivityService.create({
           triggers,
@@ -90,10 +90,10 @@ describe("createGraphTriggerActivityHandler", () => {
           projects: new OneProject(),
           analytics: breachingAnalytics(),
           delivery,
-          webhooks: AutomationWebhookSecretsService.create(crypto),
+          webhooks: AutomationWebhookSecretsService.create(triggers),
           slackDestinations: SlackDestinationService.create({
             slack: { findUsableSlackSecret: async () => [] },
-            crypto: crypto,
+            triggers,
           }),
           emailCaps: AutomationEmailCapService.create({
             store: MemoryAutomationEmailCapRepository.create(),

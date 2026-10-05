@@ -6,6 +6,7 @@ import { Temporal } from "@langwatch/time";
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
+import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
 import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
 
 /** Reversible and obviously not real, so a leak in a failure message is loud. */
@@ -14,7 +15,7 @@ const crypto = {
   decrypt: (cipher: string) => cipher.replace(/^enc\(/, "").replace(/\)$/, ""),
 };
 
-const adapter = AutomationWebhookSecretsService.create(crypto as never);
+const adapter = AutomationWebhookSecretsService.create(sealWith(crypto));
 
 const stored = (over: Record<string, unknown> = {}) =>
   ({

@@ -3,7 +3,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { SlackApi, SlackConnectionKind } from "@langwatch/slack-contract";
 import { z } from "zod";
 
-import type { AutomationSecretCrypto } from "./automation-slack-secrets.service.ts";
+import type { TriggerSecretSeal } from "../repositories/trigger.repository.ts";
 
 /** What the public API reads back in place of a credential; never a secret. */
 const REDACTED_PLACEHOLDER = "[redacted]";
@@ -61,13 +61,13 @@ export class AutomationSlackConnectionService {
       | "releaseConnection"
     >,
     private readonly projects: Pick<ProjectApi, "getOrganizationId">,
-    private readonly crypto: AutomationSecretCrypto,
+    private readonly triggers: TriggerSecretSeal,
   ) {}
 
   static create({
     slack,
     projects,
-    crypto,
+    triggers,
   }: {
     slack: Pick<
       SlackApi,
@@ -77,9 +77,9 @@ export class AutomationSlackConnectionService {
       | "releaseConnection"
     >;
     projects: Pick<ProjectApi, "getOrganizationId">;
-    crypto: AutomationSecretCrypto;
+    triggers: TriggerSecretSeal;
   }): AutomationSlackConnectionService {
-    return new AutomationSlackConnectionService(slack, projects, crypto);
+    return new AutomationSlackConnectionService(slack, projects, triggers);
   }
 
   /**
@@ -222,7 +222,7 @@ export class AutomationSlackConnectionService {
   private decryptedLegacyToken(ciphertext: string | null | undefined): string | undefined {
     if (!ciphertext) return undefined;
     try {
-      return findFreshSecret(this.crypto.decrypt(ciphertext))[0];
+      return findFreshSecret(this.triggers.openSecret({ sealed: ciphertext }))[0];
     } catch {
       return undefined;
     }

@@ -1,6 +1,6 @@
 /**
- * Secret registry for all automation channels using the deployment's shared
- * cipher; each channel defines encryption/decryption for its own params.
+ * Secret registry for all automation channels; each channel defines how its
+ * own params are sealed and opened through the trigger repository.
  */
 import {
   annotationQueueProvider as annotationQueueShared,
@@ -19,10 +19,8 @@ import { z, type ZodTypeAny } from "zod";
 /** The Slack fields without the save-time refinement: a persist reads, it does not refuse. */
 const slackStoredFieldsSchema = z.object(slackActionParamsSchema.shape);
 
-import {
-  AutomationSlackSecretsService,
-  type AutomationSecretCrypto,
-} from "#services/automation-slack-secrets.service";
+import type { TriggerSecretSeal } from "#repositories/trigger.repository";
+import { AutomationSlackSecretsService } from "#services/automation-slack-secrets.service";
 import {
   AutomationWebhookSecretsService,
   type AutomationWebhookProvider,
@@ -60,10 +58,10 @@ export interface ServerEntry {
   server: ServerDef;
 }
 
-/** The five channels' secret handling, bound to one deployment's cipher. */
+/** The five channels' secret handling, sealed and opened by the trigger repository. */
 export class AutomationProviderRegistryService {
-  static create(crypto: AutomationSecretCrypto): AutomationProviderRegistryService {
-    return new AutomationProviderRegistryService(crypto);
+  static create(triggers: TriggerSecretSeal): AutomationProviderRegistryService {
+    return new AutomationProviderRegistryService(triggers);
   }
 
   /** The webhook channel's secret capability, exposed for the two read paths. */
@@ -72,9 +70,9 @@ export class AutomationProviderRegistryService {
   private readonly slack: AutomationSlackSecretsService;
   private readonly providers: Record<TriggerAction, ServerEntry>;
 
-  private constructor(crypto: AutomationSecretCrypto) {
-    this.webhooks = AutomationWebhookSecretsService.create(crypto);
-    this.slack = AutomationSlackSecretsService.create(crypto);
+  private constructor(triggers: TriggerSecretSeal) {
+    this.webhooks = AutomationWebhookSecretsService.create(triggers);
+    this.slack = AutomationSlackSecretsService.create(triggers);
     this.providers = {
       [TriggerAction.SEND_EMAIL]: {
         shared: emailShared,

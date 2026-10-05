@@ -26,6 +26,7 @@ import type { AutomationSettlementLedgerRepository } from "../../repositories/au
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
 import { AutomationSettlementDispatchService } from "../../services/trigger-settlement-dispatch.service.ts";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
+import { sealWith } from "./trigger-secrets.fixture.ts";
 
 function unavailable(): never {
   throw new Error("unused test capability");
@@ -442,9 +443,9 @@ export function createSettlementFixture(trigger: TriggerSummary): {
     }),
     slackDestinations: SlackDestinationService.create({
       slack: { findUsableSlackSecret: async () => [] },
-      crypto,
+      triggers: sealWith(crypto),
     }),
-    webhooks: AutomationWebhookSecretsService.create(crypto),
+    webhooks: AutomationWebhookSecretsService.create(sealWith(crypto)),
     clock,
     observability,
     baseHost: "https://app.example.com",

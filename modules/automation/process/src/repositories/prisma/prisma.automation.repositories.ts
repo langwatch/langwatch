@@ -4,6 +4,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
 
 import type { AutomationClock, AutomationRepositories } from "../automation.repositories.ts";
+import type { TriggerSecretCipher } from "../trigger.repository.ts";
 
 /** The client the automation rows live in, as a process hands it over. */
 export type AutomationDatabase = PrismaClient;
@@ -25,16 +26,20 @@ import { PrismaTriggerRepository } from "./prisma.trigger.repository.ts";
  * so the tier builds its own rather than demanding a member.
  */
 export class PostgresAutomationRepositories {
-  static readonly requires = ["prisma", "redis"] as const;
+  static readonly requires = ["prisma", "redis", "encryption"] as const;
 
   static create(
-    members: Readonly<{ prisma: PrismaClient; redis: RedisConnection }>,
+    members: Readonly<{
+      prisma: PrismaClient;
+      redis: RedisConnection;
+      encryption: TriggerSecretCipher;
+    }>,
   ): AutomationRepositories {
     const database = members.prisma;
     const clock: AutomationClock = { now: () => nowInstant() };
 
     return {
-      triggers: PrismaTriggerRepository.create(database, clock),
+      triggers: PrismaTriggerRepository.create(database, clock, members.encryption),
       history: PrismaTriggerFireHistoryRepository.create(database),
       latestEvaluations: PrismaTriggerLatestEvaluationRepository.create(database),
       suppressions: PrismaEmailSuppressionRepository.create(database),

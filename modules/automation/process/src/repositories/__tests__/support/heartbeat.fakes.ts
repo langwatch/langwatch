@@ -82,6 +82,14 @@ export class HeartbeatTriggerRepository extends TriggerRepository {
   update(_input: UpdateTriggerCommand): Promise<Trigger> {
     return unavailable();
   }
+
+  openSecret(): string {
+    throw new Error("The heartbeat never opens a secret.");
+  }
+
+  sealSecret(): string {
+    throw new Error("The heartbeat never seals a secret.");
+  }
 }
 
 export class SilentAutomationLogger extends AutomationLogger {

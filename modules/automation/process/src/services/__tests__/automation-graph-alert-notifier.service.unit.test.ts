@@ -6,6 +6,7 @@ import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { settlementTrigger } from "../../__tests__/fixtures/settlement.fixtures.ts";
+import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
 import type { GraphAlertDispatchInput } from "../../channels/automation-graph-alert.channel.ts";
 import { MemoryAutomationEmailCapRepository } from "../../repositories/memory/memory.automation-email-cap.repository.ts";
 import { MemoryAutomationRepositories } from "../../repositories/memory/memory.automation.repositories.ts";
@@ -24,10 +25,9 @@ function composeNotifier(publicBaseUrl: string | undefined) {
     publicBaseUrl,
     repositories: MemoryAutomationRepositories.create(),
     caps: { emailHourlyCap: 10, tenantDailyCap: 100 },
-    providers: AutomationProviderRegistryService.create({
-      encrypt: (value) => value,
-      decrypt: (value) => value,
-    }),
+    providers: AutomationProviderRegistryService.create(
+      sealWith({ encrypt: (value) => value, decrypt: (value) => value }),
+    ),
     clock: frozenAt(),
     delivery: AutomationNotificationDeliveryService.create({
       mailer: mail,

@@ -20,14 +20,12 @@ import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { NotificationService, SendEmailCommand } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import type { SlackApi } from "@langwatch/slack-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WebhookApi, WebhookSendRequest } from "@langwatch/webhook-contract";
@@ -85,16 +83,10 @@ function composed(role: "api" | "worker", eventing: EventSourcing) {
     SecretsChain.start({ environment: { NEXTAUTH_SECRET: "session-secret" } }).withEnv(),
   );
   return createApp({ role, secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(automationProcessModule)])
+    .withModules([automationProcessModule])
     .withConfig({ automation: CONFIG })
     .withStores(memoryStores())
-    .withEventing(eventing)
-    .withKeyvalue(memoryRedisDouble())
-    .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
-    .withMember("encryption", {
-      encrypt: (value: string) => value,
-      decrypt: (value: string) => value,
-    });
+    .withEventing(eventing);
 }
 
 /** What automation's own logger writes during one test, read off the module's named logger. */

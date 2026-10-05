@@ -33,22 +33,23 @@ function composeOver(input: { projects: AutomationProjectDirectory; analytics: A
   const delivery = new RecordingDelivery();
   const clock = frozenAt(FROZEN_NOW);
   const logger = new SilentLogger();
+  const triggers = PrismaTriggerRepository.create(database.prisma, clock, crypto);
   const vertical = AutomationGraphActivityService.create({
-    triggers: PrismaTriggerRepository.create(database.prisma, clock),
+    triggers,
     customGraphs: PrismaCustomGraphRepository.create(database.prisma),
     graphTriggerSent: PrismaGraphTriggerSentRepository.create(database.prisma),
     persistence: AutomationGraphDeliveryService.create({
-      triggers: PrismaTriggerRepository.create(database.prisma, clock),
+      triggers,
       suppressions: PrismaEmailSuppressionRepository.create(database.prisma),
     }),
     clock,
     projects: input.projects,
     analytics: input.analytics,
     delivery,
-    webhooks: AutomationWebhookSecretsService.create(crypto),
+    webhooks: AutomationWebhookSecretsService.create(triggers),
     slackDestinations: SlackDestinationService.create({
       slack: { findUsableSlackSecret: async () => [] },
-      crypto,
+      triggers,
     }),
     emailCaps: AutomationEmailCapService.create({
       store: MemoryAutomationEmailCapRepository.create(),

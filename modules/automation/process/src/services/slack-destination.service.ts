@@ -3,7 +3,7 @@ import { DispatchError } from "@langwatch/eventing";
 import { type SlackApi, SlackIntegrationMissingError } from "@langwatch/slack-contract";
 import { z } from "zod";
 
-import type { AutomationSecretCrypto } from "./automation-slack-secrets.service.ts";
+import type { TriggerSecretSeal } from "../repositories/trigger.repository.ts";
 
 /** Where one Slack delivery goes. A bot posts to the automation's channel. */
 export type SlackDestination =
@@ -33,17 +33,17 @@ function readStoredSlackParams(actionParams: unknown): StoredSlackParams {
 export class SlackDestinationService {
   private constructor(
     private readonly slack: Pick<SlackApi, "findUsableSlackSecret">,
-    private readonly crypto: AutomationSecretCrypto,
+    private readonly triggers: TriggerSecretSeal,
   ) {}
 
   static create({
     slack,
-    crypto,
+    triggers,
   }: {
     slack: Pick<SlackApi, "findUsableSlackSecret">;
-    crypto: AutomationSecretCrypto;
+    triggers: TriggerSecretSeal;
   }): SlackDestinationService {
-    return new SlackDestinationService(slack, crypto);
+    return new SlackDestinationService(slack, triggers);
   }
 
   /** Zero or one destination for the automation's stored params. */
@@ -88,7 +88,9 @@ export class SlackDestinationService {
   }): SlackDestination[] {
     const method = slackDeliveryMethodOf({ slackDelivery: params.slackDelivery ?? undefined });
     if (method === "bot") {
-      const token = params.slackBotToken ? this.crypto.decrypt(params.slackBotToken) : "";
+      const token = params.slackBotToken
+        ? this.triggers.openSecret({ sealed: params.slackBotToken })
+        : "";
       return token ? [{ kind: "bot", token, channel }] : [];
     }
     const url = params.slackWebhook?.trim();

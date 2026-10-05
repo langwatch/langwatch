@@ -191,6 +191,7 @@ export function createCanonicalAutomationApp(): {
       repositories: PostgresAutomationRepositories.create({
         prisma: database,
         redis: memoryRedisDouble(),
+        encryption: { encrypt: (value) => value, decrypt: (value) => value },
       }),
       dependencies: {
         analytics,

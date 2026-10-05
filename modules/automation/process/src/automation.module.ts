@@ -21,7 +21,7 @@ import {
   PrismaTriggerRepository,
   type TriggerDatabase,
 } from "./repositories/prisma/prisma.trigger.repository.ts";
-import type { TriggerRepository } from "./repositories/trigger.repository.ts";
+import type { TriggerRepository, TriggerSecretCipher } from "./repositories/trigger.repository.ts";
 import type { AutomationEvaluationTraceSummary } from "./services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
 import type { AutomationEvaluationQueryClassification } from "./services/automation-evaluation-trigger-filter.service.ts";
@@ -154,8 +154,9 @@ export function createAutomationEvaluationSubscriber(input: {
 export function createAutomationTriggers(
   database: TriggerDatabase,
   clock: AutomationClock,
+  cipher: TriggerSecretCipher,
 ): TriggerRepository {
-  return PrismaTriggerRepository.create(database, clock);
+  return PrismaTriggerRepository.create(database, clock, cipher);
 }
 
 /** The trigger-sent ledger a graph alert reads before it fires twice. */
@@ -174,9 +175,10 @@ export function createAutomationCustomGraphs(database: CustomGraphDatabase): Cus
 export function createAutomationTraceTriggerCatalogue(input: {
   prisma: TriggerDatabase;
   clock: AutomationClock;
+  cipher: TriggerSecretCipher;
 }): AutomationTraceTriggerCatalogueRepository {
   return AutomationTraceTriggerCatalogueService.create({
-    triggers: PrismaTriggerRepository.create(input.prisma, input.clock),
+    triggers: PrismaTriggerRepository.create(input.prisma, input.clock, input.cipher),
     clock: input.clock,
   });
 }

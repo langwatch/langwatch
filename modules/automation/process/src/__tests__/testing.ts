@@ -1,6 +1,7 @@
 import type { AutomationGraphNotifier, AutomationRunawayNotice } from "../index.ts";
 import { AutomationTestFire } from "../index.ts";
 import { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
+import type { TriggerSecretSeal } from "../repositories/trigger.repository.ts";
 import { AutomationDispatchError } from "../services/automation-graph-activity.service.ts";
 import { AutomationSlackConnectionService } from "../services/automation-slack-connection.service.ts";
 import { AutomationLogger } from "../services/automation.service.ts";
@@ -8,14 +9,17 @@ import { AutomationEmailCapService } from "../services/email-cap.service.ts";
 import type { AutomationRunawaySignals } from "../services/runaway-containment.service.ts";
 import { SlackDestinationService } from "../services/slack-destination.service.ts";
 
-/** A cipher that stores what it is given, for fixtures that never read a real secret. */
-const PLAIN_CRYPTO = { encrypt: (value: string) => value, decrypt: (value: string) => value };
+/** Stores secrets as given, as the memory trigger repository does, for fixtures that read none. */
+const PLAIN_SECRETS: TriggerSecretSeal = {
+  openSecret: ({ sealed }) => sealed,
+  sealSecret: ({ plain }) => plain,
+};
 
 /** Slack as a project with no connections: every destination is the automation's own. */
 export function createTestSlackDestinations(): SlackDestinationService {
   return SlackDestinationService.create({
     slack: { findUsableSlackSecret: async () => [] },
-    crypto: PLAIN_CRYPTO,
+    triggers: PLAIN_SECRETS,
   });
 }
 
@@ -31,7 +35,7 @@ export function createTestSlackConnections(): AutomationSlackConnectionService {
       releaseConnection: async () => {},
     },
     projects: { getOrganizationId: async () => "organization-test" },
-    crypto: PLAIN_CRYPTO,
+    triggers: PLAIN_SECRETS,
   });
 }
 

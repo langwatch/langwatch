@@ -12,9 +12,7 @@ export type {
   SlackWebhookRequest,
   SlackWebhookTransport,
 } from "./channels/slack/slack.webhook-delivery.channel.ts";
-export type { AutomationSecretCrypto } from "./services/automation-slack-secrets.service.ts";
 export type {
-  AutomationWebhookSecretCrypto,
   AutomationWebhookStoredParams,
   WebhookStoredActionParams,
 } from "./services/automation-webhook-secrets.service.ts";

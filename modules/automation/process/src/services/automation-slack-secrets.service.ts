@@ -1,11 +1,7 @@
 import { type SlackActionParams, slackDeliveryMethodOf } from "@langwatch/automation-contract";
 
+import type { TriggerSecretSeal } from "../repositories/trigger.repository.ts";
 import { readableSlackActionParams } from "../rules/automation-slack-read.rules.ts";
-
-export interface AutomationSecretCrypto {
-  encrypt(value: string): string;
-  decrypt(value: string): string;
-}
 
 export abstract class AutomationSlackProvider {
   abstract findDecryptedToken(params: { slackBotToken?: string }): string | null;
@@ -32,21 +28,21 @@ function persistSlackActionParams({
 
 function findDecryptedSlackBotToken(
   params: { slackBotToken?: string },
-  crypto: AutomationSecretCrypto,
+  triggers: TriggerSecretSeal,
 ): string | null {
   if (!params.slackBotToken) return null;
-  return crypto.decrypt(params.slackBotToken);
+  return triggers.openSecret({ sealed: params.slackBotToken });
 }
 
-/** Owns Slack action-parameter persistence and secret handling. Crypto is
- * process configuration and is bound once when the service is composed. */
+/** Owns Slack action-parameter persistence and secret handling; the trigger
+ * repository opens a legacy stored token (ARCHITECTURE.md §3.2). */
 export class AutomationSlackSecretsService extends AutomationSlackProvider {
-  private constructor(private readonly crypto: AutomationSecretCrypto) {
+  private constructor(private readonly triggers: TriggerSecretSeal) {
     super();
   }
 
-  static create(crypto: AutomationSecretCrypto): AutomationSlackSecretsService {
-    return new AutomationSlackSecretsService(crypto);
+  static create(triggers: TriggerSecretSeal): AutomationSlackSecretsService {
+    return new AutomationSlackSecretsService(triggers);
   }
 
   persist(input: { incoming: SlackActionParams }): SlackActionParams {
@@ -58,6 +54,6 @@ export class AutomationSlackSecretsService extends AutomationSlackProvider {
   }
 
   findDecryptedToken(params: { slackBotToken?: string }): string | null {
-    return findDecryptedSlackBotToken(params, this.crypto);
+    return findDecryptedSlackBotToken(params, this.triggers);
   }
 }

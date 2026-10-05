@@ -29,6 +29,15 @@ export class MemoryTriggerRepository extends TriggerRepository {
     return new MemoryTriggerRepository(memory);
   }
 
+  /** The memory tier holds its secrets in plaintext: nothing it stores outlives the process. */
+  openSecret({ sealed }: { sealed: string }): string {
+    return sealed;
+  }
+
+  sealSecret({ plain }: { plain: string }): string {
+    return plain;
+  }
+
   countUsage({
     projectIds,
     since,

@@ -1,6 +1,7 @@
 /** Slack params at rest and on read. @see specs/automations/slack-connections.feature */
 import { describe, expect, it } from "vitest";
 
+import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
 import { readableSlackActionParams } from "../../rules/automation-slack-read.rules.ts";
 import { AutomationSlackSecretsService } from "../automation-slack-secrets.service.ts";
 
@@ -8,10 +9,12 @@ import { AutomationSlackSecretsService } from "../automation-slack-secrets.servi
 const BOT_TOKEN = ["xoxb", "fake", "token"].join("-");
 const WEBHOOK_URL = ["https://hooks.slack.com", "services", "fake"].join("/");
 
-const service = AutomationSlackSecretsService.create({
-  encrypt: (value) => `enc(${value})`,
-  decrypt: (value) => value.replace(/^enc\(/, "").replace(/\)$/, ""),
-});
+const service = AutomationSlackSecretsService.create(
+  sealWith({
+    encrypt: (value) => `enc(${value})`,
+    decrypt: (value) => value.replace(/^enc\(/, "").replace(/\)$/, ""),
+  }),
+);
 
 describe("AutomationSlackSecretsService.persist", () => {
   describe("when the params point at a connection", () => {

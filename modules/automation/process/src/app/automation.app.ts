@@ -67,7 +67,6 @@ import {
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { sessionSecret } from "@langwatch/secrets";
 import { SlackApi } from "@langwatch/slack-contract";
@@ -162,7 +161,7 @@ export type { AutomationWebhookStoredParams };
 export type { AutomationProjectIdentity };
 
 // ---------------------------------------------------------------------------
-// The technical members the process supplies: a cipher, an HTTP client, a
+// The technical ports the process supplies: an HTTP client, a
 // query compiler, a counter and an audit ledger, all owned by the deployment.
 // ---------------------------------------------------------------------------
 
@@ -183,7 +182,7 @@ export interface AutomationActionParamsSchema {
   safeParse(value: unknown): AutomationActionParamsParse;
 }
 
-/** Every automation channel's at-rest secret handling, bound to one cipher. */
+/** Every automation channel's at-rest secret handling, sealed and opened by the triggers. */
 export interface AutomationProviderSecrets {
   /** The authoritative `actionParams` shape for one action. */
   actionParamsSchemaFor(action: AutomationAction): AutomationActionParamsSchema;
@@ -263,17 +262,10 @@ export type AutomationInfrastructure = Readonly<{
   audit: AutomationAuditSink;
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
-  // Peer APIs are resolved from setup.dependencies; members contains technical ports only.
-}>;
-
-/** What `AutomationModule.create` reads off process members. */
-type AutomationProcessMembers = Readonly<{
-  encryption: Encryption;
+  // Peer APIs are resolved from setup.dependencies; this holds the module's own ports only.
 }>;
 
 type AutomationInfrastructureInput = Readonly<{
-  /** Reads and writes the Slack bot tokens and webhook secrets this deployment stores. */
-  crypto: Encryption;
   /** The deployment's public origin; absent, nothing this process sends can link back. */
   publicBaseUrl: string | undefined;
   slackDestinations: SlackDestinationService;
@@ -295,7 +287,6 @@ type AutomationInfrastructureInput = Readonly<{
 /** What settlement sends through: the SAME delivery and ceilings graph alerts spend. */
 type AutomationComposedInfrastructure = AutomationInfrastructure &
   Readonly<{
-    crypto: Encryption;
     delivery: AutomationNotificationDelivery;
     emailCaps: AutomationEmailCapService;
   }>;
@@ -350,11 +341,7 @@ type AutomationRuntimeDependencies = Omit<
   AutomationSettlementPeer
 >;
 
-type AutomationSetup = FeatureSetup<
-  AutomationDependencies,
-  AutomationProcessMembers,
-  AutomationServerConfig
-> &
+type AutomationSetup = FeatureSetup<AutomationDependencies, never, AutomationServerConfig> &
   Readonly<{ repositories: AutomationRepositories }>;
 
 /** What the application is composed from, once the process has supplied it. */
@@ -398,23 +385,25 @@ export class AutomationModule implements AutomationApi {
   static readonly config = automationServerConfig;
   /** Unsubscribe links are signed with auth's session key, as main signed them (§6). */
   static readonly secrets = { unsubscribe: sessionSecret } as const;
-  static readonly reads = ["encryption"] as const;
 
   /**
-   * Builds this process's own {@link AutomationInfrastructure} from the
-   * members it reads and its own config, then composes exactly as
+   * Builds this process's own {@link AutomationInfrastructure} from its
+   * repositories, peers and config, then composes exactly as
    * {@link AutomationModule.fromInfrastructure} does.
    */
   static create(setup: AutomationSetup): Promise<AutomationModule> {
     return setup.secrets.into(AutomationModule.secrets.unsubscribe, (unsubscribeSigningSecret) => {
       const { slack, projects } = setup.dependencies;
-      const crypto = setup.members.encryption;
+      const { triggers } = setup.repositories;
       const { publicBaseUrl } = setup.config;
-      const slackConnections = AutomationSlackConnectionService.create({ slack, projects, crypto });
+      const slackConnections = AutomationSlackConnectionService.create({
+        slack,
+        projects,
+        triggers,
+      });
       const infrastructure = AutomationModule.#composeInfrastructure({
-        crypto,
         publicBaseUrl,
-        slackDestinations: SlackDestinationService.create({ slack, crypto }),
+        slackDestinations: SlackDestinationService.create({ slack, triggers }),
         slackConnections,
         notifications: setup.dependencies.notifications,
         webhooks: setup.dependencies.webhooks,
@@ -451,11 +440,10 @@ export class AutomationModule implements AutomationApi {
       });
       automation.#migration = SlackConnectionMigration.create({
         pass: SlackConnectionMigrationService.create({
-          triggers: setup.repositories.triggers,
+          triggers,
           projects,
           slack,
           slackConnections,
-          crypto,
         }),
       });
       return automation;
@@ -466,8 +454,8 @@ export class AutomationModule implements AutomationApi {
   static #composeInfrastructure(
     input: AutomationInfrastructureInput,
   ): AutomationComposedInfrastructure {
-    const { crypto, publicBaseUrl } = input;
-    const providers = AutomationProviderRegistryService.create(crypto);
+    const { publicBaseUrl } = input;
+    const providers = AutomationProviderRegistryService.create(input.repositories.triggers);
     const clock: AutomationClock = { now: () => nowInstant() };
     // No public origin, no delivery: a digest would link back to nowhere.
     const delivery: AutomationNotificationDelivery = publicBaseUrl
@@ -488,7 +476,6 @@ export class AutomationModule implements AutomationApi {
     });
 
     return {
-      crypto,
       delivery,
       emailCaps,
       verifier: input.verifier,
@@ -604,7 +591,7 @@ export class AutomationModule implements AutomationApi {
         delivery: infrastructure.delivery,
         emailCaps: infrastructure.emailCaps,
         slackDestinations: infrastructure.slackDestinations,
-        webhooks: AutomationWebhookSecretsService.create(infrastructure.crypto),
+        webhooks: AutomationWebhookSecretsService.create(repositories.triggers),
         clock,
         observability: AutomationSettlementObservabilityService.create({
           capture: (error, extra) =>
@@ -631,7 +618,7 @@ export class AutomationModule implements AutomationApi {
   /**
    * Composes over an already-built {@link AutomationInfrastructure}. Kept
    * because a hand composition (and every unit test's fixture) still builds
-   * one directly rather than reading process members.
+   * one directly rather than from a process setup.
    */
   static fromInfrastructure(setup: {
     infrastructure: AutomationInfrastructure;
