@@ -147446,7 +147446,7 @@ type GetApiExperimentsRunsByRunIdResponse struct {
 			Code    string  `json:"code"`
 			DocsUrl *string `json:"docsUrl,omitempty"`
 
-			// Fault Who the failure is attributable to: customer, platform, provider
+			// Fault Who the failure is attributable to: customer, platform, presumed_platform, provider
 			Fault      *string  `json:"fault,omitempty"`
 			HttpStatus *float32 `json:"httpStatus,omitempty"`
 
@@ -147565,7 +147565,7 @@ type GetApiExperimentsRunsByRunIdResultsResponse struct {
 				Code    string  `json:"code"`
 				DocsUrl *string `json:"docsUrl,omitempty"`
 
-				// Fault Who the failure is attributable to: customer, platform, provider
+				// Fault Who the failure is attributable to: customer, platform, presumed_platform, provider
 				Fault      *string  `json:"fault,omitempty"`
 				HttpStatus *float32 `json:"httpStatus,omitempty"`
 
@@ -176020,7 +176020,7 @@ func ParseGetApiExperimentsRunsByRunIdResponse(rsp *http.Response) (*GetApiExper
 				Code    string  `json:"code"`
 				DocsUrl *string `json:"docsUrl,omitempty"`
 
-				// Fault Who the failure is attributable to: customer, platform, provider
+				// Fault Who the failure is attributable to: customer, platform, presumed_platform, provider
 				Fault      *string  `json:"fault,omitempty"`
 				HttpStatus *float32 `json:"httpStatus,omitempty"`
 
@@ -176135,7 +176135,7 @@ func ParseGetApiExperimentsRunsByRunIdResultsResponse(rsp *http.Response) (*GetA
 					Code    string  `json:"code"`
 					DocsUrl *string `json:"docsUrl,omitempty"`
 
-					// Fault Who the failure is attributable to: customer, platform, provider
+					// Fault Who the failure is attributable to: customer, platform, presumed_platform, provider
 					Fault      *string  `json:"fault,omitempty"`
 					HttpStatus *float32 `json:"httpStatus,omitempty"`
 

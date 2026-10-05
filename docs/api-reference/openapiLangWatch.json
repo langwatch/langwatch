@@ -40584,7 +40584,7 @@
                           "type": "number"
                         },
                         "fault": {
-                          "description": "Who the failure is attributable to: customer, platform, provider",
+                          "description": "Who the failure is attributable to: customer, platform, presumed_platform, provider",
                           "type": "string"
                         },
                         "traceId": {
@@ -40869,7 +40869,7 @@
                                 "type": "number"
                               },
                               "fault": {
-                                "description": "Who the failure is attributable to: customer, platform, provider",
+                                "description": "Who the failure is attributable to: customer, platform, presumed_platform, provider",
                                 "type": "string"
                               },
                               "traceId": {

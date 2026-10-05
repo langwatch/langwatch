@@ -16817,7 +16817,7 @@ export interface operations {
                                 [key: string]: unknown;
                             };
                             httpStatus?: number;
-                            /** @description Who the failure is attributable to: customer, platform, provider */
+                            /** @description Who the failure is attributable to: customer, platform, presumed_platform, provider */
                             fault?: string;
                             traceId?: string;
                             spanId?: string;
@@ -16914,7 +16914,7 @@ export interface operations {
                                     [key: string]: unknown;
                                 };
                                 httpStatus?: number;
-                                /** @description Who the failure is attributable to: customer, platform, provider */
+                                /** @description Who the failure is attributable to: customer, platform, presumed_platform, provider */
                                 fault?: string;
                                 traceId?: string;
                                 spanId?: string;
