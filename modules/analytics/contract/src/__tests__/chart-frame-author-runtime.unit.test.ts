@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildAuthorRuntimeScript } from "../chart-frame-author-runtime.ts";
+import { buildChartFrameImportMap } from "../chart-frame-import-map.ts";
 
 interface BabelVisitor {
   ImportDeclaration: (path: { node: { source: { value: string } } }) => void;
@@ -69,6 +70,34 @@ describe("given the author runtime's Babel plugin", () => {
       captured.visitor?.ImportDeclaration({ node });
 
       expect(node.source.value).toBe("https://esm.sh/dayjs?external=react,react-dom");
+    });
+  });
+
+  describe("when a widget's static import names a frame built-in", () => {
+    let runtime: ReturnType<typeof evaluateAuthorRuntime>;
+    beforeEach(() => {
+      runtime = evaluateAuthorRuntime();
+      runtime.win.__LW_AUTHOR_SOURCE__ = "export default () => null;";
+      runtime.win.__lwActivateAuthor?.();
+    });
+
+    /** @scenario "A widget's own built-in import loads even where the import map was ignored" */
+    it("rewrites it to the module URL the import map names for it", () => {
+      const { imports } = buildChartFrameImportMap();
+
+      for (const specifier of ["recharts", "react", "@langwatch/charts", "react/jsx-runtime"]) {
+        const node = { source: { value: specifier } };
+        runtime.captured.visitor?.ImportDeclaration({ node });
+
+        expect(node.source.value).toBe(imports[specifier]);
+      }
+    });
+
+    it("leaves a specifier that only looks like an object member alone", () => {
+      const node = { source: { value: "./toString" } };
+      runtime.captured.visitor?.ImportDeclaration({ node });
+
+      expect(node.source.value).toBe("./toString");
     });
   });
 
