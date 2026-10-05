@@ -575,6 +575,8 @@ const dspyInitParamsSchema = z
     ]),
     experiment_name: z.string().optional(),
     workflowId: z.string().optional(),
+    dataset_id: z.string().optional(),
+    dataset_slug: z.string().optional(),
   })
   .refine((data) => {
     if (!data.experiment_id && !data.experiment_slug) return false;
@@ -625,6 +627,16 @@ secured.access(experimentsManageAuth).post(
                 type: "string",
                 description:
                   "Optimization Studio workflow this experiment belongs to",
+              },
+              dataset_id: {
+                type: "string",
+                description:
+                  "The LangWatch-managed dataset this experiment runs against",
+              },
+              dataset_slug: {
+                type: "string",
+                description:
+                  "The LangWatch-managed dataset this experiment runs against, by slug",
               },
             },
             required: ["experiment_type"],
@@ -713,6 +725,8 @@ secured.access(experimentsManageAuth).post(
         experiment_type: params.experiment_type as ExperimentType,
         experiment_name: params.experiment_name,
         workflowId: params.workflowId,
+        dataset_id: params.dataset_id,
+        dataset_slug: params.dataset_slug,
       });
     } catch (error) {
       if (error instanceof LimitExceededError) {
