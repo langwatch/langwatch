@@ -30,6 +30,26 @@ export const { langevalsStagingThresholdBytes, langevalsStagingTtlSeconds } = Co
   }),
 );
 
+/**
+ * The deployment's environment name (`NODE_ENV`): the process derives `production` from it and
+ * every owner that reads it holds this one leaf.
+ */
+export const { nodeEnvironment } = Config.define((c) => ({
+  nodeEnvironment: c.env("NODE_ENV", z.string().optional()),
+}));
+
+/** The standard proxy spellings, keyed by env name: one group every egress-making owner holds. */
+export const { outboundProxy } = Config.define((c) => ({
+  outboundProxy: {
+    HTTPS_PROXY: c.env("HTTPS_PROXY", z.string().optional()),
+    https_proxy: c.env("https_proxy", z.string().optional()),
+    HTTP_PROXY: c.env("HTTP_PROXY", z.string().optional()),
+    http_proxy: c.env("http_proxy", z.string().optional()),
+    NO_PROXY: c.env("NO_PROXY", z.string().optional()),
+    no_proxy: c.env("no_proxy", z.string().optional()),
+  },
+}));
+
 /** The outbound address fence every egress-making owner judges a call by. */
 export const { blockLocalHttpCalls, allowedProxyHosts } = Config.define((c) => ({
   blockLocalHttpCalls: c.env("BLOCK_LOCAL_HTTP_CALLS", environmentOneOrTrueSchema),

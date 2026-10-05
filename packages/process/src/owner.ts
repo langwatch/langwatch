@@ -7,6 +7,8 @@ import {
   isSaas,
   nlpCodeBlockTimeoutSeconds,
   nlpServiceUrl,
+  nodeEnvironment,
+  outboundProxy,
   publicBaseUrl,
 } from "@langwatch/config";
 import { nlpInternalSecret } from "@langwatch/secrets";
@@ -21,11 +23,10 @@ export const processOwner = {
      */
     onePasswordAccount: c.env("LANGWATCH_OP_ACCOUNT", z.string().optional()),
     /**
-     * The deployment's environment name. A process fact with ONE owner: the
-     * http owner derives `production` from it and modules read it as a member,
-     * so nothing else may declare `NODE_ENV`.
+     * The deployment's environment name: the shared leaf, so the http owner
+     * derives `production` from it and an owner holding it too is admitted.
      */
-    nodeEnvironment: c.env("NODE_ENV", z.string().optional()),
+    nodeEnvironment,
     /**
      * Whether this deployment is the hosted product. One owner for a fact five
      * modules read; the eventual signed-licence replacement is then one edit.
@@ -63,17 +64,10 @@ export const processOwner = {
      */
     baseHost: publicBaseUrl,
     /**
-     * The standard proxy spellings, keyed by env name: a process fact handed to
-     * every module whose outbound calls follow it, as the `outboundProxy` member.
+     * The standard proxy spellings: the shared group, handed to every module whose
+     * outbound calls follow it, as the `outboundProxy` member.
      */
-    outboundProxy: {
-      HTTPS_PROXY: c.env("HTTPS_PROXY", z.string().optional()),
-      https_proxy: c.env("https_proxy", z.string().optional()),
-      HTTP_PROXY: c.env("HTTP_PROXY", z.string().optional()),
-      http_proxy: c.env("http_proxy", z.string().optional()),
-      NO_PROXY: c.env("NO_PROXY", z.string().optional()),
-      no_proxy: c.env("no_proxy", z.string().optional()),
-    },
+    outboundProxy,
   })),
   secrets: {
     /**
