@@ -15,7 +15,7 @@ Feature: No committed screenshots check
   Background:
     Given the check judges only the image files a PR adds
     And renaming, moving, or deleting an existing image is not judged
-    And images are allowed under .github/readme, docs/images, docs/media, apps/ui/public, assets, specs, and sdks/python/examples
+    And images are allowed under .github/readme, docs/images, docs/media, apps/ui/public, assets, specs, sdks/python/examples, and tools/visualdiff/fixtures
 
   @unit
   Scenario: A PR that adds no images passes
@@ -31,6 +31,12 @@ Feature: No committed screenshots check
   Scenario: README cover art passes
     Given the PR adds an image under .github/readme
     Then the check passes
+
+  @unit
+  Scenario: A file a visualdiff flow uploads passes
+    Given the PR adds an image under tools/visualdiff/fixtures
+    Then the check passes
+    And an image elsewhere under tools/visualdiff still fails
 
   @unit
   Scenario: A screenshot committed to the app tree fails
