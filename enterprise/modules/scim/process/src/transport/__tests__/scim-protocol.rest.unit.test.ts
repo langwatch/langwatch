@@ -1,3 +1,4 @@
+import type { RestIdentity } from "@langwatch/api/hosting";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -27,7 +28,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { scimProtocolRest, scimRestCredential } from "../scim-protocol.rest.ts";
 import { ScimServiceFake, scimTestApp } from "./support/scim-app.fixture.ts";
-import type { RestIdentity } from "@langwatch/api/hosting";
 
 type PublishedSchema = Readonly<{
   type?: string;
@@ -35,6 +35,8 @@ type PublishedSchema = Readonly<{
   properties?: Record<string, PublishedSchema>;
 }>;
 type PublishedOperation = Readonly<{
+  operationId?: string;
+  security?: Record<string, string[]>[];
   parameters?: { name: string; in: string; schema: PublishedSchema }[];
   responses: Record<string, { content?: Record<string, { schema: PublishedSchema }> }>;
 }>;
@@ -192,6 +194,30 @@ describe("Feature: the published SCIM reference", () => {
 
     return Object.values(content)[0]?.schema ?? {};
   }
+
+  /** @scenario "Every SCIM route is documented in the API reference" */
+  it("publishes all fifteen routes with their own operation ids and the credential each takes", async () => {
+    const { paths } = await mount().document();
+    const declared = scimProtocolRest.router().routes;
+    const operations = declared.map((route) => ({
+      route,
+      published: paths[`/api/scim/v2${route.path.replace(/:(\w+)/g, "{$1}")}`]?.[route.method],
+    }));
+
+    expect(declared).toHaveLength(15);
+    expect(operations.filter(({ published }) => published === undefined)).toEqual([]);
+    for (const { route, published } of operations) {
+      expect(published?.operationId).toBe(route.operation);
+      expect(route.operation).toMatch(/^scim[A-Z][A-Za-z]+$/);
+      const credentials = (published?.security ?? []).flatMap((entry) => Object.keys(entry));
+      expect({ operation: route.operation, credentials }).toEqual({
+        operation: route.operation,
+        credentials: route.access?.kind === "public" ? [] : ["scim_bearer"],
+      });
+    }
+    const published = Object.entries(paths).filter(([path]) => path.startsWith("/api/scim/"));
+    expect(published.flatMap(([, methods]) => Object.keys(methods))).toHaveLength(15);
+  });
 
   /** @scenario "Paging and counts are published as integers" */
   it("publishes paging parameters and collection counts as integers", async () => {
@@ -667,6 +693,45 @@ describe("given the SCIM family behind the process's own error boundary", () => 
 
       await expectMainWire(await api.get("/api/scim/v2/Users", BEARER), 403, MAIN_WIRE.planLapsed);
     });
+
+    /** @scenario "A SCIM bearer token stops working when the plan lapses" */
+    it("answers a push of a user or a group with that document and provisions neither", async () => {
+      class UnentitledDirectory extends ScimServiceFake {
+        override readonly verifyToken = vi.fn(
+          async (_input: { token: string }): Promise<ScimTokenEntitlement> => ({
+            status: "plan_not_entitled",
+            organizationId: ORGANIZATION_ID,
+            connectionId: null,
+          }),
+        );
+      }
+      const api = mount({ scim: new UnentitledDirectory() });
+
+      await expectMainWire(
+        await api.post(
+          "/api/scim/v2/Users",
+          JSON.stringify({
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            userName: "ada@acme.test",
+          }),
+        ),
+        403,
+        MAIN_WIRE.planLapsed,
+      );
+      await expectMainWire(
+        await api.post(
+          "/api/scim/v2/Groups",
+          JSON.stringify({
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+            displayName: "Engineering",
+          }),
+        ),
+        403,
+        MAIN_WIRE.planLapsed,
+      );
+      expect(api.scim.createUser).not.toHaveBeenCalled();
+      expect(api.scim.createGroup).not.toHaveBeenCalled();
+    });
   });
 
   describe("when a directory pushes a body we cannot take", () => {
@@ -807,6 +872,33 @@ describe("given the SCIM family behind the process's own error boundary", () => 
   });
 
   describe("when discovery is read", () => {
+    /** @scenario "SCIM discovery endpoints declare an honest public policy" */
+    it("answers all three discovery routes without a credential, under a declared public policy", async () => {
+      const api = mount();
+      const discovery = scimProtocolRest
+        .router()
+        .routes.filter((route) => route.access?.kind === "public");
+
+      expect(discovery.map((route) => route.path)).toEqual([
+        "/ServiceProviderConfig",
+        "/ResourceTypes",
+        "/Schemas",
+      ]);
+      for (const route of discovery) {
+        const response = await api.get(`/api/scim/v2${route.path}`);
+
+        expect({ path: route.path, status: response.status }).toEqual({
+          path: route.path,
+          status: 200,
+        });
+        expect(route.access).toMatchObject({
+          kind: "public",
+          reason: expect.stringContaining("without a credential"),
+        });
+      }
+      expect(api.scim.verifyToken).not.toHaveBeenCalled();
+    });
+
     it("still answers plain JSON without a credential", async () => {
       const api = mount();
 

@@ -83,6 +83,7 @@ function mount(
 
 describe("given the SCIM tokens management family", () => {
   describe("when the organization's tokens are listed", () => {
+    /** @scenario Listing SCIM tokens never returns secrets */
     it("describes them without a value or a hash anywhere in the answer", async () => {
       const api = mount();
 
@@ -91,7 +92,12 @@ describe("given the SCIM tokens management family", () => {
 
       expect(response.status).toBe(200);
       expect(body.tokens).toEqual([
-        expect.objectContaining({ id: "scim_token_1", description: "Okta production" }),
+        expect.objectContaining({
+          id: "scim_token_1",
+          description: "Okta production",
+          createdAt: "2026-08-25T12:00:00.000Z",
+          lastUsedAt: null,
+        }),
       ]);
       expect(JSON.stringify(body)).not.toContain(MINTED);
       expect(JSON.stringify(body)).not.toMatch(/hash/i);
@@ -100,6 +106,7 @@ describe("given the SCIM tokens management family", () => {
   });
 
   describe("when a token is minted", () => {
+    /** @scenario Creating a SCIM token returns the secret exactly once */
     it("answers the value once, at 201, with the connection it reaches", async () => {
       const api = mount();
 
@@ -194,6 +201,7 @@ describe("given the SCIM tokens management family", () => {
   });
 
   describe("when a token is revoked", () => {
+    /** @scenario Revoking a SCIM token stops it verifying */
     it("revokes it in the caller's own organization and records the act", async () => {
       const api = mount();
 
@@ -210,6 +218,7 @@ describe("given the SCIM tokens management family", () => {
       ]);
     });
 
+    /** @scenario Revoking a SCIM token stops it verifying */
     it("answers 404 scim_token_not_found for an id that is unknown or already revoked", async () => {
       const scim = new TokenDirectoryFake();
       scim.revokeToken.mockRejectedValueOnce(new ScimTokenNotFoundError("scim_token_gone"));
