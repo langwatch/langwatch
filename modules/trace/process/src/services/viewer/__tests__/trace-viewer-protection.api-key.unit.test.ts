@@ -97,6 +97,7 @@ describe("TraceViewerProtectionService.resolveForApiKey", () => {
   });
 
   describe("when the key is refused cost:view", () => {
+    /** @scenario A key without the cost grant reads traces with costs redacted */
     it("answers the anonymous protections with costs hidden", async () => {
       const { service } = serviceWith(vi.fn<AuthzApi["can"]>(async () => false));
 

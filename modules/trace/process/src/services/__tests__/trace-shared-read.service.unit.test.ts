@@ -179,7 +179,10 @@ const ANONYMOUS = { token: "token-1", viewerUserId: null, clientIp: "10.0.0.1", 
 
 describe("TraceSharedReadService", () => {
   describe("when the link is opened too often", () => {
-    /** @scenario Opening a shared link too often is refused for a moment */
+    /**
+     * @scenario Opening a shared link too often is refused for a moment
+     * @scenario A share link read past its ceiling is refused with the code its copy is written for
+     */
     it("refuses once the token's window is spent, before the link is resolved", async () => {
       const { service, calls } = setup({ refuseKey: "sharedTrace:token:token-1" });
 
@@ -187,6 +190,20 @@ describe("TraceSharedReadService", () => {
         code: "share_read_rate_limited",
       });
       expect(calls.resolve).toHaveLength(0);
+    });
+
+    /** @scenario A share link read past its ceiling is refused with the code its copy is written for */
+    it("still answers a different token while one token's window is spent", async () => {
+      const { service, calls } = setup({ refuseKey: "sharedTrace:token:token-1" });
+
+      await expect(service.getSharedTrace(ANONYMOUS)).rejects.toMatchObject({
+        code: "share_read_rate_limited",
+      });
+      await expect(
+        service.getSharedTrace({ ...ANONYMOUS, token: "token-2", clientIp: null }),
+      ).resolves.toBeDefined();
+
+      expect(calls.resolve.map((input) => input.token)).toEqual(["token-2"]);
     });
 
     it("refuses once the caller's address window is spent", async () => {
