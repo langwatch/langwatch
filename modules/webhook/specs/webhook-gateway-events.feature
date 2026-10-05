@@ -27,6 +27,13 @@ Feature: Webhook delivers gateway's spend and governance facts from its own side
     And webhook_delivery holds one requested event per gateway event
 
   @unit
+  Scenario: A gateway fact appended twice under one idempotency key is delivered once
+    Given a memory-tier worker with one active HTTP endpoint
+    When each spend fact reaches webhook's subscribers twice, under distinct event ids and one idempotency key
+    Then the delivery log records one attempt for the endpoint
+    And webhook_delivery holds one requested event per fact, keyed by its idempotency key
+
+  @unit
   Scenario: The spend replay answers at main's path behind main's permission and plan gate
     Given webhook's replay route mounted with its plan gate
     When an organization whose plan lacks billing events posts a replay

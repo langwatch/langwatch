@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
- * Redelivery of gateway's facts to webhook's peer subscribers, on a memory-tier worker: the
- * same event handled twice yields one delivery and one requested event per event id.
+ * Redelivery of gateway's facts to webhook's peer subscribers, on a memory-tier worker: one
+ * fact handled twice, by event id or by idempotency key, yields one delivery and one request.
  * @see modules/webhook/specs/webhook-gateway-events.feature
  */
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
@@ -81,77 +81,117 @@ function worker(eventStore: EventStoreMemory) {
     });
 }
 
+type Arrival = { eventId: string; idempotencyKey?: string };
+
+/** Hands the admitted and confirmed steps to the subscribers once per arrival; returns the log. */
+async function deliverSpendSteps({
+  requestId,
+  admittedArrivals,
+  confirmedArrivals,
+}: {
+  requestId: string;
+  admittedArrivals: Arrival[];
+  confirmedArrivals: Arrival[];
+}) {
+  const eventStore = EventStoreMemory.createForTesting();
+  const runtime = await worker(eventStore).boot();
+
+  try {
+    await runtime.start();
+    const webhooks = runtime.service(WebhookApi);
+    const { endpoint } = await webhooks.create({
+      organizationId: ORGANIZATION_ID,
+      url: "https://10.0.0.1/hooks/spend",
+      enabledEvents: ["gateway.request.completed"],
+      maxBatchDelayMs: 0,
+    });
+    const { admitted, confirmed } = spendSteps({
+      organizationId: ORGANIZATION_ID,
+      projectId: PROJECT_ID,
+      requestId,
+      admittedAt: Date.now(),
+    });
+    if (
+      admitted.spend.type !== GATEWAY_SPEND_ADMITTED_EVENT_TYPE ||
+      confirmed.spend.type !== GATEWAY_SPEND_CONFIRMED_EVENT_TYPE
+    ) {
+      throw new Error("the fixture's steps changed type");
+    }
+    const subscribers = webhookGatewayEventSubscribers((request) =>
+      webhooks.requestGatewayEventDelivery(request),
+    );
+    const context = (arrival: Arrival) => ({
+      tenantId: PROJECT_ID,
+      aggregateId: requestId,
+      occurredAt: Date.now(),
+      ...arrival,
+    });
+
+    for (let index = 0; index < admittedArrivals.length; index++) {
+      const admittedArrival = admittedArrivals[index];
+      const confirmedArrival = confirmedArrivals[index];
+      if (!admittedArrival || !confirmedArrival) throw new Error("arrivals must pair up");
+      await subscribers.gatewaySpendAdmittedDelivery.handle(
+        admitted.spend.data,
+        context(admittedArrival),
+      );
+      await subscribers.gatewaySpendConfirmedDelivery.handle(
+        confirmed.spend.data,
+        context(confirmedArrival),
+      );
+    }
+
+    await vi.waitFor(
+      async () => {
+        const log = await webhooks.getDeliveries({
+          organizationId: ORGANIZATION_ID,
+          endpointId: endpoint.id,
+        });
+        expect(log.deliveries).toHaveLength(1);
+      },
+      { timeout: 8_000, interval: 100 },
+    );
+    const requested = await eventStore.getEvents({
+      aggregateId: requestId,
+      aggregateType: WEBHOOK_SPEND_DELIVERY_AGGREGATE_TYPE,
+      context: { tenantId: createTenantId(PROJECT_ID) },
+    });
+    return requested.map((event) => event.idempotencyKey);
+  } finally {
+    await runtime.stop();
+  }
+}
+
 describe("given a memory-tier worker with one active HTTP endpoint and webhook's gateway subscribers", () => {
   describe("when a request's admitted and confirmed spend events each reach the subscribers twice", () => {
     /** @scenario "A redelivered gateway spend event is delivered once" */
     it("records one delivery attempt and one requested event per gateway event", async () => {
-      const eventStore = EventStoreMemory.createForTesting();
-      const runtime = await worker(eventStore).boot();
+      const keys = await deliverSpendSteps({
+        requestId: "gateway-request-redelivered",
+        admittedArrivals: [{ eventId: "evt-admitted" }, { eventId: "evt-admitted" }],
+        confirmedArrivals: [{ eventId: "evt-confirmed" }, { eventId: "evt-confirmed" }],
+      });
 
-      try {
-        await runtime.start();
-        const webhooks = runtime.service(WebhookApi);
-        const { endpoint } = await webhooks.create({
-          organizationId: ORGANIZATION_ID,
-          url: "https://10.0.0.1/hooks/spend",
-          enabledEvents: ["gateway.request.completed"],
-          maxBatchDelayMs: 0,
-        });
-        const { admitted, confirmed } = spendSteps({
-          organizationId: ORGANIZATION_ID,
-          projectId: PROJECT_ID,
-          requestId: "gateway-request-redelivered",
-          admittedAt: Date.now(),
-        });
-        if (
-          admitted.spend.type !== GATEWAY_SPEND_ADMITTED_EVENT_TYPE ||
-          confirmed.spend.type !== GATEWAY_SPEND_CONFIRMED_EVENT_TYPE
-        ) {
-          throw new Error("the fixture's steps changed type");
-        }
-        const subscribers = webhookGatewayEventSubscribers((request) =>
-          webhooks.requestGatewayEventDelivery(request),
-        );
-        const context = (eventId: string) => ({
-          tenantId: PROJECT_ID,
-          aggregateId: "gateway-request-redelivered",
-          occurredAt: Date.now(),
-          eventId,
-        });
+      expect(keys).toEqual(["evt-admitted", "evt-confirmed"]);
+    }, 15_000);
+  });
 
-        for (let delivery = 0; delivery < 2; delivery++) {
-          await subscribers.gatewaySpendAdmittedDelivery.handle(
-            admitted.spend.data,
-            context("evt-admitted"),
-          );
-          await subscribers.gatewaySpendConfirmedDelivery.handle(
-            confirmed.spend.data,
-            context("evt-confirmed"),
-          );
-        }
+  describe("when each spend fact is appended twice under one idempotency key", () => {
+    /** @scenario "A gateway fact appended twice under one idempotency key is delivered once" */
+    it("records one delivery attempt and one requested event per fact, keyed by its idempotency key", async () => {
+      const keys = await deliverSpendSteps({
+        requestId: "gateway-request-reappended",
+        admittedArrivals: [
+          { eventId: "evt-admitted-1", idempotencyKey: "fact-admitted" },
+          { eventId: "evt-admitted-2", idempotencyKey: "fact-admitted" },
+        ],
+        confirmedArrivals: [
+          { eventId: "evt-confirmed-1", idempotencyKey: "fact-confirmed" },
+          { eventId: "evt-confirmed-2", idempotencyKey: "fact-confirmed" },
+        ],
+      });
 
-        await vi.waitFor(
-          async () => {
-            const log = await webhooks.getDeliveries({
-              organizationId: ORGANIZATION_ID,
-              endpointId: endpoint.id,
-            });
-            expect(log.deliveries).toHaveLength(1);
-          },
-          { timeout: 8_000, interval: 100 },
-        );
-        const requested = await eventStore.getEvents({
-          aggregateId: "gateway-request-redelivered",
-          aggregateType: WEBHOOK_SPEND_DELIVERY_AGGREGATE_TYPE,
-          context: { tenantId: createTenantId(PROJECT_ID) },
-        });
-        expect(requested.map((event) => event.idempotencyKey)).toEqual([
-          "evt-admitted",
-          "evt-confirmed",
-        ]);
-      } finally {
-        await runtime.stop();
-      }
+      expect(keys).toEqual(["fact-admitted", "fact-confirmed"]);
     }, 15_000);
   });
 });

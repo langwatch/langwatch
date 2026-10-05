@@ -1,4 +1,4 @@
-import type { PeerSubscriberDefinition } from "@langwatch/eventing";
+import type { PeerSubscriberContext, PeerSubscriberDefinition } from "@langwatch/eventing";
 import {
   GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
@@ -36,10 +36,15 @@ export type WebhookGatewayEventSubscribers = Readonly<{
   gatewayVkLifecycleDelivery: PeerSubscriberDefinition<typeof recordVkLifecycleCommandDataSchema>;
 }>;
 
+/** A fact's delivery identity: its idempotency key when it has one, as gateway's lanes keyed it. */
+function sourceEventId({ idempotencyKey, eventId }: PeerSubscriberContext): string {
+  return idempotencyKey ?? eventId;
+}
+
 /**
  * Webhook's peer subscribers on gateway's spend and governance facts (record §5, §9): each
- * committed event is queued for delivery under its own event id, so a redelivered event
- * collapses on webhook_delivery's idempotency key and delivers once.
+ * committed fact is queued for delivery under its source id, so a redelivered or re-appended
+ * fact collapses on webhook_delivery's idempotency key and delivers once.
  */
 export function webhookGatewayEventSubscribers(
   deliver: WebhookGatewayEventDelivery,
@@ -48,51 +53,54 @@ export function webhookGatewayEventSubscribers(
     gatewaySpendAdmittedDelivery: {
       eventType: GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
       data: gatewaySpendAdmittedEventDataSchema,
-      handle: (data, { eventId }) =>
+      handle: (data, context) =>
         deliver({
-          sourceEventId: eventId,
+          sourceEventId: sourceEventId(context),
           spend: { type: GATEWAY_SPEND_ADMITTED_EVENT_TYPE, data },
         }),
     },
     gatewaySpendConfirmedDelivery: {
       eventType: GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
       data: gatewaySpendConfirmedEventDataSchema,
-      handle: (data, { eventId }) =>
+      handle: (data, context) =>
         deliver({
-          sourceEventId: eventId,
+          sourceEventId: sourceEventId(context),
           spend: { type: GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, data },
         }),
     },
     gatewaySpendFailedDelivery: {
       eventType: GATEWAY_SPEND_FAILED_EVENT_TYPE,
       data: gatewaySpendFailedEventDataSchema,
-      handle: (data, { eventId }) =>
-        deliver({ sourceEventId: eventId, spend: { type: GATEWAY_SPEND_FAILED_EVENT_TYPE, data } }),
+      handle: (data, context) =>
+        deliver({
+          sourceEventId: sourceEventId(context),
+          spend: { type: GATEWAY_SPEND_FAILED_EVENT_TYPE, data },
+        }),
     },
     gatewaySpendSettledDelivery: {
       eventType: GATEWAY_SPEND_SETTLED_EVENT_TYPE,
       data: gatewaySpendSettledEventDataSchema,
-      handle: (data, { eventId }) =>
+      handle: (data, context) =>
         deliver({
-          sourceEventId: eventId,
+          sourceEventId: sourceEventId(context),
           spend: { type: GATEWAY_SPEND_SETTLED_EVENT_TYPE, data },
         }),
     },
     gatewayBudgetCrossingDelivery: {
       eventType: GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
       data: recordBudgetCrossingCommandDataSchema,
-      handle: (data, { eventId }) =>
+      handle: (data, context) =>
         deliver({
-          sourceEventId: eventId,
+          sourceEventId: sourceEventId(context),
           governance: { type: GATEWAY_BUDGET_CROSSING_EVENT_TYPE, data },
         }),
     },
     gatewayVkLifecycleDelivery: {
       eventType: GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
       data: recordVkLifecycleCommandDataSchema,
-      handle: (data, { eventId }) =>
+      handle: (data, context) =>
         deliver({
-          sourceEventId: eventId,
+          sourceEventId: sourceEventId(context),
           governance: { type: GATEWAY_VK_LIFECYCLE_EVENT_TYPE, data },
         }),
     },

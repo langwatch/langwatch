@@ -31,3 +31,10 @@ Feature: A module reacts to a peer pipeline's events from its own side
     When its lane registers on the global registry
     Then the lane carries those options
     And the handler is handed the event's occurredAt beside its tenant and aggregate
+
+  @unit
+  Scenario: A peer subscriber is handed the event's idempotency key beside its id
+    Given a module declares a peer subscriber
+    When the owner's pipeline appends one fact twice under one idempotency key
+    Then the subscriber is handed both appends, each with its own event id and the shared key
+    And an event without an idempotency key reaches the handler with none

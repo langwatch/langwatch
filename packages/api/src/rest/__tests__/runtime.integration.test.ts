@@ -572,6 +572,23 @@ describe("a family the declaration marked superseded", () => {
     });
   });
 
+  it("reports the first call to a runtime with a log, once per process, whatever ran before", async () => {
+    const first = vi.fn();
+    const second = vi.fn();
+
+    await legacyReportsApp().app.request("/api/legacy-reports/health");
+    const logged = legacyReportsApp({ deprecatedRouteCalled: first }).app;
+    await logged.request("/api/legacy-reports/health");
+    await logged.request("/api/legacy-reports/health");
+    await legacyReportsApp({ deprecatedRouteCalled: second }).app.request(
+      "/api/legacy-reports/health",
+    );
+
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(first).toHaveBeenCalledWith(expect.objectContaining({ operation: "readLegacyHealth" }));
+    expect(second).not.toHaveBeenCalled();
+  });
+
   /** @scenario "Deprecation reaches the document and the wire" */
   it("marks the documented mount of the operation deprecated, with the notice", async () => {
     const published = await generateSpecs(legacyReportsApp().app, SPEC_OPTIONS);

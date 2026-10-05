@@ -158,6 +158,37 @@ describe("a peer subscriber", () => {
     });
   });
 
+  describe("given the owner appends one fact twice under one idempotency key", () => {
+    /** @scenario "A peer subscriber is handed the event's idempotency key beside its id" */
+    it("delivers both appends, each with its own event id and the shared idempotency key", async () => {
+      const contexts: PeerSubscriberContext[] = [];
+      const eventSourcing = runtime();
+      const owner = eventSourcing.register(ownerPipeline());
+      eventSourcing.register(
+        definePipeline({ name: "reactor", aggregate: defineAggregate({ type: "global" }) })
+          .withEvents([])
+          .withPeerSubscriber("onOwnerCreated", {
+            eventType: OWNER_CREATED,
+            data: ownerCreatedData,
+            handle: async (_data, context) => void contexts.push(context),
+          })
+          .build(),
+      );
+      const tenant = { tenantId: createTenantId("project-1") };
+      const fact = { ...created("owner-4"), idempotencyKey: "fact-owner-4" };
+
+      await owner.service.storeEvents([{ ...fact, id: "event-owner-4-a" }], tenant);
+      await owner.service.storeEvents([{ ...fact, id: "event-owner-4-b" }], tenant);
+
+      await vi.waitFor(() => expect(contexts).toHaveLength(2));
+      expect(contexts.map(({ eventId, idempotencyKey }) => ({ eventId, idempotencyKey }))).toEqual([
+        { eventId: "event-owner-4-a", idempotencyKey: "fact-owner-4" },
+        { eventId: "event-owner-4-b", idempotencyKey: "fact-owner-4" },
+      ]);
+      await eventSourcing.close();
+    });
+  });
+
   describe("given a peer subscriber declares enqueue options", () => {
     /** @scenario "A peer subscriber carries its enqueue options and the event's instant" */
     it("registers the options on its lane and hands the handler the event's occurredAt and eventId", async () => {
@@ -199,6 +230,7 @@ describe("a peer subscriber", () => {
           eventId: "event-owner-3",
         },
       );
+      expect(handle.mock.calls[0]?.[1]).not.toHaveProperty("idempotencyKey");
     });
   });
 });

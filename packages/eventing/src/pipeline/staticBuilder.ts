@@ -165,7 +165,7 @@ export class PipelineBuilder<
   /**
    * This module's subscriber on a peer pipeline's event (§9), on the global registry, staged
    * wherever either registers. Lane `<this pipeline>.<name>`, with its declared delay, dedup and
-   * group; the handler gets the contract-parsed data and the event's instant.
+   * group; the handler gets the contract-parsed data, the event's instant, id and idempotency key.
    */
   withPeerSubscriber<Data extends z.ZodType>(
     name: string,
@@ -186,6 +186,7 @@ export class PipelineBuilder<
               ...context,
               occurredAt: event.occurredAt,
               eventId: event.id,
+              ...(event.idempotencyKey && { idempotencyKey: event.idempotencyKey }),
             }),
           options: subscriber.options,
         }),

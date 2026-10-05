@@ -673,7 +673,10 @@ function rawBodyMiddleware(rawBody: RestRawBody): MiddlewareHandler {
 
 const TEXT = new TextDecoder();
 
-/** Every deprecated route is reported once per process, on its first call. */
+/**
+ * Every deprecated route is reported once per process, on its first call to a runtime that has
+ * a log: a runtime without one does not mark the route, so it cannot swallow the report.
+ */
 const reportedDeprecations = new Set<string>();
 
 function deprecationLog<Api>({
@@ -690,10 +693,10 @@ function deprecationLog<Api>({
   const key = `${family} ${route.operation}`;
 
   return async (context, next) => {
-    if (!reportedDeprecations.has(key)) {
+    if (ports.deprecationLog && !reportedDeprecations.has(key)) {
       reportedDeprecations.add(key);
 
-      ports.deprecationLog?.deprecatedRouteCalled({
+      ports.deprecationLog.deprecatedRouteCalled({
         family,
         operation: route.operation,
         successor: deprecated.successor,

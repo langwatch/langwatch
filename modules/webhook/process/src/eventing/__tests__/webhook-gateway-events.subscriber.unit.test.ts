@@ -79,4 +79,17 @@ describe("webhook's peer subscribers on gateway's events", () => {
       ]);
     });
   });
+
+  describe("when a budget crossing carrying an idempotency key reaches its subscriber", () => {
+    it("names the delivery by the idempotency key, as gateway's lanes did", async () => {
+      const { requests, subscribers } = recording();
+
+      await subscribers.gatewayBudgetCrossingDelivery.handle(crossing, {
+        ...context("evt-crossing-2"),
+        idempotencyKey: "crossing-fact",
+      });
+
+      expect(requests.map((request) => request.sourceEventId)).toEqual(["crossing-fact"]);
+    });
+  });
 });
