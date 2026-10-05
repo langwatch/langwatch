@@ -204,6 +204,11 @@ function defaultFault(httpStatus: number): HandledErrorFault {
   return httpStatus >= 500 ? "presumed_platform" : "customer";
 }
 
+/** A relayed envelope with no fault is presumed ours only where a 5xx status is known. */
+function relayedFault(httpStatus: number | undefined): HandledErrorFault {
+  return httpStatus === undefined ? "customer" : defaultFault(httpStatus);
+}
+
 export type HandledError = HandledErrorRuntime;
 export const HandledError: typeof HandledErrorRuntime = handledErrorConstructor();
 
@@ -224,7 +229,7 @@ export function handledErrorFromHerr(
       super(code, body.message, {
         meta: body.meta,
         httpStatus: options.httpStatus,
-        fault: body.fault,
+        fault: body.fault ?? relayedFault(options.httpStatus),
         retryable: body.retryable,
         tips: body.tips,
         docsUrl: body.docs_url,

@@ -349,6 +349,39 @@ describe("HandledError fault default", () => {
     expect(relayed.fault).toBe("presumed_platform");
   });
 
+  it("keeps a herr envelope relayed with no fault and no status the customer's", () => {
+    const relayed = handledErrorFromHerr({ type: "agent_error", message: "agent failed" });
+
+    expect(relayed.httpStatus).toBe(500);
+    expect(relayed.fault).toBe("customer");
+  });
+
+  it("keeps a herr envelope relayed below 5xx with no fault the customer's", () => {
+    const relayed = handledErrorFromHerr(
+      { type: "bad_input", message: "bad input" },
+      { httpStatus: 422 },
+    );
+
+    expect(relayed.fault).toBe("customer");
+  });
+
+  it("gives each nested reason with no fault and no status of its own the customer's fault", () => {
+    const relayed = handledErrorFromHerr(
+      {
+        type: "upstream_unavailable",
+        message: "upstream timed out",
+        reasons: [
+          { type: "rate_limited", message: "rate limited" },
+          { type: "provider_down", message: "provider down", fault: "provider" },
+        ],
+      },
+      { httpStatus: 503 },
+    );
+
+    expect(relayed.fault).toBe("presumed_platform");
+    expect(relayed.serialize().reasons.map((r) => r.fault)).toEqual(["customer", "provider"]);
+  });
+
   /** @scenario "A presumed platform fault goes on the wire as itself" */
   it("serializes presumed_platform as itself, and the wire schema reads it back", () => {
     const serialized = new TestError("x", { httpStatus: 503 }).serialize();
