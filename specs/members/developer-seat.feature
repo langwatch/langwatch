@@ -54,6 +54,70 @@ Feature: Developer seat
     Then the seat choice is no longer shown
     And saving sends no joiner seat at all, so whatever seat is in force stays in force
 
+  # ── Arrivals from the terminal ─────────────────────────────────────────
+  #
+  # `langwatch login` opens the browser on the device-approval page, which
+  # sends a brand-new account through sign-up and on to the welcome screen
+  # with the terminal's continuation in hand. A developer who arrives that
+  # way wants their own project and the CLI pointed at it, and nothing
+  # shared. So a join request made on that path carries its origin, and the
+  # seat it lands in is decided by the origin rather than by the
+  # organisation's joiner seat: a Developer, on approval and on an automatic
+  # door alike. Approval stays one click and still carries no role choice
+  # (specs/identity/join-requests.feature); raising a Developer to Full is
+  # the separate act it already is on the members page. A request made on
+  # the web is untouched. The origin can only ever LOWER the seat, so the
+  # browser may assert it: a client that lies about it gets less, never more.
+  #
+  # Boundaries, named so nobody reads these as wider than they are:
+  # - The sign-up that finishes through the emailed confirmation link opens a
+  #   NEW tab. The continuation only survives because the link carries it
+  #   (scenario below); without that the person lands on the ordinary join
+  #   page and the request is a web one.
+  # - A person whose single sign-on connection queued them already holds a
+  #   request the sign-in made, which carries no terminal origin. A later
+  #   terminal arrival cannot open a second one, so they land the joiner seat.
+  # - On an installation where accounts are created by invitation only, the
+  #   invitation screen runs before the welcome screen and nothing here is
+  #   reached.
+
+  Scenario: A request made from the terminal lands as a Developer when approved
+    Given the organisation accepts requests to join from its domain
+    And the organisation's joiner seat is "Full"
+    When a person signs up from "langwatch login" with a matching company email, reaches the welcome screen and asks to join
+    And an administrator approves the request with one click
+    Then they are admitted as a Developer
+    And they hold access to their personal team only
+    And the admission is recorded as a Developer seat granted to a request from the terminal
+
+  Scenario: A request made from the terminal walks in as a Developer where the door is automatic
+    Given the organisation admits verified colleagues on its domain automatically
+    And the organisation's joiner seat is "Full"
+    When a person signs up from "langwatch login" with a matching company email and reaches the welcome screen
+    Then they are admitted as a Developer without anybody approving
+    And they hold access to their personal team only
+    And the seat was decided from the request in hand, not read back from a row that may not exist yet
+
+  Scenario: The emailed confirmation link brings the terminal's continuation along
+    Given a person started sign-up from "langwatch login" and asked for the confirmation email
+    When they open the link in a fresh tab
+    Then the tab carries on to the device-approval page the terminal is waiting on
+    And a continuation that is not a path on this site is dropped rather than followed
+
+  Scenario: A request made on the web keeps the organisation's joiner seat
+    Given the organisation accepts requests to join from its domain
+    And the organisation's joiner seat is "Full"
+    When a person signs up on the web with a matching company email and asks to join
+    And an administrator approves the request with one click
+    Then they are admitted as a Full member
+
+  Scenario: The pending list shows the seat each request will land as
+    Given one request made from the terminal and one made on the web are waiting
+    And the organisation's joiner seat is "Full"
+    When an administrator opens the pending requests
+    Then the request from the terminal is marked "Developer" and the one from the web "Member"
+    And neither mark can be changed there, because approval carries no role choice
+
   # ============================================================================
   # What a Developer can and cannot reach
   # ============================================================================

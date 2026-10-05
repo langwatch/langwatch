@@ -68,6 +68,59 @@ Feature: Join before create - the choice happens before an organization is minte
     Then nothing is looked up and nothing is offered
     And no organization name has been sent to the browser
 
+  # ── An invitation that was already waiting ─────────────────────────────
+  #
+  # An administrator who invited somebody has already decided the seat and
+  # the teams. Until now that decision only reached the person through the
+  # link in the mail: somebody who signed up from the sign-in screen, or from
+  # `langwatch login`, never saw it, asked to join instead, and the admin
+  # answered a question they had already answered. The welcome screen now
+  # looks for a pending invitation on the account's VERIFIED addresses and
+  # leads with it. Accepting runs the invitation's own acceptance, so the
+  # seat is the one the invitation names and the open request, if any, is
+  # withdrawn the way it always was.
+  #
+  # Only on the welcome screen, which has no organization in view. The same
+  # takeover sits on every dashboard, and an invitation offer or an automatic
+  # admission there would cover a page somebody is working on, or quietly add
+  # a member of one organization to another. Only VERIFIED addresses count,
+  # with no fall-back to the session address: the invitation code is the
+  # secret from the mail, and it is handed over only to somebody who has
+  # proved they hold the address it was sent to. On an installation where
+  # accounts are created by invitation only, the invitation screen already
+  # runs before the welcome screen (specs/auth/sign-up-restriction.feature),
+  # and nothing here is reached.
+
+  @integration
+  Scenario: A pending invitation is offered before asking to join
+    Given "ana" invited "sam@acme.com" to "acme" as a Developer
+    And "acme" is also open to requests from "acme.com"
+    When "sam" completes verification and reaches the welcome screen
+    Then accepting the invitation to "acme" is the leading action, naming the seat
+    And asking to join is not offered beside it
+
+  @integration
+  Scenario: Accepting the invitation from the welcome screen lands the invited seat
+    Given "ana" invited "sam@acme.com" to "acme" as a Developer
+    When "sam" accepts it from the welcome screen
+    Then the invitation's own acceptance runs, so "sam" is a Developer in "acme"
+    And the screen stays where it is and lets the welcome redirect carry on, the terminal's continuation included
+
+  @integration
+  Scenario: An invitation is only offered to somebody who proved the address
+    Given "ana" invited "sam@acme.com" to "acme"
+    And "sam" signed in with an account whose "sam@acme.com" address is not verified
+    When "sam" reaches the welcome screen
+    Then no invitation is offered
+
+  @integration
+  Scenario: The welcome screen honours an automatic door
+    Given "acme" admits verified colleagues on "acme.com" automatically
+    When "sam" signs up from "langwatch login" and reaches the welcome screen
+    Then "sam" is admitted to "acme" without being offered anything
+    And the request records that it was made from the terminal
+    And a dashboard that already has an organization in view admits nobody
+
   # ── The invariant ──────────────────────────────────────────────────────
 
   @integration
