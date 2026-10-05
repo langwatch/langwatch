@@ -11,7 +11,11 @@ import { MemoryGatewayProviderLabelRepository } from "../memory.gateway-provider
 import { MemoryGatewaySpendScopeRepository } from "../memory.gateway-spend-scope.repository.ts";
 import { MemoryGatewayTransactionRepository } from "../memory.gateway-transaction.repository.ts";
 import { MemoryVirtualKeyDirectBudgetRepository } from "../memory.gateway-virtual-key-direct-budget.repository.ts";
-import { MemoryGatewayStore, memoryGatewayDecimal } from "../memory.gateway.store.ts";
+import {
+  MemoryGatewayStore,
+  memoryGatewayDecimal,
+  memoryGatewayModelProvider,
+} from "../memory.gateway.store.ts";
 
 const ORG = "org_1";
 const KEY = "vk_1";
@@ -207,8 +211,18 @@ describe("memory gateway repositories", () => {
   it("labels a provider by its name, falling back to its provider", async () => {
     const store = MemoryGatewayStore.create({
       modelProviders: [
-        { id: "mp_1", name: "Team OpenAI", provider: "openai" },
-        { id: "mp_2", name: "", provider: "anthropic" },
+        memoryGatewayModelProvider({
+          id: "mp_1",
+          name: "Team OpenAI",
+          provider: "openai",
+          organizationId: ORG,
+        }),
+        memoryGatewayModelProvider({
+          id: "mp_2",
+          name: "",
+          provider: "anthropic",
+          organizationId: ORG,
+        }),
       ],
     });
 

@@ -1,12 +1,14 @@
 import {
   bucketScopeIdFor,
   computeBudgetPeriodFloorMs,
-  type GatewayBudgetResource,
   PROVIDER_BUCKET_SEPARATOR,
 } from "@langwatch/gateway-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type { BudgetSpendTarget } from "../repositories/gateway-budget-spend.repository.ts";
+import type {
+  BudgetSpendTarget,
+  GatewayBudgetSpendRecord,
+} from "../repositories/gateway-budget-spend.repository.ts";
 
 /**
  * Read targets for a plain list of budgets, no request context (a GROUP
@@ -17,7 +19,7 @@ export function budgetSpendTargetsFor({
   budgets,
   now = nowInstant(),
 }: {
-  budgets: GatewayBudgetResource[];
+  budgets: readonly GatewayBudgetSpendRecord[];
   now?: Instant;
 }): BudgetSpendTarget[] {
   return budgets.map((b) =>
