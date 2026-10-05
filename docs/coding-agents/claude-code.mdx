@@ -100,11 +100,13 @@ The setup that `langwatch claude` and `langwatch instrument claude` write turns 
 | `OTEL_LOG_TOOL_DETAILS` | What each tool call was asked to do, such as the command text or the change to a file |
 | `OTEL_LOG_TOOL_CONTENT` | What each tool call returned, including the contents of files it read |
 | `OTEL_LOG_ASSISTANT_RESPONSES` | The assistant's response text, on a light event of its own |
-| `OTEL_LOG_RAW_API_BODIES` | The full request and response JSON of every model call — opt-in, for debugging |
+| `OTEL_LOG_RAW_API_BODIES` | The full request and response JSON of every model call. Opt-in, for debugging |
 
 Remove the flags from `~/.claude/settings.json` to keep only the usage numbers: tokens, cost, model, latency, the tool call tree and the subagent tree stay, and the content stops.
 
-`langwatch claude` and `langwatch instrument claude` set `OTEL_LOG_ASSISTANT_RESPONSES`, the light event added in Claude Code 2.1.193 that carries just the assistant's reply text. They do **not** set `OTEL_LOG_RAW_API_BODIES`: that flag makes Claude Code serialise the entire request (the whole conversation) and the whole response to JSON on every model call, which is avoidable work that grows with the session, and the light event already gives LangWatch the response text. Add `OTEL_LOG_RAW_API_BODIES=1` yourself if you need the full request and response body for debugging; LangWatch still reads it when present.
+`langwatch claude` and `langwatch instrument claude` set `OTEL_LOG_ASSISTANT_RESPONSES`, the light event added in Claude Code 2.1.193 that carries just the assistant's reply text. They do **not** set `OTEL_LOG_RAW_API_BODIES`: that flag makes Claude Code serialise the entire request (the whole conversation) and the whole response to JSON on every model call, which is avoidable work that grows with the session, and the light event already gives LangWatch the response text.
+
+Add `OTEL_LOG_RAW_API_BODIES=1` yourself if you need the full request and response body for debugging; LangWatch still reads it when present.
 
 Claude Code shortens each inline body at 60 kilobytes. `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises that limit. Claude Code always removes extended thinking from the bodies, so LangWatch never receives it.
 
@@ -141,7 +143,9 @@ A bare `claude-*` model name routes to your Anthropic credential. Write `provide
   </Accordion>
 
   <Accordion title="The trace has no response">
-    Response text is off. `langwatch claude` and `langwatch instrument claude` set `OTEL_LOG_ASSISTANT_RESPONSES=1` for you, so this only happens on a hand-written configuration or a session that was open before you re-ran the wrapper (restart Claude Code so it re-reads `~/.claude/settings.json`). Claude Code reports the assistant's response text on its lighter `assistant_response` event (needs `OTEL_LOG_ASSISTANT_RESPONSES=1`, and carries only the response text) or, if you opt in, on its `api_response_body` event (needs `OTEL_LOG_RAW_API_BODIES=1`, and carries the response JSON; the request JSON arrives on the separate `api_request_body` event). Set `OTEL_LOG_ASSISTANT_RESPONSES=1` for just the response text.
+    Response text is off. `langwatch claude` and `langwatch instrument claude` set `OTEL_LOG_ASSISTANT_RESPONSES=1` for you, so this only happens on a hand-written configuration or a session that was open before you re-ran the wrapper (restart Claude Code so it re-reads `~/.claude/settings.json`).
+
+    Claude Code reports the assistant's response text on its lighter `assistant_response` event (needs `OTEL_LOG_ASSISTANT_RESPONSES=1`, and carries only the response text) or, if you opt in, on its `api_response_body` event (needs `OTEL_LOG_RAW_API_BODIES=1`, and carries the response JSON; the request JSON arrives on the separate `api_request_body` event). Set `OTEL_LOG_ASSISTANT_RESPONSES=1` for just the response text.
 
     When `OTEL_LOG_ASSISTANT_RESPONSES` is unset, Claude Code falls back to the value of `OTEL_LOG_USER_PROMPTS`, so prompt logging alone can still emit the response text. The response is redacted when the flag is set to `0`, or when it is unset and prompt logging is off. Don't rely on the fallback: set it explicitly.
 
