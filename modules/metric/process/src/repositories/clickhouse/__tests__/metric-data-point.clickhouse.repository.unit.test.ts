@@ -238,7 +238,7 @@ describe("MetricDataPointClickHouseRepository", () => {
     ]);
     expect(projectResolver).not.toHaveBeenCalled();
     expect(organizationResolver).toHaveBeenCalledWith("organization-1");
-    expect(queryCalls[0]).toContain("GROUP BY PointId");
+    expect(queryCalls[0]).toContain("GROUP BY u.PointId");
     expect(queryCalls[0]).toContain("OrganizationId = {organizationId:String}");
     expect(queryCalls[0]).not.toContain("TenantId = {tenantId:String}");
   });
