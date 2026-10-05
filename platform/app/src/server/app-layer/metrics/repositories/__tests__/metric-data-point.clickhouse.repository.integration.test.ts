@@ -144,10 +144,12 @@ afterAll(async () => {
       "metric_data_points",
       "metric_usage_estimates",
       "metric_time_rollups",
+      "metric_series",
     ]) {
+      // Every tenant this suite writes to is named after the run's tag.
       await ch.exec({
-        query: `ALTER TABLE ${table} DELETE WHERE TenantId = {tenantId:String}`,
-        query_params: { tenantId },
+        query: `ALTER TABLE ${table} DELETE WHERE startsWith(TenantId, {tag:String})`,
+        query_params: { tag },
       });
     }
   }
@@ -582,5 +584,121 @@ describe("given one chunk carrying two series staggered in time", () => {
         folded.reduce((total, row) => total + row.sourcePointCount, 0),
       ).toBe(values.length);
     }
+  });
+});
+
+describe("given points ensured for the tenant's organization", () => {
+  describe("when one of an organization's points is accepted a second time", () => {
+    const dedupTenantId = `${tag}-dedup-project`;
+    const dedupOrganizationId = `${tag}-dedup-org`;
+    const DAY_MS = 24 * 60 * 60_000;
+    const ledgerPoint = (timeUnixMs: number, accepted = acceptedAt) =>
+      point({
+        tenantId: dedupTenantId,
+        organizationId: dedupOrganizationId,
+        seriesId: "8".repeat(64),
+        timeUnixMs,
+        valueDouble: 1,
+        acceptedAt: accepted,
+      });
+
+    beforeAll(async () => {
+      await repo.ensureDataPoints({
+        points: [ledgerPoint(bucket0 + 1_000), ledgerPoint(bucket0 + 2_000)],
+      });
+      // The same PointId accepted again in a later monthly partition, where
+      // the engine cannot collapse the two rows: only the query dedups them.
+      await repo.ensureDataPoints({
+        points: [ledgerPoint(bucket0 + 1_000, acceptedAt + 32 * DAY_MS)],
+      });
+    }, 30_000);
+
+    it("counts that point once", async () => {
+      const estimates = await repo.queryUsageEstimates({
+        organizationId: dedupOrganizationId,
+        tenantId: dedupTenantId,
+        from: new Date(acceptedAt - 60 * 60_000),
+        to: new Date(acceptedAt + 33 * DAY_MS),
+        groupBy: "organization",
+      });
+
+      expect(estimates).toHaveLength(1);
+      expect(estimates[0]).toMatchObject({
+        organizationId: dedupOrganizationId,
+        acceptedPoints: 2,
+        canonicalRetainedBytes: 4,
+        uniqueActiveSeries: 1,
+      });
+    });
+  });
+
+  describe("when usage estimates are read for a window holding them", () => {
+    it("counts each accepted point once for the organization", async () => {
+      const estimates = await repo.queryUsageEstimates({
+        organizationId,
+        tenantId,
+        from: new Date(acceptedAt - 60 * 60_000),
+        to: new Date(acceptedAt + 60 * 60_000),
+        groupBy: "organization",
+      });
+
+      expect(estimates).toHaveLength(1);
+      expect(estimates[0]?.organizationId).toBe(organizationId);
+      expect(estimates[0]?.acceptedPoints).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when series totals are read by a point attribute one series carries", () => {
+    const labelledSeriesId = "9".repeat(64);
+    const labelled = [5, 12].map((value, index) =>
+      point({
+        tenantId,
+        organizationId,
+        seriesId: labelledSeriesId,
+        timeUnixMs: bucket0 + index * 1000,
+        metricKind: "sum",
+        aggregationTemporality: "cumulative",
+        isMonotonic: true,
+        valueDouble: value,
+        acceptedAt,
+        pointAttributesJson: JSON.stringify({ team: `alpha-${tag}` }),
+        pointAttributeKeys: ["team"],
+      }),
+    );
+
+    beforeAll(async () => {
+      await repo.upsertSeriesMany({ points: labelled });
+      await repo.recomputeAffectedRollupsMany({ points: labelled });
+    });
+
+    it("returns that series with its attributes and the sum of its rollups", async () => {
+      const totals = await repo.getSeriesTotalsByPointAttribute({
+        tenantId,
+        attributeKey: "team",
+        attributeValue: `alpha-${tag}`,
+        fromMs: bucket0 - 60 * 60_000,
+      });
+
+      expect(totals).toEqual([
+        {
+          metricName: labelled[0]!.metricName,
+          pointAttributes: { team: `alpha-${tag}` },
+          total: 12,
+        },
+      ]);
+    });
+  });
+
+  describe("when series totals are read by a point attribute nothing carries", () => {
+    it("runs against the real schema and finds no series", async () => {
+      const totals = await repo.getSeriesTotalsByPointAttribute({
+        tenantId,
+        attributeKey: `absent-${tag}`,
+        attributeValue: "x",
+        fromMs: acceptedAt - 60 * 60_000,
+      });
+
+      expect(totals).toEqual([]);
+    });
   });
 });
