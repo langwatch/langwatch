@@ -95,7 +95,7 @@ type KeyDoorInput = { request: Request; permission: string; reach?: RestPermissi
 
 function mount(
   overrides: Partial<GatewayApi> = {},
-  refuse?: (question: KeyDoorQuestion) => never,
+  refuse?: (question: KeyDoorQuestion) => void,
   asked: KeyDoorQuestion[] = [],
 ) {
   const app = createApiFixture<GatewayApi>({
@@ -179,6 +179,7 @@ describe("the gateway platform family's public wire", () => {
   describe("given a request with no credential", () => {
     /** @scenario Reject unauthenticated gateway REST calls */
     /** @scenario An unauthenticated request answers the canonical error envelope */
+    /** @scenario A canonical family refuses unauthenticated calls canonically */
     it("answers 401 with the canonical unauthenticated envelope", async () => {
       const answer = await mount()("GET", "/virtual-keys", { anonymous: true });
 
@@ -247,6 +248,38 @@ describe("the gateway platform family's public wire", () => {
       expect([answer.status, answer.body.code]).toEqual([403, "permission_denied"]);
       expect(asked).toStrictEqual([{ permission: "gatewayBudgets:view", reach: undefined }]);
       expect(listBudgetPageWithHealth).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a key whose grants are view only", () => {
+    const viewerOnly = ({ permission }: KeyDoorQuestion): void => {
+      if (permission === "virtualKeys:view") return;
+      throw new PermissionDeniedError({
+        permission,
+        scope: { type: "project", id: PROJECT_ID },
+        denialReason: "no-binding",
+      });
+    };
+
+    /** @scenario A viewer-scoped API key can list but not create virtual keys */
+    it("lists the keys with 200 and refuses to create one with 403", async () => {
+      const createVirtualKey = vi.fn();
+      const call = mount(
+        {
+          createVirtualKey,
+          getVirtualKeyPage: async () => [],
+          visibleToVirtualKeyCaller: async ({ virtualKeys }) => [...virtualKeys],
+          toVirtualKeySnakeDtos: async () => [],
+        },
+        viewerOnly,
+      );
+
+      const listed = await call("GET", "/virtual-keys");
+      const created = await call("POST", "/virtual-keys", { body: { name: "ci-key" } });
+
+      expect(listed.status).toBe(200);
+      expect([created.status, created.body.code]).toEqual([403, "permission_denied"]);
+      expect(createVirtualKey).not.toHaveBeenCalled();
     });
   });
 

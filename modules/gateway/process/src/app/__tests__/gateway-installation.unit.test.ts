@@ -356,6 +356,37 @@ describe("gateway app installation", () => {
       }
     });
 
+    /** @scenario The tier that ingests registers the pipeline as a producer only */
+    it("registers the worker's pipeline, aggregate and commands and mounts no process manager", async () => {
+      const { state, resources } = await installGateway();
+
+      try {
+        const app = state.provided;
+        if (!(app instanceof GatewayModule)) {
+          throw new Error("Gateway installation did not provide GatewayModule");
+        }
+        const setup = {
+          repositories: undefined,
+          app,
+          processStore: createApiFixture<ProcessStore>(),
+        };
+
+        const produced = gatewaySpendEventing.build({ ...setup, participation: "produce" });
+        const consumed = gatewaySpendEventing.build({ ...setup, participation: "consume" });
+
+        expect(produced.metadata.name).toBe(consumed.metadata.name);
+        expect(produced.aggregate).toEqual(consumed.aggregate);
+        expect(produced.commands.length).toBeGreaterThan(0);
+        expect(produced.commands.map((command) => command.definition.name)).toEqual(
+          consumed.commands.map((command) => command.definition.name),
+        );
+        expect(consumed.processManagers.size).toBeGreaterThan(0);
+        expect(produced.processManagers.size).toBe(0);
+      } finally {
+        await resources.close();
+      }
+    });
+
     /** @scenario "The worker's spend pipeline hosts the gateway's budget debits" */
     it("hosts gatewayDebits, transient, on the worker's build only", async () => {
       const { state, resources } = await installGateway();

@@ -275,6 +275,7 @@ describe("the gateway platform family's organization-wide writes", () => {
     });
 
     /** @scenario An organization-wide gateway write is authorized at the organization */
+    /** @scenario An organization-wide cache-rule write is authorized at the organization */
     it("refuses to change a cache rule, and leaves it unchanged", async () => {
       const world = mountGatewayPlatform({ allowedAtOrganization: [] });
 
