@@ -105,14 +105,11 @@ function createRealModelProviderApp(
       dataPrivacy: createModelProviderTestDataPrivacy(),
       managed: createModelProviderTestManagedProviders(),
     },
-    members: {
-      nlpServiceUrl: undefined,
-      nlpInternalSecret: undefined,
-    },
     config: {
       blockLocalHttpCalls: true,
       allowedProxyHosts: [],
       defaultModel: undefined,
+      nlpServiceUrl: undefined,
       probeBaseUrls: {
         gemini: undefined,
         deepseek: undefined,

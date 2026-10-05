@@ -3,18 +3,21 @@ import {
   blockLocalHttpCalls,
   Config,
   langwatchDefaultModel,
+  nlpServiceUrl,
   type ConfigOf,
 } from "@langwatch/config";
 import { z } from "zod";
 
 /**
- * The address fence an outbound provider call is judged by, and the terminal
- * default model. Shared deployment-fact leaves: scenario reads the same ones.
+ * The address fence an outbound provider call is judged by, the terminal default
+ * model and the NLP engine's address. Shared deployment-fact leaves: scenario
+ * reads the same ones.
  */
 export const modelProviderConfig = Config.define((c) => ({
   blockLocalHttpCalls,
   allowedProxyHosts,
   defaultModel: langwatchDefaultModel,
+  nlpServiceUrl,
   /**
    * The API root a deployment points a provider's credential probe at, in place of the
    * vendor's own (haven sets them to llmsim and voicesim). Unset means the vendor.

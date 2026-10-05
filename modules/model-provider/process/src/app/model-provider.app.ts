@@ -71,7 +71,7 @@ import {
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
-import { openAiApiKey, Secret } from "@langwatch/secrets";
+import { nlpInternalSecret, openAiApiKey, Secret } from "@langwatch/secrets";
 
 import { modelProviderConnectionPingChannels } from "../channels/model-provider-connection-ping-channels.registry.ts";
 import type { ModelProviderConnectionPing } from "../channels/model-provider-connection-ping.channel.ts";
@@ -177,15 +177,9 @@ export interface ModelProviderCodexDeviceFlow {
   ): Promise<ModelProviderCodexDeviceApproval>;
 }
 
-/** The engine address and its credential: process facts until their shared leaves land. */
-type ModelProviderMembers = Readonly<{
-  nlpServiceUrl: string | undefined;
-  nlpInternalSecret: string | undefined;
-}>;
-
 type ModelProviderSetup = FeatureSetup<
   typeof ModelProviderModule.dependencies,
-  ModelProviderMembers,
+  never,
   ModelProviderServerConfig,
   ModelProviderRepositories
 >;
@@ -258,17 +252,18 @@ export class ModelProviderModule implements ModelProviderApi {
   /** What the module's own operations spend, never a platform provider credential. */
   static readonly operationalSecrets = {
     openRouter: Secret.load("OPENROUTER_API_KEY", { optional: true }),
+    /** The engine hop's shared credential: the same handle the process owner holds. */
+    nlpInternal: nlpInternalSecret,
   } as const;
   static readonly secrets = {
     ...ModelProviderModule.platformCredentials,
     ...ModelProviderModule.operationalSecrets,
   } as const;
-  static readonly reads = ["nlpServiceUrl", "nlpInternalSecret"] as const;
 
   static async create(setup: ModelProviderSetup): Promise<ModelProviderModule> {
-    return ModelProviderModule.withPlatformChain(
-      setup,
-      await ModelProviderModule.resolvePlatformChain(setup.secrets),
+    const platformChain = await ModelProviderModule.resolvePlatformChain(setup.secrets);
+    return setup.secrets.into(ModelProviderModule.secrets.nlpInternal, (nlpInternalSecret) =>
+      ModelProviderModule.withPlatformChain(setup, { platformChain, nlpInternalSecret }),
     );
   }
 
@@ -288,11 +283,14 @@ export class ModelProviderModule implements ModelProviderApi {
   }
 
   private static withPlatformChain(
-    { repositories, dependencies, members, config }: ModelProviderSetup,
-    platformChain: PlatformProviderChainService,
+    { repositories, dependencies, config }: ModelProviderSetup,
+    {
+      platformChain,
+      nlpInternalSecret,
+    }: { platformChain: PlatformProviderChainService; nlpInternalSecret: string | undefined },
   ): ModelProviderModule {
-    const executionProxyBaseUrl = members.nlpServiceUrl
-      ? `${members.nlpServiceUrl.replace(/\/$/, "")}${EXECUTION_PROXY_PATH}`
+    const executionProxyBaseUrl = config.nlpServiceUrl
+      ? `${config.nlpServiceUrl.replace(/\/$/, "")}${EXECUTION_PROXY_PATH}`
       : UNCONFIGURED_EXECUTION_PROXY;
     const buildConfig: ModelProviderBuildConfig = {
       egress: {
@@ -301,7 +299,7 @@ export class ModelProviderModule implements ModelProviderApi {
         verifyTls: true,
       },
       executionProxyBaseUrl,
-      nlpInternalSecret: members.nlpInternalSecret,
+      nlpInternalSecret,
       environment: {},
       probeBaseUrls: config.probeBaseUrls,
       isSaas: false,
@@ -316,7 +314,7 @@ export class ModelProviderModule implements ModelProviderApi {
       dependencies,
       infrastructure,
       executionProxyBaseUrl,
-      nlpInternalSecret: members.nlpInternalSecret,
+      nlpInternalSecret,
       platformChain,
     });
   }
