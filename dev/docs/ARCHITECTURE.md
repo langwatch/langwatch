@@ -2605,6 +2605,10 @@ naming itself. `main.ts` and `config.ts`: zero edits.
 
 ## 15. Deleted spellings
 
+`dev/docs/deleted-spellings.json` lists every spelling below with its replacement, and the
+`deleted-spellings-in-teaching` and `deleted-spellings-in-code` policies check it (§17); change the
+list in the same commit as this section.
+
 Deleted, not deprecated. Writing one new is a defect; reading one marks
 conversion debt:
 

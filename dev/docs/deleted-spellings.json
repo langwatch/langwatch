@@ -1,0 +1,905 @@
+{
+  "record": "dev/docs/ARCHITECTURE.md §15, Deleted spellings. Every spelling there is listed here and none is added: change §15 and this file in the same commit. A `prose` entry has no matcher; its note says why.",
+  "listed": "2026-10-05",
+  "spellings": [
+    {
+      "spelling": "createProcess",
+      "kind": "identifier",
+      "pattern": "\\bcreateProcess\\b",
+      "replacement": "compose the process with the `createApp(...)` chain and its container",
+      "section": "§4, §5",
+      "ruled": null
+    },
+    {
+      "spelling": "withProvided",
+      "kind": "identifier",
+      "pattern": "\\bwithProvided\\b",
+      "replacement": "let the container install the modules; a module class receives repositories, channels, peers, config and secrets",
+      "section": "§3.3, §5",
+      "ruled": null
+    },
+    {
+      "spelling": "withMemoryRepositories",
+      "kind": "identifier",
+      "pattern": "\\bwithMemoryRepositories\\b",
+      "replacement": "call `XModule.create(setup)` with memory registries and `createApiFixture` peers in a test, and boot the installed list over memory in an installation test",
+      "section": "§13, §16",
+      "ruled": null
+    },
+    {
+      "spelling": "membersFrom",
+      "kind": "identifier",
+      "pattern": "\\bmembersFrom\\b",
+      "replacement": "hand store clients to the module's registries; a module class receives repositories, channels, peers, config and secrets",
+      "section": "§3.3, §5",
+      "ruled": null
+    },
+    {
+      "spelling": "`reads(...)` statics and `static readonly reads`",
+      "kind": "call",
+      "pattern": "\\bstatic\\s+(?:readonly\\s+)?reads\\b",
+      "replacement": "declare no reads; store clients reach registries only and the module class receives repositories, channels, peers, config and secrets",
+      "section": "§3.3, §5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "the `members:` option on `createApp`",
+      "kind": "prose",
+      "replacement": "hand stores to the chain with `.withStores(stores)`",
+      "section": "§4",
+      "ruled": null,
+      "note": "`members:` is an ordinary object key elsewhere, so the option cannot be told apart by text."
+    },
+    {
+      "spelling": "withInfrastructure",
+      "kind": "identifier",
+      "pattern": "\\bwithInfrastructure\\b",
+      "replacement": "`.withStores(stores)` on the `createApp(...)` chain",
+      "section": "§4",
+      "ruled": null
+    },
+    {
+      "spelling": "withPersistence",
+      "kind": "identifier",
+      "pattern": "\\bwithPersistence\\b",
+      "replacement": "`.withStores(stores)` on the `createApp(...)` chain",
+      "section": "§4",
+      "ruled": null
+    },
+    {
+      "spelling": "`.withTransports(hosts)` on the `createApp(...)` process chain",
+      "kind": "prose",
+      "replacement": "state what the process serves through `.expose(...)`",
+      "section": "§3.2, §4",
+      "ruled": null,
+      "note": "The module installer's own `.withTransports(...declarations)` stays, so the call name alone is not deleted."
+    },
+    {
+      "spelling": "withRelational",
+      "kind": "identifier",
+      "pattern": "\\bwithRelational\\b",
+      "replacement": "`withStores`, which collapsed the per-store supply calls",
+      "section": "§4",
+      "ruled": null
+    },
+    {
+      "spelling": "withAnalytical",
+      "kind": "identifier",
+      "pattern": "\\bwithAnalytical\\b",
+      "replacement": "`withStores`, which collapsed the per-store supply calls",
+      "section": "§4",
+      "ruled": null
+    },
+    {
+      "spelling": "withKeyvalue",
+      "kind": "identifier",
+      "pattern": "\\bwithKeyvalue\\b",
+      "replacement": "`withStores`, which collapsed the per-store supply calls",
+      "section": "§4",
+      "ruled": null
+    },
+    {
+      "spelling": "absence classes (`Logged*Absence`, `Absent*`)",
+      "kind": "identifier",
+      "pattern": "\\bclass\\s+(?:Logged\\w*Absence|Absent[A-Z]\\w*)\\b|\\bLogged\\*Absence\\b|\\bAbsent\\*",
+      "replacement": "let the module class decide its own availability from its config and secrets",
+      "section": "§3.3",
+      "ruled": null,
+      "note": "Matched as a class declaration, or as the glob itself in prose: `Absent` begins ordinary names such as an error class."
+    },
+    {
+      "spelling": "`ApplicationBuilder`'s public surface",
+      "kind": "prose",
+      "replacement": "compose through `createApp(...)` and its container",
+      "section": "§4, §5",
+      "ruled": null,
+      "note": "Only the public surface is deleted, so the class name alone is not a finding."
+    },
+    {
+      "spelling": "per-process host files",
+      "kind": "prose",
+      "replacement": "an app is `main.ts` plus `config.ts`",
+      "section": "§1, §4",
+      "ruled": null,
+      "note": "A shape, not a name."
+    },
+    {
+      "spelling": "per-module composition files under `apps/*`",
+      "kind": "prose",
+      "replacement": "an app is `main.ts` plus `config.ts`; modules compose through the container",
+      "section": "§1, §5",
+      "ruled": null,
+      "note": "A shape, not a name."
+    },
+    {
+      "spelling": "hand-projected per-module config",
+      "kind": "prose",
+      "replacement": "`withConfig(processConfig(processModules))`: the installed list is the schema",
+      "section": "§6",
+      "ruled": null,
+      "note": "A shape, not a name."
+    },
+    {
+      "spelling": "bespoke member bags",
+      "kind": "prose",
+      "replacement": "registries and the container",
+      "section": "§3.3, §5",
+      "ruled": null,
+      "note": "A shape, not a name."
+    },
+    {
+      "spelling": "`*App` classes inside modules",
+      "kind": "prose",
+      "replacement": "`XModule` installed with `.withApi(...)`",
+      "section": "§3.2, §16",
+      "ruled": null,
+      "note": "`App` ends many unrelated names; see also the `<X>App` module classes of the rename window."
+    },
+    {
+      "spelling": "RestErrorHandler",
+      "kind": "identifier",
+      "pattern": "\\bRestErrorHandler\\b",
+      "replacement": "throw a `HandledError` from the contract and let the transport framework present it",
+      "section": "§8, §12",
+      "ruled": null
+    },
+    {
+      "spelling": "error envelopes in transports",
+      "kind": "prose",
+      "replacement": "throw a `HandledError`; the framework writes the body",
+      "section": "§8, §12",
+      "ruled": null,
+      "note": "A shape, not a name."
+    },
+    {
+      "spelling": "re-exports for backwards compatibility",
+      "kind": "prose",
+      "replacement": "repoint the importers and delete the old export in the same change",
+      "section": "§15",
+      "ruled": null,
+      "note": "A shape, not a name; `langwatch/no-alias-reexport` covers part of it."
+    },
+    {
+      "spelling": "the ops \"backoffice\"",
+      "kind": "identifier",
+      "pattern": "\\b[Bb]ack-?[Oo]ffice",
+      "replacement": "Ops instance admin or Cloud admin",
+      "section": "§3.5",
+      "ruled": null
+    },
+    {
+      "spelling": "`refusing*` twins",
+      "kind": "identifier",
+      "pattern": "\\bRefusing[A-Z]\\w*|\\brefusing\\*",
+      "replacement": "let the module class decide its own availability; no refusing stand-in",
+      "section": "§3.3",
+      "ruled": null,
+      "note": "Matched as a class name (`Refusing*`): lower-case `refusing*` also names ordinary helpers."
+    },
+    {
+      "spelling": "`try*`/`require*` method names",
+      "kind": "prose",
+      "replacement": "`get*` (one or throws), `find*` (an array), `list*` (a page)",
+      "section": "§3.1",
+      "ruled": "2026-09-24",
+      "note": "Too many legitimate names start with `try` or `require`; `langwatch/banned-verb-prefix` owns the contract case."
+    },
+    {
+      "spelling": "`T | null` returns in new code",
+      "kind": "prose",
+      "replacement": "`find*` returns an array; `get*` returns one or throws; `list*` returns a page",
+      "section": "§3.1",
+      "ruled": "2026-09-24",
+      "note": "A type shape, not a name."
+    },
+    {
+      "spelling": "static readonly configSchema",
+      "kind": "call",
+      "pattern": "\\bstatic\\s+(?:readonly\\s+)?configSchema\\b",
+      "replacement": "sort what it held: a deployment fact into the contract slice, a process fact into a leaf picked from `processFacts`, availability into the module's own answer, a role into `setup.role`",
+      "section": "§6",
+      "ruled": "2026-09-18"
+    },
+    {
+      "spelling": "*AppConfigSchema",
+      "kind": "identifier",
+      "pattern": "\\b[A-Z]\\w*AppConfigSchema\\b",
+      "replacement": "the module's contract config slice",
+      "section": "§6",
+      "ruled": "2026-09-18"
+    },
+    {
+      "spelling": "*ServerConfigSchema",
+      "kind": "identifier",
+      "pattern": "\\b[A-Z]\\w*ServerConfigSchema\\b",
+      "replacement": "the module's contract config slice",
+      "section": "§6",
+      "ruled": "2026-09-18"
+    },
+    {
+      "spelling": "a module declaring an env var another owner already declares",
+      "kind": "prose",
+      "replacement": "pick the leaf from its one owner, such as `BASE_HOST` from `processFacts`",
+      "section": "§6",
+      "ruled": null,
+      "note": "Needs the owner map, not a spelling."
+    },
+    {
+      "spelling": "`surfaces/` and `screens/` browser folders",
+      "kind": "file",
+      "path": "^(?:enterprise/)?modules/[^/]+/browser/src/(?:.*/)?(?:surfaces|screens)/",
+      "pattern": "`(?:[\\w./-]*/)?(?:surfaces|screens)/`",
+      "replacement": "`ui/elements`, `ui/blocks` and `ui/sections`",
+      "section": "§3.4",
+      "ruled": null
+    },
+    {
+      "spelling": "any `exports` entry on a browser package other than `./declaration`",
+      "kind": "prose",
+      "replacement": "export only `./declaration`",
+      "section": "§3.4",
+      "ruled": null,
+      "note": "The `browser-package-exports` policy owns it."
+    },
+    {
+      "spelling": "any kit: a `*-browser-kit` package or a shared browser package",
+      "kind": "package",
+      "pattern": "\\bbrowser-kits?\\b",
+      "replacement": "share through the design system, a contract or a `<name>-client` package",
+      "section": "§3.4",
+      "ruled": null
+    },
+    {
+      "spelling": "`*-openapi.rules.ts` files",
+      "kind": "file",
+      "path": "-openapi\\.rules\\.ts$",
+      "pattern": "-openapi\\.rules\\.ts\\b",
+      "replacement": "the route's own `.withDocs()` call; an error keeps only its status and a sentence via `errors`; a response that needs its own schema goes through `documentedResponses()`",
+      "section": "§8",
+      "ruled": null
+    },
+    {
+      "spelling": "PrismaScheduledJobStore",
+      "kind": "identifier",
+      "pattern": "\\bPrismaScheduledJobStore\\b",
+      "replacement": "a keyed process manager (`.schedule({ everyMs }).onWake`)",
+      "section": "§9",
+      "ruled": null
+    },
+    {
+      "spelling": "computeNextRunAt",
+      "kind": "identifier",
+      "pattern": "\\bcomputeNextRunAt\\b",
+      "replacement": "a keyed process manager (`.schedule({ everyMs }).onWake`)",
+      "section": "§9",
+      "ruled": null
+    },
+    {
+      "spelling": "the eventing `ScheduledJob` scheduler",
+      "kind": "prose",
+      "replacement": "a keyed process manager (`.schedule({ everyMs }).onWake`)",
+      "section": "§9",
+      "ruled": null,
+      "note": "Matched through `PrismaScheduledJobStore` and `computeNextRunAt`: `ScheduledJob` is also a table name."
+    },
+    {
+      "spelling": "withSlots",
+      "kind": "identifier",
+      "pattern": "\\bwithSlots\\b",
+      "replacement": "a core screen renders the enterprise module's lent component; a shell-wide surface is its owner's declared mount",
+      "section": "§11",
+      "ruled": "2026-09-29"
+    },
+    {
+      "spelling": "UiSlots",
+      "kind": "identifier",
+      "pattern": "\\bUiSlots\\b",
+      "replacement": "a core screen renders the enterprise module's lent component; a shell-wide surface is its owner's declared mount",
+      "section": "§11",
+      "ruled": "2026-09-29"
+    },
+    {
+      "spelling": "uiSlots",
+      "kind": "identifier",
+      "pattern": "\\buiSlots\\b",
+      "replacement": "a core screen renders the enterprise module's lent component; a shell-wide surface is its owner's declared mount",
+      "section": "§11",
+      "ruled": "2026-09-29"
+    },
+    {
+      "spelling": "useUiSlot / useUiSlots",
+      "kind": "identifier",
+      "pattern": "\\buseUiSlots?\\b",
+      "replacement": "a core screen renders the enterprise module's lent component; a shell-wide surface is its owner's declared mount",
+      "section": "§11",
+      "ruled": "2026-09-29"
+    },
+    {
+      "spelling": "<UiSlot>",
+      "kind": "identifier",
+      "pattern": "<UiSlot\\b",
+      "replacement": "a core screen renders the enterprise module's lent component; a shell-wide surface is its owner's declared mount",
+      "section": "§11",
+      "ruled": "2026-09-29"
+    },
+    {
+      "spelling": "the `slots` host service",
+      "kind": "prose",
+      "replacement": "a shell-wide surface is its owner's declared mount",
+      "section": "§11",
+      "ruled": "2026-09-29",
+      "note": "`slots` is an ordinary word and key."
+    },
+    {
+      "spelling": "a mail member",
+      "kind": "prose",
+      "replacement": "notification owns mail; ask its `*Api`",
+      "section": "§3.3",
+      "ruled": null,
+      "note": "A shape, not a name."
+    },
+    {
+      "spelling": "AesGcmSecretEncryptionService",
+      "kind": "identifier",
+      "pattern": "\\bAesGcmSecretEncryptionService\\b",
+      "replacement": "the stores' `encryption` client, the one cipher",
+      "section": "§6",
+      "ruled": "2026-09-29"
+    },
+    {
+      "spelling": "composeProcess",
+      "kind": "identifier",
+      "pattern": "\\bcomposeProcess\\b",
+      "replacement": "`container`",
+      "section": "§5",
+      "ruled": "2026-09-29"
+    },
+    {
+      "spelling": "*ProcessComposition",
+      "kind": "identifier",
+      "pattern": "\\b[A-Z]\\w*ProcessComposition\\b",
+      "replacement": "`*ProcessContainer`",
+      "section": "§5",
+      "ruled": "2026-09-29"
+    },
+    {
+      "spelling": "UiDeclaredCapabilities",
+      "kind": "identifier",
+      "pattern": "\\bUiDeclaredCapabilities\\b",
+      "replacement": "the host services and a peer's declared lend",
+      "section": "§10.1",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "UiDeclaredName",
+      "kind": "identifier",
+      "pattern": "\\bUiDeclaredName\\b",
+      "replacement": "the host services and a peer's declared lend",
+      "section": "§10.1",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "UiDeclared",
+      "kind": "identifier",
+      "pattern": "\\bUiDeclared\\b",
+      "replacement": "the host services and a peer's declared lend",
+      "section": "§10.1",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "declared(\"<name>\")",
+      "kind": "call",
+      "pattern": "\\bdeclared\\(\\s*[\"'`]",
+      "replacement": "the host services and a peer's declared lend",
+      "section": "§10.1",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "UiDrawerMap",
+      "kind": "identifier",
+      "pattern": "\\bUiDrawerMap\\b",
+      "replacement": "`navigateToDrawer`, the address door",
+      "section": "§10.1",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "UiDrawerPropsOf",
+      "kind": "identifier",
+      "pattern": "\\bUiDrawerPropsOf\\b",
+      "replacement": "`navigateToDrawer`, the address door",
+      "section": "§10.1",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "DrawerPropsMapOf",
+      "kind": "identifier",
+      "pattern": "\\bDrawerPropsMapOf\\b",
+      "replacement": "`navigateToDrawer`, the address door",
+      "section": "§10.1",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "DrawersDifferingFromMap",
+      "kind": "identifier",
+      "pattern": "\\bDrawersDifferingFromMap\\b",
+      "replacement": "`navigateToDrawer`, the address door",
+      "section": "§10.1",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "browser-host's `*-drawers.ts` props files",
+      "kind": "file",
+      "path": "^packages/browser-host/.*-drawers\\.tsx?$",
+      "pattern": "-drawers\\.ts\\b",
+      "replacement": "`navigateToDrawer`, the address door",
+      "section": "§10.1",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "useDrawer<Map>()",
+      "kind": "call",
+      "pattern": "\\buseDrawer<",
+      "replacement": "`navigateToDrawer`, the address door",
+      "section": "§10.1",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "a drawer opened, or its flow callbacks set, by a bare name",
+      "kind": "prose",
+      "replacement": "`navigateToDrawer`, the address door",
+      "section": "§10.1",
+      "ruled": "2026-10-01",
+      "note": "A bare string argument, not a name."
+    },
+    {
+      "spelling": "`withCapabilities` for a peer lend",
+      "kind": "prose",
+      "replacement": "the peer's declared lend",
+      "section": "§10.1",
+      "ruled": "2026-10-01",
+      "note": "Only the peer-lend use is deleted; `withCapabilities` itself stays (§10.1 slot table)."
+    },
+    {
+      "spelling": "useFeatureFlag",
+      "kind": "identifier",
+      "pattern": "\\buseFeatureFlag\\b",
+      "replacement": "`useReleaseFlag(flag)`",
+      "section": "§3.4, §10.1",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "per-module `use-feature-flag.ts` copies",
+      "kind": "file",
+      "path": "(?:^|/)use-feature-flag\\.tsx?$",
+      "pattern": "\\buse-feature-flag\\.ts\\b",
+      "replacement": "`useReleaseFlag(flag)`",
+      "section": "§3.4, §10.1",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "UiSession.featureFlag / isFeatureEnabled",
+      "kind": "call",
+      "pattern": "\\bUiSession\\.(?:featureFlag|isFeatureEnabled)\\b",
+      "replacement": "`useReleaseFlag(flag)`",
+      "section": "§10.1",
+      "ruled": "2026-10-01",
+      "note": "Matched on `UiSession` only: `isFeatureEnabled` alone also names live server calls."
+    },
+    {
+      "spelling": "TrpcCachePolicy",
+      "kind": "identifier",
+      "pattern": "\\bTrpcCachePolicy\\b",
+      "replacement": "nothing: the browser mirrors every read to disk by default, minus a named exclusion list",
+      "section": "§10.2",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "cache: { persist } on a tRPC read",
+      "kind": "call",
+      "pattern": "\\bcache:\\s*\\{\\s*persist\\b",
+      "replacement": "nothing: the browser mirrors every read to disk by default, minus a named exclusion list",
+      "section": "§10.2",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "setup.members",
+      "kind": "call",
+      "pattern": "\\bsetup\\.members\\b",
+      "replacement": "the module class receives repositories, channels, peers, config and secrets; store clients reach registries only",
+      "section": "§3.3, §5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "MembersRead",
+      "kind": "identifier",
+      "pattern": "\\bMembersRead\\b",
+      "replacement": "the module class receives repositories, channels, peers, config and secrets; store clients reach registries only",
+      "section": "§3.3, §5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "ProcessMembers",
+      "kind": "identifier",
+      "pattern": "\\bProcessMembers\\b",
+      "replacement": "the module class receives repositories, channels, peers, config and secrets; store clients reach registries only",
+      "section": "§3.3, §5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "MemberName",
+      "kind": "identifier",
+      "pattern": "\\bMemberName\\b",
+      "replacement": "the module class receives repositories, channels, peers, config and secrets; store clients reach registries only",
+      "section": "§3.3, §5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "MEMBER_NAMES",
+      "kind": "identifier",
+      "pattern": "\\bMEMBER_NAMES\\b",
+      "replacement": "the module class receives repositories, channels, peers, config and secrets; store clients reach registries only",
+      "section": "§3.3, §5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "MemberSource",
+      "kind": "identifier",
+      "pattern": "\\bMemberSource\\b",
+      "replacement": "the module class receives repositories, channels, peers, config and secrets; store clients reach registries only",
+      "section": "§3.3, §5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "storesBackedMembers",
+      "kind": "identifier",
+      "pattern": "\\bstoresBackedMembers\\b",
+      "replacement": "store clients reach registries only",
+      "section": "§3.3, §5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "noMembers",
+      "kind": "identifier",
+      "pattern": "\\bnoMembers\\b",
+      "replacement": "nothing: a module with no store clients declares none",
+      "section": "§3.3, §5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "serverModuleMembers",
+      "kind": "identifier",
+      "pattern": "\\bserverModuleMembers\\b",
+      "replacement": "the container over `processModules`",
+      "section": "§3.3, §5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "`*.members.ts` files",
+      "kind": "file",
+      "path": "\\.members\\.ts$",
+      "pattern": "\\.members\\.ts\\b",
+      "replacement": "the module's repository and channel registries",
+      "section": "§3.3, §5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "a restated member type",
+      "kind": "prose",
+      "replacement": "take the owner contract's exported leaf",
+      "section": "§3.3",
+      "ruled": "2026-10-01",
+      "note": "A type shape, not a name."
+    },
+    {
+      "spelling": "a process fact passed as a member",
+      "kind": "prose",
+      "replacement": "pick the leaf from `processFacts` in the module's config slice",
+      "section": "§3.3, §6",
+      "ruled": "2026-10-01",
+      "note": "A shape, not a name."
+    },
+    {
+      "spelling": "the `secrets`, `cache` and `telemetry` members",
+      "kind": "prose",
+      "replacement": "secrets through `Secret.load` handles, the logger through `createLogger(\"<module>\")`; the Redis cache client stays until the Redis TTL work lands",
+      "section": "§3.3, §6",
+      "ruled": "2026-10-01",
+      "note": "The three words are ordinary keys."
+    },
+    {
+      "spelling": "`*-composition.build.ts` files",
+      "kind": "file",
+      "path": "-composition\\.build\\.ts$",
+      "pattern": "composition\\.build\\.ts\\b",
+      "replacement": "the container; never add one",
+      "section": "§5",
+      "ruled": null
+    },
+    {
+      "spelling": "withMember",
+      "kind": "identifier",
+      "pattern": "\\bwithMember\\b",
+      "replacement": "the module class receives repositories, channels, peers, config and secrets",
+      "section": "§4",
+      "ruled": null
+    },
+    {
+      "spelling": "SupplyToken",
+      "kind": "identifier",
+      "pattern": "\\bSupplyToken\\b",
+      "replacement": "the module class receives repositories, channels, peers, config and secrets",
+      "section": "§4",
+      "ruled": null
+    },
+    {
+      "spelling": "MissingSupply",
+      "kind": "identifier",
+      "pattern": "\\bMissingSupply\\b",
+      "replacement": "the module class receives repositories, channels, peers, config and secrets",
+      "section": "§4",
+      "ruled": null
+    },
+    {
+      "spelling": ".provide (supply)",
+      "kind": "prose",
+      "replacement": "the module class receives repositories, channels, peers, config and secrets",
+      "section": "§4",
+      "ruled": null,
+      "note": "`.provide` is an ordinary method name in libraries."
+    },
+    {
+      "spelling": "a channel registry's `.live.create`/`.memory.create` called by hand in `create()` or a service",
+      "kind": "prose",
+      "replacement": "let the container install the channels",
+      "section": "§5",
+      "ruled": null,
+      "note": "Legitimate in a registry and a test, so the call alone is not a finding."
+    },
+    {
+      "spelling": "nested `into`",
+      "kind": "prose",
+      "replacement": "one `secrets.into({ … }, build)` (a §16 target; code spells nested `into` until its row lands)",
+      "section": "§6, §16",
+      "ruled": null,
+      "note": "Nesting is a shape, not a name."
+    },
+    {
+      "spelling": "Secret.define",
+      "kind": "call",
+      "pattern": "\\bSecret\\.define\\b",
+      "replacement": "`Secret.load(id)`",
+      "section": "§6",
+      "ruled": null
+    },
+    {
+      "spelling": "a feature leaf or handle in `packages/config` or `packages/secrets`",
+      "kind": "prose",
+      "replacement": "the owning module's contract slice",
+      "section": "§6",
+      "ruled": null,
+      "note": "Needs ownership, not a spelling."
+    },
+    {
+      "spelling": "public-app-config.projection.ts",
+      "kind": "file",
+      "path": "(?:^|/)public-app-config\\.projection\\.ts$",
+      "pattern": "\\bpublic-app-config\\.projection\\b",
+      "replacement": "the dev UI lifts the config meta tag from the api's own rendered shell",
+      "section": "§6",
+      "ruled": null
+    },
+    {
+      "spelling": "ProcessModuleApp",
+      "kind": "identifier",
+      "pattern": "\\bProcessModuleApp\\b",
+      "replacement": "the container",
+      "section": "§5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "registerProcessDependencies",
+      "kind": "identifier",
+      "pattern": "\\bregisterProcessDependencies\\b",
+      "replacement": "the container",
+      "section": "§5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "addProcessDependencies",
+      "kind": "identifier",
+      "pattern": "\\baddProcessDependencies\\b",
+      "replacement": "the container",
+      "section": "§5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "withProcessDependencies",
+      "kind": "identifier",
+      "pattern": "\\bwithProcessDependencies\\b",
+      "replacement": "the container",
+      "section": "§5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "withModuleDependencies",
+      "kind": "identifier",
+      "pattern": "\\bwithModuleDependencies\\b",
+      "replacement": "the container",
+      "section": "§5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "createProcessApp",
+      "kind": "identifier",
+      "pattern": "\\bcreateProcessApp\\b",
+      "replacement": "the container",
+      "section": "§5",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "@langwatch/kernel",
+      "kind": "package",
+      "pattern": "@langwatch/kernel(?![\\w-])",
+      "replacement": "`@langwatch/module` (its light half) or `@langwatch/process` (the rest)",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "@langwatch/process-server",
+      "kind": "package",
+      "pattern": "@langwatch/process-server\\b",
+      "replacement": "the rename window's landed packages (`@langwatch/module`, `@langwatch/process`)",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "@langwatch/ui-kernel",
+      "kind": "package",
+      "pattern": "@langwatch/ui-kernel\\b",
+      "replacement": "`@langwatch/browser`",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "@langwatch/api-fixture",
+      "kind": "package",
+      "pattern": "@langwatch/api-fixture\\b",
+      "replacement": "`test-harness/api-fixture`",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "@langwatch/error-presentation",
+      "kind": "package",
+      "pattern": "@langwatch/error-presentation\\b",
+      "replacement": "the `handled-error` presentation subpaths",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "@langwatch/actor",
+      "kind": "package",
+      "pattern": "@langwatch/actor(?![\\w-])",
+      "replacement": "the ledger actor in `@langwatch/authorization`",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "@langwatch/installed-server-modules",
+      "kind": "package",
+      "pattern": "@langwatch/installed-server-modules\\b",
+      "replacement": "the generated per-app module lists",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "@langwatch/installed-web-modules",
+      "kind": "package",
+      "pattern": "@langwatch/installed-web-modules\\b",
+      "replacement": "the generated per-app module lists",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "packages/audit-log-null",
+      "kind": "package",
+      "pattern": "\\baudit-log-null\\b",
+      "replacement": "nothing: it is deleted",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "defineServerModule",
+      "kind": "identifier",
+      "pattern": "\\bdefineServerModule\\b",
+      "replacement": "`defineProcessModule`",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "defineWebModule",
+      "kind": "identifier",
+      "pattern": "\\bdefineWebModule\\b",
+      "replacement": "`defineBrowserModule`",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "serverModules",
+      "kind": "identifier",
+      "pattern": "\\bserverModules\\b",
+      "replacement": "`processModules`",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "webModules",
+      "kind": "identifier",
+      "pattern": "\\bwebModules\\b",
+      "replacement": "`browserModules`",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "<id>Server",
+      "kind": "prose",
+      "replacement": "`<id>ProcessModule`",
+      "section": "§16",
+      "ruled": "2026-10-01",
+      "note": "`Server` ends many unrelated names."
+    },
+    {
+      "spelling": "openProcessStores",
+      "kind": "identifier",
+      "pattern": "\\bopenProcessStores\\b",
+      "replacement": "`openStores`",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "<f>.server.ts stems",
+      "kind": "file",
+      "path": "^(?:enterprise/)?modules/.*\\.server\\.tsx?$",
+      "pattern": "<f>\\.server\\.ts\\b|\\b[\\w-]+\\.server\\.ts\\b",
+      "replacement": "`<f>.module.ts`",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    },
+    {
+      "spelling": "<X>App module classes",
+      "kind": "prose",
+      "replacement": "`XModule`, installed with `.withApi(...)`",
+      "section": "§16",
+      "ruled": "2026-10-01",
+      "note": "`App` ends many unrelated names."
+    },
+    {
+      "spelling": ".withApp(...)",
+      "kind": "call",
+      "pattern": "\\.withApp\\(",
+      "replacement": "`.withApi(...)`",
+      "section": "§16",
+      "ruled": "2026-10-01"
+    }
+  ]
+}

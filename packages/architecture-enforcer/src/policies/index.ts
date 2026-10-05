@@ -29,8 +29,13 @@ import { lintStrictContractBuildConfigs } from "./quality/contract-build-config.
 import { lintDeclarationProjectReferences } from "./quality/declaration-project-references.ts";
 import { lintDeclarations } from "./quality/declarations.ts";
 import { lintDefaultTestLanes } from "./quality/default-test-lane.ts";
+import {
+  lintDeletedSpellingsInCode,
+  lintDeletedSpellingsInTeaching,
+} from "./quality/deleted-spellings.ts";
 import { lintServiceCeilings } from "./quality/service-ceilings.ts";
 import { lintServiceProjectionBoundaries } from "./quality/service-projection-boundaries.ts";
+import { lintLintRuleSkillPointers, lintTeachingCitations } from "./quality/teaching-citations.ts";
 import { lintUnusedModuleExports } from "./quality/unused-module-export.ts";
 import { lintWorkspaceSeams } from "./quality/workspace-seams.ts";
 import { lintSourceFolderShape } from "./source-folder-shape.ts";
@@ -54,6 +59,7 @@ export function definePolicy(policy: PolicyDefinition): PolicyDefinition {
 const FEATURE_PACKAGE_BOUNDARIES = "specs/feature-package-boundaries.feature";
 const STRICT_FEATURE_LAYOUT = "specs/strict-feature-layout.feature";
 const DEAD_CODE_GUARDS = "specs/dead-code-guards.feature";
+const DELETED_SPELLINGS = "specs/tooling/lint-deleted-spellings.feature";
 
 /** Prisma migration access reads the same schema models table ownership does. */
 function lintPrismaMigrationAccessPolicy(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
@@ -205,8 +211,28 @@ export const POLICIES: readonly PolicyDefinition[] = [
     run: lintWorkspaceSeams,
   }),
   definePolicy({
+    id: "deleted-spellings-in-teaching",
+    spec: DELETED_SPELLINGS,
+    run: lintDeletedSpellingsInTeaching,
+  }),
+  definePolicy({
+    id: "deleted-spellings-in-code",
+    spec: DELETED_SPELLINGS,
+    run: lintDeletedSpellingsInCode,
+  }),
+  definePolicy({
     id: "composed-exports",
     spec: "specs/api-package-surface.feature",
     run: lintComposedExports,
+  }),
+  definePolicy({
+    id: "teaching-citations",
+    spec: "specs/tooling/lint-teaching-citations.feature",
+    run: lintTeachingCitations,
+  }),
+  definePolicy({
+    id: "lint-rule-skill-pointers",
+    spec: "specs/tooling/lint-teaching-citations.feature",
+    run: lintLintRuleSkillPointers,
   }),
 ];
