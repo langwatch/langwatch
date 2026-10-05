@@ -233,10 +233,10 @@ Feature: Workflow service boundary
     Then the monitor is deleted, the evaluator and the agent are archived, then the workflow
 
   @unit
-  Scenario: The workflows list reads copy lineage on a process that supplies only declared members
-    Given the workflow module is installed from its declared members alone
+  Scenario: The workflows list reads copy lineage on a process that supplies only stores and declared peers
+    Given the workflow module is installed on the process's stores and its declared peers alone
     When the project's workflows are listed with their copy lineage
-    Then the list answers instead of failing on a member the process never supplied
+    Then the list answers instead of failing on anything the process never supplied
 
   @unit
   Scenario: An evaluation run is judged against an API key's own bindings

@@ -13,7 +13,6 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -28,7 +27,6 @@ import {
 } from "../../rules/nlp-lambda-config.rules.ts";
 import { NLP_LAMBDA_ARN_CACHE_PREFIX } from "../../services/nlp-lambda-runtime.service.ts";
 import { WorkflowModule } from "../workflow.app.ts";
-import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 const lambda = vi.hoisted(() => {
   const sent: unknown[] = [];
@@ -84,13 +82,7 @@ function appWith({
   fleetSecret: string;
   repositories?: WorkflowRepositories;
 }): Promise<WorkflowModule> {
-  const members = createWorkflowTestInfrastructure();
-
   return WorkflowModule.create({
-    members: {
-      ...members,
-      prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-    },
     dependencies: {
       evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
       modelProviders: createApiFixture<ModelProviderApi>(
@@ -121,7 +113,7 @@ function appWith({
   });
 }
 
-/** The fingerprint the app derives from `fleet` and the members above. */
+/** The fingerprint the app derives from `fleet` and the config above. */
 function fleetFingerprint(): string {
   return studioLambdaConfigFingerprint(
     buildStudioLambdaConfig({

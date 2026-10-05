@@ -5,7 +5,7 @@
  */
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { ObjectStorage, StoredObjectAddress } from "@langwatch/process-stores/members";
+import type { ObjectStorage, StoredObjectAddress } from "@langwatch/process-stores";
 import { nowInstant } from "@langwatch/time";
 
 import type { NlpPayloadStaging, StagedNlpPayload } from "../../channels/nlp-lambda.channel.ts";

@@ -12,7 +12,6 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -23,15 +22,9 @@ import type { WorkflowRepositories } from "../../repositories/workflow-repositor
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
 import { workflowRunCallerKey, workflowRunRest } from "../../transport/workflow-run.rest.ts";
 import { WorkflowModule } from "../workflow.app.ts";
-import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 async function postRun({ repositories }: { repositories: WorkflowRepositories }) {
-  const members = createWorkflowTestInfrastructure();
   const app = await WorkflowModule.create({
-    members: {
-      ...members,
-      prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-    },
     dependencies: {
       evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
