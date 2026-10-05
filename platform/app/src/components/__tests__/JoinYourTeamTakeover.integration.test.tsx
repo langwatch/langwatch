@@ -27,6 +27,7 @@ const {
   offerRef,
   mineRef,
   invitationsRef,
+  admitFailedRef,
   dismissMock,
   requestMock,
   admitMock,
@@ -40,6 +41,7 @@ const {
   offerRef: { current: { data: undefined as unknown, isPending: false } },
   mineRef: { current: { data: [] as unknown[], isPending: false } },
   invitationsRef: { current: { data: [] as unknown[], isPending: false } },
+  admitFailedRef: { current: false },
   dismissMock: vi.fn(),
   requestMock: vi.fn(),
   admitMock: vi.fn(),
@@ -78,7 +80,11 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: requestMock, isPending: false }),
       },
       admitAutomatically: {
-        useMutation: () => ({ mutate: admitMock, isPending: false }),
+        useMutation: () => ({
+          mutate: admitMock,
+          isPending: false,
+          isError: admitFailedRef.current,
+        }),
       },
     },
     invite: {
@@ -159,6 +165,7 @@ beforeEach(() => {
   offerRef.current = { ...OFFERED };
   mineRef.current = { data: [], isPending: false };
   invitationsRef.current = { data: [], isPending: false };
+  admitFailedRef.current = false;
 });
 
 afterEach(() => cleanup());
@@ -600,6 +607,87 @@ describe("given a sign-up the device page sent to the welcome screen", () => {
 
       expect(admitMock).not.toHaveBeenCalled();
       expect(screen.getByTestId("current-organization")).toBeInTheDocument();
+    });
+
+    /** @scenario A pending invitation is offered before asking to join */
+    it("leads with a waiting invitation and admits nobody behind it", async () => {
+      offerRef.current = {
+        data: {
+          outcome: "auto",
+          organization: {
+            organizationId: "org_acme",
+            name: "Acme",
+            colleagueCount: 10,
+          },
+        },
+        isPending: false,
+      };
+      invitationsRef.current = {
+        data: [
+          { inviteCode: "code_1", organizationName: "Acme", role: "ADMIN" },
+        ],
+        isPending: false,
+      };
+      renderTakeover();
+
+      expect(
+        screen.getByRole("button", { name: /Accept the invitation to Acme/ }),
+      ).toBeInTheDocument();
+      // Admitting first would make them a member at the joiner seat and the
+      // invitation, with the seat the administrator chose, could no longer be
+      // accepted.
+      await waitFor(() => expect(admitMock).not.toHaveBeenCalled());
+      expect(
+        screen.queryByTestId("join-team-admitting"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario The welcome screen honours an automatic door */
+    it("waits for the invitation answer before walking through the door", () => {
+      offerRef.current = {
+        data: {
+          outcome: "auto",
+          organization: {
+            organizationId: "org_acme",
+            name: "Acme",
+            colleagueCount: 10,
+          },
+        },
+        isPending: false,
+      };
+      invitationsRef.current = { data: undefined as never, isPending: true };
+      renderTakeover();
+
+      expect(admitMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The welcome screen honours an automatic door */
+    it("steps aside when the admission is refused, so the screen beneath is reachable", () => {
+      offerRef.current = {
+        data: {
+          outcome: "auto",
+          organization: {
+            organizationId: "org_acme",
+            name: "Acme",
+            colleagueCount: 10,
+          },
+        },
+        isPending: false,
+      };
+      admitFailedRef.current = true;
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover
+            currentOrganizationId={null}
+            fallback={<div data-testid="make-your-own" />}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(
+        screen.queryByTestId("join-team-admitting"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("make-your-own")).toBeInTheDocument();
     });
   });
 });

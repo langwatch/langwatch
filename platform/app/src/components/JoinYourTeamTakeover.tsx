@@ -147,8 +147,14 @@ function useJoinTakeoverState({
     {},
     { enabled: enabled && onboarding },
   );
+  // An invitation outranks the door: an administrator chose a seat by
+  // inviting, and admitting first would refuse the invitation afterwards
+  // (members cannot accept one) and lose that choice. So admission waits for
+  // the invitation answer, and runs only when there is none.
+  const noInvitation =
+    !invitations.isPending && (invitations.data?.length ?? 0) === 0;
   const admitting = useAutomaticAdmission({
-    admit: onboarding && offer.data?.outcome === "auto",
+    admit: onboarding && noInvitation && offer.data?.outcome === "auto",
     origin,
   });
 
@@ -284,6 +290,10 @@ function AdmittingTakeover({ organizationName }: { organizationName: string }) {
  * as already pending. Nothing navigates on success; the organization list is
  * refreshed and the welcome screen's own redirect carries on, honouring the
  * continuation the device page gave it.
+ *
+ * Returns whether the "one moment" screen should still be up. A refused
+ * admission says why and steps aside, so the screen beneath (make your own
+ * workspace) is reachable rather than a modal nobody can close.
  */
 function useAutomaticAdmission({
   admit,
@@ -302,6 +312,8 @@ function useAutomaticAdmission({
     admitAutomatically.mutate(
       { origin },
       {
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't join just now" }),
         onSettled: () => {
           void utils.organization.getAll.invalidate();
           void utils.joinRequests.offer.invalidate();
@@ -311,7 +323,7 @@ function useAutomaticAdmission({
     );
   }, [admit, origin, admitAutomatically, utils]);
 
-  return admit;
+  return admit && !admitAutomatically.isError;
 }
 
 /**
