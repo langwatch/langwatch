@@ -3,7 +3,7 @@
  *
  * The View drawer's Conditions section: a query-subject automation shows its
  * search query (ADR-043), legacy structured filters render via FilterDisplay,
- * and an automation with neither shows the "No conditions" empty state (the
+ * and an automation with neither is flagged as matching every trace (the
  * stored `filters` string is "{}" for query automations, which is truthy, so
  * emptiness must be judged on the parsed object).
  */
@@ -11,6 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ViewAutomationDrawer } from "../ViewAutomationDrawer";
+import { fakeQuery } from "./viewDrawerTestKit";
 
 let mockTriggerRow: Record<string, unknown> | null = null;
 
@@ -43,27 +44,53 @@ vi.mock("~/utils/api", () => ({
   api: {
     automation: {
       getTriggerById: {
-        useQuery: () => ({
-          data: mockTriggerRow,
-          isLoading: false,
-          error: null,
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockTriggerRow, options),
+      },
+      getFireHistory: {
+        useInfiniteQuery: (
+          _input: unknown,
+          options?: { enabled?: boolean },
+        ) => ({
+          ...fakeQuery({ pages: [{ fires: [], nextCursor: null }] }, options),
+          hasNextPage: false,
+          isFetchingNextPage: false,
+          fetchNextPage: vi.fn(),
         }),
       },
-      getRecentFires: {
-        useQuery: () => ({ data: [], isLoading: false, error: null }),
+      getLatestEvaluation: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(null, options),
+      },
+      getNextFiring: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery({ kind: "immediate", traceDebounceMs: 30000 }, options),
       },
       getWebhookDeliveries: {
-        useQuery: () => ({ data: [], isLoading: false, error: null }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery([], options),
       },
     },
     graphs: {
       getById: {
-        useQuery: () => ({ data: null, isLoading: false, error: null }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(null, options),
       },
     },
     dataset: {
       getAll: {
-        useQuery: () => ({ data: [], isLoading: false, error: null }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery([], options),
+      },
+    },
+    // Names a Slack row's connection; these automations are not Slack ones.
+    slackIntegration: {
+      list: { useQuery: () => ({ data: undefined }) },
+    },
+    tracesV2: {
+      list: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(undefined, options),
       },
     },
   },
@@ -139,6 +166,29 @@ describe("ViewAutomationDrawer conditions section", () => {
     });
   });
 
+  describe("given an automation narrowed only by a monitor check", () => {
+    beforeEach(() => {
+      mockTriggerRow = {
+        ...baseTrigger,
+        filterQuery: null,
+        // Monitor checks are stored as keys inside `filters`, which is where
+        // the automations table's check count comes from as well.
+        filters: JSON.stringify({
+          "evaluations.passed": { check_abc: ["false"] },
+        }),
+      };
+    });
+
+    describe("when the drawer renders", () => {
+      it("does not claim it matches every trace", () => {
+        renderDrawer();
+
+        expect(screen.queryByTestId("matches-every-trace")).toBeNull();
+        expect(screen.getByTestId("filter-display")).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given an automation with no query and empty filters", () => {
     beforeEach(() => {
       mockTriggerRow = {
@@ -149,11 +199,26 @@ describe("ViewAutomationDrawer conditions section", () => {
     });
 
     describe("when the drawer renders", () => {
-      it("shows the no-conditions empty state", () => {
+      /** @scenario "An automation with no condition is flagged as matching every trace" */
+      it("warns that it matches every trace", () => {
         renderDrawer();
 
-        expect(screen.getByText("No conditions")).toBeDefined();
+        expect(screen.getByTestId("matches-every-trace")).toHaveTextContent(
+          "Matches every trace",
+        );
         expect(screen.queryByTestId("filter-display")).toBeNull();
+      });
+
+      /** @scenario "An automation with no condition is flagged as matching every trace" */
+      it("does not claim in its history that it only acts on matching traces", () => {
+        renderDrawer();
+
+        expect(
+          screen.getByText(
+            /It has no condition, so it will act on every trace/,
+          ),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/only acts on traces that match/)).toBeNull();
       });
     });
   });

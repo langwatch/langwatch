@@ -17,6 +17,22 @@ export const isSmtpConfigured = (): boolean =>
   Boolean(env.SMTP_URL ?? env.SMTP_HOST);
 
 /**
+ * Whether the transport logs in to the relay: a user in `SMTP_URL`, or
+ * `SMTP_USER` when the discrete settings are used. Follows the same precedence
+ * as `buildSmtpTransportOptions`.
+ */
+export const smtpSendsCredentials = (): boolean => {
+  if (env.SMTP_URL) {
+    try {
+      return new URL(env.SMTP_URL).username !== "";
+    } catch {
+      return false;
+    }
+  }
+  return Boolean(env.SMTP_USER);
+};
+
+/**
  * Nodemailer's own defaults let a send hang for minutes (2m to connect, 10m of
  * socket inactivity). An unreachable relay is a common misconfiguration, so
  * fail fast enough that a queued notification does not sit on a dead socket.

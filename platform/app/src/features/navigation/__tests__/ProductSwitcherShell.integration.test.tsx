@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let mockPathname = "/[project]";
 let mockGovernanceFlagEnabled = true;
+let mockOrganizationRole = "ADMIN";
 const pushMock = vi.fn().mockResolvedValue(true);
 
 const teamA = {
@@ -182,7 +183,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", async (importOriginal) => ({
     organizations: mockOrganizations,
     team: mockAmbientTeam,
     project: mockAmbientTeam.projects[0],
-    organizationRole: "ADMIN",
+    organizationRole: mockOrganizationRole,
     hasPermission: () => true,
   }),
 }));
@@ -407,6 +408,7 @@ async function openProductSwitcher() {
 beforeEach(() => {
   mockPathname = "/[project]";
   mockGovernanceFlagEnabled = true;
+  mockOrganizationRole = "ADMIN";
   mockOrganizations = [orgA];
   mockAmbientTeam = teamA;
   pushMock.mockClear();
@@ -450,6 +452,21 @@ describe("the product-switcher top bar", () => {
       expect(
         screen.queryByText("Every AI tool, license, agent and dollar"),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario A Developer is offered the Me product and nothing organisation-wide */
+    it("offers a Developer the Me product and no organization-wide one, whatever the flags and permissions say", async () => {
+      mockOrganizationRole = "DEVELOPER";
+      mockPathname = "/me";
+      mockAmbientTeam = personalTeam;
+      renderShell({ personalScope: true });
+      await openProductSwitcher();
+
+      expect(
+        screen.getByText("Track your coding assistants"),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Gateway")).not.toBeInTheDocument();
+      expect(screen.queryByText("Governance")).not.toBeInTheDocument();
     });
 
     /** @scenario Switching product opens that product's home */

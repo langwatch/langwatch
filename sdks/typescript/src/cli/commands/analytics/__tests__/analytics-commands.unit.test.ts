@@ -68,6 +68,31 @@ describe("queryAnalyticsCommand()", () => {
     });
   });
 
+  describe("when no origin choice is given", () => {
+    /** @scenario "Langy's own turns are left out of the numbers" */
+    it("leaves Langy's own turns out", async () => {
+      mockTimeseries.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
+
+      await queryAnalyticsCommand({ groupBy: "metadata.model" });
+
+      expect(mockTimeseries).toHaveBeenCalledWith(
+        expect.objectContaining({ excludeOrigins: ["langy"] }),
+      );
+    });
+  });
+
+  describe("when --include-langy is given", () => {
+    /** @scenario "Langy's own turns are counted when asked" */
+    it("excludes no origin", async () => {
+      mockTimeseries.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
+
+      await queryAnalyticsCommand({ shouldIncludeLangy: true });
+
+      const body = mockTimeseries.mock.calls[0]![0] as Record<string, unknown>;
+      expect(body.excludeOrigins).toBeUndefined();
+    });
+  });
+
   describe("when using a metric preset", () => {
     it("resolves the preset to metric and aggregation", async () => {
       mockTimeseries.mockResolvedValue({

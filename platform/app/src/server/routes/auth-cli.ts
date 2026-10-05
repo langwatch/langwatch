@@ -81,6 +81,7 @@ import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import { holdsSharedAccess } from "~/utils/memberRoleConstraints";
 import {
   publishDeviceCodeSettled,
   waitForDeviceCodeSettled,
@@ -403,6 +404,31 @@ function getRedis() {
   return redisConnection;
 }
 
+/** Whether the caller holds a Developer seat in the organization this project belongs to. */
+async function isDeveloperSeat({
+  userId,
+  projectId,
+}: {
+  userId: string;
+  projectId: string;
+}): Promise<boolean> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  if (!project) return false;
+  const membership = await prisma.organizationUser.findUnique({
+    where: {
+      userId_organizationId: {
+        userId,
+        organizationId: project.team.organizationId,
+      },
+    },
+    select: { role: true },
+  });
+  return membership != null && !holdsSharedAccess(membership.role);
+}
+
 /**
  * The authorization rule every endpoint that hands back a Project.apiKey
  * shares (/approve with a project pick, /project-key): a personal project is
@@ -426,6 +452,29 @@ async function refuseProjectKeyHandout(
         error: "personal_project_not_allowed",
         error_description:
           "Another user's personal project can't back your API key. Pick a shared team project, or your own personal workspace.",
+      },
+      400,
+    );
+  }
+  // ADR-143: a Developer seat works in its own personal project only. The
+  // permission probe below would refuse a shared project anyway, because a
+  // Developer holds no access there; this names the seat so the person is
+  // told what to pick instead of being told they lack a role nobody can
+  // grant them.
+  const ownsPersonalProject =
+    project.isPersonal && project.ownerUserId === session.user.id;
+  if (
+    !ownsPersonalProject &&
+    (await isDeveloperSeat({
+      userId: session.user.id,
+      projectId: project.id,
+    }))
+  ) {
+    return c.json(
+      {
+        error: "developer_seat_personal_only",
+        error_description:
+          "A Developer seat works in its own personal project only. Pick your personal workspace.",
       },
       400,
     );

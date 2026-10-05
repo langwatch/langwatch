@@ -50,8 +50,8 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[ListLangyControlRequestsResponse200]:
-    """List the open requests Langy made for a folder of mine in this project. Only the person Langy asked
-    ever sees a request, and each one expires fifteen minutes after it was made.
+    """List the open requests Langy made for a folder of mine, on every project I can read. Only the person
+    Langy asked ever sees a request, and each one expires fifteen minutes after it was made.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -74,8 +74,8 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> ListLangyControlRequestsResponse200 | None:
-    """List the open requests Langy made for a folder of mine in this project. Only the person Langy asked
-    ever sees a request, and each one expires fifteen minutes after it was made.
+    """List the open requests Langy made for a folder of mine, on every project I can read. Only the person
+    Langy asked ever sees a request, and each one expires fifteen minutes after it was made.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -94,8 +94,8 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[ListLangyControlRequestsResponse200]:
-    """List the open requests Langy made for a folder of mine in this project. Only the person Langy asked
-    ever sees a request, and each one expires fifteen minutes after it was made.
+    """List the open requests Langy made for a folder of mine, on every project I can read. Only the person
+    Langy asked ever sees a request, and each one expires fifteen minutes after it was made.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -116,8 +116,8 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> ListLangyControlRequestsResponse200 | None:
-    """List the open requests Langy made for a folder of mine in this project. Only the person Langy asked
-    ever sees a request, and each one expires fifteen minutes after it was made.
+    """List the open requests Langy made for a folder of mine, on every project I can read. Only the person
+    Langy asked ever sees a request, and each one expires fifteen minutes after it was made.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

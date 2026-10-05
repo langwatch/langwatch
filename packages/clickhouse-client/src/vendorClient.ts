@@ -21,6 +21,7 @@
  * none of it can throw into the caller's path — is ./statementReporting.ts.
  */
 
+import type { AbortSignalLike } from "./query";
 import { runWithRetry } from "./retry";
 import {
   StatementReporter,
@@ -170,6 +171,7 @@ export class VendorClientResilience {
         const result = (await this.withTransientRetry({
           run: () => client.query(params),
           operation: "query",
+          signal: abortSignalOf(params),
         })) as { json?: (...args: never[]) => unknown };
         const durationMs = now() - start;
         this.report.success({ operation: "query", durationMs, params });
@@ -232,11 +234,14 @@ export class VendorClientResilience {
   private withTransientRetry<R>({
     run,
     operation,
+    signal,
   }: {
     run: () => Promise<R>;
     operation: StatementOperation;
+    signal?: AbortSignalLike | undefined;
   }): Promise<R> {
     return runWithRetry(run, {
+      isAborted: () => signal?.aborted === true,
       // maxRetries counts retries after the first try; runWithRetry counts
       // tries.
       maxAttempts: this.maxRetries + 1,
@@ -324,4 +329,19 @@ export class VendorClientResilience {
     }) as R["json"];
     return result;
   }
+}
+
+/** The caller's `abort_signal`, so an abandoned statement is not retried. */
+function abortSignalOf(params: unknown): AbortSignalLike | undefined {
+  if (!params || typeof params !== "object") return undefined;
+  const signal = (params as { abort_signal?: unknown }).abort_signal;
+  return isAbortSignalLike(signal) ? signal : undefined;
+}
+
+function isAbortSignalLike(value: unknown): value is AbortSignalLike {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { aborted?: unknown }).aborted === "boolean"
+  );
 }

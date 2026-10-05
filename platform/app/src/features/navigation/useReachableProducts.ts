@@ -3,7 +3,7 @@ import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
-import { PRODUCTS, type ProductId } from "./products";
+import { PRODUCTS, type ProductId, seatReachesProduct } from "./products";
 
 /**
  * Which products the current user can open right now: every access gate
@@ -26,6 +26,7 @@ export function useReachableProducts({
   const {
     project,
     organization,
+    organizationRole,
     hasPermission,
     isLoading: isOrganizationLoading,
   } = useOrganizationTeamProject({
@@ -51,17 +52,19 @@ export function useReachableProducts({
   };
 
   const reachableIds = enabled
-    ? PRODUCTS.filter((product) =>
-        product.gates.every((gate) => {
-          if (gate.flag !== undefined && !flagValues[gate.flag]) return false;
-          if (
-            gate.permission !== undefined &&
-            !hasPermission(gate.permission)
-          ) {
-            return false;
-          }
-          return true;
-        }),
+    ? PRODUCTS.filter(
+        (product) =>
+          seatReachesProduct({ product, organizationRole }) &&
+          product.gates.every((gate) => {
+            if (gate.flag !== undefined && !flagValues[gate.flag]) return false;
+            if (
+              gate.permission !== undefined &&
+              !hasPermission(gate.permission)
+            ) {
+              return false;
+            }
+            return true;
+          }),
       ).map((product) => product.id)
     : [];
 

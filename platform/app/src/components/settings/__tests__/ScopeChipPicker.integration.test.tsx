@@ -425,3 +425,42 @@ describe("ScopeChipPicker search and team grouping", () => {
     });
   });
 });
+
+describe("ScopeChipPicker summary line", () => {
+  afterEach(cleanup);
+
+  const renderWithProject = (subjectNoun?: string) =>
+    renderPicker(
+      <ScopeChipPicker
+        value={[{ scopeType: "PROJECT", scopeId: "proj-1" }]}
+        onChange={vi.fn()}
+        organizationId="org-1"
+        projectId="proj-1"
+        projectName="Checkout"
+        singleSelect
+        subjectNoun={subjectNoun}
+        currentOrganizationId="org-1"
+        currentProjectId="proj-1"
+      />,
+    );
+
+  describe("given no subject noun", () => {
+    it("calls the scoped thing a configuration", () => {
+      renderWithProject();
+
+      expect(
+        screen.getByText("Only this project can use this configuration."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given a subject noun", () => {
+    it("names the scoped thing with it", () => {
+      renderWithProject("connection");
+
+      expect(
+        screen.getByText("Only this project can use this connection."),
+      ).toBeInTheDocument();
+    });
+  });
+});

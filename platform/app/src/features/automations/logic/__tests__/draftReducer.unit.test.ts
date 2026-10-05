@@ -62,12 +62,10 @@ describe("draftReducer", () => {
   describe("SET_SLICE", () => {
     it("updates exactly the provider's slice", () => {
       const slack = {
+        slackIntegrationId: "conn-hook",
         deliveryMethod: "webhook" as const,
-        webhook: "https://hooks.slack.com/services/T/B/X",
-        botToken: "",
         channelId: "",
-        botTokenAlreadySet: false,
-        isLegacyWebhook: false,
+        legacyParams: null,
         templateType: "string" as const,
         template: { value: "", usingDefault: true },
       };
@@ -99,6 +97,17 @@ describe("draftReducer", () => {
         value: "customGraph",
       });
       expect(next.action).toBe(TriggerAction.SEND_EMAIL);
+    });
+    it("keeps a webhook when switching to customGraph", () => {
+      const withWebhook: AutomationDraft = {
+        ...SAMPLE,
+        action: TriggerAction.SEND_WEBHOOK,
+      };
+      const next = reducer(withWebhook, {
+        type: "SET_SOURCE",
+        value: "customGraph",
+      });
+      expect(next.action).toBe(TriggerAction.SEND_WEBHOOK);
     });
     it("resets a persist action when switching to customGraph", () => {
       const withDataset: AutomationDraft = {
@@ -381,38 +390,55 @@ describe("SET_FILTER_QUERY", () => {
 
 describe("presetLabels", () => {
   it("keys the noun set on the preset for a trace automation", () => {
-    expect(presetLabels("trace", false)).toEqual({
+    expect(presetLabels({ source: "trace", isEdit: false })).toEqual({
       title: "Add automation",
       saveButton: "Create automation",
       createdToast: "Automation created",
       updatedToast: "Automation updated",
       noun: "automation",
     });
-    expect(presetLabels("trace", true).title).toBe("Edit automation");
-    expect(presetLabels("trace", true).saveButton).toBe("Save changes");
+    expect(presetLabels({ source: "trace", isEdit: true }).title).toBe(
+      "Edit automation",
+    );
+    expect(presetLabels({ source: "trace", isEdit: true }).saveButton).toBe(
+      "Save changes",
+    );
   });
 
-  it("gives an alert its own copy", () => {
-    expect(presetLabels("customGraph", false)).toMatchObject({
-      title: "New alert",
-      saveButton: "Create alert",
-      createdToast: "Alert created",
-      noun: "alert",
-    });
-    expect(presetLabels("customGraph", true).title).toBe("Edit alert");
+  it("names a graph-watching automation an automation, like any other", () => {
+    // ADR-093 §1: the alert/automation split was a distinction customers did
+    // not draw, so both subjects share one noun — which is what makes the
+    // delete dialog and its toast say "automation" for a graph row too.
+    expect(presetLabels({ source: "customGraph", isEdit: false })).toEqual(
+      presetLabels({ source: "trace", isEdit: false }),
+    );
+    expect(presetLabels({ source: "customGraph", isEdit: false }).noun).toBe(
+      "automation",
+    );
+    expect(presetLabels({ source: "customGraph", isEdit: true }).title).toBe(
+      "Edit automation",
+    );
+    expect(
+      presetLabels({ source: "customGraph", isEdit: false }).saveButton,
+    ).not.toMatch(/alert/i);
   });
 
-  it("gives a report schedule copy — never automation copy (field-5015)", () => {
-    const create = presetLabels("report", false);
+  it("calls the third concept a report — never a schedule, never automation copy (field-5015)", () => {
+    // The schedule is when it goes out, which is one of its fields; the thing
+    // itself is the report it sends (decision by Alex, 2026-08-12).
+    const create = presetLabels({ source: "report", isEdit: false });
     expect(create).toMatchObject({
-      title: "New schedule",
-      saveButton: "Create schedule",
-      createdToast: "Schedule created",
-      updatedToast: "Schedule updated",
-      noun: "schedule",
+      title: "New report",
+      saveButton: "Create report",
+      createdToast: "Report created",
+      updatedToast: "Report updated",
+      noun: "report",
     });
     expect(create.saveButton).not.toMatch(/automation/i);
-    expect(presetLabels("report", true).title).toBe("Edit schedule");
+    expect(create.title).not.toMatch(/schedule/i);
+    expect(presetLabels({ source: "report", isEdit: true }).title).toBe(
+      "Edit report",
+    );
   });
 });
 
@@ -525,6 +551,28 @@ describe("buildTestFirePayload sends the graph-alert discriminator", () => {
       expect(payload.graphAlert).toBeNull();
       expect(payload.channel).toBe("email");
       expect(payload.trigger.name).toBe("High latency");
+    });
+  });
+
+  describe("given a Slack draft that delivers through a connection", () => {
+    it("names the connection, and omits it when there is none", () => {
+      const withConnection = buildTestFirePayload({
+        draft: SAMPLE,
+        projectId: "proj_1",
+        channel: "slack",
+        webhook: null,
+        slackIntegrationId: "conn-hook",
+      });
+      const without = buildTestFirePayload({
+        draft: SAMPLE,
+        projectId: "proj_1",
+        channel: "slack",
+        webhook: null,
+        slackIntegrationId: null,
+      });
+
+      expect(withConnection).toMatchObject({ slackIntegrationId: "conn-hook" });
+      expect(without).not.toHaveProperty("slackIntegrationId");
     });
   });
 
