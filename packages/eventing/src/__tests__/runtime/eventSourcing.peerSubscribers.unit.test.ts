@@ -160,7 +160,7 @@ describe("a peer subscriber", () => {
 
   describe("given a peer subscriber declares enqueue options", () => {
     /** @scenario "A peer subscriber carries its enqueue options and the event's instant" */
-    it("registers the options on its lane and hands the handler the event's occurredAt", async () => {
+    it("registers the options on its lane and hands the handler the event's occurredAt and eventId", async () => {
       const handle = vi.fn(
         async (_data: { ownerId: string }, _context: PeerSubscriberContext) => void 0,
       );
@@ -192,7 +192,12 @@ describe("a peer subscriber", () => {
 
       expect(handle).toHaveBeenCalledWith(
         { ownerId: "owner-3" },
-        { tenantId: "project-1", aggregateId: "owner-3", occurredAt: 1 },
+        {
+          tenantId: "project-1",
+          aggregateId: "owner-3",
+          occurredAt: 1,
+          eventId: "event-owner-3",
+        },
       );
     });
   });

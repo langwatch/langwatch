@@ -38,9 +38,6 @@
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
-      "path": "../../project/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
@@ -66,6 +63,9 @@
     },
     {
       "path": "../../../packages/process-stores/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"

@@ -163,7 +163,7 @@ beforeAll(() => {
         noEmit: true,
         skipLibCheck: true,
         strict: true,
-        target: "ES2022",
+        target: "ES2023",
         typeRoots: [resolve(root, "node_modules/@types")],
         types: ["node"],
       },

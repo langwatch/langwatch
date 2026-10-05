@@ -354,10 +354,6 @@ const presentations = {
     title: "This query read too much data",
     describe: () => "Narrow the time range or add filters so the query reads less.",
   },
-  time_range_too_wide: {
-    title: "Time range is too wide",
-    describe: () => "Pick a shorter range and try again.",
-  },
   page_too_deep: {
     title: "That page is too deep to open by number",
     describe: () => "Narrow the time range or filters, or step forward with Next.",
@@ -5680,6 +5676,16 @@ const presentations = {
   secret_reveal_expired: {
     title: "This key can no longer be shown",
     describe: () => "Create a new key if you did not save it.",
+  },
+  secret_unreadable: {
+    title: "Something went wrong on our side",
+    describe: () =>
+      "A project secret is stored but cannot be read on this deployment. An operator needs to check its encryption key.",
+  },
+  web_push_endpoint_refused: {
+    title: "Push notifications aren't available in this browser",
+    describe: () =>
+      "This browser's push service is not one LangWatch sends to, so notifications stay in the open tab.",
   },
   unsupported_parameter: {
     title: "That provider can't honor one of your parameters",
