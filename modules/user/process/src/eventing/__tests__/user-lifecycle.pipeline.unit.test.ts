@@ -1,7 +1,8 @@
 /**
  * @vitest-environment node
  *
- * user_lifecycle records an account's deactivation and reactivation; peers react from their side (§9).
+ * user_lifecycle records an account's deactivation and reactivation; peers react from their side
+ * (§9).
  * @see modules/user/specs/user.feature
  */
 import { createTenantId } from "@langwatch/eventing";

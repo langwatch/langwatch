@@ -30,7 +30,7 @@ const versionOf = (id: string, nodes: unknown[]): WorkflowVersion => ({
   commitMessage: "first",
   authorId: null,
   parentId: null,
-  dsl: { version: "1", name: "Flow", nodes, edges: [] } as unknown as WorkflowVersion["dsl"],
+  dsl: { version: "1", name: "Flow", nodes, edges: [] },
   createdAt: at,
   updatedAt: at,
 });

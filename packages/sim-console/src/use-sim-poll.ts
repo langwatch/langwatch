@@ -7,6 +7,33 @@ const failed = <T>({ caught }: { caught: unknown }) => {
   return (previous: Answer<T>): Answer<T> => ({ data: previous.data, error });
 };
 
+const followVisibility = ({
+  refresh,
+  inFlight,
+  everyMs,
+}: {
+  refresh: () => Promise<void>;
+  inFlight: { current: boolean };
+  everyMs: number;
+}) => {
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const follow = () => {
+    clearInterval(timer);
+    timer = undefined;
+    if (document.visibilityState === "hidden") return;
+    void refresh();
+    timer = setInterval(() => {
+      if (!inFlight.current) void refresh();
+    }, everyMs);
+  };
+  follow();
+  document.addEventListener("visibilitychange", follow);
+  return () => {
+    clearInterval(timer);
+    document.removeEventListener("visibilitychange", follow);
+  };
+};
+
 /**
  * Calls `fetch` now and every `everyMs` while the tab is visible, and again the
  * moment it is shown. `fetch` is read afresh on each call, so an inline arrow is
@@ -46,21 +73,9 @@ export const useSimPoll = <T>({
   }, []);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | undefined;
-    const follow = () => {
-      clearInterval(timer);
-      timer = undefined;
-      if (document.visibilityState === "hidden") return;
-      void refresh();
-      timer = setInterval(() => {
-        if (!inFlight.current) void refresh();
-      }, everyMs);
-    };
-    follow();
-    document.addEventListener("visibilitychange", follow);
+    const stop = followVisibility({ refresh, inFlight, everyMs });
     return () => {
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", follow);
+      stop();
       newest.current += 1;
     };
   }, [refresh, everyMs]);

@@ -105,7 +105,7 @@ export class WorkflowHttpCredentialsBackfillTask extends Task {
           error,
           projectId: input.projectId,
           versionId: input.versionId,
-          nodeId: nodeIdOf(input.node),
+          ...nodeIdFields(input.node),
         },
         "node credentials left in place",
       );
@@ -114,8 +114,8 @@ export class WorkflowHttpCredentialsBackfillTask extends Task {
   }
 }
 
-function nodeIdOf(node: unknown): string | undefined {
+function nodeIdFields(node: unknown): { nodeId?: string } {
   return typeof node === "object" && node !== null && "id" in node && typeof node.id === "string"
-    ? node.id
-    : undefined;
+    ? { nodeId: node.id }
+    : {};
 }

@@ -84,7 +84,10 @@ export class McpCallerAuthService {
     return this.#authFailures.isBlocked(this.clientIpOf(req));
   }
 
-  /** An access token is the person capped at a project, re-proved; a project key is its own check. */
+  /**
+   * An access token is the person capped at a project, re-proved; a project key is its own
+   * check.
+   */
   async resolveCaller(token: string): Promise<McpCallerLookup> {
     if (!token.startsWith(ACCESS_TOKEN_PREFIX)) {
       return { kind: "resolved", apiKey: token, userId: undefined, projectId: undefined };
@@ -175,7 +178,8 @@ export class McpCallerAuthService {
         ? null
         : { userId: session.userId, projectId: session.projectId };
     } catch (err) {
-      if (!HandledError.isHandled(err)) logger.error({ error: err }, "MCP access token read failed");
+      if (!HandledError.isHandled(err))
+        logger.error({ error: err }, "MCP access token read failed");
       return null;
     }
   }

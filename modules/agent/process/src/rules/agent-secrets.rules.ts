@@ -48,7 +48,9 @@ function httpConfigWithoutSecrets(config: HttpAgentConfig): HttpAgentConfig {
   return httpConfigBlanking(config, withoutLiteralCredential);
 }
 
-/** A read of an agent: every literal HTTP credential blank; `{{ secrets.NAME }}` references stay. */
+/**
+ * A read of an agent: every literal HTTP credential blank; `{{ secrets.NAME }}` references stay.
+ */
 export function agentWithoutSecrets(agent: AgentOverview): AgentOverview {
   if (agent.type !== "http") return agent;
 
@@ -105,7 +107,10 @@ export function httpSecretsKeepingStored<T extends HttpSecrets>(input: {
 
 type HttpDestination = HttpSecrets & { url: string };
 
-/** Whether a write's blank credentials would carry stored values to another origin than the saved one. */
+/**
+ * Whether a write's blank credentials would carry stored values to another origin than the saved
+ * one.
+ */
 export function movesStoredSecrets(input: {
   stored: HttpDestination;
   incoming: HttpDestination;
@@ -132,7 +137,10 @@ export function configForCopy(input: {
   const { source, current } = input;
   if (source.type !== "http" || source.projectId === input.targetProjectId) return source.config;
   const blank = httpConfigBlanking(source.config, () => "");
-  if (current?.type !== "http" || !isSameOrigin({ requested: blank.url, saved: current.config.url })) {
+  if (
+    current?.type !== "http" ||
+    !isSameOrigin({ requested: blank.url, saved: current.config.url })
+  ) {
     return blank;
   }
 

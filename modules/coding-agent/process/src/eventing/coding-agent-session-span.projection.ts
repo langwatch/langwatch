@@ -112,47 +112,11 @@ export class CodingAgentSessionSpanProjection {
     const isLogsOnly = agent !== undefined && LOGS_ONLY_AGENT_IDS.has(agent);
 
     if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
-      // Identity still rides the span; only the counted facts are the log's.
-      if (isLogsOnly) return this.stateProjection.withIdentity(state, attrs);
-      const before = this.stateProjection.withIdentity(state, attrs);
-      const folded = this.stateProjection.foldModelCall(before, attrs, durationMs);
-      // Priced from the span's tokens with the same formula and the same
-      // cache-write lifetime the trace pipeline applies to the identical span,
-      // so the session and its traces state one figure. The cost the agent
-      // reports about itself lands on agentReportedCostUsd instead.
-      return this.stateProjection.chargeContextUsage({
-        before,
-        after: {
-          ...folded,
-          costUsd:
-            folded.costUsd +
-            this.pricedFromTokens(
-              this.claudeCallTokenFacts(attrs, this.traceCanonicalisation),
-              this.modelProviders,
-            ),
-        },
-        context,
-      });
+      return this.applyClaudeLlmRequest({ state, attrs, durationMs, isLogsOnly, context });
     }
 
     if (span.name === CODEX.SPAN.TURN) {
-      // The contribution's own label gates the fold: the dispatcher already
-      // declined foreign spans reusing this bare name, and one that still
-      // arrives labeled as another agent contributes identity only.
-      if (agent !== "codex" || isLogsOnly) return this.stateProjection.withIdentity(state, attrs);
-      const facts = this.codexTurnTokenFacts(attrs);
-      // Fallback duration 0, not the span's: the turn's wall time includes the
-      // tools that ran inside it, and zero reads honestly as "not measured".
-      const before = this.stateProjection.withIdentity(state, attrs);
-      const folded = this.stateProjection.foldModelCall(before, facts, 0);
-      return this.stateProjection.chargeContextUsage({
-        before,
-        after: {
-          ...folded,
-          costUsd: folded.costUsd + this.pricedFromTokens(facts, this.modelProviders),
-        },
-        context,
-      });
+      return this.applyCodexTurn({ state, attrs, agent, isLogsOnly, context });
     }
 
     if (span.name === CODEX.SPAN.HELPER_REQUEST) {
@@ -189,6 +153,74 @@ export class CodingAgentSessionSpanProjection {
         startedAtMs: span.startTimeUnixMs,
       },
     );
+  }
+
+  private applyClaudeLlmRequest({
+    state,
+    attrs,
+    durationMs,
+    isLogsOnly,
+    context,
+  }: {
+    state: CodingAgentSessionData;
+    attrs: Record<string, unknown>;
+    durationMs: number;
+    isLogsOnly: boolean;
+    context: NonNullable<CodingAgentSessionSpanProjectionInput["context"]> | null;
+  }): CodingAgentSessionData {
+    // Identity still rides the span; only the counted facts are the log's.
+    if (isLogsOnly) return this.stateProjection.withIdentity(state, attrs);
+    const before = this.stateProjection.withIdentity(state, attrs);
+    const folded = this.stateProjection.foldModelCall(before, attrs, durationMs);
+    // Priced from the span's tokens with the same formula and the same
+    // cache-write lifetime the trace pipeline applies to the identical span,
+    // so the session and its traces state one figure. The cost the agent
+    // reports about itself lands on agentReportedCostUsd instead.
+    return this.stateProjection.chargeContextUsage({
+      before,
+      after: {
+        ...folded,
+        costUsd:
+          folded.costUsd +
+          this.pricedFromTokens(
+            this.claudeCallTokenFacts(attrs, this.traceCanonicalisation),
+            this.modelProviders,
+          ),
+      },
+      context,
+    });
+  }
+
+  private applyCodexTurn({
+    state,
+    attrs,
+    agent,
+    isLogsOnly,
+    context,
+  }: {
+    state: CodingAgentSessionData;
+    attrs: Record<string, unknown>;
+    agent: CodingAgentSessionSpanProjectionInput["agent"];
+    isLogsOnly: boolean;
+    context: NonNullable<CodingAgentSessionSpanProjectionInput["context"]> | null;
+  }): CodingAgentSessionData {
+    // The contribution's own label gates the fold: the dispatcher already
+    // declined foreign spans reusing this bare name, and one that still
+    // arrives labeled as another agent contributes identity only.
+    if (agent !== "codex" || isLogsOnly) return this.stateProjection.withIdentity(state, attrs);
+    const facts = this.codexTurnTokenFacts(attrs);
+    // Fallback duration 0, not the span's: the turn's wall time includes the
+    // tools that ran inside it, and zero reads honestly as "not measured".
+    const before = this.stateProjection.withIdentity(state, attrs);
+    const folded = this.stateProjection.foldModelCall(before, facts, 0);
+    return this.stateProjection.chargeContextUsage({
+      before,
+      after: {
+        ...folded,
+        costUsd: folded.costUsd + this.pricedFromTokens(facts, this.modelProviders),
+      },
+      context,
+    });
   }
 
   private pricedFromTokens(

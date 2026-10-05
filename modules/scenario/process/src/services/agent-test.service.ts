@@ -114,20 +114,30 @@ export class AgentTestService {
       voiceTargets: null,
     });
 
-    return new AgentTestService(
+    return new AgentTestService({
       options,
       targetPrefetch,
-      ConnectedTargetService.create(options.agents),
-      ScenarioRunKeyService.create({ apiKeys: options.apiKeys }),
-    );
+      connectedTargets: ConnectedTargetService.create(options.agents),
+      runKeys: ScenarioRunKeyService.create({ apiKeys: options.apiKeys }),
+    });
   }
 
-  private constructor(
-    private readonly options: AgentTestServiceOptions,
-    private readonly targetPrefetch: ScenarioTargetPrefetchService,
-    private readonly connectedTargets: ConnectedTargetService,
-    private readonly runKeys: ScenarioRunKeyService,
-  ) {}
+  private readonly options: AgentTestServiceOptions;
+  private readonly targetPrefetch: ScenarioTargetPrefetchService;
+  private readonly connectedTargets: ConnectedTargetService;
+  private readonly runKeys: ScenarioRunKeyService;
+
+  private constructor(input: {
+    options: AgentTestServiceOptions;
+    targetPrefetch: ScenarioTargetPrefetchService;
+    connectedTargets: ConnectedTargetService;
+    runKeys: ScenarioRunKeyService;
+  }) {
+    this.options = input.options;
+    this.targetPrefetch = input.targetPrefetch;
+    this.connectedTargets = input.connectedTargets;
+    this.runKeys = input.runKeys;
+  }
 
   /** The target a test points at, with a connected agent's ownership already
    * settled, or the refusal an agent no test can run against carries. */

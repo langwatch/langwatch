@@ -74,25 +74,29 @@ const workspaceModules = (workspaceRoot) =>
 const names = (text, path) =>
   text.includes(`${path} `) || text.includes(`"${path}"`) || text.includes(`"${path}/`);
 
-export const createDependencies = (_options, context) => {
-  const modules = workspaceModules(context.workspaceRoot);
+const projectEdges = ({ project, files, modules, context }) => {
+  const isModule = modules.some((module) => module.project === project);
+  const tags = context.projects[project]?.tags;
+  if (!isModule && !tags?.includes("go")) return [];
   const edges = [];
-  for (const [project, files] of Object.entries(context.fileMap.projectFileMap)) {
-    const isModule = modules.some((module) => module.project === project);
-    const tags = context.projects[project]?.tags;
-    if (!isModule && !tags?.includes("go")) continue;
-    for (const { file } of files) {
-      const read = isModule
-        ? basename(file) === "go.mod"
-        : file.endsWith(".go") && !file.endsWith("_test.go");
-      if (!read) continue;
-      const text = readFileSync(join(context.workspaceRoot, file), "utf8");
-      for (const { path, project: target } of modules) {
-        if (target !== project && names(text, path)) {
-          edges.push({ source: project, target, sourceFile: file, type: "static" });
-        }
+  for (const { file } of files) {
+    const read = isModule
+      ? basename(file) === "go.mod"
+      : file.endsWith(".go") && !file.endsWith("_test.go");
+    if (!read) continue;
+    const text = readFileSync(join(context.workspaceRoot, file), "utf8");
+    for (const { path, project: target } of modules) {
+      if (target !== project && names(text, path)) {
+        edges.push({ source: project, target, sourceFile: file, type: "static" });
       }
     }
   }
   return edges;
+};
+
+export const createDependencies = (_options, context) => {
+  const modules = workspaceModules(context.workspaceRoot);
+  return Object.entries(context.fileMap.projectFileMap).flatMap(([project, files]) =>
+    projectEdges({ project, files, modules, context }),
+  );
 };

@@ -45,8 +45,10 @@ describe("getRawColorValue", () => {
   });
 
   it("throws for a token the stylesheet does not define instead of guessing", () => {
-    expect(() => getRawColorValue("blue.fg")).toThrow();
-    expect(() => getRawColorValue("not-a-colour")).toThrow();
+    expect(() => getRawColorValue("blue.fg")).toThrow(
+      "Colour variable --chakra-colors-blue-fg is not defined",
+    );
+    expect(() => getRawColorValue("not-a-colour")).toThrow(/"not-a-colour" is not a colour token/);
   });
 
   it("reads a semantic token from the stylesheet Chakra emits", () => {

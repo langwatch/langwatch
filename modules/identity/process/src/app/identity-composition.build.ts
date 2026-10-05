@@ -175,7 +175,9 @@ function ssoConnectionHistoryStore(options: {
   };
 }
 
-/** What this process hands `IdentityModule` at boot, built from its own rows, members and config. */
+/**
+ * What this process hands `IdentityModule` at boot, built from its own rows, members and config.
+ */
 export function buildIdentityInfrastructure(input: {
   repositories: Pick<
     IdentityRepositories,

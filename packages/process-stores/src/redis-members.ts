@@ -52,7 +52,10 @@ export function redisIdempotency(redis: RedisConnection): IdempotencyStore {
   };
 }
 
-/** One script, so no counter is ever left without its window's expiry (a lockout that never lifts). */
+/**
+ * One script, so no counter is ever left without its window's expiry (a lockout that never
+ * lifts).
+ */
 const COUNT_IN_WINDOW = `
 local used = redis.call('INCR', KEYS[1])
 if redis.call('TTL', KEYS[1]) < 0 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end

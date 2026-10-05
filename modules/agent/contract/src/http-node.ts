@@ -207,10 +207,16 @@ function parametersBlanking<Parameter extends NodeParameter>(input: {
     const { identifier, value } = parameter;
     if (SECRET_PARAMETERS.includes(identifier)) return { ...parameter, value: blank(value) };
     if (identifier === "headers") {
-      return { ...parameter, value: blankMapEntries({ value, isCredential: isCredentialHeader, blank }) };
+      return {
+        ...parameter,
+        value: blankMapEntries({ value, isCredential: isCredentialHeader, blank }),
+      };
     }
     if (identifier === "auth") {
-      return { ...parameter, value: blankMapEntries({ value, isCredential: isAuthSecretField, blank }) };
+      return {
+        ...parameter,
+        value: blankMapEntries({ value, isCredential: isAuthSecretField, blank }),
+      };
     }
 
     return parameter;
@@ -284,7 +290,11 @@ export type SecretWriter = {
 };
 
 /** Stores one credential as a project secret and answers the reference that replaces it. */
-export type SecretReferencer = (input: { owner: string; field: string; value: string }) => Promise<string>;
+export type SecretReferencer = (input: {
+  owner: string;
+  field: string;
+  value: string;
+}) => Promise<string>;
 
 function upperSnake(text: string): string {
   return text
@@ -296,7 +306,11 @@ function upperSnake(text: string): string {
 const MAX_NAME_ATTEMPTS = 3;
 
 /** The base name, or the first numbered one that is free or already holds the value. */
-function freeName(input: { names: ReadonlyMap<string, string>; base: string; value: string }): string {
+function freeName(input: {
+  names: ReadonlyMap<string, string>;
+  base: string;
+  value: string;
+}): string {
   let name = input.base;
   for (let suffix = 2; input.names.has(name) && input.names.get(name) !== input.value; suffix++) {
     name = `${input.base}_${suffix}`;
@@ -316,7 +330,11 @@ export function createSecretReferencer(writer: SecretWriter): SecretReferencer {
 
     return known;
   };
-  const store = async (input: { base: string; value: string; attempt: number }): Promise<string> => {
+  const store = async (input: {
+    base: string;
+    value: string;
+    attempt: number;
+  }): Promise<string> => {
     const names = known ?? (await reread());
     const name = freeName({ names, base: input.base, value: input.value });
     if (names.get(name) === input.value) return `{{ secrets.${name} }}`;
@@ -347,40 +365,35 @@ function credentialStorer(input: { owner: string; reference: SecretReferencer })
   const { owner, reference } = input;
 
   return async (field, value) =>
-    holdsLiteralCredential(value)
-      ? reference({ owner, field, value })
-      : inReferenceSpelling(value);
+    holdsLiteralCredential(value) ? reference({ owner, field, value }) : inReferenceSpelling(value);
 }
 
 async function entriesStoringSecrets(input: {
   entries: readonly (readonly [string, unknown])[];
-  field: (key: string) => string | undefined;
+  entryField: EntryField;
   store: CredentialStorer;
 }): Promise<[string, unknown][]> {
+  const { entryField } = input;
   const stored: [string, unknown][] = [];
   for (const [key, value] of input.entries) {
-    const field = input.field(key);
-    stored.push([
-      key,
-      typeof value === "string" && field ? await input.store(field, value) : value,
-    ]);
+    const storable = typeof value === "string" && entryField.holdsCredential(key);
+    stored.push([key, storable ? await input.store(`${entryField.prefix}${key}`, value) : value]);
   }
 
   return stored;
 }
 
-function headerField(key: string): string | undefined {
-  return isCredentialHeader(key) ? `header_${key}` : undefined;
-}
-
-function authField(field: string): string | undefined {
-  return isAuthSecretField(field) ? `auth_${field}` : undefined;
+interface EntryField {
+  holdsCredential: (key: string) => boolean;
+  prefix: string;
 }
 
 /** The dict parameters whose entries may hold a credential, and the field each is stored under. */
-const ENTRY_FIELDS: ReadonlyMap<string, (key: string) => string | undefined> = new Map([
-  ["headers", headerField],
-  ["auth", authField],
+const HEADER_ENTRY_FIELD: EntryField = { holdsCredential: isCredentialHeader, prefix: "header_" };
+
+const ENTRY_FIELDS: ReadonlyMap<string, EntryField> = new Map([
+  ["headers", HEADER_ENTRY_FIELD],
+  ["auth", { holdsCredential: isAuthSecretField, prefix: "auth_" }],
 ]);
 
 async function parameterStoringSecrets<Parameter extends NodeParameter>(input: {
@@ -390,12 +403,18 @@ async function parameterStoringSecrets<Parameter extends NodeParameter>(input: {
   const { parameter, store } = input;
   const { identifier, value } = parameter;
   if (SECRET_PARAMETERS.includes(identifier)) {
-    return typeof value === "string" ? { ...parameter, value: await store(identifier, value) } : parameter;
+    return typeof value === "string"
+      ? { ...parameter, value: await store(identifier, value) }
+      : parameter;
   }
-  const field = ENTRY_FIELDS.get(identifier);
-  const entries = field ? valueMapSchema.safeParse(value) : undefined;
-  if (!field || !entries?.success) return parameter;
-  const stored = await entriesStoringSecrets({ entries: Object.entries(entries.data), field, store });
+  const entryField = ENTRY_FIELDS.get(identifier);
+  const entries = entryField ? valueMapSchema.safeParse(value) : undefined;
+  if (!entryField || !entries?.success) return parameter;
+  const stored = await entriesStoringSecrets({
+    entries: Object.entries(entries.data),
+    entryField,
+    store,
+  });
 
   return { ...parameter, value: Object.fromEntries(stored) };
 }
@@ -435,17 +454,13 @@ async function authStoringSecrets(input: {
 /** An HTTP agent's config with each literal credential stored as a project secret. */
 export async function httpAgentConfigStoringSecrets<
   Config extends Pick<HttpAgentConfig, "headers" | "auth">,
->(input: {
-  config: Config;
-  owner: string;
-  reference: SecretReferencer;
-}): Promise<Config> {
+>(input: { config: Config; owner: string; reference: SecretReferencer }): Promise<Config> {
   const store = credentialStorer(input);
   const { headers, auth } = input.config;
   const storedAuth = auth && (await authStoringSecrets({ auth, store }));
   const entries = await entriesStoringSecrets({
     entries: (headers ?? []).map(({ key, value }): [string, unknown] => [key, value]),
-    field: headerField,
+    entryField: HEADER_ENTRY_FIELD,
     store,
   });
   const storedHeaders: HttpHeader[] = entries.map(([key, value]) => ({

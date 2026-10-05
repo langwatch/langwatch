@@ -71,10 +71,9 @@ function workspaceMembers(): Member[] {
 }
 
 /**
- * The packages that render React: a module's `browser` package, a module's `client` package (its
- * typed hooks, tested with `renderHook`), the browser application, the internal consoles
- * (`apps/*-web`, ADR-160) and the shared UI packages. Everything else is a contract, a process
- * package or a tool.
+ * The packages that render React: a module's `browser` and `client` packages (typed hooks, tested
+ * with `renderHook`), the browser application, the internal consoles (`apps/*-web`, ADR-160) and
+ * the shared UI packages. Everything else is a contract, a process package or a tool.
  */
 function isWebPackage(dir: string): boolean {
   const leaf = dir.slice(dir.lastIndexOf("/") + 1);

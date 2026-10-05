@@ -22,7 +22,10 @@ function spanAttributes(
   return { "payload.user.id": payload.userId };
 }
 
-/** Records that an account was deactivated; keyed on its instant, so a redelivery records nothing new. */
+/**
+ * Records that an account was deactivated; keyed on its instant, so a redelivery records nothing
+ * new.
+ */
 export class RecordUserDeactivatedCommand implements CommandHandler<
   Command<RecordUserLifecycleCommandData>,
   UserDeactivatedEvent
@@ -57,7 +60,10 @@ export class RecordUserDeactivatedCommand implements CommandHandler<
   static getSpanAttributes = spanAttributes;
 }
 
-/** Records that an account was reactivated; keyed on its instant, so a redelivery records nothing new. */
+/**
+ * Records that an account was reactivated; keyed on its instant, so a redelivery records nothing
+ * new.
+ */
 export class RecordUserReactivatedCommand implements CommandHandler<
   Command<RecordUserLifecycleCommandData>,
   UserReactivatedEvent

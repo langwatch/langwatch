@@ -1,16 +1,15 @@
 /**
- * The seam between a module and the event-sourced half of a process (ADR-144):
- * what a process hands a module's eventing declaration, and what it declares.
- * `Resources` is the process's resource owner, supplied by the composing package.
- */
-/**
  * Whether this process only sends on a pipeline, or also drains it: the api produces, the
  * worker folds, maps, subscribes and runs process managers. "describe" builds the consume
  * side to be listed, never run, so it reads the worker's dependencies only when a handler runs.
  */
 export type EventingParticipation = "produce" | "consume" | "describe";
 
-/** What a module's eventing declaration is handed when a process installs it. */
+/**
+ * The seam between a module and the event-sourced half of a process (ADR-144): what a module's
+ * eventing declaration is handed when a process installs it. `Resources` is the process's resource
+ * owner, supplied by the composing package.
+ */
 export interface FeatureEventingSetup<Repositories, App, ProcessStore, Resources = unknown> {
   readonly participation: EventingParticipation;
   /** The module's own repositories, on the backend this process selected. */

@@ -29,7 +29,16 @@ export function codexHelperThreadMarkersOf({
 }: {
   scopes: ScopedSpans[];
 }): Map<string, string> {
-  const normalise = OtlpTraceRequestService.normalizeOtlpId;
+  const requestSpanIds = codexRequestSpanIds({ scopes });
+  const markers = new Map<string, string>();
+  if (requestSpanIds.size === 0) return markers;
+  for (const span of scopes.flatMap((scope) => scope.spans)) {
+    addQueueChildMarker({ span, requestSpanIds, markers });
+  }
+  return markers;
+}
+
+function codexRequestSpanIds({ scopes }: { scopes: ScopedSpans[] }): Set<string> {
   const requestSpanIds = new Set<string>();
   for (const { scopeName, spans } of scopes) {
     if (!isCodexScope(scopeName)) continue;
@@ -37,21 +46,27 @@ export function codexHelperThreadMarkersOf({
       if (
         isCodexTemporaryStructuredRequestSpan({ scopeName, attributes: stringAttributes(span) })
       ) {
-        requestSpanIds.add(normalise(span.spanId));
+        requestSpanIds.add(OtlpTraceRequestService.normalizeOtlpId(span.spanId));
       }
     }
   }
+  return requestSpanIds;
+}
 
-  const markers = new Map<string, string>();
-  if (requestSpanIds.size === 0) return markers;
-  for (const span of scopes.flatMap((scope) => scope.spans)) {
-    if (span.name !== REQUEST_QUEUE_SPAN_NAME || !span.parentSpanId) continue;
-    const parentId = normalise(span.parentSpanId);
-    if (!requestSpanIds.has(parentId)) continue;
-    const threadId = queuedThreadIdOf({ key: stringAttributes(span).key });
-    if (threadId) markers.set(parentId, threadId);
-  }
-  return markers;
+function addQueueChildMarker({
+  span,
+  requestSpanIds,
+  markers,
+}: {
+  span: OtlpSpan;
+  requestSpanIds: Set<string>;
+  markers: Map<string, string>;
+}): void {
+  if (span.name !== REQUEST_QUEUE_SPAN_NAME || !span.parentSpanId) return;
+  const parentId = OtlpTraceRequestService.normalizeOtlpId(span.parentSpanId);
+  if (!requestSpanIds.has(parentId)) return;
+  const threadId = queuedThreadIdOf({ key: stringAttributes(span).key });
+  if (threadId) markers.set(parentId, threadId);
 }
 
 /** The request span with its helper's thread id, the stamp that admits it past the noise filter. */
