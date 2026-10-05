@@ -19,19 +19,19 @@ import { DispatchError, EventSourcing, InMemoryProcessStore } from "@langwatch/e
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { NotificationService, SendEmailCommand } from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import type { SlackApi } from "@langwatch/slack-contract";
-import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WebhookApi, WebhookSendRequest } from "@langwatch/webhook-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import {
   createSettlementProjects,
@@ -77,10 +77,9 @@ type Installed = Readonly<{
   authz?: AuthzApi;
   notification?: NotificationService;
   webhook?: WebhookApi;
-  logger?: ReturnType<typeof createTestLogger>["logger"];
 }>;
 
-function composed(role: "api" | "worker", eventing: EventSourcing, installed: Installed = {}) {
+function composed(role: "api" | "worker", eventing: EventSourcing) {
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: { NEXTAUTH_SECRET: "session-secret" } }).withEnv(),
   );
@@ -95,8 +94,21 @@ function composed(role: "api" | "worker", eventing: EventSourcing, installed: In
       encrypt: (value: string) => value,
       decrypt: (value: string) => value,
     })
-    .withMember("publicBaseUrl", "https://app.langwatch.test")
-    .withMember("logging", installed.logger ?? createTestLogger().logger);
+    .withMember("publicBaseUrl", "https://app.langwatch.test");
+}
+
+/** What automation's own logger writes during one test, read off the module's named logger. */
+function automationLogLines(): unknown[] {
+  const logger = createLogger("langwatch:automation");
+  const lines: unknown[] = [];
+  const capture = (fields: unknown) => void lines.push(fields);
+  for (const level of ["error", "warn", "info", "debug"] as const) {
+    vi.spyOn(logger, level).mockImplementation(capture as never);
+  }
+  onTestFinished(() => {
+    vi.restoreAllMocks();
+  });
+  return lines;
 }
 
 function peers(installed: Installed = {}) {
@@ -119,7 +131,7 @@ function peers(installed: Installed = {}) {
 }
 
 function process(role: "api" | "worker", eventing: EventSourcing, installed: Installed = {}) {
-  return composed(role, eventing, installed).provide(peers(installed));
+  return composed(role, eventing).provide(peers(installed));
 }
 
 /** A worker whose process supplies every peer but `absent`. */
@@ -386,10 +398,9 @@ describe("given a memory-tier worker settling a match end to end", () => {
 
     /** @scenario "A confirmed match is held to the ceiling this project's plan grants" */
     it("appends inside the plan's ceiling and records the breach against it", async () => {
-      const { logger, lines } = createTestLogger();
+      const lines = automationLogLines();
       const appended: string[] = [];
       const worker = await settlingWorker({
-        logger,
         trace: tracesHolding(["trace-1", "trace-2"]),
         entitlement: planWithCeiling(1),
         dataset: createApiFixture<DatasetApi>({

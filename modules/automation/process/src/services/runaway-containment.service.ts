@@ -5,9 +5,9 @@ import {
 } from "@langwatch/automation-contract";
 import { toDate, type Instant } from "@langwatch/time";
 
-import type { AutomationClock, AutomationRunawaySignals } from "../app/automation.members.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
+import type { AutomationClock } from "../repositories/automation.repositories.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 
@@ -211,4 +211,13 @@ export class RunawayContainmentService {
       ...(nextStep ? { nextStep } : {}),
     });
   }
+}
+
+/** Telemetry and logging the containment policy reports as it runs. */
+export abstract class AutomationRunawaySignals {
+  abstract onCeilingBreach(): void;
+  abstract onAutoPaused(reason: string): void;
+  abstract onContainmentFailed(): void;
+  abstract error(fields: Record<string, unknown>, message: string): void;
+  abstract info(fields: Record<string, unknown>, message: string): void;
 }

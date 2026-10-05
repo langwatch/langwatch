@@ -11,13 +11,13 @@ import type { EventingCommands, PersistedProcessInstance, ProcessStore } from "@
 import { generate } from "@langwatch/ksuid";
 import { Temporal, toDate } from "@langwatch/time";
 
-import type { AutomationClock } from "../app/automation.members.ts";
 import type { AutomationsPipeline } from "../eventing/automation.pipeline.ts";
 import type { ReportRunSettlement } from "../eventing/report-schedule.intent.ts";
 import {
   REPORT_SCHEDULE_PROCESS_NAME,
   type ReportScheduleState,
 } from "../eventing/report-schedule.process.ts";
+import type { AutomationClock } from "../repositories/automation.repositories.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 
 type ReportScheduleInstances = Pick<ProcessStore, "findByRef">;

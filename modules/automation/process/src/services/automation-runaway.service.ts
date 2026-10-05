@@ -5,7 +5,6 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type { AutomationRunawayMetricsSink } from "../app/automation.members.ts";
 import type { AutomationContainmentClaimRepository } from "../repositories/automation-containment-claim.repository.ts";
 import {
   AutomationRunawayRepository,
@@ -173,4 +172,14 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
   info(fields: Record<string, unknown>, message: string): void {
     this.logger.info(fields, message);
   }
+}
+
+/**
+ * Three containment observations isolated so composition can use them without
+ * satisfying the whole `AutomationRunawayRepository` port; wiring per-root decides OTLP.
+ */
+export abstract class AutomationRunawayMetricsSink {
+  abstract onCeilingBreach(): void;
+  abstract onAutoPaused(reason: string): void;
+  abstract onContainmentFailed(): void;
 }

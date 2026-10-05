@@ -3,8 +3,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
 
-import type { AutomationClock } from "../../app/automation.members.ts";
-import type { AutomationRepositories } from "../automation.repositories.ts";
+import type { AutomationClock, AutomationRepositories } from "../automation.repositories.ts";
 
 /** The client the automation rows live in, as a process hands it over. */
 export type AutomationDatabase = PrismaClient;

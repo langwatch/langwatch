@@ -1,7 +1,4 @@
-import type {
-  AutomationEvaluationQueryClassification,
-  AutomationEvaluationTriggerFilter,
-} from "../app/automation.members.ts";
+import type { TraceQueryClassification } from "@langwatch/trace-contract";
 
 /**
  * Automation-owned answer to whether a trigger needs an evaluation-terminal
@@ -27,4 +24,20 @@ export class AutomationEvaluationTriggerFilterService implements AutomationEvalu
 
     return this.traces.classifyQuery({ query: input.filterQuery }).evaluations;
   }
+}
+
+export interface AutomationEvaluationTriggerFilter {
+  readsEvaluations(input: {
+    filters: Record<string, unknown>;
+    filterQuery: string | null;
+  }): boolean;
+}
+
+/**
+ * Whether a saved filter query reads evaluations at all. Synchronous,
+ * since classification is a parse of the customer's query text, not a
+ * read; narrowed off `TraceService` for the same reason the summary read is.
+ */
+export interface AutomationEvaluationQueryClassification {
+  classifyQuery(input: { query: string }): TraceQueryClassification;
 }

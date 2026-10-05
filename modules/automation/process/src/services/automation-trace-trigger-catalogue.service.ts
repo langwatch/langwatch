@@ -1,7 +1,7 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
 
-import type { AutomationClock } from "../app/automation.members.ts";
 import { AutomationTraceTriggerCatalogueRepository } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
+import type { AutomationClock } from "../repositories/automation.repositories.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 

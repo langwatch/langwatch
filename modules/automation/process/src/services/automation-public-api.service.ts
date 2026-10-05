@@ -50,7 +50,6 @@ import type {
   AutomationTraceFilterCompiler,
   AutomationWebhookStoredParams,
 } from "../app/automation.app.ts";
-import type { AutomationLogger } from "../app/automation.members.ts";
 import type { TriggerFireHistoryRepository } from "../repositories/trigger-fire-history.repository.ts";
 import {
   partitionFilterFields,
@@ -67,7 +66,7 @@ import {
 } from "../rules/trigger-redaction.rules.ts";
 import type { AutomationRulesService } from "./automation-rules.service.ts";
 import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
-import type { AutomationService } from "./automation.service.ts";
+import type { AutomationLogger, AutomationService } from "./automation.service.ts";
 import type { SlackDestinationService } from "./slack-destination.service.ts";
 import type { TriggerFilterValidationService } from "./trigger-filter-validation.service.ts";
 

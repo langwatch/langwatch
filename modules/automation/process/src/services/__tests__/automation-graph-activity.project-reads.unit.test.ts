@@ -13,23 +13,39 @@ import {
   TestDispatchErrors,
 } from "../../__tests__/fixtures/graph-activity.fixture.ts";
 import { MemoryAutomationEmailCapRepository } from "../../repositories/memory/memory.automation-email-cap.repository.ts";
-import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
-import { SlackDestinationService } from "../../services/slack-destination.service.ts";
-import { composeAutomationGraphActivity } from "../automation-graph-composition.build.ts";
-import type { AutomationProjectDirectory } from "../automation.members.ts";
+import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
+import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
+import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
+import { PrismaTriggerLatestEvaluationRepository } from "../../repositories/prisma/prisma.trigger-latest-evaluation.repository.ts";
+import { PrismaTriggerRepository } from "../../repositories/prisma/prisma.trigger.repository.ts";
+import { AutomationGraphActivityService } from "../automation-graph-activity.service.ts";
+import { AutomationGraphDeliveryService } from "../automation-graph-delivery.service.ts";
+import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
+import type { AutomationProjectDirectory } from "../automation.service.ts";
+import { AutomationEmailCapService } from "../email-cap.service.ts";
+import { SlackDestinationService } from "../slack-destination.service.ts";
+import { TriggerLatestEvaluationService } from "../trigger-latest-evaluation.service.ts";
 
 const crypto = { encrypt: (plain: string) => plain, decrypt: (cipher: string) => cipher };
 
 function composeOver(input: { projects: AutomationProjectDirectory; analytics: AnalyticsService }) {
   const database = createGraphActivityPrismaDouble({ triggers: [graphTriggerRow()] });
   const delivery = new RecordingDelivery();
-  const vertical = composeAutomationGraphActivity({
-    prisma: database.prisma,
-    clock: frozenAt(FROZEN_NOW),
+  const clock = frozenAt(FROZEN_NOW);
+  const logger = new SilentLogger();
+  const vertical = AutomationGraphActivityService.create({
+    triggers: PrismaTriggerRepository.create(database.prisma, clock),
+    customGraphs: PrismaCustomGraphRepository.create(database.prisma),
+    graphTriggerSent: PrismaGraphTriggerSentRepository.create(database.prisma),
+    persistence: AutomationGraphDeliveryService.create({
+      triggers: PrismaTriggerRepository.create(database.prisma, clock),
+      suppressions: PrismaEmailSuppressionRepository.create(database.prisma),
+    }),
+    clock,
     projects: input.projects,
     analytics: input.analytics,
     delivery,
-    crypto,
+    webhooks: AutomationWebhookSecretsService.create(crypto),
     slackDestinations: SlackDestinationService.create({
       slack: { findUsableSlackSecret: async () => [] },
       crypto,
@@ -38,8 +54,12 @@ function composeOver(input: { projects: AutomationProjectDirectory; analytics: A
       store: MemoryAutomationEmailCapRepository.create(),
       fallback: MemoryAutomationEmailCapRepository.create(),
     }),
-    logger: new SilentLogger(),
+    logger,
     dispatchErrors: new TestDispatchErrors(),
+    latestEvaluations: TriggerLatestEvaluationService.create({
+      repository: PrismaTriggerLatestEvaluationRepository.create(database.prisma),
+      logger,
+    }),
     baseHost: "https://app.langwatch.test",
     emailHourlyCap: 100,
     tenantDailyCap: 10_000,
@@ -48,7 +68,7 @@ function composeOver(input: { projects: AutomationProjectDirectory; analytics: A
   return { vertical, delivery };
 }
 
-describe("composeAutomationGraphActivity", () => {
+describe("AutomationGraphActivityService", () => {
   describe("given the project reads the process composed", () => {
     describe("when the graph-alert vertical is composed over them", () => {
       /** @scenario "The graph vertical takes the project reads this process composes" */

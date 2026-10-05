@@ -20,15 +20,13 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { automationPeerSubscribers } from "../../__tests__/fixtures/pipeline-test-harness.ts";
-import type {
-  AutomationEvaluationTraceSummary,
-  AutomationEvaluationTriggerFilter,
-  AutomationGraphActivity,
-  AutomationTriggerMatchRecorder,
-} from "../../app/automation.members.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "../../repositories/automation-trace-trigger-catalogue.repository.ts";
+import type { AutomationEvaluationTraceSummary } from "../../services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationSubscriberService } from "../../services/automation-evaluation-subscriber.service.ts";
+import type { AutomationEvaluationTriggerFilter } from "../../services/automation-evaluation-trigger-filter.service.ts";
+import type { AutomationGraphActivity } from "../../services/automation-graph-activity.service.ts";
 import type { AutomationMatchRecordMetricsSink } from "../../services/automation-match-record-metrics.service.ts";
+import type { AutomationTriggerMatchRecorder } from "../../services/automation-trigger-match-dispatcher.service.ts";
 
 const NOW = 1_800_000_000_000;
 

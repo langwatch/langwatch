@@ -2,11 +2,9 @@ import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contra
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type {
-  AutomationEvaluationTraceSummary,
-  AutomationEvaluationTriggerFilter,
-  AutomationTriggerMatchRecorder,
-} from "../app/automation.members.ts";
+import type { AutomationEvaluationTraceSummary } from "../services/automation-evaluation-subscriber.service.ts";
+import type { AutomationEvaluationTriggerFilter } from "../services/automation-evaluation-trigger-filter.service.ts";
+import type { AutomationTriggerMatchRecorder } from "../services/automation-trigger-match-dispatcher.service.ts";
 
 const NOTIFY_TRIGGER_ACTIONS = new Set(["SEND_EMAIL", "SEND_SLACK_MESSAGE", "SEND_WEBHOOK"]);
 

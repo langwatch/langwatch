@@ -1,7 +1,10 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { GraphEvaluationRequest, TimeseriesInputType } from "../../app/automation.members.ts";
+import type {
+  GraphEvaluationRequest,
+  TimeseriesInputType,
+} from "../graph-trigger-evaluation-plan.service.ts";
 import { GraphTriggerEvaluationPlanService } from "../graph-trigger-evaluation-plan.service.ts";
 
 const NOW = Temporal.Instant.from("2026-06-20T12:00:00Z");

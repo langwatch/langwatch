@@ -57,6 +57,7 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import type { ResolvedTokens } from "@langwatch/module";
 import {
   MonitorApi,
@@ -64,75 +65,98 @@ import {
   type MonitorApi as MonitorApiContract,
 } from "@langwatch/monitor-contract";
 import { NotificationService } from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
+import type { Encryption } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { sessionSecret } from "@langwatch/secrets";
 import { SlackApi } from "@langwatch/slack-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
-import type { Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WebhookApi } from "@langwatch/webhook-contract";
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
+import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
 import {
   createAutomationsPipeline,
   type AutomationsPipeline,
 } from "../eventing/automation.pipeline.ts";
+import type { AutomationScheduledIntent } from "../eventing/graph-alert-sweep.intent.ts";
 import type { ReportDispatcher } from "../eventing/report-schedule.intent.ts";
+import type { AutomationSettlementExecutor } from "../eventing/trigger-settlement.intent.ts";
 import { SlackConnectionMigration } from "../migrations/legacy-import.slack-connection.migration.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
-import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
+import type {
+  AutomationRepositories,
+  AutomationClock,
+} from "../repositories/automation.repositories.ts";
+import { MemoryAutomationEmailCapRepository } from "../repositories/memory/memory.automation-email-cap.repository.ts";
 import { automationPlatformUrl } from "../rules/automation-platform-url.rules.ts";
+import { AutomationAuditSinkService } from "../services/automation-audit-sink.service.ts";
 import { AutomationAuthoringService } from "../services/automation-authoring.service.ts";
+import { AutomationDispatchErrorsTerminalService } from "../services/automation-dispatch-errors-terminal.service.ts";
 import { AutomationEvaluationSubscriberService } from "../services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "../services/automation-evaluation-trigger-filter.service.ts";
+import type { AutomationDispatchError } from "../services/automation-graph-activity.service.ts";
+import { AutomationGraphAlertNotifierService } from "../services/automation-graph-alert-notifier.service.ts";
 import { AutomationMatchRecordMetricsService } from "../services/automation-match-record-metrics.service.ts";
+import { AutomationNotificationDeliveryUnavailableService } from "../services/automation-notification-delivery-unavailable.service.ts";
+import { AutomationNotificationDeliveryService } from "../services/automation-notification-delivery.service.ts";
+import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
 import { AutomationPublicApiService } from "../services/automation-public-api.service.ts";
 import {
   AutomationRulesService,
   type AutomationProjectIdentity,
 } from "../services/automation-rules.service.ts";
 import { AutomationRunawayMetricsOtelService } from "../services/automation-runaway-metrics-otel.service.ts";
+import { AutomationRunawayUncontainedService } from "../services/automation-runaway-uncontained.service.ts";
 import { AutomationRunawayService } from "../services/automation-runaway.service.ts";
+import { AutomationScheduledIntentsService } from "../services/automation-scheduled-intents.service.ts";
+import { AutomationSettlementBreachLateService } from "../services/automation-settlement-breach-late.service.ts";
+import { AutomationSettlementBreachLoggedService } from "../services/automation-settlement-breach-logged.service.ts";
+import { AutomationSettlementLedgerService } from "../services/automation-settlement-ledger.service.ts";
+import { AutomationSettlementMatchConfirmationService } from "../services/automation-settlement-match-confirmation.service.ts";
 import { AutomationSettlementObservabilityService } from "../services/automation-settlement-observability.service.ts";
 import { AutomationSlackConnectionService } from "../services/automation-slack-connection.service.ts";
+import { AutomationSlackDirectoryUnavailableService } from "../services/automation-slack-directory-unavailable.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
+import { AutomationTestFireService } from "../services/automation-test-fire.service.ts";
+import { AutomationTraceFilterCompilerService } from "../services/automation-trace-filter-compiler.service.ts";
 import { AutomationTraceTriggerCatalogueService } from "../services/automation-trace-trigger-catalogue.service.ts";
 import { AutomationTriggerMatchDispatcherService } from "../services/automation-trigger-match-dispatcher.service.ts";
-import type { AutomationWebhookStoredParams } from "../services/automation-webhook-secrets.service.ts";
-import { AutomationService } from "../services/automation.service.ts";
+import {
+  type AutomationWebhookStoredParams,
+  AutomationWebhookSecretsService,
+} from "../services/automation-webhook-secrets.service.ts";
+import { AutomationService, type AutomationLogger } from "../services/automation.service.ts";
+import { DatasetTraceMapperService } from "../services/dataset-trace-mapper.service.ts";
+import { AutomationEmailCapService } from "../services/email-cap.service.ts";
+import { GraphTriggerHeartbeatService } from "../services/graph-trigger-heartbeat.service.ts";
+import { PersistActionWriterService } from "../services/persist-action-writer.service.ts";
+import { AutomationPersistActionService } from "../services/persist-action.service.ts";
 import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
+import { ReportDispatcherService } from "../services/report-dispatcher.service.ts";
 import { ReportScheduleService } from "../services/report-schedule.service.ts";
+import {
+  RunawayContainmentService,
+  type AutomationRunawaySignals,
+} from "../services/runaway-containment.service.ts";
 import { SlackConnectionMigrationService } from "../services/slack-connection-migration.service.ts";
 import { SlackDestinationService } from "../services/slack-destination.service.ts";
 import { TriggerFilterValidationService } from "../services/trigger-filter-validation.service.ts";
 import { AutomationGraphService } from "../services/trigger-graph.service.ts";
 import { TriggerLatestEvaluationService } from "../services/trigger-latest-evaluation.service.ts";
+import { AutomationSettlementDispatchService } from "../services/trigger-settlement-dispatch.service.ts";
 import {
   HmacUnsubscribeTokenAdapter,
   type UnsubscribeTokenVerifier,
 } from "../services/unsubscribe-token.service.ts";
-import {
-  buildAutomationInfrastructure,
-  createAutomationReportDispatcher,
-  createAutomationSettlement,
-  DatasetTraceMapper,
-  LoggedSettlementBreach,
-  PeerPersistActionWriter,
-  type AutomationComposedInfrastructure,
-  type AutomationProcessMembers,
-  type AutomationSettlement,
-} from "./automation-composition.build.ts";
-import type {
-  AutomationDispatchError,
-  AutomationHeartbeat,
-  AutomationLogger,
-  AutomationRunawaySignals,
-  AutomationClock,
-} from "./automation.members.ts";
+
+const logger = createLogger("langwatch:automation");
 
 export type { AutomationWebhookStoredParams };
 export type { AutomationProjectIdentity };
@@ -229,7 +253,6 @@ export type AutomationInfrastructure = Readonly<{
   /** Points a Slack save at a connection and moves its claim (ARCHITECTURE.md §3). */
   slackConnections: AutomationSlackConnectionService;
   dispatchErrors: AutomationDispatchError;
-  heartbeat: AutomationHeartbeat;
   runaway: AutomationRunawayRepository & AutomationRunawayNotice & AutomationRunawaySignals;
   testFire: AutomationTestFire;
   persistCaps: AutomationPersistCapRepository;
@@ -241,6 +264,47 @@ export type AutomationInfrastructure = Readonly<{
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
   // Peer APIs are resolved from setup.dependencies; members contains technical ports only.
+}>;
+
+/** What `AutomationModule.create` reads off process members. */
+type AutomationProcessMembers = Readonly<{
+  encryption: Encryption;
+  publicBaseUrl: string | undefined;
+}>;
+
+type AutomationInfrastructureInput = Readonly<{
+  /** Reads and writes the Slack bot tokens and webhook secrets this deployment stores. */
+  crypto: Encryption;
+  /** The deployment's public origin; absent, nothing this process sends can link back. */
+  publicBaseUrl: string | undefined;
+  slackDestinations: SlackDestinationService;
+  slackConnections: AutomationSlackConnectionService;
+  notifications: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
+  webhooks: Pick<WebhookApi, "sendRequest">;
+  traces: Pick<TraceApi, "translateTraceFilter">;
+  auditLog: AuditLogApi;
+  verifier: UnsubscribeTokenVerifier;
+  /** The key the verifier checks with, so every link this process mails verifies. */
+  unsubscribeSigningSecret: string | undefined;
+  repositories: Pick<
+    AutomationRepositories,
+    "triggers" | "suppressions" | "persistCaps" | "callCounter" | "emailCaps"
+  >;
+  caps: Readonly<{ emailHourlyCap: number; tenantDailyCap: number }>;
+}>;
+
+/** What settlement sends through: the SAME delivery and ceilings graph alerts spend. */
+type AutomationComposedInfrastructure = AutomationInfrastructure &
+  Readonly<{
+    crypto: Encryption;
+    delivery: AutomationNotificationDelivery;
+    emailCaps: AutomationEmailCapService;
+  }>;
+
+/** This feature's settlement half, as the pipeline mounts it. */
+type AutomationSettlement = Readonly<{
+  settlement: AutomationSettlementExecutor;
+  scheduledIntents: AutomationScheduledIntent;
 }>;
 
 /** How often the unauthenticated unsubscribe pair may be asked, per caller. */
@@ -335,7 +399,7 @@ export class AutomationModule implements AutomationApi {
   static readonly config = automationServerConfig;
   /** Unsubscribe links are signed with auth's session key, as main signed them (§6). */
   static readonly secrets = { unsubscribe: sessionSecret } as const;
-  static readonly reads = ["logger", "encryption", "publicBaseUrl"] as const;
+  static readonly reads = ["encryption", "publicBaseUrl"] as const;
 
   /**
    * Builds this process's own {@link AutomationInfrastructure} from the
@@ -345,10 +409,11 @@ export class AutomationModule implements AutomationApi {
   static create(setup: AutomationSetup): Promise<AutomationModule> {
     return setup.secrets.into(AutomationModule.secrets.unsubscribe, (unsubscribeSigningSecret) => {
       const { slack, projects } = setup.dependencies;
-      const crypto = setup.members.encryption;
+      const { encryption: crypto, publicBaseUrl } = setup.members;
       const slackConnections = AutomationSlackConnectionService.create({ slack, projects, crypto });
-      const infrastructure = buildAutomationInfrastructure({
-        members: setup.members,
+      const infrastructure = AutomationModule.#composeInfrastructure({
+        crypto,
+        publicBaseUrl,
         slackDestinations: SlackDestinationService.create({ slack, crypto }),
         slackConnections,
         notifications: setup.dependencies.notifications,
@@ -374,7 +439,7 @@ export class AutomationModule implements AutomationApi {
         infrastructure,
         automation,
       );
-      automation.#reportDispatcher = createAutomationReportDispatcher({
+      automation.#reportDispatcher = ReportDispatcherService.create({
         repositories: setup.repositories,
         projects: setup.dependencies.projects,
         analytics: setup.dependencies.analytics,
@@ -382,7 +447,7 @@ export class AutomationModule implements AutomationApi {
         delivery: infrastructure.delivery,
         slackDestinations: infrastructure.slackDestinations,
         suppression: automation.#automation,
-        baseHost: setup.members.publicBaseUrl ?? "",
+        baseHost: publicBaseUrl ?? "",
       });
       automation.#migration = SlackConnectionMigration.create({
         pass: SlackConnectionMigrationService.create({
@@ -397,67 +462,170 @@ export class AutomationModule implements AutomationApi {
     });
   }
 
-  /** Main's worker-automation-settlement.composition.ts, over peers instead of foreign tables. */
+  /** The graph-alert delivery a re-evaluation dispatches through (mail, Slack, webhook). */
+  static #composeInfrastructure(
+    input: AutomationInfrastructureInput,
+  ): AutomationComposedInfrastructure {
+    const { crypto, publicBaseUrl } = input;
+    const providers = AutomationProviderRegistryService.create(crypto);
+    const clock: AutomationClock = { now: () => nowInstant() };
+    // No public origin, no delivery: a digest would link back to nowhere.
+    const delivery: AutomationNotificationDelivery = publicBaseUrl
+      ? AutomationNotificationDeliveryService.create({
+          mailer: input.notifications,
+          renderer: ReactEmailMailRenderer.create(),
+          baseHost: publicBaseUrl,
+          ...(input.unsubscribeSigningSecret === undefined
+            ? {}
+            : { unsubscribeSigningSecret: input.unsubscribeSigningSecret }),
+          webhookTransport: input.webhooks,
+          logger,
+        })
+      : AutomationNotificationDeliveryUnavailableService.create();
+    const emailCaps = AutomationEmailCapService.create({
+      store: input.repositories.emailCaps,
+      fallback: MemoryAutomationEmailCapRepository.create(),
+    });
+
+    return {
+      crypto,
+      delivery,
+      emailCaps,
+      verifier: input.verifier,
+      clock,
+      notifier: AutomationGraphAlertNotifierService.create({
+        publicBaseUrl,
+        repositories: input.repositories,
+        caps: input.caps,
+        providers,
+        clock,
+        delivery,
+        emailCaps,
+      }),
+      logger,
+      slackDestinations: input.slackDestinations,
+      slackConnections: input.slackConnections,
+      dispatchErrors: AutomationDispatchErrorsTerminalService.create(),
+      runaway: AutomationRunawayUncontainedService.create(logger),
+      testFire: AutomationTestFireService.create({
+        mail: input.notifications,
+        delivery,
+        webhooks: input.webhooks,
+      }),
+      persistCaps: input.repositories.persistCaps,
+      providers,
+      slackChannels: AutomationSlackDirectoryUnavailableService.create(),
+      traceFilters: AutomationTraceFilterCompilerService.create({ traces: input.traces, logger }),
+      limits: input.repositories.callCounter,
+      audit: AutomationAuditSinkService.create(input.auditLog),
+      publicBaseUrl,
+    };
+  }
+
+  /**
+   * Main's worker-automation-settlement.composition.ts, over peers instead of foreign tables.
+   * Containment shares the ledger's suppression rows, so the breach resolves it late.
+   */
   static #composeSettlement(
     setup: AutomationSetup,
     infrastructure: AutomationComposedInfrastructure,
     automation: AutomationModule,
   ): AutomationSettlement {
-    const { members, dependencies, config } = setup;
-    const logger = infrastructure.logger;
-    return createAutomationSettlement({
-      repositories: setup.repositories,
-      clock: infrastructure.clock,
-      persistCapSlots: infrastructure.persistCaps,
+    const { dependencies, config, repositories } = setup;
+    const { clock } = infrastructure;
+    const baseHost = infrastructure.publicBaseUrl ?? "";
+    // Only the ceiling's tier is resolved here; the COUNTING stays on the ledger's shared slot.
+    const persistCaps = AutomationPersistCapService.create({
       projects: dependencies.projects,
-      traces: dependencies.traces,
-      evaluations: dependencies.evaluations,
-      traceFilters: dependencies.traces,
-      evaluationFilters: dependencies.evaluations,
-      mapper: new DatasetTraceMapper(),
-      writer: new PeerPersistActionWriter({
-        datasets: dependencies.datasets,
-        annotations: dependencies.annotations,
-      }),
-      delivery: infrastructure.delivery,
-      emailCaps: infrastructure.emailCaps,
-      slackDestinations: infrastructure.slackDestinations,
-      slackConnections: infrastructure.slackConnections,
-      crypto: members.encryption,
-      baseHost: members.publicBaseUrl ?? "",
-      observability: AutomationSettlementObservabilityService.create({
-        capture: (error, extra) =>
-          logger.error({ ...extra, error: error.message }, "Automation settlement dispatch failed"),
-      }),
-      breach: new LoggedSettlementBreach(logger),
-      analytics: dependencies.analytics,
-      logger,
-      graphActivity: automation.#automation,
-      persistCeiling: {
-        kind: "plan",
-        projects: dependencies.projects,
-        plans: dependencies.entitlement,
+      planProvider: dependencies.entitlement,
+      slots: infrastructure.persistCaps,
+      config: {
         free: config.persistDailyCapFree,
         paid: config.persistDailyCapPaid,
         enterprise: config.persistDailyCapEnterprise,
       },
-      emailHourlyCap: config.emailHourlyCap,
-      tenantDailyCap: config.tenantDailyCap,
-      createRunaway: (suppression) =>
-        AutomationRunawayService.create({
-          claims: setup.repositories.containmentClaims,
-          directories: {
-            projects: dependencies.projects,
-            authorization: dependencies.authorization,
-          },
-          suppression,
-          mailer: { send: (content) => dependencies.notifications.sendEmail(content) },
-          traces: dependencies.traces,
-          metrics: AutomationRunawayMetricsOtelService.create(),
-          baseHost: members.publicBaseUrl ?? "",
-          logger: members.logger,
-        }),
     });
+    let containment: RunawayContainmentService | undefined;
+    const ledger = AutomationSettlementLedgerService.create({
+      triggers: repositories.triggers,
+      suppressions: repositories.suppressions,
+      clock,
+      persistCaps: infrastructure.persistCaps,
+      persistCap: {
+        kind: "resolved",
+        resolve: (projectId) => persistCaps.resolvePersistDailyCap(projectId),
+      },
+      breach: AutomationSettlementBreachLateService.create({
+        reported: AutomationSettlementBreachLoggedService.create(logger),
+        resolve: () => containment,
+      }),
+    });
+    containment = RunawayContainmentService.create({
+      runaway: AutomationRunawayService.create({
+        claims: repositories.containmentClaims,
+        directories: {
+          projects: dependencies.projects,
+          authorization: dependencies.authorization,
+        },
+        suppression: ledger,
+        mailer: { send: (content) => dependencies.notifications.sendEmail(content) },
+        traces: dependencies.traces,
+        metrics: AutomationRunawayMetricsOtelService.create(),
+        baseHost,
+        logger,
+      }),
+      triggers: repositories.triggers,
+      clock,
+      slackConnections: infrastructure.slackConnections,
+    });
+
+    return {
+      settlement: AutomationSettlementDispatchService.create({
+        automation: ledger,
+        projects: dependencies.projects,
+        traces: dependencies.traces,
+        baseHost,
+        confirmation: AutomationSettlementMatchConfirmationService.create({
+          evaluations: dependencies.evaluations,
+          traces: dependencies.traces,
+          traceFilters: dependencies.traces,
+          evaluationFilters: dependencies.evaluations,
+        }),
+        persistActions: AutomationPersistActionService.create({
+          automation: ledger,
+          projects: dependencies.projects,
+          traces: dependencies.traces,
+          mapper: DatasetTraceMapperService.create(),
+          writer: PersistActionWriterService.create({
+            datasets: dependencies.datasets,
+            annotations: dependencies.annotations,
+          }),
+        }),
+        delivery: infrastructure.delivery,
+        emailCaps: infrastructure.emailCaps,
+        slackDestinations: infrastructure.slackDestinations,
+        webhooks: AutomationWebhookSecretsService.create(infrastructure.crypto),
+        clock,
+        observability: AutomationSettlementObservabilityService.create({
+          capture: (error, extra) =>
+            logger.error(
+              { ...extra, error: error.message },
+              "Automation settlement dispatch failed",
+            ),
+        }),
+        emailHourlyCap: config.emailHourlyCap,
+        tenantDailyCap: config.tenantDailyCap,
+      }),
+      scheduledIntents: AutomationScheduledIntentsService.create({
+        heartbeat: GraphTriggerHeartbeatService.create({
+          triggers: repositories.triggers,
+          triggerSent: repositories.graphTriggerSent,
+          analytics: dependencies.analytics,
+          logger,
+        }),
+        graphActivity: automation.#automation,
+      }),
+    };
   }
 
   /**
@@ -471,7 +639,7 @@ export class AutomationModule implements AutomationApi {
     repositories: AutomationRepositories;
     config: AutomationServerConfig;
   }): AutomationModule {
-    const { infrastructure: members, dependencies, repositories, config } = setup;
+    const { infrastructure, dependencies, repositories, config } = setup;
 
     const persistCaps = AutomationPersistCapService.create({
       projects: dependencies.projects,
@@ -481,30 +649,30 @@ export class AutomationModule implements AutomationApi {
         paid: config.persistDailyCapPaid,
         enterprise: config.persistDailyCapEnterprise,
       },
-      slots: members.persistCaps,
+      slots: infrastructure.persistCaps,
     });
     const latestEvaluations = TriggerLatestEvaluationService.create({
       repository: repositories.latestEvaluations,
-      logger: members.logger,
+      logger: infrastructure.logger,
     });
     const graph = AutomationGraphService.create({
       triggers: repositories.triggers,
       customGraphs: repositories.customGraphs,
       projects: dependencies.projects,
       analytics: dependencies.analytics,
-      notifier: members.notifier,
+      notifier: infrastructure.notifier,
       triggerSent: repositories.graphTriggerSent,
-      logger: members.logger,
-      slackDestinations: members.slackDestinations,
-      slackConnections: members.slackConnections,
-      dispatchErrors: members.dispatchErrors,
+      logger: infrastructure.logger,
+      slackDestinations: infrastructure.slackDestinations,
+      slackConnections: infrastructure.slackConnections,
+      dispatchErrors: infrastructure.dispatchErrors,
       latestEvaluations,
-      runaway: members.runaway,
-      clock: members.clock,
-      baseHost: members.publicBaseUrl ?? "",
+      runaway: infrastructure.runaway,
+      clock: infrastructure.clock,
+      baseHost: infrastructure.publicBaseUrl ?? "",
     });
     const reportSchedules = ReportScheduleService.create({
-      clock: members.clock,
+      clock: infrastructure.clock,
       triggers: repositories.triggers,
       instances: repositories.processStore,
     });
@@ -515,16 +683,16 @@ export class AutomationModule implements AutomationApi {
       names: repositories.names,
       customGraphs: repositories.customGraphs,
       webhookDeliveries: dependencies.webhooks,
-      verifier: members.verifier,
+      verifier: infrastructure.verifier,
       reportSchedules,
-      clock: members.clock,
+      clock: infrastructure.clock,
       graph,
       templates: AutomationTemplateService.create({
-        baseHost: members.publicBaseUrl ?? "",
-        delivery: members.testFire,
+        baseHost: infrastructure.publicBaseUrl ?? "",
+        delivery: infrastructure.testFire,
       }),
       persistCaps,
-      slackConnections: members.slackConnections,
+      slackConnections: infrastructure.slackConnections,
     });
     const rules = AutomationRulesService.create({
       automation,
@@ -544,36 +712,36 @@ export class AutomationModule implements AutomationApi {
         automation,
         rules,
         monitors: dependencies.monitors,
-        providers: members.providers,
-        slackChannels: members.slackChannels,
-        slackDestinations: members.slackDestinations,
-        slackConnections: members.slackConnections,
-        traceFilters: members.traceFilters,
-        limits: members.limits,
+        providers: infrastructure.providers,
+        slackChannels: infrastructure.slackChannels,
+        slackDestinations: infrastructure.slackDestinations,
+        slackConnections: infrastructure.slackConnections,
+        traceFilters: infrastructure.traceFilters,
+        limits: infrastructure.limits,
         filterValidation,
-        logger: members.logger,
+        logger: infrastructure.logger,
       }),
       publicApi: AutomationPublicApiService.create({
         automation,
         rules,
-        providers: members.providers,
-        slackConnections: members.slackConnections,
-        slackDestinations: members.slackDestinations,
+        providers: infrastructure.providers,
+        slackConnections: infrastructure.slackConnections,
+        slackDestinations: infrastructure.slackDestinations,
         filterValidation,
         history: repositories.history,
-        traceFilters: members.traceFilters,
-        limits: members.limits,
-        logger: members.logger,
+        traceFilters: infrastructure.traceFilters,
+        limits: infrastructure.limits,
+        logger: infrastructure.logger,
       }),
       latestEvaluations,
       monitors: dependencies.monitors,
-      audit: members.audit,
-      limits: members.limits,
-      publicBaseUrl: members.publicBaseUrl,
+      audit: infrastructure.audit,
+      limits: infrastructure.limits,
+      publicBaseUrl: infrastructure.publicBaseUrl,
       evaluations: AutomationEvaluationSubscriberService.create({
         triggers: AutomationTraceTriggerCatalogueService.create({
           triggers: repositories.triggers,
-          clock: members.clock,
+          clock: infrastructure.clock,
         }),
         graphActivity: automation,
         traces: dependencies.traces,

@@ -1,9 +1,9 @@
 import { AlertType } from "@langwatch/automation-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ApiAutomationTestFire } from "../../app/automation-composition.build.ts";
 import type { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
 import { AutomationTemplateService } from "../automation-template.service.ts";
+import { AutomationTestFireService } from "../automation-test-fire.service.ts";
 
 function serviceOver({ provider }: { provider: string | undefined }) {
   const sendEmail = vi.fn(async () => undefined);
@@ -25,7 +25,7 @@ function serviceOver({ provider }: { provider: string | undefined }) {
   };
   const service = AutomationTemplateService.create({
     baseHost: "https://app.langwatch.ai",
-    delivery: ApiAutomationTestFire.create({
+    delivery: AutomationTestFireService.create({
       mail,
       delivery,
       webhooks: { sendRequest: unused },

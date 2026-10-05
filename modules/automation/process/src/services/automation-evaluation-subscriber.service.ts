@@ -5,19 +5,17 @@ import type {
   AutomationTraceSubscriberContext,
 } from "@langwatch/automation-contract";
 import type { EvaluationApi, EvaluationStatus } from "@langwatch/evaluation-contract";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { passesTraceOriginGuards } from "@langwatch/trace-contract";
 
-import type {
-  AutomationGraphActivity,
-  AutomationEvaluationTraceSummary,
-  AutomationEvaluationTriggerFilter,
-  AutomationTriggerMatchRecorder,
-} from "../app/automation.members.ts";
 import { handleEvaluationAlertTriggerMatch } from "../eventing/evaluation-alert-trigger-match.subscriber.ts";
 import { handleGraphTriggerActivity } from "../eventing/graph-trigger-activity.subscriber.ts";
 import { handleTraceAlertTriggerMatch } from "../eventing/trace-alert-trigger-match.subscriber.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
+import type { AutomationEvaluationTriggerFilter } from "./automation-evaluation-trigger-filter.service.ts";
+import type { AutomationGraphActivity } from "./automation-graph-activity.service.ts";
 import type { AutomationMatchRecordMetricsSink } from "./automation-match-record-metrics.service.ts";
+import type { AutomationTriggerMatchRecorder } from "./automation-trigger-match-dispatcher.service.ts";
 
 /**
  * Evaluation event subscribers using four narrow ports instead of two capability
@@ -120,4 +118,12 @@ export class AutomationEvaluationSubscriberService {
   ): Promise<void> {
     return handleGraphTriggerActivity(this.deps.graphActivity, event, context);
   }
+}
+
+/**
+ * Trace summary read by evaluation alert subscriber; narrower than full TraceService
+ * which carries unused paths.
+ */
+export interface AutomationEvaluationTraceSummary {
+  findSummary(input: { projectId: string; traceId: string }): Promise<TraceSummaryData | null>;
 }

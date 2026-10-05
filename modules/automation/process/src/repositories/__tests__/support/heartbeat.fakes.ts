@@ -5,7 +5,7 @@ import type {
   UpdateTriggerCommand,
 } from "@langwatch/automation-contract";
 
-import { AutomationLogger } from "../../../app/automation.members.ts";
+import { AutomationLogger } from "../../../services/automation.service.ts";
 import type { ReportScheduleTarget } from "../../trigger.repository.ts";
 import { TriggerRepository } from "../../trigger.repository.ts";
 

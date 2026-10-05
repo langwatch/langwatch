@@ -9,10 +9,10 @@ import { settlementTrigger } from "../../__tests__/fixtures/settlement.fixtures.
 import type { GraphAlertDispatchInput } from "../../channels/automation-graph-alert.channel.ts";
 import { MemoryAutomationEmailCapRepository } from "../../repositories/memory/memory.automation-email-cap.repository.ts";
 import { MemoryAutomationRepositories } from "../../repositories/memory/memory.automation.repositories.ts";
-import { AutomationNotificationDeliveryService } from "../../services/automation-notification-delivery.service.ts";
-import { AutomationProviderRegistryService } from "../../services/automation-provider-registry.service.ts";
-import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
-import { buildGraphAlertNotifier } from "../automation-composition.build.ts";
+import { AutomationGraphAlertNotifierService } from "../automation-graph-alert-notifier.service.ts";
+import { AutomationNotificationDeliveryService } from "../automation-notification-delivery.service.ts";
+import { AutomationProviderRegistryService } from "../automation-provider-registry.service.ts";
+import { AutomationEmailCapService } from "../email-cap.service.ts";
 
 const BASE_HOST = "https://app.langwatch.test";
 const SAVED_AT = toDate(Temporal.Instant.from("2026-06-01T00:00:00.000Z"));
@@ -20,8 +20,8 @@ const SAVED_AT = toDate(Temporal.Instant.from("2026-06-01T00:00:00.000Z"));
 function composeNotifier(publicBaseUrl: string | undefined) {
   const sent: SendEmailCommand[] = [];
   const mail = { sent, sendEmail: async (command: SendEmailCommand) => void sent.push(command) };
-  const notifier = buildGraphAlertNotifier({
-    members: { publicBaseUrl },
+  const notifier = AutomationGraphAlertNotifierService.create({
+    publicBaseUrl,
     repositories: MemoryAutomationRepositories.create(),
     caps: { emailHourlyCap: 10, tenantDailyCap: 100 },
     providers: AutomationProviderRegistryService.create({
@@ -73,7 +73,7 @@ function crossedAlert(): GraphAlertDispatchInput {
   };
 }
 
-describe("buildGraphAlertNotifier", () => {
+describe("AutomationGraphAlertNotifierService", () => {
   describe("given a process that names its public origin", () => {
     /** @scenario "With a public origin, a graph alert's email leaves through notification" */
     it("sends the alert through notification", async () => {

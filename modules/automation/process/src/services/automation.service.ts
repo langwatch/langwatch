@@ -31,8 +31,8 @@ import {
 import { type Instant } from "@langwatch/time";
 import type { WebhookApi } from "@langwatch/webhook-contract";
 
-import type { AutomationClock } from "../app/automation.members.ts";
 import { GRAPH_ALERT_SWEEP_INTERVAL_MS } from "../eventing/graph-alert-sweep.process.ts";
+import type { AutomationClock } from "../repositories/automation.repositories.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { EmailSuppressionNameRepository } from "../repositories/email-suppression-name.repository.ts";
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
@@ -489,4 +489,24 @@ export class AutomationService {
     });
     return rows.map(({ ref, ...row }) => ({ ...row, triggerId: ref }));
   }
+}
+
+/** Process logger used by graph evaluation and heartbeat isolation. */
+export abstract class AutomationLogger {
+  abstract error(fields: Record<string, unknown>, message: string): void;
+  abstract debug(fields: Record<string, unknown>, message: string): void;
+  abstract info(fields: Record<string, unknown>, message: string): void;
+  abstract warn(fields: Record<string, unknown>, message: string): void;
+}
+
+/**
+ * Project read for graph alerts; narrowing to avoid dragging credentials and authz
+ * services into processes that only send alerts.
+ */
+export interface AutomationProjectDirectory {
+  findById(projectId: string): Promise<{
+    id: string;
+    name: string;
+    slug: string;
+  } | null>;
 }

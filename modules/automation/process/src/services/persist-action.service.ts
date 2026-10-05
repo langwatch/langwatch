@@ -1,4 +1,5 @@
 import {
+  type DatasetActionParams,
   annotationQueueActionParamsSchema,
   datasetActionParamsSchema,
   NOTIFY_TRIGGER_ACTIONS,
@@ -9,13 +10,10 @@ import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract";
 
-import type {
-  AutomationProjectDirectory,
-  AutomationDatasetMapper,
-} from "../app/automation.members.ts";
 import type { AutomationPersistActionRepository } from "../repositories/automation-persist-action.repository.ts";
 import type { AutomationSettlementLedgerRepository } from "../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceRepository } from "../repositories/automation-settlement-read.repository.ts";
+import type { AutomationProjectDirectory } from "./automation.service.ts";
 
 /** The project read this path makes: an existence check, and nothing else. */
 type PersistActionProject = { id: string; name: string; slug: string };
@@ -203,4 +201,12 @@ export class AutomationPersistActionService {
 
     return true;
   }
+}
+
+export abstract class AutomationDatasetMapper {
+  abstract map(input: {
+    trace: TraceRecord;
+    mapping: DatasetActionParams["datasetMapping"]["mapping"];
+    expansions: readonly string[];
+  }): Record<string, string | number>[];
 }

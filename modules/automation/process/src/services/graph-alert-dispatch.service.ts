@@ -11,13 +11,13 @@ import {
 import { DispatchError } from "@langwatch/eventing";
 
 import type {
-  AutomationClock,
-  AutomationGraphDelivery,
   GraphAlertDispatchInput,
   GraphAlertDispatchResult,
-} from "../app/automation.members.ts";
+} from "../channels/automation-graph-alert.channel.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import type { AutomationClock } from "../repositories/automation.repositories.ts";
 import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
+import type { AutomationGraphDelivery } from "./automation-graph-delivery.service.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 
 function destinationHash(destination: string): string {

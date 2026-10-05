@@ -8,23 +8,21 @@ import type {
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
-import type {
-  AutomationDispatchError,
-  AutomationGraphNotifier,
-  AutomationLogger,
-  SlackDestinationService,
-  AutomationClock,
-  AutomationRunawaySignals,
-} from "../app/automation.members.ts";
+import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
+import type { AutomationClock } from "../repositories/automation.repositories.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { AutomationDispatchError } from "./automation-graph-activity.service.ts";
 import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
+import type { AutomationLogger } from "./automation.service.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
 import { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service.ts";
+import type { AutomationRunawaySignals } from "./runaway-containment.service.ts";
 import { RunawayContainmentService } from "./runaway-containment.service.ts";
+import type { SlackDestinationService } from "./slack-destination.service.ts";
 import type { TriggerLatestEvaluationService } from "./trigger-latest-evaluation.service.ts";
 
 /** Private graph-alert collaborator, assembled once with Automation's service. */

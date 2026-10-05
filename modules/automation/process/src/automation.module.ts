@@ -1,27 +1,12 @@
-import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { defineProcessModule } from "@langwatch/process";
 
-import {
-  composeAutomationGraphActivity,
-  type AutomationGraphActivityDatabase,
-} from "./app/automation-graph-composition.build.ts";
 import { AutomationModule } from "./app/automation.app.ts";
-import type {
-  AutomationClock,
-  AutomationDispatchError,
-  AutomationEvaluationQueryClassification,
-  AutomationEvaluationTraceSummary,
-  AutomationGraphActivity,
-  AutomationLogger,
-  AutomationProjectDirectory,
-  AutomationTriggerMatchRecorder,
-} from "./app/automation.members.ts";
-import type { AutomationNotificationDelivery } from "./channels/automation-notification-delivery.channel.ts";
 import { automationsEventing } from "./eventing/automations.pipeline.ts";
 import type { AutomationEmailCapRepository } from "./repositories/automation-email-cap.repository.ts";
 import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
+import type { AutomationClock } from "./repositories/automation.repositories.ts";
 import type { CustomGraphRepository } from "./repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "./repositories/graph-trigger-sent.repository.ts";
 import {
@@ -37,13 +22,15 @@ import {
   type TriggerDatabase,
 } from "./repositories/prisma/prisma.trigger.repository.ts";
 import type { TriggerRepository } from "./repositories/trigger.repository.ts";
+import type { AutomationEvaluationTraceSummary } from "./services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
+import type { AutomationEvaluationQueryClassification } from "./services/automation-evaluation-trigger-filter.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
+import type { AutomationGraphActivity } from "./services/automation-graph-activity.service.ts";
 import { AutomationMatchRecordMetricsService } from "./services/automation-match-record-metrics.service.ts";
-import { type AutomationSecretCrypto } from "./services/automation-slack-secrets.service.ts";
 import { AutomationTraceTriggerCatalogueService } from "./services/automation-trace-trigger-catalogue.service.ts";
+import type { AutomationTriggerMatchRecorder } from "./services/automation-trigger-match-dispatcher.service.ts";
 import { AutomationEmailCapService } from "./services/email-cap.service.ts";
-import type { SlackDestinationService } from "./services/slack-destination.service.ts";
 import {
   TriggerNoReplyService,
   TriggerNoReplyWarning,
@@ -135,35 +122,6 @@ export function createAutomationEmailCaps(input: {
 }
 
 /**
- * The graph-alert vertical, over substrates the composing process owns:
- * which tables it reads, which secrets it decrypts and which schedule it
- * checks; the process supplies the client, clock, transports and ceilings.
- */
-export function createAutomationGraphActivity(input: {
-  /** The one database client the composing process opened. */
-  prisma: AutomationGraphActivityDatabase;
-  clock: AutomationClock;
-  projects: AutomationProjectDirectory;
-  analytics: AnalyticsService;
-  /** The process's outbound transports: mail, Slack, webhook. */
-  delivery: AutomationNotificationDelivery;
-  /** Reads the Slack bot tokens and webhook secrets this deployment wrote. */
-  crypto: AutomationSecretCrypto;
-  /** Where every Slack delivery goes, over `SlackApi` (ARCHITECTURE.md §3). */
-  slackDestinations: SlackDestinationService;
-  emailCaps: AutomationEmailCapService;
-  logger: AutomationLogger;
-  /** How the process's queue tells a permanent failure from a retryable one. */
-  dispatchErrors: AutomationDispatchError;
-  /** The deployment's own origin; every link in an alert is built from it. */
-  baseHost: string;
-  emailHourlyCap: number;
-  tenantDailyCap: number;
-}): AutomationGraphActivity {
-  return composeAutomationGraphActivity(input);
-}
-
-/**
  * What this feature does when an evaluation finishes: decide whether the
  * run matched a trigger, and re-check the graph alerts it feeds. The
  * filter is built here, not handed in, so a caller can't reclassify a query.
@@ -187,14 +145,6 @@ export function createAutomationEvaluationSubscriber(input: {
     runs: input.runs,
   });
 }
-
-export {
-  createAutomationSettlement,
-  type AutomationPersistCeiling,
-  type AutomationRunawayCollaborator,
-  type AutomationSettlement,
-  type AutomationSettlementRepositories,
-} from "./app/automation-composition.build.ts";
 
 /**
  * The durable automation rows a composing process writes through, each built here rather than by

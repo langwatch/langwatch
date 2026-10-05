@@ -16,7 +16,6 @@ import type { TraceApi, TraceListItem } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createTestSlackDestinations } from "../../__tests__/testing.ts";
-import { createReportTraceList } from "../../app/automation-composition.build.ts";
 import { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
 import { toReportTraceRow } from "../../rules/report-trace-row.rules.ts";
 import { ReportChartService } from "../report-chart.service.ts";
@@ -25,6 +24,7 @@ import {
   type ReportDispatchDeps,
   type ReportFire,
 } from "../report-dispatch.service.ts";
+import { ReportTraceListService } from "../report-trace-list.service.ts";
 
 const BASE_HOST = "https://app.langwatch.test";
 const PROJECT = { id: "project-1", name: "Checkout", slug: "checkout" };
@@ -483,13 +483,15 @@ describe("the composed trace-query report", () => {
         evaluations: {},
         nextCursor: null,
       }));
-      const listReportTraces = createReportTraceList({
+      const traceList = ReportTraceListService.create({
         traces: createApiFixture<TraceApi>({
           translateTraceFilter: () => filterWhere,
           readTraceList,
         }),
         baseHost: BASE_HOST,
       });
+      const listReportTraces: ReportDispatchDeps["listReportTraces"] = (input) =>
+        traceList.list(input);
       const mail = new FakeMailGateway();
       const trigger = makeTrigger({
         source: { kind: "traceQuery", filters: {}, topN: 3 },

@@ -1,4 +1,3 @@
-import type { AutomationGraphDelivery } from "../app/automation.members.ts";
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 
@@ -39,4 +38,19 @@ export class AutomationGraphDeliveryService implements AutomationGraphDelivery {
   claimSend(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean> {
     return this.triggers.claimSend(input);
   }
+}
+
+/**
+ * Automation-owned persistence operations used by the host's graph delivery
+ * adapter. Keeping this nominal boundary prevents composition from reaching
+ * into the process service while it is being constructed.
+ */
+export interface AutomationGraphDelivery {
+  filterSuppressed(input: {
+    projectId: string;
+    triggerId: string;
+    emails: string[];
+  }): Promise<string[]>;
+  isSendClaimed(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean>;
+  claimSend(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean>;
 }

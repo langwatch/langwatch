@@ -1,6 +1,6 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 
-import { AutomationRunawayMetricsSink } from "../app/automation.members.ts";
+import { AutomationRunawayMetricsSink } from "./automation-runaway.service.ts";
 
 export const AUTOMATION_CEILING_BREACH_METRIC_NAME = "automation_ceiling_breach_total";
 export const AUTOMATION_AUTO_PAUSED_METRIC_NAME = "automation_auto_paused_total";

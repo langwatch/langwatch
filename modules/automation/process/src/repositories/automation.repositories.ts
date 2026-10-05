@@ -1,4 +1,5 @@
 import type { ProcessStore } from "@langwatch/eventing";
+import type { Instant } from "@langwatch/time";
 
 import type { AutomationCallCounterRepository } from "./automation-call-counter.repository.ts";
 import type { AutomationContainmentClaimRepository } from "./automation-containment-claim.repository.ts";
@@ -32,4 +33,8 @@ export interface AutomationRepositories {
   readonly emailCaps: AutomationEmailCapRepository;
   /** The report schedules' process-manager rows, read on every role (the api hosts no pipeline). */
   readonly processStore: Pick<ProcessStore, "findByRef">;
+}
+
+export interface AutomationClock {
+  now(): Instant;
 }

@@ -1,9 +1,12 @@
-import type { GraphTriggerSweepCandidate } from "@langwatch/automation-contract";
+import type {
+  GraphTriggerEvaluationReason,
+  GraphTriggerEvaluationResult,
+  GraphTriggerSweepCandidate,
+} from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
-import { Temporal } from "@langwatch/time";
+import { type Instant, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
-import type { AutomationScheduledIntent } from "../app/automation.members.ts";
 import type { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
 
 const logger = createLogger("langwatch:automation:graph-alert-sweep");
@@ -49,4 +52,16 @@ export function runGraphAlertSweep(
       );
     }
   };
+}
+
+export abstract class AutomationScheduledIntent {
+  abstract decideGraphTriggerHeartbeat(input: {
+    now: Instant;
+  }): Promise<GraphTriggerSweepCandidate[]>;
+
+  abstract evaluateGraphTrigger(input: {
+    triggerId: string;
+    projectId: string;
+    reason: GraphTriggerEvaluationReason;
+  }): Promise<GraphTriggerEvaluationResult>;
 }

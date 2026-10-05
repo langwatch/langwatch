@@ -8,7 +8,7 @@ import {
 } from "@langwatch/automation-contract";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { AutomationClock } from "../../app/automation.members.ts";
+import type { AutomationClock } from "../automation.repositories.ts";
 import { TriggerRepository, type ReportScheduleTarget } from "../trigger.repository.ts";
 import { mapTriggerRow } from "./prisma.trigger.mapper.ts";
 

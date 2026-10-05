@@ -50,10 +50,10 @@ export type {
 export { createGraphTriggerActivityHandler } from "./eventing/graph-trigger-activity.subscriber.ts";
 export type {
   AutomationEvaluationQueryClassification,
-  AutomationEvaluationTraceSummary,
   AutomationEvaluationTriggerFilter,
-  AutomationTriggerMatchRecorder,
-} from "./app/automation.members.ts";
+} from "./services/automation-evaluation-trigger-filter.service.ts";
+export type { AutomationEvaluationTraceSummary } from "./services/automation-evaluation-subscriber.service.ts";
+export type { AutomationTriggerMatchRecorder } from "./services/automation-trigger-match-dispatcher.service.ts";
 export type {
   LogOverflowIntent,
   NotifyDigestIntent,
@@ -75,16 +75,14 @@ export type {
   GraphAlertDispatchInput,
   GraphAlertDispatchResult,
 } from "./channels/automation-graph-alert.channel.ts";
-export type { AutomationGraphDelivery } from "./app/automation.members.ts";
+export type { AutomationGraphDelivery } from "./services/automation-graph-delivery.service.ts";
 export { AutomationRunawayNotice } from "./channels/automation-runaway-notice.channel.ts";
 export { AutomationNotificationDelivery } from "./channels/automation-notification-delivery.channel.ts";
 export type { AutomationSettlementMatchConfirmation } from "./services/automation-settlement-match-confirmation.service.ts";
 export type { EmailSuppressionDatabase } from "./repositories/prisma/prisma.email-suppression.repository.ts";
-export type { AutomationClock } from "./app/automation.members.ts";
-export type {
-  AutomationGraphActivity,
-  AutomationProjectDirectory,
-} from "./app/automation.members.ts";
+export type { AutomationClock } from "./repositories/automation.repositories.ts";
+export type { AutomationGraphActivity } from "./services/automation-graph-activity.service.ts";
+export type { AutomationProjectDirectory } from "./services/automation.service.ts";
 export type { UnsubscribeTokenPayload } from "./services/unsubscribe-token.service.ts";
 export { TEST_FIRE_TRIGGER_ID_SENTINEL } from "./channels/automation-test-fire.channel.ts";
 export {

@@ -1,21 +1,25 @@
-import { parseSeriesIndex } from "@langwatch/automation-contract";
-import type {
-  EvaluationSkipCode,
-  GraphTriggerEvaluationCondition,
-  GraphTriggerEvaluationResult,
-  Trigger,
+import type { AnalyticsService } from "@langwatch/analytics-contract";
+import {
+  type CustomGraph,
+  type GraphTriggerEvaluationReason,
+  parseSeriesIndex,
+  type EvaluationSkipCode,
+  type GraphTriggerEvaluationCondition,
+  type GraphTriggerEvaluationResult,
+  type Trigger,
 } from "@langwatch/automation-contract";
 import { type Instant } from "@langwatch/time";
 
-import type {
-  GraphActionParams,
-  GraphEvaluationPlan,
-  GraphEvaluationRequest,
-  GraphSeries,
-  StoredGraphConfig,
-  TimeseriesInputType,
-} from "../app/automation.members.ts";
+import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
+import type { AutomationClock } from "../repositories/automation.repositories.ts";
+import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
+import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
+import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import { skippedGraphEvaluation } from "../rules/trigger-evaluator.rules.ts";
+import type { AutomationDispatchError } from "./automation-graph-activity.service.ts";
+import type { AutomationLogger, AutomationProjectDirectory } from "./automation.service.ts";
+import type { SlackDestinationService } from "./slack-destination.service.ts";
+import type { TriggerLatestEvaluationService } from "./trigger-latest-evaluation.service.ts";
 
 export class GraphTriggerEvaluationPlanService {
   private constructor() {}
@@ -228,3 +232,115 @@ export class GraphTriggerEvaluationPlanService {
     return skippedGraphEvaluation({ ...request, detail, skipCode, condition });
   }
 }
+
+export type GraphActionParams = {
+  members?: string[] | null;
+  slackWebhook?: string | null;
+  threshold?: number;
+  operator?: string;
+  timePeriod?: number;
+  seriesName?: string;
+  slackDelivery?: "webhook" | "bot";
+  slackBotToken?: string;
+  slackChannelId?: string;
+  [key: string]: unknown;
+};
+
+export type TimeseriesFilterValue =
+  | string[]
+  | Record<string, string[]>
+  | Record<string, Record<string, string[]>>;
+
+export type TimeseriesPipeline = {
+  field: "trace_id" | "user_id" | "thread_id" | "customer_id";
+  aggregation: "sum" | "avg" | "min" | "max";
+};
+
+export type GraphSeries = {
+  name?: string;
+  metric: string;
+  key?: string;
+  subkey?: string;
+  aggregation:
+    | "terms"
+    | "cardinality"
+    | "avg"
+    | "sum"
+    | "min"
+    | "max"
+    | "median"
+    | "p99"
+    | "p95"
+    | "p90";
+  pipeline?: TimeseriesPipeline;
+  filters?: Record<string, TimeseriesFilterValue>;
+  asPercent?: boolean;
+};
+
+export type TimeseriesInputType = {
+  projectId: string;
+  startDate: number;
+  endDate: number;
+  query?: string;
+  filters: Record<string, TimeseriesFilterValue>;
+  traceIds?: string[];
+  negateFilters?: boolean;
+  series: GraphSeries[];
+  groupBy?: string;
+  groupByKey?: string;
+  timeScale?: "full" | number;
+  timeZone: string;
+};
+
+export type StoredGraphConfig = {
+  series: GraphSeries[];
+  groupBy?: string;
+  groupByKey?: string;
+  timeScale?: "full" | number;
+};
+
+export type GraphTriggerEvaluationDeps = {
+  triggers: TriggerRepository;
+  customGraphs: CustomGraphRepository;
+  projects: AutomationProjectDirectory;
+  analytics: AnalyticsService;
+  triggerSent: GraphTriggerSentRepository;
+  notifier: AutomationGraphNotifier;
+  logger: AutomationLogger;
+  slackDestinations: SlackDestinationService;
+  dispatchErrors: AutomationDispatchError;
+  /** Records what each check observed; never throws, so it cannot suppress an alert. */
+  latestEvaluations: Pick<TriggerLatestEvaluationService, "record">;
+  clock: AutomationClock;
+  baseHost: string;
+};
+
+export type ProjectIdentity = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+export type GraphEvaluationRequest = {
+  deps: GraphTriggerEvaluationDeps;
+  triggerId: string;
+  projectId: string;
+  reason: GraphTriggerEvaluationReason;
+};
+
+export type GraphEvaluationPlan = {
+  request: GraphEvaluationRequest;
+  trigger: Trigger;
+  customGraph: CustomGraph;
+  customGraphId: string;
+  params: GraphActionParams;
+  threshold: number;
+  operator: string;
+  timePeriod: number;
+  seriesName: string;
+  series: GraphSeries;
+  graph: StoredGraphConfig;
+  now: Instant;
+  startDate: Instant;
+  timeseriesInput: TimeseriesInputType;
+};

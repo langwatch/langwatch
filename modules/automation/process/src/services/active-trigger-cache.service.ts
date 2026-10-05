@@ -1,6 +1,6 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
 
-import type { AutomationClock } from "../app/automation.members.ts";
+import type { AutomationClock } from "../repositories/automation.repositories.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 
 /** How long a project's active-automation list is reused before re-reading. */

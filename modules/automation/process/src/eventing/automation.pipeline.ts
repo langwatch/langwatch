@@ -27,10 +27,6 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import type {
-  AutomationScheduledIntent,
-  AutomationSettlementExecutor,
-} from "../app/automation.members.ts";
 import type { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
 import {
   INITIAL_SETTLEMENT_STATE,
@@ -44,6 +40,7 @@ import {
   settleWindowBucket,
 } from "../rules/trigger-settlement.rules.ts";
 import type { AutomationEvaluationSubscriberService } from "../services/automation-evaluation-subscriber.service.ts";
+import type { AutomationScheduledIntent } from "./graph-alert-sweep.intent.ts";
 import { runGraphAlertSweep } from "./graph-alert-sweep.intent.ts";
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
@@ -86,6 +83,7 @@ import {
   reportScheduleWake,
   reportScheduleStateSchema,
 } from "./report-schedule.process.ts";
+import type { AutomationSettlementExecutor } from "./trigger-settlement.intent.ts";
 import {
   logOverflowIntentSchema,
   notifyDigestIntentSchema,

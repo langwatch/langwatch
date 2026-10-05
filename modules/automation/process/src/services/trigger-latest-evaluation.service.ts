@@ -1,7 +1,7 @@
 import type { TriggerLatestEvaluation } from "@langwatch/automation-contract";
 
-import type { AutomationLogger } from "../app/automation.members.ts";
 import type { TriggerLatestEvaluationRepository } from "../repositories/trigger-latest-evaluation.repository.ts";
+import type { AutomationLogger } from "./automation.service.ts";
 
 /**
  * What an alert's last check saw and decided, so "why is this alert not firing?"
