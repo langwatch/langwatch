@@ -17371,6 +17371,10 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "No annotation with that ID exists in the project (annotation_not_found)",
+            "content": {}
           }
         },
         "summary": "Delete an annotation in the caller’s project",

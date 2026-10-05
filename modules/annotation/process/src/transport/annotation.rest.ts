@@ -80,6 +80,12 @@ export const annotationRest: Readonly<{
   .withDocs({
     operationId: "deleteApiAnnotationsId",
     summary: "Delete an annotation in the caller’s project",
+    errors: [
+      {
+        status: 404,
+        description: "No annotation with that ID exists in the project (annotation_not_found)",
+      },
+    ],
   })
   .handle(async ({ app, input, scope }) => {
     await app.delete({ id: input.id, projectId: scope.id });

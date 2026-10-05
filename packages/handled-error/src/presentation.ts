@@ -309,6 +309,10 @@ const label = (map: Record<string, string>, key: string): string | undefined => 
 
 const presentations = {
   // ---- traces & spans ----
+  annotation_not_found: {
+    title: "Annotation not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
   trace_not_found: {
     title: "Trace not found",
     describe: () =>

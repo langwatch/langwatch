@@ -178,7 +178,6 @@ const UNCOPIED_CODES_BACKLOG = new Set<string>([
   "agent_source_not_found",
   "agent_source_permission_denied",
   "agent_stored_credentials_destination_mismatch",
-  "annotation_not_found",
   "annotation_queue_not_found",
   "annotation_score_not_found",
   "batching_not_supported",

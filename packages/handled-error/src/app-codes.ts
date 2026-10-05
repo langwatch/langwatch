@@ -61,6 +61,7 @@ export const APP_ERROR_CODES = [
   "already_organization_member",
   "analytics_series_percentage_unsupported",
   "annotation_annotator_reference_invalid",
+  "annotation_not_found",
   "annotation_queue_item_not_found",
   "annotation_queue_name_reserved",
   "annotation_queue_name_taken",

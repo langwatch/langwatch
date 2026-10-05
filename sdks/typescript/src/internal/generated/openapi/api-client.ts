@@ -8970,6 +8970,13 @@ export interface operations {
                     };
                 };
             };
+            /** @description No annotation with that ID exists in the project (annotation_not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     patchApiAnnotationsId: {
