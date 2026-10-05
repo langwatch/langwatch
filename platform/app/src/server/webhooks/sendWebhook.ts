@@ -4,10 +4,14 @@ import {
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookMethod,
 } from "@langwatch/automations/providers/webhook";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import {
+  DispatchError,
+  isDispatchError,
+} from "~/server/event-sourcing/queues/dispatchError";
 import { assertDispatchBudget } from "./dispatchBudget";
 import { sendHttpDestination } from "./httpDestination";
 import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "./signature";
+import { describeTransportFailure } from "./transportFailure";
 import { assertWebhookUrlAllowed, webhookUrlValidator } from "./urlPolicy";
 
 /**
@@ -45,6 +49,7 @@ export const WEBHOOK_DELIVERY_ID_HEADER = "X-LangWatch-Delivery-Id";
 function buildWebhookHeaders({
   headers,
   body,
+  contentType,
   eventId,
   dispatchIdHeader,
   signingSecrets,
@@ -53,6 +58,7 @@ function buildWebhookHeaders({
 }: {
   headers: Record<string, string>;
   body: string;
+  contentType: string;
   eventId: string;
   dispatchIdHeader: string;
   signingSecrets?: readonly string[];
@@ -69,7 +75,7 @@ function buildWebhookHeaders({
   );
   return {
     ...sanitizeWebhookHeaders(resolvedHeaders),
-    "Content-Type": "application/json",
+    "Content-Type": contentType,
     [dispatchIdHeader]: eventId,
     ...(signingSecrets && signingSecrets.length > 0
       ? {
@@ -93,8 +99,13 @@ export interface WebhookSendInput {
   /** Customer-configured static headers; reserved keys are stripped here
    *  again (defense in depth over the save-time sanitize). */
   headers?: Record<string, string>;
-  /** The rendered JSON body. */
+  /** The rendered body. */
   body: string;
+  /** What that body is, sent as `Content-Type`. The automations channel derives
+   *  it from the automation's body format; the webhook endpoints platform, whose
+   *  envelope is always JSON, leaves it alone. Reserved as a raw header either
+   *  way, so a customer header can never contradict the body actually sent. */
+  contentType?: string;
   /** Woven into DispatchError messages and delivery logs. */
   triggerName: string;
   /** Overrides the default `Webhook for trigger "<name>"` phrasing for
@@ -156,6 +167,7 @@ export async function sendWebhook({
   method = "POST",
   headers = {},
   body,
+  contentType = "application/json",
   triggerName,
   testFire = false,
   projectId,
@@ -183,6 +195,7 @@ export async function sendWebhook({
     headers: buildWebhookHeaders({
       headers,
       body,
+      contentType,
       eventId: resolvedEventId,
       dispatchIdHeader,
       signingSecrets,
@@ -192,8 +205,22 @@ export async function sendWebhook({
     body,
     contextLabel: label,
     validateUrl: webhookUrlValidator(allowInsecureLocal),
+  }).catch((error: unknown) => {
+    throw withTransportFailureNamed(error);
   });
   return { ...response, eventId: resolvedEventId };
+}
+
+/** The author supplied this endpoint, so a failure to reach it is named. */
+function withTransportFailureNamed(error: unknown): unknown {
+  if (!isDispatchError(error) || error.customerMessage) return error;
+  return new DispatchError({
+    message: error.message,
+    retryable: error.retryable,
+    cause: error.cause,
+    retryAfterMs: error.retryAfterMs,
+    customerMessage: describeTransportFailure(error.cause),
+  });
 }
 
 /** How much of the receiver's response rides in an error message. */
@@ -239,6 +266,7 @@ export function assertWebhookDelivered({
       `Webhook for trigger "${triggerName}" received HTTP ${status}` +
       (snippet ? `: ${snippet}` : ""),
     retryable,
+    customerMessage: `The endpoint answered HTTP ${status}.`,
     // Honor the receiver's backpressure on a retryable status (ADR-040 §5);
     // the queue folds it into its backoff as a floor.
     retryAfterMs: retryable ? result.retryAfterMs : undefined,

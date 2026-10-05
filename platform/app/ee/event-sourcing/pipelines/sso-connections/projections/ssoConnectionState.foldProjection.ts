@@ -15,6 +15,7 @@ import {
   type ConnectionActivatedEvent,
   type ConnectionArrivalPolicySetEvent,
   type ConnectionDiscardedEvent,
+  type ConnectionIdpUpdatedEvent,
   type ConnectionRegisteredEvent,
   type ConnectionRenamedEvent,
   type ConnectionResumedEvent,
@@ -23,6 +24,7 @@ import {
   connectionActivatedEventSchema,
   connectionArrivalPolicySetEventSchema,
   connectionDiscardedEventSchema,
+  connectionIdpUpdatedEventSchema,
   connectionRegisteredEventSchema,
   connectionRenamedEventSchema,
   connectionResumedEventSchema,
@@ -96,6 +98,7 @@ export const ssoConnectionEvents = [
   connectionTornDownEventSchema,
   connectionArrivalPolicySetEventSchema,
   connectionRenamedEventSchema,
+  connectionIdpUpdatedEventSchema,
   domainProofWaveredEventSchema,
   domainProofLapsedEventSchema,
   domainProofRecoveredEventSchema,
@@ -337,6 +340,13 @@ export class SsoConnectionStateFoldProjection
 
   handleIdentityConnectionRenamed(
     event: ConnectionRenamedEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityConnectionIdpUpdated(
+    event: ConnectionIdpUpdatedEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
     return this.fold(event, state);

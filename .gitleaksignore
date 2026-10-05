@@ -13,3 +13,15 @@
 # the gate walks every commit in the pull request's range, and this one is now
 # history.
 4c7f177f4f5b4a4290d9281031dc4cdeff2d23a6:services/aigateway/adapters/providers/bifrost_error_test.go:generic-api-key:217
+
+# A Slack connection test named its refused bot token `xoxb-revoked-5678`, which
+# clears the generic-api-key entropy bar beside a `secret:` key. It was never a
+# credential; the fixture now reads `xoxb-bad-5678`, below the bar, so the tree
+# is clean and only this pull request's history still carries the literal.
+5575c828111cee9893e905201a240c26aa3d7437:platform/app/src/server/app-layer/automations/slack-integration/__tests__/slack-integration.service.unit.test.ts:generic-api-key:288
+
+# The SSO gate test set LANGWATCH_LICENSE_KEY to a made-up activation code
+# (LW- followed by sixteen characters), which clears the generic-api-key bar
+# beside a LICENSE_KEY name. It was never a credential; the test now mints a
+# code at runtime, so only this pull request's history carries the literal.
+ee724546d96949b22f8d04adc3a2ec5d8c79616a:platform/app/ee/sso/__tests__/sso-gate.test.ts:generic-api-key:248

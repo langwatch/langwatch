@@ -10,6 +10,7 @@ import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signup
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { trackOnboardingVariantAssigned } from "~/server/onboarding/guided-onboarding.analytics";
+import { trackOrganizationCreated } from "~/server/onboarding/signup-attribution.analytics";
 import {
   onboardingVariantSchema,
   signUpDataSchema,
@@ -182,6 +183,12 @@ export const onboardingRouter = createTRPCRouter({
           organizationName: orgResult.organization.name,
           signUpData: input.signUpData,
           primaryIntent: input.primaryIntent,
+        });
+
+        trackOrganizationCreated({
+          userId: ctx.session.user.id,
+          organizationId: orgResult.organization.id,
+          signUpData: input.signUpData,
         });
 
         if (input.onboardingVariant) {

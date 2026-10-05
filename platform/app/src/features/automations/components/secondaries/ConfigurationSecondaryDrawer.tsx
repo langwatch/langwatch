@@ -30,7 +30,7 @@ export function ConfigurationSecondaryDrawer({
         onClose={onDone}
         onDone={onDone}
       >
-        Choose a type first.
+        Choose where this automation delivers first.
       </SecondaryDrawerShell>
     );
   }

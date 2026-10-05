@@ -18,6 +18,7 @@ import {
 } from "~/server/app-layer/automations/graph-alert.builder";
 import { reportSourceSchema } from "~/server/app-layer/automations/report.builder";
 import type { FilterField } from "~/server/filters/types";
+import { queryIsValid } from "./conditionQuery";
 import { describeCron, isValidCron } from "./reportSchedule";
 
 /**
@@ -171,6 +172,14 @@ export const INITIAL_DRAFT: AutomationDraft = {
   slices: initialSlices(),
 };
 
+/** The deliveries a graph alert can dispatch; the rest are trace-only. */
+const GRAPH_ALERT_ACTIONS: ReadonlySet<TriggerAction | null> =
+  new Set<TriggerAction | null>([
+    "SEND_EMAIL",
+    "SEND_SLACK_MESSAGE",
+    "SEND_WEBHOOK",
+  ]);
+
 export function reducer(
   state: AutomationDraft,
   action: DraftAction,
@@ -188,7 +197,7 @@ export function reducer(
     case "SET_SOURCE":
       // Switching source clears the conditions tied to the other source so
       // we never persist stale filters next to a customGraphId or vice versa.
-      // Graph alerts only support notify actions (email / Slack) — a
+      // Graph alerts only support notify actions (email, Slack, webhook): a
       // previously picked persist action would be rejected at save time, so
       // switching to customGraph resets it and the user re-picks.
       if (action.value === "customGraph") {
@@ -197,11 +206,7 @@ export function reducer(
           source: "customGraph",
           filters: {},
           filterQuery: null,
-          action:
-            state.action === "SEND_EMAIL" ||
-            state.action === "SEND_SLACK_MESSAGE"
-              ? state.action
-              : null,
+          action: GRAPH_ALERT_ACTIONS.has(state.action) ? state.action : null,
         };
       }
       if (action.value === "report") {
@@ -268,7 +273,7 @@ export function reducer(
   }
 }
 
-/** The Automation / Alert / Schedule noun set for one preset. */
+/** The Automation / Report noun set for one preset. */
 export interface PresetLabels {
   /** Drawer heading. */
   title: string;
@@ -283,34 +288,43 @@ export interface PresetLabels {
 }
 
 /**
- * The single source of truth for the Automation / Alert / Schedule nouns,
- * keyed on the preset (`draft.source`) so every heading, button, and toast
- * stays in step with the chosen type. Replaces the scattered
- * `source === "customGraph" ? … : …` two-way branches that classified a
- * REPORT as trace data — the visible bug where the drawer said "New report"
- * yet the save button read "Create automation" (field-5015).
+ * The single source of truth for the customer-facing nouns, keyed on the
+ * preset (`draft.source`) so every heading, button, and toast stays in step
+ * with what the row actually is.
+ *
+ * There are two nouns, not three (ADR-093 §1): an automation is defined by
+ * what it watches, and watching a graph is not a different kind of thing from
+ * watching a trace filter — that split was a distinction the product drew and
+ * customers did not. A report stays separate, because the clock is not
+ * something to watch and a report has no rule.
+ *
+ * The third concept is called a **report**, not a schedule (decision by Alex,
+ * 2026-08-12): a schedule is when it goes out, which is one of its fields — the
+ * thing itself is the report it sends. The scheduling vocabulary stays wherever
+ * it describes timing ("sends on a schedule"); only the name of the object
+ * changes. The storage enum (`REPORT`, which already agreed) and the wire
+ * discriminator are untouched; this is vocabulary.
  */
-export function presetLabels(
-  source: ConditionSource,
-  isEdit: boolean,
-): PresetLabels {
+export function presetLabels({
+  source,
+  isEdit,
+}: {
+  source: ConditionSource;
+  isEdit: boolean;
+}): PresetLabels {
   switch (source) {
-    case "customGraph":
-      return {
-        title: isEdit ? "Edit alert" : "New alert",
-        saveButton: isEdit ? "Save alert" : "Create alert",
-        createdToast: "Alert created",
-        updatedToast: "Alert updated",
-        noun: "alert",
-      };
     case "report":
       return {
-        title: isEdit ? "Edit schedule" : "New schedule",
-        saveButton: isEdit ? "Save schedule" : "Create schedule",
-        createdToast: "Schedule created",
-        updatedToast: "Schedule updated",
-        noun: "schedule",
+        title: isEdit ? "Edit report" : "New report",
+        saveButton: isEdit ? "Save report" : "Create report",
+        createdToast: "Report created",
+        updatedToast: "Report updated",
+        noun: "report",
       };
+    // One noun for both subjects: a graph-watching automation is an
+    // automation, and the delete dialog, the toast, and the drawer heading all
+    // say so.
+    case "customGraph":
     case "trace":
       return {
         title: isEdit ? "Edit automation" : "Add automation",
@@ -361,6 +375,7 @@ export function buildTestFirePayload({
   channel,
   webhook,
   botDestination,
+  slackIntegrationId,
   webhookDestination,
   automationId,
   graphName,
@@ -372,6 +387,8 @@ export function buildTestFirePayload({
   webhook: string | null;
   /** Slack bot connection: test-fires via the Web API to this channel. */
   botDestination?: { channelId: string; botToken: string | null } | null;
+  /** The Slack connection a Slack test fire delivers through (ADR-093 §5a). */
+  slackIntegrationId?: string | null;
   /** ADR-040 generic HTTP destination: the full request the test fire sends. */
   webhookDestination?: {
     url: string;
@@ -396,6 +413,7 @@ export function buildTestFirePayload({
     draft: templatesFromDraft(draft),
     webhook,
     botDestination: botDestination ?? null,
+    ...(slackIntegrationId ? { slackIntegrationId } : {}),
     webhookDestination: webhookDestination ?? null,
     ...(automationId ? { automationId } : {}),
     graphAlert: isGraphAlert
@@ -453,6 +471,18 @@ export function subjectIsSet(draft: AutomationDraft): boolean {
     );
   }
   return filterQueryIsSet(draft.filterQuery) || filtersAreSet(draft.filters);
+}
+
+/**
+ * `subjectIsSet`, and for a trace query also that it parses and names nothing
+ * suspicious: the green check means "this will match", not "this is filled".
+ */
+export function subjectIsValid(draft: AutomationDraft): boolean {
+  if (!subjectIsSet(draft)) return false;
+  if (draft.source !== "trace" || !filterQueryIsSet(draft.filterQuery)) {
+    return true;
+  }
+  return queryIsValid(draft.filterQuery);
 }
 
 /** A trace-subject query is set when it has non-whitespace content. */
@@ -526,7 +556,7 @@ export const TIME_PERIOD_LABELS: Record<GraphAlertTimePeriod, string> = {
 };
 
 export function configurationSummary(draft: AutomationDraft): string {
-  if (!draft.action) return "Choose a type first";
+  if (!draft.action) return "Choose where it delivers";
   const provider = CLIENT_PROVIDERS[draft.action];
   return provider.client.summary(draft.slices[draft.action], {
     name: draft.name,

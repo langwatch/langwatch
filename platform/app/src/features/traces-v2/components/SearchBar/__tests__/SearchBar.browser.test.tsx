@@ -27,6 +27,15 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
       instantEval: {
+        access: {
+          useQuery: () => ({
+            data: { released: true, offer: "enable" },
+            isLoading: false,
+          }),
+        },
+        enable: {
+          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+        },
         estimate: {
           useMutation: () => ({ mutate: vi.fn(), isPending: false }),
         },
@@ -35,6 +44,11 @@ vi.mock("~/utils/api", () => ({
         },
       },
     },
+    useUtils: () => ({
+      tracesV2: {
+        instantEval: { access: { invalidate: vi.fn(), setData: vi.fn() } },
+      },
+    }),
     // The Instant Evals gate reads this flag; stub it enabled so nothing
     // in this suite depends on the tRPC provider this suite doesn't mount.
     featureFlag: {

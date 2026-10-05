@@ -26,6 +26,7 @@ class PostApiGatewayV1VirtualKeysBody:
         name (str):
         description (str | Unset):
         principal_user_id (None | str | Unset):
+        reveal_once (bool | Unset):
         scopes (list[PostApiGatewayV1VirtualKeysBodyScopesItem] | Unset):
         trace_project_id (None | str | Unset):
         routing_policy_id (None | str | Unset):
@@ -42,6 +43,7 @@ class PostApiGatewayV1VirtualKeysBody:
     name: str
     description: str | Unset = UNSET
     principal_user_id: None | str | Unset = UNSET
+    reveal_once: bool | Unset = UNSET
     scopes: list[PostApiGatewayV1VirtualKeysBodyScopesItem] | Unset = UNSET
     trace_project_id: None | str | Unset = UNSET
     routing_policy_id: None | str | Unset = UNSET
@@ -68,6 +70,8 @@ class PostApiGatewayV1VirtualKeysBody:
             principal_user_id = UNSET
         else:
             principal_user_id = self.principal_user_id
+
+        reveal_once = self.reveal_once
 
         scopes: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.scopes, Unset):
@@ -129,6 +133,8 @@ class PostApiGatewayV1VirtualKeysBody:
             field_dict["description"] = description
         if principal_user_id is not UNSET:
             field_dict["principal_user_id"] = principal_user_id
+        if reveal_once is not UNSET:
+            field_dict["reveal_once"] = reveal_once
         if scopes is not UNSET:
             field_dict["scopes"] = scopes
         if trace_project_id is not UNSET:
@@ -174,6 +180,8 @@ class PostApiGatewayV1VirtualKeysBody:
             return cast(None | str | Unset, data)
 
         principal_user_id = _parse_principal_user_id(d.pop("principal_user_id", UNSET))
+
+        reveal_once = d.pop("reveal_once", UNSET)
 
         _scopes = d.pop("scopes", UNSET)
         scopes: list[PostApiGatewayV1VirtualKeysBodyScopesItem] | Unset = UNSET
@@ -259,6 +267,7 @@ class PostApiGatewayV1VirtualKeysBody:
             name=name,
             description=description,
             principal_user_id=principal_user_id,
+            reveal_once=reveal_once,
             scopes=scopes,
             trace_project_id=trace_project_id,
             routing_policy_id=routing_policy_id,
