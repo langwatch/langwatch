@@ -1,5 +1,4 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 /**
  * The test-delivery door's per-organization window: counted ahead of
  * dispatch, refused 429 past the caller tier's ceiling, never reached on a refusal.
@@ -10,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { WebhookDispatchResult } from "../../app/webhook.app.ts";
 import type { WebhookEndpointRepository } from "../../repositories/webhook-endpoint.repository.ts";
+import type { WebhookRateLimitRepository } from "../../repositories/webhook-rate-limit.repository.ts";
 import { WebhookTestBoundsService } from "../../services/webhook-test-bounds.service.ts";
 import { mountWebhookRest } from "./webhook-rest.harness.ts";
 
@@ -18,14 +18,14 @@ import { mountWebhookRest } from "./webhook-rest.harness.ts";
 const FREE_TESTS_PER_MINUTE = 10;
 
 /** A real fixed window: each key counts its own checks, refused past the allowance named. */
-function windowLimiter(): RateLimiter {
+function windowLimiter(): WebhookRateLimitRepository {
   const used = new Map<string, number>();
 
   return {
     check: (key, limit) => {
       const count = (used.get(key) ?? 0) + 1;
       used.set(key, count);
-      const requests = limit?.requests ?? Number.POSITIVE_INFINITY;
+      const requests = limit.requests;
 
       return Promise.resolve(
         count <= requests ? { allowed: true } : { allowed: false, retryAfterSeconds: 30 },
@@ -64,7 +64,7 @@ function mountWithPlan(planType: "FREE" | "ENTERPRISE") {
     dispatch,
     testFireBounds: WebhookTestBoundsService.create({
       entitlement: entitlementOf(planType),
-      rateLimiter: windowLimiter(),
+      rateLimits: windowLimiter(),
     }),
   });
 

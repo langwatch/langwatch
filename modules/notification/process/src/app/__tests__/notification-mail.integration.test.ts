@@ -56,7 +56,6 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
   })
     .withModules([withMemoryRepositories(notificationProcessModule)])
-    .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withMember("outboundProxy", {})
     .withEventing(testEventing())
     .withConfig({
@@ -65,6 +64,7 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
         provider: smtp.provider,
         ses: { enabled: undefined, region: undefined, endpoint: undefined },
         smtp: { host: smtp.host, port: smtp.port, user: "u", secure: "false" },
+        publicBaseUrl: "https://app.langwatch.test",
       },
     });
 }

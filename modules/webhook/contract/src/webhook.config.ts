@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, isSaas, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -12,6 +12,8 @@ const unsafeSwitch = z
 export const webhookConfig = Config.define((c) => ({
   allowInsecureLocalUrls: c.env("WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS", unsafeSwitch),
   allowAmbientAwsCredentials: c.env("WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS", unsafeSwitch),
+  /** The hosted product (the shared leaf): its HTTP egress verifies the receiver's certificate. */
+  isSaas,
 }));
 
 export type WebhookServerConfig = ConfigOf<typeof webhookConfig>;

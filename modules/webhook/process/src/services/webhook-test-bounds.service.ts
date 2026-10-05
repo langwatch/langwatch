@@ -1,6 +1,7 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import { WebhookTestRateLimitedError } from "@langwatch/webhook-contract";
+
+import type { WebhookRateLimitRepository } from "../repositories/webhook-rate-limit.repository.ts";
 
 /**
  * The tier-effective window the test-delivery door fires under: a test
@@ -10,7 +11,7 @@ import { WebhookTestRateLimitedError } from "@langwatch/webhook-contract";
 export class WebhookTestBoundsService {
   static create(deps: {
     entitlement: Pick<EntitlementApi, "requestBound">;
-    rateLimiter: RateLimiter;
+    rateLimits: WebhookRateLimitRepository;
   }): WebhookTestBoundsService {
     return new WebhookTestBoundsService(deps);
   }
@@ -18,7 +19,7 @@ export class WebhookTestBoundsService {
   private constructor(
     private readonly deps: Readonly<{
       entitlement: Pick<EntitlementApi, "requestBound">;
-      rateLimiter: RateLimiter;
+      rateLimits: WebhookRateLimitRepository;
     }>,
   ) {}
 
@@ -28,7 +29,7 @@ export class WebhookTestBoundsService {
       key: "webhookTestPerMinute",
       organizationId: input.organizationId,
     });
-    const decision = await this.deps.rateLimiter.check(`webhook-test:${input.organizationId}`, {
+    const decision = await this.deps.rateLimits.check(`webhook-test:${input.organizationId}`, {
       requests,
       seconds: 60,
     });

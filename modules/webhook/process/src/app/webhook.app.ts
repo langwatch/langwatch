@@ -14,7 +14,6 @@ import type {
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
@@ -149,16 +148,12 @@ export interface WebhookAppDependencies {
   requests?: WebhookRequestService;
 }
 
-const storeReads = ["rateLimiter"] as const;
-
 type WebhookSetup = FeatureSetup<
   typeof WebhookModule.dependencies,
-  MembersRead<typeof storeReads> &
-    Readonly<{
-      isSaas: boolean;
-      /** The proxy spellings, a process fact; SQS deliveries follow them. */
-      outboundProxy: Readonly<Record<string, string | undefined>>;
-    }>,
+  Readonly<{
+    /** The proxy spellings, a process fact; SQS deliveries follow them. */
+    outboundProxy: Readonly<Record<string, string | undefined>>;
+  }>,
   WebhookServerConfig,
   WebhookRepositories
 >;
@@ -176,8 +171,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
   /** The entitlement peer this app's own plan gate reads (`WebhookAccessService`),
    *  and the project peer naming an organization's tenants for the events listing. */
   static readonly dependencies = { entitlement: EntitlementApi, projects: ProjectApi };
-  /** The test-fire door's per-organization counter. */
-  static readonly reads = ["rateLimiter", "isSaas", "outboundProxy"] as const;
+  static readonly reads = ["outboundProxy"] as const;
   static readonly config = webhookConfig;
 
   static create(input: WebhookSetup): WebhookModule {
@@ -187,7 +181,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
     const egress = WebhookEgressService.create({
       caps,
       http: HttpDestinationChannel.create({
-        tls: { rejectUnauthorized: input.members.isSaas },
+        tls: { rejectUnauthorized: input.config.isSaas },
       }),
     });
     const aws = AwsClientConfiguration.create({
@@ -218,7 +212,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
       dispatch: deliver,
       testFireBounds: WebhookTestBoundsService.create({
         entitlement: input.dependencies.entitlement,
-        rateLimiter: input.members.rateLimiter,
+        rateLimits: input.repositories.rateLimits,
       }),
       requests: WebhookRequestService.create({
         egress,

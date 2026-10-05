@@ -6,7 +6,8 @@ import { type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { evaluatorSchema, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
@@ -32,7 +33,8 @@ function evaluatorRow(input: { id: string; projectId: string }) {
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(monitorProcessModule)])
+    .withModules([monitorProcessModule])
+    .withStores(memoryStores())
     .withMember("publicBaseUrl", PUBLIC_BASE_URL)
     .provide({
       authz: createApiFixture<AuthzApiContract>({ hasProjectPermission: async () => true }),

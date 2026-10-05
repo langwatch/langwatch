@@ -28,6 +28,7 @@ const config: NotificationServerConfig = {
   provider: undefined,
   ses: { enabled: undefined, region: undefined, endpoint: undefined },
   smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
+  publicBaseUrl: undefined,
 };
 
 /** The gateway-facing message each send is handed, recorded rather than delivered. */

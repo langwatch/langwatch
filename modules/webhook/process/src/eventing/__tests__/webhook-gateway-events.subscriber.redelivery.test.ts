@@ -11,11 +11,10 @@ import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
 } from "@langwatch/gateway-contract";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { WEBHOOK_SPEND_DELIVERY_AGGREGATE_TYPE, WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -39,19 +38,6 @@ const entitledPlan: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-function stores() {
-  const members: Record<string, unknown> = {
-    prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-    rateLimiter: { check: async () => ({ allowed: true }) },
-    redis: memoryRedisDouble(),
-  };
-
-  return {
-    order: ["prisma", "rateLimiter", "redis"],
-    read: (name: string) => members[name],
-  };
-}
-
 function worker(eventStore: EventStoreMemory) {
   const eventing = new EventSourcing({
     eventStore,
@@ -61,16 +47,16 @@ function worker(eventStore: EventStoreMemory) {
   });
 
   return createApp({ role: "worker" })
-    .withModules([withMemoryRepositories(webhookProcessModule)])
+    .withModules([webhookProcessModule])
     .withConfig({
       webhook: {
         allowInsecureLocalUrls: false,
         allowAmbientAwsCredentials: false,
+        isSaas: false,
       },
     })
-    .withStores(stores())
+    .withStores(memoryStores())
     .withEventing(eventing)
-    .withMember("isSaas", false)
     .withMember("outboundProxy", {})
     .provide({
       entitlement: createApiFixture<EntitlementApi>({

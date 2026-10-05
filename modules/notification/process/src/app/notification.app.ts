@@ -41,12 +41,8 @@ import { MailDeliveryService } from "../services/mail-delivery.service.ts";
 import { NotificationService } from "../services/notification.service.ts";
 import { WebPushService, type WebPushQueue } from "../services/web-push.service.ts";
 
-/**
- * Process facts: the sender address derives from the public base URL when unnamed,
- * and the SES and Resend calls follow the proxy spellings.
- */
+/** A process fact: the SES and Resend calls follow the proxy spellings. */
 type NotificationMembers = Readonly<{
-  publicBaseUrl: string | undefined;
   outboundProxy: Readonly<Record<string, string | undefined>>;
 }>;
 
@@ -60,7 +56,7 @@ type NotificationSetup = FeatureSetup<
 export class NotificationModule implements NotificationApiContract {
   static readonly contract = NotificationApi;
   static readonly dependencies = {};
-  static readonly reads = ["publicBaseUrl", "outboundProxy"] as const;
+  static readonly reads = ["outboundProxy"] as const;
   static readonly config = notificationConfig;
   static readonly publicConfig = notificationBrowserConfig.project;
   /** Resolved while the module constructs, before boot seals them. */
@@ -104,7 +100,7 @@ export class NotificationModule implements NotificationApiContract {
       ...settings,
       defaultFrom: resolveDefaultFrom({
         ...(config.defaultFrom === undefined ? {} : { emailDefaultFrom: config.defaultFrom }),
-        baseHost: members.publicBaseUrl ?? "",
+        baseHost: config.publicBaseUrl ?? "",
       }),
     };
     const outboundProxy = parseOutboundProxyConfig(members.outboundProxy);
@@ -121,7 +117,7 @@ export class NotificationModule implements NotificationApiContract {
     resources.own("Notification mail gateway", () => delivery.close());
     const mailDelivery = MailDeliveryService.create({ settings: async () => settings, delivery });
     return new NotificationModule(repositories, mailDelivery, {
-      publicBaseUrl: members.publicBaseUrl,
+      publicBaseUrl: config.publicBaseUrl,
     });
   }
 

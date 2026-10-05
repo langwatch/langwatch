@@ -1,8 +1,8 @@
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
@@ -11,7 +11,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
  * the one process store the kernel supplies.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -34,19 +33,6 @@ const entitledPlan: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-function stores() {
-  const members: Record<string, unknown> = {
-    prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-    rateLimiter: { check: async () => ({ allowed: true }) },
-    redis: memoryRedisDouble(),
-  };
-
-  return {
-    order: ["prisma", "rateLimiter", "redis"],
-    read: (name: string) => members[name],
-  };
-}
-
 function worker() {
   const eventing = new EventSourcing({
     eventStore: EventStoreMemory.createForTesting(),
@@ -56,16 +42,16 @@ function worker() {
   });
 
   return createApp({ role: "worker" })
-    .withModules([withMemoryRepositories(webhookProcessModule)])
+    .withModules([webhookProcessModule])
     .withConfig({
       webhook: {
         allowInsecureLocalUrls: false,
         allowAmbientAwsCredentials: false,
+        isSaas: false,
       },
     })
-    .withStores(stores())
+    .withStores(memoryStores())
     .withEventing(eventing)
-    .withMember("isSaas", false)
     .withMember("outboundProxy", {})
     .provide({
       entitlement: createApiFixture<EntitlementApi>({

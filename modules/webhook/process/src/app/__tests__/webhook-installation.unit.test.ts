@@ -4,11 +4,10 @@
  * repositories, with no repository class or tier named here.
  */
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
@@ -29,33 +28,17 @@ const entitledPlan: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-/** The stores this feature reads, answered the way opened stores answer. */
-function stores() {
-  const prisma = new PrismaClient({ accelerateUrl: "prisma://localhost/test" });
-  const rateLimiter = { check: async () => ({ allowed: true }) };
-  const members: Record<string, unknown> = {
-    prisma,
-    rateLimiter,
-    redis: memoryRedisDouble(),
-  };
-
-  return {
-    order: ["prisma", "rateLimiter", "redis"],
-    read: (name: string) => members[name],
-  };
-}
-
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(webhookProcessModule)])
+    .withModules([webhookProcessModule])
     .withConfig({
       webhook: {
         allowInsecureLocalUrls: false,
         allowAmbientAwsCredentials: false,
+        isSaas: false,
       },
     })
-    .withStores(stores())
-    .withMember("isSaas", false)
+    .withStores(memoryStores())
     .withMember("outboundProxy", {})
     .provide({
       entitlement: createApiFixture<EntitlementApi>({

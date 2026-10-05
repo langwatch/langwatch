@@ -19,12 +19,13 @@ export function createNotificationTestApp(
   return NotificationModule.create({
     repositories: input.repositories ?? MemoryNotificationRepositories.create(),
     dependencies: {},
-    members: { publicBaseUrl: undefined, outboundProxy: {} },
+    members: { outboundProxy: {} },
     config: {
       defaultFrom: undefined,
       provider: undefined,
       ses: { enabled: undefined, region: undefined, endpoint: undefined },
       smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
+      publicBaseUrl: undefined,
     },
     resources: new ResourceScope(),
     secrets,

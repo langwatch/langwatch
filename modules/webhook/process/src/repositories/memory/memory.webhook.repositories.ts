@@ -5,6 +5,7 @@ import type { WebhookRepositories } from "../webhook.repositories.ts";
 import { MemoryWebhookDispatchCapRepository } from "./memory.webhook-dispatch-cap.repository.ts";
 import { MemoryWebhookEndpointRepository } from "./memory.webhook-endpoint.repository.ts";
 import { MemoryWebhookEventsRepository } from "./memory.webhook-events.repository.ts";
+import { MemoryWebhookRateLimitRepository } from "./memory.webhook-rate-limit.repository.ts";
 import { MemoryWebhookRetentionRepository } from "./memory.webhook-retention.repository.ts";
 import { MemoryWebhookDatabase } from "./memory.webhook.database.ts";
 
@@ -40,6 +41,7 @@ export class MemoryWebhookRepositories {
       }),
       events: MemoryWebhookEventsRepository.create(),
       retention: MemoryWebhookRetentionRepository.create({ database }),
+      rateLimits: MemoryWebhookRateLimitRepository.create(),
     };
   }
 }

@@ -12,7 +12,6 @@ function process(
 ) {
   return createApp({ role, secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
     .withModules([withMemoryRepositories(notificationProcessModule)])
-    .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withMember("outboundProxy", {})
     .withEventing(testEventing())
     .withConfig({
@@ -21,6 +20,7 @@ function process(
         provider: undefined,
         ses: { enabled: undefined, region: undefined, endpoint: undefined },
         smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
+        publicBaseUrl: "https://app.langwatch.test",
       },
     });
 }
