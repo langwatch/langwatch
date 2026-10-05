@@ -1,16 +1,8 @@
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { ResourceScope } from "@langwatch/process";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { TEST_LICENSING_CONFIG, VALID_LICENSE_KEY } from "../../__tests__/testing.ts";
-import { LicensingModule } from "../../app/licensing.app.ts";
-import type { OrganizationLicenseReads } from "../../app/licensing.members.ts";
+import { createTestLicensingApp, VALID_LICENSE_KEY } from "../../__tests__/testing.ts";
 import { MemoryOrganizationLicenseRepository } from "../../repositories/memory/memory.organization-license.repository.ts";
+import type { OrganizationLicenseReads } from "../../repositories/organization-license.repository.ts";
 import { LicensingInfrastructureService } from "../licensing-infrastructure.service.ts";
 
 const LICENSED_ORGANIZATION_ID = "org_paid";
@@ -33,25 +25,19 @@ function licenceRows(): {
 }
 
 function composeWithoutMutation() {
-  return LicensingInfrastructureService.create({ processName: "the worker" }).withoutMutation({
+  return LicensingInfrastructureService.create({ role: "worker" }).withoutMutation({
     licenses: licenceRows().licenses,
+    getMemberCount: async () => 0,
+    getMembersLiteCount: async () => 0,
   });
 }
 
 describe("licensing infrastructure composed without licence mutation", () => {
   /** @scenario "A process that composes no licence mutation still scans the licence rows" */
   it("accepts a key activated on an organization when no instance key is set", async () => {
-    const app = await LicensingModule.create({
-      dependencies: {
-        instantEval: createApiFixture<InstantEvalApi>(),
-        projects: createApiFixture<ProjectApi>(),
-        gateway: createApiFixture<GatewayApi>(),
-        organizations: createApiFixture<OrganizationApi>(),
-      },
-      members: { infrastructure: composeWithoutMutation(), isSaas: false, serviceVersion: "test" },
-      config: TEST_LICENSING_CONFIG,
-      resources: new ResourceScope(),
-      secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
+    const app = await createTestLicensingApp({
+      repositories: { organizationLicenses: licenceRows().candidates },
+      role: "worker",
     });
 
     await expect(app.inspectPlatformAccess()).resolves.toMatchObject({

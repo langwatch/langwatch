@@ -6,7 +6,7 @@
 
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type { HostedSpendRecorder, LicenseLogger } from "../app/licensing.members.ts";
+import type { LicenseLogger } from "./license.service.ts";
 
 export interface ConnectSpendEntry {
   virtualKeyId: string;
@@ -122,4 +122,17 @@ export class ConnectSpendBufferService {
     clearTimeout(this.#timer);
     this.#timer = undefined;
   }
+}
+
+/** Where metered hosted usage is written. One record covers many calls. */
+export interface HostedSpendRecorder {
+  recordSpend(entry: {
+    projectId: string;
+    virtualKeyId: string;
+    inputTokens: number;
+    requests: number;
+    costUsd: number;
+    priceUsd: number;
+    occurredAt: Instant;
+  }): Promise<void>;
 }

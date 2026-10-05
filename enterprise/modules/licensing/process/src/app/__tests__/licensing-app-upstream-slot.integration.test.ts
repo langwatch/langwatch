@@ -2,7 +2,7 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
-import type { Encryption, RateLimiter } from "@langwatch/process-stores/members";
+import type { RateLimiter } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -15,10 +15,12 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { TEST_LICENSING_CONFIG, VALID_LICENSE_KEY } from "../../__tests__/testing.ts";
+import { LiveLicensingRepositories } from "../../repositories/live/live.licensing.repositories.ts";
 import {
   createLicensingTestConnection,
   TEST_DATABASE_URL,
 } from "../../repositories/prisma/__tests__/support/licensing-database.fixture.ts";
+import type { IssuedLicenseCipher } from "../../repositories/prisma/prisma.issued-license.repository.ts";
 import { LicensingModule } from "../licensing.app.ts";
 
 const RUN = `slot-${crypto.randomUUID().slice(0, 8)}`;
@@ -49,15 +51,13 @@ describe.skipIf(!TEST_DATABASE_URL)("the install's hosted provider slot in produ
             },
           }),
         },
-        members: {
+        members: { logger: createTestLogger().logger, serviceVersion: "test" },
+        repositories: LiveLicensingRepositories.create({
           prisma,
-          logger: createTestLogger().logger,
-          encryption: createApiFixture<Encryption>(),
+          encryption: createApiFixture<IssuedLicenseCipher>(),
           rateLimiter: createApiFixture<RateLimiter>(),
-          isSaas: false,
-          serviceVersion: "test",
-        },
-        config: TEST_LICENSING_CONFIG,
+        }),
+        config: { ...TEST_LICENSING_CONFIG, isSaas: false },
         resources: new ResourceScope(),
         secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
       });

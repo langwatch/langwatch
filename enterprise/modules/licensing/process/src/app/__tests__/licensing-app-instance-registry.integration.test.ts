@@ -2,7 +2,7 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
-import type { Encryption, RateLimiter } from "@langwatch/process-stores/members";
+import type { RateLimiter } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -17,10 +17,12 @@ import { nowInstant } from "@langwatch/time";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
+import { LiveLicensingRepositories } from "../../repositories/live/live.licensing.repositories.ts";
 import {
   createLicensingTestConnection,
   TEST_DATABASE_URL,
 } from "../../repositories/prisma/__tests__/support/licensing-database.fixture.ts";
+import type { IssuedLicenseCipher } from "../../repositories/prisma/prisma.issued-license.repository.ts";
 import { PrismaSelfHostedInstanceRepository } from "../../repositories/prisma/prisma.self-hosted-instance.repository.ts";
 import { LicensingModule } from "../licensing.app.ts";
 
@@ -78,15 +80,13 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry in produc
                 : null,
           }),
         },
-        members: {
+        members: { logger: createTestLogger().logger, serviceVersion: "test" },
+        repositories: LiveLicensingRepositories.create({
           prisma,
-          logger: createTestLogger().logger,
-          encryption: createApiFixture<Encryption>(),
+          encryption: createApiFixture<IssuedLicenseCipher>(),
           rateLimiter: createApiFixture<RateLimiter>(),
-          isSaas: true,
-          serviceVersion: "test",
-        },
-        config: TEST_LICENSING_CONFIG,
+        }),
+        config: { ...TEST_LICENSING_CONFIG, isSaas: true },
         resources: new ResourceScope(),
         secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
       });

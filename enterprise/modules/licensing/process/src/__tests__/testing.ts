@@ -8,7 +8,7 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { planQuantities } from "@langwatch/plans";
-import { ResourceScope } from "@langwatch/process";
+import { ResourceScope, type ServerRole } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 // gitleaks:allow — test fixture keys only (not real secrets)
@@ -19,12 +19,15 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { LicensingModule } from "../app/licensing.app.ts";
-import {
-  type LicenseRetention,
-  type LicenseRetentionRule,
-  type LicenseStorage,
-  type StoredLicense,
-} from "../app/licensing.members.ts";
+import type { LicensingRepositories } from "../repositories/licensing.repositories.ts";
+import { MemoryLicensingRepositories } from "../repositories/memory/memory.licensing.repositories.ts";
+import { MemoryOrganizationLicenseRepository } from "../repositories/memory/memory.organization-license.repository.ts";
+import type { StoredLicense } from "../repositories/organization-license.repository.ts";
+import type {
+  LicenseRetention,
+  LicenseRetentionRule,
+  LicenseStorage,
+} from "../services/license.service.ts";
 import { TEST_PUBLIC_KEY } from "./fixtures/license-keys.fixture.ts";
 
 /** Connect off, so no suite composing this app can make an outbound call. */
@@ -34,6 +37,7 @@ export const TEST_LICENSING_CONFIG: LicensingServerConfig = {
   connectGatewayEndpoint: CONNECT_DEFAULT_GATEWAY_ENDPOINT,
   connectLicenseEndpoint: CONNECT_DEFAULT_LICENSE_ENDPOINT,
   connectInstanceId: void 0,
+  isSaas: false,
 };
 
 /**
@@ -235,27 +239,50 @@ export class RecordingLicenseRetention implements LicenseRetention {
   }
 }
 
-export function createTestLicensingApp(): Promise<LicensingModule> {
+type LicensingPeers = Parameters<typeof LicensingModule.create>[0]["dependencies"];
+
+/** What a suite changes about the app it boots; everything else is memory and silence. */
+export type TestLicensingAppOptions = Readonly<{
+  repositories?: Partial<LicensingRepositories>;
+  dependencies?: Partial<LicensingPeers>;
+  config?: Partial<LicensingServerConfig>;
+  /** The value each declared secret resolves to, by its key; unnamed keys are unset. */
+  secrets?: Readonly<Record<string, string | undefined>>;
+  resources?: ResourceScope;
+  role?: ServerRole;
+}>;
+
+const SILENT_LOGGER = { error: () => undefined };
+
+/**
+ * The licensing app over its memory registry, every peer a fixture. One
+ * organization, `org-456`, exists with no licence and no seats taken.
+ */
+export function createTestLicensingApp(
+  options: TestLicensingAppOptions = {},
+): Promise<LicensingModule> {
+  const secrets = options.secrets ?? {};
   return LicensingModule.create({
     dependencies: {
       instantEval: createApiFixture<InstantEvalApi>(),
       projects: createApiFixture<ProjectApi>(),
       gateway: createApiFixture<GatewayApi>(),
-      organizations: createApiFixture<OrganizationApi>(),
+      organizations: createApiFixture<OrganizationApi>({
+        countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+      }),
+      ...options.dependencies,
     },
-    members: {
-      infrastructure: {
-        repository: MemoryLicenseStorage.create({ organizations: ["org-456"] }),
-        configuredAuthProvider: () => null,
-        platformSsoAllowed: async () => true,
-        authProviderIsMounted: () => true,
-        reportSigningFailure: () => {},
-      },
-      isSaas: false,
-      serviceVersion: "test",
+    members: { logger: SILENT_LOGGER, serviceVersion: "test" },
+    repositories: {
+      ...MemoryLicensingRepositories.create(),
+      organizationLicenses: MemoryOrganizationLicenseRepository.create(
+        new Map([["org-456", null]]),
+      ),
+      ...options.repositories,
     },
-    config: TEST_LICENSING_CONFIG,
-    resources: new ResourceScope(),
-    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    config: { ...TEST_LICENSING_CONFIG, ...options.config },
+    resources: options.resources ?? new ResourceScope(),
+    secrets: new ScopedSecrets(async (handle, build) => build(secrets[handle.id])),
+    ...(options.role ? { role: options.role } : {}),
   });
 }

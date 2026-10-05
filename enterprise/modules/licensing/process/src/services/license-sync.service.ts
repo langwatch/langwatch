@@ -25,16 +25,12 @@ import type { HandledError } from "@langwatch/handled-error";
 import type { Instant } from "@langwatch/time";
 
 import type {
-  ConnectManagedKeys,
-  LicenseDeliveryCipher,
-  LicenseSyncRateLimit,
-} from "../app/licensing.members.ts";
-import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
 import { bearerTokenOf } from "../rules/connect-presented-credential.rules.ts";
 import type { ConnectCredentialOutcome } from "./connect-credential.service.ts";
+import type { ConnectManagedKeys } from "./license-registry.service.ts";
 
 /** The credential service, as the sync uses it. It binds the instance on first use. */
 export interface ConnectCredentialResolver {
@@ -49,7 +45,6 @@ export interface LicenseSyncOptions {
   repository: IssuedLicenseRepository;
   managedKeys: ConnectManagedKeys;
   rateLimit: LicenseSyncRateLimit;
-  cipher: LicenseDeliveryCipher;
   /** Attributed as the actor when a replaced license's managed key is ended. */
   systemActorId: string;
   now: () => Instant;
@@ -158,10 +153,15 @@ export class LicenseSyncService {
     await this.options.repository.update(row.id, { pendingDeliveryLicense: null });
   }
 
-  /** The reissued license waiting for this install, decrypted, or nothing. */
+  /** The reissued license waiting for this install, or nothing. */
   private async pendingDelivery(row: IssuedLicenseRecord): Promise<string | undefined> {
     const replacement = await this.options.repository.findByReplacesId(row.id);
     if (!replacement?.pendingDeliveryLicense) return undefined;
-    return this.options.cipher.decrypt(replacement.pendingDeliveryLicense);
+    return replacement.pendingDeliveryLicense;
   }
+}
+
+/** Whether this license may sync again now (48 calls per license per day). */
+export interface LicenseSyncRateLimit {
+  allow(params: { licenseRowId: string }): Promise<boolean>;
 }

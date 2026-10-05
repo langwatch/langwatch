@@ -13,13 +13,13 @@ import {
 import { isLicenseTokenShape, registryHashForToken } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 
-import type { ConnectManagedKeys } from "../app/licensing.members.ts";
 import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
 import { statusOfIssuedLicense } from "../rules/issued-license.rules.ts";
 import { isInstanceIdShape } from "../rules/license-token.rules.ts";
+import type { ConnectManagedKeys } from "./license-registry.service.ts";
 
 export interface ConnectCredentialOptions {
   repository: IssuedLicenseRepository;

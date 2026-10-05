@@ -82,5 +82,5 @@ export function buildLicenseSync({
 
 export const licenseSyncEventing = defineEventingModule({
   pipeline: LICENSE_SYNC_PIPELINE_NAME,
-  build: (setup: EventingSetup<undefined, LicensingModule>) => buildLicenseSync(setup),
+  build: (setup: EventingSetup<never, LicensingModule>) => buildLicenseSync(setup),
 });

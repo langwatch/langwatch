@@ -17,9 +17,9 @@ import {
   ConnectServiceNotEntitledError,
   DEFAULT_LICENSE_PUBLIC_KEY,
 } from "@langwatch/enterprise-licensing-contract";
+import type { GatewayConnectUpstream } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 
-import type { ConnectUpstreamSlot, LicenseLogger } from "../app/licensing.members.ts";
 import type { ConnectGatewayChannel } from "../channels/connect-gateway.channel.ts";
 import type {
   ConnectOrganizationRecord,
@@ -32,6 +32,7 @@ import {
 } from "../rules/connect-entitlement.rules.ts";
 import { licenseKeyFingerprint } from "../rules/license-key.rules.ts";
 import type { InstanceIdentityService } from "./instance-identity.service.ts";
+import type { LicenseLogger } from "./license.service.ts";
 
 /** How long the settings read waits for the hosted usage route before showing it unavailable. */
 const USAGE_READ_TIMEOUT_MS = 10_000;
@@ -380,4 +381,14 @@ function syncOf(organization: ConnectOrganizationRecord | null): ConnectSyncView
     lastSyncAt: organization?.lastSyncAt?.toString() ?? null,
     lastError: organization?.lastSyncError ? { code: organization.lastSyncError } : null,
   };
+}
+
+/**
+ * The hosted provider slot the install's own gateway adds for one organization,
+ * which the gateway owns. Licensing sets it only while managed models may be
+ * reached, and clears it on every other change of license, service or Connect.
+ */
+export interface ConnectUpstreamSlot {
+  set(params: GatewayConnectUpstream): Promise<void>;
+  clear(params: { organizationId: string }): Promise<void>;
 }

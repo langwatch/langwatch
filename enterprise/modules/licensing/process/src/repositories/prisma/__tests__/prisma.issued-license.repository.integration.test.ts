@@ -27,10 +27,16 @@ import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 const RUN = `lic-reg-${crypto.randomUUID().slice(0, 8)}`;
 
+/** Marks what reached the column, so a suite can see the row was sealed at rest. */
+const SEALING = {
+  encrypt: (plaintext: string) => `sealed:${plaintext}`,
+  decrypt: (ciphertext: string) => ciphertext.slice("sealed:".length),
+};
+
 describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
   const connection = createLicensingTestConnection(TEST_DATABASE_URL ?? "");
   const prisma = connection.client;
-  const repository = PrismaIssuedLicenseRepository.create(prisma);
+  const repository = PrismaIssuedLicenseRepository.create(prisma, SEALING);
   const organizationIds: string[] = [];
   const organizationNames = new Map<string, string>();
   const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
@@ -53,7 +59,6 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     contractBudgets: { sync: async () => undefined },
     cryptography,
     generation: LicenseGenerationService.create(cryptography),
-    cipher: { encrypt: (plain) => `sealed:${plain.length}`, decrypt: () => "" },
     signingKey: () => TEST_PRIVATE_KEY,
     now: () => nowInstant(),
   });
@@ -108,6 +113,21 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     await expect(
       registry.findSeatChanges({ organizationId: license.organizationId ?? "" }),
     ).resolves.toMatchObject([{ licenseRowId: changed.license.id, previousSeats: 50, seats: 58 }]);
+  });
+
+  /** @scenario A reissued license is held encrypted only until it is delivered */
+  it("seals a reissued license at rest and reads it back opened", async () => {
+    const { license } = await issue("ACME Sealed");
+    const changed = await registry.changeSeats({
+      id: license.id,
+      maxMembers: 60,
+      operatorId: "user_operator",
+    });
+
+    const stored = await prisma.issuedLicense.findUnique({ where: { id: changed.license.id } });
+    expect(stored?.pendingDeliveryLicense).toBe(`sealed:${changed.licenseKey}`);
+    const read = await repository.findByReplacesId(license.id);
+    expect(read?.pendingDeliveryLicense).toBe(changed.licenseKey);
   });
 
   it("refuses a second reissue of the same license from the table's own unique constraint", async () => {
@@ -169,7 +189,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
         return true;
       },
       second: (tx) =>
-        PrismaIssuedLicenseRepository.create(tx).attachVirtualKey({
+        PrismaIssuedLicenseRepository.create(tx, SEALING).attachVirtualKey({
           id: license.id,
           virtualKeyId: `vk_${RUN}_interleaved`,
           requires: {
@@ -191,7 +211,11 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     const { license } = await issue("ACME Bind Race");
     const at = nowInstant();
     const bindFor = (instanceId: string) => (tx: Prisma.TransactionClient) =>
-      PrismaIssuedLicenseRepository.create(tx).bindInstance({ id: license.id, instanceId, at });
+      PrismaIssuedLicenseRepository.create(tx, SEALING).bindInstance({
+        id: license.id,
+        instanceId,
+        at,
+      });
 
     const binds = await raceOnOneRow({
       prisma,

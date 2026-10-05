@@ -19,12 +19,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { licenseResourceCounts } from "@langwatch/plans";
 import { nowInstant, Temporal, toEpochMs, type Instant } from "@langwatch/time";
 
-import type {
-  LicenseLogger,
-  LicenseRetention,
-  LicenseUsage,
-  LicenseStorage,
-} from "../app/licensing.members.ts";
+import type { OrganizationLicenseRepository } from "../repositories/organization-license.repository.ts";
 import { connectServicesNamedBy } from "../rules/connect-entitlement.rules.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
@@ -414,4 +409,40 @@ export class LicenseService extends LicensingServiceContract {
       );
     }
   }
+}
+
+export interface LicenseLogger {
+  error(fields: Record<string, unknown>, message: string): void;
+}
+
+export type LicenseRetentionRule = {
+  scopeType: string;
+  scopeId: string;
+  category: string;
+};
+
+export interface LicenseRetention {
+  listOrganizationRules(organizationId: string): Promise<readonly LicenseRetentionRule[]>;
+
+  setForOrganization(input: {
+    organizationId: string;
+    category: string;
+    retentionDays: number;
+  }): Promise<void>;
+}
+
+export type LicenseUsageCount = number | "unlimited" | "unknown";
+
+export interface LicenseUsage {
+  getCurrentMonthCount(input: { organizationId: string }): Promise<LicenseUsageCount>;
+}
+
+/**
+ * Persistence and seat-count port. Concrete database adapters stay in
+ * apps, except the reads, inherited from `OrganizationLicenseReads` so a
+ * plan-resolution-only process can compose those alone, without seats.
+ */
+export interface LicenseStorage extends OrganizationLicenseRepository {
+  getMemberCount(organizationId: string): Promise<number>;
+  getMembersLiteCount(organizationId: string): Promise<number>;
 }

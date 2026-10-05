@@ -17,8 +17,9 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LicenseStorage, StoredLicense } from "../app/licensing.members.ts";
+import type { StoredLicense } from "../repositories/organization-license.repository.ts";
 import { connectServicesNamedBy } from "../rules/connect-entitlement.rules.ts";
+import type { LicenseStorage } from "../services/license.service.ts";
 import { LicenseService } from "../services/license.service.ts";
 import { OFFLINE_LICENSE_FROM_MAIN as fixture } from "./support/offline-license-from-main.fixture.ts";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./testing.ts";

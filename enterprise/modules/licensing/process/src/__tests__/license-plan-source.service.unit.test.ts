@@ -5,7 +5,7 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
 
-import type { OrganizationLicense } from "../app/licensing.members.ts";
+import type { OrganizationLicense } from "../repositories/organization-license.repository.ts";
 import { LicensePlanSourceService } from "../services/license-plan-source.service.ts";
 import { LicensingEntitlementSourceService } from "../services/licensing-entitlement-source.service.ts";
 import {

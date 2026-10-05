@@ -66,40 +66,23 @@ import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import {
-  type Encryption,
-  type MembersRead,
-  type RateLimiter,
-} from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
+import type { ConnectGatewayChannel } from "../channels/connect-gateway.channel.ts";
+import type { ConnectLicenseChannel } from "../channels/connect-license.channel.ts";
 import { HttpConnectGatewayChannel } from "../channels/http/http.connect-gateway.channel.ts";
 import { HttpConnectLicenseChannel } from "../channels/http/http.connect-license.channel.ts";
-import {
-  type ActivationCodeDatabase,
-  PrismaActivationCodeRepository,
-} from "../repositories/prisma/prisma.activation-code.repository.ts";
-import {
-  type ConnectOrganizationDatabase,
-  PrismaConnectOrganizationRepository,
-} from "../repositories/prisma/prisma.connect-organization.repository.ts";
-import {
-  type InstanceIdentityDatabase,
-  PrismaInstanceIdentityRepository,
-} from "../repositories/prisma/prisma.instance-identity.repository.ts";
-import {
-  type IssuedLicenseDatabase,
-  PrismaIssuedLicenseRepository,
-} from "../repositories/prisma/prisma.issued-license.repository.ts";
-import { PrismaOrganizationLicenseRepository } from "../repositories/prisma/prisma.organization-license.repository.ts";
-import {
-  PrismaSelfHostedInstanceRepository,
-  type SelfHostedInstanceDatabase,
-} from "../repositories/prisma/prisma.self-hosted-instance.repository.ts";
+import type { ActivationCodeRepository } from "../repositories/activation-code.repository.ts";
+import type { ConnectOrganizationRepository } from "../repositories/connect-organization.repository.ts";
+import type { InstanceIdentityRepository } from "../repositories/instance-identity.repository.ts";
+import type { IssuedLicenseRepository } from "../repositories/issued-license.repository.ts";
+import type { LicensingRepositories } from "../repositories/licensing.repositories.ts";
+import type { SelfHostedInstanceRepository } from "../repositories/self-hosted-instance.repository.ts";
 import { ACTIVATION_ATTEMPTS_LIMIT } from "../rules/activation-code.rules.ts";
 import { LICENSE_SYNCS_LIMIT } from "../rules/issued-license.rules.ts";
 import { ActivationCodeService } from "../services/activation-code.service.ts";
+import type { ActivationRateLimit } from "../services/activation-code.service.ts";
 import {
   type ConfiguredActivationLogger,
   ConfiguredActivationService,
@@ -107,32 +90,30 @@ import {
 } from "../services/configured-activation.service.ts";
 import { ConnectCredentialService } from "../services/connect-credential.service.ts";
 import { ConnectInstallService } from "../services/connect-install.service.ts";
+import type { ConnectUpstreamSlot } from "../services/connect-install.service.ts";
 import { ConnectSpendBufferService } from "../services/connect-spend-buffer.service.ts";
+import type { HostedSpendRecorder } from "../services/connect-spend-buffer.service.ts";
 import { ContractBudgetStoreService } from "../services/contract-budget-store.service.ts";
 import { ContractBudgetService } from "../services/contract-budget.service.ts";
+import type { ContractBudgetStore } from "../services/contract-budget.service.ts";
 import { DomainClaimAuthorityService } from "../services/domain-claim-authority.service.ts";
 import { HostedServicesService } from "../services/hosted-services.service.ts";
+import type { HostedJudge } from "../services/hosted-services.service.ts";
 import { HostedUsageReaderService } from "../services/hosted-usage-reader.service.ts";
+import type { HostedUsageReader } from "../services/hosted-usage-reader.service.ts";
 import { InstanceIdentityService } from "../services/instance-identity.service.ts";
 import { LicenseRefreshService } from "../services/license-refresh.service.ts";
 import { LicenseRegistryService } from "../services/license-registry.service.ts";
+import type { ConnectManagedKeys, LicenseCustomers } from "../services/license-registry.service.ts";
 import { LicenseSyncService } from "../services/license-sync.service.ts";
+import type { LicenseSyncRateLimit } from "../services/license-sync.service.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
+import type { LicenseLogger, LicenseStorage } from "../services/license.service.ts";
 import { LicensingEntitlementSourceService } from "../services/licensing-entitlement-source.service.ts";
 import { LicensingInfrastructureService } from "../services/licensing-infrastructure.service.ts";
 import { SelfHostedCrmService } from "../services/self-hosted-crm.service.ts";
+import type { SelfHostedLeadsInfrastructure } from "../services/self-hosted-crm.service.ts";
 import { SelfHostedInstanceService } from "../services/self-hosted-instance.service.ts";
-import type {
-  ConnectInstallInfrastructure,
-  LicenseCustomers,
-  HostedServicesInfrastructure,
-  SelfHostedInstancesInfrastructure,
-  LicenseLogger,
-  LicenseRegistryInfrastructure,
-  LicenseRetention,
-  LicenseStorage,
-  LicenseUsage,
-} from "./licensing.members.ts";
 
 /** Seat counts are organization's: one peer read, the same count its own seat checks use. */
 function seatCountsOver(
@@ -149,9 +130,6 @@ function seatCountsOver(
 /** What the process composes this feature's application from. */
 export type LicensingInfrastructure = Readonly<{
   repository: LicenseStorage;
-  usage?: LicenseUsage;
-  retention?: LicenseRetention;
-  logger?: LicenseLogger;
   /**
    * The provider name the deployment is CONFIGURED with, before the license
    * gate and the mount inspector have their say. `null` or `"email"` means
@@ -164,55 +142,18 @@ export type LicensingInfrastructure = Readonly<{
   authProviderIsMounted: () => boolean;
   /** Records a signing failure; the customer never sees the diagnostic. */
   reportSigningFailure: (entry: Readonly<{ organizationId: string; error: Error }>) => void;
-  /**
-   * The license registry (ADR-156). Only LangWatch Cloud composes one; an
-   * install has no licenses to issue, and its operations refuse by name.
-   */
-  registry?: LicenseRegistryInfrastructure;
-  /**
-   * The hosted end of Connect (ADR-156, section 5), composed from its owners on
-   * every deployment; each licence's entitlements still gate its services.
-   */
-  hosted?: HostedServicesInfrastructure;
-  /** The registry of self-hosted installs (ADR-156, section 10); else derived from the stores. */
-  instances?: SelfHostedInstancesInfrastructure;
-  /**
-   * The install end of Connect (ADR-156, section 9). Every deployment has one;
-   * it is derived from the process's own stores where nothing supplies it.
-   */
-  connect?: ConnectInstallInfrastructure;
 }>;
 
-export type LicensingRuntime = Readonly<
-  Omit<
-    LicensingInfrastructure,
-    | "repository"
-    | "usage"
-    | "retention"
-    | "logger"
-    | "registry"
-    | "hosted"
-    | "instances"
-    | "connect"
-  >
->;
+export type LicensingRuntime = Readonly<Omit<LicensingInfrastructure, "repository">>;
 
-/**
- * Production supplies the closed members and the app derives its own
- * infrastructure; `infrastructure` is the test-only fabric seam.
- */
-type LicensingProcessMembers = Readonly<{ isSaas: boolean; serviceVersion: string }> &
-  (
-    | (MembersRead<readonly ["prisma", "logger", "encryption", "rateLimiter"]> & {
-        infrastructure?: never;
-      })
-    | Readonly<{ prisma?: never; logger?: LicenseLogger; infrastructure: LicensingInfrastructure }>
-  );
+/** The two process facts with no shared home yet: see the members-licensing handoff. */
+type LicensingProcessMembers = Readonly<{ logger: LicenseLogger; serviceVersion: string }>;
 
 type LicensingSetup = FeatureSetup<
   typeof LicensingModule.dependencies,
   LicensingProcessMembers,
-  LicensingServerConfig
+  LicensingServerConfig,
+  LicensingRepositories
 >;
 
 export class LicensingModule implements LicensingApiContract {
@@ -236,15 +177,7 @@ export class LicensingModule implements LicensingApiContract {
     instanceLicenseKey: licensingSecrets.instanceLicenseKey,
     licensePrivateKey: licensingSecrets.licensePrivateKey,
   } as const;
-  /** `isSaas` and `serviceVersion` are the process's own facts, drilled in. */
-  static readonly reads = [
-    "prisma",
-    "logger",
-    "encryption",
-    "rateLimiter",
-    "isSaas",
-    "serviceVersion",
-  ] as const;
+  static readonly reads = ["logger", "serviceVersion"] as const;
 
   readonly #service: LicenseService;
   readonly #entitlements: LicensingEntitlementSourceService;
@@ -320,89 +253,61 @@ export class LicensingModule implements LicensingApiContract {
   }
 
   static #assemble(
-    { members, config, resources, dependencies }: LicensingSetup,
+    { members, config, resources, dependencies, repositories, role }: LicensingSetup,
     {
       instanceLicenseKey,
       licensePrivateKey,
     }: { instanceLicenseKey: string | undefined; licensePrivateKey: string | undefined },
   ): LicensingModule {
+    const { logger } = members;
     const cryptography = NodeLicenseCryptographyService.create({ publicKey: config.publicKey });
     // The variable takes a signed key or an activation code. A code is not a
     // license: it is redeemed at start and stored on an organization.
     const configured = detectLicenseInputForm(instanceLicenseKey);
     const signedInstanceKey = configured.form === "license_key" ? configured.licenseKey : undefined;
-    // Derived from the closed prisma member: the licence rows are read and written
-    // live, and the seat counts are organization's own membership classification
-    // (a peer, not owned here).
-    const partial = LicensingInfrastructureService.create({ processName: "this process" });
-    const infrastructure =
-      members.infrastructure !== undefined
-        ? members.infrastructure
-        : {
-            ...partial.withStorage({
-              licenses: PrismaOrganizationLicenseRepository.create(members.prisma),
-              ...seatCountsOver(dependencies.organizations),
-            }),
-            registry: licenseRegistryOverPrisma({
-              database: members.prisma,
-              organizations: dependencies.organizations,
-              gateway: dependencies.gateway,
-              encryption: members.encryption,
-              rateLimiter: members.rateLimiter,
-              signingKey: licensePrivateKey,
-            }),
-            hosted: hostedServicesOverPeers(dependencies),
-            instances: selfHostedInstancesOverPrisma({
-              database: members.prisma,
-              organizations: dependencies.organizations,
-            }),
-          };
-    const {
-      repository,
-      usage,
-      retention,
-      logger,
-      registry,
-      hosted,
-      instances,
-      connect,
-      ...runtime
-    } = infrastructure;
+    // The licence rows are this module's own; the seat counts are organization's
+    // own membership classification (a peer, not owned here).
+    const { repository, ...runtime } = LicensingInfrastructureService.create({ role }).withStorage({
+      licenses: repositories.organizationLicenses,
+      ...seatCountsOver(dependencies.organizations),
+    });
     const registryParts = licenseRegistryParts({
-      infrastructure: registry ?? partial.unavailableRegistry(),
-      hosted: hosted ?? partial.unavailableHostedServices(),
-      instances: instances ?? partial.unavailableSelfHostedInstances(),
+      infrastructure: licenseRegistryOver({
+        repositories,
+        organizations: dependencies.organizations,
+        gateway: dependencies.gateway,
+        signingKey: licensePrivateKey,
+      }),
+      hosted: hostedServicesOverPeers(dependencies),
+      instances: selfHostedInstancesOver({
+        repositories,
+        organizations: dependencies.organizations,
+      }),
       cryptography,
-      logger: logger ?? members.logger,
+      logger,
     });
     const service = LicenseService.create({
       repository,
       cryptography,
-      usage,
-      retention,
-      logger: logger ?? members.logger,
+      logger,
       configuration: LicenseServiceConfiguration.create(),
       instanceLicenseKey: signedInstanceKey,
     });
-    const connectInfrastructure =
-      connect ??
-      (members.prisma
-        ? connectInstallOverPrisma({
-            database: members.prisma,
-            gateway: dependencies.gateway,
-            config,
-            cryptography,
-            version: members.serviceVersion,
-            instanceLicenseKey: signedInstanceKey,
-          })
-        : unavailableConnectInstall({ version: members.serviceVersion }));
+    const connectInfrastructure = connectInstallOver({
+      repositories,
+      gateway: dependencies.gateway,
+      config,
+      cryptography,
+      version: members.serviceVersion,
+      instanceLicenseKey: signedInstanceKey,
+    });
     const app = new LicensingModule({
       generation: LicenseGenerationService.create(cryptography),
       service,
       runtime,
       entitlements: LicensingEntitlementSourceService.create({
         licensing: service,
-        mode: members.isSaas ? "cloud" : "self-hosted",
+        mode: config.isSaas ? "cloud" : "self-hosted",
       }),
       registry: registryParts,
       install: connectInstallParts({
@@ -411,19 +316,19 @@ export class LicensingModule implements LicensingApiContract {
         seats: repository,
         licenses: service,
         config,
-        logger: logger ?? members.logger,
+        logger,
       }),
-      isSaas: members.isSaas,
+      isSaas: config.isSaas,
       signingKey: licensePrivateKey,
       domainClaims: DomainClaimAuthorityService.create({
-        isSaas: members.isSaas,
+        isSaas: config.isSaas,
         licenses: service,
         organizations: dependencies.organizations,
       }),
     });
     // Hosted spend a gateway reported but the buffer has not written yet is written at shutdown.
     resources.own("hosted-service spend buffer", () => app.flushHostedSpend());
-    if (!members.isSaas && configured.form === "activation_code") {
+    if (!config.isSaas && configured.form === "activation_code") {
       app.#configuredActivation = ConfiguredActivationService.create({
         configured,
         connectPermitted: config.connectDisabled !== true,
@@ -440,7 +345,7 @@ export class LicensingModule implements LicensingApiContract {
           return { success: true };
         },
         isValidLicense: (licenseKey) => cryptography.validateLicense({ licenseKey }).valid,
-        logger: activationLoggerOf(members.logger),
+        logger: activationLoggerOf(logger),
       });
       // Before the server listens, so the first request already sees the license.
       resources.ownService({
@@ -906,7 +811,6 @@ function licenseRegistryParts({
     contractBudgets,
     cryptography,
     generation: LicenseGenerationService.create(cryptography),
-    cipher: infrastructure.cipher,
     signingKey: infrastructure.signingKey,
     now,
   });
@@ -951,30 +855,24 @@ function licenseRegistryParts({
       repository: infrastructure.repository,
       managedKeys: infrastructure.managedKeys,
       rateLimit: infrastructure.syncRateLimit,
-      cipher: infrastructure.cipher,
       systemActorId: infrastructure.systemActorId,
       now,
     }),
   };
 }
 
-/** The registry's own tables, over one connection. */
-type LicenseRegistryDatabase = IssuedLicenseDatabase & ActivationCodeDatabase;
-
 /**
- * The licence registry derived from the process's own stores, as main's
+ * The licence registry over this module's own stores, as main's
  * `registry/composition.ts` built it on every deployment. Billing reads the seat
  * changes it records through `findSeatChanges` (ARCHITECTURE.md section 9).
  */
-function licenseRegistryOverPrisma({
-  database,
+function licenseRegistryOver({
+  repositories,
   organizations,
   gateway,
-  encryption,
-  rateLimiter,
   signingKey,
 }: {
-  database: LicenseRegistryDatabase;
+  repositories: Pick<LicensingRepositories, "issuedLicenses" | "activationCodes" | "rateLimits">;
   organizations: Pick<
     OrganizationApi,
     "findProvisioningSummary" | "createSelfHostedCustomer" | "markSelfHostedCustomer"
@@ -987,15 +885,13 @@ function licenseRegistryOverPrisma({
     | "setManagedKeyConnectServicesInternal"
     | "setManagedKeyLicenseInternal"
   >;
-  encryption: Encryption;
-  rateLimiter: RateLimiter;
   signingKey: string | undefined;
 }): LicenseRegistryInfrastructure {
   const systemActorId = SYSTEM_ACTORS.connectLicense;
   const allowed = async (key: string, limit: { requests: number; seconds: number }) =>
-    (await rateLimiter.check(key, limit)).allowed;
+    (await repositories.rateLimits.check(key, limit)).allowed;
   return {
-    repository: PrismaIssuedLicenseRepository.create(database),
+    repository: repositories.issuedLicenses,
     organizations: {
       findById: customerLookup(organizations),
       createSelfHostedCustomer: ({ name }) => organizations.createSelfHostedCustomer({ name }),
@@ -1014,14 +910,13 @@ function licenseRegistryOverPrisma({
       setConnectServices: (key) => gateway.setManagedKeyConnectServicesInternal(key),
       setLicense: (key) => gateway.setManagedKeyLicenseInternal(key),
     },
-    activationCodes: PrismaActivationCodeRepository.create(database),
+    activationCodes: repositories.activationCodes,
     activationRateLimit: {
       allow: ({ codeHash }) => allowed(`activation_code:${codeHash}`, ACTIVATION_ATTEMPTS_LIMIT),
     },
     syncRateLimit: {
       allow: ({ licenseRowId }) => allowed(`license_sync:${licenseRowId}`, LICENSE_SYNCS_LIMIT),
     },
-    cipher: encryption,
     signingKey: () => signingKey,
     systemActorId,
   };
@@ -1071,32 +966,26 @@ function customerLookup(
   };
 }
 
-/** The install rows and the licences bound to them, over one connection. */
-type SelfHostedInstancesDatabase = SelfHostedInstanceDatabase & IssuedLicenseDatabase;
-
 /**
- * The instance registry derived from the process's own stores, as main built it on
+ * The instance registry over this module's own stores, as main built it on
  * every deployment: the rows from Postgres, the customer's name from its owner.
  */
-function selfHostedInstancesOverPrisma({
-  database,
+function selfHostedInstancesOver({
+  repositories,
   organizations,
 }: {
-  database: SelfHostedInstancesDatabase;
+  repositories: Pick<LicensingRepositories, "selfHostedInstances" | "issuedLicenses">;
   organizations: Pick<OrganizationApi, "findProvisioningSummary">;
 }): SelfHostedInstancesInfrastructure {
   return {
-    repository: PrismaSelfHostedInstanceRepository.create(database),
-    licenses: PrismaIssuedLicenseRepository.create(database),
+    repository: repositories.selfHostedInstances,
+    licenses: repositories.issuedLicenses,
     organizations: {
       findById: customerLookup(organizations),
     },
     optionalReportKeys: new Set(optionalUsageReportKeys()),
   };
 }
-
-/** Both tables the install end reads, over one connection. */
-type ConnectInstallDatabase = ConnectOrganizationDatabase & InstanceIdentityDatabase;
 
 /** The three services the install end of Connect resolves to. */
 type ConnectInstallParts = Readonly<{
@@ -1106,19 +995,19 @@ type ConnectInstallParts = Readonly<{
 }>;
 
 /**
- * The install end derived from the process's own stores. Every deployment has
+ * The install end over this module's own stores. Every deployment has
  * these two tables; whether anything is called is decided by the license and by
  * `LANGWATCH_CONNECT_DISABLED`, never by whether a client was composed.
  */
-function connectInstallOverPrisma({
-  database,
+function connectInstallOver({
+  repositories,
   gateway,
   config,
   cryptography,
   version,
   instanceLicenseKey,
 }: {
-  database: ConnectInstallDatabase;
+  repositories: Pick<LicensingRepositories, "connectOrganizations" | "instanceIdentity">;
   gateway: Pick<GatewayApi, "setConnectUpstreamInternal" | "clearConnectUpstreamInternal">;
   config: LicensingServerConfig;
   cryptography: LicenseCryptography;
@@ -1127,8 +1016,8 @@ function connectInstallOverPrisma({
 }): ConnectInstallInfrastructure {
   const permitted = config.connectDisabled !== true;
   return {
-    organizations: PrismaConnectOrganizationRepository.create(database),
-    identity: PrismaInstanceIdentityRepository.create(database),
+    organizations: repositories.connectOrganizations,
+    identity: repositories.instanceIdentity,
     ...(permitted
       ? {
           gateway: HttpConnectGatewayChannel.create({
@@ -1147,31 +1036,6 @@ function connectInstallOverPrisma({
     newInstanceId: () => cryptography.generateInstanceId(),
     version: () => version,
     ...(config.connectInstanceId ? { instanceIdOverride: config.connectInstanceId } : {}),
-  };
-}
-
-/** What a process composing no stores answers: no identity, and no call out. */
-function unavailableConnectInstall({ version }: { version: string }): ConnectInstallInfrastructure {
-  const unavailable = () => new Error("this process composes no install-side Connect");
-  return {
-    organizations: {
-      findById: () => Promise.resolve(null),
-      findLicensedOrganizationIds: () => Promise.resolve([]),
-      findAllOldestFirst: () => Promise.resolve([]),
-      setServicesDisabled: () => Promise.reject(unavailable()),
-      recordSyncOutcome: () => Promise.reject(unavailable()),
-    },
-    identity: {
-      findRow: () => Promise.resolve(null),
-      mint: () => Promise.reject(unavailable()),
-      setReportSwitches: () => Promise.reject(unavailable()),
-      recordReport: () => Promise.reject(unavailable()),
-    },
-    instanceLicenseKey: () => void 0,
-    newInstanceId: () => {
-      throw unavailable();
-    },
-    version: () => version,
   };
 }
 
@@ -1229,3 +1093,65 @@ function connectInstallParts({
     }),
   };
 }
+
+/** The hosted end of Connect (ADR-156, section 5), composed on every deployment. */
+export type HostedServicesInfrastructure = Readonly<{
+  budgets: ContractBudgetStore;
+  usage: HostedUsageReader;
+  judge: HostedJudge;
+  spend: HostedSpendRecorder;
+}>;
+
+/** Everything the license registry needs from the rest of the deployment. */
+export type LicenseRegistryInfrastructure = Readonly<{
+  repository: IssuedLicenseRepository;
+  organizations: LicenseCustomers;
+  managedKeys: ConnectManagedKeys;
+  /** The codes a fresh install pastes instead of a license blob (ADR-156 §5). */
+  activationCodes: ActivationCodeRepository;
+  /** What bounds guessing a code: one limiter, keyed by the code's own hash. */
+  activationRateLimit: ActivationRateLimit;
+  syncRateLimit: LicenseSyncRateLimit;
+  /** The signing key, resolved through the secrets chain. Never a config field. */
+  signingKey: () => string | undefined;
+  /** Attributed when the registry itself ends a key nothing authenticated with. */
+  systemActorId: string;
+}>;
+
+/**
+ * The install end of Connect (ADR-156, section 9): what a self-hosted
+ * deployment needs to call LangWatch with the license it already holds. Absent
+ * where the deployment switched Connect off, which builds no client at all.
+ */
+export type ConnectInstallInfrastructure = Readonly<{
+  organizations: ConnectOrganizationRepository;
+  identity: InstanceIdentityRepository;
+  /** Composed only where Connect is permitted; absent means no outbound call. */
+  gateway?: ConnectGatewayChannel;
+  licenseHost?: ConnectLicenseChannel;
+  /** The gateway's hosted provider slot; absent where no gateway is composed beside. */
+  upstream?: ConnectUpstreamSlot;
+  /** The key this whole deployment is licensed by, where one is set. */
+  instanceLicenseKey: () => string | undefined;
+  /** A fresh instance identity. Supplied, so a suite mints a predictable one. */
+  newInstanceId: () => string;
+  /** The release this install runs: the process's `serviceVersion` member, drilled in. */
+  version: () => string;
+  /** The identity an operator named instead of the one this install minted. */
+  instanceIdOverride?: string;
+}>;
+
+/**
+ * The registry of self-hosted installs (ADR-156, section 10), which the usage
+ * report receiver writes. Every deployment composes it from its own stores.
+ */
+export type SelfHostedInstancesInfrastructure = Readonly<{
+  repository: SelfHostedInstanceRepository;
+  /** The licence bound to an install, which names its customer. */
+  licenses: Pick<IssuedLicenseRepository, "findAllBoundToInstance">;
+  /** The customer's name, as the organization feature answers it. */
+  organizations: Pick<LicenseCustomers, "findById">;
+  /** The usage report's optional-category keys, from its field dictionary. */
+  optionalReportKeys: ReadonlySet<string>;
+  leads?: SelfHostedLeadsInfrastructure;
+}>;

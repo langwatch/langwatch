@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
 import { licensingProcessModule } from "../../licensing.module.ts";
-import { LicensingInfrastructureService } from "../../services/licensing-infrastructure.service.ts";
+import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import { connectHostedRest } from "../../transport/connect-hosted.rest.ts";
 
 const SIGNED = "signed-with-the-gateway-secret";
@@ -36,29 +36,17 @@ const gatewayDoor: RestIdentity = {
 };
 
 async function hostedFamily() {
-  const partial = LicensingInfrastructureService.create({ processName: "the api" });
-  const unregistered = partial.unavailableRegistry();
-  const findByVirtualKeyId = vi.fn().mockResolvedValue(null);
+  // The memory tier's own licence rows: none carries the calling key.
+  const findByVirtualKeyId = vi.spyOn(
+    MemoryIssuedLicenseRepository.prototype,
+    "findByVirtualKeyId",
+  );
   const resources = new ResourceScope();
   const state = await licensingProcessModule.install({
     resources,
-    config: TEST_LICENSING_CONFIG,
-    members: {
-      infrastructure: {
-        ...partial.withoutMutation({
-          licenses: {
-            getOrganizationLicense: () => Promise.resolve({ licenseKey: null }),
-            findOrganizationsWithLicense: () => Promise.resolve([]),
-          },
-        }),
-        registry: {
-          ...unregistered,
-          repository: { ...unregistered.repository, findByVirtualKeyId },
-        },
-      },
-      isSaas: true,
-      serviceVersion: "test",
-    },
+    config: { ...TEST_LICENSING_CONFIG, isSaas: true },
+    members: { logger: { error: () => undefined }, serviceVersion: "test" },
+    repositorySelection: { tier: "memory", members: {} },
     role: "api",
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     resolve: (token) =>
@@ -97,7 +85,14 @@ async function hostedFamily() {
         }),
       }),
     );
-  return { call, findByVirtualKeyId, close: () => resources.close() };
+  return {
+    call,
+    findByVirtualKeyId,
+    close: async () => {
+      findByVirtualKeyId.mockRestore();
+      await resources.close();
+    },
+  };
 }
 
 describe("the hosted Connect family behind the gateway's own door", () => {

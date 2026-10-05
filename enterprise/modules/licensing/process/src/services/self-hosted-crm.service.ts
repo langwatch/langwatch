@@ -7,16 +7,11 @@
 
 import type { SelfHostedSignal } from "@langwatch/enterprise-licensing-contract";
 
-import type {
-  CloudCustomerLookup,
-  SelfHostedLeadNotifications,
-  SelfHostedLeadNurturing,
-  SelfHostedOrgTraits,
-  LicenseLogger,
-} from "../app/licensing.members.ts";
 import type { SelfHostedInstanceRecord } from "../repositories/self-hosted-instance.repository.ts";
 import { isReportNumber } from "../rules/self-hosted-report.rules.ts";
 import { SIGNAL_EVENTS, SIGNAL_HEADLINES } from "../rules/self-hosted-signals.rules.ts";
+import type { SelfHostedSignalEvent } from "../rules/self-hosted-signals.rules.ts";
+import type { LicenseLogger } from "./license.service.ts";
 
 export type SignalAnnouncement = Readonly<{
   signals: readonly SelfHostedSignal[];
@@ -165,3 +160,50 @@ export class SelfHostedCrmService {
     }
   }
 }
+
+/** The person CRM traits are written through: the same member on every report. */
+export interface CloudCustomer {
+  userId: string;
+  organizationName: string;
+}
+
+/** Lookups over LangWatch Cloud's own customers, answered by their owners. */
+export interface CloudCustomerLookup {
+  /** The organization's longest-standing member first; empty when it has none. */
+  findRepresentatives(organizationId: string): Promise<CloudCustomer[]>;
+  /** Whether anybody on this email domain has a Cloud account. */
+  hasAccountOnDomain(domain: string): Promise<boolean>;
+}
+
+/** The install's traits on the customer's CRM object. */
+export type SelfHostedOrgTraits = Readonly<Record<string, string | number | boolean>>;
+
+export interface SelfHostedLeadNurturing {
+  groupUser(input: { userId: string; groupId: string; traits: SelfHostedOrgTraits }): Promise<void>;
+  trackEvent(input: {
+    userId: string;
+    event: SelfHostedSignalEvent;
+    properties: Record<string, unknown>;
+  }): Promise<void>;
+}
+
+export interface SelfHostedLeadNotifications {
+  sendSlackSelfHostedSignal(payload: {
+    headline: string;
+    instanceId: string;
+    organizationName: string | null;
+    leadingDomain: string | null;
+    version: string | null;
+    users: number | null;
+    traces28d: number | null;
+    instanceUrl: string;
+  }): Promise<void>;
+}
+
+/** Where a lead signal goes; absent where nothing is listening, which raises none. */
+export type SelfHostedLeadsInfrastructure = Readonly<{
+  customers: CloudCustomerLookup;
+  notifications: SelfHostedLeadNotifications;
+  nurturing?: SelfHostedLeadNurturing;
+  baseUrl: string;
+}>;

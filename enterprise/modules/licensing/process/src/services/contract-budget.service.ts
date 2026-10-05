@@ -12,7 +12,6 @@ import {
 import { ValidationError } from "@langwatch/handled-error";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type { ContractBudgets, ContractBudgetStore } from "../app/licensing.members.ts";
 import type { IssuedLicenseRecord } from "../repositories/issued-license.repository.ts";
 import { contractTermsOf } from "../rules/contract-terms.rules.ts";
 
@@ -129,4 +128,44 @@ export class ContractBudgetService implements ContractBudgets {
     });
     return { capUsdCents, maximumUsdCents };
   }
+}
+
+/**
+ * The customer's contract budget, which follows the commercial terms of its
+ * licenses. Called after any change that can move those terms. The module owns
+ * the behaviour; composition supplies only the store below.
+ */
+export interface ContractBudgets {
+  sync(params: { organizationId: string; operatorId: string }): Promise<void>;
+}
+
+/** The one blocking organization budget hosted usage stops at. */
+export interface ContractBudget {
+  id: string;
+  limitUsdCents: number;
+  /** Whether the customer chose this cap, as opposed to it following the commit. */
+  capSetByCustomer: boolean;
+}
+
+/**
+ * Where the contract budget is kept, which is the gateway's own budget table.
+ * Declared here and answered by composition: licensing states what it needs of
+ * a budget and never queries a table another feature owns.
+ */
+export interface ContractBudgetStore {
+  findForOrganization(organizationId: string): Promise<ContractBudget | null>;
+  create(params: {
+    organizationId: string;
+    limitUsdCents: number;
+    operatorId: string;
+  }): Promise<void>;
+  setLimit(params: {
+    organizationId: string;
+    id: string;
+    limitUsdCents: number;
+    capSetByCustomer: boolean;
+    actorId: string;
+  }): Promise<void>;
+  /** Starts a new window: spend so far no longer counts against the cap. */
+  reset(params: { organizationId: string; id: string; actorId: string }): Promise<void>;
 }

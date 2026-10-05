@@ -4,10 +4,10 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { TEST_PUBLIC_KEY } from "../../__tests__/fixtures/license-keys.fixture.ts";
-import type { ConnectManagedKeys } from "../../app/licensing.members.ts";
 import type { IssuedLicenseRecord } from "../../repositories/issued-license.repository.ts";
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import { ConnectCredentialService } from "../connect-credential.service.ts";
+import type { ConnectManagedKeys } from "../license-registry.service.ts";
 import { LicenseSyncService } from "../license-sync.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
@@ -255,7 +255,6 @@ describe("a license sync", () => {
       repository,
       managedKeys,
       rateLimit: { allow: () => Promise.resolve(allow) },
-      cipher: { encrypt: (plain) => `sealed:${plain}`, decrypt: (cipher) => cipher.slice(7) },
       systemActorId: "system",
       now: () => NOW,
     });
@@ -350,7 +349,7 @@ describe("a license sync", () => {
       licenseId: "lic-2",
       tokenHash: OTHER_TOKEN_HASH,
       replacesId: "license-1",
-      pendingDeliveryLicense: "sealed:new-license-key",
+      pendingDeliveryLicense: "new-license-key",
       instanceId: "install-1",
       instanceBoundAt: NOW,
     });

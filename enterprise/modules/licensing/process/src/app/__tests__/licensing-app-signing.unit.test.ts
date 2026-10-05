@@ -1,24 +1,16 @@
-import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { ResourceScope } from "@langwatch/process";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  * @see enterprise/modules/licensing/specs/licensing.feature
  */
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import { describe, expect, it } from "vitest";
 
 import {
   TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,
 } from "../../__tests__/fixtures/license-keys.fixture.ts";
-import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
-import { LicensingInfrastructureService } from "../../services/licensing-infrastructure.service.ts";
-import { LicensingModule } from "../licensing.app.ts";
+import { createTestLicensingApp } from "../../__tests__/testing.ts";
+import type { LicensingModule } from "../licensing.app.ts";
 
 const PURCHASE = {
   organizationName: "Acme",
@@ -28,30 +20,10 @@ const PURCHASE = {
 };
 
 function licensingWithSigningKey(signingKey: string | undefined): Promise<LicensingModule> {
-  return LicensingModule.create({
-    dependencies: {
-      instantEval: createApiFixture<InstantEvalApi>(),
-      projects: createApiFixture<ProjectApi>(),
-      gateway: createApiFixture<GatewayApi>(),
-      organizations: createApiFixture<OrganizationApi>(),
-    },
-    members: {
-      infrastructure: LicensingInfrastructureService.create({
-        processName: "the api",
-      }).withoutMutation({
-        licenses: {
-          getOrganizationLicense: () => Promise.resolve({ licenseKey: null }),
-          findOrganizationsWithLicense: () => Promise.resolve([]),
-        },
-      }),
-      isSaas: true,
-      serviceVersion: "test",
-    },
-    config: TEST_LICENSING_CONFIG,
-    resources: new ResourceScope(),
-    secrets: new ScopedSecrets(async (handle, build) =>
-      build(handle.id === "LANGWATCH_LICENSE_PRIVATE_KEY" ? signingKey : undefined),
-    ),
+  return createTestLicensingApp({
+    config: { isSaas: true },
+    secrets: { LANGWATCH_LICENSE_PRIVATE_KEY: signingKey },
+    role: "api",
   });
 }
 

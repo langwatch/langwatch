@@ -1,7 +1,7 @@
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { z } from "zod";
 
-import type { ContractBudget, ContractBudgetStore } from "../app/licensing.members.ts";
+import type { ContractBudget, ContractBudgetStore } from "./contract-budget.service.ts";
 
 /** Addresses the contract budget within its organization. */
 export const CONTRACT_BUDGET_EXTERNAL_ID = "connect-contract";

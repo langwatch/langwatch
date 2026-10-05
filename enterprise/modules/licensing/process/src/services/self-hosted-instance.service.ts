@@ -14,7 +14,6 @@ import type {
 } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
-import type { LicenseCustomers } from "../app/licensing.members.ts";
 import type { IssuedLicenseRepository } from "../repositories/issued-license.repository.ts";
 import type {
   SelfHostedInstanceRecord,
@@ -26,6 +25,7 @@ import {
   reportFieldsOf,
 } from "../rules/self-hosted-report.rules.ts";
 import { signalsRaisedBy } from "../rules/self-hosted-signals.rules.ts";
+import type { LicenseCustomers } from "./license-registry.service.ts";
 import type { SelfHostedCrmService } from "./self-hosted-crm.service.ts";
 
 /** How many history rows the drawer shows. */

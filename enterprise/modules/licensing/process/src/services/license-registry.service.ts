@@ -29,17 +29,12 @@ import {
   type LicenseTermsInput,
   type SeatChangeResult,
   type SignedIssuedLicense,
+  type ConnectService,
 } from "@langwatch/enterprise-licensing-contract";
 import { registryHashForToken } from "@langwatch/gateway-contract";
 import { licenseSeats } from "@langwatch/plans";
 import { Temporal, toDate, type Instant } from "@langwatch/time";
 
-import type {
-  ConnectManagedKeys,
-  ContractBudgets,
-  LicenseCustomers,
-  LicenseDeliveryCipher,
-} from "../app/licensing.members.ts";
 import type {
   IssuedLicenseDraft,
   IssuedLicenseRecord,
@@ -51,6 +46,7 @@ import {
   statusOfIssuedLicense,
   violationNames,
 } from "../rules/issued-license.rules.ts";
+import type { ContractBudgets } from "./contract-budget.service.ts";
 
 export interface LicenseRegistryOptions {
   repository: IssuedLicenseRepository;
@@ -59,7 +55,6 @@ export interface LicenseRegistryOptions {
   contractBudgets: ContractBudgets;
   cryptography: LicenseCryptography;
   generation: LicenseGenerationService;
-  cipher: LicenseDeliveryCipher;
   /** The signing key from the server secret, or undefined when none is set. */
   signingKey: () => string | undefined;
   now: () => Instant;
@@ -468,7 +463,7 @@ export class LicenseRegistryService {
         source: "BACKOFFICE",
         issuedById: input.operatorId,
         overrides: {
-          ...replacementColumns({ current, held: this.options.cipher.encrypt(licenseKey) }),
+          ...replacementColumns({ current, held: licenseKey }),
           seatsRaisedFrom: input.seatsRaisedFrom ?? null,
         },
       });
@@ -634,4 +629,41 @@ function blankRow(): Omit<
     virtualKeyId: null,
     seatsRaisedFrom: null,
   };
+}
+
+/**
+ * The managed gateway key a license resolves to, which the gateway owns. Ending
+ * or invalidating it is what reaches a gateway that already cached the
+ * credential: both write to the change feed every gateway polls.
+ */
+export interface ConnectManagedKeys {
+  provision(params: { organizationId: string; licenseId: string }): Promise<{ id: string }>;
+  /** Ends the key for good. Safe to repeat. */
+  retire(params: { virtualKeyId: string; organizationId: string; actorId: string }): Promise<void>;
+  /** Makes every gateway resolve the license again on its next call. */
+  invalidate(params: { virtualKeyId: string; organizationId: string }): Promise<void>;
+  /** The platform services the gateway lets this key serve; empty serves none. */
+  setConnectServices(params: {
+    virtualKeyId: string;
+    organizationId: string;
+    services: readonly ConnectService[];
+  }): Promise<void>;
+  /**
+   * The license the key serves, as the gateway resolves a token by it: the
+   * registry hash, the bound install (none while unbound) and the term's end.
+   */
+  setLicense(params: {
+    virtualKeyId: string;
+    organizationId: string;
+    tokenHash: string;
+    instanceId: string | null;
+    expiresAt: Instant;
+  }): Promise<void>;
+}
+
+/** The customer a license is issued to, as the organization feature answers it. */
+export interface LicenseCustomers {
+  findById(id: string): Promise<{ id: string; name: string } | null>;
+  createSelfHostedCustomer(params: { name: string }): Promise<{ id: string; name: string }>;
+  markSelfHostedCustomer(id: string): Promise<void>;
 }

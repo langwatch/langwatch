@@ -10,11 +10,12 @@ import type { InstantEvalJudgement } from "@langwatch/instant-eval-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { HostedBudgetUsage, HostedJudge } from "../../app/licensing.members.ts";
 import type { IssuedLicenseRecord } from "../../repositories/issued-license.repository.ts";
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import type { ConnectSpendEntry } from "../connect-spend-buffer.service.ts";
+import type { HostedJudge } from "../hosted-services.service.ts";
 import { HostedServicesService } from "../hosted-services.service.ts";
+import type { HostedBudgetUsage } from "../hosted-usage-reader.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 

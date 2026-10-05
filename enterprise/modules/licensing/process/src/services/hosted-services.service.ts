@@ -14,13 +14,9 @@ import {
   type HostedClassifyAnswer,
   type HostedUsageAnswer,
 } from "@langwatch/enterprise-licensing-contract";
+import type { InstantEvalJudgement, InstantEvalQuestion } from "@langwatch/instant-eval-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type {
-  HostedBudgetUsage,
-  HostedJudge,
-  HostedUsageReader,
-} from "../app/licensing.members.ts";
 import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
@@ -33,6 +29,7 @@ import {
 import { statusOfIssuedLicense } from "../rules/issued-license.rules.ts";
 import type { ConnectSpendEntry } from "./connect-spend-buffer.service.ts";
 import type { ContractBudgetService } from "./contract-budget.service.ts";
+import type { HostedBudgetUsage, HostedUsageReader } from "./hosted-usage-reader.service.ts";
 
 const CENTS = 100;
 const INSTANT_EVALS = "instant_evals";
@@ -175,4 +172,17 @@ function budgetWire(budget: HostedBudgetUsage): HostedBudgetWire {
     period_started_at: budget.periodStartedAt.toString(),
     is_contract: budget.isContract,
   };
+}
+
+/**
+ * The judge a hosted classify call reaches, and what its answer is worth. Both
+ * belong to instant-eval; licensing states only what a hosted call needs.
+ */
+export interface HostedJudge {
+  classify(
+    input: { projectId: string; text: string; questions: readonly InstantEvalQuestion[] },
+    signal?: AbortSignal,
+  ): Promise<InstantEvalJudgement>;
+  /** What one judgement cost LangWatch, and what the customer is charged. */
+  priceOf(input: { inputTokens: number }): { costUsd: number; priceUsd: number };
 }

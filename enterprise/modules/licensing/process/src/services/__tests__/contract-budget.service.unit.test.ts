@@ -6,8 +6,8 @@ import { ValidationError } from "@langwatch/handled-error";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { ContractBudget, ContractBudgetStore } from "../../app/licensing.members.ts";
 import type { IssuedLicenseRecord } from "../../repositories/issued-license.repository.ts";
+import type { ContractBudget, ContractBudgetStore } from "../contract-budget.service.ts";
 import { ContractBudgetService } from "../contract-budget.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");

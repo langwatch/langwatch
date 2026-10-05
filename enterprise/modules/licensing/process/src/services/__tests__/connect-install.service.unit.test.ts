@@ -19,11 +19,11 @@ import {
   TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,
 } from "../../__tests__/fixtures/license-keys.fixture.ts";
-import type { ConnectUpstreamSlot } from "../../app/licensing.members.ts";
 import { MemoryConnectGatewayChannel } from "../../channels/memory/memory.connect-gateway.channel.ts";
 import type { ConnectOrganizationRecord } from "../../repositories/connect-organization.repository.ts";
 import { MemoryConnectOrganizationRepository } from "../../repositories/memory/memory.connect-organization.repository.ts";
 import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memory.instance-identity.repository.ts";
+import type { ConnectUpstreamSlot } from "../connect-install.service.ts";
 import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
 
