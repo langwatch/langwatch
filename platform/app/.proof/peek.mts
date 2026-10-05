@@ -1,0 +1,12 @@
+import { chromium } from "playwright";
+const BASE="http://localhost:5560";
+const browser = await chromium.launch(); const page = await (await browser.newContext({viewport:{width:1440,height:900}})).newPage();
+const r = await page.request.post(`${BASE}/api/auth/sign-in/email`,{data:{email:"chart-sandbox-qa@langwatch.ai",password:"chart-sandbox-qa-2026!"},headers:{origin:BASE}});
+console.log("signin", r.status());
+await page.goto(`${BASE}/test-project/analytics/reports`,{waitUntil:"networkidle"});
+const nn = page.getByRole("button",{name:"Not now"}); if (await nn.isVisible().catch(()=>false)) await nn.click();
+await page.waitForTimeout(2000);
+console.log("url", page.url());
+console.log("buttons", await page.getByRole("button").allTextContents());
+await page.screenshot({path: process.env.OUT_DIR+"/peek.png"});
+await browser.close();
