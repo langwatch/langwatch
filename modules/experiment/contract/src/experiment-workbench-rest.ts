@@ -91,7 +91,9 @@ export const handledErrorEnvelopeSchema = z
     fault: z
       .string()
       .optional()
-      .describe("Who the failure is attributable to: customer, platform, provider"),
+      .describe(
+        "Who the failure is attributable to: customer, platform, presumed_platform, provider",
+      ),
     tips: z.array(z.string()).optional(),
     docsUrl: z.string().optional(),
   })
@@ -122,7 +124,9 @@ const handledErrorSchema = z.object({
   fault: z
     .string()
     .optional()
-    .describe("Who the failure is attributable to: customer, platform, provider"),
+    .describe(
+      "Who the failure is attributable to: customer, platform, presumed_platform, provider",
+    ),
   traceId: z.string().optional(),
   spanId: z.string().optional(),
   traceUrl: z.string().optional(),

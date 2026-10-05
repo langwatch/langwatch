@@ -312,6 +312,7 @@ function peersOf(overrides: PeerOverrides) {
     }),
     "data-retention": createApiFixture<DataRetentionApi>({
       getPlatformDefaultRetentionDays: () => 49,
+      getResolvedForProject: async () => ({ traces: 49, scenarios: 49, experiments: 49 }),
     }),
     ...overrides,
   };
@@ -459,6 +460,9 @@ export async function bootRunPair(options: RunPairOptions) {
     peers: options.api ?? {},
     workflow: createApiFixture<WorkflowApi>({ ...options.workflow }),
   });
+  // Boot holds each runtime's consumers; the worker's process managers drain only once started.
+  await worker.start();
+  await api.start();
 
   return {
     api: installedExperimentOf(api.module(experimentProcessModule).provided),
