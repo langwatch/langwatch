@@ -1,0 +1,59 @@
+{
+  "skill_name": "architecture-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review this merge lane's slice before I commit it. It adds `relayExecuteSync(input: { projectId; event; signal }): Promise<Response>` to the WorkflowApi interface in modules/workflow/contract/src and a REST route in workflow that calls it. Lint is green.",
+      "expected_output": "Runs the scoped instruments first (lint:changed, lint:architecture with the touched policies, check:feature-parity) and does not re-argue lint. Flags the new WorkflowApi member under checklist A, citing §8 (a one-to-one move from a handler is approved in advance; an operation adding behaviour or a new shape is asked for, Alex 2026-09-24) and §3.1. Searches ARCHITECTURE.md and .claude/coordinator/rulings-*.md for a dated ruling; with none, the verdict is 'needs a ruling' and the proposal with options goes to Risks. Does not design or rename the operation itself. Also checks the route's wire against origin/main (checklist D).",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "A tRPC procedure in this diff is declared `.withAccess(anyAuthenticated())` and the TraceApi operation it calls starts with a permission check on `traces:update` before doing the work. Is that fine since the check still runs?",
+      "expected_output": "No: a finding under checklist C citing §8 (handlers call one operation; the framework, not the handler or the Api, asks the permission) and CLAUDE.md rule 6, which names a permission check after withAccess(anyAuthenticated(...)) as a bypass. The fix is `.withPermission(\"traces:update\")` on the declaration. If the framework cannot express the check, the fix is an extension of packages/api, shapes first (§8), raised as a question, never a workaround. Reports file:line, section and fix in the report format.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "This diff is the first procedure that uses `.withPermission(\"instantEval:enable\", { via: \"projectId\" })` with a single permission. Types compile. Anything to check?",
+      "expected_output": "Names the 2026-10-05 framework trap: a single permission with `{ via }` was a type error and the runtime dropped `via`, checking at the wrong scope and answering 500, until c4ee0b12d0. Under checklist C asks for a test that reads the built declaration (the scope field carried), not the type. If the runtime still drops it, the fix belongs in packages/api, not around it in the route. Does not invent a record section for the trap beyond §8 and CLAUDE.md rule 6.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "The lane cut the gateway -> webhook peer edge: gateway's webhook subscriber is deleted and webhook now subscribes to gateway's governance facts as a peer subscriber. module tests pass. Review it.",
+      "expected_output": "Checklist B, §5: confirms the cut is ruled (gateway -> webhook is one of the two cuts ruled 2026-10-05; no peer-cycle edge is cut without asking Alex). Runs lint:architecture --policies peer-cycles and reports only edges the diff adds, since the policy stays red until the last cycle is cut. Greps apps/*/src/**/__tests__ and the reacting module's tests for the deleted subscriber and flags the worker's governance-delivery test, which went stale exactly this way (fixed in 8a48fdbe40; five stale suites in d752cad06a). Points to module-dependencies for the shape of a cut.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Main's instant-evals enable wrote its own audit row naming the organization. Our tRPC framework audits only the project, so the lane added an audit write in InstantEvalService naming the organization. Review.",
+      "expected_output": "A finding under checklist C citing §8 and the L7 ruling: no hand-rolled audit write; the enable audit stays the framework's project-level row until E10 (a declared audit target in packages/api) is ruled, and E10 is listed in §16 as open, a proposal, not a rule. Fix: remove the service write, report the gap as a wire or audit difference with its reason (checklist D). Does not treat the §16 proposal as ruled.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "The relay route port answers a non-JSON body with 400 `malformed_request` where main answered `{\"error\":\"Bad request, expecting a JSON event\"}`, and a top-level projectId naming another project with 403 `scope_input_mismatch` where main forwarded it. The handoff lists both. Pass?",
+      "expected_output": "Checklist D, §8 and §12: finds main's shape with git grep on origin/main, confirms each difference is listed with its reason, and that each is ruled (non-JSON body ruled; the 403 ruled under L6b R2, both in rulings-2026-10-05.md and §8). Listed and ruled differences pass. States that a status collapsed to 200 or a setting no longer configurable would be a regression, not a listed difference. If a declaration change alters the OpenAPI document, asks for make sync-all-openapi.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Review this skill edit: the example in .claude/skills/backend/SKILL.md now says `createApp({ role }).withMemoryRepositories().boot()` for tests.",
+      "expected_output": "Checklist E, §15: runs the deleted-spellings scan over the added lines using dev/docs/deleted-spellings.json and reports `withMemoryRepositories` with its section and the replacement the file gives (XModule.create with memory registries and createApiFixture peers, or booting the installed list over memory in an installation test). A teaching surface writing a deleted spelling outside a deletion context is a finding. Gives file:line, section, fix.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "The enforcer perf diff adds a prefilter, serverSourceReach, that skips files whose resolved import path never spells `process`. It is sound because module-graph resolution is lexical. Which section does this break?",
+      "expected_output": "None: reports it as 'not a record finding' (section 3) rather than inventing a citation. Names the invariant (every resolution path is lexical; a realpath or tsconfig paths resolver would break it) and asks for a test that fails when the invariant breaks, routing correctness review to code-review. Does not propose a lint rule for it.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "This lane moved a `/** @scenario */` annotation that sat above a describe block down onto the `it`. I think I saw the same fix earlier today. What does review do with that?",
+      "expected_output": "Searches git log and .claude/handoffs for the earlier sighting, finds cb02116fdd (fourteen annotations above a describe, a file header or a multi-line it.each) and b05ae63a46 (titles read only from the annotation's line), so this is at least the second: adds a lint-rule proposal through the lint-rule skill (§1 instrument, likely the parity checker rather than an oxlint rule; §2 measure today's count; a message that says why and what to use, record §17), after checking whether check:feature-parity --json already reports it. States the proposal goes to the coordinator and a rule ships at error only with the tree at zero.",
+      "files": []
+    }
+  ]
+}

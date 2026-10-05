@@ -1,0 +1,53 @@
+{
+  "skill_name": "spec-binding-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "An @integration scenario in specs about the API process's auth composition is bound to a unit test in modules/auth that builds the sign-in service over a faked user directory. The assertions match the Then steps. Keep it?",
+      "expected_output": "Weak by level (rubric 2): an @integration composition scenario is proven by booting the composition, through the installation fixture (apps/api/src/__tests__/api-installation.fixture.ts) or the createApp chain, not by a unit with fakes. Cites the 2026-10-05 review that unbound auth rows 86 and 87 for this reason. Verdict: remove the annotation only, keep the test, list the row for a lane that binds through the composed application.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Three auth scenarios about password reset refusals are bound to a test that creates its own betterAuth({...}) instance with its own options and asserts its refusals. Good binds?",
+      "expected_output": "No (rubric 3): a test of a library instance the test builds proves the library, not LangWatch's composition. Verdict 'upstream premise pin': remove the tags, keep the test, say which Better Auth behaviour it pins, as the 2026-10-05 review did for auth rows 21-23 (1d74ccd142). Binding them needs LangWatch's composed auth.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "SCIM's 'A removal leaves nothing behind' says the person keeps no membership and no role binding. The bound test asserts the membership row is gone and that offboardMember was called on the grants authority fake. Proven?",
+      "expected_output": "Half-proven, so weak (rubric 1): the role-binding half is a call on a fake, which proves the call, not that nothing is left; the Then needs a read that finds no binding (memory twin or installation level). Verdict: unbind or strengthen the assertion; lists which Then is missing.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "The parity banner still lists three connected-target scenarios as unbound, but the test file has `/** @scenario \"...\" */` above each. One annotation wraps its title over two lines, one sits above a describe, one carries two titles. Why?",
+      "expected_output": "Rubric 4: the checker reads the title only from the annotation's own line (b05ae63a46) and binds only when a test call follows (cb02116fdd). Each annotation goes on one line, directly above the it/test call; a test proving two scenarios carries two stacked annotation lines. Recommends reading the verdict banner and check:feature-parity --json (unknownAnnotations) after the fix.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Scenario 'A REST request is parsed before its credential is resolved' is unbound. authenticate-first.integration.test.ts proves the opposite order. Should the lane reword the scenario to match and bind it?",
+      "expected_output": "No (rubric 5): a product that disagrees with its scenario is a behaviour question, never a bind and never a wording change by the binding lane. Lists feature:line, what the scenario says, what the product does with the test as evidence, and the ruling it rests on (authenticate-first, Alex 2026-09-30) for the coordinator, who rewords or changes the product. Notes specs are requirements (CLAUDE.md truth order).",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Governance row 60's test asserts the credit renders as one of '-$12.50', '−$12.50' or '($12.50)'. The scenario says '-$12.50'. Bound?",
+      "expected_output": "Weak until tightened (rubric 1): an assertion that accepts several answers where the scenario names one does not prove the Then. Fix: assert the exact string '-$12.50', as the governance lane did.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Langy rows 169-172 are @integration scenarios about the panel rendering the cadence. They are bound to service unit tests that prove the cadence decision. The lane suggests retagging them @unit. OK?",
+      "expected_output": "Weak by level (rubric 2): the tests prove the decision, not the rendering. Retagging an already-tagged scenario changes the requirement, so it is a question for the coordinator, never part of a bind; a binding lane only tags untagged scenarios (parity-bind manifests). Options: a panel (.integration.test.tsx) test, or the coordinator rules the level.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "parity:candidates scored an analytics test 0.91 for a scenario about deleting a project's dashboards. The test only proves the project is deleted. Bind it since the score is high?",
+      "expected_output": "No: the candidate score is a reading order (about 75% have the right test in the top three), not a verdict; the Then (dashboards gone) has no assertion (rubric 1). Leave it unbound or write a test at the scenario's level in the owning module, via the testing skill.",
+      "files": []
+    }
+  ]
+}
