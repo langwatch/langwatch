@@ -81,9 +81,9 @@ describe("the monthly billing roll-up's eventing declaration", () => {
       const app = BillingModule.assemble({
         usageWarnings: createApiFixture<UsageWarningService>({}),
         resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
-        members: { isSaas: false, nodeEnvironment: "test" },
+        nodeEnvironment: "test",
         repositories: MemoryBillingRepositories.create(),
-        config: { bankDetails: undefined, licensePaymentLinkId: undefined },
+        config: { bankDetails: undefined, licensePaymentLinkId: undefined, isSaas: false },
         peers,
         stripeSecretKey: undefined,
       });
@@ -103,9 +103,9 @@ describe("the monthly billing roll-up's eventing declaration", () => {
       BillingModule.assemble({
         usageWarnings: createApiFixture<UsageWarningService>({}),
         resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
-        members: { isSaas: true, nodeEnvironment: "test" },
+        nodeEnvironment: "test",
         repositories: MemoryBillingRepositories.create(),
-        config: { bankDetails: undefined, licensePaymentLinkId: undefined },
+        config: { bankDetails: undefined, licensePaymentLinkId: undefined, isSaas: true },
         peers,
         stripeSecretKey: undefined,
       });
@@ -127,9 +127,9 @@ describe("the monthly billing roll-up's eventing declaration", () => {
       const pipeline = BillingModule.assemble({
         usageWarnings: createApiFixture<UsageWarningService>({}),
         resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
-        members: { isSaas: true, nodeEnvironment: "test" },
+        nodeEnvironment: "test",
         repositories: MemoryBillingRepositories.create(),
-        config: { bankDetails: undefined, licensePaymentLinkId: undefined },
+        config: { bankDetails: undefined, licensePaymentLinkId: undefined, isSaas: true },
         peers,
         stripeSecretKey: undefined,
       }).reportingPipeline({ participation: "produce" });

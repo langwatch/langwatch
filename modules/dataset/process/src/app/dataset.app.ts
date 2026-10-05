@@ -48,7 +48,6 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
 import { generate } from "@langwatch/ksuid";
 import type { FeatureSetup } from "@langwatch/process";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 
@@ -57,7 +56,6 @@ import {
   type DatasetNormalizationDefinition,
 } from "../eventing/dataset-normalization.pipeline.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
-import { ObjectStorageDatasetChunkRepository } from "../repositories/object-storage/object-storage.dataset-chunk.repository.ts";
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
 import { DatasetAttachmentUploadService } from "../services/dataset-attachment-upload.service.ts";
@@ -71,12 +69,11 @@ import { DatasetService } from "../services/dataset.service.ts";
 const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
 
 /**
- * Shapes restated rather than imported: a module depends on contracts.
- * `publicBaseUrl` is the process's own fact, drilled in — absent where the
- * deployment named no `BASE_HOST`. `platformUrl` refuses by name when it is.
+ * `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`;
+ * `platformUrl` refuses by name when it is. It moves to the shared leaf once the contract may
+ * hold it.
  */
-type DatasetMembers = Pick<ProcessMembers, "objectStorage"> &
-  Readonly<{ publicBaseUrl: string | undefined }>;
+type DatasetMembers = Readonly<{ publicBaseUrl: string | undefined }>;
 
 type DatasetSetup = FeatureSetup<
   typeof DatasetModule.dependencies,
@@ -118,8 +115,8 @@ export class DatasetModule implements DatasetApi {
     /** Reads the confirmed files a dataset is imported from (ADR-158 §6). */
     storedObjects: StoredObjectApi,
   };
-  /** `publicBaseUrl` is the process's own fact; `objectStorage` is the process's client. */
-  static readonly reads = ["publicBaseUrl", "objectStorage"] as const;
+  /** `publicBaseUrl` is the process's own fact. */
+  static readonly reads = ["publicBaseUrl"] as const;
 
   #datasets: DatasetService;
   #attachmentUploads: DatasetAttachmentUploadService;
@@ -135,9 +132,7 @@ export class DatasetModule implements DatasetApi {
     dependencies: DatasetSetup["dependencies"],
     members: DatasetMembers,
   ) {
-    const chunks = ObjectStorageDatasetChunkRepository.create({
-      objectStorage: members.objectStorage,
-    });
+    const chunks = repositories.chunks;
 
     this.#normalization = DatasetNormalizeService.create({
       repository: repositories.content,

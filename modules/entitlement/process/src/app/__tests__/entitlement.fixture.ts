@@ -12,15 +12,15 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";
 import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
-import type { UsageLimitResult } from "../../services/usage-enforcement.service.ts";
-import { EntitlementModule } from "../entitlement.app.ts";
-import type { EntitlementInfrastructure } from "../entitlement.app.ts";
 import {
   USAGE_UNKNOWN,
-  type UsageCounter,
   type UsageCount,
-  type UsageWarning,
-} from "../entitlement.members.ts";
+  type UsageCounter,
+  type UsageLimitResult,
+} from "../../services/usage-enforcement.service.ts";
+import type { UsageWarning } from "../../services/usage-warning.service.ts";
+import { EntitlementModule } from "../entitlement.app.ts";
+import type { EntitlementInfrastructure } from "../entitlement.app.ts";
 
 /** A source that always answers the same plan, or none at all. */
 export function fixedEntitlementSource(plan: Plan | null): EntitlementSource {
@@ -86,18 +86,18 @@ export function createEntitlementTestUsers(): UserApi {
 export function createEntitlementTestApp(
   input: Readonly<{
     repositories?: EntitlementRepositories;
-    members: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
+    infrastructure: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
       Partial<Pick<EntitlementInfrastructure, "counter" | "warnings">>;
     dependencies?: Partial<{ users: UserApi; organizations: OrganizationApi }>;
-    config?: EntitlementConfig;
+    config?: Pick<EntitlementConfig, "requestBounds">;
   }>,
 ): EntitlementModule {
   return EntitlementModule.createForTesting({
     repositories: input.repositories ?? MemoryEntitlementRepositories.create(),
-    members: {
-      ...input.members,
-      counter: input.members.counter ?? TestUsageCounter.create(),
-      warnings: input.members.warnings ?? TestUsageWarnings.create(),
+    infrastructure: {
+      ...input.infrastructure,
+      counter: input.infrastructure.counter ?? TestUsageCounter.create(),
+      warnings: input.infrastructure.warnings ?? TestUsageWarnings.create(),
     },
     dependencies: {
       users: input.dependencies?.users ?? createEntitlementTestUsers(),

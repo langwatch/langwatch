@@ -5,7 +5,7 @@
  * repositories, with the two peers it declares, in every role it serves.
  */
 import { DatasetApi, DatasetNotFoundError } from "@langwatch/dataset-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -21,7 +21,7 @@ import {
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(datasetProcessModule)])
+    .withModules([datasetProcessModule])
     .withStores(memoryStores())
     .withMember("publicBaseUrl", undefined)
     .provide({

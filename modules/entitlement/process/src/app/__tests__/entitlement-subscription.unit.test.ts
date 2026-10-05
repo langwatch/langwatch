@@ -2,7 +2,8 @@ import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -38,9 +39,9 @@ async function boot({ isSaas, billing }: { isSaas: boolean; billing: BillingApi 
   const { logger } = createTestLogger();
 
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(entitlementProcessModule)])
-    .withConfig({ entitlement: { requestBounds: undefined } })
-    .withMembers({ isSaas, processName: "test" })
+    .withModules([entitlementProcessModule])
+    .withConfig({ entitlement: { requestBounds: undefined, isSaas } })
+    .withStores(memoryStores())
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
       user: createEntitlementTestUsers(),

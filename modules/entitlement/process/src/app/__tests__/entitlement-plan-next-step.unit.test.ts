@@ -19,7 +19,7 @@ describe("EntitlementModule.resolvePlanNextStep", () => {
   /** @scenario "A peer asks the entitlement capability for the next step" */
   it("names the rung the self-serve catalogue sells above a paid tiered plan", async () => {
     const app = createEntitlementTestApp({
-      members: { baseline: free, license: fixedEntitlementSource(null) },
+      infrastructure: { baseline: free, license: fixedEntitlementSource(null) },
     });
 
     const pro: Plan = {

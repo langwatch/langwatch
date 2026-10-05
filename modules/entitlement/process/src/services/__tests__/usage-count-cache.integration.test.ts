@@ -8,13 +8,13 @@ import type { PlanInfo } from "@langwatch/entitlement-contract";
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { InProcessUsageCache } from "../../app/entitlement.members.ts";
-import type {
-  UsageOrganization,
-  UsageVolumeCounter,
-  ProjectUsageCounts,
-} from "../../app/entitlement.members.ts";
-import { UsageService } from "../usage-enforcement.service.ts";
+import {
+  InProcessUsageCache,
+  type UsageOrganization,
+  type UsageVolumeCounter,
+  type ProjectUsageCounts,
+  UsageService,
+} from "../usage-enforcement.service.ts";
 
 const PLAN: PlanInfo = {
   planSource: "subscription",

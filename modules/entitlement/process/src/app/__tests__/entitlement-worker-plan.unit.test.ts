@@ -3,7 +3,8 @@ import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementApi, type EntitlementGrant, type Plan } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { UNLIMITED } from "@langwatch/plans";
-import { createApp, MissingProviderError, withMemoryRepositories } from "@langwatch/process";
+import { createApp, MissingProviderError } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 /**
@@ -56,9 +57,9 @@ type Sources = Readonly<{
 function bootOn({ role = "worker", isSaas, billing, licence = unlicensed }: Sources) {
   const { logger } = createTestLogger();
   return createApp({ role })
-    .withModules([withMemoryRepositories(entitlementProcessModule)])
-    .withConfig({ entitlement: { requestBounds: undefined } })
-    .withMembers({ isSaas, processName: `langwatch-${role}` })
+    .withModules([entitlementProcessModule])
+    .withConfig({ entitlement: { requestBounds: undefined, isSaas } })
+    .withStores(memoryStores())
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
       user: createEntitlementTestUsers(),
@@ -155,9 +156,9 @@ describe("given the entitlement module installed on the worker role", () => {
       const { logger } = createTestLogger();
       const boot = Promise.resolve().then(() =>
         createApp({ role: "worker" })
-          .withModules([withMemoryRepositories(entitlementProcessModule)])
-          .withConfig({ entitlement: { requestBounds: undefined } })
-          .withMembers({ isSaas: true, processName: "langwatch-worker" })
+          .withModules([entitlementProcessModule])
+          .withConfig({ entitlement: { requestBounds: undefined, isSaas: true } })
+          .withStores(memoryStores())
           .withObservability((observability) => observability.withLogging(logger))
           .provide({
             user: createEntitlementTestUsers(),
@@ -183,9 +184,9 @@ describe("given the entitlement module installed on the worker role", () => {
     it("asks the installed licensing peer, the same one every other read uses", async () => {
       const asked: string[] = [];
       const runtime = await createApp({ role: "worker" })
-        .withModules([withMemoryRepositories(entitlementProcessModule)])
-        .withConfig({ entitlement: { requestBounds: undefined } })
-        .withMembers({ isSaas: false, processName: "langwatch-worker" })
+        .withModules([entitlementProcessModule])
+        .withConfig({ entitlement: { requestBounds: undefined, isSaas: false } })
+        .withStores(memoryStores())
         .withObservability((observability) => observability.withLogging(createTestLogger().logger))
         .provide({
           user: createEntitlementTestUsers(),

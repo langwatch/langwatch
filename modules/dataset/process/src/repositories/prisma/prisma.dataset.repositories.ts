@@ -1,5 +1,5 @@
 import { prismaRepositories } from "@langwatch/prisma-client";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { ObjectStorage } from "@langwatch/process-stores/members";
 
 import type { DatasetRepositories } from "../dataset.repositories.ts";
 import { ObjectStorageDatasetChunkRepository } from "../object-storage/object-storage.dataset-chunk.repository.ts";
@@ -28,11 +28,15 @@ export class PostgresDatasetRepositories {
   static create({
     prisma,
     objectStorage,
-  }: Pick<ProcessMembers, "prisma" | "objectStorage">): DatasetRepositories {
+  }: Parameters<typeof PostgresDatasetTableRepositories.create>[0] & {
+    objectStorage: ObjectStorage;
+  }): DatasetRepositories {
+    const chunks = ObjectStorageDatasetChunkRepository.create({ objectStorage });
     return {
       ...PostgresDatasetTableRepositories.create({ prisma }),
+      chunks,
       migration: PrismaDatasetMigrationRepository.create({ database: prisma }),
-      migrationChunks: ObjectStorageDatasetChunkRepository.create({ objectStorage }),
+      migrationChunks: chunks,
     };
   }
 }

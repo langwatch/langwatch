@@ -1,7 +1,7 @@
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
-import { USAGE_UNKNOWN, type ProjectUsageCounts } from "../../app/entitlement.members.ts";
+import { USAGE_UNKNOWN, type ProjectUsageCounts } from "../usage-enforcement.service.ts";
 import {
   type CountedUsageReading,
   UsageWarningSweepService,

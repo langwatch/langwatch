@@ -8,8 +8,8 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type { UsageCounter, UsageCount } from "../../app/entitlement.members.ts";
 import type { UsageMembershipRepository } from "../../repositories/usage-membership.repository.ts";
+import type { UsageCounter, UsageCount } from "../usage-enforcement.service.ts";
 import { UNCAPPED_MONTHLY_USAGE_LIMIT, UsageStatsService } from "../usage-stats.service.ts";
 
 const UNLIMITED_MESSAGES = 999_999_999;

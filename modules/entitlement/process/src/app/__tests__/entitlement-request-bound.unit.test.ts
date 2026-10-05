@@ -3,7 +3,8 @@ import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { REQUEST_BOUND_KEYS, requestBounds } from "@langwatch/plans";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -44,7 +45,7 @@ const openSource: Plan = { ...free, type: "OPEN_SOURCE", name: "Open Source" };
 
 function appForLicense(plan: Plan | null) {
   return createEntitlementTestApp({
-    members: { baseline: free, license: fixedEntitlementSource(plan) },
+    infrastructure: { baseline: free, license: fixedEntitlementSource(plan) },
   });
 }
 
@@ -79,7 +80,7 @@ describe("EntitlementModule.requestBound", () => {
 
   it("resolves the enterprise tier for a self-hosted OPEN_SOURCE baseline", async () => {
     const app = createEntitlementTestApp({
-      members: { baseline: openSource, license: fixedEntitlementSource(null) },
+      infrastructure: { baseline: openSource, license: fixedEntitlementSource(null) },
     });
 
     await expect(
@@ -89,7 +90,7 @@ describe("EntitlementModule.requestBound", () => {
 
   it("lets a plain-number override win on every tier without a plan lookup", async () => {
     const app = createEntitlementTestApp({
-      members: { baseline: free, license: fixedEntitlementSource(enterprise) },
+      infrastructure: { baseline: free, license: fixedEntitlementSource(enterprise) },
       config: { requestBounds: { tracesPageSizeMax: 42 } },
     });
 
@@ -103,7 +104,7 @@ describe("EntitlementModule.requestBound", () => {
 
   it("lets a per-tier override win only on the plan's own tier", async () => {
     const app = createEntitlementTestApp({
-      members: { baseline: free, license: fixedEntitlementSource(paid("PRO")) },
+      infrastructure: { baseline: free, license: fixedEntitlementSource(paid("PRO")) },
       config: { requestBounds: { tracesPageSizeMax: { paid: 3_000, enterprise: 6_000 } } },
     });
 
@@ -112,7 +113,7 @@ describe("EntitlementModule.requestBound", () => {
     ).resolves.toBe(3_000);
 
     const enterpriseApp = createEntitlementTestApp({
-      members: { baseline: free, license: fixedEntitlementSource(enterprise) },
+      infrastructure: { baseline: free, license: fixedEntitlementSource(enterprise) },
       config: { requestBounds: { tracesPageSizeMax: { paid: 3_000, enterprise: 6_000 } } },
     });
 
@@ -123,7 +124,7 @@ describe("EntitlementModule.requestBound", () => {
 
   it("falls back to the registry value for tiers a partial override does not name", async () => {
     const app = createEntitlementTestApp({
-      members: { baseline: free, license: fixedEntitlementSource(null) },
+      infrastructure: { baseline: free, license: fixedEntitlementSource(null) },
       config: { requestBounds: { exportPerMinute: { paid: 24 } } },
     });
 
@@ -139,16 +140,17 @@ describe("EntitlementModule.requestBound", () => {
   it("receives per-tier overrides through the installed module's config slice", async () => {
     const { logger } = createTestLogger();
     const runtime = await createApp({ role: "api" })
-      .withModules([withMemoryRepositories(entitlementProcessModule)])
+      .withModules([entitlementProcessModule])
       .withConfig({
         entitlement: {
           // The unlicensed cloud baseline resolves FREE, so the override must
           // name the free tier to be observed — exercising the module schema's
           // tier-record arm end to end.
           requestBounds: { tracesPageSizeMax: { free: 3_000 } },
+          isSaas: true,
         },
       })
-      .withMembers({ isSaas: true, processName: "test" })
+      .withStores(memoryStores())
       .withObservability((observability) => observability.withLogging(logger))
       .provide({
         user: createEntitlementTestUsers(),

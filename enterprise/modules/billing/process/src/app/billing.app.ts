@@ -113,15 +113,15 @@ import type { BillingStripeWebhookApi } from "../transport/billing-stripe-webhoo
 import type { BillingCurrencyApi } from "../transport/currency.trpc.ts";
 import type { BillingSubscriber, BillingSubscriptionApi } from "../transport/subscription.trpc.ts";
 
-/** Both are the process's own facts: where it runs, and which price mode it bills in. */
-type BillingMembers = Readonly<{ isSaas: boolean; nodeEnvironment: string | undefined }>;
+/** Which price mode it bills in: the process's own fact until `NODE_ENV` is a shared leaf. */
+type BillingMembers = Readonly<{ nodeEnvironment: string | undefined }>;
 
 /** Main's `env.BASE_HOST ?? "https://app.langwatch.ai"` for the usage link. */
 const DEFAULT_PUBLIC_BASE_URL = "https://app.langwatch.ai";
 
 type BillingSetup = FeatureSetup<
   typeof BillingModule.dependencies,
-  BillingMembers & Readonly<{ publicBaseUrl: string | undefined }>,
+  BillingMembers,
   BillingServerConfig,
   BillingRepositories
 >;
@@ -216,7 +216,7 @@ export class BillingModule
     internalSlackSelfHostedWebhook: billingSecrets.internalSlackSelfHostedWebhook,
     internalSlackSignupsWebhook: billingSecrets.internalSlackSignupsWebhook,
   } as const;
-  static readonly reads = ["isSaas", "nodeEnvironment", "publicBaseUrl"] as const;
+  static readonly reads = ["nodeEnvironment"] as const;
 
   static async create(setup: BillingSetup): Promise<BillingModule> {
     const mailer: MailSender = {
@@ -240,7 +240,7 @@ export class BillingModule
     const resourceLimitAlerts = BillingModule.#composeResourceLimitAlerts(setup, notices);
     return setup.secrets.into(BillingModule.secrets.stripeSecretKey, (stripeSecretKey) =>
       BillingModule.assemble({
-        members: setup.members,
+        nodeEnvironment: setup.members.nodeEnvironment,
         repositories: setup.repositories,
         config: setup.config,
         peers: setup.dependencies,
@@ -279,7 +279,7 @@ export class BillingModule
             secrets.into(handles.internalSlackSelfHostedWebhook, (slackSelfHostedChannel) =>
               BillingUsageNoticeService.create({
                 config: {
-                  baseHost: setup.members.publicBaseUrl,
+                  baseHost: setup.config.publicBaseUrl,
                   slackPlanLimitChannel,
                   slackSignupsChannel,
                   slackSelfHostedChannel,
@@ -310,7 +310,7 @@ export class BillingModule
       records: notifications,
       organizations: UsageLimitOrganizationService.create({ organizations, projects }),
       emails: notices,
-      baseHost: setup.members.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
+      baseHost: setup.config.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
     });
   }
 
@@ -320,7 +320,7 @@ export class BillingModule
     notices: BillingUsageNoticeService,
   ): ResourceLimitAlertService {
     const { organizations, projects } = setup.dependencies;
-    const { isSaas } = setup.members;
+    const { isSaas } = setup.config;
     return ResourceLimitAlertService.create({
       isSaas,
       cooldown: resourceLimitCooldown,
@@ -336,7 +336,7 @@ export class BillingModule
 
   /** The construction once the payment provider's key has resolved, or not. */
   static assemble({
-    members,
+    nodeEnvironment,
     repositories,
     config,
     peers,
@@ -348,7 +348,7 @@ export class BillingModule
     subscription,
     lifecycle,
   }: {
-    members: BillingMembers;
+    nodeEnvironment: string | undefined;
     repositories: Pick<
       BillingRepositories,
       | "connectedBilling"
@@ -363,7 +363,7 @@ export class BillingModule
       | "seatEventSubscriptions"
       | "organizations"
     >;
-    config: Pick<BillingServerConfig, "bankDetails" | "licensePaymentLinkId">;
+    config: Pick<BillingServerConfig, "bankDetails" | "licensePaymentLinkId" | "isSaas">;
     peers: ConnectedBillingPeers;
     stripeSecretKey: string | undefined;
     /** The monthly statement mail; absent, statements wait and nothing is recorded. */
@@ -377,7 +377,7 @@ export class BillingModule
     /** Records the checkout and subscription changes for peers; absent where a suite composes none. */
     lifecycle?: BillingLifecycleAnnouncerService;
   }): BillingModule {
-    const { isSaas, nodeEnvironment } = members;
+    const { isSaas } = config;
     const repository = repositories.connectedBilling;
     const facts = ConnectedCustomerFactsService.create(peers);
     const overview = ConnectedBillingOverviewService.create({

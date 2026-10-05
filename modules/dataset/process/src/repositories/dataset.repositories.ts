@@ -20,6 +20,8 @@ export interface DatasetRepositories {
   readonly batchEvaluations: BatchEvaluationRepository;
   /** The usage report's counts over the three tables above. */
   readonly count: DatasetCountRepository;
+  /** The object-storage chunks an object-backed dataset's entries live in. */
+  readonly chunks: DatasetChunkRepository;
   /** The one-off content move only the dataset-content-backfill task runs. */
   readonly migration: DatasetMigrationRepository;
   /** The chunk store that move writes into. */

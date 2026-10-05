@@ -12,8 +12,8 @@ import type {
 } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
-import { USAGE_UNKNOWN, type UsageCounter } from "../app/entitlement.members.ts";
 import type { UsageMembershipRepository } from "../repositories/usage-membership.repository.ts";
+import { USAGE_UNKNOWN, type UsageCounter } from "./usage-enforcement.service.ts";
 
 /**
  * The message allowance a plan states when it means "we do not cap this". Stated rather than

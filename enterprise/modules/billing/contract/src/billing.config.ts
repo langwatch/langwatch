@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, isSaas, publicBaseUrl, type ConfigOf } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { Secret } from "@langwatch/secrets/secret";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets/shared-secrets";
@@ -23,6 +23,10 @@ export const billingConfig = Config.define((c) => ({
   hubspotFormId: c.env("HUBSPOT_FORM_ID", z.string().optional()),
   hubspotReachedLimitFormId: c.env("HUBSPOT_REACHED_LIMIT_FORM_ID", z.string().optional()),
   bankDetails: c.env("LANGWATCH_BILLING_BANK_DETAILS", z.string().optional()),
+  /** The shared leaf: Cloud bills subscriptions and reports usage; an install runs neither. */
+  isSaas,
+  /** The shared leaf: the origin the usage links and notices point back at. */
+  publicBaseUrl,
 }));
 
 export type BillingServerConfig = ConfigOf<typeof billingConfig>;

@@ -10,6 +10,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
 import { hashApiKeySecret } from "../../rules/api-key-token.rules.ts";
@@ -47,7 +48,7 @@ async function appOver({
   const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
 
   return ApiKeyModule.create({
-    repositories: { apiKeys },
+    repositories: { apiKeys, answers: MemoryApiKeyAnswerCacheRepository.create() },
     dependencies: {
       authorization: createApiFixture<AuthzApi>({
         listApiKeyBindings: async () => [],
@@ -58,7 +59,6 @@ async function appOver({
       projects: createApiFixture<ProjectApi>({}),
     },
     secrets: resolver.scopeTo("api-key", Object.values(ApiKeyModule.secrets)),
-    members: { redis: null },
   });
 }
 

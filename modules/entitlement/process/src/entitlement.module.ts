@@ -1,4 +1,5 @@
 import type { OrganizationUserRole } from "@langwatch/authorization";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { defineProcessModule } from "@langwatch/process";
 
 import { EntitlementModule } from "./app/entitlement.app.ts";
@@ -15,6 +16,7 @@ import {
   isViewOnlyCustomRole as classifyViewOnlyCustomRole,
   type RoleChangeType,
 } from "./rules/member-classification.rules.ts";
+import { absentRequestBound } from "./rules/plan-baseline.rules.ts";
 import {
   EntitlementService,
   type EntitlementServiceOptions,
@@ -25,7 +27,6 @@ import { planTrpcTransport } from "./transport/plan.trpc.ts";
 import { usageLimitsTrpcTransport } from "./transport/usage-limits.trpc.ts";
 
 export type { EntitlementInfrastructure } from "./app/entitlement.app.ts";
-export { createAbsentRequestBound } from "./app/entitlement-composition.build.ts";
 
 export const entitlementProcessModule = defineProcessModule("entitlement")
   .withRepositories(entitlementRepositories)
@@ -66,4 +67,12 @@ export function createPlanNextStepService(options: {
   catalogue: PlanCatalogueReader;
 }): PlanNextStepService {
   return PlanNextStepService.create(options);
+}
+
+/**
+ * The request-bound seam for a process that composes no entitlement graph at
+ * all: every bound answers its free-tier value.
+ */
+export function createAbsentRequestBound(): Pick<EntitlementApi, "requestBound"> {
+  return { requestBound: async ({ key }) => absentRequestBound({ key }) };
 }

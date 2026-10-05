@@ -3,8 +3,6 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import { ResourceScope } from "@langwatch/process";
-import { memoryObjectStorage } from "@langwatch/process-stores";
-import type { ObjectStorage } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -101,7 +99,6 @@ export function createDatasetTestAttachments(
 export function createDatasetTestApp(
   input: Readonly<{
     repositories?: DatasetRepositories;
-    objectStorage?: ObjectStorage;
     publicBaseUrl?: string;
     dependencies?: Partial<{
       experiments: ExperimentApi;
@@ -122,10 +119,7 @@ export function createDatasetTestApp(
       storedObjects:
         input.dependencies?.storedObjects ?? createApiFixture<StoredObjectApi>({}, "storedObjects"),
     },
-    members: {
-      objectStorage: input.objectStorage ?? memoryObjectStorage(),
-      publicBaseUrl: input.publicBaseUrl,
-    },
+    members: { publicBaseUrl: input.publicBaseUrl },
     config: undefined,
     resources: new ResourceScope(),
     secrets: {} as never,

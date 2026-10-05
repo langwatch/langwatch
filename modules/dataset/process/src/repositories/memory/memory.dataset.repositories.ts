@@ -16,6 +16,9 @@ export class MemoryDatasetRepositories {
 
   static create(): DatasetRepositories {
     const database = MemoryDatasetDatabase.create();
+    const chunks = ObjectStorageDatasetChunkRepository.create({
+      objectStorage: memoryObjectStorage(),
+    });
 
     return {
       datasets: MemoryDatasetRepository.create({ database }),
@@ -25,9 +28,8 @@ export class MemoryDatasetRepositories {
       batchEvaluations: MemoryBatchEvaluationRepository.create({ database }),
       count: MemoryDatasetCountRepository.create({ database }),
       migration: MemoryDatasetMigrationRepository.create(),
-      migrationChunks: ObjectStorageDatasetChunkRepository.create({
-        objectStorage: memoryObjectStorage(),
-      }),
+      chunks,
+      migrationChunks: chunks,
     };
   }
 }
