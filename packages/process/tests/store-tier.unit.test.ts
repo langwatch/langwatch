@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import { StoreTierUnstatedError } from "../src/boot-errors.ts";
 import { bootInstalledProcess } from "../src/boot-installed-process.ts";
 import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
-import { storesBackedMembers } from "../src/module-members.ts";
 import { defineRepositories } from "../src/repository-registry.ts";
 import { memberSourceOf } from "./member-source.ts";
 
@@ -86,7 +85,7 @@ describe("given a module that declares live and memory repositories", () => {
         role: "worker",
         modules: [project],
         config: {},
-        members: { ...storesBackedMembers(memoryStores(), {}), close: async () => void 0 },
+        members: { ...memoryStores(), close: async () => void 0 },
       });
 
       try {

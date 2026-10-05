@@ -86,7 +86,7 @@ export class StoreTierUnstatedError extends Error {
     super(
       `Module "${module}" declares repositories, and this process stated no store tier. ` +
         "Open the live stores, or ask for memory explicitly in a test or dev harness " +
-        "(memoryStores() or withMemoryRepositories(...)); no tier is ever assumed.",
+        "(memoryStores(), or the module's own memory registry); no tier is ever assumed.",
     );
     this.name = "StoreTierUnstatedError";
   }

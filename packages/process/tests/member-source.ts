@@ -20,7 +20,7 @@ export function memberSourceOf<Members extends object>(members: Members): Member
 /** The same source, stating the live tier, for tests that drive live repositories over doubles. */
 export function liveMemberSourceOf<Members extends object>(
   members: Members,
-): MemberSource<Members> {
+): ReturnType<typeof memberSourceOf<Members>> {
   const tier: Tier = "live";
   return { ...memberSourceOf(members), tier };
 }
