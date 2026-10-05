@@ -14,7 +14,6 @@ export type {
   OpenLangyRelay,
 } from "./services/langy.service.ts";
 export type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
-export type { LangyRedis } from "./app/langy.app.ts";
 export type { SetupSkillId } from "./services/setup-skills.service.ts";
 export { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
 export { langyEgressTrpcTransport, langyTrpcTransport } from "./transport/langy.trpc.ts";
@@ -23,12 +22,14 @@ export { langyEgressTrpcTransport, langyTrpcTransport } from "./transport/langy.
 // action manifest, which arrives as {@link LangyUiActionCatalog}.
 export type {
   UiActionBackendRunner,
-  UiActionBlockingRedis,
   UiActionCompletion,
   UiActionConversations,
   UiActionOutcome,
-  UiActionRedis,
 } from "./services/langy-ui-action.service.ts";
+export type {
+  UiActionBlockingRedis,
+  UiActionRedis,
+} from "./repositories/redis/redis.langy-ui-action.repository.ts";
 
 // Application-facing Langy orchestration primitives. These are deliberately
 // exported from the package root so the application never couples itself to

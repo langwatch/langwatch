@@ -31,7 +31,6 @@ import { resolveRequestBound } from "@langwatch/plans";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -119,13 +118,6 @@ async function harness() {
       notifications: createApiFixture<NotificationService>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
-    members: {
-      publicBaseUrl: undefined,
-      prisma: undefined!,
-      // A throwing double rather than a Redis-less build: the turn paths this
-      // suite exercises never reach the member, and a reach is a loud failure.
-      redis: createApiFixture<RedisConnection>(),
-    },
     config: {
       agentUrl: undefined,
       workerCallbackUrl: undefined,
@@ -134,6 +126,7 @@ async function harness() {
       gatewayInternalUrl: undefined,
       gatewayPublicUrl: undefined,
       gatewayLegacyUrl: undefined,
+      publicBaseUrl: undefined,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: noSecrets,

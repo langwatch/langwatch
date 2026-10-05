@@ -5,7 +5,6 @@ import { instantiateRepositories } from "@langwatch/process";
  * against each backend the package can reach. The memory tier always runs;
  * Redis joins as a second row when this package declares that datastore.
  */
-import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import type { LangyTurnHandoff } from "../langy-live-turn.repository.ts";
@@ -158,7 +157,7 @@ describe.each(backends)("given the $name langy repositories", ({ create }) => {
   describe("when a status is put on the live edge", () => {
     it("replays it from the tail of the turn's stream", async () => {
       const repositories = create();
-      const buffer = repositories.tokenBuffer.open({ redis: redisDouble() });
+      const buffer = repositories.tokenBuffer.open();
 
       await buffer.appendStatus({ ...turn, status: "reading the trace" });
 
@@ -174,8 +173,8 @@ describe.each(backends)("given the $name langy repositories", ({ create }) => {
   describe("when the token buffer is opened twice for the same store", () => {
     it("both openings read back the same turn's entries", async () => {
       const repositories = create();
-      const first = repositories.tokenBuffer.open({ redis: redisDouble() });
-      const second = repositories.tokenBuffer.open({ redis: redisDouble() });
+      const first = repositories.tokenBuffer.open();
+      const second = repositories.tokenBuffer.open();
 
       await first.appendStatus({ ...turn, status: "reading the trace" });
 
@@ -216,24 +215,35 @@ describe("given the langy repository registry", () => {
       });
 
       expect(Object.keys(repositories).toSorted()).toEqual([
+        "admission",
         "analyticsEvents",
+        "conversationState",
+        "conversationTurnState",
+        "conversations",
+        "credentials",
         "feedbackPrompts",
         "frameDedup",
         "githubPrCounts",
         "localPresence",
+        "messageStorage",
+        "messages",
         "rateLimits",
         "resourceLinks",
+        "sessionKeyReap",
+        "sessionKeys",
         "sessionState",
         "tokenBuffer",
         "turnAccess",
         "turnHandoff",
+        "uiActions",
       ]);
     });
   });
 
   describe("when the live tier is selected", () => {
-    it("asks for the process's ClickHouse and rate limiter beside its Redis", () => {
+    it("asks for the process's database, ClickHouse and rate limiter beside its Redis", () => {
       expect(langyRepositories.definitions.live.requires).toEqual([
+        "prisma",
         "redis",
         "clickhouse",
         "rateLimiter",

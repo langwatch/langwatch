@@ -10,18 +10,18 @@ import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import {
+  RedisLangyUiActionRepository,
+  type UiActionBlockingRedis,
+  type UiActionRedis,
+  uiActionKeys,
+} from "../../repositories/redis/redis.langy-ui-action.repository.ts";
 import type {
   LangyUiActionCatalog,
   LangyUiActionDefinition,
 } from "../langy-ui-action-catalog.service.ts";
 import { LangyUiActionPageService } from "../langy-ui-action-page.service.ts";
-import {
-  LangyUiActionService,
-  UI_ACTION_MAX_BUDGET_MS,
-  type UiActionBlockingRedis,
-  type UiActionRedis,
-  uiActionKeys,
-} from "../langy-ui-action.service.ts";
+import { LangyUiActionService, UI_ACTION_MAX_BUDGET_MS } from "../langy-ui-action.service.ts";
 
 const duplicateTargetSchema = z.object({ targetId: z.string() });
 const runSchema = z.object({});
@@ -128,7 +128,7 @@ function makeService({
   }) => Promise<unknown>;
 }) {
   const dispatcher = LangyUiActionService.create({
-    redis,
+    uiActions: RedisLangyUiActionRepository.create({ redis }),
     conversations: {
       getById: async ({ id }) => {
         if (!conversationExists) throw new LangyConversationNotFoundError(id);
@@ -148,7 +148,9 @@ function makeService({
         }
       : {}),
   });
-  const page = LangyUiActionPageService.create({ redis });
+  const page = LangyUiActionPageService.create({
+    uiActions: RedisLangyUiActionRepository.create({ redis }),
+  });
   return {
     dispatch: dispatcher.dispatch.bind(dispatcher),
     claim: page.claim.bind(page),

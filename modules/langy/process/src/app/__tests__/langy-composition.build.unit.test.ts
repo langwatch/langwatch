@@ -30,6 +30,7 @@ const NO_ADDRESSES: LangyServerConfig = {
   gatewayInternalUrl: undefined,
   gatewayPublicUrl: undefined,
   gatewayLegacyUrl: undefined,
+  publicBaseUrl: undefined,
 };
 
 class ConfiguredLangyModel extends LangyModel {
@@ -49,7 +50,6 @@ function build(input: { config?: Partial<LangyServerConfig>; publicBaseUrl?: str
   return {
     sessionKeys,
     built: buildLangyInfrastructure({
-      redis: null,
       config: { ...NO_ADDRESSES, ...input.config },
       publicBaseUrl: input.publicBaseUrl,
       worker: UnavailableLangyWorkerChannel.create(LangyWorkerMetricsNullService.create()),

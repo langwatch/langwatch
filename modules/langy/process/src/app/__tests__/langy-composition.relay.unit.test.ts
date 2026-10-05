@@ -20,14 +20,12 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { UnavailableLangyWorkerChannel } from "../../channels/unavailable.langy-worker.channel.ts";
 import type { LangySessionKeyRepository } from "../../repositories/langy-session-key.repository.ts";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
-import { LangyTokenBufferRedisRepository } from "../../repositories/redis/redis.langy-token-buffer.repository.ts";
 import { mintRunToken, signFrame } from "../../rules/langy-frame-auth.rules.ts";
 import { LangyModel } from "../../services/langy-model.service.ts";
 import { LangyNavigateFallbackService } from "../../services/langy-navigate-fallback.service.ts";
@@ -78,26 +76,10 @@ const conversations = createApiFixture<LangyService>({
 });
 
 /** The live buffer's stream commands, reading back what was written (the double has no streams). */
-function streamScript() {
-  const streams = new Map<string, [string, string[]][]>();
-  return {
-    xadd: async (...args: unknown[]) => {
-      const key = String(args[0]);
-      const rows = streams.get(key) ?? [];
-      const id = `1-${rows.length + 1}`;
-      rows.push([id, args.slice(args.indexOf("*") + 1).map(String)]);
-      streams.set(key, rows);
-      return id;
-    },
-    xrange: async (...args: unknown[]) => streams.get(String(args[0])) ?? [],
-  };
-}
-
-/** A relay opened by the composition, over one Redis double its buffer is read back from. */
+/** A relay opened by the composition, over the memory registry its buffer is read back from. */
 function composedRelay() {
-  const redis = memoryRedisDouble({ script: streamScript() });
+  const repositories = MemoryLangyRepositories.create();
   const built = buildLangyInfrastructure({
-    redis,
     config: {
       agentUrl: undefined,
       workerCallbackUrl: undefined,
@@ -106,10 +88,11 @@ function composedRelay() {
       gatewayInternalUrl: undefined,
       gatewayPublicUrl: undefined,
       gatewayLegacyUrl: undefined,
+      publicBaseUrl: undefined,
     },
     publicBaseUrl: ORIGIN,
     worker: UnavailableLangyWorkerChannel.create(LangyWorkerMetricsNullService.create()),
-    repositories: MemoryLangyRepositories.create(),
+    repositories,
     models: new NoLangyModel(),
     sessionKeys: LangySessionKeyService.create({
       repository: createApiFixture<LangySessionKeyRepository>(),
@@ -141,9 +124,9 @@ function composedRelay() {
       publicBaseUrl: ORIGIN,
     }),
   });
-  if (!built.openRelay) throw new Error("a process with Redis composes the relay");
+  if (!built.openRelay) throw new Error("the composition builds the relay");
   const relay = built.openRelay(conversations);
-  const buffer = LangyTokenBufferRedisRepository.create({ redis });
+  const buffer = repositories.tokenBuffer.open();
 
   return {
     push: async (payloads: unknown[]) => {

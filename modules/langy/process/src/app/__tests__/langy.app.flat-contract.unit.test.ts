@@ -25,7 +25,6 @@ import type { OnboardingApi } from "@langwatch/onboarding-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -252,13 +251,6 @@ async function createApp({
       notifications: createApiFixture<NotificationService>(),
       retention,
     },
-    members: {
-      publicBaseUrl: undefined,
-      prisma: undefined!,
-      // A throwing double rather than a Redis-less build: the reads this
-      // suite exercises never reach the member, and a reach is a loud failure.
-      redis: createApiFixture<RedisConnection>(),
-    },
     config: {
       agentUrl: undefined,
       workerCallbackUrl: undefined,
@@ -267,6 +259,7 @@ async function createApp({
       gatewayInternalUrl: undefined,
       gatewayPublicUrl: undefined,
       gatewayLegacyUrl: undefined,
+      publicBaseUrl: undefined,
     },
     resources,
     secrets,

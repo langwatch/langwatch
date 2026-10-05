@@ -4,6 +4,7 @@ import {
   gatewayInternalUrl,
   gatewayLegacyUrl,
   gatewayPublicUrl,
+  publicBaseUrl,
 } from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
@@ -21,6 +22,7 @@ export const langyConfig = Config.define((c) => ({
   gatewayInternalUrl,
   gatewayPublicUrl,
   gatewayLegacyUrl,
+  publicBaseUrl,
 }));
 
 export type LangyServerConfig = ConfigOf<typeof langyConfig>;

@@ -28,7 +28,6 @@ import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
@@ -84,11 +83,6 @@ async function relayRoute() {
       notifications: createApiFixture<NotificationService>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
-    members: {
-      publicBaseUrl: "https://app.example.test",
-      prisma: undefined!,
-      redis: memoryRedisDouble(),
-    },
     config: {
       agentUrl: undefined,
       workerCallbackUrl: undefined,
@@ -97,6 +91,7 @@ async function relayRoute() {
       gatewayInternalUrl: undefined,
       gatewayPublicUrl: undefined,
       gatewayLegacyUrl: undefined,
+      publicBaseUrl: "https://app.example.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: deploymentSecrets,

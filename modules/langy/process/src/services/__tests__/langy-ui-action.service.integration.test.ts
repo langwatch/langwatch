@@ -9,12 +9,16 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
+import {
+  RedisLangyUiActionRepository,
+  uiActionKeys,
+} from "../../repositories/redis/redis.langy-ui-action.repository.ts";
 import type {
   LangyUiActionCatalog,
   LangyUiActionDefinition,
 } from "../langy-ui-action-catalog.service.ts";
 import { LangyUiActionPageService } from "../langy-ui-action-page.service.ts";
-import { LangyUiActionService, uiActionKeys } from "../langy-ui-action.service.ts";
+import { LangyUiActionService } from "../langy-ui-action.service.ts";
 
 const FAKE_DEFINITIONS: Record<string, LangyUiActionDefinition> = {
   "workbench.duplicateTarget": {
@@ -49,7 +53,7 @@ function makeService({
   backendRunner?: (args: { kind: string }) => Promise<unknown>;
 }) {
   const dispatcher = LangyUiActionService.create({
-    redis,
+    uiActions: RedisLangyUiActionRepository.create({ redis }),
     conversations: {
       getById: async () => ({ currentTurnId: IDS.turnId }),
     },
@@ -61,7 +65,9 @@ function makeService({
     actions: new FakeUiActionCatalog(),
     ...(backendRunner ? { backendRunner } : {}),
   });
-  const page = LangyUiActionPageService.create({ redis });
+  const page = LangyUiActionPageService.create({
+    uiActions: RedisLangyUiActionRepository.create({ redis }),
+  });
   return {
     dispatch: dispatcher.dispatch.bind(dispatcher),
     claim: page.claim.bind(page),

@@ -1,15 +1,13 @@
 /**
- * LangyModule infrastructure: built from redis, config and own classes. The model
+ * LangyModule infrastructure: built from its registry rows, config and own classes. The model
  * and session-key members arrive built over peers; commands are supplied
  * externally (taken as dependency tokens).
  */
 import { renderLangyTurnContext, type LangyServerConfig } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { RedisConnection } from "@langwatch/redis-client";
 
 import { type LangyWorker } from "../channels/langy-worker.channel.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
-import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import { RedisLangyTurnRelayRepository } from "../repositories/redis/redis.langy-turn-relay.repository.ts";
 import { langyWorkerRuntimeOf } from "../rules/langy-worker-runtime.rules.ts";
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
@@ -69,7 +67,6 @@ class LangyGithubPrPermitsAdapter extends LangyGithubPermit {
 export type LangyBuiltInfrastructure = Omit<LangyServiceCompositionOptions, "commands">;
 
 export function buildLangyInfrastructure(input: {
-  redis: RedisConnection | null;
   config: LangyServerConfig;
   publicBaseUrl: string | undefined;
   worker: LangyWorker | null;
@@ -86,31 +83,25 @@ export function buildLangyInfrastructure(input: {
   /** A turn's GitHub token; absent where no GitHub peer is composed. */
   github?: LangyGithubService;
 }): LangyBuiltInfrastructure {
-  const { redis, repositories, worker, models, sessionKeys, virtualKeys } = input;
-  const tokenBuffer = redis ? LangyTokenBufferRedisRepository.create({ redis }) : null;
+  const { repositories, worker, models, sessionKeys, virtualKeys } = input;
 
   const permits = LangyGithubPrPermitsAdapter.create(
-    LangyGithubPrQuotaService.create({
-      counts: redis ? repositories.githubPrCounts : null,
-    }),
+    LangyGithubPrQuotaService.create({ counts: repositories.githubPrCounts }),
   );
 
   const turns: LangyTurnTechnicalMembers = {
     models,
     worker,
-    tokenBuffer,
+    tokenBuffer: repositories.tokenBuffer.open(),
     permits,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     sessionKeys,
     // The one turn port that answers for real here: rendering the composer's
     // context chips is pure, and the contract package owns it.
     context: { render: renderLangyTurnContext },
-    // Without a surface, or without the Redis the channel runs on, the channel
-    // stays closed: advertising one a dispatch cannot reach would be a lie.
-    uiActionSurface:
-      redis && input.uiActionSurface
-        ? input.uiActionSurface
-        : { resolve: () => Promise.resolve(false) },
+    // Without a surface the channel stays closed: advertising one a dispatch
+    // cannot reach would be a lie.
+    uiActionSurface: input.uiActionSurface ?? { resolve: () => Promise.resolve(false) },
     skillGates: input.skillGates ?? { resolveDisabled: () => Promise.resolve([]) },
     metrics: { count: () => undefined },
     accessStore: repositories.turnAccess,
@@ -129,18 +120,12 @@ export function buildLangyInfrastructure(input: {
     credentials,
     events: null,
     blockMetrics: LangyBlockMetricsOtelService.create(),
-    ...(redis ? { feedbackPrompts: repositories.feedbackPrompts } : {}),
-    // No live buffer, no relay: the internal service answers 503 before opening one.
-    ...(redis
-      ? {
-          openRelay: relayOpener({
-            redis,
-            repositories,
-            baseHost: input.publicBaseUrl ?? "",
-            navigateFallback: input.navigateFallback,
-          }),
-        }
-      : {}),
+    feedbackPrompts: repositories.feedbackPrompts,
+    openRelay: relayOpener({
+      repositories,
+      baseHost: input.publicBaseUrl ?? "",
+      navigateFallback: input.navigateFallback,
+    }),
   };
 }
 
@@ -152,16 +137,15 @@ const relayLogger = createLogger("langwatch:langy:relay");
  * nonce set, fanned to the live buffer; an unremembered navigate falls back.
  */
 function relayOpener(input: {
-  redis: RedisConnection;
   repositories: LangyRepositories;
   baseHost: string;
   navigateFallback: LangyNavigateFallbackService;
 }): OpenLangyRelay {
-  const { redis, repositories, baseHost, navigateFallback } = input;
+  const { repositories, baseHost, navigateFallback } = input;
   return (conversations) =>
     RedisLangyTurnRelayRepository.create({
       conversations,
-      buffer: LangyTokenBufferRedisRepository.create({ redis }),
+      buffer: repositories.tokenBuffer.open(),
       frameDedup: repositories.frameDedup,
       handoff: repositories.turnHandoff,
       resourceLinks: repositories.resourceLinks,

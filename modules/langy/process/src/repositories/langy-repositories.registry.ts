@@ -21,23 +21,22 @@ import type {
 import type { LangyLocalPresenceRepository } from "./langy-local-presence.repository.ts";
 import type { LangyMessageRepository } from "./langy-message.repository.ts";
 import type { LangyRateLimitRepository } from "./langy-rate-limit.repository.ts";
+import type { LangySessionKeyReapRepository } from "./langy-session-key-reap.repository.ts";
 import type { LangySessionKeyRepository } from "./langy-session-key.repository.ts";
-import type {
-  LangyTokenBufferConnection,
-  LangyTokenBufferRepository,
-} from "./langy-token-buffer.repository.ts";
+import type { LangyTokenBufferRepository } from "./langy-token-buffer.repository.ts";
 import type { LangyTurnAdmissionRepository } from "./langy-turn-admission.repository.ts";
+import type { LangyUiActionRepository } from "./langy-ui-action.repository.ts";
+import { LiveLangyRepositories } from "./live/live.langy.repositories.ts";
 import { MemoryLangyRepositories } from "./memory/memory.langy.repositories.ts";
-import type { LangyDatabase } from "./prisma/langy-database.mapper.ts";
-import { PrismaLangyRepositories } from "./prisma/prisma.langy.repositories.ts";
-import { PostgresLangyRepositories } from "./redis/redis.langy.repositories.ts";
 
 /**
- * The rows the langy module keeps outside its event log, chosen once at
- * boot: watch access, worker pickup, seen frames, navigate links, shared
- * folder, live token edge. Redis holds them where a deployment has one.
+ * Every row the langy module keeps, chosen once at boot: its own tables, and
+ * the live edge (watch access, worker pickup, seen frames, navigate links,
+ * shared folder, token stream) Redis holds in a deployment.
  */
-export interface LangyRepositories {
+export interface LangyRepositories extends LangyDatabaseRepositories {
+  /** The fleet-wide sweep's one write over elapsed session keys. */
+  readonly sessionKeyReap: LangySessionKeyReapRepository;
   readonly turnAccess: LangyTurnAccessRepository;
   readonly turnHandoff: LangyTurnHandoffRepository;
   readonly frameDedup: LangyFrameDedupRepository;
@@ -49,13 +48,15 @@ export interface LangyRepositories {
   /** When each person was last asked for feedback. */
   readonly feedbackPrompts: LangyFeedbackPromptRepository;
   /**
-   * Opens the live edge over one turn's own borrowed connection (ADR-044 part
-   * 3): a blocking tail duplicates a connection per stream, so this row is a
-   * factory rather than one instance chosen at boot.
+   * Opens the live edge (ADR-044 part 3). Every call builds a fresh buffer; a
+   * blocking tail holds a connection of its own until it is released.
    */
   readonly tokenBuffer: {
-    open(connection: LangyTokenBufferConnection): LangyTokenBufferRepository;
+    open(): LangyTokenBufferRepository;
+    openBlocking(): { buffer: LangyTokenBufferRepository; release(): void };
   };
+  /** The agent-to-page action channel: pending record, claim, result list. */
+  readonly uiActions: LangyUiActionRepository;
   /** Where the content-free analytics grain the worker folds lands. */
   readonly analyticsEvents: LangyAnalyticsEventRepository;
   /** The turn window's, the panel sends' and the worker warms' fixed windows. */
@@ -63,7 +64,7 @@ export interface LangyRepositories {
 }
 
 export const langyRepositories = defineRepositories({
-  live: PostgresLangyRepositories,
+  live: LiveLangyRepositories,
   memory: MemoryLangyRepositories,
 });
 
@@ -77,11 +78,4 @@ export interface LangyDatabaseRepositories {
   readonly conversationTurnState: StateProjectionStore<LangyConversationTurnData>;
   readonly messageStorage: AppendStore<LangyMessageProjectionRecord>;
   readonly sessionKeys: LangySessionKeyRepository;
-}
-
-/** Langy's Postgres rows over the process's database — the one place their backend is named. */
-export function createLangyDatabaseRepositories(
-  database: LangyDatabase,
-): LangyDatabaseRepositories {
-  return PrismaLangyRepositories.create(database);
 }

@@ -7,13 +7,13 @@ import {
   LangyUiTurnInactiveError,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { Redis } from "ioredis";
 
 import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
+import type { LangyTokenBufferRepository } from "../repositories/langy-token-buffer.repository.ts";
 import type {
-  LangyStreamRedis,
-  LangyTokenBufferRepository,
-} from "../repositories/langy-token-buffer.repository.ts";
+  LangyUiActionRepository,
+  PendingUiAction,
+} from "../repositories/langy-ui-action.repository.ts";
 import type {
   LangyUiActionCatalog,
   LangyUiActionDefinition,
@@ -42,20 +42,6 @@ export const UI_ACTION_CLAIM_TTL_SECONDS = 60;
 const BACKEND_CLAIMANT = "langy:backend";
 
 const logger = createLogger("langwatch:langy:ui-actions");
-
-export const uiActionKeys = {
-  pending: (actionId: string): string => `langy:ui:pending:${actionId}`,
-  claim: (actionId: string): string => `langy:ui:claim:${actionId}`,
-  result: (actionId: string): string => `langy:ui:result:${actionId}`,
-};
-
-/** What the pending record pins: where the action belongs. */
-export interface PendingUiAction {
-  projectId: string;
-  conversationId: string;
-  turnId: string;
-  kind: string;
-}
 
 /** What the page reports back through `completeUiAction`. */
 export interface UiActionCompletion {
@@ -88,15 +74,6 @@ export type UiActionBackendRunner = (args: {
   experimentSlug?: string;
 }) => Promise<unknown>;
 
-/** The minimal Redis surface the service needs (ioredis satisfies it). */
-export type UiActionRedis = LangyStreamRedis &
-  Pick<Redis, "del" | "lpush"> & {
-    /** ioredis duplicate — a dedicated connection for the blocking wait. */
-    duplicate(): UiActionBlockingRedis;
-  };
-
-export type UiActionBlockingRedis = Pick<Redis, "blpop" | "disconnect">;
-
 /** The one slice of the conversation service dispatch needs. */
 export interface UiActionConversations {
   /** Throws `LangyConversationNotFoundError` when the conversation is missing or not visible. */
@@ -109,7 +86,8 @@ export interface UiActionConversations {
 
 /** Everything the UI-action channel needs from the process that holds it. */
 export type LangyUiActionServiceDependencies = {
-  redis: UiActionRedis;
+  /** The pending record, the one claim and the result list the dispatch waits on. */
+  uiActions: LangyUiActionRepository;
   conversations: UiActionConversations;
   buffer: Pick<LangyTokenBufferRepository, "appendUiAction">;
   /**
@@ -126,14 +104,14 @@ export class LangyUiActionService {
     return new LangyUiActionService(deps);
   }
 
-  private readonly redis: UiActionRedis;
+  private readonly uiActions: LangyUiActionRepository;
   private readonly conversations: UiActionConversations;
   private readonly buffer: Pick<LangyTokenBufferRepository, "appendUiAction">;
   private readonly actions: LangyUiActionCatalog;
   private readonly backendRunner?: UiActionBackendRunner;
 
   private constructor(deps: LangyUiActionServiceDependencies) {
-    this.redis = deps.redis;
+    this.uiActions = deps.uiActions;
     this.conversations = deps.conversations;
     this.buffer = deps.buffer;
     this.actions = deps.actions;
@@ -189,12 +167,7 @@ export class LangyUiActionService {
       turnId,
       kind,
     };
-    await this.redis.set(
-      uiActionKeys.pending(actionId),
-      JSON.stringify(pending),
-      "EX",
-      PENDING_TTL_SECONDS,
-    );
+    await this.uiActions.publishPending({ actionId, pending, ttlSeconds: PENDING_TTL_SECONDS });
 
     await this.buffer.appendUiAction({
       conversationId,
@@ -290,7 +263,7 @@ export class LangyUiActionService {
     payload: unknown;
     experimentSlug?: string;
   }): Promise<UiActionOutcome> {
-    const blocking = this.redis.duplicate();
+    const wait = this.uiActions.openResultWait();
     // What is left of the ceiling once the claim window is spent. Both the
     // page and the backend answer inside it, so the whole server wait stays
     // under the CLI's own deadline whichever side runs the action.
@@ -301,9 +274,9 @@ export class LangyUiActionService {
     const remainingMs = Math.max(1_000, budgetMs - UI_ACTION_CLAIM_WINDOW_MS);
     try {
       const claimWindowSeconds = Math.ceil(UI_ACTION_CLAIM_WINDOW_MS / 1000);
-      const first = await blocking.blpop(uiActionKeys.result(actionId), claimWindowSeconds);
-      if (first) {
-        return this.toOutcome({ actionId, kind, raw: first[1] });
+      const first = await wait.next({ actionId, timeoutSeconds: claimWindowSeconds });
+      if (first.kind === "result") {
+        return this.toOutcome({ actionId, kind, raw: first.raw });
       }
 
       // Take the claim key for the backend with the same SET NX a page uses:
@@ -311,14 +284,11 @@ export class LangyUiActionService {
       // Only reading the key here would leave a window where a tab that has
       // already validated the pending record claims right after the dispatch
       // decided, and the page and the backend both run the action.
-      const isClaimedForBackend =
-        (await this.redis.set(
-          uiActionKeys.claim(actionId),
-          BACKEND_CLAIMANT,
-          "EX",
-          UI_ACTION_CLAIM_TTL_SECONDS,
-          "NX",
-        )) === "OK";
+      const { isClaimed: isClaimedForBackend } = await this.uiActions.claim({
+        actionId,
+        claimant: BACKEND_CLAIMANT,
+        ttlSeconds: UI_ACTION_CLAIM_TTL_SECONDS,
+      });
       if (isClaimedForBackend) {
         // Which path an action took decides what the user sees: the page runs
         // it in front of them, the backend runs it out of sight and the page
@@ -331,7 +301,7 @@ export class LangyUiActionService {
         );
         // Nothing is listening, and no page can claim now. Drop the pending
         // record so a zombie tab finds nothing left to validate either.
-        await this.redis.del(uiActionKeys.pending(actionId));
+        await this.uiActions.dropPending(actionId);
 
         return await this.runOnBackend({
           actionId,
@@ -346,16 +316,16 @@ export class LangyUiActionService {
       }
 
       const remainingSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
-      const second = await blocking.blpop(uiActionKeys.result(actionId), remainingSeconds);
-      if (second) {
-        return this.toOutcome({ actionId, kind, raw: second[1] });
+      const second = await wait.next({ actionId, timeoutSeconds: remainingSeconds });
+      if (second.kind === "result") {
+        return this.toOutcome({ actionId, kind, raw: second.raw });
       }
 
-      await this.redis.del(uiActionKeys.pending(actionId));
+      await this.uiActions.dropPending(actionId);
 
       throw new LangyUiTimeoutError(kind);
     } finally {
-      blocking.disconnect();
+      wait.release();
     }
   }
 

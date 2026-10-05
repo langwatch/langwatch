@@ -32,7 +32,6 @@ import type { OnboardingApi } from "@langwatch/onboarding-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -42,9 +41,9 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyModule } from "../app/langy.app.ts";
-import { createLangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
 import { MemoryLangyRepositories } from "../repositories/memory/memory.langy.repositories.ts";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
+import { PrismaLangyRepositories } from "../repositories/prisma/prisma.langy.repositories.ts";
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
 import type { LangyEventingMembers } from "../services/langy-postgres.service.ts";
 import { LangyPostgresService } from "../services/langy-postgres.service.ts";
@@ -100,7 +99,7 @@ describe("LangyPostgresService", () => {
   it("shares the memoized generic stores with every eventing consumer", () => {
     const database: LangyDatabase = undefined!;
     const instance = LangyPostgresService.create({
-      repositories: createLangyDatabaseRepositories(database),
+      repositories: PrismaLangyRepositories.create(database),
     });
 
     const first: LangyEventingMembers = instance.eventing();
@@ -137,7 +136,7 @@ describe("LangyPostgresService", () => {
     });
     const database: LangyDatabase = undefined!;
     const instance = LangyPostgresService.create({
-      repositories: createLangyDatabaseRepositories(database),
+      repositories: PrismaLangyRepositories.create(database),
     });
 
     const first = instance.build(options);
@@ -155,7 +154,7 @@ describe("LangyPostgresService", () => {
         metrics.install();
         try {
           const instance = LangyPostgresService.create({
-            repositories: createLangyDatabaseRepositories(undefined!),
+            repositories: PrismaLangyRepositories.create(undefined!),
           });
           const service = instance.build({
             ...compositionOptions(),
@@ -183,7 +182,7 @@ describe("LangyPostgresService", () => {
       /** @scenario "transports share one Langy capability" */
       it("hands back the one service the adapter built, not a second graph", async () => {
         const instance = LangyPostgresService.create({
-          repositories: createLangyDatabaseRepositories(undefined!),
+          repositories: PrismaLangyRepositories.create(undefined!),
         });
         const service = instance.build(compositionOptions());
 
@@ -199,7 +198,7 @@ describe("LangyPostgresService", () => {
       /** @scenario "composition hides persistence" */
       it("receives the contract service, with no repository or database on its surface", () => {
         const instance = LangyPostgresService.create({
-          repositories: createLangyDatabaseRepositories(undefined!),
+          repositories: PrismaLangyRepositories.create(undefined!),
         });
 
         const service = instance.build(compositionOptions());
@@ -211,7 +210,7 @@ describe("LangyPostgresService", () => {
       /** @scenario "application transports use the flat contract" */
       it("publishes every capability as a flat method, naming no subordinate among them", () => {
         const instance = LangyPostgresService.create({
-          repositories: createLangyDatabaseRepositories(undefined!),
+          repositories: PrismaLangyRepositories.create(undefined!),
         });
 
         const service = instance.build(compositionOptions());
@@ -299,11 +298,6 @@ async function createApp(): Promise<LangyModule> {
       notifications: createApiFixture<NotificationService>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
-    members: {
-      publicBaseUrl: undefined,
-      prisma: undefined!,
-      redis: createApiFixture<RedisConnection>(),
-    },
     config: {
       agentUrl: undefined,
       workerCallbackUrl: undefined,
@@ -312,6 +306,7 @@ async function createApp(): Promise<LangyModule> {
       gatewayInternalUrl: undefined,
       gatewayPublicUrl: undefined,
       gatewayLegacyUrl: undefined,
+      publicBaseUrl: undefined,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: noSecrets,

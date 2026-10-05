@@ -1,4 +1,4 @@
-import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import type { CliResultDigest, CliToolResult, LangyStreamEntry } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { LANGY_EMPTY_TURN_FALLBACK } from "../../rules/langy-empty-turn.rules.ts";
@@ -111,6 +111,83 @@ export class LangyTokenBufferMemoryRepository extends LangyTokenBufferRepository
     });
   }
 
+  async appendChunk(input: {
+    conversationId: string;
+    turnId: string;
+    text: string;
+  }): Promise<void> {
+    if (input.text) this.append(input, { type: "delta", text: input.text });
+  }
+
+  async appendReasoning(input: {
+    conversationId: string;
+    turnId: string;
+    text: string;
+  }): Promise<void> {
+    if (input.text) this.append(input, { type: "reasoning", text: input.text });
+  }
+
+  async appendProgress(input: {
+    conversationId: string;
+    turnId: string;
+    message?: string;
+    progress?: number;
+    current?: number;
+    total?: number;
+    batchItems?: number;
+    batchDurationMs?: number;
+  }): Promise<void> {
+    const { conversationId: _conversationId, turnId: _turnId, ...fields } = input;
+    this.append(input, { type: "progress", ...definedOnly(fields) });
+  }
+
+  async appendMilestone(input: {
+    conversationId: string;
+    turnId: string;
+    kind: string;
+    detail?: string;
+  }): Promise<void> {
+    this.append(input, {
+      type: "milestone",
+      kind: input.kind,
+      ...(input.detail !== undefined ? { detail: input.detail } : {}),
+    });
+  }
+
+  async appendPlan(input: {
+    conversationId: string;
+    turnId: string;
+    items: { content: string; status: string }[];
+  }): Promise<void> {
+    this.append(input, { type: "plan", items: input.items });
+  }
+
+  async appendTool(input: {
+    conversationId: string;
+    turnId: string;
+    id: string;
+    name: string;
+    phase: "start" | "end";
+    title?: string;
+    input?: unknown;
+    output?: string;
+    isError?: boolean;
+    digest?: CliResultDigest;
+    result?: CliToolResult;
+    local?: boolean;
+  }): Promise<void> {
+    const { conversationId: _conversationId, turnId: _turnId, ...fields } = input;
+    this.append(input, { type: "tool", ...definedOnly(fields) } as LangyStreamEntry);
+  }
+
+  async appendNavigate(input: {
+    conversationId: string;
+    turnId: string;
+    href: string;
+  }): Promise<void> {
+    this.append(input, { type: "navigate", href: input.href });
+  }
+
   async appendStatus(input: {
     conversationId: string;
     turnId: string;
@@ -148,4 +225,9 @@ export class LangyTokenBufferMemoryRepository extends LangyTokenBufferRepository
     held.push({ id: `${held.length + 1}-0`, entry });
     this.store.streams.set(key, held);
   }
+}
+
+/** Drops the absent optional fields, as the Redis buffer never writes them. */
+function definedOnly<T extends Record<string, unknown>>(fields: T): T {
+  return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)) as T;
 }
