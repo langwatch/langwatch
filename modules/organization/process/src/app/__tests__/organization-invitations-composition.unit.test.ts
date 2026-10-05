@@ -339,7 +339,10 @@ describe("given a batch naming only teams the organization has", () => {
 
 describe("given a deployment that composed no invitation service", () => {
   describe("when an admin asks to create invitations", () => {
-    /** @scenario "A deployment with no invitation service refuses by name" */
+    /**
+     * @scenario "A deployment with no invitation service refuses by name"
+     * @scenario "A capability the deployment does not hold refuses by name"
+     */
     it("refuses with the named capability error rather than crashing", async () => {
       const app = organizationAppForTesting({
         dependencies: {

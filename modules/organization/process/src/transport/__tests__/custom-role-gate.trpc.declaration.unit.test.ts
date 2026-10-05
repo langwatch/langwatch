@@ -115,6 +115,10 @@ describe("given an organization below Enterprise", () => {
     expect(asks(gate, { teamId: "team-1", userId: "user-2", role: "VIEWER" })).toBe(false);
   });
 
+  /**
+   * @scenario "Non-enterprise org cannot assign custom roles via team update"
+   * @scenario "Non-enterprise org cannot create teams with custom role members"
+   */
   it("asks for Enterprise when a team is created or updated with a custom-role member", () => {
     const members = [{ userId: "user-2", role: "custom:role-1", customRoleId: "role-1" }];
     const builtIn = [{ userId: "user-2", role: "MEMBER" }];

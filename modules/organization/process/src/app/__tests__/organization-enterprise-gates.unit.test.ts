@@ -81,6 +81,7 @@ describe("given a team member list that names only built-in roles", () => {
 
 describe("given the audit trail is read", () => {
   describe("when the trail is read", () => {
+    /** @scenario "Enterprise org can access audit logs" */
     it("answers with the trail", async () => {
       const { app, getAuditLogs } = application();
 

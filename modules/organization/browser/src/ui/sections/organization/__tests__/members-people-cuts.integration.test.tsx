@@ -309,6 +309,30 @@ describe("given the directory's people tab", () => {
     });
   });
 
+  describe("when the directory created some of the members", () => {
+    /** @scenario "The directory's own people are listed by name" */
+    it("lists each by name and address, with the access they hold and where they came from", () => {
+      state.provenance = {
+        user_sam: { source: "directory", providerId: "okta" },
+        user_ana: { source: "directory", providerId: "okta" },
+      };
+      renderPeople();
+
+      const rows = screen.getAllByTestId("member-row");
+      expect(rows).toHaveLength(2);
+      const [samRow, anaRow] = ["Sam Rivera", "Ana Diaz"].map((name) =>
+        rows.find((row) => within(row).queryByText(name))!,
+      );
+      expect(within(samRow!).getByText("sam@acme.com")).toBeInTheDocument();
+      expect(within(samRow!).getByText("Member")).toBeInTheDocument();
+      expect(within(anaRow!).getByText("ana@acme.com")).toBeInTheDocument();
+      expect(within(anaRow!).getByText("Admin")).toBeInTheDocument();
+      for (const row of [samRow!, anaRow!]) {
+        expect(within(row).getByTestId("provenance-directory")).toBeInTheDocument();
+      }
+    });
+  });
+
   describe("when somebody walked in on the domain policy", () => {
     /** @scenario A member who walked in on the domain policy says nobody approved */
     it("names the domain and says nobody approved it", () => {

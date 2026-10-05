@@ -45,7 +45,10 @@ const GRANTS: Readonly<Record<string, readonly string[]>> = {
 
 describe("given a reader who may manage evaluations in one project and only view them in another", () => {
   describe("when the replication targets are derived", () => {
-    /** @scenario "A replication target I cannot create in is listed rather than hidden" */
+    /**
+     * @scenario "A replication target I cannot create in is listed rather than hidden"
+     * @scenario "Replication targets are the teams the reader may create agents in"
+     */
     it("lists both, and marks the one they may not create in as closed", () => {
       const targets = uiCopyTargets({
         candidates: uiCopyCandidates({ organizations: GRAPH, userId: "user_1" }),
@@ -84,7 +87,10 @@ describe("given a reader who may manage evaluations in one project and only view
 
 describe("given a team the reader holds no membership row in", () => {
   describe("when the replication targets are derived", () => {
-    /** @scenario "A team I am not a member of contributes no replication targets" */
+    /**
+     * @scenario "A team I am not a member of contributes no replication targets"
+     * @scenario "Replication targets are the teams the reader may create agents in"
+     */
     it("contributes none of that team's projects at all", () => {
       const candidates = uiCopyCandidates({ organizations: GRAPH, userId: "user_1" });
 

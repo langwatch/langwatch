@@ -71,6 +71,26 @@ describe("the seat-type choice", () => {
     });
   });
 
+  describe("when an admin reads what a lite member is", () => {
+    const BILLING_WORDS = /billing|billed|invoice|charge|subscription|\bpay|price/i;
+
+    /** @scenario "The explanation names capability rather than a billing switch" */
+    it("describes them by what they can do, and never as a billing setting", async () => {
+      const user = userEvent.setup();
+      renderInviteForm();
+
+      const short = screen.getByText(SEAT_TYPE_COPY.liteMemberShortDescription);
+      expect(short.textContent).not.toMatch(BILLING_WORDS);
+
+      await user.click(screen.getByTestId("lite-member-info"));
+      const explanation = await screen.findByText(LITE_MEMBER_EXPLANATION);
+
+      expect(explanation.textContent).toMatch(/can open the projects/i);
+      expect(explanation.textContent).toMatch(/cannot create, edit or delete/i);
+      expect(explanation.textContent).not.toMatch(BILLING_WORDS);
+    });
+  });
+
   describe("when an admin only wants to read the explanation", () => {
     /** @scenario Reading the explanation does not choose the seat */
     it("does not switch the member to a lite seat on the way", async () => {
