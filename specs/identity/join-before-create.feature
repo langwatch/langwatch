@@ -123,6 +123,14 @@ Feature: Join before create - the choice happens before an organization is minte
     And "sam" is not admitted to "acme" behind the invitation, which still stands
 
   @integration
+  Scenario: A failed invitation lookup neither asks nor admits
+    Given "acme" is open to "acme.com" by request or automatically
+    And the lookup for "sam"'s pending invitations fails
+    When "sam" reaches the welcome screen
+    Then "sam" is neither offered to ask to join nor admitted to "acme"
+    And the welcome screen beneath is reachable
+
+  @integration
   Scenario: An invitation is only offered to somebody who proved the address
     Given "ana" invited "sam@acme.com" to "acme"
     And "sam" signed in with an account whose "sam@acme.com" address is not verified

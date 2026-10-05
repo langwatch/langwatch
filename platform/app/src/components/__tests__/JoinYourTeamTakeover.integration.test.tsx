@@ -847,7 +847,7 @@ describe("given a sign-up the device page sent to the welcome screen", () => {
       expect(admitMock).not.toHaveBeenCalled();
     });
 
-    /** @scenario The welcome screen honours an automatic door */
+    /** @scenario A failed invitation lookup neither asks nor admits */
     it("keeps the door shut when the invitation answer failed to come back", async () => {
       offerRef.current = {
         data: {
@@ -880,7 +880,7 @@ describe("given a sign-up the device page sent to the welcome screen", () => {
       expect(screen.getByTestId("make-your-own")).toBeInTheDocument();
     });
 
-    /** @scenario A pending invitation is offered before asking to join */
+    /** @scenario A failed invitation lookup neither asks nor admits */
     it("offers no ask while the invitation answer failed to come back", () => {
       // The ask offer from beforeEach stands. A failed read may be hiding
       // an invitation, and asking instead could land the joiner seat over
