@@ -1,4 +1,4 @@
-import { type HttpAuth, type HttpAuthType, secretReferenceOf } from "@langwatch/agent-contract";
+import { type HttpAuth, type HttpAuthType, readSecretReference } from "@langwatch/agent-contract";
 import { Field, Input, NativeSelect, VStack } from "@langwatch/design-system/primitives";
 
 import { SecretReferenceLine } from "./secret-reference-line.tsx";
@@ -49,11 +49,11 @@ export function AuthConfigSection({
     onValueChange: (next: string) => void;
     placeholder: string;
   }) => {
-    const name = secretReferenceOf(current);
-    if (name !== void 0) {
+    const reference = readSecretReference(current);
+    if (reference.isReference) {
       return (
         <SecretReferenceLine
-          name={name}
+          name={reference.name}
           {...(disabled ? {} : { onReplace: () => onValueChange("") })}
         />
       );

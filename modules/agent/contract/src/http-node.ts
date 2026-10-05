@@ -115,15 +115,19 @@ export function isCredentialHeader(key: string): boolean {
 
 const SECRET_REFERENCE_VALUE = /^((Bearer|Basic|Token) )?\{\{ secrets\.([A-Z0-9_]+) \}\}$/;
 
-/** The project secret a stored credential points at, or nothing when it is not a reference. */
-export function secretReferenceOf(value: string): string | undefined {
-  return SECRET_REFERENCE_VALUE.exec(value)?.[3];
+/** What a stored credential is: a reference naming a project secret, or anything else. */
+export type SecretReferenceRead = { isReference: true; name: string } | { isReference: false };
+
+export function readSecretReference(value: string): SecretReferenceRead {
+  const name = SECRET_REFERENCE_VALUE.exec(value)?.[3];
+
+  return name === undefined ? { isReference: false } : { isReference: true, name };
 }
 
 const LOOSE_SECRET_REFERENCE =
   /^\s*(?:(bearer|basic|token)\s+)?\{\{\s*secrets\.([A-Z][A-Z0-9_]*)\s*\}\}\s*$/i;
 
-/** A reference typed loosely ("bearer {{secrets.X}}") in the spelling `secretReferenceOf` reads. */
+/** A reference typed loosely ("bearer {{secrets.X}}") in the spelling `readSecretReference` reads. */
 function inReferenceSpelling(value: string): string {
   const match = LOOSE_SECRET_REFERENCE.exec(value);
   if (!match?.[2]) return value;
@@ -160,7 +164,7 @@ function isFieldLabel(label: string): boolean {
  * and one listed scheme or field label; any other word or token-shaped label makes it a literal. */
 export function holdsLiteralCredential(value: string): boolean {
   const text = value.trim();
-  if (text === "" || secretReferenceOf(inReferenceSpelling(text)) !== undefined) return false;
+  if (text === "" || readSecretReference(inReferenceSpelling(text)).isReference) return false;
   const match = SCHEMED_REFERENCES.exec(text);
   const label = match?.[1];
 
