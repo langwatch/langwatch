@@ -48,6 +48,7 @@ const CONFIG: AutomationServerConfig = {
   persistDailyCapFree: 50,
   persistDailyCapPaid: 500,
   persistDailyCapEnterprise: 5_000,
+  publicBaseUrl: "https://app.langwatch.test",
 };
 
 function eventingFor(role: "api" | "worker"): EventSourcing {
@@ -93,8 +94,7 @@ function composed(role: "api" | "worker", eventing: EventSourcing) {
     .withMember("encryption", {
       encrypt: (value: string) => value,
       decrypt: (value: string) => value,
-    })
-    .withMember("publicBaseUrl", "https://app.langwatch.test");
+    });
 }
 
 /** What automation's own logger writes during one test, read off the module's named logger. */

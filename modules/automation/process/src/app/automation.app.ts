@@ -269,7 +269,6 @@ export type AutomationInfrastructure = Readonly<{
 /** What `AutomationModule.create` reads off process members. */
 type AutomationProcessMembers = Readonly<{
   encryption: Encryption;
-  publicBaseUrl: string | undefined;
 }>;
 
 type AutomationInfrastructureInput = Readonly<{
@@ -399,7 +398,7 @@ export class AutomationModule implements AutomationApi {
   static readonly config = automationServerConfig;
   /** Unsubscribe links are signed with auth's session key, as main signed them (§6). */
   static readonly secrets = { unsubscribe: sessionSecret } as const;
-  static readonly reads = ["encryption", "publicBaseUrl"] as const;
+  static readonly reads = ["encryption"] as const;
 
   /**
    * Builds this process's own {@link AutomationInfrastructure} from the
@@ -409,7 +408,8 @@ export class AutomationModule implements AutomationApi {
   static create(setup: AutomationSetup): Promise<AutomationModule> {
     return setup.secrets.into(AutomationModule.secrets.unsubscribe, (unsubscribeSigningSecret) => {
       const { slack, projects } = setup.dependencies;
-      const { encryption: crypto, publicBaseUrl } = setup.members;
+      const crypto = setup.members.encryption;
+      const { publicBaseUrl } = setup.config;
       const slackConnections = AutomationSlackConnectionService.create({ slack, projects, crypto });
       const infrastructure = AutomationModule.#composeInfrastructure({
         crypto,

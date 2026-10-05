@@ -154,7 +154,7 @@ export function createCanonicalAutomationApp(): {
     replicate: vi.fn(),
     performanceForProject: vi.fn(),
   });
-  const members: AutomationInfrastructure = {
+  const infrastructure: AutomationInfrastructure = {
     verifier,
     clock,
     notifier,
@@ -211,13 +211,14 @@ export function createCanonicalAutomationApp(): {
         evaluations: createApiFixture<EvaluationApi>({}),
         webhooks: createApiFixture<WebhookApi>({}),
       },
-      infrastructure: members,
+      infrastructure,
       config: {
         emailHourlyCap: 100,
         tenantDailyCap: 10_000,
         persistDailyCapFree: 50,
         persistDailyCapPaid: 500,
         persistDailyCapEnterprise: 5_000,
+        publicBaseUrl: undefined,
       },
     }),
     triggerCreate,

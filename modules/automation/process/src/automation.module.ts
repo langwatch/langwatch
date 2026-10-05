@@ -59,8 +59,8 @@ export const automationProcessModule = defineProcessModule("automation")
     slackAutomationRest,
     unsubscribeRest,
   )
-  .withTasks(({ app, members }) => [
-    SlackAlertTask.create({ baseHost: members.publicBaseUrl ?? "" }),
+  .withTasks(({ app, config }) => [
+    SlackAlertTask.create({ baseHost: config.publicBaseUrl ?? "" }),
     ReportScheduleBackfillTask.create(app),
   ])
   .withEventing(automationsEventing);
