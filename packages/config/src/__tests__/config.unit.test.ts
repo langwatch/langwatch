@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { ConfigCollisionError, ConfigParseError } from "../config.errors.ts";
 import { Config, parseProcessConfig } from "../config.ts";
-import { langevalsStagingTtlSeconds, publicBaseUrl } from "../deployment-facts.ts";
+import { langevalsStagingTtlSeconds, nlpServiceUrl, publicBaseUrl } from "../deployment-facts.ts";
 
 const github = {
   name: "github",
@@ -133,6 +133,22 @@ describe("parseProcessConfig", () => {
       expect(read({})).toBeUndefined();
       expect(read({ BASE_HOST: " https://app.langwatch.test " })).toBe(
         "https://app.langwatch.test",
+      );
+    });
+  });
+
+  describe("given an owner holding the engine address leaf", () => {
+    const evaluation = { name: "evaluation", config: { nlpServiceUrl } } as const;
+    const read = (environment: Record<string, string | undefined>) =>
+      parseProcessConfig({ owners: [evaluation], environment }).evaluation.nlpServiceUrl;
+
+    /** @scenario "A blank engine address reads as absent" */
+    it("reads a blank or unset LANGWATCH_NLP_SERVICE as no engine address", () => {
+      expect(read({ LANGWATCH_NLP_SERVICE: "   " })).toBeUndefined();
+      expect(read({ LANGWATCH_NLP_SERVICE: "" })).toBeUndefined();
+      expect(read({})).toBeUndefined();
+      expect(read({ LANGWATCH_NLP_SERVICE: " http://nlp.langwatch.test " })).toBe(
+        "http://nlp.langwatch.test",
       );
     });
   });

@@ -26,6 +26,7 @@ export {
   langevalsStagingTtlSeconds,
   langwatchDefaultModel,
   LOCAL_GATEWAY_URL,
+  nlpServiceUrl,
   posthogHost,
   posthogKey,
   publicBaseUrl,

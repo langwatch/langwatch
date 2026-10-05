@@ -2,8 +2,8 @@
  * The process-server's own declaration (§6): framework globals declare at
  * their framework owner, with the same primitive a module uses.
  */
-import { Config, isSaas, publicBaseUrl } from "@langwatch/config";
-import { Secret } from "@langwatch/secrets";
+import { Config, isSaas, nlpServiceUrl, publicBaseUrl } from "@langwatch/config";
+import { nlpInternalSecret } from "@langwatch/secrets";
 import { z } from "zod";
 
 export const processOwner = {
@@ -26,16 +26,10 @@ export const processOwner = {
      */
     isSaas,
     /**
-     * The NLP engine's address. A deployment fact of the process, read by the
-     * http surface and by every module that calls the engine.
+     * The NLP engine's address: the shared leaf, so a module holding
+     * `nlpServiceUrl` in its own slice reads the same fact without a collision.
      */
-    nlpServiceUrl: c.env(
-      "LANGWATCH_NLP_SERVICE",
-      z
-        .string()
-        .optional()
-        .transform((value) => value?.trim() || void 0),
-    ),
+    nlpServiceUrl,
     /**
      * How long a code block may run inside the engine, raw as the engine reads it.
      * One owner for a fact workflow and scenario both read; each clamps its own way.
@@ -80,10 +74,9 @@ export const processOwner = {
   })),
   secrets: {
     /**
-     * The engine hop's shared credential, resolved here and handed to every
-     * module that calls the engine as the `nlpInternalSecret` member. One
-     * owner, because the engine checks one value for all of them.
+     * The engine hop's shared credential: the shared handle, so a module
+     * claiming `nlpInternalSecret` too is admitted rather than refused.
      */
-    nlpInternal: Secret.load("LANGWATCH_NLP_INTERNAL_SECRET", { optional: true }),
+    nlpInternal: nlpInternalSecret,
   },
 } as const;

@@ -1,4 +1,10 @@
-import { parseProcessConfig, publicBaseUrl } from "@langwatch/config";
+import { nlpServiceUrl, parseProcessConfig, publicBaseUrl } from "@langwatch/config";
+import {
+  nlpInternalSecret,
+  refuseDoubleClaims,
+  Secret,
+  SecretClaimedTwiceError,
+} from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { processOwner } from "../owner.ts";
@@ -29,6 +35,46 @@ describe("the process owner's own declaration", () => {
 
       expect(config.process.baseHost).toBe("https://app.langwatch.test");
       expect(config.automation.publicBaseUrl).toBe("https://app.langwatch.test");
+    });
+  });
+
+  describe("given a module holding the shared engine address leaf beside the process", () => {
+    /** @scenario "The process and a module both holding the engine address leaf parse it" */
+    it("parses LANGWATCH_NLP_SERVICE once for both, with no collision", () => {
+      const evaluation = { name: "evaluation", config: { nlpServiceUrl } } as const;
+
+      const config = parseProcessConfig({
+        owners: [processOwner, evaluation],
+        environment: { LANGWATCH_NLP_SERVICE: " http://nlp.langwatch.test " },
+      });
+
+      expect(config.process.nlpServiceUrl).toBe("http://nlp.langwatch.test");
+      expect(config.evaluation.nlpServiceUrl).toBe("http://nlp.langwatch.test");
+    });
+  });
+
+  describe("given a module claiming the engine credential beside the process", () => {
+    /** @scenario "The process and a module both holding the engine credential handle boot" */
+    it("admits the shared handle and refuses a fresh one, naming the process", () => {
+      expect(() =>
+        refuseDoubleClaims([
+          processOwner,
+          { name: "evaluation", secrets: { nlpInternal: nlpInternalSecret } },
+        ]),
+      ).not.toThrow();
+
+      const fresh = Secret.load("LANGWATCH_NLP_INTERNAL_SECRET", { optional: true });
+      const refusal = (() => {
+        try {
+          refuseDoubleClaims([processOwner, { name: "evaluation", secrets: { fresh } }]);
+        } catch (error) {
+          return error;
+        }
+        return void 0;
+      })();
+
+      expect(refusal).toBeInstanceOf(SecretClaimedTwiceError);
+      expect((refusal as SecretClaimedTwiceError).owners).toEqual(["process", "evaluation"]);
     });
   });
 

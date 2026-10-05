@@ -81,6 +81,20 @@ export const { publicBaseUrl } = Config.define((c) => ({
   ),
 }));
 
+/**
+ * The NLP engine's address (`LANGWATCH_NLP_SERVICE`): the process and every module that calls
+ * the engine hold this one leaf. Absent and blank both mean "named none".
+ */
+export const { nlpServiceUrl } = Config.define((c) => ({
+  nlpServiceUrl: c.env(
+    "LANGWATCH_NLP_SERVICE",
+    z
+      .string()
+      .optional()
+      .transform((value) => value?.trim() || void 0),
+  ),
+}));
+
 /** The terminal fallback for a target that names no model; blank is not a model. */
 export const { langwatchDefaultModel } = Config.define((c) => ({
   langwatchDefaultModel: c.env(

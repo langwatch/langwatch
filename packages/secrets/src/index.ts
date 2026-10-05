@@ -7,6 +7,7 @@ export {
   credentialsSecret,
   gatewayInternalSecret,
   internalSlackSignupsWebhook,
+  nlpInternalSecret,
   openAiApiKey,
   sessionSecret,
   signInProviderSecrets,

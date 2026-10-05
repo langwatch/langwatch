@@ -16,6 +16,9 @@ export const gatewayInternalSecret = Secret.load("LW_GATEWAY_INTERNAL_SECRET", {
 /** The hash pepper: gateway peppers virtual keys with it, governance its ingestion secrets. */
 export const virtualKeyPepper = Secret.load("LW_VIRTUAL_KEY_PEPPER", { optional: true });
 
+/** The engine hop's shared credential: the process and every module calling the engine. */
+export const nlpInternalSecret = Secret.load("LANGWATCH_NLP_INTERNAL_SECRET", { optional: true });
+
 /**
  * The platform's own OpenAI key: model-provider dispatches on it, evaluation
  * reads it, sample-agents' demo bot spends it.
