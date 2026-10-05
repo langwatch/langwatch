@@ -13,6 +13,7 @@ import {
   experimentRanSignal,
   guidedOnboardingSignal,
   subscriptionChangedSignal,
+  subscriptionStartedSignal,
 } from "../nurturing-owner-signals.rules.ts";
 
 const recorded: Omit<GuidedOnboardingRecordedEventData, "event"> = {
@@ -171,6 +172,32 @@ describe("subscriptionChangedSignal", () => {
       sourceEventId: "org-1:subscription:false:7",
       memberUserIds: ["user-1", "user-2"],
       hasSubscription: false,
+    });
+  });
+});
+
+describe("subscriptionStartedSignal", () => {
+  it("carries the plan and every member, keyed by the subscription and its instant", () => {
+    expect(
+      subscriptionStartedSignal({
+        aggregateId: "org-1",
+        data: {
+          tenantId: "org-1",
+          occurredAt: 8,
+          organizationId: "org-1",
+          subscriptionId: "sub-1",
+          plan: "LAUNCH",
+          memberUserIds: ["user-1", "user-2"],
+        },
+      }),
+    ).toEqual({
+      kind: "subscription_started",
+      sourceEventId: "org-1:sub-1:8",
+      tenantId: "org-1",
+      occurredAt: 8,
+      organizationId: "org-1",
+      memberUserIds: ["user-1", "user-2"],
+      plan: "LAUNCH",
     });
   });
 });

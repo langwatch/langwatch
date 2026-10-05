@@ -10,6 +10,8 @@ import {
   checkoutCompletedEventDataSchema,
   SUBSCRIPTION_CHANGED_EVENT_TYPE,
   subscriptionChangedEventDataSchema,
+  SUBSCRIPTION_STARTED_EVENT_TYPE,
+  subscriptionStartedEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import {
@@ -88,6 +90,7 @@ import {
   signedUpSignal,
   ssoAutoAddedSignal,
   subscriptionChangedSignal,
+  subscriptionStartedSignal,
   traceReceivedSignal,
   workflowCreatedSignal,
 } from "../rules/nurturing-owner-signals.rules.ts";
@@ -177,6 +180,14 @@ export function buildNurturingPipeline(deps: {
       data: subscriptionChangedEventDataSchema,
       handle: (data, { aggregateId }) => {
         const signal = subscriptionChangedSignal({ data, aggregateId });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("subscriptionStarted", {
+      eventType: SUBSCRIPTION_STARTED_EVENT_TYPE,
+      data: subscriptionStartedEventDataSchema,
+      handle: (data, { aggregateId }) => {
+        const signal = subscriptionStartedSignal({ data, aggregateId });
         return deps.deliver({ key: nurturingSignalKey(signal), signal });
       },
     })

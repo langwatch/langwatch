@@ -3142,9 +3142,6 @@ importers:
       nanoid:
         specifier: 'catalog:'
         version: 5.1.16
-      posthog-node:
-        specifier: 'catalog:'
-        version: 5.48.1(rxjs@7.8.2)
       stripe:
         specifier: ^15.12.0
         version: 15.12.0

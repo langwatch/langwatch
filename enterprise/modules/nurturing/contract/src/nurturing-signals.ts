@@ -216,6 +216,14 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     hasSubscription: z.boolean(),
   }),
   z.object({
+    kind: z.literal("subscription_started"),
+    ...signalSource,
+    organizationId: id,
+    /** Every member of the organization, each tracked the event. */
+    memberUserIds: z.array(id),
+    plan: id,
+  }),
+  z.object({
     kind: z.literal("checkout_completed"),
     ...signalSource,
     organizationId: id,

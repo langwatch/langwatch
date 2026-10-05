@@ -2,6 +2,7 @@
 /**
  * @vitest-environment node
  * @see specs/features/customer-io-nurturing-integration.feature
+ * @see specs/analytics/posthog-campaign-conversion.feature
  */
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
@@ -9,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import type {
   RecordCheckoutCompletedCommandData,
   RecordSubscriptionChangedCommandData,
+  RecordSubscriptionStartedCommandData,
 } from "../../eventing/billing-lifecycle.events.ts";
 import { BillingLifecycleAnnouncerService } from "../billing-lifecycle-announcer.service.ts";
 
@@ -27,6 +29,7 @@ function recorder<Payload>(sent: Payload[]): EventingCommandSender<Payload> {
 
 function announcerOver(input: { remaining: boolean }) {
   const changed: RecordSubscriptionChangedCommandData[] = [];
+  const started: RecordSubscriptionStartedCommandData[] = [];
   const checkouts: RecordCheckoutCompletedCommandData[] = [];
   const service = BillingLifecycleAnnouncerService.create({
     subscriptions: { findLastNonCancelled: async () => (input.remaining ? { id: "sub-2" } : null) },
@@ -35,16 +38,19 @@ function announcerOver(input: { remaining: boolean }) {
   });
   service.connect({
     recordSubscriptionChanged: recorder(changed),
+    recordSubscriptionStarted: recorder(started),
     recordCheckoutCompleted: recorder(checkouts),
   });
-  return { service, changed, checkouts };
+  return { service, changed, started, checkouts };
 }
+
+const activation = { organizationId: "org-1", subscriptionId: "sub-1", plan: "LAUNCH" };
 
 describe("BillingLifecycleAnnouncerService", () => {
   it("records an activation for every member of the organization", async () => {
     const { service, changed } = announcerOver({ remaining: false });
 
-    await service.subscriptionActivated({ organizationId: "org-1" });
+    await service.subscriptionActivated(activation);
 
     expect(changed).toEqual([
       expect.objectContaining({
@@ -53,6 +59,30 @@ describe("BillingLifecycleAnnouncerService", () => {
         hasSubscription: true,
       }),
     ]);
+  });
+
+  it("records the started subscription with its plan and every member", async () => {
+    const { service, started } = announcerOver({ remaining: false });
+
+    await service.subscriptionActivated(activation);
+
+    expect(started).toEqual([
+      expect.objectContaining({
+        tenantId: "org-1",
+        organizationId: "org-1",
+        subscriptionId: "sub-1",
+        plan: "LAUNCH",
+        memberUserIds: ["user-1", "user-2"],
+      }),
+    ]);
+  });
+
+  it("records no started subscription for a cancellation", async () => {
+    const { service, started } = announcerOver({ remaining: false });
+
+    await service.subscriptionCancelled({ organizationId: "org-1" });
+
+    expect(started).toEqual([]);
   });
 
   it("records a cancellation as no subscription only when none remains", async () => {
@@ -84,8 +114,10 @@ describe("BillingLifecycleAnnouncerService", () => {
     ]);
   });
 
+  /** @scenario A failed member lookup does not break the webhook */
   it("never throws and records nothing when the member lookup fails", async () => {
     const changed: RecordSubscriptionChangedCommandData[] = [];
+    const started: RecordSubscriptionStartedCommandData[] = [];
     const service = BillingLifecycleAnnouncerService.create({
       subscriptions: { findLastNonCancelled: async () => null },
       organizations: {
@@ -97,13 +129,13 @@ describe("BillingLifecycleAnnouncerService", () => {
     });
     service.connect({
       recordSubscriptionChanged: recorder(changed),
+      recordSubscriptionStarted: recorder(started),
       recordCheckoutCompleted: recorder<RecordCheckoutCompletedCommandData>([]),
     });
 
-    await expect(
-      service.subscriptionActivated({ organizationId: "org-1" }),
-    ).resolves.toBeUndefined();
+    await expect(service.subscriptionActivated(activation)).resolves.toBeUndefined();
     expect(changed).toEqual([]);
+    expect(started).toEqual([]);
   });
 
   it("never throws when its senders are not connected", async () => {
@@ -113,8 +145,6 @@ describe("BillingLifecycleAnnouncerService", () => {
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     });
 
-    await expect(
-      service.subscriptionActivated({ organizationId: "org-1" }),
-    ).resolves.toBeUndefined();
+    await expect(service.subscriptionActivated(activation)).resolves.toBeUndefined();
   });
 });
