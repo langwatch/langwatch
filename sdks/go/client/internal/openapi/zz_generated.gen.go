@@ -1646,9 +1646,10 @@ func (e GetApiGatewayV1Budgets200JSONResponseBodyDataWindow) Valid() bool {
 
 // Defines values for GetApiGatewayV1Budgets400JSONResponseBodyFault.
 const (
-	GetApiGatewayV1Budgets400JSONResponseBodyFaultCustomer GetApiGatewayV1Budgets400JSONResponseBodyFault = "customer"
-	GetApiGatewayV1Budgets400JSONResponseBodyFaultPlatform GetApiGatewayV1Budgets400JSONResponseBodyFault = "platform"
-	GetApiGatewayV1Budgets400JSONResponseBodyFaultProvider GetApiGatewayV1Budgets400JSONResponseBodyFault = "provider"
+	GetApiGatewayV1Budgets400JSONResponseBodyFaultCustomer         GetApiGatewayV1Budgets400JSONResponseBodyFault = "customer"
+	GetApiGatewayV1Budgets400JSONResponseBodyFaultPlatform         GetApiGatewayV1Budgets400JSONResponseBodyFault = "platform"
+	GetApiGatewayV1Budgets400JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1Budgets400JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1Budgets400JSONResponseBodyFaultProvider         GetApiGatewayV1Budgets400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1Budgets400JSONResponseBodyFault enum.
@@ -1657,6 +1658,8 @@ func (e GetApiGatewayV1Budgets400JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1Budgets400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1Budgets400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1Budgets400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1Budgets400JSONResponseBodyFaultProvider:
 		return true
@@ -1667,9 +1670,10 @@ func (e GetApiGatewayV1Budgets400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1Budgets401JSONResponseBodyFault.
 const (
-	GetApiGatewayV1Budgets401JSONResponseBodyFaultCustomer GetApiGatewayV1Budgets401JSONResponseBodyFault = "customer"
-	GetApiGatewayV1Budgets401JSONResponseBodyFaultPlatform GetApiGatewayV1Budgets401JSONResponseBodyFault = "platform"
-	GetApiGatewayV1Budgets401JSONResponseBodyFaultProvider GetApiGatewayV1Budgets401JSONResponseBodyFault = "provider"
+	GetApiGatewayV1Budgets401JSONResponseBodyFaultCustomer         GetApiGatewayV1Budgets401JSONResponseBodyFault = "customer"
+	GetApiGatewayV1Budgets401JSONResponseBodyFaultPlatform         GetApiGatewayV1Budgets401JSONResponseBodyFault = "platform"
+	GetApiGatewayV1Budgets401JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1Budgets401JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1Budgets401JSONResponseBodyFaultProvider         GetApiGatewayV1Budgets401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1Budgets401JSONResponseBodyFault enum.
@@ -1678,6 +1682,8 @@ func (e GetApiGatewayV1Budgets401JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1Budgets401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1Budgets401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1Budgets401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1Budgets401JSONResponseBodyFaultProvider:
 		return true
@@ -1688,9 +1694,10 @@ func (e GetApiGatewayV1Budgets401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1Budgets403JSONResponseBodyFault.
 const (
-	GetApiGatewayV1Budgets403JSONResponseBodyFaultCustomer GetApiGatewayV1Budgets403JSONResponseBodyFault = "customer"
-	GetApiGatewayV1Budgets403JSONResponseBodyFaultPlatform GetApiGatewayV1Budgets403JSONResponseBodyFault = "platform"
-	GetApiGatewayV1Budgets403JSONResponseBodyFaultProvider GetApiGatewayV1Budgets403JSONResponseBodyFault = "provider"
+	GetApiGatewayV1Budgets403JSONResponseBodyFaultCustomer         GetApiGatewayV1Budgets403JSONResponseBodyFault = "customer"
+	GetApiGatewayV1Budgets403JSONResponseBodyFaultPlatform         GetApiGatewayV1Budgets403JSONResponseBodyFault = "platform"
+	GetApiGatewayV1Budgets403JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1Budgets403JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1Budgets403JSONResponseBodyFaultProvider         GetApiGatewayV1Budgets403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1Budgets403JSONResponseBodyFault enum.
@@ -1699,6 +1706,8 @@ func (e GetApiGatewayV1Budgets403JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1Budgets403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1Budgets403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1Budgets403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1Budgets403JSONResponseBodyFaultProvider:
 		return true
@@ -1709,9 +1718,10 @@ func (e GetApiGatewayV1Budgets403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1Budgets500JSONResponseBodyFault.
 const (
-	GetApiGatewayV1Budgets500JSONResponseBodyFaultCustomer GetApiGatewayV1Budgets500JSONResponseBodyFault = "customer"
-	GetApiGatewayV1Budgets500JSONResponseBodyFaultPlatform GetApiGatewayV1Budgets500JSONResponseBodyFault = "platform"
-	GetApiGatewayV1Budgets500JSONResponseBodyFaultProvider GetApiGatewayV1Budgets500JSONResponseBodyFault = "provider"
+	GetApiGatewayV1Budgets500JSONResponseBodyFaultCustomer         GetApiGatewayV1Budgets500JSONResponseBodyFault = "customer"
+	GetApiGatewayV1Budgets500JSONResponseBodyFaultPlatform         GetApiGatewayV1Budgets500JSONResponseBodyFault = "platform"
+	GetApiGatewayV1Budgets500JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1Budgets500JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1Budgets500JSONResponseBodyFaultProvider         GetApiGatewayV1Budgets500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1Budgets500JSONResponseBodyFault enum.
@@ -1720,6 +1730,8 @@ func (e GetApiGatewayV1Budgets500JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1Budgets500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1Budgets500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1Budgets500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1Budgets500JSONResponseBodyFaultProvider:
 		return true
@@ -1988,9 +2000,10 @@ func (e PostApiGatewayV1Budgets201JSONResponseBodyBudgetWindow) Valid() bool {
 
 // Defines values for PostApiGatewayV1Budgets400JSONResponseBodyFault.
 const (
-	PostApiGatewayV1Budgets400JSONResponseBodyFaultCustomer PostApiGatewayV1Budgets400JSONResponseBodyFault = "customer"
-	PostApiGatewayV1Budgets400JSONResponseBodyFaultPlatform PostApiGatewayV1Budgets400JSONResponseBodyFault = "platform"
-	PostApiGatewayV1Budgets400JSONResponseBodyFaultProvider PostApiGatewayV1Budgets400JSONResponseBodyFault = "provider"
+	PostApiGatewayV1Budgets400JSONResponseBodyFaultCustomer         PostApiGatewayV1Budgets400JSONResponseBodyFault = "customer"
+	PostApiGatewayV1Budgets400JSONResponseBodyFaultPlatform         PostApiGatewayV1Budgets400JSONResponseBodyFault = "platform"
+	PostApiGatewayV1Budgets400JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1Budgets400JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1Budgets400JSONResponseBodyFaultProvider         PostApiGatewayV1Budgets400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1Budgets400JSONResponseBodyFault enum.
@@ -1999,6 +2012,8 @@ func (e PostApiGatewayV1Budgets400JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1Budgets400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1Budgets400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1Budgets400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1Budgets400JSONResponseBodyFaultProvider:
 		return true
@@ -2009,9 +2024,10 @@ func (e PostApiGatewayV1Budgets400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1Budgets401JSONResponseBodyFault.
 const (
-	PostApiGatewayV1Budgets401JSONResponseBodyFaultCustomer PostApiGatewayV1Budgets401JSONResponseBodyFault = "customer"
-	PostApiGatewayV1Budgets401JSONResponseBodyFaultPlatform PostApiGatewayV1Budgets401JSONResponseBodyFault = "platform"
-	PostApiGatewayV1Budgets401JSONResponseBodyFaultProvider PostApiGatewayV1Budgets401JSONResponseBodyFault = "provider"
+	PostApiGatewayV1Budgets401JSONResponseBodyFaultCustomer         PostApiGatewayV1Budgets401JSONResponseBodyFault = "customer"
+	PostApiGatewayV1Budgets401JSONResponseBodyFaultPlatform         PostApiGatewayV1Budgets401JSONResponseBodyFault = "platform"
+	PostApiGatewayV1Budgets401JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1Budgets401JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1Budgets401JSONResponseBodyFaultProvider         PostApiGatewayV1Budgets401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1Budgets401JSONResponseBodyFault enum.
@@ -2020,6 +2036,8 @@ func (e PostApiGatewayV1Budgets401JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1Budgets401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1Budgets401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1Budgets401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1Budgets401JSONResponseBodyFaultProvider:
 		return true
@@ -2030,9 +2048,10 @@ func (e PostApiGatewayV1Budgets401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1Budgets403JSONResponseBodyFault.
 const (
-	PostApiGatewayV1Budgets403JSONResponseBodyFaultCustomer PostApiGatewayV1Budgets403JSONResponseBodyFault = "customer"
-	PostApiGatewayV1Budgets403JSONResponseBodyFaultPlatform PostApiGatewayV1Budgets403JSONResponseBodyFault = "platform"
-	PostApiGatewayV1Budgets403JSONResponseBodyFaultProvider PostApiGatewayV1Budgets403JSONResponseBodyFault = "provider"
+	PostApiGatewayV1Budgets403JSONResponseBodyFaultCustomer         PostApiGatewayV1Budgets403JSONResponseBodyFault = "customer"
+	PostApiGatewayV1Budgets403JSONResponseBodyFaultPlatform         PostApiGatewayV1Budgets403JSONResponseBodyFault = "platform"
+	PostApiGatewayV1Budgets403JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1Budgets403JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1Budgets403JSONResponseBodyFaultProvider         PostApiGatewayV1Budgets403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1Budgets403JSONResponseBodyFault enum.
@@ -2041,6 +2060,8 @@ func (e PostApiGatewayV1Budgets403JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1Budgets403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1Budgets403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1Budgets403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1Budgets403JSONResponseBodyFaultProvider:
 		return true
@@ -2051,9 +2072,10 @@ func (e PostApiGatewayV1Budgets403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1Budgets409JSONResponseBodyFault.
 const (
-	PostApiGatewayV1Budgets409JSONResponseBodyFaultCustomer PostApiGatewayV1Budgets409JSONResponseBodyFault = "customer"
-	PostApiGatewayV1Budgets409JSONResponseBodyFaultPlatform PostApiGatewayV1Budgets409JSONResponseBodyFault = "platform"
-	PostApiGatewayV1Budgets409JSONResponseBodyFaultProvider PostApiGatewayV1Budgets409JSONResponseBodyFault = "provider"
+	PostApiGatewayV1Budgets409JSONResponseBodyFaultCustomer         PostApiGatewayV1Budgets409JSONResponseBodyFault = "customer"
+	PostApiGatewayV1Budgets409JSONResponseBodyFaultPlatform         PostApiGatewayV1Budgets409JSONResponseBodyFault = "platform"
+	PostApiGatewayV1Budgets409JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1Budgets409JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1Budgets409JSONResponseBodyFaultProvider         PostApiGatewayV1Budgets409JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1Budgets409JSONResponseBodyFault enum.
@@ -2062,6 +2084,8 @@ func (e PostApiGatewayV1Budgets409JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1Budgets409JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1Budgets409JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1Budgets409JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1Budgets409JSONResponseBodyFaultProvider:
 		return true
@@ -2072,9 +2096,10 @@ func (e PostApiGatewayV1Budgets409JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1Budgets500JSONResponseBodyFault.
 const (
-	PostApiGatewayV1Budgets500JSONResponseBodyFaultCustomer PostApiGatewayV1Budgets500JSONResponseBodyFault = "customer"
-	PostApiGatewayV1Budgets500JSONResponseBodyFaultPlatform PostApiGatewayV1Budgets500JSONResponseBodyFault = "platform"
-	PostApiGatewayV1Budgets500JSONResponseBodyFaultProvider PostApiGatewayV1Budgets500JSONResponseBodyFault = "provider"
+	PostApiGatewayV1Budgets500JSONResponseBodyFaultCustomer         PostApiGatewayV1Budgets500JSONResponseBodyFault = "customer"
+	PostApiGatewayV1Budgets500JSONResponseBodyFaultPlatform         PostApiGatewayV1Budgets500JSONResponseBodyFault = "platform"
+	PostApiGatewayV1Budgets500JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1Budgets500JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1Budgets500JSONResponseBodyFaultProvider         PostApiGatewayV1Budgets500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1Budgets500JSONResponseBodyFault enum.
@@ -2083,6 +2108,8 @@ func (e PostApiGatewayV1Budgets500JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1Budgets500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1Budgets500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1Budgets500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1Budgets500JSONResponseBodyFaultProvider:
 		return true
@@ -2195,9 +2222,10 @@ func (e DeleteApiGatewayV1BudgetsById200JSONResponseBodyBudgetWindow) Valid() bo
 
 // Defines values for DeleteApiGatewayV1BudgetsById400JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1BudgetsById400JSONResponseBodyFaultCustomer DeleteApiGatewayV1BudgetsById400JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1BudgetsById400JSONResponseBodyFaultPlatform DeleteApiGatewayV1BudgetsById400JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1BudgetsById400JSONResponseBodyFaultProvider DeleteApiGatewayV1BudgetsById400JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1BudgetsById400JSONResponseBodyFaultCustomer         DeleteApiGatewayV1BudgetsById400JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1BudgetsById400JSONResponseBodyFaultPlatform         DeleteApiGatewayV1BudgetsById400JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1BudgetsById400JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1BudgetsById400JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1BudgetsById400JSONResponseBodyFaultProvider         DeleteApiGatewayV1BudgetsById400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1BudgetsById400JSONResponseBodyFault enum.
@@ -2206,6 +2234,8 @@ func (e DeleteApiGatewayV1BudgetsById400JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1BudgetsById400JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1BudgetsById400JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1BudgetsById400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1BudgetsById400JSONResponseBodyFaultProvider:
 		return true
@@ -2216,9 +2246,10 @@ func (e DeleteApiGatewayV1BudgetsById400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiGatewayV1BudgetsById401JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1BudgetsById401JSONResponseBodyFaultCustomer DeleteApiGatewayV1BudgetsById401JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1BudgetsById401JSONResponseBodyFaultPlatform DeleteApiGatewayV1BudgetsById401JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1BudgetsById401JSONResponseBodyFaultProvider DeleteApiGatewayV1BudgetsById401JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1BudgetsById401JSONResponseBodyFaultCustomer         DeleteApiGatewayV1BudgetsById401JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1BudgetsById401JSONResponseBodyFaultPlatform         DeleteApiGatewayV1BudgetsById401JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1BudgetsById401JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1BudgetsById401JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1BudgetsById401JSONResponseBodyFaultProvider         DeleteApiGatewayV1BudgetsById401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1BudgetsById401JSONResponseBodyFault enum.
@@ -2227,6 +2258,8 @@ func (e DeleteApiGatewayV1BudgetsById401JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1BudgetsById401JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1BudgetsById401JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1BudgetsById401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1BudgetsById401JSONResponseBodyFaultProvider:
 		return true
@@ -2237,9 +2270,10 @@ func (e DeleteApiGatewayV1BudgetsById401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiGatewayV1BudgetsById403JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1BudgetsById403JSONResponseBodyFaultCustomer DeleteApiGatewayV1BudgetsById403JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1BudgetsById403JSONResponseBodyFaultPlatform DeleteApiGatewayV1BudgetsById403JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1BudgetsById403JSONResponseBodyFaultProvider DeleteApiGatewayV1BudgetsById403JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1BudgetsById403JSONResponseBodyFaultCustomer         DeleteApiGatewayV1BudgetsById403JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1BudgetsById403JSONResponseBodyFaultPlatform         DeleteApiGatewayV1BudgetsById403JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1BudgetsById403JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1BudgetsById403JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1BudgetsById403JSONResponseBodyFaultProvider         DeleteApiGatewayV1BudgetsById403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1BudgetsById403JSONResponseBodyFault enum.
@@ -2248,6 +2282,8 @@ func (e DeleteApiGatewayV1BudgetsById403JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1BudgetsById403JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1BudgetsById403JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1BudgetsById403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1BudgetsById403JSONResponseBodyFaultProvider:
 		return true
@@ -2258,9 +2294,10 @@ func (e DeleteApiGatewayV1BudgetsById403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiGatewayV1BudgetsById500JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1BudgetsById500JSONResponseBodyFaultCustomer DeleteApiGatewayV1BudgetsById500JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1BudgetsById500JSONResponseBodyFaultPlatform DeleteApiGatewayV1BudgetsById500JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1BudgetsById500JSONResponseBodyFaultProvider DeleteApiGatewayV1BudgetsById500JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1BudgetsById500JSONResponseBodyFaultCustomer         DeleteApiGatewayV1BudgetsById500JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1BudgetsById500JSONResponseBodyFaultPlatform         DeleteApiGatewayV1BudgetsById500JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1BudgetsById500JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1BudgetsById500JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1BudgetsById500JSONResponseBodyFaultProvider         DeleteApiGatewayV1BudgetsById500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1BudgetsById500JSONResponseBodyFault enum.
@@ -2269,6 +2306,8 @@ func (e DeleteApiGatewayV1BudgetsById500JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1BudgetsById500JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1BudgetsById500JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1BudgetsById500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1BudgetsById500JSONResponseBodyFaultProvider:
 		return true
@@ -2381,9 +2420,10 @@ func (e GetApiGatewayV1BudgetsById200JSONResponseBodyBudgetWindow) Valid() bool 
 
 // Defines values for GetApiGatewayV1BudgetsById400JSONResponseBodyFault.
 const (
-	GetApiGatewayV1BudgetsById400JSONResponseBodyFaultCustomer GetApiGatewayV1BudgetsById400JSONResponseBodyFault = "customer"
-	GetApiGatewayV1BudgetsById400JSONResponseBodyFaultPlatform GetApiGatewayV1BudgetsById400JSONResponseBodyFault = "platform"
-	GetApiGatewayV1BudgetsById400JSONResponseBodyFaultProvider GetApiGatewayV1BudgetsById400JSONResponseBodyFault = "provider"
+	GetApiGatewayV1BudgetsById400JSONResponseBodyFaultCustomer         GetApiGatewayV1BudgetsById400JSONResponseBodyFault = "customer"
+	GetApiGatewayV1BudgetsById400JSONResponseBodyFaultPlatform         GetApiGatewayV1BudgetsById400JSONResponseBodyFault = "platform"
+	GetApiGatewayV1BudgetsById400JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1BudgetsById400JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1BudgetsById400JSONResponseBodyFaultProvider         GetApiGatewayV1BudgetsById400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1BudgetsById400JSONResponseBodyFault enum.
@@ -2392,6 +2432,8 @@ func (e GetApiGatewayV1BudgetsById400JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1BudgetsById400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1BudgetsById400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1BudgetsById400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1BudgetsById400JSONResponseBodyFaultProvider:
 		return true
@@ -2402,9 +2444,10 @@ func (e GetApiGatewayV1BudgetsById400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1BudgetsById401JSONResponseBodyFault.
 const (
-	GetApiGatewayV1BudgetsById401JSONResponseBodyFaultCustomer GetApiGatewayV1BudgetsById401JSONResponseBodyFault = "customer"
-	GetApiGatewayV1BudgetsById401JSONResponseBodyFaultPlatform GetApiGatewayV1BudgetsById401JSONResponseBodyFault = "platform"
-	GetApiGatewayV1BudgetsById401JSONResponseBodyFaultProvider GetApiGatewayV1BudgetsById401JSONResponseBodyFault = "provider"
+	GetApiGatewayV1BudgetsById401JSONResponseBodyFaultCustomer         GetApiGatewayV1BudgetsById401JSONResponseBodyFault = "customer"
+	GetApiGatewayV1BudgetsById401JSONResponseBodyFaultPlatform         GetApiGatewayV1BudgetsById401JSONResponseBodyFault = "platform"
+	GetApiGatewayV1BudgetsById401JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1BudgetsById401JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1BudgetsById401JSONResponseBodyFaultProvider         GetApiGatewayV1BudgetsById401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1BudgetsById401JSONResponseBodyFault enum.
@@ -2413,6 +2456,8 @@ func (e GetApiGatewayV1BudgetsById401JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1BudgetsById401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1BudgetsById401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1BudgetsById401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1BudgetsById401JSONResponseBodyFaultProvider:
 		return true
@@ -2423,9 +2468,10 @@ func (e GetApiGatewayV1BudgetsById401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1BudgetsById403JSONResponseBodyFault.
 const (
-	GetApiGatewayV1BudgetsById403JSONResponseBodyFaultCustomer GetApiGatewayV1BudgetsById403JSONResponseBodyFault = "customer"
-	GetApiGatewayV1BudgetsById403JSONResponseBodyFaultPlatform GetApiGatewayV1BudgetsById403JSONResponseBodyFault = "platform"
-	GetApiGatewayV1BudgetsById403JSONResponseBodyFaultProvider GetApiGatewayV1BudgetsById403JSONResponseBodyFault = "provider"
+	GetApiGatewayV1BudgetsById403JSONResponseBodyFaultCustomer         GetApiGatewayV1BudgetsById403JSONResponseBodyFault = "customer"
+	GetApiGatewayV1BudgetsById403JSONResponseBodyFaultPlatform         GetApiGatewayV1BudgetsById403JSONResponseBodyFault = "platform"
+	GetApiGatewayV1BudgetsById403JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1BudgetsById403JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1BudgetsById403JSONResponseBodyFaultProvider         GetApiGatewayV1BudgetsById403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1BudgetsById403JSONResponseBodyFault enum.
@@ -2434,6 +2480,8 @@ func (e GetApiGatewayV1BudgetsById403JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1BudgetsById403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1BudgetsById403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1BudgetsById403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1BudgetsById403JSONResponseBodyFaultProvider:
 		return true
@@ -2444,9 +2492,10 @@ func (e GetApiGatewayV1BudgetsById403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1BudgetsById500JSONResponseBodyFault.
 const (
-	GetApiGatewayV1BudgetsById500JSONResponseBodyFaultCustomer GetApiGatewayV1BudgetsById500JSONResponseBodyFault = "customer"
-	GetApiGatewayV1BudgetsById500JSONResponseBodyFaultPlatform GetApiGatewayV1BudgetsById500JSONResponseBodyFault = "platform"
-	GetApiGatewayV1BudgetsById500JSONResponseBodyFaultProvider GetApiGatewayV1BudgetsById500JSONResponseBodyFault = "provider"
+	GetApiGatewayV1BudgetsById500JSONResponseBodyFaultCustomer         GetApiGatewayV1BudgetsById500JSONResponseBodyFault = "customer"
+	GetApiGatewayV1BudgetsById500JSONResponseBodyFaultPlatform         GetApiGatewayV1BudgetsById500JSONResponseBodyFault = "platform"
+	GetApiGatewayV1BudgetsById500JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1BudgetsById500JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1BudgetsById500JSONResponseBodyFaultProvider         GetApiGatewayV1BudgetsById500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1BudgetsById500JSONResponseBodyFault enum.
@@ -2455,6 +2504,8 @@ func (e GetApiGatewayV1BudgetsById500JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1BudgetsById500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1BudgetsById500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1BudgetsById500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1BudgetsById500JSONResponseBodyFaultProvider:
 		return true
@@ -2585,9 +2636,10 @@ func (e PatchApiGatewayV1BudgetsById200JSONResponseBodyBudgetWindow) Valid() boo
 
 // Defines values for PatchApiGatewayV1BudgetsById400JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1BudgetsById400JSONResponseBodyFaultCustomer PatchApiGatewayV1BudgetsById400JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1BudgetsById400JSONResponseBodyFaultPlatform PatchApiGatewayV1BudgetsById400JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1BudgetsById400JSONResponseBodyFaultProvider PatchApiGatewayV1BudgetsById400JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1BudgetsById400JSONResponseBodyFaultCustomer         PatchApiGatewayV1BudgetsById400JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1BudgetsById400JSONResponseBodyFaultPlatform         PatchApiGatewayV1BudgetsById400JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1BudgetsById400JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1BudgetsById400JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1BudgetsById400JSONResponseBodyFaultProvider         PatchApiGatewayV1BudgetsById400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1BudgetsById400JSONResponseBodyFault enum.
@@ -2596,6 +2648,8 @@ func (e PatchApiGatewayV1BudgetsById400JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1BudgetsById400JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1BudgetsById400JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1BudgetsById400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1BudgetsById400JSONResponseBodyFaultProvider:
 		return true
@@ -2606,9 +2660,10 @@ func (e PatchApiGatewayV1BudgetsById400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1BudgetsById401JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1BudgetsById401JSONResponseBodyFaultCustomer PatchApiGatewayV1BudgetsById401JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1BudgetsById401JSONResponseBodyFaultPlatform PatchApiGatewayV1BudgetsById401JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1BudgetsById401JSONResponseBodyFaultProvider PatchApiGatewayV1BudgetsById401JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1BudgetsById401JSONResponseBodyFaultCustomer         PatchApiGatewayV1BudgetsById401JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1BudgetsById401JSONResponseBodyFaultPlatform         PatchApiGatewayV1BudgetsById401JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1BudgetsById401JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1BudgetsById401JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1BudgetsById401JSONResponseBodyFaultProvider         PatchApiGatewayV1BudgetsById401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1BudgetsById401JSONResponseBodyFault enum.
@@ -2617,6 +2672,8 @@ func (e PatchApiGatewayV1BudgetsById401JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1BudgetsById401JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1BudgetsById401JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1BudgetsById401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1BudgetsById401JSONResponseBodyFaultProvider:
 		return true
@@ -2627,9 +2684,10 @@ func (e PatchApiGatewayV1BudgetsById401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1BudgetsById403JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1BudgetsById403JSONResponseBodyFaultCustomer PatchApiGatewayV1BudgetsById403JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1BudgetsById403JSONResponseBodyFaultPlatform PatchApiGatewayV1BudgetsById403JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1BudgetsById403JSONResponseBodyFaultProvider PatchApiGatewayV1BudgetsById403JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1BudgetsById403JSONResponseBodyFaultCustomer         PatchApiGatewayV1BudgetsById403JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1BudgetsById403JSONResponseBodyFaultPlatform         PatchApiGatewayV1BudgetsById403JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1BudgetsById403JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1BudgetsById403JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1BudgetsById403JSONResponseBodyFaultProvider         PatchApiGatewayV1BudgetsById403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1BudgetsById403JSONResponseBodyFault enum.
@@ -2638,6 +2696,8 @@ func (e PatchApiGatewayV1BudgetsById403JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1BudgetsById403JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1BudgetsById403JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1BudgetsById403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1BudgetsById403JSONResponseBodyFaultProvider:
 		return true
@@ -2648,9 +2708,10 @@ func (e PatchApiGatewayV1BudgetsById403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1BudgetsById500JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1BudgetsById500JSONResponseBodyFaultCustomer PatchApiGatewayV1BudgetsById500JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1BudgetsById500JSONResponseBodyFaultPlatform PatchApiGatewayV1BudgetsById500JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1BudgetsById500JSONResponseBodyFaultProvider PatchApiGatewayV1BudgetsById500JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1BudgetsById500JSONResponseBodyFaultCustomer         PatchApiGatewayV1BudgetsById500JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1BudgetsById500JSONResponseBodyFaultPlatform         PatchApiGatewayV1BudgetsById500JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1BudgetsById500JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1BudgetsById500JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1BudgetsById500JSONResponseBodyFaultProvider         PatchApiGatewayV1BudgetsById500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1BudgetsById500JSONResponseBodyFault enum.
@@ -2659,6 +2720,8 @@ func (e PatchApiGatewayV1BudgetsById500JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1BudgetsById500JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1BudgetsById500JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1BudgetsById500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1BudgetsById500JSONResponseBodyFaultProvider:
 		return true
@@ -2771,9 +2834,10 @@ func (e PostApiGatewayV1BudgetsByIdReset200JSONResponseBodyBudgetWindow) Valid()
 
 // Defines values for PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFault.
 const (
-	PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFaultCustomer PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFault = "customer"
-	PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFaultPlatform PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFault = "platform"
-	PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFaultProvider PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFault = "provider"
+	PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFaultCustomer         PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFault = "customer"
+	PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFaultPlatform         PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFault = "platform"
+	PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFaultProvider         PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFault enum.
@@ -2782,6 +2846,8 @@ func (e PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFaultProvider:
 		return true
@@ -2792,9 +2858,10 @@ func (e PostApiGatewayV1BudgetsByIdReset400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFault.
 const (
-	PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFaultCustomer PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFault = "customer"
-	PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFaultPlatform PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFault = "platform"
-	PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFaultProvider PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFault = "provider"
+	PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFaultCustomer         PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFault = "customer"
+	PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFaultPlatform         PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFault = "platform"
+	PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFaultProvider         PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFault enum.
@@ -2803,6 +2870,8 @@ func (e PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFaultProvider:
 		return true
@@ -2813,9 +2882,10 @@ func (e PostApiGatewayV1BudgetsByIdReset401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFault.
 const (
-	PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFaultCustomer PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFault = "customer"
-	PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFaultPlatform PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFault = "platform"
-	PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFaultProvider PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFault = "provider"
+	PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFaultCustomer         PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFault = "customer"
+	PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFaultPlatform         PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFault = "platform"
+	PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFaultProvider         PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFault enum.
@@ -2824,6 +2894,8 @@ func (e PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFaultProvider:
 		return true
@@ -2834,9 +2906,10 @@ func (e PostApiGatewayV1BudgetsByIdReset403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFault.
 const (
-	PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFaultCustomer PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFault = "customer"
-	PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFaultPlatform PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFault = "platform"
-	PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFaultProvider PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFault = "provider"
+	PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFaultCustomer         PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFault = "customer"
+	PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFaultPlatform         PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFault = "platform"
+	PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFaultProvider         PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFault enum.
@@ -2845,6 +2918,8 @@ func (e PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1BudgetsByIdReset500JSONResponseBodyFaultProvider:
 		return true
@@ -2897,9 +2972,10 @@ func (e GetApiGatewayV1CacheRules200JSONResponseBodyDataModeEnum) Valid() bool {
 
 // Defines values for GetApiGatewayV1CacheRules400JSONResponseBodyFault.
 const (
-	GetApiGatewayV1CacheRules400JSONResponseBodyFaultCustomer GetApiGatewayV1CacheRules400JSONResponseBodyFault = "customer"
-	GetApiGatewayV1CacheRules400JSONResponseBodyFaultPlatform GetApiGatewayV1CacheRules400JSONResponseBodyFault = "platform"
-	GetApiGatewayV1CacheRules400JSONResponseBodyFaultProvider GetApiGatewayV1CacheRules400JSONResponseBodyFault = "provider"
+	GetApiGatewayV1CacheRules400JSONResponseBodyFaultCustomer         GetApiGatewayV1CacheRules400JSONResponseBodyFault = "customer"
+	GetApiGatewayV1CacheRules400JSONResponseBodyFaultPlatform         GetApiGatewayV1CacheRules400JSONResponseBodyFault = "platform"
+	GetApiGatewayV1CacheRules400JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1CacheRules400JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1CacheRules400JSONResponseBodyFaultProvider         GetApiGatewayV1CacheRules400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1CacheRules400JSONResponseBodyFault enum.
@@ -2908,6 +2984,8 @@ func (e GetApiGatewayV1CacheRules400JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1CacheRules400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1CacheRules400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1CacheRules400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1CacheRules400JSONResponseBodyFaultProvider:
 		return true
@@ -2918,9 +2996,10 @@ func (e GetApiGatewayV1CacheRules400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1CacheRules401JSONResponseBodyFault.
 const (
-	GetApiGatewayV1CacheRules401JSONResponseBodyFaultCustomer GetApiGatewayV1CacheRules401JSONResponseBodyFault = "customer"
-	GetApiGatewayV1CacheRules401JSONResponseBodyFaultPlatform GetApiGatewayV1CacheRules401JSONResponseBodyFault = "platform"
-	GetApiGatewayV1CacheRules401JSONResponseBodyFaultProvider GetApiGatewayV1CacheRules401JSONResponseBodyFault = "provider"
+	GetApiGatewayV1CacheRules401JSONResponseBodyFaultCustomer         GetApiGatewayV1CacheRules401JSONResponseBodyFault = "customer"
+	GetApiGatewayV1CacheRules401JSONResponseBodyFaultPlatform         GetApiGatewayV1CacheRules401JSONResponseBodyFault = "platform"
+	GetApiGatewayV1CacheRules401JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1CacheRules401JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1CacheRules401JSONResponseBodyFaultProvider         GetApiGatewayV1CacheRules401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1CacheRules401JSONResponseBodyFault enum.
@@ -2929,6 +3008,8 @@ func (e GetApiGatewayV1CacheRules401JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1CacheRules401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1CacheRules401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1CacheRules401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1CacheRules401JSONResponseBodyFaultProvider:
 		return true
@@ -2939,9 +3020,10 @@ func (e GetApiGatewayV1CacheRules401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1CacheRules403JSONResponseBodyFault.
 const (
-	GetApiGatewayV1CacheRules403JSONResponseBodyFaultCustomer GetApiGatewayV1CacheRules403JSONResponseBodyFault = "customer"
-	GetApiGatewayV1CacheRules403JSONResponseBodyFaultPlatform GetApiGatewayV1CacheRules403JSONResponseBodyFault = "platform"
-	GetApiGatewayV1CacheRules403JSONResponseBodyFaultProvider GetApiGatewayV1CacheRules403JSONResponseBodyFault = "provider"
+	GetApiGatewayV1CacheRules403JSONResponseBodyFaultCustomer         GetApiGatewayV1CacheRules403JSONResponseBodyFault = "customer"
+	GetApiGatewayV1CacheRules403JSONResponseBodyFaultPlatform         GetApiGatewayV1CacheRules403JSONResponseBodyFault = "platform"
+	GetApiGatewayV1CacheRules403JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1CacheRules403JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1CacheRules403JSONResponseBodyFaultProvider         GetApiGatewayV1CacheRules403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1CacheRules403JSONResponseBodyFault enum.
@@ -2950,6 +3032,8 @@ func (e GetApiGatewayV1CacheRules403JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1CacheRules403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1CacheRules403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1CacheRules403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1CacheRules403JSONResponseBodyFaultProvider:
 		return true
@@ -2960,9 +3044,10 @@ func (e GetApiGatewayV1CacheRules403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1CacheRules500JSONResponseBodyFault.
 const (
-	GetApiGatewayV1CacheRules500JSONResponseBodyFaultCustomer GetApiGatewayV1CacheRules500JSONResponseBodyFault = "customer"
-	GetApiGatewayV1CacheRules500JSONResponseBodyFaultPlatform GetApiGatewayV1CacheRules500JSONResponseBodyFault = "platform"
-	GetApiGatewayV1CacheRules500JSONResponseBodyFaultProvider GetApiGatewayV1CacheRules500JSONResponseBodyFault = "provider"
+	GetApiGatewayV1CacheRules500JSONResponseBodyFaultCustomer         GetApiGatewayV1CacheRules500JSONResponseBodyFault = "customer"
+	GetApiGatewayV1CacheRules500JSONResponseBodyFaultPlatform         GetApiGatewayV1CacheRules500JSONResponseBodyFault = "platform"
+	GetApiGatewayV1CacheRules500JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1CacheRules500JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1CacheRules500JSONResponseBodyFaultProvider         GetApiGatewayV1CacheRules500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1CacheRules500JSONResponseBodyFault enum.
@@ -2971,6 +3056,8 @@ func (e GetApiGatewayV1CacheRules500JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1CacheRules500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1CacheRules500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1CacheRules500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1CacheRules500JSONResponseBodyFaultProvider:
 		return true
@@ -3044,9 +3131,10 @@ func (e PostApiGatewayV1CacheRules201JSONResponseBodyCacheRuleModeEnum) Valid() 
 
 // Defines values for PostApiGatewayV1CacheRules400JSONResponseBodyFault.
 const (
-	PostApiGatewayV1CacheRules400JSONResponseBodyFaultCustomer PostApiGatewayV1CacheRules400JSONResponseBodyFault = "customer"
-	PostApiGatewayV1CacheRules400JSONResponseBodyFaultPlatform PostApiGatewayV1CacheRules400JSONResponseBodyFault = "platform"
-	PostApiGatewayV1CacheRules400JSONResponseBodyFaultProvider PostApiGatewayV1CacheRules400JSONResponseBodyFault = "provider"
+	PostApiGatewayV1CacheRules400JSONResponseBodyFaultCustomer         PostApiGatewayV1CacheRules400JSONResponseBodyFault = "customer"
+	PostApiGatewayV1CacheRules400JSONResponseBodyFaultPlatform         PostApiGatewayV1CacheRules400JSONResponseBodyFault = "platform"
+	PostApiGatewayV1CacheRules400JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1CacheRules400JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1CacheRules400JSONResponseBodyFaultProvider         PostApiGatewayV1CacheRules400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1CacheRules400JSONResponseBodyFault enum.
@@ -3055,6 +3143,8 @@ func (e PostApiGatewayV1CacheRules400JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1CacheRules400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1CacheRules400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1CacheRules400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1CacheRules400JSONResponseBodyFaultProvider:
 		return true
@@ -3065,9 +3155,10 @@ func (e PostApiGatewayV1CacheRules400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1CacheRules401JSONResponseBodyFault.
 const (
-	PostApiGatewayV1CacheRules401JSONResponseBodyFaultCustomer PostApiGatewayV1CacheRules401JSONResponseBodyFault = "customer"
-	PostApiGatewayV1CacheRules401JSONResponseBodyFaultPlatform PostApiGatewayV1CacheRules401JSONResponseBodyFault = "platform"
-	PostApiGatewayV1CacheRules401JSONResponseBodyFaultProvider PostApiGatewayV1CacheRules401JSONResponseBodyFault = "provider"
+	PostApiGatewayV1CacheRules401JSONResponseBodyFaultCustomer         PostApiGatewayV1CacheRules401JSONResponseBodyFault = "customer"
+	PostApiGatewayV1CacheRules401JSONResponseBodyFaultPlatform         PostApiGatewayV1CacheRules401JSONResponseBodyFault = "platform"
+	PostApiGatewayV1CacheRules401JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1CacheRules401JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1CacheRules401JSONResponseBodyFaultProvider         PostApiGatewayV1CacheRules401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1CacheRules401JSONResponseBodyFault enum.
@@ -3076,6 +3167,8 @@ func (e PostApiGatewayV1CacheRules401JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1CacheRules401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1CacheRules401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1CacheRules401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1CacheRules401JSONResponseBodyFaultProvider:
 		return true
@@ -3086,9 +3179,10 @@ func (e PostApiGatewayV1CacheRules401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1CacheRules403JSONResponseBodyFault.
 const (
-	PostApiGatewayV1CacheRules403JSONResponseBodyFaultCustomer PostApiGatewayV1CacheRules403JSONResponseBodyFault = "customer"
-	PostApiGatewayV1CacheRules403JSONResponseBodyFaultPlatform PostApiGatewayV1CacheRules403JSONResponseBodyFault = "platform"
-	PostApiGatewayV1CacheRules403JSONResponseBodyFaultProvider PostApiGatewayV1CacheRules403JSONResponseBodyFault = "provider"
+	PostApiGatewayV1CacheRules403JSONResponseBodyFaultCustomer         PostApiGatewayV1CacheRules403JSONResponseBodyFault = "customer"
+	PostApiGatewayV1CacheRules403JSONResponseBodyFaultPlatform         PostApiGatewayV1CacheRules403JSONResponseBodyFault = "platform"
+	PostApiGatewayV1CacheRules403JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1CacheRules403JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1CacheRules403JSONResponseBodyFaultProvider         PostApiGatewayV1CacheRules403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1CacheRules403JSONResponseBodyFault enum.
@@ -3097,6 +3191,8 @@ func (e PostApiGatewayV1CacheRules403JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1CacheRules403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1CacheRules403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1CacheRules403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1CacheRules403JSONResponseBodyFaultProvider:
 		return true
@@ -3107,9 +3203,10 @@ func (e PostApiGatewayV1CacheRules403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1CacheRules409JSONResponseBodyFault.
 const (
-	PostApiGatewayV1CacheRules409JSONResponseBodyFaultCustomer PostApiGatewayV1CacheRules409JSONResponseBodyFault = "customer"
-	PostApiGatewayV1CacheRules409JSONResponseBodyFaultPlatform PostApiGatewayV1CacheRules409JSONResponseBodyFault = "platform"
-	PostApiGatewayV1CacheRules409JSONResponseBodyFaultProvider PostApiGatewayV1CacheRules409JSONResponseBodyFault = "provider"
+	PostApiGatewayV1CacheRules409JSONResponseBodyFaultCustomer         PostApiGatewayV1CacheRules409JSONResponseBodyFault = "customer"
+	PostApiGatewayV1CacheRules409JSONResponseBodyFaultPlatform         PostApiGatewayV1CacheRules409JSONResponseBodyFault = "platform"
+	PostApiGatewayV1CacheRules409JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1CacheRules409JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1CacheRules409JSONResponseBodyFaultProvider         PostApiGatewayV1CacheRules409JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1CacheRules409JSONResponseBodyFault enum.
@@ -3118,6 +3215,8 @@ func (e PostApiGatewayV1CacheRules409JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1CacheRules409JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1CacheRules409JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1CacheRules409JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1CacheRules409JSONResponseBodyFaultProvider:
 		return true
@@ -3128,9 +3227,10 @@ func (e PostApiGatewayV1CacheRules409JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1CacheRules500JSONResponseBodyFault.
 const (
-	PostApiGatewayV1CacheRules500JSONResponseBodyFaultCustomer PostApiGatewayV1CacheRules500JSONResponseBodyFault = "customer"
-	PostApiGatewayV1CacheRules500JSONResponseBodyFaultPlatform PostApiGatewayV1CacheRules500JSONResponseBodyFault = "platform"
-	PostApiGatewayV1CacheRules500JSONResponseBodyFaultProvider PostApiGatewayV1CacheRules500JSONResponseBodyFault = "provider"
+	PostApiGatewayV1CacheRules500JSONResponseBodyFaultCustomer         PostApiGatewayV1CacheRules500JSONResponseBodyFault = "customer"
+	PostApiGatewayV1CacheRules500JSONResponseBodyFaultPlatform         PostApiGatewayV1CacheRules500JSONResponseBodyFault = "platform"
+	PostApiGatewayV1CacheRules500JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1CacheRules500JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1CacheRules500JSONResponseBodyFaultProvider         PostApiGatewayV1CacheRules500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1CacheRules500JSONResponseBodyFault enum.
@@ -3139,6 +3239,8 @@ func (e PostApiGatewayV1CacheRules500JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1CacheRules500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1CacheRules500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1CacheRules500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1CacheRules500JSONResponseBodyFaultProvider:
 		return true
@@ -3191,9 +3293,10 @@ func (e DeleteApiGatewayV1CacheRulesById200JSONResponseBodyCacheRuleModeEnum) Va
 
 // Defines values for DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFaultCustomer DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFaultPlatform DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFaultProvider DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFaultCustomer         DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFaultPlatform         DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFaultProvider         DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFault enum.
@@ -3202,6 +3305,8 @@ func (e DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFaultProvider:
 		return true
@@ -3212,9 +3317,10 @@ func (e DeleteApiGatewayV1CacheRulesById400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFaultCustomer DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFaultPlatform DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFaultProvider DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFaultCustomer         DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFaultPlatform         DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFaultProvider         DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFault enum.
@@ -3223,6 +3329,8 @@ func (e DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFaultProvider:
 		return true
@@ -3233,9 +3341,10 @@ func (e DeleteApiGatewayV1CacheRulesById401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFaultCustomer DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFaultPlatform DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFaultProvider DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFaultCustomer         DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFaultPlatform         DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFaultProvider         DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFault enum.
@@ -3244,6 +3353,8 @@ func (e DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFaultProvider:
 		return true
@@ -3254,9 +3365,10 @@ func (e DeleteApiGatewayV1CacheRulesById403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFaultCustomer DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFaultPlatform DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFaultProvider DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFaultCustomer         DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFaultPlatform         DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFaultProvider         DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFault enum.
@@ -3265,6 +3377,8 @@ func (e DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1CacheRulesById500JSONResponseBodyFaultProvider:
 		return true
@@ -3317,9 +3431,10 @@ func (e GetApiGatewayV1CacheRulesById200JSONResponseBodyCacheRuleModeEnum) Valid
 
 // Defines values for GetApiGatewayV1CacheRulesById400JSONResponseBodyFault.
 const (
-	GetApiGatewayV1CacheRulesById400JSONResponseBodyFaultCustomer GetApiGatewayV1CacheRulesById400JSONResponseBodyFault = "customer"
-	GetApiGatewayV1CacheRulesById400JSONResponseBodyFaultPlatform GetApiGatewayV1CacheRulesById400JSONResponseBodyFault = "platform"
-	GetApiGatewayV1CacheRulesById400JSONResponseBodyFaultProvider GetApiGatewayV1CacheRulesById400JSONResponseBodyFault = "provider"
+	GetApiGatewayV1CacheRulesById400JSONResponseBodyFaultCustomer         GetApiGatewayV1CacheRulesById400JSONResponseBodyFault = "customer"
+	GetApiGatewayV1CacheRulesById400JSONResponseBodyFaultPlatform         GetApiGatewayV1CacheRulesById400JSONResponseBodyFault = "platform"
+	GetApiGatewayV1CacheRulesById400JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1CacheRulesById400JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1CacheRulesById400JSONResponseBodyFaultProvider         GetApiGatewayV1CacheRulesById400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1CacheRulesById400JSONResponseBodyFault enum.
@@ -3328,6 +3443,8 @@ func (e GetApiGatewayV1CacheRulesById400JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1CacheRulesById400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1CacheRulesById400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1CacheRulesById400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1CacheRulesById400JSONResponseBodyFaultProvider:
 		return true
@@ -3338,9 +3455,10 @@ func (e GetApiGatewayV1CacheRulesById400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1CacheRulesById401JSONResponseBodyFault.
 const (
-	GetApiGatewayV1CacheRulesById401JSONResponseBodyFaultCustomer GetApiGatewayV1CacheRulesById401JSONResponseBodyFault = "customer"
-	GetApiGatewayV1CacheRulesById401JSONResponseBodyFaultPlatform GetApiGatewayV1CacheRulesById401JSONResponseBodyFault = "platform"
-	GetApiGatewayV1CacheRulesById401JSONResponseBodyFaultProvider GetApiGatewayV1CacheRulesById401JSONResponseBodyFault = "provider"
+	GetApiGatewayV1CacheRulesById401JSONResponseBodyFaultCustomer         GetApiGatewayV1CacheRulesById401JSONResponseBodyFault = "customer"
+	GetApiGatewayV1CacheRulesById401JSONResponseBodyFaultPlatform         GetApiGatewayV1CacheRulesById401JSONResponseBodyFault = "platform"
+	GetApiGatewayV1CacheRulesById401JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1CacheRulesById401JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1CacheRulesById401JSONResponseBodyFaultProvider         GetApiGatewayV1CacheRulesById401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1CacheRulesById401JSONResponseBodyFault enum.
@@ -3349,6 +3467,8 @@ func (e GetApiGatewayV1CacheRulesById401JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1CacheRulesById401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1CacheRulesById401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1CacheRulesById401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1CacheRulesById401JSONResponseBodyFaultProvider:
 		return true
@@ -3359,9 +3479,10 @@ func (e GetApiGatewayV1CacheRulesById401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1CacheRulesById403JSONResponseBodyFault.
 const (
-	GetApiGatewayV1CacheRulesById403JSONResponseBodyFaultCustomer GetApiGatewayV1CacheRulesById403JSONResponseBodyFault = "customer"
-	GetApiGatewayV1CacheRulesById403JSONResponseBodyFaultPlatform GetApiGatewayV1CacheRulesById403JSONResponseBodyFault = "platform"
-	GetApiGatewayV1CacheRulesById403JSONResponseBodyFaultProvider GetApiGatewayV1CacheRulesById403JSONResponseBodyFault = "provider"
+	GetApiGatewayV1CacheRulesById403JSONResponseBodyFaultCustomer         GetApiGatewayV1CacheRulesById403JSONResponseBodyFault = "customer"
+	GetApiGatewayV1CacheRulesById403JSONResponseBodyFaultPlatform         GetApiGatewayV1CacheRulesById403JSONResponseBodyFault = "platform"
+	GetApiGatewayV1CacheRulesById403JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1CacheRulesById403JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1CacheRulesById403JSONResponseBodyFaultProvider         GetApiGatewayV1CacheRulesById403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1CacheRulesById403JSONResponseBodyFault enum.
@@ -3370,6 +3491,8 @@ func (e GetApiGatewayV1CacheRulesById403JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1CacheRulesById403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1CacheRulesById403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1CacheRulesById403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1CacheRulesById403JSONResponseBodyFaultProvider:
 		return true
@@ -3380,9 +3503,10 @@ func (e GetApiGatewayV1CacheRulesById403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1CacheRulesById500JSONResponseBodyFault.
 const (
-	GetApiGatewayV1CacheRulesById500JSONResponseBodyFaultCustomer GetApiGatewayV1CacheRulesById500JSONResponseBodyFault = "customer"
-	GetApiGatewayV1CacheRulesById500JSONResponseBodyFaultPlatform GetApiGatewayV1CacheRulesById500JSONResponseBodyFault = "platform"
-	GetApiGatewayV1CacheRulesById500JSONResponseBodyFaultProvider GetApiGatewayV1CacheRulesById500JSONResponseBodyFault = "provider"
+	GetApiGatewayV1CacheRulesById500JSONResponseBodyFaultCustomer         GetApiGatewayV1CacheRulesById500JSONResponseBodyFault = "customer"
+	GetApiGatewayV1CacheRulesById500JSONResponseBodyFaultPlatform         GetApiGatewayV1CacheRulesById500JSONResponseBodyFault = "platform"
+	GetApiGatewayV1CacheRulesById500JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1CacheRulesById500JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1CacheRulesById500JSONResponseBodyFaultProvider         GetApiGatewayV1CacheRulesById500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1CacheRulesById500JSONResponseBodyFault enum.
@@ -3391,6 +3515,8 @@ func (e GetApiGatewayV1CacheRulesById500JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1CacheRulesById500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1CacheRulesById500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1CacheRulesById500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1CacheRulesById500JSONResponseBodyFaultProvider:
 		return true
@@ -3464,9 +3590,10 @@ func (e PatchApiGatewayV1CacheRulesById200JSONResponseBodyCacheRuleModeEnum) Val
 
 // Defines values for PatchApiGatewayV1CacheRulesById400JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1CacheRulesById400JSONResponseBodyFaultCustomer PatchApiGatewayV1CacheRulesById400JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1CacheRulesById400JSONResponseBodyFaultPlatform PatchApiGatewayV1CacheRulesById400JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1CacheRulesById400JSONResponseBodyFaultProvider PatchApiGatewayV1CacheRulesById400JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1CacheRulesById400JSONResponseBodyFaultCustomer         PatchApiGatewayV1CacheRulesById400JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1CacheRulesById400JSONResponseBodyFaultPlatform         PatchApiGatewayV1CacheRulesById400JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1CacheRulesById400JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1CacheRulesById400JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1CacheRulesById400JSONResponseBodyFaultProvider         PatchApiGatewayV1CacheRulesById400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1CacheRulesById400JSONResponseBodyFault enum.
@@ -3475,6 +3602,8 @@ func (e PatchApiGatewayV1CacheRulesById400JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1CacheRulesById400JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1CacheRulesById400JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1CacheRulesById400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1CacheRulesById400JSONResponseBodyFaultProvider:
 		return true
@@ -3485,9 +3614,10 @@ func (e PatchApiGatewayV1CacheRulesById400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1CacheRulesById401JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1CacheRulesById401JSONResponseBodyFaultCustomer PatchApiGatewayV1CacheRulesById401JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1CacheRulesById401JSONResponseBodyFaultPlatform PatchApiGatewayV1CacheRulesById401JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1CacheRulesById401JSONResponseBodyFaultProvider PatchApiGatewayV1CacheRulesById401JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1CacheRulesById401JSONResponseBodyFaultCustomer         PatchApiGatewayV1CacheRulesById401JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1CacheRulesById401JSONResponseBodyFaultPlatform         PatchApiGatewayV1CacheRulesById401JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1CacheRulesById401JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1CacheRulesById401JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1CacheRulesById401JSONResponseBodyFaultProvider         PatchApiGatewayV1CacheRulesById401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1CacheRulesById401JSONResponseBodyFault enum.
@@ -3496,6 +3626,8 @@ func (e PatchApiGatewayV1CacheRulesById401JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1CacheRulesById401JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1CacheRulesById401JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1CacheRulesById401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1CacheRulesById401JSONResponseBodyFaultProvider:
 		return true
@@ -3506,9 +3638,10 @@ func (e PatchApiGatewayV1CacheRulesById401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1CacheRulesById403JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1CacheRulesById403JSONResponseBodyFaultCustomer PatchApiGatewayV1CacheRulesById403JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1CacheRulesById403JSONResponseBodyFaultPlatform PatchApiGatewayV1CacheRulesById403JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1CacheRulesById403JSONResponseBodyFaultProvider PatchApiGatewayV1CacheRulesById403JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1CacheRulesById403JSONResponseBodyFaultCustomer         PatchApiGatewayV1CacheRulesById403JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1CacheRulesById403JSONResponseBodyFaultPlatform         PatchApiGatewayV1CacheRulesById403JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1CacheRulesById403JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1CacheRulesById403JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1CacheRulesById403JSONResponseBodyFaultProvider         PatchApiGatewayV1CacheRulesById403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1CacheRulesById403JSONResponseBodyFault enum.
@@ -3517,6 +3650,8 @@ func (e PatchApiGatewayV1CacheRulesById403JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1CacheRulesById403JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1CacheRulesById403JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1CacheRulesById403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1CacheRulesById403JSONResponseBodyFaultProvider:
 		return true
@@ -3527,9 +3662,10 @@ func (e PatchApiGatewayV1CacheRulesById403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1CacheRulesById500JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1CacheRulesById500JSONResponseBodyFaultCustomer PatchApiGatewayV1CacheRulesById500JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1CacheRulesById500JSONResponseBodyFaultPlatform PatchApiGatewayV1CacheRulesById500JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1CacheRulesById500JSONResponseBodyFaultProvider PatchApiGatewayV1CacheRulesById500JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1CacheRulesById500JSONResponseBodyFaultCustomer         PatchApiGatewayV1CacheRulesById500JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1CacheRulesById500JSONResponseBodyFaultPlatform         PatchApiGatewayV1CacheRulesById500JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1CacheRulesById500JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1CacheRulesById500JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1CacheRulesById500JSONResponseBodyFaultProvider         PatchApiGatewayV1CacheRulesById500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1CacheRulesById500JSONResponseBodyFault enum.
@@ -3538,6 +3674,8 @@ func (e PatchApiGatewayV1CacheRulesById500JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1CacheRulesById500JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1CacheRulesById500JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1CacheRulesById500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1CacheRulesById500JSONResponseBodyFaultProvider:
 		return true
@@ -3587,9 +3725,10 @@ func (e GetApiGatewayV1EndUsersByIdSpend200JSONResponseBodyDataCapsOnBreach) Val
 
 // Defines values for GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFault.
 const (
-	GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFaultCustomer GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFault = "customer"
-	GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFaultPlatform GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFault = "platform"
-	GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFaultProvider GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFault = "provider"
+	GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFaultCustomer         GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFault = "customer"
+	GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFaultPlatform         GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFault = "platform"
+	GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFaultProvider         GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFault enum.
@@ -3598,6 +3737,8 @@ func (e GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFaultProvider:
 		return true
@@ -3608,9 +3749,10 @@ func (e GetApiGatewayV1EndUsersByIdSpend400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFault.
 const (
-	GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFaultCustomer GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFault = "customer"
-	GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFaultPlatform GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFault = "platform"
-	GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFaultProvider GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFault = "provider"
+	GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFaultCustomer         GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFault = "customer"
+	GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFaultPlatform         GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFault = "platform"
+	GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFaultProvider         GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFault enum.
@@ -3619,6 +3761,8 @@ func (e GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFaultProvider:
 		return true
@@ -3629,9 +3773,10 @@ func (e GetApiGatewayV1EndUsersByIdSpend401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFault.
 const (
-	GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFaultCustomer GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFault = "customer"
-	GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFaultPlatform GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFault = "platform"
-	GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFaultProvider GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFault = "provider"
+	GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFaultCustomer         GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFault = "customer"
+	GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFaultPlatform         GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFault = "platform"
+	GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFaultProvider         GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFault enum.
@@ -3640,6 +3785,8 @@ func (e GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFaultProvider:
 		return true
@@ -3650,9 +3797,10 @@ func (e GetApiGatewayV1EndUsersByIdSpend403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFault.
 const (
-	GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFaultCustomer GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFault = "customer"
-	GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFaultPlatform GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFault = "platform"
-	GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFaultProvider GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFault = "provider"
+	GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFaultCustomer         GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFault = "customer"
+	GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFaultPlatform         GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFault = "platform"
+	GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFaultProvider         GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFault enum.
@@ -3661,6 +3809,8 @@ func (e GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFaultProvider:
 		return true
@@ -3671,9 +3821,10 @@ func (e GetApiGatewayV1EndUsersByIdSpend500JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1Providers400JSONResponseBodyFault.
 const (
-	GetApiGatewayV1Providers400JSONResponseBodyFaultCustomer GetApiGatewayV1Providers400JSONResponseBodyFault = "customer"
-	GetApiGatewayV1Providers400JSONResponseBodyFaultPlatform GetApiGatewayV1Providers400JSONResponseBodyFault = "platform"
-	GetApiGatewayV1Providers400JSONResponseBodyFaultProvider GetApiGatewayV1Providers400JSONResponseBodyFault = "provider"
+	GetApiGatewayV1Providers400JSONResponseBodyFaultCustomer         GetApiGatewayV1Providers400JSONResponseBodyFault = "customer"
+	GetApiGatewayV1Providers400JSONResponseBodyFaultPlatform         GetApiGatewayV1Providers400JSONResponseBodyFault = "platform"
+	GetApiGatewayV1Providers400JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1Providers400JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1Providers400JSONResponseBodyFaultProvider         GetApiGatewayV1Providers400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1Providers400JSONResponseBodyFault enum.
@@ -3682,6 +3833,8 @@ func (e GetApiGatewayV1Providers400JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1Providers400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1Providers400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1Providers400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1Providers400JSONResponseBodyFaultProvider:
 		return true
@@ -3692,9 +3845,10 @@ func (e GetApiGatewayV1Providers400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1Providers401JSONResponseBodyFault.
 const (
-	GetApiGatewayV1Providers401JSONResponseBodyFaultCustomer GetApiGatewayV1Providers401JSONResponseBodyFault = "customer"
-	GetApiGatewayV1Providers401JSONResponseBodyFaultPlatform GetApiGatewayV1Providers401JSONResponseBodyFault = "platform"
-	GetApiGatewayV1Providers401JSONResponseBodyFaultProvider GetApiGatewayV1Providers401JSONResponseBodyFault = "provider"
+	GetApiGatewayV1Providers401JSONResponseBodyFaultCustomer         GetApiGatewayV1Providers401JSONResponseBodyFault = "customer"
+	GetApiGatewayV1Providers401JSONResponseBodyFaultPlatform         GetApiGatewayV1Providers401JSONResponseBodyFault = "platform"
+	GetApiGatewayV1Providers401JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1Providers401JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1Providers401JSONResponseBodyFaultProvider         GetApiGatewayV1Providers401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1Providers401JSONResponseBodyFault enum.
@@ -3703,6 +3857,8 @@ func (e GetApiGatewayV1Providers401JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1Providers401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1Providers401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1Providers401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1Providers401JSONResponseBodyFaultProvider:
 		return true
@@ -3713,9 +3869,10 @@ func (e GetApiGatewayV1Providers401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1Providers403JSONResponseBodyFault.
 const (
-	GetApiGatewayV1Providers403JSONResponseBodyFaultCustomer GetApiGatewayV1Providers403JSONResponseBodyFault = "customer"
-	GetApiGatewayV1Providers403JSONResponseBodyFaultPlatform GetApiGatewayV1Providers403JSONResponseBodyFault = "platform"
-	GetApiGatewayV1Providers403JSONResponseBodyFaultProvider GetApiGatewayV1Providers403JSONResponseBodyFault = "provider"
+	GetApiGatewayV1Providers403JSONResponseBodyFaultCustomer         GetApiGatewayV1Providers403JSONResponseBodyFault = "customer"
+	GetApiGatewayV1Providers403JSONResponseBodyFaultPlatform         GetApiGatewayV1Providers403JSONResponseBodyFault = "platform"
+	GetApiGatewayV1Providers403JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1Providers403JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1Providers403JSONResponseBodyFaultProvider         GetApiGatewayV1Providers403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1Providers403JSONResponseBodyFault enum.
@@ -3724,6 +3881,8 @@ func (e GetApiGatewayV1Providers403JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1Providers403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1Providers403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1Providers403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1Providers403JSONResponseBodyFaultProvider:
 		return true
@@ -3734,9 +3893,10 @@ func (e GetApiGatewayV1Providers403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1Providers410JSONResponseBodyFault.
 const (
-	GetApiGatewayV1Providers410JSONResponseBodyFaultCustomer GetApiGatewayV1Providers410JSONResponseBodyFault = "customer"
-	GetApiGatewayV1Providers410JSONResponseBodyFaultPlatform GetApiGatewayV1Providers410JSONResponseBodyFault = "platform"
-	GetApiGatewayV1Providers410JSONResponseBodyFaultProvider GetApiGatewayV1Providers410JSONResponseBodyFault = "provider"
+	GetApiGatewayV1Providers410JSONResponseBodyFaultCustomer         GetApiGatewayV1Providers410JSONResponseBodyFault = "customer"
+	GetApiGatewayV1Providers410JSONResponseBodyFaultPlatform         GetApiGatewayV1Providers410JSONResponseBodyFault = "platform"
+	GetApiGatewayV1Providers410JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1Providers410JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1Providers410JSONResponseBodyFaultProvider         GetApiGatewayV1Providers410JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1Providers410JSONResponseBodyFault enum.
@@ -3745,6 +3905,8 @@ func (e GetApiGatewayV1Providers410JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1Providers410JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1Providers410JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1Providers410JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1Providers410JSONResponseBodyFaultProvider:
 		return true
@@ -3755,9 +3917,10 @@ func (e GetApiGatewayV1Providers410JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1Providers500JSONResponseBodyFault.
 const (
-	GetApiGatewayV1Providers500JSONResponseBodyFaultCustomer GetApiGatewayV1Providers500JSONResponseBodyFault = "customer"
-	GetApiGatewayV1Providers500JSONResponseBodyFaultPlatform GetApiGatewayV1Providers500JSONResponseBodyFault = "platform"
-	GetApiGatewayV1Providers500JSONResponseBodyFaultProvider GetApiGatewayV1Providers500JSONResponseBodyFault = "provider"
+	GetApiGatewayV1Providers500JSONResponseBodyFaultCustomer         GetApiGatewayV1Providers500JSONResponseBodyFault = "customer"
+	GetApiGatewayV1Providers500JSONResponseBodyFaultPlatform         GetApiGatewayV1Providers500JSONResponseBodyFault = "platform"
+	GetApiGatewayV1Providers500JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1Providers500JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1Providers500JSONResponseBodyFaultProvider         GetApiGatewayV1Providers500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1Providers500JSONResponseBodyFault enum.
@@ -3766,6 +3929,8 @@ func (e GetApiGatewayV1Providers500JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1Providers500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1Providers500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1Providers500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1Providers500JSONResponseBodyFaultProvider:
 		return true
@@ -3776,9 +3941,10 @@ func (e GetApiGatewayV1Providers500JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1Providers400JSONResponseBodyFault.
 const (
-	PostApiGatewayV1Providers400JSONResponseBodyFaultCustomer PostApiGatewayV1Providers400JSONResponseBodyFault = "customer"
-	PostApiGatewayV1Providers400JSONResponseBodyFaultPlatform PostApiGatewayV1Providers400JSONResponseBodyFault = "platform"
-	PostApiGatewayV1Providers400JSONResponseBodyFaultProvider PostApiGatewayV1Providers400JSONResponseBodyFault = "provider"
+	PostApiGatewayV1Providers400JSONResponseBodyFaultCustomer         PostApiGatewayV1Providers400JSONResponseBodyFault = "customer"
+	PostApiGatewayV1Providers400JSONResponseBodyFaultPlatform         PostApiGatewayV1Providers400JSONResponseBodyFault = "platform"
+	PostApiGatewayV1Providers400JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1Providers400JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1Providers400JSONResponseBodyFaultProvider         PostApiGatewayV1Providers400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1Providers400JSONResponseBodyFault enum.
@@ -3787,6 +3953,8 @@ func (e PostApiGatewayV1Providers400JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1Providers400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1Providers400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1Providers400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1Providers400JSONResponseBodyFaultProvider:
 		return true
@@ -3797,9 +3965,10 @@ func (e PostApiGatewayV1Providers400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1Providers401JSONResponseBodyFault.
 const (
-	PostApiGatewayV1Providers401JSONResponseBodyFaultCustomer PostApiGatewayV1Providers401JSONResponseBodyFault = "customer"
-	PostApiGatewayV1Providers401JSONResponseBodyFaultPlatform PostApiGatewayV1Providers401JSONResponseBodyFault = "platform"
-	PostApiGatewayV1Providers401JSONResponseBodyFaultProvider PostApiGatewayV1Providers401JSONResponseBodyFault = "provider"
+	PostApiGatewayV1Providers401JSONResponseBodyFaultCustomer         PostApiGatewayV1Providers401JSONResponseBodyFault = "customer"
+	PostApiGatewayV1Providers401JSONResponseBodyFaultPlatform         PostApiGatewayV1Providers401JSONResponseBodyFault = "platform"
+	PostApiGatewayV1Providers401JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1Providers401JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1Providers401JSONResponseBodyFaultProvider         PostApiGatewayV1Providers401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1Providers401JSONResponseBodyFault enum.
@@ -3808,6 +3977,8 @@ func (e PostApiGatewayV1Providers401JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1Providers401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1Providers401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1Providers401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1Providers401JSONResponseBodyFaultProvider:
 		return true
@@ -3818,9 +3989,10 @@ func (e PostApiGatewayV1Providers401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1Providers403JSONResponseBodyFault.
 const (
-	PostApiGatewayV1Providers403JSONResponseBodyFaultCustomer PostApiGatewayV1Providers403JSONResponseBodyFault = "customer"
-	PostApiGatewayV1Providers403JSONResponseBodyFaultPlatform PostApiGatewayV1Providers403JSONResponseBodyFault = "platform"
-	PostApiGatewayV1Providers403JSONResponseBodyFaultProvider PostApiGatewayV1Providers403JSONResponseBodyFault = "provider"
+	PostApiGatewayV1Providers403JSONResponseBodyFaultCustomer         PostApiGatewayV1Providers403JSONResponseBodyFault = "customer"
+	PostApiGatewayV1Providers403JSONResponseBodyFaultPlatform         PostApiGatewayV1Providers403JSONResponseBodyFault = "platform"
+	PostApiGatewayV1Providers403JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1Providers403JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1Providers403JSONResponseBodyFaultProvider         PostApiGatewayV1Providers403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1Providers403JSONResponseBodyFault enum.
@@ -3829,6 +4001,8 @@ func (e PostApiGatewayV1Providers403JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1Providers403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1Providers403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1Providers403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1Providers403JSONResponseBodyFaultProvider:
 		return true
@@ -3839,9 +4013,10 @@ func (e PostApiGatewayV1Providers403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1Providers410JSONResponseBodyFault.
 const (
-	PostApiGatewayV1Providers410JSONResponseBodyFaultCustomer PostApiGatewayV1Providers410JSONResponseBodyFault = "customer"
-	PostApiGatewayV1Providers410JSONResponseBodyFaultPlatform PostApiGatewayV1Providers410JSONResponseBodyFault = "platform"
-	PostApiGatewayV1Providers410JSONResponseBodyFaultProvider PostApiGatewayV1Providers410JSONResponseBodyFault = "provider"
+	PostApiGatewayV1Providers410JSONResponseBodyFaultCustomer         PostApiGatewayV1Providers410JSONResponseBodyFault = "customer"
+	PostApiGatewayV1Providers410JSONResponseBodyFaultPlatform         PostApiGatewayV1Providers410JSONResponseBodyFault = "platform"
+	PostApiGatewayV1Providers410JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1Providers410JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1Providers410JSONResponseBodyFaultProvider         PostApiGatewayV1Providers410JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1Providers410JSONResponseBodyFault enum.
@@ -3850,6 +4025,8 @@ func (e PostApiGatewayV1Providers410JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1Providers410JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1Providers410JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1Providers410JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1Providers410JSONResponseBodyFaultProvider:
 		return true
@@ -3860,9 +4037,10 @@ func (e PostApiGatewayV1Providers410JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1Providers500JSONResponseBodyFault.
 const (
-	PostApiGatewayV1Providers500JSONResponseBodyFaultCustomer PostApiGatewayV1Providers500JSONResponseBodyFault = "customer"
-	PostApiGatewayV1Providers500JSONResponseBodyFaultPlatform PostApiGatewayV1Providers500JSONResponseBodyFault = "platform"
-	PostApiGatewayV1Providers500JSONResponseBodyFaultProvider PostApiGatewayV1Providers500JSONResponseBodyFault = "provider"
+	PostApiGatewayV1Providers500JSONResponseBodyFaultCustomer         PostApiGatewayV1Providers500JSONResponseBodyFault = "customer"
+	PostApiGatewayV1Providers500JSONResponseBodyFaultPlatform         PostApiGatewayV1Providers500JSONResponseBodyFault = "platform"
+	PostApiGatewayV1Providers500JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1Providers500JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1Providers500JSONResponseBodyFaultProvider         PostApiGatewayV1Providers500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1Providers500JSONResponseBodyFault enum.
@@ -3871,6 +4049,8 @@ func (e PostApiGatewayV1Providers500JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1Providers500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1Providers500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1Providers500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1Providers500JSONResponseBodyFaultProvider:
 		return true
@@ -3881,9 +4061,10 @@ func (e PostApiGatewayV1Providers500JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiGatewayV1ProvidersById400JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1ProvidersById400JSONResponseBodyFaultCustomer DeleteApiGatewayV1ProvidersById400JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1ProvidersById400JSONResponseBodyFaultPlatform DeleteApiGatewayV1ProvidersById400JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1ProvidersById400JSONResponseBodyFaultProvider DeleteApiGatewayV1ProvidersById400JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1ProvidersById400JSONResponseBodyFaultCustomer         DeleteApiGatewayV1ProvidersById400JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1ProvidersById400JSONResponseBodyFaultPlatform         DeleteApiGatewayV1ProvidersById400JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1ProvidersById400JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1ProvidersById400JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1ProvidersById400JSONResponseBodyFaultProvider         DeleteApiGatewayV1ProvidersById400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1ProvidersById400JSONResponseBodyFault enum.
@@ -3892,6 +4073,8 @@ func (e DeleteApiGatewayV1ProvidersById400JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1ProvidersById400JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1ProvidersById400JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1ProvidersById400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1ProvidersById400JSONResponseBodyFaultProvider:
 		return true
@@ -3902,9 +4085,10 @@ func (e DeleteApiGatewayV1ProvidersById400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiGatewayV1ProvidersById401JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1ProvidersById401JSONResponseBodyFaultCustomer DeleteApiGatewayV1ProvidersById401JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1ProvidersById401JSONResponseBodyFaultPlatform DeleteApiGatewayV1ProvidersById401JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1ProvidersById401JSONResponseBodyFaultProvider DeleteApiGatewayV1ProvidersById401JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1ProvidersById401JSONResponseBodyFaultCustomer         DeleteApiGatewayV1ProvidersById401JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1ProvidersById401JSONResponseBodyFaultPlatform         DeleteApiGatewayV1ProvidersById401JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1ProvidersById401JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1ProvidersById401JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1ProvidersById401JSONResponseBodyFaultProvider         DeleteApiGatewayV1ProvidersById401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1ProvidersById401JSONResponseBodyFault enum.
@@ -3913,6 +4097,8 @@ func (e DeleteApiGatewayV1ProvidersById401JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1ProvidersById401JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1ProvidersById401JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1ProvidersById401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1ProvidersById401JSONResponseBodyFaultProvider:
 		return true
@@ -3923,9 +4109,10 @@ func (e DeleteApiGatewayV1ProvidersById401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiGatewayV1ProvidersById403JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1ProvidersById403JSONResponseBodyFaultCustomer DeleteApiGatewayV1ProvidersById403JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1ProvidersById403JSONResponseBodyFaultPlatform DeleteApiGatewayV1ProvidersById403JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1ProvidersById403JSONResponseBodyFaultProvider DeleteApiGatewayV1ProvidersById403JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1ProvidersById403JSONResponseBodyFaultCustomer         DeleteApiGatewayV1ProvidersById403JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1ProvidersById403JSONResponseBodyFaultPlatform         DeleteApiGatewayV1ProvidersById403JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1ProvidersById403JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1ProvidersById403JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1ProvidersById403JSONResponseBodyFaultProvider         DeleteApiGatewayV1ProvidersById403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1ProvidersById403JSONResponseBodyFault enum.
@@ -3934,6 +4121,8 @@ func (e DeleteApiGatewayV1ProvidersById403JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1ProvidersById403JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1ProvidersById403JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1ProvidersById403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1ProvidersById403JSONResponseBodyFaultProvider:
 		return true
@@ -3944,9 +4133,10 @@ func (e DeleteApiGatewayV1ProvidersById403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiGatewayV1ProvidersById410JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1ProvidersById410JSONResponseBodyFaultCustomer DeleteApiGatewayV1ProvidersById410JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1ProvidersById410JSONResponseBodyFaultPlatform DeleteApiGatewayV1ProvidersById410JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1ProvidersById410JSONResponseBodyFaultProvider DeleteApiGatewayV1ProvidersById410JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1ProvidersById410JSONResponseBodyFaultCustomer         DeleteApiGatewayV1ProvidersById410JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1ProvidersById410JSONResponseBodyFaultPlatform         DeleteApiGatewayV1ProvidersById410JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1ProvidersById410JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1ProvidersById410JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1ProvidersById410JSONResponseBodyFaultProvider         DeleteApiGatewayV1ProvidersById410JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1ProvidersById410JSONResponseBodyFault enum.
@@ -3955,6 +4145,8 @@ func (e DeleteApiGatewayV1ProvidersById410JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1ProvidersById410JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1ProvidersById410JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1ProvidersById410JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1ProvidersById410JSONResponseBodyFaultProvider:
 		return true
@@ -3965,9 +4157,10 @@ func (e DeleteApiGatewayV1ProvidersById410JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiGatewayV1ProvidersById500JSONResponseBodyFault.
 const (
-	DeleteApiGatewayV1ProvidersById500JSONResponseBodyFaultCustomer DeleteApiGatewayV1ProvidersById500JSONResponseBodyFault = "customer"
-	DeleteApiGatewayV1ProvidersById500JSONResponseBodyFaultPlatform DeleteApiGatewayV1ProvidersById500JSONResponseBodyFault = "platform"
-	DeleteApiGatewayV1ProvidersById500JSONResponseBodyFaultProvider DeleteApiGatewayV1ProvidersById500JSONResponseBodyFault = "provider"
+	DeleteApiGatewayV1ProvidersById500JSONResponseBodyFaultCustomer         DeleteApiGatewayV1ProvidersById500JSONResponseBodyFault = "customer"
+	DeleteApiGatewayV1ProvidersById500JSONResponseBodyFaultPlatform         DeleteApiGatewayV1ProvidersById500JSONResponseBodyFault = "platform"
+	DeleteApiGatewayV1ProvidersById500JSONResponseBodyFaultPresumedPlatform DeleteApiGatewayV1ProvidersById500JSONResponseBodyFault = "presumed_platform"
+	DeleteApiGatewayV1ProvidersById500JSONResponseBodyFaultProvider         DeleteApiGatewayV1ProvidersById500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiGatewayV1ProvidersById500JSONResponseBodyFault enum.
@@ -3976,6 +4169,8 @@ func (e DeleteApiGatewayV1ProvidersById500JSONResponseBodyFault) Valid() bool {
 	case DeleteApiGatewayV1ProvidersById500JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiGatewayV1ProvidersById500JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiGatewayV1ProvidersById500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiGatewayV1ProvidersById500JSONResponseBodyFaultProvider:
 		return true
@@ -3986,9 +4181,10 @@ func (e DeleteApiGatewayV1ProvidersById500JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1ProvidersById400JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1ProvidersById400JSONResponseBodyFaultCustomer PatchApiGatewayV1ProvidersById400JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1ProvidersById400JSONResponseBodyFaultPlatform PatchApiGatewayV1ProvidersById400JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1ProvidersById400JSONResponseBodyFaultProvider PatchApiGatewayV1ProvidersById400JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1ProvidersById400JSONResponseBodyFaultCustomer         PatchApiGatewayV1ProvidersById400JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1ProvidersById400JSONResponseBodyFaultPlatform         PatchApiGatewayV1ProvidersById400JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1ProvidersById400JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1ProvidersById400JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1ProvidersById400JSONResponseBodyFaultProvider         PatchApiGatewayV1ProvidersById400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1ProvidersById400JSONResponseBodyFault enum.
@@ -3997,6 +4193,8 @@ func (e PatchApiGatewayV1ProvidersById400JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1ProvidersById400JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1ProvidersById400JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1ProvidersById400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1ProvidersById400JSONResponseBodyFaultProvider:
 		return true
@@ -4007,9 +4205,10 @@ func (e PatchApiGatewayV1ProvidersById400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1ProvidersById401JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1ProvidersById401JSONResponseBodyFaultCustomer PatchApiGatewayV1ProvidersById401JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1ProvidersById401JSONResponseBodyFaultPlatform PatchApiGatewayV1ProvidersById401JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1ProvidersById401JSONResponseBodyFaultProvider PatchApiGatewayV1ProvidersById401JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1ProvidersById401JSONResponseBodyFaultCustomer         PatchApiGatewayV1ProvidersById401JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1ProvidersById401JSONResponseBodyFaultPlatform         PatchApiGatewayV1ProvidersById401JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1ProvidersById401JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1ProvidersById401JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1ProvidersById401JSONResponseBodyFaultProvider         PatchApiGatewayV1ProvidersById401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1ProvidersById401JSONResponseBodyFault enum.
@@ -4018,6 +4217,8 @@ func (e PatchApiGatewayV1ProvidersById401JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1ProvidersById401JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1ProvidersById401JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1ProvidersById401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1ProvidersById401JSONResponseBodyFaultProvider:
 		return true
@@ -4028,9 +4229,10 @@ func (e PatchApiGatewayV1ProvidersById401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1ProvidersById403JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1ProvidersById403JSONResponseBodyFaultCustomer PatchApiGatewayV1ProvidersById403JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1ProvidersById403JSONResponseBodyFaultPlatform PatchApiGatewayV1ProvidersById403JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1ProvidersById403JSONResponseBodyFaultProvider PatchApiGatewayV1ProvidersById403JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1ProvidersById403JSONResponseBodyFaultCustomer         PatchApiGatewayV1ProvidersById403JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1ProvidersById403JSONResponseBodyFaultPlatform         PatchApiGatewayV1ProvidersById403JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1ProvidersById403JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1ProvidersById403JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1ProvidersById403JSONResponseBodyFaultProvider         PatchApiGatewayV1ProvidersById403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1ProvidersById403JSONResponseBodyFault enum.
@@ -4039,6 +4241,8 @@ func (e PatchApiGatewayV1ProvidersById403JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1ProvidersById403JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1ProvidersById403JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1ProvidersById403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1ProvidersById403JSONResponseBodyFaultProvider:
 		return true
@@ -4049,9 +4253,10 @@ func (e PatchApiGatewayV1ProvidersById403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1ProvidersById410JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1ProvidersById410JSONResponseBodyFaultCustomer PatchApiGatewayV1ProvidersById410JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1ProvidersById410JSONResponseBodyFaultPlatform PatchApiGatewayV1ProvidersById410JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1ProvidersById410JSONResponseBodyFaultProvider PatchApiGatewayV1ProvidersById410JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1ProvidersById410JSONResponseBodyFaultCustomer         PatchApiGatewayV1ProvidersById410JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1ProvidersById410JSONResponseBodyFaultPlatform         PatchApiGatewayV1ProvidersById410JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1ProvidersById410JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1ProvidersById410JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1ProvidersById410JSONResponseBodyFaultProvider         PatchApiGatewayV1ProvidersById410JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1ProvidersById410JSONResponseBodyFault enum.
@@ -4060,6 +4265,8 @@ func (e PatchApiGatewayV1ProvidersById410JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1ProvidersById410JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1ProvidersById410JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1ProvidersById410JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1ProvidersById410JSONResponseBodyFaultProvider:
 		return true
@@ -4070,9 +4277,10 @@ func (e PatchApiGatewayV1ProvidersById410JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1ProvidersById500JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1ProvidersById500JSONResponseBodyFaultCustomer PatchApiGatewayV1ProvidersById500JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1ProvidersById500JSONResponseBodyFaultPlatform PatchApiGatewayV1ProvidersById500JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1ProvidersById500JSONResponseBodyFaultProvider PatchApiGatewayV1ProvidersById500JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1ProvidersById500JSONResponseBodyFaultCustomer         PatchApiGatewayV1ProvidersById500JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1ProvidersById500JSONResponseBodyFaultPlatform         PatchApiGatewayV1ProvidersById500JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1ProvidersById500JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1ProvidersById500JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1ProvidersById500JSONResponseBodyFaultProvider         PatchApiGatewayV1ProvidersById500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1ProvidersById500JSONResponseBodyFault enum.
@@ -4081,6 +4289,8 @@ func (e PatchApiGatewayV1ProvidersById500JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1ProvidersById500JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1ProvidersById500JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1ProvidersById500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1ProvidersById500JSONResponseBodyFaultProvider:
 		return true
@@ -4121,9 +4331,10 @@ func (e GetApiGatewayV1SpendEventsParamsStatus) Valid() bool {
 
 // Defines values for GetApiGatewayV1SpendEvents400JSONResponseBodyFault.
 const (
-	GetApiGatewayV1SpendEvents400JSONResponseBodyFaultCustomer GetApiGatewayV1SpendEvents400JSONResponseBodyFault = "customer"
-	GetApiGatewayV1SpendEvents400JSONResponseBodyFaultPlatform GetApiGatewayV1SpendEvents400JSONResponseBodyFault = "platform"
-	GetApiGatewayV1SpendEvents400JSONResponseBodyFaultProvider GetApiGatewayV1SpendEvents400JSONResponseBodyFault = "provider"
+	GetApiGatewayV1SpendEvents400JSONResponseBodyFaultCustomer         GetApiGatewayV1SpendEvents400JSONResponseBodyFault = "customer"
+	GetApiGatewayV1SpendEvents400JSONResponseBodyFaultPlatform         GetApiGatewayV1SpendEvents400JSONResponseBodyFault = "platform"
+	GetApiGatewayV1SpendEvents400JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1SpendEvents400JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1SpendEvents400JSONResponseBodyFaultProvider         GetApiGatewayV1SpendEvents400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1SpendEvents400JSONResponseBodyFault enum.
@@ -4132,6 +4343,8 @@ func (e GetApiGatewayV1SpendEvents400JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1SpendEvents400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1SpendEvents400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1SpendEvents400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1SpendEvents400JSONResponseBodyFaultProvider:
 		return true
@@ -4142,9 +4355,10 @@ func (e GetApiGatewayV1SpendEvents400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1SpendEvents401JSONResponseBodyFault.
 const (
-	GetApiGatewayV1SpendEvents401JSONResponseBodyFaultCustomer GetApiGatewayV1SpendEvents401JSONResponseBodyFault = "customer"
-	GetApiGatewayV1SpendEvents401JSONResponseBodyFaultPlatform GetApiGatewayV1SpendEvents401JSONResponseBodyFault = "platform"
-	GetApiGatewayV1SpendEvents401JSONResponseBodyFaultProvider GetApiGatewayV1SpendEvents401JSONResponseBodyFault = "provider"
+	GetApiGatewayV1SpendEvents401JSONResponseBodyFaultCustomer         GetApiGatewayV1SpendEvents401JSONResponseBodyFault = "customer"
+	GetApiGatewayV1SpendEvents401JSONResponseBodyFaultPlatform         GetApiGatewayV1SpendEvents401JSONResponseBodyFault = "platform"
+	GetApiGatewayV1SpendEvents401JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1SpendEvents401JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1SpendEvents401JSONResponseBodyFaultProvider         GetApiGatewayV1SpendEvents401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1SpendEvents401JSONResponseBodyFault enum.
@@ -4153,6 +4367,8 @@ func (e GetApiGatewayV1SpendEvents401JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1SpendEvents401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1SpendEvents401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1SpendEvents401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1SpendEvents401JSONResponseBodyFaultProvider:
 		return true
@@ -4163,9 +4379,10 @@ func (e GetApiGatewayV1SpendEvents401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1SpendEvents403JSONResponseBodyFault.
 const (
-	GetApiGatewayV1SpendEvents403JSONResponseBodyFaultCustomer GetApiGatewayV1SpendEvents403JSONResponseBodyFault = "customer"
-	GetApiGatewayV1SpendEvents403JSONResponseBodyFaultPlatform GetApiGatewayV1SpendEvents403JSONResponseBodyFault = "platform"
-	GetApiGatewayV1SpendEvents403JSONResponseBodyFaultProvider GetApiGatewayV1SpendEvents403JSONResponseBodyFault = "provider"
+	GetApiGatewayV1SpendEvents403JSONResponseBodyFaultCustomer         GetApiGatewayV1SpendEvents403JSONResponseBodyFault = "customer"
+	GetApiGatewayV1SpendEvents403JSONResponseBodyFaultPlatform         GetApiGatewayV1SpendEvents403JSONResponseBodyFault = "platform"
+	GetApiGatewayV1SpendEvents403JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1SpendEvents403JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1SpendEvents403JSONResponseBodyFaultProvider         GetApiGatewayV1SpendEvents403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1SpendEvents403JSONResponseBodyFault enum.
@@ -4174,6 +4391,8 @@ func (e GetApiGatewayV1SpendEvents403JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1SpendEvents403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1SpendEvents403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1SpendEvents403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1SpendEvents403JSONResponseBodyFaultProvider:
 		return true
@@ -4184,9 +4403,10 @@ func (e GetApiGatewayV1SpendEvents403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1SpendEvents500JSONResponseBodyFault.
 const (
-	GetApiGatewayV1SpendEvents500JSONResponseBodyFaultCustomer GetApiGatewayV1SpendEvents500JSONResponseBodyFault = "customer"
-	GetApiGatewayV1SpendEvents500JSONResponseBodyFaultPlatform GetApiGatewayV1SpendEvents500JSONResponseBodyFault = "platform"
-	GetApiGatewayV1SpendEvents500JSONResponseBodyFaultProvider GetApiGatewayV1SpendEvents500JSONResponseBodyFault = "provider"
+	GetApiGatewayV1SpendEvents500JSONResponseBodyFaultCustomer         GetApiGatewayV1SpendEvents500JSONResponseBodyFault = "customer"
+	GetApiGatewayV1SpendEvents500JSONResponseBodyFaultPlatform         GetApiGatewayV1SpendEvents500JSONResponseBodyFault = "platform"
+	GetApiGatewayV1SpendEvents500JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1SpendEvents500JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1SpendEvents500JSONResponseBodyFaultProvider         GetApiGatewayV1SpendEvents500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1SpendEvents500JSONResponseBodyFault enum.
@@ -4195,6 +4415,8 @@ func (e GetApiGatewayV1SpendEvents500JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1SpendEvents500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1SpendEvents500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1SpendEvents500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1SpendEvents500JSONResponseBodyFaultProvider:
 		return true
@@ -4205,9 +4427,10 @@ func (e GetApiGatewayV1SpendEvents500JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFault.
 const (
-	PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFaultCustomer PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFault = "customer"
-	PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFaultPlatform PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFault = "platform"
-	PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFaultProvider PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFault = "provider"
+	PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFaultCustomer         PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFault = "customer"
+	PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFaultPlatform         PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFault = "platform"
+	PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFaultProvider         PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFault enum.
@@ -4216,6 +4439,8 @@ func (e PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFault) Valid() bool 
 	case PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFaultProvider:
 		return true
@@ -4226,9 +4451,10 @@ func (e PostApiGatewayV1SpendEventsReplay400JSONResponseBodyFault) Valid() bool 
 
 // Defines values for PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFault.
 const (
-	PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFaultCustomer PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFault = "customer"
-	PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFaultPlatform PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFault = "platform"
-	PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFaultProvider PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFault = "provider"
+	PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFaultCustomer         PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFault = "customer"
+	PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFaultPlatform         PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFault = "platform"
+	PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFaultProvider         PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFault enum.
@@ -4237,6 +4463,8 @@ func (e PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFault) Valid() bool 
 	case PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFaultProvider:
 		return true
@@ -4247,9 +4475,10 @@ func (e PostApiGatewayV1SpendEventsReplay401JSONResponseBodyFault) Valid() bool 
 
 // Defines values for PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFault.
 const (
-	PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFaultCustomer PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFault = "customer"
-	PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFaultPlatform PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFault = "platform"
-	PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFaultProvider PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFault = "provider"
+	PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFaultCustomer         PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFault = "customer"
+	PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFaultPlatform         PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFault = "platform"
+	PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFaultProvider         PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFault enum.
@@ -4258,6 +4487,8 @@ func (e PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFault) Valid() bool 
 	case PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFaultProvider:
 		return true
@@ -4268,9 +4499,10 @@ func (e PostApiGatewayV1SpendEventsReplay403JSONResponseBodyFault) Valid() bool 
 
 // Defines values for PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFault.
 const (
-	PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFaultCustomer PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFault = "customer"
-	PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFaultPlatform PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFault = "platform"
-	PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFaultProvider PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFault = "provider"
+	PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFaultCustomer         PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFault = "customer"
+	PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFaultPlatform         PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFault = "platform"
+	PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFaultProvider         PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFault enum.
@@ -4279,6 +4511,8 @@ func (e PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFault) Valid() bool 
 	case PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1SpendEventsReplay500JSONResponseBodyFaultProvider:
 		return true
@@ -4337,9 +4571,10 @@ func (e GetApiGatewayV1SpendSummariesParamsStatus) Valid() bool {
 
 // Defines values for GetApiGatewayV1SpendSummaries400JSONResponseBodyFault.
 const (
-	GetApiGatewayV1SpendSummaries400JSONResponseBodyFaultCustomer GetApiGatewayV1SpendSummaries400JSONResponseBodyFault = "customer"
-	GetApiGatewayV1SpendSummaries400JSONResponseBodyFaultPlatform GetApiGatewayV1SpendSummaries400JSONResponseBodyFault = "platform"
-	GetApiGatewayV1SpendSummaries400JSONResponseBodyFaultProvider GetApiGatewayV1SpendSummaries400JSONResponseBodyFault = "provider"
+	GetApiGatewayV1SpendSummaries400JSONResponseBodyFaultCustomer         GetApiGatewayV1SpendSummaries400JSONResponseBodyFault = "customer"
+	GetApiGatewayV1SpendSummaries400JSONResponseBodyFaultPlatform         GetApiGatewayV1SpendSummaries400JSONResponseBodyFault = "platform"
+	GetApiGatewayV1SpendSummaries400JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1SpendSummaries400JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1SpendSummaries400JSONResponseBodyFaultProvider         GetApiGatewayV1SpendSummaries400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1SpendSummaries400JSONResponseBodyFault enum.
@@ -4348,6 +4583,8 @@ func (e GetApiGatewayV1SpendSummaries400JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1SpendSummaries400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1SpendSummaries400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1SpendSummaries400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1SpendSummaries400JSONResponseBodyFaultProvider:
 		return true
@@ -4358,9 +4595,10 @@ func (e GetApiGatewayV1SpendSummaries400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1SpendSummaries401JSONResponseBodyFault.
 const (
-	GetApiGatewayV1SpendSummaries401JSONResponseBodyFaultCustomer GetApiGatewayV1SpendSummaries401JSONResponseBodyFault = "customer"
-	GetApiGatewayV1SpendSummaries401JSONResponseBodyFaultPlatform GetApiGatewayV1SpendSummaries401JSONResponseBodyFault = "platform"
-	GetApiGatewayV1SpendSummaries401JSONResponseBodyFaultProvider GetApiGatewayV1SpendSummaries401JSONResponseBodyFault = "provider"
+	GetApiGatewayV1SpendSummaries401JSONResponseBodyFaultCustomer         GetApiGatewayV1SpendSummaries401JSONResponseBodyFault = "customer"
+	GetApiGatewayV1SpendSummaries401JSONResponseBodyFaultPlatform         GetApiGatewayV1SpendSummaries401JSONResponseBodyFault = "platform"
+	GetApiGatewayV1SpendSummaries401JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1SpendSummaries401JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1SpendSummaries401JSONResponseBodyFaultProvider         GetApiGatewayV1SpendSummaries401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1SpendSummaries401JSONResponseBodyFault enum.
@@ -4369,6 +4607,8 @@ func (e GetApiGatewayV1SpendSummaries401JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1SpendSummaries401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1SpendSummaries401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1SpendSummaries401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1SpendSummaries401JSONResponseBodyFaultProvider:
 		return true
@@ -4379,9 +4619,10 @@ func (e GetApiGatewayV1SpendSummaries401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1SpendSummaries403JSONResponseBodyFault.
 const (
-	GetApiGatewayV1SpendSummaries403JSONResponseBodyFaultCustomer GetApiGatewayV1SpendSummaries403JSONResponseBodyFault = "customer"
-	GetApiGatewayV1SpendSummaries403JSONResponseBodyFaultPlatform GetApiGatewayV1SpendSummaries403JSONResponseBodyFault = "platform"
-	GetApiGatewayV1SpendSummaries403JSONResponseBodyFaultProvider GetApiGatewayV1SpendSummaries403JSONResponseBodyFault = "provider"
+	GetApiGatewayV1SpendSummaries403JSONResponseBodyFaultCustomer         GetApiGatewayV1SpendSummaries403JSONResponseBodyFault = "customer"
+	GetApiGatewayV1SpendSummaries403JSONResponseBodyFaultPlatform         GetApiGatewayV1SpendSummaries403JSONResponseBodyFault = "platform"
+	GetApiGatewayV1SpendSummaries403JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1SpendSummaries403JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1SpendSummaries403JSONResponseBodyFaultProvider         GetApiGatewayV1SpendSummaries403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1SpendSummaries403JSONResponseBodyFault enum.
@@ -4390,6 +4631,8 @@ func (e GetApiGatewayV1SpendSummaries403JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1SpendSummaries403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1SpendSummaries403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1SpendSummaries403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1SpendSummaries403JSONResponseBodyFaultProvider:
 		return true
@@ -4400,9 +4643,10 @@ func (e GetApiGatewayV1SpendSummaries403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1SpendSummaries500JSONResponseBodyFault.
 const (
-	GetApiGatewayV1SpendSummaries500JSONResponseBodyFaultCustomer GetApiGatewayV1SpendSummaries500JSONResponseBodyFault = "customer"
-	GetApiGatewayV1SpendSummaries500JSONResponseBodyFaultPlatform GetApiGatewayV1SpendSummaries500JSONResponseBodyFault = "platform"
-	GetApiGatewayV1SpendSummaries500JSONResponseBodyFaultProvider GetApiGatewayV1SpendSummaries500JSONResponseBodyFault = "provider"
+	GetApiGatewayV1SpendSummaries500JSONResponseBodyFaultCustomer         GetApiGatewayV1SpendSummaries500JSONResponseBodyFault = "customer"
+	GetApiGatewayV1SpendSummaries500JSONResponseBodyFaultPlatform         GetApiGatewayV1SpendSummaries500JSONResponseBodyFault = "platform"
+	GetApiGatewayV1SpendSummaries500JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1SpendSummaries500JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1SpendSummaries500JSONResponseBodyFaultProvider         GetApiGatewayV1SpendSummaries500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1SpendSummaries500JSONResponseBodyFault enum.
@@ -4411,6 +4655,8 @@ func (e GetApiGatewayV1SpendSummaries500JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1SpendSummaries500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1SpendSummaries500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1SpendSummaries500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1SpendSummaries500JSONResponseBodyFaultProvider:
 		return true
@@ -4502,9 +4748,10 @@ func (e GetApiGatewayV1VirtualKeys200JSONResponseBodyDataStatus) Valid() bool {
 
 // Defines values for GetApiGatewayV1VirtualKeys400JSONResponseBodyFault.
 const (
-	GetApiGatewayV1VirtualKeys400JSONResponseBodyFaultCustomer GetApiGatewayV1VirtualKeys400JSONResponseBodyFault = "customer"
-	GetApiGatewayV1VirtualKeys400JSONResponseBodyFaultPlatform GetApiGatewayV1VirtualKeys400JSONResponseBodyFault = "platform"
-	GetApiGatewayV1VirtualKeys400JSONResponseBodyFaultProvider GetApiGatewayV1VirtualKeys400JSONResponseBodyFault = "provider"
+	GetApiGatewayV1VirtualKeys400JSONResponseBodyFaultCustomer         GetApiGatewayV1VirtualKeys400JSONResponseBodyFault = "customer"
+	GetApiGatewayV1VirtualKeys400JSONResponseBodyFaultPlatform         GetApiGatewayV1VirtualKeys400JSONResponseBodyFault = "platform"
+	GetApiGatewayV1VirtualKeys400JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1VirtualKeys400JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1VirtualKeys400JSONResponseBodyFaultProvider         GetApiGatewayV1VirtualKeys400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1VirtualKeys400JSONResponseBodyFault enum.
@@ -4513,6 +4760,8 @@ func (e GetApiGatewayV1VirtualKeys400JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1VirtualKeys400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1VirtualKeys400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1VirtualKeys400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1VirtualKeys400JSONResponseBodyFaultProvider:
 		return true
@@ -4523,9 +4772,10 @@ func (e GetApiGatewayV1VirtualKeys400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1VirtualKeys401JSONResponseBodyFault.
 const (
-	GetApiGatewayV1VirtualKeys401JSONResponseBodyFaultCustomer GetApiGatewayV1VirtualKeys401JSONResponseBodyFault = "customer"
-	GetApiGatewayV1VirtualKeys401JSONResponseBodyFaultPlatform GetApiGatewayV1VirtualKeys401JSONResponseBodyFault = "platform"
-	GetApiGatewayV1VirtualKeys401JSONResponseBodyFaultProvider GetApiGatewayV1VirtualKeys401JSONResponseBodyFault = "provider"
+	GetApiGatewayV1VirtualKeys401JSONResponseBodyFaultCustomer         GetApiGatewayV1VirtualKeys401JSONResponseBodyFault = "customer"
+	GetApiGatewayV1VirtualKeys401JSONResponseBodyFaultPlatform         GetApiGatewayV1VirtualKeys401JSONResponseBodyFault = "platform"
+	GetApiGatewayV1VirtualKeys401JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1VirtualKeys401JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1VirtualKeys401JSONResponseBodyFaultProvider         GetApiGatewayV1VirtualKeys401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1VirtualKeys401JSONResponseBodyFault enum.
@@ -4534,6 +4784,8 @@ func (e GetApiGatewayV1VirtualKeys401JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1VirtualKeys401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1VirtualKeys401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1VirtualKeys401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1VirtualKeys401JSONResponseBodyFaultProvider:
 		return true
@@ -4544,9 +4796,10 @@ func (e GetApiGatewayV1VirtualKeys401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1VirtualKeys403JSONResponseBodyFault.
 const (
-	GetApiGatewayV1VirtualKeys403JSONResponseBodyFaultCustomer GetApiGatewayV1VirtualKeys403JSONResponseBodyFault = "customer"
-	GetApiGatewayV1VirtualKeys403JSONResponseBodyFaultPlatform GetApiGatewayV1VirtualKeys403JSONResponseBodyFault = "platform"
-	GetApiGatewayV1VirtualKeys403JSONResponseBodyFaultProvider GetApiGatewayV1VirtualKeys403JSONResponseBodyFault = "provider"
+	GetApiGatewayV1VirtualKeys403JSONResponseBodyFaultCustomer         GetApiGatewayV1VirtualKeys403JSONResponseBodyFault = "customer"
+	GetApiGatewayV1VirtualKeys403JSONResponseBodyFaultPlatform         GetApiGatewayV1VirtualKeys403JSONResponseBodyFault = "platform"
+	GetApiGatewayV1VirtualKeys403JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1VirtualKeys403JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1VirtualKeys403JSONResponseBodyFaultProvider         GetApiGatewayV1VirtualKeys403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1VirtualKeys403JSONResponseBodyFault enum.
@@ -4555,6 +4808,8 @@ func (e GetApiGatewayV1VirtualKeys403JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1VirtualKeys403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1VirtualKeys403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1VirtualKeys403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1VirtualKeys403JSONResponseBodyFaultProvider:
 		return true
@@ -4565,9 +4820,10 @@ func (e GetApiGatewayV1VirtualKeys403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1VirtualKeys500JSONResponseBodyFault.
 const (
-	GetApiGatewayV1VirtualKeys500JSONResponseBodyFaultCustomer GetApiGatewayV1VirtualKeys500JSONResponseBodyFault = "customer"
-	GetApiGatewayV1VirtualKeys500JSONResponseBodyFaultPlatform GetApiGatewayV1VirtualKeys500JSONResponseBodyFault = "platform"
-	GetApiGatewayV1VirtualKeys500JSONResponseBodyFaultProvider GetApiGatewayV1VirtualKeys500JSONResponseBodyFault = "provider"
+	GetApiGatewayV1VirtualKeys500JSONResponseBodyFaultCustomer         GetApiGatewayV1VirtualKeys500JSONResponseBodyFault = "customer"
+	GetApiGatewayV1VirtualKeys500JSONResponseBodyFaultPlatform         GetApiGatewayV1VirtualKeys500JSONResponseBodyFault = "platform"
+	GetApiGatewayV1VirtualKeys500JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1VirtualKeys500JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1VirtualKeys500JSONResponseBodyFaultProvider         GetApiGatewayV1VirtualKeys500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1VirtualKeys500JSONResponseBodyFault enum.
@@ -4576,6 +4832,8 @@ func (e GetApiGatewayV1VirtualKeys500JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1VirtualKeys500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1VirtualKeys500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1VirtualKeys500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1VirtualKeys500JSONResponseBodyFaultProvider:
 		return true
@@ -4805,9 +5063,10 @@ func (e PostApiGatewayV1VirtualKeys201JSONResponseBodyVirtualKeyStatus) Valid() 
 
 // Defines values for PostApiGatewayV1VirtualKeys400JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeys400JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeys400JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeys400JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeys400JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeys400JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeys400JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeys400JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeys400JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeys400JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeys400JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeys400JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeys400JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeys400JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeys400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeys400JSONResponseBodyFault enum.
@@ -4816,6 +5075,8 @@ func (e PostApiGatewayV1VirtualKeys400JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1VirtualKeys400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeys400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeys400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeys400JSONResponseBodyFaultProvider:
 		return true
@@ -4826,9 +5087,10 @@ func (e PostApiGatewayV1VirtualKeys400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1VirtualKeys401JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeys401JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeys401JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeys401JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeys401JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeys401JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeys401JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeys401JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeys401JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeys401JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeys401JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeys401JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeys401JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeys401JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeys401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeys401JSONResponseBodyFault enum.
@@ -4837,6 +5099,8 @@ func (e PostApiGatewayV1VirtualKeys401JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1VirtualKeys401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeys401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeys401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeys401JSONResponseBodyFaultProvider:
 		return true
@@ -4847,9 +5111,10 @@ func (e PostApiGatewayV1VirtualKeys401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1VirtualKeys403JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeys403JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeys403JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeys403JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeys403JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeys403JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeys403JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeys403JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeys403JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeys403JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeys403JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeys403JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeys403JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeys403JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeys403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeys403JSONResponseBodyFault enum.
@@ -4858,6 +5123,8 @@ func (e PostApiGatewayV1VirtualKeys403JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1VirtualKeys403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeys403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeys403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeys403JSONResponseBodyFaultProvider:
 		return true
@@ -4868,9 +5135,10 @@ func (e PostApiGatewayV1VirtualKeys403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1VirtualKeys409JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeys409JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeys409JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeys409JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeys409JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeys409JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeys409JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeys409JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeys409JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeys409JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeys409JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeys409JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeys409JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeys409JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeys409JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeys409JSONResponseBodyFault enum.
@@ -4879,6 +5147,8 @@ func (e PostApiGatewayV1VirtualKeys409JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1VirtualKeys409JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeys409JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeys409JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeys409JSONResponseBodyFaultProvider:
 		return true
@@ -4889,9 +5159,10 @@ func (e PostApiGatewayV1VirtualKeys409JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiGatewayV1VirtualKeys500JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeys500JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeys500JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeys500JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeys500JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeys500JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeys500JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeys500JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeys500JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeys500JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeys500JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeys500JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeys500JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeys500JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeys500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeys500JSONResponseBodyFault enum.
@@ -4900,6 +5171,8 @@ func (e PostApiGatewayV1VirtualKeys500JSONResponseBodyFault) Valid() bool {
 	case PostApiGatewayV1VirtualKeys500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeys500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeys500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeys500JSONResponseBodyFaultProvider:
 		return true
@@ -4991,9 +5264,10 @@ func (e GetApiGatewayV1VirtualKeysById200JSONResponseBodyVirtualKeyStatus) Valid
 
 // Defines values for GetApiGatewayV1VirtualKeysById400JSONResponseBodyFault.
 const (
-	GetApiGatewayV1VirtualKeysById400JSONResponseBodyFaultCustomer GetApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "customer"
-	GetApiGatewayV1VirtualKeysById400JSONResponseBodyFaultPlatform GetApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "platform"
-	GetApiGatewayV1VirtualKeysById400JSONResponseBodyFaultProvider GetApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "provider"
+	GetApiGatewayV1VirtualKeysById400JSONResponseBodyFaultCustomer         GetApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "customer"
+	GetApiGatewayV1VirtualKeysById400JSONResponseBodyFaultPlatform         GetApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "platform"
+	GetApiGatewayV1VirtualKeysById400JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1VirtualKeysById400JSONResponseBodyFaultProvider         GetApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1VirtualKeysById400JSONResponseBodyFault enum.
@@ -5002,6 +5276,8 @@ func (e GetApiGatewayV1VirtualKeysById400JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1VirtualKeysById400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1VirtualKeysById400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1VirtualKeysById400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1VirtualKeysById400JSONResponseBodyFaultProvider:
 		return true
@@ -5012,9 +5288,10 @@ func (e GetApiGatewayV1VirtualKeysById400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1VirtualKeysById401JSONResponseBodyFault.
 const (
-	GetApiGatewayV1VirtualKeysById401JSONResponseBodyFaultCustomer GetApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "customer"
-	GetApiGatewayV1VirtualKeysById401JSONResponseBodyFaultPlatform GetApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "platform"
-	GetApiGatewayV1VirtualKeysById401JSONResponseBodyFaultProvider GetApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "provider"
+	GetApiGatewayV1VirtualKeysById401JSONResponseBodyFaultCustomer         GetApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "customer"
+	GetApiGatewayV1VirtualKeysById401JSONResponseBodyFaultPlatform         GetApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "platform"
+	GetApiGatewayV1VirtualKeysById401JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1VirtualKeysById401JSONResponseBodyFaultProvider         GetApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1VirtualKeysById401JSONResponseBodyFault enum.
@@ -5023,6 +5300,8 @@ func (e GetApiGatewayV1VirtualKeysById401JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1VirtualKeysById401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1VirtualKeysById401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1VirtualKeysById401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1VirtualKeysById401JSONResponseBodyFaultProvider:
 		return true
@@ -5033,9 +5312,10 @@ func (e GetApiGatewayV1VirtualKeysById401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1VirtualKeysById403JSONResponseBodyFault.
 const (
-	GetApiGatewayV1VirtualKeysById403JSONResponseBodyFaultCustomer GetApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "customer"
-	GetApiGatewayV1VirtualKeysById403JSONResponseBodyFaultPlatform GetApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "platform"
-	GetApiGatewayV1VirtualKeysById403JSONResponseBodyFaultProvider GetApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "provider"
+	GetApiGatewayV1VirtualKeysById403JSONResponseBodyFaultCustomer         GetApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "customer"
+	GetApiGatewayV1VirtualKeysById403JSONResponseBodyFaultPlatform         GetApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "platform"
+	GetApiGatewayV1VirtualKeysById403JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1VirtualKeysById403JSONResponseBodyFaultProvider         GetApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1VirtualKeysById403JSONResponseBodyFault enum.
@@ -5044,6 +5324,8 @@ func (e GetApiGatewayV1VirtualKeysById403JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1VirtualKeysById403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1VirtualKeysById403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1VirtualKeysById403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1VirtualKeysById403JSONResponseBodyFaultProvider:
 		return true
@@ -5054,9 +5336,10 @@ func (e GetApiGatewayV1VirtualKeysById403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiGatewayV1VirtualKeysById500JSONResponseBodyFault.
 const (
-	GetApiGatewayV1VirtualKeysById500JSONResponseBodyFaultCustomer GetApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "customer"
-	GetApiGatewayV1VirtualKeysById500JSONResponseBodyFaultPlatform GetApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "platform"
-	GetApiGatewayV1VirtualKeysById500JSONResponseBodyFaultProvider GetApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "provider"
+	GetApiGatewayV1VirtualKeysById500JSONResponseBodyFaultCustomer         GetApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "customer"
+	GetApiGatewayV1VirtualKeysById500JSONResponseBodyFaultPlatform         GetApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "platform"
+	GetApiGatewayV1VirtualKeysById500JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1VirtualKeysById500JSONResponseBodyFaultProvider         GetApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1VirtualKeysById500JSONResponseBodyFault enum.
@@ -5065,6 +5348,8 @@ func (e GetApiGatewayV1VirtualKeysById500JSONResponseBodyFault) Valid() bool {
 	case GetApiGatewayV1VirtualKeysById500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1VirtualKeysById500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1VirtualKeysById500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1VirtualKeysById500JSONResponseBodyFaultProvider:
 		return true
@@ -5279,9 +5564,10 @@ func (e PatchApiGatewayV1VirtualKeysById200JSONResponseBodyVirtualKeyStatus) Val
 
 // Defines values for PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFaultCustomer PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFaultPlatform PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFaultProvider PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFaultCustomer         PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFaultPlatform         PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFaultProvider         PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFault enum.
@@ -5290,6 +5576,8 @@ func (e PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFaultProvider:
 		return true
@@ -5300,9 +5588,10 @@ func (e PatchApiGatewayV1VirtualKeysById400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFaultCustomer PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFaultPlatform PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFaultProvider PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFaultCustomer         PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFaultPlatform         PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFaultProvider         PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFault enum.
@@ -5311,6 +5600,8 @@ func (e PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFaultProvider:
 		return true
@@ -5321,9 +5612,10 @@ func (e PatchApiGatewayV1VirtualKeysById401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFaultCustomer PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFaultPlatform PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFaultProvider PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFaultCustomer         PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFaultPlatform         PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFaultProvider         PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFault enum.
@@ -5332,6 +5624,8 @@ func (e PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFaultProvider:
 		return true
@@ -5342,9 +5636,10 @@ func (e PatchApiGatewayV1VirtualKeysById403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFault.
 const (
-	PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFaultCustomer PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "customer"
-	PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFaultPlatform PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "platform"
-	PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFaultProvider PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "provider"
+	PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFaultCustomer         PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "customer"
+	PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFaultPlatform         PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "platform"
+	PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFaultPresumedPlatform PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "presumed_platform"
+	PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFaultProvider         PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFault enum.
@@ -5353,6 +5648,8 @@ func (e PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFault) Valid() bool {
 	case PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiGatewayV1VirtualKeysById500JSONResponseBodyFaultProvider:
 		return true
@@ -5444,9 +5741,10 @@ func (e PostApiGatewayV1VirtualKeysByIdDisable200JSONResponseBodyVirtualKeyStatu
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFault enum.
@@ -5455,6 +5753,8 @@ func (e PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFault) Valid() 
 	case PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFaultProvider:
 		return true
@@ -5465,9 +5765,10 @@ func (e PostApiGatewayV1VirtualKeysByIdDisable400JSONResponseBodyFault) Valid() 
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFault enum.
@@ -5476,6 +5777,8 @@ func (e PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFault) Valid() 
 	case PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFaultProvider:
 		return true
@@ -5486,9 +5789,10 @@ func (e PostApiGatewayV1VirtualKeysByIdDisable401JSONResponseBodyFault) Valid() 
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFault enum.
@@ -5497,6 +5801,8 @@ func (e PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFault) Valid() 
 	case PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFaultProvider:
 		return true
@@ -5507,9 +5813,10 @@ func (e PostApiGatewayV1VirtualKeysByIdDisable403JSONResponseBodyFault) Valid() 
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFault enum.
@@ -5518,6 +5825,8 @@ func (e PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFault) Valid() 
 	case PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdDisable500JSONResponseBodyFaultProvider:
 		return true
@@ -5609,9 +5918,10 @@ func (e PostApiGatewayV1VirtualKeysByIdEnable200JSONResponseBodyVirtualKeyStatus
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFault enum.
@@ -5620,6 +5930,8 @@ func (e PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFault) Valid() b
 	case PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFaultProvider:
 		return true
@@ -5630,9 +5942,10 @@ func (e PostApiGatewayV1VirtualKeysByIdEnable400JSONResponseBodyFault) Valid() b
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFault enum.
@@ -5641,6 +5954,8 @@ func (e PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFault) Valid() b
 	case PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFaultProvider:
 		return true
@@ -5651,9 +5966,10 @@ func (e PostApiGatewayV1VirtualKeysByIdEnable401JSONResponseBodyFault) Valid() b
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFault enum.
@@ -5662,6 +5978,8 @@ func (e PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFault) Valid() b
 	case PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFaultProvider:
 		return true
@@ -5672,9 +5990,10 @@ func (e PostApiGatewayV1VirtualKeysByIdEnable403JSONResponseBodyFault) Valid() b
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFault enum.
@@ -5683,6 +6002,8 @@ func (e PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFault) Valid() b
 	case PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdEnable500JSONResponseBodyFaultProvider:
 		return true
@@ -5774,9 +6095,10 @@ func (e PostApiGatewayV1VirtualKeysByIdRevoke200JSONResponseBodyVirtualKeyStatus
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFault enum.
@@ -5785,6 +6107,8 @@ func (e PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFault) Valid() b
 	case PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFaultProvider:
 		return true
@@ -5795,9 +6119,10 @@ func (e PostApiGatewayV1VirtualKeysByIdRevoke400JSONResponseBodyFault) Valid() b
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFault enum.
@@ -5806,6 +6131,8 @@ func (e PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFault) Valid() b
 	case PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFaultProvider:
 		return true
@@ -5816,9 +6143,10 @@ func (e PostApiGatewayV1VirtualKeysByIdRevoke401JSONResponseBodyFault) Valid() b
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFault enum.
@@ -5827,6 +6155,8 @@ func (e PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFault) Valid() b
 	case PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFaultProvider:
 		return true
@@ -5837,9 +6167,10 @@ func (e PostApiGatewayV1VirtualKeysByIdRevoke403JSONResponseBodyFault) Valid() b
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFault enum.
@@ -5848,6 +6179,8 @@ func (e PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFault) Valid() b
 	case PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRevoke500JSONResponseBodyFaultProvider:
 		return true
@@ -5939,9 +6272,10 @@ func (e PostApiGatewayV1VirtualKeysByIdRotate200JSONResponseBodyVirtualKeyStatus
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFault enum.
@@ -5950,6 +6284,8 @@ func (e PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFault) Valid() b
 	case PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFaultProvider:
 		return true
@@ -5960,9 +6296,10 @@ func (e PostApiGatewayV1VirtualKeysByIdRotate400JSONResponseBodyFault) Valid() b
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFault enum.
@@ -5971,6 +6308,8 @@ func (e PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFault) Valid() b
 	case PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFaultProvider:
 		return true
@@ -5981,9 +6320,10 @@ func (e PostApiGatewayV1VirtualKeysByIdRotate401JSONResponseBodyFault) Valid() b
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFault enum.
@@ -5992,6 +6332,8 @@ func (e PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFault) Valid() b
 	case PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFaultProvider:
 		return true
@@ -6002,9 +6344,10 @@ func (e PostApiGatewayV1VirtualKeysByIdRotate403JSONResponseBodyFault) Valid() b
 
 // Defines values for PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFault.
 const (
-	PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFaultCustomer PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFault = "customer"
-	PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFaultPlatform PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFault = "platform"
-	PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFaultProvider PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFault = "provider"
+	PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFaultCustomer         PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFault = "customer"
+	PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFaultPlatform         PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFault = "platform"
+	PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFaultPresumedPlatform PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFault = "presumed_platform"
+	PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFaultProvider         PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFault enum.
@@ -6013,6 +6356,8 @@ func (e PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFault) Valid() b
 	case PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFaultProvider:
 		return true
@@ -6023,9 +6368,10 @@ func (e PostApiGatewayV1VirtualKeysByIdRotate500JSONResponseBodyFault) Valid() b
 
 // Defines values for GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFault.
 const (
-	GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFaultCustomer GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFault = "customer"
-	GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFaultPlatform GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFault = "platform"
-	GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFaultProvider GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFault = "provider"
+	GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFaultCustomer         GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFault = "customer"
+	GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFaultPlatform         GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFault = "platform"
+	GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFaultProvider         GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFault enum.
@@ -6034,6 +6380,8 @@ func (e GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFault) Valid() boo
 	case GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFaultProvider:
 		return true
@@ -6044,9 +6392,10 @@ func (e GetApiGatewayV1VirtualKeysByIdSpend400JSONResponseBodyFault) Valid() boo
 
 // Defines values for GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFault.
 const (
-	GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFaultCustomer GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFault = "customer"
-	GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFaultPlatform GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFault = "platform"
-	GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFaultProvider GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFault = "provider"
+	GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFaultCustomer         GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFault = "customer"
+	GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFaultPlatform         GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFault = "platform"
+	GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFaultProvider         GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFault enum.
@@ -6055,6 +6404,8 @@ func (e GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFault) Valid() boo
 	case GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFaultProvider:
 		return true
@@ -6065,9 +6416,10 @@ func (e GetApiGatewayV1VirtualKeysByIdSpend401JSONResponseBodyFault) Valid() boo
 
 // Defines values for GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFault.
 const (
-	GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFaultCustomer GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFault = "customer"
-	GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFaultPlatform GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFault = "platform"
-	GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFaultProvider GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFault = "provider"
+	GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFaultCustomer         GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFault = "customer"
+	GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFaultPlatform         GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFault = "platform"
+	GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFaultProvider         GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFault enum.
@@ -6076,6 +6428,8 @@ func (e GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFault) Valid() boo
 	case GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFaultProvider:
 		return true
@@ -6086,9 +6440,10 @@ func (e GetApiGatewayV1VirtualKeysByIdSpend403JSONResponseBodyFault) Valid() boo
 
 // Defines values for GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFault.
 const (
-	GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFaultCustomer GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFault = "customer"
-	GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFaultPlatform GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFault = "platform"
-	GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFaultProvider GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFault = "provider"
+	GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFaultCustomer         GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFault = "customer"
+	GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFaultPlatform         GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFault = "platform"
+	GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFaultPresumedPlatform GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFault = "presumed_platform"
+	GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFaultProvider         GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFault enum.
@@ -6097,6 +6452,8 @@ func (e GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFault) Valid() boo
 	case GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiGatewayV1VirtualKeysByIdSpend500JSONResponseBodyFaultProvider:
 		return true
@@ -8090,9 +8447,10 @@ func (e RunAdminOperationJSONBodyParamsSortOrder) Valid() bool {
 
 // Defines values for DeleteApiAgentCacheByName400JSONResponseBodyFault.
 const (
-	DeleteApiAgentCacheByName400JSONResponseBodyFaultCustomer DeleteApiAgentCacheByName400JSONResponseBodyFault = "customer"
-	DeleteApiAgentCacheByName400JSONResponseBodyFaultPlatform DeleteApiAgentCacheByName400JSONResponseBodyFault = "platform"
-	DeleteApiAgentCacheByName400JSONResponseBodyFaultProvider DeleteApiAgentCacheByName400JSONResponseBodyFault = "provider"
+	DeleteApiAgentCacheByName400JSONResponseBodyFaultCustomer         DeleteApiAgentCacheByName400JSONResponseBodyFault = "customer"
+	DeleteApiAgentCacheByName400JSONResponseBodyFaultPlatform         DeleteApiAgentCacheByName400JSONResponseBodyFault = "platform"
+	DeleteApiAgentCacheByName400JSONResponseBodyFaultPresumedPlatform DeleteApiAgentCacheByName400JSONResponseBodyFault = "presumed_platform"
+	DeleteApiAgentCacheByName400JSONResponseBodyFaultProvider         DeleteApiAgentCacheByName400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiAgentCacheByName400JSONResponseBodyFault enum.
@@ -8101,6 +8459,8 @@ func (e DeleteApiAgentCacheByName400JSONResponseBodyFault) Valid() bool {
 	case DeleteApiAgentCacheByName400JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiAgentCacheByName400JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiAgentCacheByName400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiAgentCacheByName400JSONResponseBodyFaultProvider:
 		return true
@@ -8111,9 +8471,10 @@ func (e DeleteApiAgentCacheByName400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiAgentCacheByName401JSONResponseBodyFault.
 const (
-	DeleteApiAgentCacheByName401JSONResponseBodyFaultCustomer DeleteApiAgentCacheByName401JSONResponseBodyFault = "customer"
-	DeleteApiAgentCacheByName401JSONResponseBodyFaultPlatform DeleteApiAgentCacheByName401JSONResponseBodyFault = "platform"
-	DeleteApiAgentCacheByName401JSONResponseBodyFaultProvider DeleteApiAgentCacheByName401JSONResponseBodyFault = "provider"
+	DeleteApiAgentCacheByName401JSONResponseBodyFaultCustomer         DeleteApiAgentCacheByName401JSONResponseBodyFault = "customer"
+	DeleteApiAgentCacheByName401JSONResponseBodyFaultPlatform         DeleteApiAgentCacheByName401JSONResponseBodyFault = "platform"
+	DeleteApiAgentCacheByName401JSONResponseBodyFaultPresumedPlatform DeleteApiAgentCacheByName401JSONResponseBodyFault = "presumed_platform"
+	DeleteApiAgentCacheByName401JSONResponseBodyFaultProvider         DeleteApiAgentCacheByName401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiAgentCacheByName401JSONResponseBodyFault enum.
@@ -8122,6 +8483,8 @@ func (e DeleteApiAgentCacheByName401JSONResponseBodyFault) Valid() bool {
 	case DeleteApiAgentCacheByName401JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiAgentCacheByName401JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiAgentCacheByName401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiAgentCacheByName401JSONResponseBodyFaultProvider:
 		return true
@@ -8132,9 +8495,10 @@ func (e DeleteApiAgentCacheByName401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiAgentCacheByName403JSONResponseBodyFault.
 const (
-	DeleteApiAgentCacheByName403JSONResponseBodyFaultCustomer DeleteApiAgentCacheByName403JSONResponseBodyFault = "customer"
-	DeleteApiAgentCacheByName403JSONResponseBodyFaultPlatform DeleteApiAgentCacheByName403JSONResponseBodyFault = "platform"
-	DeleteApiAgentCacheByName403JSONResponseBodyFaultProvider DeleteApiAgentCacheByName403JSONResponseBodyFault = "provider"
+	DeleteApiAgentCacheByName403JSONResponseBodyFaultCustomer         DeleteApiAgentCacheByName403JSONResponseBodyFault = "customer"
+	DeleteApiAgentCacheByName403JSONResponseBodyFaultPlatform         DeleteApiAgentCacheByName403JSONResponseBodyFault = "platform"
+	DeleteApiAgentCacheByName403JSONResponseBodyFaultPresumedPlatform DeleteApiAgentCacheByName403JSONResponseBodyFault = "presumed_platform"
+	DeleteApiAgentCacheByName403JSONResponseBodyFaultProvider         DeleteApiAgentCacheByName403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiAgentCacheByName403JSONResponseBodyFault enum.
@@ -8143,6 +8507,8 @@ func (e DeleteApiAgentCacheByName403JSONResponseBodyFault) Valid() bool {
 	case DeleteApiAgentCacheByName403JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiAgentCacheByName403JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiAgentCacheByName403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiAgentCacheByName403JSONResponseBodyFaultProvider:
 		return true
@@ -8153,9 +8519,10 @@ func (e DeleteApiAgentCacheByName403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for DeleteApiAgentCacheByName500JSONResponseBodyFault.
 const (
-	DeleteApiAgentCacheByName500JSONResponseBodyFaultCustomer DeleteApiAgentCacheByName500JSONResponseBodyFault = "customer"
-	DeleteApiAgentCacheByName500JSONResponseBodyFaultPlatform DeleteApiAgentCacheByName500JSONResponseBodyFault = "platform"
-	DeleteApiAgentCacheByName500JSONResponseBodyFaultProvider DeleteApiAgentCacheByName500JSONResponseBodyFault = "provider"
+	DeleteApiAgentCacheByName500JSONResponseBodyFaultCustomer         DeleteApiAgentCacheByName500JSONResponseBodyFault = "customer"
+	DeleteApiAgentCacheByName500JSONResponseBodyFaultPlatform         DeleteApiAgentCacheByName500JSONResponseBodyFault = "platform"
+	DeleteApiAgentCacheByName500JSONResponseBodyFaultPresumedPlatform DeleteApiAgentCacheByName500JSONResponseBodyFault = "presumed_platform"
+	DeleteApiAgentCacheByName500JSONResponseBodyFaultProvider         DeleteApiAgentCacheByName500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiAgentCacheByName500JSONResponseBodyFault enum.
@@ -8164,6 +8531,8 @@ func (e DeleteApiAgentCacheByName500JSONResponseBodyFault) Valid() bool {
 	case DeleteApiAgentCacheByName500JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiAgentCacheByName500JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiAgentCacheByName500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiAgentCacheByName500JSONResponseBodyFaultProvider:
 		return true
@@ -8174,9 +8543,10 @@ func (e DeleteApiAgentCacheByName500JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiAgentCacheByName400JSONResponseBodyFault.
 const (
-	GetApiAgentCacheByName400JSONResponseBodyFaultCustomer GetApiAgentCacheByName400JSONResponseBodyFault = "customer"
-	GetApiAgentCacheByName400JSONResponseBodyFaultPlatform GetApiAgentCacheByName400JSONResponseBodyFault = "platform"
-	GetApiAgentCacheByName400JSONResponseBodyFaultProvider GetApiAgentCacheByName400JSONResponseBodyFault = "provider"
+	GetApiAgentCacheByName400JSONResponseBodyFaultCustomer         GetApiAgentCacheByName400JSONResponseBodyFault = "customer"
+	GetApiAgentCacheByName400JSONResponseBodyFaultPlatform         GetApiAgentCacheByName400JSONResponseBodyFault = "platform"
+	GetApiAgentCacheByName400JSONResponseBodyFaultPresumedPlatform GetApiAgentCacheByName400JSONResponseBodyFault = "presumed_platform"
+	GetApiAgentCacheByName400JSONResponseBodyFaultProvider         GetApiAgentCacheByName400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiAgentCacheByName400JSONResponseBodyFault enum.
@@ -8185,6 +8555,8 @@ func (e GetApiAgentCacheByName400JSONResponseBodyFault) Valid() bool {
 	case GetApiAgentCacheByName400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiAgentCacheByName400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiAgentCacheByName400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiAgentCacheByName400JSONResponseBodyFaultProvider:
 		return true
@@ -8195,9 +8567,10 @@ func (e GetApiAgentCacheByName400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiAgentCacheByName401JSONResponseBodyFault.
 const (
-	GetApiAgentCacheByName401JSONResponseBodyFaultCustomer GetApiAgentCacheByName401JSONResponseBodyFault = "customer"
-	GetApiAgentCacheByName401JSONResponseBodyFaultPlatform GetApiAgentCacheByName401JSONResponseBodyFault = "platform"
-	GetApiAgentCacheByName401JSONResponseBodyFaultProvider GetApiAgentCacheByName401JSONResponseBodyFault = "provider"
+	GetApiAgentCacheByName401JSONResponseBodyFaultCustomer         GetApiAgentCacheByName401JSONResponseBodyFault = "customer"
+	GetApiAgentCacheByName401JSONResponseBodyFaultPlatform         GetApiAgentCacheByName401JSONResponseBodyFault = "platform"
+	GetApiAgentCacheByName401JSONResponseBodyFaultPresumedPlatform GetApiAgentCacheByName401JSONResponseBodyFault = "presumed_platform"
+	GetApiAgentCacheByName401JSONResponseBodyFaultProvider         GetApiAgentCacheByName401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiAgentCacheByName401JSONResponseBodyFault enum.
@@ -8206,6 +8579,8 @@ func (e GetApiAgentCacheByName401JSONResponseBodyFault) Valid() bool {
 	case GetApiAgentCacheByName401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiAgentCacheByName401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiAgentCacheByName401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiAgentCacheByName401JSONResponseBodyFaultProvider:
 		return true
@@ -8216,9 +8591,10 @@ func (e GetApiAgentCacheByName401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiAgentCacheByName403JSONResponseBodyFault.
 const (
-	GetApiAgentCacheByName403JSONResponseBodyFaultCustomer GetApiAgentCacheByName403JSONResponseBodyFault = "customer"
-	GetApiAgentCacheByName403JSONResponseBodyFaultPlatform GetApiAgentCacheByName403JSONResponseBodyFault = "platform"
-	GetApiAgentCacheByName403JSONResponseBodyFaultProvider GetApiAgentCacheByName403JSONResponseBodyFault = "provider"
+	GetApiAgentCacheByName403JSONResponseBodyFaultCustomer         GetApiAgentCacheByName403JSONResponseBodyFault = "customer"
+	GetApiAgentCacheByName403JSONResponseBodyFaultPlatform         GetApiAgentCacheByName403JSONResponseBodyFault = "platform"
+	GetApiAgentCacheByName403JSONResponseBodyFaultPresumedPlatform GetApiAgentCacheByName403JSONResponseBodyFault = "presumed_platform"
+	GetApiAgentCacheByName403JSONResponseBodyFaultProvider         GetApiAgentCacheByName403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiAgentCacheByName403JSONResponseBodyFault enum.
@@ -8227,6 +8603,8 @@ func (e GetApiAgentCacheByName403JSONResponseBodyFault) Valid() bool {
 	case GetApiAgentCacheByName403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiAgentCacheByName403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiAgentCacheByName403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiAgentCacheByName403JSONResponseBodyFaultProvider:
 		return true
@@ -8237,9 +8615,10 @@ func (e GetApiAgentCacheByName403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiAgentCacheByName500JSONResponseBodyFault.
 const (
-	GetApiAgentCacheByName500JSONResponseBodyFaultCustomer GetApiAgentCacheByName500JSONResponseBodyFault = "customer"
-	GetApiAgentCacheByName500JSONResponseBodyFaultPlatform GetApiAgentCacheByName500JSONResponseBodyFault = "platform"
-	GetApiAgentCacheByName500JSONResponseBodyFaultProvider GetApiAgentCacheByName500JSONResponseBodyFault = "provider"
+	GetApiAgentCacheByName500JSONResponseBodyFaultCustomer         GetApiAgentCacheByName500JSONResponseBodyFault = "customer"
+	GetApiAgentCacheByName500JSONResponseBodyFaultPlatform         GetApiAgentCacheByName500JSONResponseBodyFault = "platform"
+	GetApiAgentCacheByName500JSONResponseBodyFaultPresumedPlatform GetApiAgentCacheByName500JSONResponseBodyFault = "presumed_platform"
+	GetApiAgentCacheByName500JSONResponseBodyFaultProvider         GetApiAgentCacheByName500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiAgentCacheByName500JSONResponseBodyFault enum.
@@ -8248,6 +8627,8 @@ func (e GetApiAgentCacheByName500JSONResponseBodyFault) Valid() bool {
 	case GetApiAgentCacheByName500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiAgentCacheByName500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiAgentCacheByName500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiAgentCacheByName500JSONResponseBodyFaultProvider:
 		return true
@@ -8258,9 +8639,10 @@ func (e GetApiAgentCacheByName500JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PutApiAgentCacheByName400JSONResponseBodyFault.
 const (
-	PutApiAgentCacheByName400JSONResponseBodyFaultCustomer PutApiAgentCacheByName400JSONResponseBodyFault = "customer"
-	PutApiAgentCacheByName400JSONResponseBodyFaultPlatform PutApiAgentCacheByName400JSONResponseBodyFault = "platform"
-	PutApiAgentCacheByName400JSONResponseBodyFaultProvider PutApiAgentCacheByName400JSONResponseBodyFault = "provider"
+	PutApiAgentCacheByName400JSONResponseBodyFaultCustomer         PutApiAgentCacheByName400JSONResponseBodyFault = "customer"
+	PutApiAgentCacheByName400JSONResponseBodyFaultPlatform         PutApiAgentCacheByName400JSONResponseBodyFault = "platform"
+	PutApiAgentCacheByName400JSONResponseBodyFaultPresumedPlatform PutApiAgentCacheByName400JSONResponseBodyFault = "presumed_platform"
+	PutApiAgentCacheByName400JSONResponseBodyFaultProvider         PutApiAgentCacheByName400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PutApiAgentCacheByName400JSONResponseBodyFault enum.
@@ -8269,6 +8651,8 @@ func (e PutApiAgentCacheByName400JSONResponseBodyFault) Valid() bool {
 	case PutApiAgentCacheByName400JSONResponseBodyFaultCustomer:
 		return true
 	case PutApiAgentCacheByName400JSONResponseBodyFaultPlatform:
+		return true
+	case PutApiAgentCacheByName400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PutApiAgentCacheByName400JSONResponseBodyFaultProvider:
 		return true
@@ -8279,9 +8663,10 @@ func (e PutApiAgentCacheByName400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PutApiAgentCacheByName401JSONResponseBodyFault.
 const (
-	PutApiAgentCacheByName401JSONResponseBodyFaultCustomer PutApiAgentCacheByName401JSONResponseBodyFault = "customer"
-	PutApiAgentCacheByName401JSONResponseBodyFaultPlatform PutApiAgentCacheByName401JSONResponseBodyFault = "platform"
-	PutApiAgentCacheByName401JSONResponseBodyFaultProvider PutApiAgentCacheByName401JSONResponseBodyFault = "provider"
+	PutApiAgentCacheByName401JSONResponseBodyFaultCustomer         PutApiAgentCacheByName401JSONResponseBodyFault = "customer"
+	PutApiAgentCacheByName401JSONResponseBodyFaultPlatform         PutApiAgentCacheByName401JSONResponseBodyFault = "platform"
+	PutApiAgentCacheByName401JSONResponseBodyFaultPresumedPlatform PutApiAgentCacheByName401JSONResponseBodyFault = "presumed_platform"
+	PutApiAgentCacheByName401JSONResponseBodyFaultProvider         PutApiAgentCacheByName401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PutApiAgentCacheByName401JSONResponseBodyFault enum.
@@ -8290,6 +8675,8 @@ func (e PutApiAgentCacheByName401JSONResponseBodyFault) Valid() bool {
 	case PutApiAgentCacheByName401JSONResponseBodyFaultCustomer:
 		return true
 	case PutApiAgentCacheByName401JSONResponseBodyFaultPlatform:
+		return true
+	case PutApiAgentCacheByName401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PutApiAgentCacheByName401JSONResponseBodyFaultProvider:
 		return true
@@ -8300,9 +8687,10 @@ func (e PutApiAgentCacheByName401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PutApiAgentCacheByName403JSONResponseBodyFault.
 const (
-	PutApiAgentCacheByName403JSONResponseBodyFaultCustomer PutApiAgentCacheByName403JSONResponseBodyFault = "customer"
-	PutApiAgentCacheByName403JSONResponseBodyFaultPlatform PutApiAgentCacheByName403JSONResponseBodyFault = "platform"
-	PutApiAgentCacheByName403JSONResponseBodyFaultProvider PutApiAgentCacheByName403JSONResponseBodyFault = "provider"
+	PutApiAgentCacheByName403JSONResponseBodyFaultCustomer         PutApiAgentCacheByName403JSONResponseBodyFault = "customer"
+	PutApiAgentCacheByName403JSONResponseBodyFaultPlatform         PutApiAgentCacheByName403JSONResponseBodyFault = "platform"
+	PutApiAgentCacheByName403JSONResponseBodyFaultPresumedPlatform PutApiAgentCacheByName403JSONResponseBodyFault = "presumed_platform"
+	PutApiAgentCacheByName403JSONResponseBodyFaultProvider         PutApiAgentCacheByName403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PutApiAgentCacheByName403JSONResponseBodyFault enum.
@@ -8311,6 +8699,8 @@ func (e PutApiAgentCacheByName403JSONResponseBodyFault) Valid() bool {
 	case PutApiAgentCacheByName403JSONResponseBodyFaultCustomer:
 		return true
 	case PutApiAgentCacheByName403JSONResponseBodyFaultPlatform:
+		return true
+	case PutApiAgentCacheByName403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PutApiAgentCacheByName403JSONResponseBodyFaultProvider:
 		return true
@@ -8321,9 +8711,10 @@ func (e PutApiAgentCacheByName403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PutApiAgentCacheByName500JSONResponseBodyFault.
 const (
-	PutApiAgentCacheByName500JSONResponseBodyFaultCustomer PutApiAgentCacheByName500JSONResponseBodyFault = "customer"
-	PutApiAgentCacheByName500JSONResponseBodyFaultPlatform PutApiAgentCacheByName500JSONResponseBodyFault = "platform"
-	PutApiAgentCacheByName500JSONResponseBodyFaultProvider PutApiAgentCacheByName500JSONResponseBodyFault = "provider"
+	PutApiAgentCacheByName500JSONResponseBodyFaultCustomer         PutApiAgentCacheByName500JSONResponseBodyFault = "customer"
+	PutApiAgentCacheByName500JSONResponseBodyFaultPlatform         PutApiAgentCacheByName500JSONResponseBodyFault = "platform"
+	PutApiAgentCacheByName500JSONResponseBodyFaultPresumedPlatform PutApiAgentCacheByName500JSONResponseBodyFault = "presumed_platform"
+	PutApiAgentCacheByName500JSONResponseBodyFaultProvider         PutApiAgentCacheByName500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PutApiAgentCacheByName500JSONResponseBodyFault enum.
@@ -8332,6 +8723,8 @@ func (e PutApiAgentCacheByName500JSONResponseBodyFault) Valid() bool {
 	case PutApiAgentCacheByName500JSONResponseBodyFaultCustomer:
 		return true
 	case PutApiAgentCacheByName500JSONResponseBodyFaultPlatform:
+		return true
+	case PutApiAgentCacheByName500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PutApiAgentCacheByName500JSONResponseBodyFaultProvider:
 		return true
@@ -8342,9 +8735,10 @@ func (e PutApiAgentCacheByName500JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiAgentCacheByNameClaim400JSONResponseBodyFault.
 const (
-	PostApiAgentCacheByNameClaim400JSONResponseBodyFaultCustomer PostApiAgentCacheByNameClaim400JSONResponseBodyFault = "customer"
-	PostApiAgentCacheByNameClaim400JSONResponseBodyFaultPlatform PostApiAgentCacheByNameClaim400JSONResponseBodyFault = "platform"
-	PostApiAgentCacheByNameClaim400JSONResponseBodyFaultProvider PostApiAgentCacheByNameClaim400JSONResponseBodyFault = "provider"
+	PostApiAgentCacheByNameClaim400JSONResponseBodyFaultCustomer         PostApiAgentCacheByNameClaim400JSONResponseBodyFault = "customer"
+	PostApiAgentCacheByNameClaim400JSONResponseBodyFaultPlatform         PostApiAgentCacheByNameClaim400JSONResponseBodyFault = "platform"
+	PostApiAgentCacheByNameClaim400JSONResponseBodyFaultPresumedPlatform PostApiAgentCacheByNameClaim400JSONResponseBodyFault = "presumed_platform"
+	PostApiAgentCacheByNameClaim400JSONResponseBodyFaultProvider         PostApiAgentCacheByNameClaim400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiAgentCacheByNameClaim400JSONResponseBodyFault enum.
@@ -8353,6 +8747,8 @@ func (e PostApiAgentCacheByNameClaim400JSONResponseBodyFault) Valid() bool {
 	case PostApiAgentCacheByNameClaim400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiAgentCacheByNameClaim400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiAgentCacheByNameClaim400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiAgentCacheByNameClaim400JSONResponseBodyFaultProvider:
 		return true
@@ -8363,9 +8759,10 @@ func (e PostApiAgentCacheByNameClaim400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiAgentCacheByNameClaim401JSONResponseBodyFault.
 const (
-	PostApiAgentCacheByNameClaim401JSONResponseBodyFaultCustomer PostApiAgentCacheByNameClaim401JSONResponseBodyFault = "customer"
-	PostApiAgentCacheByNameClaim401JSONResponseBodyFaultPlatform PostApiAgentCacheByNameClaim401JSONResponseBodyFault = "platform"
-	PostApiAgentCacheByNameClaim401JSONResponseBodyFaultProvider PostApiAgentCacheByNameClaim401JSONResponseBodyFault = "provider"
+	PostApiAgentCacheByNameClaim401JSONResponseBodyFaultCustomer         PostApiAgentCacheByNameClaim401JSONResponseBodyFault = "customer"
+	PostApiAgentCacheByNameClaim401JSONResponseBodyFaultPlatform         PostApiAgentCacheByNameClaim401JSONResponseBodyFault = "platform"
+	PostApiAgentCacheByNameClaim401JSONResponseBodyFaultPresumedPlatform PostApiAgentCacheByNameClaim401JSONResponseBodyFault = "presumed_platform"
+	PostApiAgentCacheByNameClaim401JSONResponseBodyFaultProvider         PostApiAgentCacheByNameClaim401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiAgentCacheByNameClaim401JSONResponseBodyFault enum.
@@ -8374,6 +8771,8 @@ func (e PostApiAgentCacheByNameClaim401JSONResponseBodyFault) Valid() bool {
 	case PostApiAgentCacheByNameClaim401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiAgentCacheByNameClaim401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiAgentCacheByNameClaim401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiAgentCacheByNameClaim401JSONResponseBodyFaultProvider:
 		return true
@@ -8384,9 +8783,10 @@ func (e PostApiAgentCacheByNameClaim401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiAgentCacheByNameClaim403JSONResponseBodyFault.
 const (
-	PostApiAgentCacheByNameClaim403JSONResponseBodyFaultCustomer PostApiAgentCacheByNameClaim403JSONResponseBodyFault = "customer"
-	PostApiAgentCacheByNameClaim403JSONResponseBodyFaultPlatform PostApiAgentCacheByNameClaim403JSONResponseBodyFault = "platform"
-	PostApiAgentCacheByNameClaim403JSONResponseBodyFaultProvider PostApiAgentCacheByNameClaim403JSONResponseBodyFault = "provider"
+	PostApiAgentCacheByNameClaim403JSONResponseBodyFaultCustomer         PostApiAgentCacheByNameClaim403JSONResponseBodyFault = "customer"
+	PostApiAgentCacheByNameClaim403JSONResponseBodyFaultPlatform         PostApiAgentCacheByNameClaim403JSONResponseBodyFault = "platform"
+	PostApiAgentCacheByNameClaim403JSONResponseBodyFaultPresumedPlatform PostApiAgentCacheByNameClaim403JSONResponseBodyFault = "presumed_platform"
+	PostApiAgentCacheByNameClaim403JSONResponseBodyFaultProvider         PostApiAgentCacheByNameClaim403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiAgentCacheByNameClaim403JSONResponseBodyFault enum.
@@ -8395,6 +8795,8 @@ func (e PostApiAgentCacheByNameClaim403JSONResponseBodyFault) Valid() bool {
 	case PostApiAgentCacheByNameClaim403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiAgentCacheByNameClaim403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiAgentCacheByNameClaim403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiAgentCacheByNameClaim403JSONResponseBodyFaultProvider:
 		return true
@@ -8405,9 +8807,10 @@ func (e PostApiAgentCacheByNameClaim403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiAgentCacheByNameClaim500JSONResponseBodyFault.
 const (
-	PostApiAgentCacheByNameClaim500JSONResponseBodyFaultCustomer PostApiAgentCacheByNameClaim500JSONResponseBodyFault = "customer"
-	PostApiAgentCacheByNameClaim500JSONResponseBodyFaultPlatform PostApiAgentCacheByNameClaim500JSONResponseBodyFault = "platform"
-	PostApiAgentCacheByNameClaim500JSONResponseBodyFaultProvider PostApiAgentCacheByNameClaim500JSONResponseBodyFault = "provider"
+	PostApiAgentCacheByNameClaim500JSONResponseBodyFaultCustomer         PostApiAgentCacheByNameClaim500JSONResponseBodyFault = "customer"
+	PostApiAgentCacheByNameClaim500JSONResponseBodyFaultPlatform         PostApiAgentCacheByNameClaim500JSONResponseBodyFault = "platform"
+	PostApiAgentCacheByNameClaim500JSONResponseBodyFaultPresumedPlatform PostApiAgentCacheByNameClaim500JSONResponseBodyFault = "presumed_platform"
+	PostApiAgentCacheByNameClaim500JSONResponseBodyFaultProvider         PostApiAgentCacheByNameClaim500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiAgentCacheByNameClaim500JSONResponseBodyFault enum.
@@ -8416,6 +8819,8 @@ func (e PostApiAgentCacheByNameClaim500JSONResponseBodyFault) Valid() bool {
 	case PostApiAgentCacheByNameClaim500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiAgentCacheByNameClaim500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiAgentCacheByNameClaim500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiAgentCacheByNameClaim500JSONResponseBodyFaultProvider:
 		return true
@@ -13730,9 +14135,10 @@ func (e CancelInstantEvalRun200JSONResponseBodyStatus) Valid() bool {
 
 // Defines values for CancelInstantEvalRun409JSONResponseBodyFault.
 const (
-	CancelInstantEvalRun409JSONResponseBodyFaultCustomer CancelInstantEvalRun409JSONResponseBodyFault = "customer"
-	CancelInstantEvalRun409JSONResponseBodyFaultPlatform CancelInstantEvalRun409JSONResponseBodyFault = "platform"
-	CancelInstantEvalRun409JSONResponseBodyFaultProvider CancelInstantEvalRun409JSONResponseBodyFault = "provider"
+	CancelInstantEvalRun409JSONResponseBodyFaultCustomer         CancelInstantEvalRun409JSONResponseBodyFault = "customer"
+	CancelInstantEvalRun409JSONResponseBodyFaultPlatform         CancelInstantEvalRun409JSONResponseBodyFault = "platform"
+	CancelInstantEvalRun409JSONResponseBodyFaultPresumedPlatform CancelInstantEvalRun409JSONResponseBodyFault = "presumed_platform"
+	CancelInstantEvalRun409JSONResponseBodyFaultProvider         CancelInstantEvalRun409JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the CancelInstantEvalRun409JSONResponseBodyFault enum.
@@ -13741,6 +14147,8 @@ func (e CancelInstantEvalRun409JSONResponseBodyFault) Valid() bool {
 	case CancelInstantEvalRun409JSONResponseBodyFaultCustomer:
 		return true
 	case CancelInstantEvalRun409JSONResponseBodyFaultPlatform:
+		return true
+	case CancelInstantEvalRun409JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case CancelInstantEvalRun409JSONResponseBodyFaultProvider:
 		return true
@@ -16046,9 +16454,10 @@ func (e GetPlatformHealthSubsystem503JSONResponseBodyStatus) Valid() bool {
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault enum.
@@ -16057,6 +16466,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault) Vali
 	case GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultProvider:
 		return true
@@ -16067,9 +16478,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault) Vali
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault enum.
@@ -16078,6 +16490,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault) Vali
 	case GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultProvider:
 		return true
@@ -16088,9 +16502,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault) Vali
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault enum.
@@ -16099,6 +16514,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault) Vali
 	case GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultProvider:
 		return true
@@ -16109,9 +16526,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault) Vali
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault enum.
@@ -16120,6 +16538,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault) Vali
 	case GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultProvider:
 		return true
@@ -16130,9 +16550,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault) Vali
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault enum.
@@ -16141,6 +16562,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault) Val
 	case PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFaultProvider:
 		return true
@@ -16151,9 +16574,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsCharts400JSONResponseBodyFault) Val
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault enum.
@@ -16162,6 +16586,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault) Val
 	case PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFaultProvider:
 		return true
@@ -16172,9 +16598,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsCharts401JSONResponseBodyFault) Val
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault enum.
@@ -16183,6 +16610,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault) Val
 	case PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFaultProvider:
 		return true
@@ -16193,9 +16622,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsCharts403JSONResponseBodyFault) Val
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault enum.
@@ -16204,6 +16634,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault) Val
 	case PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFaultProvider:
 		return true
@@ -16214,9 +16646,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsCharts500JSONResponseBodyFault) Val
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault enum.
@@ -16225,6 +16658,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBod
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultProvider:
 		return true
@@ -16235,9 +16670,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBod
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault enum.
@@ -16246,6 +16682,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBod
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultProvider:
 		return true
@@ -16256,9 +16694,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBod
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault enum.
@@ -16267,6 +16706,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBod
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultProvider:
 		return true
@@ -16277,9 +16718,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBod
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault enum.
@@ -16288,6 +16730,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBod
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultProvider:
 		return true
@@ -16298,9 +16742,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBod
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault enum.
@@ -16309,6 +16754,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBod
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultProvider:
 		return true
@@ -16319,9 +16766,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBod
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault enum.
@@ -16330,6 +16778,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFa
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultProvider:
 		return true
@@ -16340,9 +16790,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFa
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault enum.
@@ -16351,6 +16802,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFa
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultProvider:
 		return true
@@ -16361,9 +16814,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFa
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault enum.
@@ -16372,6 +16826,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFa
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultProvider:
 		return true
@@ -16382,9 +16838,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFa
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault enum.
@@ -16393,6 +16850,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFa
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultProvider:
 		return true
@@ -16403,9 +16862,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFa
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault enum.
@@ -16414,6 +16874,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFa
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultProvider:
 		return true
@@ -16424,9 +16886,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFa
 
 // Defines values for PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault.
 const (
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultCustomer PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "customer"
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPlatform PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "platform"
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultProvider PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "provider"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultCustomer         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "customer"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPlatform         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPresumedPlatform PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "presumed_platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultProvider         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFault enum.
@@ -16435,6 +16898,8 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBody
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBodyFaultProvider:
 		return true
@@ -16445,9 +16910,10 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId400JSONResponseBody
 
 // Defines values for PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault.
 const (
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultCustomer PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "customer"
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPlatform PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "platform"
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultProvider PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "provider"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultCustomer         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "customer"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPlatform         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPresumedPlatform PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "presumed_platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultProvider         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFault enum.
@@ -16456,6 +16922,8 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBody
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBodyFaultProvider:
 		return true
@@ -16466,9 +16934,10 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId401JSONResponseBody
 
 // Defines values for PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault.
 const (
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultCustomer PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "customer"
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPlatform PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "platform"
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultProvider PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "provider"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultCustomer         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "customer"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPlatform         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPresumedPlatform PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "presumed_platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultProvider         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFault enum.
@@ -16477,6 +16946,8 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBody
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBodyFaultProvider:
 		return true
@@ -16487,9 +16958,10 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId403JSONResponseBody
 
 // Defines values for PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault.
 const (
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultCustomer PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "customer"
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPlatform PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "platform"
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultProvider PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "provider"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultCustomer         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "customer"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPlatform         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPresumedPlatform PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "presumed_platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultProvider         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFault enum.
@@ -16498,6 +16970,8 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBody
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBodyFaultProvider:
 		return true
@@ -16508,9 +16982,10 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId404JSONResponseBody
 
 // Defines values for PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault.
 const (
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultCustomer PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "customer"
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPlatform PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "platform"
-	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultProvider PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "provider"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultCustomer         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "customer"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPlatform         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPresumedPlatform PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "presumed_platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultProvider         PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFault enum.
@@ -16519,6 +16994,8 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBody
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBodyFaultProvider:
 		return true
@@ -16529,9 +17006,10 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsChartsByChartId500JSONResponseBody
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault enum.
@@ -16540,6 +17018,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONRe
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultProvider:
 		return true
@@ -16550,9 +17030,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONRe
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault enum.
@@ -16561,6 +17042,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONRe
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultProvider:
 		return true
@@ -16571,9 +17054,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONRe
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault enum.
@@ -16582,6 +17066,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONRe
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultProvider:
 		return true
@@ -16592,9 +17078,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONRe
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault enum.
@@ -16603,6 +17090,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONRe
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultProvider:
 		return true
@@ -16613,9 +17102,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONRe
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault enum.
@@ -16624,6 +17114,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONRe
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultProvider:
 		return true
@@ -16634,9 +17126,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONRe
 
 // Defines values for PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault.
 const (
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultCustomer PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "customer"
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultPlatform PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "platform"
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultProvider PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "provider"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultCustomer         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "customer"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultPlatform         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "platform"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultPresumedPlatform PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "presumed_platform"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultProvider         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFault enum.
@@ -16645,6 +17138,8 @@ func (e PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONRespo
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultCustomer:
 		return true
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultPlatform:
+		return true
+	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONResponseBodyFaultProvider:
 		return true
@@ -16655,9 +17150,10 @@ func (e PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement400JSONRespo
 
 // Defines values for PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault.
 const (
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultCustomer PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "customer"
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultPlatform PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "platform"
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultProvider PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "provider"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultCustomer         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "customer"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultPlatform         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "platform"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultPresumedPlatform PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "presumed_platform"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultProvider         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFault enum.
@@ -16666,6 +17162,8 @@ func (e PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONRespo
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultCustomer:
 		return true
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultPlatform:
+		return true
+	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONResponseBodyFaultProvider:
 		return true
@@ -16676,9 +17174,10 @@ func (e PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement401JSONRespo
 
 // Defines values for PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault.
 const (
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultCustomer PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "customer"
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultPlatform PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "platform"
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultProvider PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "provider"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultCustomer         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "customer"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultPlatform         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "platform"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultPresumedPlatform PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "presumed_platform"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultProvider         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFault enum.
@@ -16687,6 +17186,8 @@ func (e PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONRespo
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultCustomer:
 		return true
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultPlatform:
+		return true
+	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONResponseBodyFaultProvider:
 		return true
@@ -16697,9 +17198,10 @@ func (e PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement403JSONRespo
 
 // Defines values for PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault.
 const (
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultCustomer PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "customer"
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultPlatform PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "platform"
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultProvider PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "provider"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultCustomer         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "customer"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultPlatform         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "platform"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultPresumedPlatform PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "presumed_platform"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultProvider         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFault enum.
@@ -16708,6 +17210,8 @@ func (e PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONRespo
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultCustomer:
 		return true
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultPlatform:
+		return true
+	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONResponseBodyFaultProvider:
 		return true
@@ -16718,9 +17222,10 @@ func (e PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement404JSONRespo
 
 // Defines values for PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault.
 const (
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultCustomer PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "customer"
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultPlatform PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "platform"
-	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultProvider PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "provider"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultCustomer         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "customer"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultPlatform         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "platform"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultPresumedPlatform PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "presumed_platform"
+	PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultProvider         PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFault enum.
@@ -16729,6 +17234,8 @@ func (e PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONRespo
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultCustomer:
 		return true
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultPlatform:
+		return true
+	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement500JSONResponseBodyFaultProvider:
 		return true
@@ -16760,9 +17267,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets200JSONResponseBodyD
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault enum.
@@ -16771,6 +17279,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyF
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultProvider:
 		return true
@@ -16781,9 +17291,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyF
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault enum.
@@ -16792,6 +17303,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyF
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultProvider:
 		return true
@@ -16802,9 +17315,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyF
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault enum.
@@ -16813,6 +17327,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyF
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultProvider:
 		return true
@@ -16823,9 +17339,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyF
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault enum.
@@ -16834,6 +17351,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyF
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultProvider:
 		return true
@@ -16886,9 +17405,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets201JSONResponseBody
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFault enum.
@@ -16897,6 +17417,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBody
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBodyFaultProvider:
 		return true
@@ -16907,9 +17429,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets400JSONResponseBody
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFault enum.
@@ -16918,6 +17441,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBody
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBodyFaultProvider:
 		return true
@@ -16928,9 +17453,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets401JSONResponseBody
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFault enum.
@@ -16939,6 +17465,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBody
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBodyFaultProvider:
 		return true
@@ -16949,9 +17477,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets403JSONResponseBody
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFault enum.
@@ -16960,6 +17489,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBody
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBodyFaultProvider:
 		return true
@@ -16970,9 +17501,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgets500JSONResponseBody
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault enum.
@@ -16981,6 +17513,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSON
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultProvider:
 		return true
@@ -16991,9 +17525,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSON
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault enum.
@@ -17002,6 +17537,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSON
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultProvider:
 		return true
@@ -17012,9 +17549,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSON
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault enum.
@@ -17023,6 +17561,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSON
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultProvider:
 		return true
@@ -17033,9 +17573,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSON
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault enum.
@@ -17044,6 +17585,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSON
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultProvider:
 		return true
@@ -17054,9 +17597,10 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSON
 
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault.
 const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultCustomer DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "customer"
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPlatform DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "platform"
-	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultProvider DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "provider"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "customer"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPlatform         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPresumedPlatform DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "presumed_platform"
+	DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultProvider         DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault enum.
@@ -17065,6 +17609,8 @@ func (e DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSON
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultCustomer:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPlatform:
+		return true
+	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultProvider:
 		return true
@@ -17096,9 +17642,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONRes
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault enum.
@@ -17107,6 +17654,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONRes
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultProvider:
 		return true
@@ -17117,9 +17666,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONRes
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault enum.
@@ -17128,6 +17678,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONRes
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultProvider:
 		return true
@@ -17138,9 +17690,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONRes
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault enum.
@@ -17149,6 +17702,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONRes
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultProvider:
 		return true
@@ -17159,9 +17714,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONRes
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault enum.
@@ -17170,6 +17726,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONRes
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultProvider:
 		return true
@@ -17180,9 +17738,10 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONRes
 
 // Defines values for GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault.
 const (
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultCustomer GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "customer"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "platform"
-	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultProvider GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "provider"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultCustomer         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "customer"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPlatform         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPresumedPlatform GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "presumed_platform"
+	GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultProvider         GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault enum.
@@ -17191,6 +17750,8 @@ func (e GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONRes
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultProvider:
 		return true
@@ -17243,9 +17804,10 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId200JSONR
 
 // Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault.
 const (
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultCustomer PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "customer"
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPlatform PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "platform"
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultProvider PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "provider"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultCustomer         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "customer"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPlatform         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPresumedPlatform PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "presumed_platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultProvider         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFault enum.
@@ -17254,6 +17816,8 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONR
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONResponseBodyFaultProvider:
 		return true
@@ -17264,9 +17828,10 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId400JSONR
 
 // Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault.
 const (
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultCustomer PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "customer"
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPlatform PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "platform"
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultProvider PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "provider"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultCustomer         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "customer"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPlatform         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPresumedPlatform PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "presumed_platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultProvider         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFault enum.
@@ -17275,6 +17840,8 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONR
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONResponseBodyFaultProvider:
 		return true
@@ -17285,9 +17852,10 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId401JSONR
 
 // Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault.
 const (
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultCustomer PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "customer"
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPlatform PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "platform"
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultProvider PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "provider"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultCustomer         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "customer"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPlatform         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPresumedPlatform PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "presumed_platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultProvider         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFault enum.
@@ -17296,6 +17864,8 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONR
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONResponseBodyFaultProvider:
 		return true
@@ -17306,9 +17876,10 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId403JSONR
 
 // Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault.
 const (
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultCustomer PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "customer"
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPlatform PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "platform"
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultProvider PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "provider"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultCustomer         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "customer"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPlatform         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPresumedPlatform PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "presumed_platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultProvider         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFault enum.
@@ -17317,6 +17888,8 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONR
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONResponseBodyFaultProvider:
 		return true
@@ -17327,9 +17900,10 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId404JSONR
 
 // Defines values for PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault.
 const (
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultCustomer PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "customer"
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPlatform PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "platform"
-	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultProvider PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "provider"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultCustomer         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "customer"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPlatform         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPresumedPlatform PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "presumed_platform"
+	PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultProvider         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFault enum.
@@ -17338,6 +17912,8 @@ func (e PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONR
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultCustomer:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId500JSONResponseBodyFaultProvider:
 		return true
@@ -17369,9 +17945,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFault enum.
@@ -17380,6 +17957,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard400JSONResponseBodyFaultProvider:
 		return true
@@ -17390,9 +17969,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFault enum.
@@ -17401,6 +17981,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard401JSONResponseBodyFaultProvider:
 		return true
@@ -17411,9 +17993,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFault enum.
@@ -17422,6 +18005,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard403JSONResponseBodyFaultProvider:
 		return true
@@ -17432,9 +18017,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFault enum.
@@ -17443,6 +18029,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard404JSONResponseBodyFaultProvider:
 		return true
@@ -17453,9 +18041,10 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 
 // Defines values for PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFault.
 const (
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultCustomer PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFault = "customer"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFault = "platform"
-	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultProvider PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFault = "provider"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultCustomer         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFault = "customer"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultPlatform         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFault = "platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultPresumedPlatform PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFault = "presumed_platform"
+	PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultProvider         PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFault enum.
@@ -17464,6 +18053,8 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard500JSONResponseBodyFaultProvider:
 		return true
@@ -20027,9 +20618,10 @@ func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 
 // Defines values for PostApiV1Query400JSONResponseBodyFault.
 const (
-	PostApiV1Query400JSONResponseBodyFaultCustomer PostApiV1Query400JSONResponseBodyFault = "customer"
-	PostApiV1Query400JSONResponseBodyFaultPlatform PostApiV1Query400JSONResponseBodyFault = "platform"
-	PostApiV1Query400JSONResponseBodyFaultProvider PostApiV1Query400JSONResponseBodyFault = "provider"
+	PostApiV1Query400JSONResponseBodyFaultCustomer         PostApiV1Query400JSONResponseBodyFault = "customer"
+	PostApiV1Query400JSONResponseBodyFaultPlatform         PostApiV1Query400JSONResponseBodyFault = "platform"
+	PostApiV1Query400JSONResponseBodyFaultPresumedPlatform PostApiV1Query400JSONResponseBodyFault = "presumed_platform"
+	PostApiV1Query400JSONResponseBodyFaultProvider         PostApiV1Query400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1Query400JSONResponseBodyFault enum.
@@ -20038,6 +20630,8 @@ func (e PostApiV1Query400JSONResponseBodyFault) Valid() bool {
 	case PostApiV1Query400JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1Query400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1Query400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1Query400JSONResponseBodyFaultProvider:
 		return true
@@ -20048,9 +20642,10 @@ func (e PostApiV1Query400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiV1Query401JSONResponseBodyFault.
 const (
-	PostApiV1Query401JSONResponseBodyFaultCustomer PostApiV1Query401JSONResponseBodyFault = "customer"
-	PostApiV1Query401JSONResponseBodyFaultPlatform PostApiV1Query401JSONResponseBodyFault = "platform"
-	PostApiV1Query401JSONResponseBodyFaultProvider PostApiV1Query401JSONResponseBodyFault = "provider"
+	PostApiV1Query401JSONResponseBodyFaultCustomer         PostApiV1Query401JSONResponseBodyFault = "customer"
+	PostApiV1Query401JSONResponseBodyFaultPlatform         PostApiV1Query401JSONResponseBodyFault = "platform"
+	PostApiV1Query401JSONResponseBodyFaultPresumedPlatform PostApiV1Query401JSONResponseBodyFault = "presumed_platform"
+	PostApiV1Query401JSONResponseBodyFaultProvider         PostApiV1Query401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1Query401JSONResponseBodyFault enum.
@@ -20059,6 +20654,8 @@ func (e PostApiV1Query401JSONResponseBodyFault) Valid() bool {
 	case PostApiV1Query401JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1Query401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1Query401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1Query401JSONResponseBodyFaultProvider:
 		return true
@@ -20069,9 +20666,10 @@ func (e PostApiV1Query401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiV1Query403JSONResponseBodyFault.
 const (
-	PostApiV1Query403JSONResponseBodyFaultCustomer PostApiV1Query403JSONResponseBodyFault = "customer"
-	PostApiV1Query403JSONResponseBodyFaultPlatform PostApiV1Query403JSONResponseBodyFault = "platform"
-	PostApiV1Query403JSONResponseBodyFaultProvider PostApiV1Query403JSONResponseBodyFault = "provider"
+	PostApiV1Query403JSONResponseBodyFaultCustomer         PostApiV1Query403JSONResponseBodyFault = "customer"
+	PostApiV1Query403JSONResponseBodyFaultPlatform         PostApiV1Query403JSONResponseBodyFault = "platform"
+	PostApiV1Query403JSONResponseBodyFaultPresumedPlatform PostApiV1Query403JSONResponseBodyFault = "presumed_platform"
+	PostApiV1Query403JSONResponseBodyFaultProvider         PostApiV1Query403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1Query403JSONResponseBodyFault enum.
@@ -20080,6 +20678,8 @@ func (e PostApiV1Query403JSONResponseBodyFault) Valid() bool {
 	case PostApiV1Query403JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1Query403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1Query403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1Query403JSONResponseBodyFaultProvider:
 		return true
@@ -20090,9 +20690,10 @@ func (e PostApiV1Query403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiV1Query422JSONResponseBodyFault.
 const (
-	PostApiV1Query422JSONResponseBodyFaultCustomer PostApiV1Query422JSONResponseBodyFault = "customer"
-	PostApiV1Query422JSONResponseBodyFaultPlatform PostApiV1Query422JSONResponseBodyFault = "platform"
-	PostApiV1Query422JSONResponseBodyFaultProvider PostApiV1Query422JSONResponseBodyFault = "provider"
+	PostApiV1Query422JSONResponseBodyFaultCustomer         PostApiV1Query422JSONResponseBodyFault = "customer"
+	PostApiV1Query422JSONResponseBodyFaultPlatform         PostApiV1Query422JSONResponseBodyFault = "platform"
+	PostApiV1Query422JSONResponseBodyFaultPresumedPlatform PostApiV1Query422JSONResponseBodyFault = "presumed_platform"
+	PostApiV1Query422JSONResponseBodyFaultProvider         PostApiV1Query422JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1Query422JSONResponseBodyFault enum.
@@ -20101,6 +20702,8 @@ func (e PostApiV1Query422JSONResponseBodyFault) Valid() bool {
 	case PostApiV1Query422JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1Query422JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1Query422JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1Query422JSONResponseBodyFaultProvider:
 		return true
@@ -20111,9 +20714,10 @@ func (e PostApiV1Query422JSONResponseBodyFault) Valid() bool {
 
 // Defines values for PostApiV1Query500JSONResponseBodyFault.
 const (
-	PostApiV1Query500JSONResponseBodyFaultCustomer PostApiV1Query500JSONResponseBodyFault = "customer"
-	PostApiV1Query500JSONResponseBodyFaultPlatform PostApiV1Query500JSONResponseBodyFault = "platform"
-	PostApiV1Query500JSONResponseBodyFaultProvider PostApiV1Query500JSONResponseBodyFault = "provider"
+	PostApiV1Query500JSONResponseBodyFaultCustomer         PostApiV1Query500JSONResponseBodyFault = "customer"
+	PostApiV1Query500JSONResponseBodyFaultPlatform         PostApiV1Query500JSONResponseBodyFault = "platform"
+	PostApiV1Query500JSONResponseBodyFaultPresumedPlatform PostApiV1Query500JSONResponseBodyFault = "presumed_platform"
+	PostApiV1Query500JSONResponseBodyFaultProvider         PostApiV1Query500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1Query500JSONResponseBodyFault enum.
@@ -20122,6 +20726,8 @@ func (e PostApiV1Query500JSONResponseBodyFault) Valid() bool {
 	case PostApiV1Query500JSONResponseBodyFaultCustomer:
 		return true
 	case PostApiV1Query500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiV1Query500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case PostApiV1Query500JSONResponseBodyFaultProvider:
 		return true
@@ -21548,9 +22154,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType) Val
 
 // Defines values for GetApiV1QueryReference400JSONResponseBodyFault.
 const (
-	GetApiV1QueryReference400JSONResponseBodyFaultCustomer GetApiV1QueryReference400JSONResponseBodyFault = "customer"
-	GetApiV1QueryReference400JSONResponseBodyFaultPlatform GetApiV1QueryReference400JSONResponseBodyFault = "platform"
-	GetApiV1QueryReference400JSONResponseBodyFaultProvider GetApiV1QueryReference400JSONResponseBodyFault = "provider"
+	GetApiV1QueryReference400JSONResponseBodyFaultCustomer         GetApiV1QueryReference400JSONResponseBodyFault = "customer"
+	GetApiV1QueryReference400JSONResponseBodyFaultPlatform         GetApiV1QueryReference400JSONResponseBodyFault = "platform"
+	GetApiV1QueryReference400JSONResponseBodyFaultPresumedPlatform GetApiV1QueryReference400JSONResponseBodyFault = "presumed_platform"
+	GetApiV1QueryReference400JSONResponseBodyFaultProvider         GetApiV1QueryReference400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QueryReference400JSONResponseBodyFault enum.
@@ -21559,6 +22166,8 @@ func (e GetApiV1QueryReference400JSONResponseBodyFault) Valid() bool {
 	case GetApiV1QueryReference400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1QueryReference400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1QueryReference400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1QueryReference400JSONResponseBodyFaultProvider:
 		return true
@@ -21569,9 +22178,10 @@ func (e GetApiV1QueryReference400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QueryReference401JSONResponseBodyFault.
 const (
-	GetApiV1QueryReference401JSONResponseBodyFaultCustomer GetApiV1QueryReference401JSONResponseBodyFault = "customer"
-	GetApiV1QueryReference401JSONResponseBodyFaultPlatform GetApiV1QueryReference401JSONResponseBodyFault = "platform"
-	GetApiV1QueryReference401JSONResponseBodyFaultProvider GetApiV1QueryReference401JSONResponseBodyFault = "provider"
+	GetApiV1QueryReference401JSONResponseBodyFaultCustomer         GetApiV1QueryReference401JSONResponseBodyFault = "customer"
+	GetApiV1QueryReference401JSONResponseBodyFaultPlatform         GetApiV1QueryReference401JSONResponseBodyFault = "platform"
+	GetApiV1QueryReference401JSONResponseBodyFaultPresumedPlatform GetApiV1QueryReference401JSONResponseBodyFault = "presumed_platform"
+	GetApiV1QueryReference401JSONResponseBodyFaultProvider         GetApiV1QueryReference401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QueryReference401JSONResponseBodyFault enum.
@@ -21580,6 +22190,8 @@ func (e GetApiV1QueryReference401JSONResponseBodyFault) Valid() bool {
 	case GetApiV1QueryReference401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1QueryReference401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1QueryReference401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1QueryReference401JSONResponseBodyFaultProvider:
 		return true
@@ -21590,9 +22202,10 @@ func (e GetApiV1QueryReference401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QueryReference403JSONResponseBodyFault.
 const (
-	GetApiV1QueryReference403JSONResponseBodyFaultCustomer GetApiV1QueryReference403JSONResponseBodyFault = "customer"
-	GetApiV1QueryReference403JSONResponseBodyFaultPlatform GetApiV1QueryReference403JSONResponseBodyFault = "platform"
-	GetApiV1QueryReference403JSONResponseBodyFaultProvider GetApiV1QueryReference403JSONResponseBodyFault = "provider"
+	GetApiV1QueryReference403JSONResponseBodyFaultCustomer         GetApiV1QueryReference403JSONResponseBodyFault = "customer"
+	GetApiV1QueryReference403JSONResponseBodyFaultPlatform         GetApiV1QueryReference403JSONResponseBodyFault = "platform"
+	GetApiV1QueryReference403JSONResponseBodyFaultPresumedPlatform GetApiV1QueryReference403JSONResponseBodyFault = "presumed_platform"
+	GetApiV1QueryReference403JSONResponseBodyFaultProvider         GetApiV1QueryReference403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QueryReference403JSONResponseBodyFault enum.
@@ -21601,6 +22214,8 @@ func (e GetApiV1QueryReference403JSONResponseBodyFault) Valid() bool {
 	case GetApiV1QueryReference403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1QueryReference403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1QueryReference403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1QueryReference403JSONResponseBodyFaultProvider:
 		return true
@@ -21611,9 +22226,10 @@ func (e GetApiV1QueryReference403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QueryReference500JSONResponseBodyFault.
 const (
-	GetApiV1QueryReference500JSONResponseBodyFaultCustomer GetApiV1QueryReference500JSONResponseBodyFault = "customer"
-	GetApiV1QueryReference500JSONResponseBodyFaultPlatform GetApiV1QueryReference500JSONResponseBodyFault = "platform"
-	GetApiV1QueryReference500JSONResponseBodyFaultProvider GetApiV1QueryReference500JSONResponseBodyFault = "provider"
+	GetApiV1QueryReference500JSONResponseBodyFaultCustomer         GetApiV1QueryReference500JSONResponseBodyFault = "customer"
+	GetApiV1QueryReference500JSONResponseBodyFaultPlatform         GetApiV1QueryReference500JSONResponseBodyFault = "platform"
+	GetApiV1QueryReference500JSONResponseBodyFaultPresumedPlatform GetApiV1QueryReference500JSONResponseBodyFault = "presumed_platform"
+	GetApiV1QueryReference500JSONResponseBodyFaultProvider         GetApiV1QueryReference500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QueryReference500JSONResponseBodyFault enum.
@@ -21622,6 +22238,8 @@ func (e GetApiV1QueryReference500JSONResponseBodyFault) Valid() bool {
 	case GetApiV1QueryReference500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1QueryReference500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1QueryReference500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1QueryReference500JSONResponseBodyFaultProvider:
 		return true
@@ -22508,9 +23126,10 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 
 // Defines values for GetApiV1QuerySchema400JSONResponseBodyFault.
 const (
-	GetApiV1QuerySchema400JSONResponseBodyFaultCustomer GetApiV1QuerySchema400JSONResponseBodyFault = "customer"
-	GetApiV1QuerySchema400JSONResponseBodyFaultPlatform GetApiV1QuerySchema400JSONResponseBodyFault = "platform"
-	GetApiV1QuerySchema400JSONResponseBodyFaultProvider GetApiV1QuerySchema400JSONResponseBodyFault = "provider"
+	GetApiV1QuerySchema400JSONResponseBodyFaultCustomer         GetApiV1QuerySchema400JSONResponseBodyFault = "customer"
+	GetApiV1QuerySchema400JSONResponseBodyFaultPlatform         GetApiV1QuerySchema400JSONResponseBodyFault = "platform"
+	GetApiV1QuerySchema400JSONResponseBodyFaultPresumedPlatform GetApiV1QuerySchema400JSONResponseBodyFault = "presumed_platform"
+	GetApiV1QuerySchema400JSONResponseBodyFaultProvider         GetApiV1QuerySchema400JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema400JSONResponseBodyFault enum.
@@ -22519,6 +23138,8 @@ func (e GetApiV1QuerySchema400JSONResponseBodyFault) Valid() bool {
 	case GetApiV1QuerySchema400JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1QuerySchema400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1QuerySchema400JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1QuerySchema400JSONResponseBodyFaultProvider:
 		return true
@@ -22529,9 +23150,10 @@ func (e GetApiV1QuerySchema400JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QuerySchema401JSONResponseBodyFault.
 const (
-	GetApiV1QuerySchema401JSONResponseBodyFaultCustomer GetApiV1QuerySchema401JSONResponseBodyFault = "customer"
-	GetApiV1QuerySchema401JSONResponseBodyFaultPlatform GetApiV1QuerySchema401JSONResponseBodyFault = "platform"
-	GetApiV1QuerySchema401JSONResponseBodyFaultProvider GetApiV1QuerySchema401JSONResponseBodyFault = "provider"
+	GetApiV1QuerySchema401JSONResponseBodyFaultCustomer         GetApiV1QuerySchema401JSONResponseBodyFault = "customer"
+	GetApiV1QuerySchema401JSONResponseBodyFaultPlatform         GetApiV1QuerySchema401JSONResponseBodyFault = "platform"
+	GetApiV1QuerySchema401JSONResponseBodyFaultPresumedPlatform GetApiV1QuerySchema401JSONResponseBodyFault = "presumed_platform"
+	GetApiV1QuerySchema401JSONResponseBodyFaultProvider         GetApiV1QuerySchema401JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema401JSONResponseBodyFault enum.
@@ -22540,6 +23162,8 @@ func (e GetApiV1QuerySchema401JSONResponseBodyFault) Valid() bool {
 	case GetApiV1QuerySchema401JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1QuerySchema401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1QuerySchema401JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1QuerySchema401JSONResponseBodyFaultProvider:
 		return true
@@ -22550,9 +23174,10 @@ func (e GetApiV1QuerySchema401JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QuerySchema403JSONResponseBodyFault.
 const (
-	GetApiV1QuerySchema403JSONResponseBodyFaultCustomer GetApiV1QuerySchema403JSONResponseBodyFault = "customer"
-	GetApiV1QuerySchema403JSONResponseBodyFaultPlatform GetApiV1QuerySchema403JSONResponseBodyFault = "platform"
-	GetApiV1QuerySchema403JSONResponseBodyFaultProvider GetApiV1QuerySchema403JSONResponseBodyFault = "provider"
+	GetApiV1QuerySchema403JSONResponseBodyFaultCustomer         GetApiV1QuerySchema403JSONResponseBodyFault = "customer"
+	GetApiV1QuerySchema403JSONResponseBodyFaultPlatform         GetApiV1QuerySchema403JSONResponseBodyFault = "platform"
+	GetApiV1QuerySchema403JSONResponseBodyFaultPresumedPlatform GetApiV1QuerySchema403JSONResponseBodyFault = "presumed_platform"
+	GetApiV1QuerySchema403JSONResponseBodyFaultProvider         GetApiV1QuerySchema403JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema403JSONResponseBodyFault enum.
@@ -22561,6 +23186,8 @@ func (e GetApiV1QuerySchema403JSONResponseBodyFault) Valid() bool {
 	case GetApiV1QuerySchema403JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1QuerySchema403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1QuerySchema403JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1QuerySchema403JSONResponseBodyFaultProvider:
 		return true
@@ -22571,9 +23198,10 @@ func (e GetApiV1QuerySchema403JSONResponseBodyFault) Valid() bool {
 
 // Defines values for GetApiV1QuerySchema500JSONResponseBodyFault.
 const (
-	GetApiV1QuerySchema500JSONResponseBodyFaultCustomer GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
-	GetApiV1QuerySchema500JSONResponseBodyFaultPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
-	GetApiV1QuerySchema500JSONResponseBodyFaultProvider GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
+	GetApiV1QuerySchema500JSONResponseBodyFaultCustomer         GetApiV1QuerySchema500JSONResponseBodyFault = "customer"
+	GetApiV1QuerySchema500JSONResponseBodyFaultPlatform         GetApiV1QuerySchema500JSONResponseBodyFault = "platform"
+	GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform GetApiV1QuerySchema500JSONResponseBodyFault = "presumed_platform"
+	GetApiV1QuerySchema500JSONResponseBodyFaultProvider         GetApiV1QuerySchema500JSONResponseBodyFault = "provider"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema500JSONResponseBodyFault enum.
@@ -22582,6 +23210,8 @@ func (e GetApiV1QuerySchema500JSONResponseBodyFault) Valid() bool {
 	case GetApiV1QuerySchema500JSONResponseBodyFaultCustomer:
 		return true
 	case GetApiV1QuerySchema500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiV1QuerySchema500JSONResponseBodyFaultPresumedPlatform:
 		return true
 	case GetApiV1QuerySchema500JSONResponseBodyFaultProvider:
 		return true

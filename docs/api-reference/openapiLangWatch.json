@@ -14769,7 +14769,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -14833,7 +14834,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -14897,7 +14899,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -14961,7 +14964,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -15025,7 +15029,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -15679,7 +15684,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -15743,7 +15749,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -15807,7 +15814,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -15871,7 +15879,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -16928,7 +16937,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -16992,7 +17002,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -17056,7 +17067,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -17120,7 +17132,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -28882,7 +28895,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -28946,7 +28960,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -29010,7 +29025,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -29074,7 +29090,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -29323,7 +29340,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -29387,7 +29405,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -29451,7 +29470,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -29515,7 +29535,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -29858,7 +29879,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -29922,7 +29944,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -29986,7 +30009,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -30050,7 +30074,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -30114,7 +30139,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -30372,7 +30398,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -30436,7 +30463,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -30500,7 +30528,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -30564,7 +30593,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -30628,7 +30658,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -30836,7 +30867,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -30900,7 +30932,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -30964,7 +30997,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -31028,7 +31062,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -31092,7 +31127,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -31352,7 +31388,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -31416,7 +31453,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -31480,7 +31518,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -31544,7 +31583,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -31608,7 +31648,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -32425,7 +32466,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -32489,7 +32531,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -32553,7 +32596,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -32617,7 +32661,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -32812,7 +32857,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -32876,7 +32922,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -32940,7 +32987,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -33004,7 +33052,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -33222,7 +33271,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -33286,7 +33336,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -33350,7 +33401,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -33414,7 +33466,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -33478,7 +33531,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -33682,7 +33736,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -33746,7 +33801,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -33810,7 +33866,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -33874,7 +33931,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -33938,7 +33996,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -34077,7 +34136,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -34141,7 +34201,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -34205,7 +34266,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -34269,7 +34331,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -34333,7 +34396,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -34539,7 +34603,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -34603,7 +34668,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -34667,7 +34733,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -34731,7 +34798,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -34795,7 +34863,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -34954,7 +35023,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -35018,7 +35088,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -35082,7 +35153,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -35146,7 +35218,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -35210,7 +35283,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -42361,7 +42435,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -42425,7 +42500,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -42489,7 +42565,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -42553,7 +42630,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -42674,7 +42752,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -42738,7 +42817,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -42802,7 +42882,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -42866,7 +42947,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -43011,7 +43093,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -43075,7 +43158,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -43139,7 +43223,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -43203,7 +43288,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -43330,7 +43416,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -43394,7 +43481,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -43458,7 +43546,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -43522,7 +43611,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -43893,7 +43983,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -43957,7 +44048,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -44021,7 +44113,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -44085,7 +44178,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -44411,7 +44505,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -44475,7 +44570,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -44539,7 +44635,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -44603,7 +44700,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -44667,7 +44765,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -45307,7 +45406,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -45371,7 +45471,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -45435,7 +45536,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -45499,7 +45601,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -45794,7 +45897,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -45858,7 +45962,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -45922,7 +46027,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -45986,7 +46092,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -46465,7 +46572,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -46529,7 +46637,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -46593,7 +46702,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -46657,7 +46767,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -46977,7 +47088,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -47041,7 +47153,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -47105,7 +47218,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -47169,7 +47283,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -47478,7 +47593,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -47542,7 +47658,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -47606,7 +47723,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -47670,7 +47788,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -47984,7 +48103,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -48048,7 +48168,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -48112,7 +48233,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -48176,7 +48298,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -48474,7 +48597,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -48538,7 +48662,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -48602,7 +48727,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -48666,7 +48792,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -48984,7 +49111,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -49048,7 +49176,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -49112,7 +49241,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -49176,7 +49306,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -49503,7 +49634,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -49567,7 +49699,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -49631,7 +49764,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -49695,7 +49829,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -49759,7 +49894,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -50287,7 +50423,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -50351,7 +50488,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -50415,7 +50553,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -50479,7 +50618,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -50780,7 +50920,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -50844,7 +50985,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -50908,7 +51050,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -50972,7 +51115,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -51345,7 +51489,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -51409,7 +51554,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -51473,7 +51619,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -51537,7 +51684,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -51840,7 +51988,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -51904,7 +52053,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -51968,7 +52118,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -52032,7 +52183,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -52276,7 +52428,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -52340,7 +52493,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -52404,7 +52558,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -52468,7 +52623,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -52684,7 +52840,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -52748,7 +52905,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -52812,7 +52970,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -52876,7 +53035,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -52940,7 +53100,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -53251,7 +53412,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -53315,7 +53477,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -53379,7 +53542,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -53443,7 +53607,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -53650,7 +53815,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -53714,7 +53880,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -53778,7 +53945,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -53842,7 +54010,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54144,7 +54313,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54208,7 +54378,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54272,7 +54443,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54336,7 +54508,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54442,7 +54615,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54506,7 +54680,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54570,7 +54745,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54634,7 +54810,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54698,7 +54875,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54791,7 +54969,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54855,7 +55034,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54919,7 +55099,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -54983,7 +55164,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -55047,7 +55229,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -55142,7 +55325,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -55206,7 +55390,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -55270,7 +55455,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -55334,7 +55520,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -55398,7 +55585,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -55502,7 +55690,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -55566,7 +55755,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -55630,7 +55820,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -55694,7 +55885,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -55758,7 +55950,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -56004,7 +56197,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -56068,7 +56262,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -56132,7 +56327,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -56196,7 +56392,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -56885,7 +57082,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -56949,7 +57147,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -57013,7 +57212,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -57077,7 +57277,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -57641,7 +57842,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -57705,7 +57907,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -57769,7 +57972,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -57833,7 +58037,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -57922,375 +58127,6 @@
             }
           }
         ]
-      }
-    },
-    "/api/gateway/v1/spend-events/replay": {
-      "post": {
-        "operationId": "postApiGatewayV1SpendEventsReplay",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "endpoint_id": {
-                          "type": "string"
-                        },
-                        "replay_id": {
-                          "type": "string"
-                        },
-                        "replayed": {
-                          "type": "integer",
-                          "minimum": -9007199254740991,
-                          "maximum": 9007199254740991
-                        },
-                        "window": {
-                          "type": "object",
-                          "properties": {
-                            "from": {
-                              "type": "string"
-                            },
-                            "to": {
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "from",
-                            "to"
-                          ],
-                          "additionalProperties": false
-                        }
-                      },
-                      "required": [
-                        "endpoint_id",
-                        "replay_id",
-                        "replayed",
-                        "window"
-                      ],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "retryable": {
-                      "type": "boolean"
-                    },
-                    "meta": {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {}
-                    },
-                    "trace_id": {
-                      "type": "string"
-                    },
-                    "span_id": {
-                      "type": "string"
-                    },
-                    "tips": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "docs_url": {
-                      "type": "string"
-                    },
-                    "fault": {
-                      "type": "string",
-                      "enum": [
-                        "customer",
-                        "platform",
-                        "provider"
-                      ]
-                    },
-                    "reasons": {
-                      "type": "array",
-                      "items": {}
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "code",
-                    "message",
-                    "retryable"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "retryable": {
-                      "type": "boolean"
-                    },
-                    "meta": {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {}
-                    },
-                    "trace_id": {
-                      "type": "string"
-                    },
-                    "span_id": {
-                      "type": "string"
-                    },
-                    "tips": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "docs_url": {
-                      "type": "string"
-                    },
-                    "fault": {
-                      "type": "string",
-                      "enum": [
-                        "customer",
-                        "platform",
-                        "provider"
-                      ]
-                    },
-                    "reasons": {
-                      "type": "array",
-                      "items": {}
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "code",
-                    "message",
-                    "retryable"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "retryable": {
-                      "type": "boolean"
-                    },
-                    "meta": {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {}
-                    },
-                    "trace_id": {
-                      "type": "string"
-                    },
-                    "span_id": {
-                      "type": "string"
-                    },
-                    "tips": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "docs_url": {
-                      "type": "string"
-                    },
-                    "fault": {
-                      "type": "string",
-                      "enum": [
-                        "customer",
-                        "platform",
-                        "provider"
-                      ]
-                    },
-                    "reasons": {
-                      "type": "array",
-                      "items": {}
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "code",
-                    "message",
-                    "retryable"
-                  ]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "retryable": {
-                      "type": "boolean"
-                    },
-                    "meta": {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {}
-                    },
-                    "trace_id": {
-                      "type": "string"
-                    },
-                    "span_id": {
-                      "type": "string"
-                    },
-                    "tips": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "docs_url": {
-                      "type": "string"
-                    },
-                    "fault": {
-                      "type": "string",
-                      "enum": [
-                        "customer",
-                        "platform",
-                        "provider"
-                      ]
-                    },
-                    "reasons": {
-                      "type": "array",
-                      "items": {}
-                    }
-                  },
-                  "required": [
-                    "type",
-                    "code",
-                    "message",
-                    "retryable"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "description": "Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing.",
-        "summary": "Replay spend events to an endpoint",
-        "tags": [
-          "Gateway Spend"
-        ],
-        "security": [
-          {
-            "admin_api_key": []
-          }
-        ],
-        "x-access-policy": {
-          "kind": "handlerManaged",
-          "credential": [
-            "organization_api_key"
-          ],
-          "permissions": [
-            "gatewaySpend:manage"
-          ]
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "from": {
-                    "type": "integer",
-                    "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "to": {
-                    "type": "integer",
-                    "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "endpoint_id": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 200
-                  }
-                },
-                "required": [
-                  "from",
-                  "to",
-                  "endpoint_id"
-                ]
-              }
-            }
-          }
-        }
       }
     },
     "/api/v1/governance/ingestion-templates": {
@@ -65510,7 +65346,8 @@
                       "enum": [
                         "customer",
                         "platform",
-                        "provider"
+                        "provider",
+                        "presumed_platform"
                       ]
                     },
                     "reasons": {
@@ -108173,6 +108010,379 @@
             "required": true
           }
         ]
+      }
+    },
+    "/api/gateway/v1/spend-events/replay": {
+      "post": {
+        "operationId": "postApiGatewayV1SpendEventsReplay",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "endpoint_id": {
+                          "type": "string"
+                        },
+                        "replay_id": {
+                          "type": "string"
+                        },
+                        "replayed": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "window": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "string"
+                            },
+                            "to": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "from",
+                            "to"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "endpoint_id",
+                        "replay_id",
+                        "replayed",
+                        "window"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retryable": {
+                      "type": "boolean"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "trace_id": {
+                      "type": "string"
+                    },
+                    "span_id": {
+                      "type": "string"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docs_url": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "enum": [
+                        "customer",
+                        "platform",
+                        "provider",
+                        "presumed_platform"
+                      ]
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "code",
+                    "message",
+                    "retryable"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing.",
+        "summary": "Replay spend events to an endpoint",
+        "tags": [
+          "Gateway Spend"
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "gatewaySpend:manage"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "to": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endpoint_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "from",
+                  "to",
+                  "endpoint_id"
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/workflows": {
