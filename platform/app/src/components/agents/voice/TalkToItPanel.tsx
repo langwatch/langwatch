@@ -100,7 +100,7 @@ type TalkRefs = {
   // retried or delayed (slow name entry, a failed first save) must reuse the
   // moment the call actually ended, not `Date.now()` at each attempt — else a
   // below-limit call could cross the limit while disconnected and persist as
-  // cut (#8214). 0 until the call ends, when runFinish falls back to now.
+  // cut (#8214). 0 until the call ends, when callSpanOf falls back to now.
   endedAt: { current: number };
   conversationId: { current: string | undefined };
   // The signed session token from mint, carried back verbatim to finish.
@@ -207,6 +207,20 @@ function applyFinishSuccess({
   });
 }
 
+/**
+ * The call's span as finish posts it. Whether the limit ended the call is the
+ * server's finding from this span (#8028); the panel keeps its own flag only
+ * for what it shows. endedAt is the frozen end time from when the call ended;
+ * `Date.now()` only as a fallback for a finish that never went through
+ * runEndCall (#8214).
+ */
+function callSpanOf(refs: TalkRefs): { startedAt: number; endedAt: number } {
+  return {
+    startedAt: refs.startedAt.current || Date.now(),
+    endedAt: refs.endedAt.current || Date.now(),
+  };
+}
+
 async function runFinish({
   props,
   refs,
@@ -229,12 +243,7 @@ async function runFinish({
     name: nameOverride ?? props.name,
     conversationId: refs.conversationId.current,
     transcript,
-    // Whether the limit ended the call is the server's finding from this span
-    // (#8028); the panel keeps its own flag only for what it shows.
-    startedAt: refs.startedAt.current || Date.now(),
-    // The frozen end time from when the call ended; `Date.now()` only as a
-    // fallback for a finish that never went through runEndCall (#8214).
-    endedAt: refs.endedAt.current || Date.now(),
+    ...callSpanOf(refs),
     ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
   };
   let res: Response;
