@@ -13,7 +13,9 @@ import {
   type UsageSenders,
 } from "../eventing/usage.pipeline.ts";
 import { BillableEventsMeterClickHouseRepository } from "../repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
+import { TraceMeterClickHouseRepository } from "../repositories/clickhouse/clickhouse.trace-meter.repository.ts";
 import { BillableEventsMeterAppendService } from "../services/billable-events-meter-append.service.ts";
+import { TraceMeterAppendService } from "../services/trace-meter-append.service.ts";
 import { UsageCountingService } from "../services/usage-counting.service.ts";
 
 export type UsageInfrastructure = Readonly<{ clickhouse: ClickHouseQueryClient; isSaas: boolean }>;
@@ -53,8 +55,17 @@ export class UsageModule implements UsageApiContract {
     return new UsageModule((send) =>
       buildUsagePipeline({
         countMonth: CountMonthCommand.create({ counting }),
-        meterStore: members.isSaas
-          ? BillableEventsMeterAppendService.create({ meter, projects: dependencies.projects })
+        meterStores: members.isSaas
+          ? {
+              billableEvents: BillableEventsMeterAppendService.create({
+                meter,
+                projects: dependencies.projects,
+              }),
+              traces: TraceMeterAppendService.create({
+                meter: TraceMeterClickHouseRepository.create(members.clickhouse),
+                projects: dependencies.projects,
+              }),
+            }
           : void 0,
         projects: dependencies.projects,
         send,

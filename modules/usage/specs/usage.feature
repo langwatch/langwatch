@@ -12,30 +12,43 @@ Feature: Usage meters, decisions and who learns them
 
   # --- The trace meter ---------------------------------------------------------
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: The trace meter counts each trace once a month however many spans it has
     Given three spans of one trace and one span of another arrive for a project this month
     When the month's trace count is read for the organization
     Then the count is 2
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: A replayed span does not count its trace twice
     Given a span of a trace was metered this month
     When the same span_received event is delivered again
     Then the month's trace count is unchanged
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: A trace counts in the month its first span arrived
     Given a trace whose first span arrived on the last day of last month
     And whose second span arrived on the first day of this month
-    When this month's trace count is read
-    Then the trace counts once in each month
+    When last month's and this month's trace counts are read
+    Then the trace counts in last month and not in this month
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: The month's count reads only the organization's own projects
     Given another organization's project sent traces this month
     When the month's trace count is read for the organization
     Then the other organization's traces are not counted
+
+  @unit @usage
+  Scenario: A span from a project in no organization is skipped, loudly
+    Given a project that belongs to no organization
+    When a span arrives for it
+    Then no trace meter row is written
+    And a warning is logged naming the project
+
+  @unit @usage
+  Scenario: The trace meter registers beside the billable-events meter, on SaaS only
+    When the usage pipeline registers its global projections
+    Then the trace meter is registered as "usageTraceMeter" on a SaaS deployment
+    And a self-hosted deployment registers neither meter
 
   @integration @usage @unimplemented
   Scenario: The meter seed is idempotent
