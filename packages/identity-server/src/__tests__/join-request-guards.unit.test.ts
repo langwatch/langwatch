@@ -85,6 +85,21 @@ describe("given nobody has asked yet", () => {
       // so the fact and a later lookup compare byte for byte.
       expect(facts[0]?.data).toMatchObject({ domain: "acme.com" });
     });
+
+    /** @scenario A request made from the terminal lands as a Developer when approved */
+    it("carries where the request was made onto the fact", async () => {
+      const facts = await guards.requestJoin({
+        ...command,
+        actor: { type: "user", id: "user_sam" },
+        userId: "user_sam",
+        domain: "acme.com",
+        matchedVia: "verified-identifier-domain",
+        expiresAtMs: EXPIRES_AT,
+        origin: "cli",
+      });
+
+      expect(facts[0]?.data).toMatchObject({ origin: "cli" });
+    });
   });
 
   describe("when somebody asks on a public email domain", () => {

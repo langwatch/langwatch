@@ -8,6 +8,7 @@ import {
   JOIN_WITHDRAWN_EVENT_TYPE,
   type JoinRequestAggregateState,
   type JoinRequestFact,
+  joinRequestedPayloadSchema,
   reduceJoinRequest,
 } from "../join-request";
 
@@ -37,6 +38,7 @@ const requested: JoinRequestFact = {
     matchedVia: "verified-identifier-domain",
     expiresAtMs: EXPIRES_AT,
     notifyAdmins: true,
+    origin: "web",
     actor: { type: "user", id: "user_sam" },
   },
 };
@@ -258,6 +260,30 @@ describe("given a request that reached any ending", () => {
         expect(state.resolvedAtMs).toBe(RESOLVED_AT);
         expect(state.state).not.toBe("PENDING");
       }
+    });
+  });
+});
+
+describe("given a request made from the terminal", () => {
+  describe("when the request is made", () => {
+    /** @scenario The welcome screen honours an automatic door */
+    it("records where it was made, so the seat can be decided from it later", () => {
+      const state = reduceJoinRequest({
+        state: emptyJoinRequest({ joinRequestId: "jreq_1" }),
+        fact: { ...requested, data: { ...requested.data, origin: "cli" } },
+      });
+
+      expect(state.origin).toBe("cli");
+    });
+  });
+
+  describe("when an event written before origins existed is read back", () => {
+    it("reads as a web request, so a replay rebuilds the same row the column default gives", () => {
+      const { origin: _dropped, ...legacy } = requested.data;
+      const parsed = joinRequestedPayloadSchema.parse(legacy);
+
+      expect(parsed.origin).toBe("web");
+      expect(emptyJoinRequest({ joinRequestId: "jreq_1" }).origin).toBe("web");
     });
   });
 });

@@ -10,6 +10,7 @@ import {
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
   readJoinerRole,
+  seatForJoiner,
   resolveJoinLookup,
 } from "../join-matching";
 
@@ -489,6 +490,32 @@ describe("readJoinerRole()", () => {
       expect(readJoinerRole(null)).toBe("MEMBER");
       expect(readJoinerRole(undefined)).toBe("MEMBER");
       expect(readJoinerRole("ADMIN")).toBe("MEMBER");
+    });
+  });
+});
+
+describe("seatForJoiner()", () => {
+  describe("when the request was made from the terminal", () => {
+    /** @scenario A request made from the terminal lands as a Developer when approved */
+    it("lands a Developer whatever the joiner seat says", () => {
+      expect(seatForJoiner({ origin: "cli", joinerRole: "MEMBER" })).toBe(
+        "DEVELOPER",
+      );
+      expect(seatForJoiner({ origin: "cli", joinerRole: "DEVELOPER" })).toBe(
+        "DEVELOPER",
+      );
+    });
+  });
+
+  describe("when the request was made on the web", () => {
+    /** @scenario A request made on the web keeps the organisation's joiner seat */
+    it("lands the organisation's joiner seat, unchanged", () => {
+      expect(seatForJoiner({ origin: "web", joinerRole: "MEMBER" })).toBe(
+        "MEMBER",
+      );
+      expect(seatForJoiner({ origin: "web", joinerRole: "DEVELOPER" })).toBe(
+        "DEVELOPER",
+      );
     });
   });
 });

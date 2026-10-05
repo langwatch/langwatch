@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
+  DEFAULT_JOIN_REQUEST_ORIGIN,
   joinMatchKindSchema,
+  joinRequestOriginSchema,
   joinResolverSchema,
   joinWithdrawalCauseSchema,
 } from "./join-request";
@@ -76,6 +78,8 @@ export const requestJoinCommandDataSchema = commandDataSchema({
   matchedVia: joinMatchKindSchema,
   expiresAtMs: z.number().int().nonnegative(),
   notifyAdmins: z.boolean().default(true),
+  /** Where the request was made; see `JOIN_REQUEST_ORIGINS`. */
+  origin: joinRequestOriginSchema.default(DEFAULT_JOIN_REQUEST_ORIGIN),
 });
 export type RequestJoinCommandData = z.infer<
   typeof requestJoinCommandDataSchema

@@ -75,6 +75,23 @@ export function readJoinerRole(stored: string | null | undefined): JoinerRole {
 }
 
 /**
+ * The seat a join lands in (ADR-143 v6): the organisation's joiner seat for a
+ * request made on the web, and a Developer for one made from the terminal,
+ * whatever the joiner seat says. A pure decision, so the service can take it
+ * from the request in hand on the automatic path, where the projection row
+ * may not exist yet, and from the stored request on a later approval.
+ */
+export function seatForJoiner({
+  origin,
+  joinerRole,
+}: {
+  origin: "web" | "cli";
+  joinerRole: JoinerRole;
+}): JoinerRole {
+  return origin === "cli" ? "DEVELOPER" : joinerRole;
+}
+
+/**
  * Asking to join needs ONE member holding a verified address on the domain:
  * the ask reveals nothing on its own and an admin gates the outcome.
  */
