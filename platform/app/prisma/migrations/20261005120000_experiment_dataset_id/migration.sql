@@ -9,9 +9,10 @@ ALTER TABLE "Experiment" ADD COLUMN "datasetId" TEXT;
 -- CreateIndex
 CREATE INDEX "Experiment_datasetId_idx" ON "Experiment"("datasetId");
 
--- Down (manual): reverses this migration; run only to roll back.
--- Safe to run: the column is additive-only and unread by any code that
--- predates it, so rolling back loses only the dataset association on
--- SDK-driven experiments, nothing else.
+-- IRREVERSIBLE: Prisma migrations are forward-only; there is no Down step to
+-- run automatically. The commands below are commentary, not an executable
+-- rollback. They are safe to run manually anyway: the column is additive-only
+-- and unread by any code that predates it, so running them loses only the
+-- dataset association on SDK-driven experiments, nothing else.
 --   DROP INDEX "Experiment_datasetId_idx";
 --   ALTER TABLE "Experiment" DROP COLUMN "datasetId";
