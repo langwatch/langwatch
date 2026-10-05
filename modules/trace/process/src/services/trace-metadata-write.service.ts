@@ -5,10 +5,14 @@ import {
   type CustomMetadata,
   type ReservedTraceMetadata,
   type TraceMetadataUpdate,
+  type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
 
-import type { TraceSpanIngest } from "../app/trace.members.ts";
 import { TraceCollectorSpanService } from "./trace-collector-span.service.ts";
+
+export interface TraceSpanIngest {
+  recordSpan(data: RecordSpanCommandData): Promise<unknown>;
+}
 
 /** Metadata keys that map onto the trace's first-class identity fields rather
  *  than free-form custom metadata. */

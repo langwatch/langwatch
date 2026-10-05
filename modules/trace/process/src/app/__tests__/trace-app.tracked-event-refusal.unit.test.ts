@@ -8,8 +8,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TrackedEventInvalidError } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import { TraceModule, type TraceAppDependencies } from "../trace.app.ts";
-import type { TraceLegacyRead } from "../trace.members.ts";
 
 const loggerSpies = vi.hoisted(() => ({
   warn: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 }));
 
 function app() {
-  return TraceModule.create(
+  return TraceModule.fromDependencies(
     createApiFixture<TraceAppDependencies>({
       traces: createApiFixture<TraceAppDependencies["traces"]>({
         read: createApiFixture<TraceLegacyRead>(),

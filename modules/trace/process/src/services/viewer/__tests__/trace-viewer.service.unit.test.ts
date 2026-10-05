@@ -2,7 +2,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace, Protections } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceLegacyRead } from "../../../app/trace.members.ts";
+import type { TraceLegacyRead } from "../../trace-viewer.service.ts";
 import { TraceViewerReadService } from "../../trace-viewer.service.ts";
 
 const protections: Protections = {

@@ -23,7 +23,7 @@ import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.
 import type { TraceRepositories } from "../../repositories/trace.repositories.ts";
 import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { composeTraceAppDependencies } from "../trace-composition.build.ts";
+import { TraceModule } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 
 const FOLDED: TraceSummaryData = traceSummaryDataSchema.parse({
@@ -119,7 +119,7 @@ function compose({
   const peers = unreachablePeers();
   const refuse = () => Promise.reject(new Error("no datastore in this test"));
 
-  return composeTraceAppDependencies({
+  return TraceModule.composeDependencies({
     repositories,
     ...(withClickHouse ? { resolveClickHouseClient: refuse } : {}),
     ...(summaryStore ? { summaryStore } : {}),
@@ -178,7 +178,7 @@ function treeOf(deps: ReturnType<typeof compose>) {
   return tree;
 }
 
-describe("composeTraceAppDependencies summary reader", () => {
+describe("TraceModule.composeDependencies summary reader", () => {
   it("answers the folded summary, asking the fold for the trace under its tenant", async () => {
     const { store, asked } = summaryStoreReading({ kind: "folded", state: FOLDED });
 

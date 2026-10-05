@@ -35,7 +35,7 @@ import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { composeTraceAppDependencies } from "../trace-composition.build.ts";
+import { TraceModule } from "../trace.app.ts";
 
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";
@@ -115,7 +115,7 @@ function compose({
     },
   });
 
-  const deps = composeTraceAppDependencies({
+  const deps = TraceModule.composeDependencies({
     repositories: MemoryTraceRepositories.create(),
     resolveClickHouseClient: resolve,
     storedObjects: createApiFixture<StoredObjectApi>(),

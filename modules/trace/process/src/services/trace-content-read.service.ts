@@ -9,7 +9,7 @@ import {
   type TracesForProjectResult,
 } from "@langwatch/trace-contract";
 
-import type { TraceLegacyRead } from "../app/trace.members.ts";
+import type { TraceLegacyRead } from "./trace-viewer.service.ts";
 
 export class TraceContentReadService extends TraceContentReadContract {
   static create(read: TraceLegacyRead): TraceContentReadService {

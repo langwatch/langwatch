@@ -14,7 +14,7 @@ export function createTraceAppHarness({
 }: Partial<Omit<TraceAppDependencies, "traces">> & {
   traces?: Partial<TraceReaders>;
 } = {}): TraceModule {
-  return TraceModule.create({
+  return TraceModule.fromDependencies({
     storedObjects: createApiFixture<TraceAppDependencies["storedObjects"]>({}, "storedObjects"),
     topics: createApiFixture<TraceAppDependencies["topics"]>({}, "topics"),
     broadcast: createApiFixture<TraceAppDependencies["broadcast"]>({}, "broadcast"),

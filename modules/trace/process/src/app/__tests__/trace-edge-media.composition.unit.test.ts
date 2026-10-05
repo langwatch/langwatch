@@ -26,7 +26,7 @@ import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { composeTraceAppDependencies } from "../trace-composition.build.ts";
+import { TraceModule } from "../trace.app.ts";
 
 const PNG_DATA_URI =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
@@ -49,7 +49,7 @@ function compose({
     legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
     resolveClickHouseClient: refuse,
   });
-  const deps = composeTraceAppDependencies({
+  const deps = TraceModule.composeDependencies({
     repositories: MemoryTraceRepositories.create(),
     storedObjects: createApiFixture<StoredObjectApi>({ storeFromBytes } as never),
     canonicalisation: TraceCanonicalisationService.create(),
@@ -145,7 +145,7 @@ const flags = (enabled: boolean): FeatureFlagApi =>
 const storedInput = (composed: ReturnType<typeof compose>) =>
   composed.recorded[0]?.span.attributes[0]?.value.stringValue;
 
-describe("composeTraceAppDependencies edge media hook", () => {
+describe("TraceModule.composeDependencies edge media hook", () => {
   describe("given the feature flag is enabled for the project", () => {
     /** @scenario "A data-URI image inside an image_url part is externalized" */
     it("stores the bytes through Stored Object and queues a reference instead", async () => {
@@ -185,7 +185,7 @@ describe("composeTraceAppDependencies edge media hook", () => {
   });
 });
 
-describe("composeTraceAppDependencies edge spool", () => {
+describe("TraceModule.composeDependencies edge spool", () => {
   const oversized = "x".repeat(300 * 1024);
 
   describe("given a span whose command payload exceeds 256 KB", () => {

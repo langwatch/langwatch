@@ -16,16 +16,16 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 
-import {
-  type TraceIoExtraction,
-  type TraceMediaReferenceResolver,
-  type TraceModelCost,
-  type TraceSpanNormalization,
-  type TraceSpanContentDrop,
-  type TraceSpanCostEnrichment,
-  type TraceSpanPiiRedaction,
-  type TraceSpanTokenEstimation,
-} from "../app/trace.members.ts";
+import type { TraceSpanNormalization } from "../services/span-normalization.service.ts";
+import type { TraceIoExtraction } from "../services/trace-io-extraction.service.ts";
+import type { TraceMediaReferenceResolver } from "../services/trace-media-reference.service.ts";
+import type { TraceModelCost } from "../services/trace-model-cost.service.ts";
+import type {
+  TraceSpanContentDrop,
+  TraceSpanCostEnrichment,
+  TraceSpanPiiRedaction,
+  TraceSpanTokenEstimation,
+} from "./record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
 import type { TraceAnalyticsData } from "./trace-derived.projection.ts";
 import { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";

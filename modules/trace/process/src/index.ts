@@ -1,34 +1,31 @@
+export type { TraceProcessingCommands } from "./services/trace-processing-commands.service.ts";
 export type {
-  TraceProcessingCommands,
-  TraceProductAnalytics,
-  TraceProductEvent,
   TraceSpanContentDrop,
   TraceSpanContentDropResult,
   TraceSpanCostEnrichment,
   TraceSpanPiiRedaction,
   TraceSpanSpool,
-} from "./app/trace.members.ts";
+  TraceSpanTokenEstimation,
+} from "./eventing/record-span.commands.ts";
 export type { TraceSummarySubscriber } from "./eventing/origin-guarded.subscriber.ts";
 export type { TraceClickHouseClient } from "./repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 export { EventingRecordSpanAdapter } from "./eventing/record-span.commands.ts";
-export { traceProcessModule, type TraceInfrastructure } from "./trace.module.ts";
+export { traceProcessModule } from "./trace.module.ts";
 
 export {
   EventingTracePipelineAdapter,
   type EventingTracePipelineAdapterOptions,
 } from "./eventing/trace-processing-projections.pipeline.ts";
+export type { TraceProjectMetadata } from "./eventing/project-metadata.subscriber.ts";
+export type { TraceModelCostCatalog } from "./services/span-cost-enrichment.service.ts";
 export type {
-  TraceSpanTokenEstimation,
-  TraceSpoolLegacyObject,
-  TraceSpoolStorage,
-  TraceSpoolObjectStore,
-  TraceProjectMetadata,
-  TraceModelCostCatalog,
-  TraceEvaluationMonitor,
-  TraceEvaluationLoopMetrics,
-  TraceEvaluationLoopBlockReason,
   TraceEvaluationDispatch,
-} from "./app/trace.members.ts";
+  TraceEvaluationMonitor,
+} from "./eventing/evaluation-trigger.subscriber.ts";
+export type {
+  TraceEvaluationLoopBlockReason,
+  TraceEvaluationLoopMetrics,
+} from "./services/trace-evaluation-loop-metrics.service.ts";
 export {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
   CUSTOM_EVAL_SYNC_DELAY_MS,
@@ -68,5 +65,3 @@ export { TraceAnalyticsStore } from "./eventing/trace-derived.store.ts";
 export { TraceAnalyticsRollupStore } from "./eventing/trace-rollup.store.ts";
 export { TraceSummaryStore } from "./eventing/trace-summary.store.ts";
 export { createEvaluationTriggerSubscriber } from "./eventing/evaluation-trigger.subscriber.ts";
-export type { TraceLegacyReadRepository } from "./repositories/trace-legacy-read.repository.ts";
-export { createTracePayloadReader, createTraceLegacyRead } from "./trace.module.ts";

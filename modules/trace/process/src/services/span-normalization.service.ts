@@ -15,9 +15,19 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
-import type { TraceSpanNormalization } from "../app/trace.members.ts";
 import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
 import { SpanRecordIdentityService } from "./span-record-identity.service.ts";
+
+export interface TraceSpanNormalization {
+  normalizeSpanReceived(params: {
+    tenantId: string;
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    instrumentationScope: OtlpInstrumentationScope | null;
+  }): NormalizedSpan;
+
+  enrichRagContextIds(span: NormalizedSpan): void;
+}
 
 const spanRecordIdentityService = SpanRecordIdentityService.create();
 

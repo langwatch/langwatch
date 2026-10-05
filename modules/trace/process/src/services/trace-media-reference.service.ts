@@ -6,10 +6,31 @@ import {
   type TraceMediaRef,
 } from "@langwatch/trace-contract";
 
-import {
-  type TraceMediaReferenceResolver,
-  type TraceMediaReference,
-} from "../app/trace.members.ts";
+export type TraceMediaReference = {
+  kind: "audio" | "file" | "image" | "video";
+  url: string;
+  filename?: string;
+  mimeType?: string;
+  role?: string;
+};
+
+export const TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE = "langwatch.reserved.media_refs.input";
+
+export const TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE = "langwatch.reserved.media_refs.output";
+
+export interface TraceMediaReferenceResolver {
+  collect(value: unknown): TraceMediaReference[];
+
+  parse(serialized: string | null): TraceMediaReference[];
+
+  merge(input: {
+    existing: TraceMediaReference[];
+    incoming: TraceMediaReference[];
+    precedence: "append" | "prepend";
+  }): TraceMediaReference[];
+
+  serialize(references: TraceMediaReference[]): string | null;
+}
 
 /** Media reference serialization: shared format between write and read paths
  * prevents parsing failures that hide thumbnails. */

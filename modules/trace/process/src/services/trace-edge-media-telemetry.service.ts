@@ -1,9 +1,20 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 
-import {
-  type TraceEdgeMediaFailOpenReason,
-  type TraceEdgeMediaTelemetry,
-} from "../app/trace.members.ts";
+/** The fail-open reasons the edge extraction reports. First three: hook
+ * standing down (flag store, privacy probe, store refusal). Last three: budget
+ * outcomes (per-span cap, deadline, part store). */
+export type TraceEdgeMediaFailOpenReason =
+  | "flag_store"
+  | "privacy_probe"
+  | "storage"
+  | "part_cap"
+  | "deadline"
+  | "part_store";
+
+/** The one series the edge extraction reports. Absent means unreported. */
+export interface TraceEdgeMediaTelemetry {
+  failOpen(reason: TraceEdgeMediaFailOpenReason, count?: number): void;
+}
 
 const TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME = "langwatch_edge_media_extract_fail_open_total";
 

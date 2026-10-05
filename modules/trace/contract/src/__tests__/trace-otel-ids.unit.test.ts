@@ -26,4 +26,13 @@ describe("OpenTelemetry id generation", () => {
       }
     });
   });
+
+  describe("given many trace ids generated in a row", () => {
+    /** @scenario Repeated generation yields unique trace ids */
+    it("yields a distinct id on every call", () => {
+      const ids = Array.from({ length: 1000 }, () => generateOtelTraceId());
+
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+  });
 });

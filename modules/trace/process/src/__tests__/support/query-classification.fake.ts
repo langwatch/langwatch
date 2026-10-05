@@ -1,4 +1,4 @@
-import { type TraceQueryClassifier } from "../../app/trace.members.ts";
+import type { TraceQueryClassifier } from "../../services/trace-query-classification.service.ts";
 
 export class TestTraceQueryClassification implements TraceQueryClassifier {
   classify() {

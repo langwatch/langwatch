@@ -33,7 +33,7 @@ export interface GovernanceClickHouseResolver {
  * ClickHouse-tier governance repository asks its resolver for. One tenant
  * per resolution, exactly as the tables' own rule requires: every statement
  * names its tenant. Same convention as `modules/trace/process`'s
- * `MemberTraceClickHouseClient` (`app/trace-composition.build.ts:220-231`).
+ * `ClickHouseTraceClientsRepository` (`repositories/clickhouse/clickhouse.trace-member-client.repository.ts`).
  */
 class MemberGovernanceClickHouseClient {
   constructor(

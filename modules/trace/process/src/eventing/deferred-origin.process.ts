@@ -10,7 +10,11 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import type { DeferredOriginPayload } from "../app/trace.members.ts";
+export type DeferredOriginPayload = {
+  id: string;
+  tenantId: string;
+  traceId: string;
+};
 
 const logger = createLogger("langwatch:trace-processing:origin-gate");
 

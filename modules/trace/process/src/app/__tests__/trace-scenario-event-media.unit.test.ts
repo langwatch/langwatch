@@ -2,8 +2,8 @@ import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import { TraceModule, type TraceAppDependencies } from "../trace.app.ts";
-import type { TraceLegacyRead } from "../trace.members.ts";
 
 function fixture(options: { storeFromBytes?: StoredObjectApi["storeFromBytes"] } = {}) {
   const storeFromBytes =
@@ -21,7 +21,7 @@ function fixture(options: { storeFromBytes?: StoredObjectApi["storeFromBytes"] }
       isDuplicate: false,
     });
   const storedObjects = createApiFixture<StoredObjectApi>({ storeFromBytes });
-  const app = TraceModule.create(
+  const app = TraceModule.fromDependencies(
     createApiFixture<TraceAppDependencies>({
       storedObjects,
       traces: createApiFixture<TraceAppDependencies["traces"]>({

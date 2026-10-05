@@ -12,8 +12,9 @@ import {
   type OtlpSpan,
 } from "@langwatch/trace-contract";
 
-import type { TraceEdgeMediaTelemetry, TraceMediaStore } from "../app/trace.members.ts";
 import type { ExtractedRef } from "../rules/content-part-extraction.rules.ts";
+import type { TraceEdgeMediaTelemetry } from "./trace-edge-media-telemetry.service.ts";
+import type { TraceMediaStore } from "./trace-stored-media-store.service.ts";
 import { TraceValueMediaExtractionService } from "./trace-value-media-extraction.service.ts";
 import { type ExtractionBudget } from "./trace-value-media-extraction.service.ts";
 

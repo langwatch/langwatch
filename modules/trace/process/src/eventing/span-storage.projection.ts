@@ -10,13 +10,13 @@ import {
   type NormalizedSpan,
 } from "@langwatch/trace-contract";
 
-import { type TraceSpanNormalization } from "../app/trace.members.ts";
 import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
 import {
   spanStorageMapGroupKey,
   TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
 } from "../rules/trace-span-storage-group.rules.ts";
 import type { SpanCostService } from "../services/span-cost.service.ts";
+import type { TraceSpanNormalization } from "../services/span-normalization.service.ts";
 
 const logger = createLogger("langwatch:trace-processing:span-storage-map");
 

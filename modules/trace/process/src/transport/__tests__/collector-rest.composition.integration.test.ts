@@ -25,14 +25,13 @@ import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it } from "vitest";
 
-import { composeTraceAppDependencies } from "../../app/trace-composition.build.ts";
 import { TraceModule } from "../../app/trace.app.ts";
-import type { TraceProcessingCommands } from "../../app/trace.members.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import type { TraceProcessingCommands } from "../../services/trace-processing-commands.service.ts";
 import { traceProcessModule } from "../../trace.module.ts";
 import { CollectorApi, collectorRest } from "../collector.rest.ts";
 
@@ -161,8 +160,8 @@ function deployment(access: CollectorAccess = {}) {
   };
 
   const canonicalisation = TraceCanonicalisationService.create();
-  const app = TraceModule.create(
-    composeTraceAppDependencies({
+  const app = TraceModule.fromDependencies(
+    TraceModule.composeDependencies({
       repositories: MemoryTraceRepositories.create(),
       storedObjects: createApiFixture<StoredObjectApi>(),
       canonicalisation,

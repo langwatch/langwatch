@@ -1,9 +1,18 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 
-import {
-  type TraceEvaluationLoopMetrics,
-  type TraceEvaluationLoopBlockReason,
-} from "../app/trace.members.ts";
+/**
+ * Why an online-evaluator dispatch was refused: `depth_direct` reads the
+ * incoming span, `depth_fold` reads the same check off the folded trace state
+ * on the deferred-origin path, `parent_in_subtree` is an already-covered parent.
+ */
+export type TraceEvaluationLoopBlockReason = "depth_direct" | "depth_fold" | "parent_in_subtree";
+
+/** What an operator can see about evaluations the loop guards refused. A port
+ * because different processes export differently: app uses prom-client, packages
+ * push over OTLP. Both write the same series to keep the dashboard consistent. */
+export interface TraceEvaluationLoopMetrics {
+  loopBlocked(reason: TraceEvaluationLoopBlockReason): void;
+}
 
 /**
  * The series name, help text and one label, pinned because two processes

@@ -20,6 +20,7 @@ import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
+import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import { traceLegacyRest } from "../../transport/trace-legacy.rest.ts";
 import { tracesRestCredential } from "../../transport/traces.rest.ts";
@@ -31,7 +32,6 @@ import {
   type TracesSessionGroupsReader,
   type TracesSpanReader,
 } from "../trace.app.ts";
-import type { TraceLegacyRead } from "../trace.members.ts";
 import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 
 const PROJECT = {
@@ -81,7 +81,7 @@ function bootTraceApp(options: {
     findSpanForPromptStudio: unread,
   };
 
-  const app = TraceModule.create({
+  const app = TraceModule.fromDependencies({
     storedObjects: createApiFixture<StoredObjectApi>(),
     traces: {
       existence: {

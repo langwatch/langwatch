@@ -12,11 +12,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
 
-import type {
-  TraceProcessingPipelineDefinition,
-  TraceSpanCostEnrichment,
-  TraceSpanTokenEstimation,
-} from "../app/trace.members.ts";
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { leanForProjection } from "../rules/trace-projection-lean.rules.ts";
@@ -37,11 +32,13 @@ import {
   createProjectMetadataHandler,
   type ProjectMetadataSubscriberDeps,
 } from "./project-metadata.subscriber.ts";
+import type { TraceSpanCostEnrichment, TraceSpanTokenEstimation } from "./record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "./span-storage.store.ts";
 import { TraceAnalyticsStore } from "./trace-derived.store.ts";
 import { createTraceProcessingProducerPipeline } from "./trace-processing-producer.pipeline.ts";
+import type { TraceProcessingPipelineDefinition } from "./trace-processing-projections.pipeline.ts";
 import { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
 import { buildTraceProcessingConsumer } from "./trace-processing.pipeline.ts";
 import { TraceAnalyticsRollupStore } from "./trace-rollup.store.ts";

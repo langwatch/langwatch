@@ -10,6 +10,7 @@ import type { Evaluation, TracesForProjectResult } from "@langwatch/trace-contra
 import { TraceIdsTooManyError } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import {
   TraceModule,
@@ -19,7 +20,6 @@ import {
   type TracesSessionGroupsReader,
   type TracesSpanReader,
 } from "../trace.app.ts";
-import type { TraceLegacyRead } from "../trace.members.ts";
 import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 
 const PROTECTIONS = { canSeeCosts: true };
@@ -48,7 +48,7 @@ function harness(tier: "free" | "paid" | "enterprise") {
   };
   const summary: TraceSummaryReader = { getByTraceId: async () => ({}) as never };
 
-  const app = TraceModule.create({
+  const app = TraceModule.fromDependencies({
     storedObjects: createApiFixture<StoredObjectApi>(),
     traces: {
       existence: {

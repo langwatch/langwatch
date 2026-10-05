@@ -1,5 +1,11 @@
-import type { Command, CommandHandler } from "@langwatch/eventing";
-import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
+import {
+  type Command,
+  type CommandHandler,
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+  type TenantId,
+} from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
@@ -14,20 +20,53 @@ import {
   type OtlpSpan,
   type RecordSpanCommandData,
   type SpanReceivedEvent,
+  type PIIRedactionLevel,
 } from "@langwatch/trace-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
-import type {
-  TraceSpanContentDrop,
-  TraceSpanCostEnrichment,
-  TraceSpanPiiRedaction,
-  TraceSpanTokenEstimation,
-  TraceSpanSpool,
-} from "../app/trace.members.ts";
 import { clonePayload } from "../rules/payload-clone.rules.ts";
 import { TraceAttributeCapService } from "../services/trace-attribute-cap.service.ts";
+
+export interface TraceSpanPiiRedaction {
+  redact(input: {
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    piiRedactionLevel: PIIRedactionLevel;
+    tenantId: TenantId;
+  }): Promise<void>;
+}
+
+export interface TraceSpanCostEnrichment {
+  enrich(span: OtlpSpan, tenantId: string): Promise<void>;
+}
+
+export interface TraceSpanTokenEstimation {
+  estimate(span: OtlpSpan, tenantId: string): Promise<void>;
+}
+
+export type TraceSpanContentDropResult = {
+  droppedCount: number;
+  droppedCategories: string[];
+};
+
+export interface TraceSpanContentDrop {
+  drop(span: OtlpSpan, projectId: string): Promise<TraceSpanContentDropResult>;
+}
+
+export type TraceSpanSpoolIdentity = {
+  spoolRef: string;
+  projectId: string;
+  traceId: string;
+  spanId: string;
+};
+
+/** Transient oversized-command storage. The event log remains authoritative. */
+export interface TraceSpanSpool {
+  read(identity: TraceSpanSpoolIdentity): Promise<string>;
+  delete(identity: TraceSpanSpoolIdentity): Promise<void>;
+}
 
 const traceAttributeCapService = TraceAttributeCapService.create();
 

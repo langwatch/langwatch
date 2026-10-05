@@ -12,9 +12,9 @@ import {
   MAX_MEDIA_WALK_DEPTH,
 } from "@langwatch/trace-contract";
 
-import type { TraceMediaStore } from "../app/trace.members.ts";
 import type { ExtractedRef } from "../rules/content-part-extraction.rules.ts";
 import { TraceContentExtractionService } from "./trace-content-extraction.service.ts";
+import type { TraceMediaStore } from "./trace-stored-media-store.service.ts";
 
 /** Upper bound for parsing a nested JSON string (sanity guard, not a policy). */
 const MAX_NESTED_JSON_BYTES = 50 * 1024 * 1024;

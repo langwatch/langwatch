@@ -1,7 +1,7 @@
 import type { EventingCommands } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import type { TraceProcessingPipelineDefinition } from "../../app/trace.members.ts";
+import type { TraceProcessingPipelineDefinition } from "../../eventing/trace-processing-projections.pipeline.ts";
 import { TraceProcessingCommandsService } from "../trace-processing-commands.service.ts";
 
 type Sent = { command: string; payload: unknown };

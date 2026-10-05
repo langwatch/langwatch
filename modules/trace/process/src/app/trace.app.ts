@@ -1,38 +1,54 @@
+import { AnnotationApi } from "@langwatch/annotation-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 /**
  * Trace feature application: one typed contract replacing five previous bags.
  * Rules: attribution (caller stamped), full resolution on consuming reads,
  * partition-pruning hints, visibility verdicts, sample draw. See ADR for details.
  */
 import type { PrincipalRef } from "@langwatch/authorization";
-import type { CodingAgentApi, CodingAgentTranscript } from "@langwatch/coding-agent-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { CodingAgentApi, type CodingAgentTranscript } from "@langwatch/coding-agent-contract";
+import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
-  type EvaluationApi,
+  EvaluationApi,
   reportEvaluationCommandDataSchema,
   type EvaluationRunData,
   type EvaluationRunsByTraceQuery,
 } from "@langwatch/evaluation-contract";
-import type { EventingCommands, EventingParticipation } from "@langwatch/eventing";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import {
+  type EventingCommands,
+  type EventingParticipation,
+  type FoldProjectionStore,
+  createTenantId,
+} from "@langwatch/eventing";
+import { ExperimentApi } from "@langwatch/experiment-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import type {
+import {
   InstantEvalApi,
-  InstantEvalEstimateWire,
-  InstantEvalOptInAccess,
-  InstantEvalRunProgress,
-  InstantEvalRunReference,
+  type InstantEvalEstimateWire,
+  type InstantEvalOptInAccess,
+  type InstantEvalRunProgress,
+  type InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
 import { generate } from "@langwatch/ksuid";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { LogApi } from "@langwatch/log-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
-import type { PresenceApi } from "@langwatch/presence-contract";
+import { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { ShareViewer, ShareApi } from "@langwatch/share-contract";
-import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { ProjectApi } from "@langwatch/project-contract";
+import { type ShareViewer, ShareApi } from "@langwatch/share-contract";
+import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
-import type { TopicApi } from "@langwatch/topic-contract";
+import { TopicApi } from "@langwatch/topic-contract";
 import {
   TraceCapabilityUnavailableError,
+  traceRecordSchema,
   type ExportProgressEvent,
   type Protections,
   type TraceFacetsAnswer,
@@ -180,15 +196,40 @@ import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
 
 import { tokenCounterChannels } from "../channels/token-counter-channels.registry.ts";
+import { traceLegacySpoolChannels } from "../channels/trace-legacy-spool-channels.registry.ts";
+import type { TraceProcessingPipelineDefinition } from "../eventing/trace-processing-projections.pipeline.ts";
 import { TraceProcessingRuntimeAdapter } from "../eventing/trace-processing-runtime.pipeline.ts";
 import {
   buildTraceProjectMilestonesPipeline,
   type TraceProjectMilestonesDefinition,
 } from "../eventing/trace-project-milestones.pipeline.ts";
+import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
+import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import {
+  TraceClickHouse,
+  type TraceClickHouseClient,
+  type TraceClickHouseResolver,
+} from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
+import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
+import {
+  TraceLegacyReadClickHouseRepository,
+  type ClickHouseTraceLegacyReadOptions,
+} from "../repositories/clickhouse/trace-legacy-read.repository.ts";
+import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
+import {
+  TraceQueryFieldValuesRepository,
+  type TraceQueryFieldValuesInput,
+  type TraceQueryFieldValuesResult,
+} from "../repositories/query-field-values.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
+import type { TracePayloadReaderRepository } from "../repositories/trace-payload-reader.repository.ts";
 import type { TraceRateLimitRepository } from "../repositories/trace-rate-limit.repository.ts";
+import { TraceRecordRepository } from "../repositories/trace-record.repository.ts";
+import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
+import { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import {
@@ -232,44 +273,82 @@ import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
 import { LegacyFilterMatchingService } from "../services/legacy-filter-matching.service.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
-import type { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
+import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
+import { SpanCostService } from "../services/span-cost.service.ts";
 import { TraceAiQueryService } from "../services/trace-ai-query.service.ts";
+import { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
+import { TraceCanonicalisationService as TraceCanonicalisation } from "../services/trace-canonicalisation.service.ts";
 import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
 import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
+import { TraceEdgeMediaPayloadService } from "../services/trace-edge-media-payload.service.ts";
+import { TraceEdgeMediaTelemetryService } from "../services/trace-edge-media-telemetry.service.ts";
+import { TraceEdgeSpoolService } from "../services/trace-edge-spool.service.ts";
 import type { TraceEditRemoval } from "../services/trace-edit-overlay.service.ts";
+import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
+import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
 import {
   TraceExportBoundsService,
   type TraceExportBounds,
 } from "../services/trace-export-bounds.service.ts";
 import { TraceExportDownloadService } from "../services/trace-export-download.service.ts";
 import { TraceExportService } from "../services/trace-export.service.ts";
-import type { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
-import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
+import { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
+import {
+  TraceIngestionService,
+  TraceIngressCommand,
+  type CodingAgentIngestFilter,
+} from "../services/trace-ingestion.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
+import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
+import {
+  AmbiguousTraceIdPrefixError,
+  TraceLegacyReadService,
+  type BlobResolutionDeps,
+} from "../services/trace-legacy-read.service.ts";
+import { TraceListService } from "../services/trace-list-read.service.ts";
 import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
-import { TraceMetadataWriteService } from "../services/trace-metadata-write.service.ts";
+import { LogRecordStorageService } from "../services/trace-log-record-read.service.ts";
+import {
+  TraceMetadataWriteService,
+  type TraceSpanIngest,
+} from "../services/trace-metadata-write.service.ts";
+import { TraceModelCostService } from "../services/trace-model-cost.service.ts";
+import { TraceOffloadResolutionBatchService } from "../services/trace-offload-resolution-batch.service.ts";
+import { TraceOffloadResolutionService } from "../services/trace-offload-resolution.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
 import { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
+import type { TraceProcessingCommands } from "../services/trace-processing-commands.service.ts";
 import { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
+import {
+  TraceQueryClassificationService,
+  type TraceQueryClassifier,
+} from "../services/trace-query-classification.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
+import {
+  TraceReadFullIoService,
+  type TraceFullIo,
+} from "../services/trace-read-full-io.service.ts";
+import { TraceRetentionFloorService } from "../services/trace-retention-floor.service.ts";
 import { TraceScenarioEventMediaService } from "../services/trace-scenario-event-media.service.ts";
 import { TraceSearchRouterService } from "../services/trace-search-router.service.ts";
-import type { TraceTopicClusteringReadService } from "../services/trace-topic-clustering-read.service.ts";
+import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
+import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
+import { TraceStoredMediaStoreService } from "../services/trace-stored-media-store.service.ts";
+import { TraceSummaryService } from "../services/trace-summary-read.service.ts";
+import { TraceTopicClusteringReadService } from "../services/trace-topic-clustering-read.service.ts";
 import { TraceUsageCountService } from "../services/trace-usage-count.service.ts";
-import type { TraceViewerProtectionService } from "../services/trace-viewer-protection.service.ts";
-import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
+import {
+  TraceViewerProtectionService,
+  type TraceViewerProtectionOptions,
+} from "../services/trace-viewer-protection.service.ts";
+import { type TraceLegacyRead, TraceViewerReadService } from "../services/trace-viewer.service.ts";
+import { TraceService } from "../services/trace.service.ts";
+import type { TraceEventDerivation } from "../services/trace.service.ts";
 import type {
   CollectorApp,
   CollectorCredential,
   CollectorProject,
 } from "../transport/collector.rest.ts";
-import { buildTraceCollaborators, composeTraceAppDependencies } from "./trace-composition.build.ts";
-import {
-  traceDependencies,
-  type TraceProcessingPipelineDefinition,
-  type TraceSpanIngest,
-  type TraceLegacyRead,
-} from "./trace.members.ts";
 
 /**
  * The app's KSUID resource for a tracked event (`KSUID_RESOURCES.TRACKED_EVENT`).
@@ -304,7 +383,6 @@ import {
 } from "../services/trace-collector-dispatch.service.ts";
 import { TraceExportProgressService } from "../services/trace-export-progress.service.ts";
 import { TraceFacetValuesService } from "../services/trace-facet-values.service.ts";
-import { AmbiguousTraceIdPrefixError } from "../services/trace-legacy-read.service.ts";
 import { TraceSharedReadService } from "../services/trace-shared-read.service.ts";
 import { TraceTenantUpdateStreamService } from "../services/trace-tenant-update-stream.service.ts";
 import { TraceTranscriptReadService } from "../services/trace-transcript-read.service.ts";
@@ -562,7 +640,7 @@ export interface TraceAppDependencies {
     spans: TracesSpanReader;
     summary: TraceSummaryReader;
     /** Absent where no ClickHouse was composed; each tree read then refuses by name. */
-    tree?: TraceTreeService | undefined;
+    tree?: TraceService | undefined;
     logRecords: TraceLogRecordReader;
     canonicalisation: TraceCanonicalisationService;
     /** Reviewer corrections applied over a captured trace at read time. */
@@ -644,96 +722,439 @@ function occurredAtHint(occurredAtMs?: number): { occurredAtMs: number } | Recor
  */
 const TRACE_FALLBACK_VISIBILITY_DAYS = 14;
 
-/** The one fact still read off the process: its public origin, until it is a config leaf. */
-type TraceMembers = Readonly<{ publicBaseUrl: string | undefined }>;
-
 type TraceSetup = FeatureSetup<
-  typeof traceDependencies,
-  TraceMembers,
+  typeof TraceModule.dependencies,
+  never,
   TraceServerConfig,
   TraceRepositories
 >;
 
+/** What one process composes Trace's read graph over: its registry, collaborators and peers. */
+type TraceReaderCompositionOptions = {
+  /** The rows the registry chose for this process, one tier over both stores. */
+  repositories: TraceRepositories;
+  /** Absent on a process that composed no ClickHouse: every read refuses by name. */
+  resolveClickHouseClient?: TraceClickHouseResolver | undefined;
+  defaultRetentionDays?: number | undefined;
+  canonicalisation: TraceCanonicalisationService;
+  blobStore: TraceBlobStoreService;
+  /** A test's summary store; absent, the summary is read off the trace_summaries row. */
+  summaryStore?: FoldProjectionStore<TraceSummaryData> | undefined;
+  projects: ProjectApi;
+  topics: TopicApi;
+  modelProviders: ModelProviderApi;
+  logs: LogApi;
+  annotations: AnnotationApi;
+  dataRetention: DataRetentionApi;
+  protections: TraceViewerProtectionOptions;
+  /**
+   * The API-key directory the deprecated `/api/trace/*` family's own door
+   * resolves a project credential through. Absent, that family's five
+   * addresses raise by name rather than admitting an unauthenticated caller.
+   */
+  apiKeys?: Pick<ApiKeyApi, "findResolvedToken" | "markUsed"> | undefined;
+  /**
+   * The ingestion doors' duplicate claim. Required: the doors are mounted on
+   * every process that composes Trace's REST surface, and a claim that is
+   * absent rather than null would be an ingest path deciding silently.
+   */
+  dedup: TraceSpanDedupRepository;
+  /**
+   * The ceiling the INGESTION doors ask about, where it is not the viewer
+   * protections' own. Narrow because one question is all they ask: whether this
+   * key may create traces in its project.
+   */
+  ingestAuthz?: Pick<AuthzApi, "hasApiKeyPermission"> | undefined;
+  /**
+   * The one question the INGEST path asks Coding Agent: whether a span is
+   * one a coding agent emits about itself, which the receiver drops. Narrow
+   * and separate from the whole `codingAgents` peer below.
+   */
+  ingestCodingAgents?: CodingAgentIngestFilter | undefined;
+  evaluations: TraceAppDependencies["evaluations"];
+  /** The Instant Eval peer the Explorer's judged searches run through. */
+  instantEvals?: TraceAppDependencies["instantEvals"];
+  codingAgents: TraceAppDependencies["codingAgents"];
+  storedObjects: TraceAppDependencies["storedObjects"];
+  /**
+   * Gates the edge media hook (`release_trace_media_extraction`). Absent, the
+   * ingestion doors externalise nothing, as with the flag off.
+   */
+  featureFlags?: FeatureFlagApi | undefined;
+  presence?: TraceAppDependencies["presence"];
+  share: TraceAppDependencies["share"];
+  broadcast: TraceAppDependencies["broadcast"];
+  /** Where a finished background discover refresh tells the tenant's tabs to refetch. */
+  tenantBroadcast: Pick<PresenceApi, "publishProjectEvent">;
+  commands: TraceProcessingCommands;
+  /**
+   * The tier-effective request bounds the read graph clamps and refuses by.
+   * The entitlement peer resolves the caller's plan; the transport schemas
+   * only carry the registry's enterprise ceiling.
+   */
+  requestBounds: TraceAppDependencies["requestBounds"];
+  /** The export door's rate window and in-flight slots, built by the app from its registry. */
+  exportBounds: TraceAppDependencies["exportBounds"];
+  shareReadLimiter?: TraceAppDependencies["shareReadLimiter"];
+  /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
+  publicBaseUrl?: string;
+};
+
+/** What a composition root gives the legacy trace read: the store, and the policies over it. */
+type TraceLegacyReadCompositionOptions = Omit<ClickHouseTraceLegacyReadOptions, "retentionDays"> & {
+  /** Restores offloaded spans from the blob store (ADR-022) where no resolver is supplied. */
+  blobResolutionDeps?: BlobResolutionDeps | undefined;
+  /** The tenant's retention policy; absent, the span read floors at the platform default. */
+  retentionResolver?: DataRetentionApi | undefined;
+};
+
+type TraceTreeCompositionOptions = {
+  resolveClient: TraceClickHouseResolver;
+  modelProviders: ModelProviderApi;
+  queryFieldValues: TraceQueryFieldValuesRepository;
+  queryClassification?: TraceQueryClassifier;
+  summaryReader?: TraceSummaryReaderRepository;
+  records?: TraceRecordRepository;
+  eventDerivation?: TraceEventDerivation;
+  payloads: TracePayloadReaderRepository;
+  fullIo: TraceFullIo;
+};
+
 /** Trace implements its public API and the collector's internal transport seam. */
 export class TraceModule implements TraceApi, CollectorApp {
   static readonly contract = TraceApiToken;
-  static readonly dependencies = traceDependencies;
+  static readonly dependencies = {
+    annotations: AnnotationApi,
+    /**
+     * The API-key directory the deprecated `/api/trace/*` family resolves its
+     * own credential through: it opts out of the framework door because a
+     * released SDK parses its pre-framework refusal bodies.
+     */
+    apiKeys: ApiKeyApi,
+    authz: AuthzApi,
+    codingAgents: CodingAgentApi,
+    dataPrivacy: DataPrivacyApi,
+    dataRetention: DataRetentionApi,
+    plans: EntitlementApi,
+    evaluations: EvaluationApi,
+    evaluators: EvaluatorApi,
+    experiments: ExperimentApi,
+    featureFlags: FeatureFlagApi,
+    instantEvals: InstantEvalApi,
+    logs: LogApi,
+    modelProviders: ModelProviderApi,
+    monitors: MonitorApi,
+    presence: PresenceApi,
+    projects: ProjectApi,
+    share: ShareApi,
+    storedObjects: StoredObjectApi,
+    topics: TopicApi,
+  };
+  /** The span pipeline's settings and the shared public origin `platformUrl` links to. */
   static readonly config = traceConfig;
-  /** Store clients reach trace through its registry; the public origin is the one read left. */
-  static readonly reads = ["publicBaseUrl"] as const;
 
-  static create(input: TraceAppDependencies | TraceSetup): TraceModule {
-    if (!("members" in input)) return new TraceModule(input);
-
+  static create(setup: TraceSetup): TraceModule {
     // Refusals name the module and the role; a test that builds by hand names none.
-    const role = input.role ?? "this process";
-    const { repositories } = input;
+    const role = setup.role ?? "this process";
+    const { repositories, dependencies } = setup;
     const commands = TraceProcessingCommandsService.create({ role });
-    const collaborators = buildTraceCollaborators({
-      resolveClickHouseClient: (tenantId) => repositories.clickhouseClients.resolve(tenantId),
-      config: {
-        role,
-        fallbackVisibilityDays: TRACE_FALLBACK_VISIBILITY_DAYS,
-        publicBaseUrl: input.members.publicBaseUrl,
-      },
-      commands,
-      dedup: repositories.spanDedup,
+    const resolveClickHouseClient: TraceClickHouseResolver = (tenantId) =>
+      repositories.clickhouseClients.resolve(tenantId);
+    const canonicalisation = TraceCanonicalisation.create();
+    const blobStore = TraceBlobStoreService.create({
+      // A v1 spool ref predates the stored-object registry and reads back through S3 directly,
+      // which no process composes; `resolveOffloadedTraces` swallows the refusal per field.
+      legacySpool: traceLegacySpoolChannels.live.create({
+        resolveS3Client: () =>
+          Promise.reject(new TraceCapabilityUnavailableError(role, "a v1 spool object read")),
+      }),
+      resolveClickHouseClient,
+      logger: createLogger("langwatch:trace:blob-store"),
     });
+    const { publicBaseUrl } = setup.config;
     const app = new TraceModule({
-      ...composeTraceAppDependencies({
-        ...collaborators,
-        ...input.dependencies,
-        repositories: input.repositories,
-        requestBounds: input.dependencies.plans,
+      ...TraceModule.composeDependencies({
+        ...dependencies,
+        repositories,
+        resolveClickHouseClient,
+        canonicalisation,
+        blobStore,
+        commands,
+        dedup: repositories.spanDedup,
+        ...(publicBaseUrl === undefined ? {} : { publicBaseUrl }),
+        requestBounds: dependencies.plans,
         exportBounds: TraceExportBoundsService.create({
-          entitlement: input.dependencies.plans,
-          projects: input.dependencies.projects,
+          entitlement: dependencies.plans,
+          projects: dependencies.projects,
           rateLimiter: repositories.rateLimits,
           slots: repositories.exportSlots,
         }),
-        presence: input.dependencies.presence,
-        broadcast: input.dependencies.presence,
-        tenantBroadcast: input.dependencies.presence,
+        presence: dependencies.presence,
+        broadcast: dependencies.presence,
+        tenantBroadcast: dependencies.presence,
         shareReadLimiter: repositories.rateLimits,
         protections: {
-          authz: input.dependencies.authz,
-          projects: input.dependencies.projects,
-          plans: input.dependencies.plans,
-          dataPrivacy: input.dependencies.dataPrivacy,
-          fallbackVisibilityDays: collaborators.fallbackVisibilityDays,
+          authz: dependencies.authz,
+          projects: dependencies.projects,
+          plans: dependencies.plans,
+          dataPrivacy: dependencies.dataPrivacy,
+          fallbackVisibilityDays: TRACE_FALLBACK_VISIBILITY_DAYS,
         },
       }),
     });
     app.#processingCommands = commands;
     app.#usageCounts = TraceUsageCountService.create({
-      projects: input.dependencies.projects,
-      usageCount: input.repositories.usageCount,
+      projects: setup.dependencies.projects,
+      usageCount: setup.repositories.usageCount,
     });
-    app.#modelSpend = input.repositories.modelSpend;
-    app.#attributeSpend = input.repositories.attributeSpend;
-    app.#usageCount = input.repositories.usageCount;
+    app.#modelSpend = setup.repositories.modelSpend;
+    app.#attributeSpend = setup.repositories.attributeSpend;
+    app.#usageCount = setup.repositories.usageCount;
     app.#preconditionSamples = TracePreconditionSampleService.create({
       traces: app,
-      evaluators: input.dependencies.evaluators,
+      evaluators: setup.dependencies.evaluators,
     });
-    const tokenizer = tokenCounterChannels.live.create(input.config.tokenizer);
-    input.resources.own("Trace tokenizer", () => tokenizer.close());
+    const tokenizer = tokenCounterChannels.live.create(setup.config.tokenizer);
+    setup.resources.own("Trace tokenizer", () => tokenizer.close());
     const milestones = TraceProjectMilestonesService.create({ role });
     app.#milestones = milestones;
     app.#processing = TraceProcessingRuntimeAdapter.create({
       role,
       tokenizer,
-      peers: input.dependencies,
-      repositories: input.repositories,
-      canonicalisation: collaborators.canonicalisation,
+      peers: setup.dependencies,
+      repositories: setup.repositories,
+      canonicalisation,
       commands,
       findSummary: (lookup) => app.findSummary(lookup),
       recordTrackedEvent: ({ tenantId, body, eventId }) =>
         app.recordTrackedEvent({ project: { id: tenantId }, body, eventId }),
-      broadcast: input.dependencies.presence,
+      broadcast: setup.dependencies.presence,
       milestones,
     });
     return app;
+  }
+
+  /** Builds over an already-composed read graph, as a unit test hands one in. */
+  static fromDependencies(dependencies: TraceAppDependencies): TraceModule {
+    return new TraceModule(dependencies);
+  }
+
+  /** Constructs one Trace read graph from process storage and complete feature peers. */
+  static composeDependencies(options: TraceReaderCompositionOptions): TraceAppDependencies {
+    const resolve = options.resolveClickHouseClient;
+    const ioExtractionService = TraceIOExtractionService.create(options.canonicalisation);
+    const blobResolutionDeps = { blobStore: options.blobStore, ioExtractionService };
+    const spanStorageRepository = options.repositories.spanStorage;
+    const editOverlay = TraceEditOverlayService.create(options.repositories.editOverlay);
+    // ADR-022: media extraction first, then the whole-payload spool over 256 KB, as main ordered.
+    const edgeSpool = TraceEdgeSpoolService.create({
+      spool: options.blobStore,
+      logger: createLogger("langwatch:traces:edge-spool"),
+      featureFlags: options.featureFlags,
+    });
+    const payloads = options.featureFlags
+      ? TraceEdgeMediaPayloadService.create({
+          deps: {
+            featureFlags: options.featureFlags,
+            hasContentDropRules: (projectId) =>
+              options.protections.dataPrivacy.dropsAnyContent({ projectId }),
+            telemetry: TraceEdgeMediaTelemetryService.create(),
+            service: TraceStoredMediaStoreService.create(options.storedObjects),
+          },
+          logger: createLogger("langwatch:traces:edge-media-extraction"),
+          next: edgeSpool,
+        })
+      : edgeSpool;
+    const logRecords = LogRecordStorageService.create({
+      repository: options.repositories.logRecords,
+      canonical: options.logs,
+    });
+    const read = TraceLegacyReadService.create({
+      traceCanonicalisation: options.canonicalisation,
+      traceRead: TraceModule.composeLegacyRead({
+        traceCanonicalisation: options.canonicalisation,
+        ...(resolve ? { resolveClickHouseClient: resolve } : {}),
+        retentionResolver: options.dataRetention,
+        annotations: options.annotations,
+        blobResolutionDeps,
+      }),
+      editOverlay,
+      logRecordStorage: logRecords,
+      evaluationService: options.evaluations,
+    });
+    const list = TraceListService.create({
+      repository: options.repositories.list,
+      evaluations: options.evaluations,
+      topicService: options.topics,
+      facets: CLICKHOUSE_FACET_CATALOG,
+      discoverUpdates: options.tenantBroadcast,
+    });
+    const protections = TraceViewerProtectionService.create(options.protections);
+    // Every role reads the summary off the trace_summaries row the worker's fold writes, as main's
+    // traceSummaryStore did; a test may hand in its own store.
+    const summaryStore =
+      options.summaryStore ??
+      TraceSummaryStore.create({
+        storage: options.repositories.summaryProjection,
+        defaultRetentionDays: () => options.dataRetention.getPlatformDefaultRetentionDays(),
+      });
+    const tree = !resolve
+      ? undefined
+      : TraceModule.composeTree({
+          resolveClient: resolve,
+          modelProviders: options.modelProviders,
+          queryFieldValues: TraceReadQueryFieldValues.create(list),
+          queryClassification: TraceQueryClassificationService.create(),
+          summaryReader: FoldedTraceSummaryReader.create(summaryStore),
+          records: {
+            getById: async ({ projectId, traceId }) => {
+              const resolved = await protections.resolve({
+                projectId,
+                userId: void 0,
+                publiclyShared: false,
+              });
+              const trace = await read.findById({
+                projectId,
+                traceId,
+                protections: { ...resolved, canSeeCosts: true },
+                opts: { full: true },
+              });
+              if (!trace) {
+                throw new TraceNotFoundError(traceId);
+              }
+              return traceRecordSchema.parse(trace);
+            },
+          },
+          eventDerivation: TraceEventDerivationService.create({
+            spans: options.repositories.derivationSpans,
+          }),
+          payloads: options.repositories.eventPayloads,
+          fullIo: TraceReadFullIoService.create(ioExtractionService),
+        });
+
+    return {
+      traces: {
+        existence: options.repositories.existence,
+        read,
+        list,
+        sessionGroups: SessionGroupsService.create({
+          repository: options.repositories.sessionGroups,
+          codingAgentSessions: options.codingAgents,
+          resolveOrganizationId: (projectId) => options.projects.getOrganizationId(projectId),
+        }),
+        spans: SpanStorageService.create({ repository: spanStorageRepository, blobResolutionDeps }),
+        summary: TraceSummaryService.create({
+          repository: options.repositories.summary,
+          fullResolutionDeps: { spanStorageRepository, ...blobResolutionDeps },
+        }),
+        tree,
+        logRecords,
+        canonicalisation: options.canonicalisation,
+        editOverlay,
+        changeTraceName: (data) => options.commands.changeTraceName(data),
+      },
+      spanIngest: options.commands,
+      // The receiver the two ingestion doors share. ONE dedup claim and ONE
+      // command sender across both, so a span posted to `/api/collector` and the
+      // same span exported over OTLP are one record, not two.
+      ingestion: TraceIngestionService.create({
+        codingAgents: options.ingestCodingAgents ?? options.codingAgents,
+        codingAgentSpanFilterEnabled: CODING_AGENT_SPAN_FILTER_ENABLED,
+        dedup: options.dedup,
+        commands: TraceComposedIngressCommand.create(options.commands),
+        payloads,
+      }),
+      viewer: TraceViewerReadService.create({
+        read,
+        protections,
+      }),
+      annotationCommands: {
+        add: async (input) => {
+          await options.commands.addAnnotation(input);
+        },
+        remove: async (input) => {
+          await options.commands.removeAnnotation(input);
+        },
+      },
+      topics: options.topics,
+      projects: options.projects,
+      evaluations: options.evaluations,
+      ...(options.instantEvals ? { instantEvals: options.instantEvals } : {}),
+      codingAgents: options.codingAgents,
+      storedObjects: options.storedObjects,
+      ...(options.presence ? { presence: options.presence } : {}),
+      share: options.share,
+      broadcast: options.broadcast,
+      protections,
+      requestBounds: options.requestBounds,
+      exportBounds: options.exportBounds,
+      shareReadLimiter: options.shareReadLimiter,
+      ...(options.apiKeys
+        ? {
+            ingestCredential: TraceIngestCredentialService.create({
+              apiKeys: options.apiKeys,
+              authz: options.ingestAuthz ?? options.protections.authz,
+            }),
+          }
+        : {}),
+      publicBaseUrl: options.publicBaseUrl,
+      scenarioRoleMetrics: ScenarioRoleMetricsDerivationService.create({
+        spans: options.repositories.derivationSpans,
+        spanCosts: SpanCostService.create({ modelCosts: TraceModelCostService.create() }),
+      }),
+      topicClustering: TraceTopicClusteringReadService.create({
+        repository: options.repositories.clusteringSample,
+      }),
+      topicAssignment: EventingTraceTopicAssignment.create({
+        sendAssignTopic: async (input) => {
+          await options.commands.assignTopic(input);
+        },
+      }),
+    };
+  }
+
+  /** The legacy trace read over ClickHouse, with its offload resolution and retention floor. */
+  static composeLegacyRead(
+    options: TraceLegacyReadCompositionOptions,
+  ): TraceLegacyReadClickHouseRepository {
+    const { blobResolutionDeps, retentionResolver, ...read } = options;
+
+    return TraceLegacyReadClickHouseRepository.create({
+      ...read,
+      ...(retentionResolver
+        ? { retentionDays: TraceRetentionFloorService.create(retentionResolver) }
+        : {}),
+      resolveTraceSpans:
+        read.resolveTraceSpans ??
+        (blobResolutionDeps
+          ? TraceOffloadResolutionService.create().resolverFor(blobResolutionDeps)
+          : undefined),
+      resolveTraceSpansBatch:
+        read.resolveTraceSpansBatch ??
+        (blobResolutionDeps
+          ? TraceOffloadResolutionBatchService.create().resolverFor(blobResolutionDeps)
+          : undefined),
+    });
+  }
+
+  /** The trace-tree read over this process's ClickHouse and query-value boundaries. */
+  static composeTree(options: TraceTreeCompositionOptions): TraceService {
+    const clickhouse = ResolverTraceClickHouse.create(options.resolveClient);
+    return TraceService.create({
+      repository: ClickHouseTraceSpanRepository.create(clickhouse),
+      modelProviders: options.modelProviders,
+      queryFieldValues: options.queryFieldValues,
+      queryClassification:
+        options.queryClassification ?? NullTraceQueryClassificationAdapter.create(),
+      summaryReader: options.summaryReader ?? new NullTraceSummaryReader(),
+      records: options.records ?? new NullTraceRecordRepository(),
+      eventDerivation: options.eventDerivation ?? new NullTraceEventDerivation(),
+      fullRecords: ClickHouseTraceFullRecordRepository.create(
+        clickhouse,
+        options.payloads,
+        options.fullIo,
+      ),
+    });
   }
 
   #processing: TraceProcessingRuntimeAdapter | null = null;
@@ -2241,7 +2662,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   // -------------------------------------------------------------------------
-  #getTree(): TraceTreeService {
+  #getTree(): TraceService {
     const tree = this.#dependencies.traces.tree;
     if (!tree) {
       throw new TraceCapabilityUnavailableError("this process", "the trace tree read");
@@ -2989,5 +3410,126 @@ export class TraceModule implements TraceApi, CollectorApp {
       { error, projectId: context.projectId, customerTraceIds: context.customerTraceIds },
       "the OTLP receiver answered a failure",
     );
+  }
+}
+
+/**
+ * The coding-agent span filter is on by default, exactly as the retired
+ * platform application had it: its kill switch was an environment variable read
+ * at that process's boot, and no process carries one now.
+ */
+const CODING_AGENT_SPAN_FILTER_ENABLED = true;
+
+/** The pipeline handoff, as the receiver's own abstract command. */
+class TraceComposedIngressCommand extends TraceIngressCommand {
+  static create(commands: TraceProcessingCommands): TraceComposedIngressCommand {
+    return new TraceComposedIngressCommand(commands);
+  }
+
+  #commands: TraceProcessingCommands;
+
+  private constructor(commands: TraceProcessingCommands) {
+    super();
+    this.#commands = commands;
+  }
+
+  async recordSpan(data: RecordSpanCommandData): Promise<void> {
+    await this.#commands.recordSpan(data);
+  }
+}
+
+/** The trace tree's summary, read from the folded `trace_summaries` projection. */
+class FoldedTraceSummaryReader extends TraceSummaryReaderRepository {
+  static create(store: FoldProjectionStore<TraceSummaryData>): FoldedTraceSummaryReader {
+    return new FoldedTraceSummaryReader(store);
+  }
+
+  #store: FoldProjectionStore<TraceSummaryData>;
+
+  private constructor(store: FoldProjectionStore<TraceSummaryData>) {
+    super();
+    this.#store = store;
+  }
+
+  async findSummary({
+    tenantId,
+    traceId,
+  }: {
+    tenantId: string;
+    traceId: string;
+  }): Promise<TraceSummaryData | null> {
+    const read = await this.#store.get(traceId, {
+      aggregateId: traceId,
+      tenantId: createTenantId(tenantId),
+    });
+
+    return read.kind === "folded" ? read.state : null;
+  }
+}
+
+class TraceReadQueryFieldValues extends TraceQueryFieldValuesRepository {
+  static create(listReader: TraceListService): TraceReadQueryFieldValues {
+    return new TraceReadQueryFieldValues(listReader);
+  }
+
+  #listReader: TraceListService;
+
+  private constructor(listReader: TraceListService) {
+    super();
+    this.#listReader = listReader;
+  }
+
+  findAll(input: TraceQueryFieldValuesInput): Promise<TraceQueryFieldValuesResult> {
+    return this.#listReader.getFacetValues({
+      tenantId: input.projectId,
+      timeRange: input.timeRange,
+      facetKey: input.facetKey,
+      limit: input.limit,
+      offset: input.offset,
+    });
+  }
+}
+
+class ResolverTraceClickHouse extends TraceClickHouse {
+  private constructor(private readonly resolveClient: TraceClickHouseResolver) {
+    super();
+  }
+
+  static create(resolveClient: TraceClickHouseResolver): ResolverTraceClickHouse {
+    return new ResolverTraceClickHouse(resolveClient);
+  }
+
+  resolve(tenantId: string): Promise<TraceClickHouseClient> {
+    return this.resolveClient(tenantId);
+  }
+}
+
+class NullTraceSummaryReader extends TraceSummaryReaderRepository {
+  async findSummary(): Promise<null> {
+    return null;
+  }
+}
+
+class NullTraceRecordRepository extends TraceRecordRepository {
+  async getById(input: TraceByIdInput): Promise<never> {
+    throw new TraceNotFoundError(input.traceId);
+  }
+}
+
+class NullTraceEventDerivation implements TraceEventDerivation {
+  async derive(_input: TraceDerivedEventsInput): Promise<[]> {
+    return [];
+  }
+}
+
+class NullTraceQueryClassificationAdapter implements TraceQueryClassifier {
+  private constructor() {}
+
+  static create(): NullTraceQueryClassificationAdapter {
+    return new NullTraceQueryClassificationAdapter();
+  }
+
+  classify() {
+    return { evaluations: false, events: false, spans: false };
   }
 }

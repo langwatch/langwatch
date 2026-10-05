@@ -5,12 +5,12 @@ import {
   type NormalizedSpan,
 } from "@langwatch/trace-contract";
 
+import type { TraceIoExtraction } from "./trace-io-extraction.service.ts";
 import {
   TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
   type TraceMediaReferenceResolver,
-  type TraceIoExtraction,
-} from "../app/trace.members.ts";
+} from "./trace-media-reference.service.ts";
 
 export const OUTPUT_SOURCE = {
   EXPLICIT: "explicit",

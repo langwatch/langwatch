@@ -9,14 +9,14 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  type TraceSpanContentDrop,
-  type TraceSpanCostEnrichment,
-  type TraceSpanPiiRedaction,
-  type TraceSpanTokenEstimation,
-  type TraceSpanSpool,
-  type TraceSpanSpoolIdentity,
-} from "../../app/trace.members.ts";
+import type {
+  TraceSpanContentDrop,
+  TraceSpanCostEnrichment,
+  TraceSpanPiiRedaction,
+  TraceSpanTokenEstimation,
+  TraceSpanSpool,
+  TraceSpanSpoolIdentity,
+} from "../record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "../record-span.commands.ts";
 
 class PiiRedactionFake implements TraceSpanPiiRedaction {

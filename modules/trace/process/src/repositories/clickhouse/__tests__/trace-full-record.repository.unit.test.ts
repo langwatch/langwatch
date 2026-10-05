@@ -5,7 +5,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { type TraceFullIo } from "../../../app/trace.members.ts";
+import type { TraceFullIo } from "../../../services/trace-read-full-io.service.ts";
 import { TracePayloadReaderRepository } from "../../trace-payload-reader.repository.ts";
 import {
   TraceClickHouse,

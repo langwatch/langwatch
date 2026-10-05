@@ -18,15 +18,17 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  type TraceEvaluationDispatch,
-  type TraceEvaluationLoopMetrics,
-  type TraceEvaluationLoopBlockReason,
-  type TraceEvaluationMonitor,
-} from "../../app/trace.members.ts";
 import { TraceAttributeAccumulationService } from "../../services/trace-attribute-accumulation.service.ts";
+import type {
+  TraceEvaluationLoopMetrics,
+  TraceEvaluationLoopBlockReason,
+} from "../../services/trace-evaluation-loop-metrics.service.ts";
 import { TraceOriginService } from "../../services/trace-origin.service.ts";
 import { needsOriginResolution } from "../deferred-origin.process.ts";
+import type {
+  TraceEvaluationDispatch,
+  TraceEvaluationMonitor,
+} from "../evaluation-trigger.subscriber.ts";
 import {
   createEvaluationTriggerSubscriber,
   detectCausalityLoop,

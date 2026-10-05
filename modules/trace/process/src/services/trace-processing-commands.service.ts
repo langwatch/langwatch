@@ -11,7 +11,14 @@ import {
   type TraceNameChangedEventData,
 } from "@langwatch/trace-contract";
 
-import type { TraceProcessingCommands } from "../app/trace.members.ts";
+/** Commands shared by receiver, reviewer, and background callers of Trace. */
+export interface TraceProcessingCommands {
+  recordSpan(data: RecordSpanCommandData): Promise<unknown>;
+  changeTraceName(data: TraceNameChangedEventData): Promise<unknown>;
+  addAnnotation(data: AnnotationAddedEventData): Promise<unknown>;
+  removeAnnotation(data: AnnotationRemovedEventData): Promise<unknown>;
+  assignTopic(data: AssignTopicCommandData): Promise<unknown>;
+}
 
 /** The trace_processing command senders this service dispatches through, and nothing else. */
 type TraceProcessingSenders = Readonly<{

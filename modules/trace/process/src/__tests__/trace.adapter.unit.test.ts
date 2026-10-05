@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { TraceTreeComposition } from "#app/trace-composition.build";
-import type { TraceFullIo } from "#app/trace.members";
+import { TraceModule } from "#app/trace.app";
 import { TraceQueryFieldValuesRepository } from "#repositories/query-field-values.repository";
 import { TracePayloadReaderRepository } from "#repositories/trace-payload-reader.repository";
 import { TraceSummaryReaderRepository } from "#repositories/trace-summary-reader.repository";
@@ -13,6 +12,7 @@ import type {
   TraceClickHouseResolver,
 } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
+import type { TraceFullIo } from "../services/trace-read-full-io.service.ts";
 import { TestModelProviderService } from "./support/model-provider.service.fake.ts";
 import { TestTraceQueryClassification } from "./support/query-classification.fake.ts";
 import { traceReadPorts } from "./support/trace-read-ports.fake.ts";
@@ -95,10 +95,10 @@ const resolver =
     },
   });
 
-describe("TraceTreeComposition", () => {
+describe("TraceModule.composeTree", () => {
   it("constructs concrete repositories behind the public adapter", async () => {
     const calls: { tenantId: string; sql: string }[] = [];
-    const service = TraceTreeComposition.create({
+    const service = TraceModule.composeTree({
       resolveClient: resolver(calls),
       modelProviders: new TestModelProviderService(),
       queryFieldValues: new EmptyQueryFieldValues(),
@@ -107,7 +107,7 @@ describe("TraceTreeComposition", () => {
       payloads: new EmptyPayloads(),
       fullIo: new EmptyFullIo(),
       ...traceReadPorts(),
-    }).build();
+    });
 
     const page = await service.getSpanTreePage({
       projectId: "project_1",
@@ -131,7 +131,7 @@ describe("TraceTreeComposition", () => {
   it("preserves the full node wire shape while pricing a missing stored cost", async () => {
     const calls: { tenantId: string; sql: string }[] = [];
     const modelProviders = new TestModelProviderService(0.47);
-    const service = TraceTreeComposition.create({
+    const service = TraceModule.composeTree({
       resolveClient: resolver(calls, ""),
       modelProviders,
       queryFieldValues: new EmptyQueryFieldValues(),
@@ -140,7 +140,7 @@ describe("TraceTreeComposition", () => {
       payloads: new EmptyPayloads(),
       fullIo: new EmptyFullIo(),
       ...traceReadPorts(),
-    }).build();
+    });
 
     const page = await service.getSpanTreePage({
       projectId: "project_1",
