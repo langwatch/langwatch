@@ -16,7 +16,7 @@ Feature: First sign-in for a provisioned directory member
     Given a provisioned member whose assertion, ownership, membership or credential evidence is unsuitable
     When the identity provider attempts to sign them in
     Then no account is attached and no session is issued
-    And the refusal is OAuthAccountNotLinked or the domain gate's existing refusal
+    And the refusal is OAuthAccountNotLinked, sso_existing_account_unconfirmed or the domain gate's existing refusal
 
   @integration
   Scenario: A signed SAML email does not require an OIDC verification claim

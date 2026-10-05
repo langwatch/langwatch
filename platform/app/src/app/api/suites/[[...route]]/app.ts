@@ -4,7 +4,9 @@
  * It predates the split between a RUN PLAN, which is what you run and is
  * identified by its name, and a TEST SUITE, which is a group of scenarios.
  * Both now have a family of their own, `/api/v1/run-plans` and
- * `/api/v1/test-suites`, and this one keeps answering exactly as it did.
+ * `/api/v1/test-suites`, and this one keeps answering as it did, with one
+ * exception: a create body carrying a field the family does not have is
+ * refused rather than dropped behind a 201.
  *
  * Every response carries the deprecation headers and every operation is marked
  * deprecated in the published document, so an integrator reading either finds
@@ -204,6 +206,10 @@ function refusePlanGaps(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
  * One create schema for both kinds, with the guards conditional on kind: a
  * body naming no kind is a custom run plan and keeps the historical
  * at-least-one guards.
+ *
+ * Strict, so a field this endpoint does not have (`schedule`, `cron`) is
+ * refused by name instead of dropped behind a 201: a caller that believes it
+ * set up a schedule must learn that run plans have none.
  */
 const createSuiteInputSchema = z
   .object({
@@ -221,6 +227,7 @@ const createSuiteInputSchema = z
     repeatCount: z.number().int().min(1).max(100).default(1),
     labels: z.array(z.string()).default([]),
   })
+  .strict()
   .superRefine((body, ctx) => {
     if (body.kind === "folder") {
       refuseTestSuiteExtras(body, ctx);

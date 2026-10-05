@@ -1,9 +1,11 @@
-import { getLatestOpenAIChatFlagship } from "../server/modelProviders/getLatestFlagship";
+import { resolveLatestAlias } from "../server/modelProviders/latestAliases";
 
-// Auto-derived from the LLM model registry (llmModels.json) — always the
-// newest plain `openai/gpt-<major>.<minor>` flagship. Hard fallback only
-// for the unreachable case where the registry has no plain flagship.
-export const DEFAULT_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
+// The model `openai/latest` resolves to, read from the LLM model registry
+// (llmModels.json) through the same tier grammar, so a surface falling back
+// to this constant shows the model the Default Models settings call "Latest".
+// Hard fallback only for a registry with no OpenAI main-tier model.
+export const DEFAULT_MODEL =
+  resolveLatestAlias("openai/latest") ?? "openai/gpt-5";
 
 export const DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small";
 

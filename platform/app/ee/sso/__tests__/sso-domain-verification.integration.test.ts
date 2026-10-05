@@ -28,8 +28,10 @@ const T0 = 1_756_000_000_000;
 const HOSTED_OPTED_IN: SsoSelfServeContext = {
   deployment: "hosted",
   licensed: false,
-  licenseActivatedSinceStart: false,
+  licenseActivationPending: false,
   optedIn: true,
+  singleOrganization: false,
+  actorIsPlatformOperator: false,
 };
 
 let connections: InMemoryConnections;

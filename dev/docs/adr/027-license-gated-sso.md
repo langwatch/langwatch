@@ -6,7 +6,7 @@
 
 **Tracking:** [#4673](https://github.com/langwatch/langwatch/issues/4673)
 
-**Revision:** v8, implemented. Supersedes the v3 request-time design, and has
+**Revision:** v9, implemented. Supersedes the v3 request-time design, and has
 been reviewed across design, security, tests and correctness.
 
 > One-line: every **non-email login provider** is a paid feature, gated **binary on possessing a genuinely-issued license** (`IS_SAAS || hasSignedInstanceLicense || anyOrgHasSignedLicense()` — **signature-valid, expiry deliberately ignored**: once a customer, never blocked), **decided once per process** (restart to change, never per request); a denied deployment **runs in email mode** as if the SSO env vars were unset — with **password reset open** so existing users can self-recover — and bootstraps via the **`LANGWATCH_LICENSE_KEY` env var**; **zero action required** from already-licensed customers, whose in-database org license is honored automatically.
@@ -67,7 +67,7 @@ Facts verified against `main` (2026-07-02) — two of which invalidate v2/v3 pre
 | Name | Value | Purpose |
 |---|---|---|
 | `LANGWATCH_LICENSE_KEY` | env var (optional, signed license string) | Instance-level entitlement; bootstrap + credential-less recovery (Decision 5) |
-| Gate memoization | once per process; **errors are not memoized** | Startup semantics (Decision 3) + self-healing warm-up (Decision 6) |
+| Gate memoization | an allow for the process; a deny for 60s (`DENIED_GATE_TTL_MS`); **errors are not memoized** | Decision 3 as amended in v9 + self-healing warm-up (Decision 6) |
 | Gated providers | every `NEXTAUTH_PROVIDER ≠ email` (`google, github, gitlab, azure-ad, okta, auth0`) | Decision 2 |
 | Gated SSO paths (block on gate-DENY) | **initiation**: `/sign-in/social`, `/sign-in/oauth2`, `/link-social`, `/oauth2/link` · **callbacks (pathname-prefix match)**: any path containing `/callback/` or `/oauth2/callback/` | Decision 4. Verified against better-auth 1.6.x + genericOAuth (v5 MAJOR fix): genericOAuth initiates at `/sign-in/oauth2` (NOT the phantom `/oauth2/authorize`); social callbacks are `/callback/:id`, genericOAuth `/oauth2/callback/:id`, legacy rewrites `/callback/auth0\|okta`. `/link-social`+`/oauth2/link` blocked so coerced-mode users can't pre-link a provider that goes live after an allow-flip. Callback match MUST be pathname-prefix (`includes("/callback/")`), not the current `endsWith`/suffix helper — callbacks carry `?code=&state=` + a provider segment |
 | Gated email paths (block on gate-ALLOW, SSO-capable only) | `/sign-in/email`, `/sign-up/email` | Decision 4 BLOCKER fix — preserves `main`'s no-password-account guarantee on licensed Auth0/Okta installs |
@@ -87,7 +87,7 @@ Facts verified against `main` (2026-07-02) — two of which invalidate v2/v3 pre
 | **Fail closed for SSO, self-healing** | A gate eval error denies SSO for that request and is retried — never memoized, never opens SSO | Decision 6; unit test with throwing repository, second call succeeds |
 | **SaaS: zero change** | `IS_SAAS=true` short-circuits the gate; email routes stay unmounted unless natively email-mode | Decisions 1+4; unit test |
 | **No signature risk** | Already-issued licenses validate byte-identically | No schema change (Decision 1); existing backward-compat test untouched |
-| **Frozen until restart** | The gate answer never changes mid-process (except error-retry before first success) | Decision 3 memoization; unit test: license added to DB after memoization → still denied until "restart" (module reset) |
+| **An allow is never withdrawn mid-process** | Once the gate allows, it does not read the store again, and an invalidation keeps it (v9). A deny is re-read after 60s, or at once in the process that stored a license | Decision 3 as amended in v9; unit tests in `ee/sso/__tests__/sso-gate.test.ts` |
 | **Sessions survive** | Gate never invalidates existing sessions | Decision 9; migration test |
 
 ## Schema
@@ -201,3 +201,5 @@ Explicitly **not** gate sites: per-org *license* checks (Decision 7 — but note
   - P3 (noted, not blocking): the auto-join skip now logs on denied email-mode installs; `/refresh-token`/`/get-access-token` stay open on DENY (within the "almost exact" email-mode tolerance).
 
 - **v8 (2026-08-02)** — Amendment, from dogfooding the enforcement PR. The v6 split ("SSO signature-only, plan limits strict expiry") was measured and found to invert the incentive it was meant to create: on self-hosted, an expired license resolved to `UNLIMITED_PLAN`, so a lapsed 3-seat license granted unbounded seats and reported the deployment as unlicensed. Lapsing was worth more than renewing, and the "commercial pressure lives in plan limits" cost accepted in v6 did not exist. Self-hosted plan resolution is now signature-only as well (`LicenseHandler.getSelfHostedPlan`): a license we signed keeps metering the seats it sold past its end date, nobody is disabled by the lapse, and only *new* members are refused. Cloud is unchanged and still uses `getActivePlan` with strict expiry, because there a lapsed license must step aside for the Stripe subscription underneath it. Spec: `specs/licensing/expired-license-enforcement.feature`.
+
+- **v9 (2026-10-01)** — Amendment, from a customer report: a license activated in the UI needed a restart of every app pod before SSO turned on. Decision 3's frozen deny is reversed for the deny side only. An allow is still kept for the life of the process and is never withdrawn by an invalidation, so a licensing-store outage cannot turn SSO off. A deny is re-read after 60s, so every replica picks up an activation on its own, and the process that stored the license (`license.upload`, `license.activate`, an activation code redeemed from `LANGWATCH_LICENSE_KEY`) calls `invalidateSsoGate()` and sees it at once. This is the "60s TTL + invalidation" listed under rejected alternatives, adopted on the deny side only: the v4 objection was the request-time three-state machinery, and none of it comes back, since every gate reader already asks `platformSSOAllowed()` per request and social providers mount on credentials, not on the gate. The email-mode warning is logged once per process. Spec: `specs/licensing/sso-license-gating.feature`.

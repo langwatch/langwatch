@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fireActivityTrackingNurturing,
   getActivityTrackingCacheSize,
+  getAppActiveCacheSize,
   resetActivityTrackingCache,
 } from "./activityTracking";
 
@@ -79,6 +80,28 @@ describe("Activity tracking hook", () => {
         vi.useRealTimers();
       });
 
+      /** @scenario 'Activity tracking fires an app_active event with the same debounce' */
+      it("tracks one app_active event per hour", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-03-15T12:00:00.000Z"));
+
+        fireActivityTrackingNurturing({ userId: "user-1" });
+        fireActivityTrackingNurturing({ userId: "user-1" });
+
+        expect(mockNurturing.trackEvent).toHaveBeenCalledTimes(1);
+        expect(mockNurturing.trackEvent).toHaveBeenCalledWith({
+          userId: "user-1",
+          event: "app_active",
+        });
+
+        vi.advanceTimersByTime(60 * 60 * 1000 + 1);
+        fireActivityTrackingNurturing({ userId: "user-1" });
+
+        expect(mockNurturing.trackEvent).toHaveBeenCalledTimes(2);
+
+        vi.useRealTimers();
+      });
+
       it("allows a new call after one hour has passed", () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date("2026-03-15T12:00:00.000Z"));
@@ -122,6 +145,22 @@ describe("Activity tracking hook", () => {
 
         // Only user-4 remains (user-1..3 were evicted by sweep)
         expect(getActivityTrackingCacheSize()).toBe(1);
+
+        vi.useRealTimers();
+      });
+
+      it("evicts app_active entries older than one hour as well", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-03-15T12:00:00.000Z"));
+
+        fireActivityTrackingNurturing({ userId: "user-1" });
+        fireActivityTrackingNurturing({ userId: "user-2" });
+        expect(getAppActiveCacheSize()).toBe(2);
+
+        vi.advanceTimersByTime(60 * 60 * 1000 + 1);
+        fireActivityTrackingNurturing({ userId: "user-3" });
+
+        expect(getAppActiveCacheSize()).toBe(1);
 
         vi.useRealTimers();
       });
@@ -171,6 +210,25 @@ describe("Activity tracking hook", () => {
         });
       });
 
+      /** @scenario 'A failed app_active event does not affect the last_active_at identify' */
+      it("keeps the identify and the debounce when the app_active track fails", async () => {
+        const { captureException } = await import(
+          "../../../../src/utils/posthogErrorCapture"
+        );
+        const error = new Error("CIO track unavailable");
+        mockNurturing.trackEvent.mockRejectedValueOnce(error);
+
+        expect(() =>
+          fireActivityTrackingNurturing({ userId: "user-1" }),
+        ).not.toThrow();
+
+        await vi.waitFor(() => {
+          expect(captureException).toHaveBeenCalledWith(error);
+        });
+        expect(mockNurturing.identifyUser).toHaveBeenCalledTimes(1);
+        expect(getActivityTrackingCacheSize()).toBe(1);
+      });
+
       it("clears the cache entry on rejection so the next call can retry", async () => {
         mockNurturing.identifyUser.mockRejectedValueOnce(
           new Error("CIO unavailable"),
@@ -187,6 +245,21 @@ describe("Activity tracking hook", () => {
         mockNurturing.identifyUser.mockResolvedValueOnce(undefined);
         fireActivityTrackingNurturing({ userId: "user-1" });
         expect(mockNurturing.identifyUser).toHaveBeenCalledTimes(2);
+      });
+
+      it("does not track app_active again when a failed identify is retried", async () => {
+        mockNurturing.identifyUser.mockRejectedValueOnce(
+          new Error("CIO unavailable"),
+        );
+
+        fireActivityTrackingNurturing({ userId: "user-1" });
+        await vi.waitFor(() => {
+          expect(getActivityTrackingCacheSize()).toBe(0);
+        });
+        fireActivityTrackingNurturing({ userId: "user-1" });
+
+        expect(mockNurturing.identifyUser).toHaveBeenCalledTimes(2);
+        expect(mockNurturing.trackEvent).toHaveBeenCalledTimes(1);
       });
     });
   });
@@ -206,6 +279,7 @@ describe("Activity tracking hook", () => {
         });
 
         expect(mockNurturing.identifyUser).not.toHaveBeenCalled();
+        expect(mockNurturing.trackEvent).not.toHaveBeenCalled();
       });
 
       it("does not populate the debounce cache", () => {

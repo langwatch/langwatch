@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/pkg/jwtverify"
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 func TestFetchConfig_EscapesVKID(t *testing.T) {
@@ -328,4 +329,23 @@ func TestFetchConfig_UnreadableBody_IsAnError(t *testing.T) {
 		assert.Empty(t, res.ETag)
 		assert.False(t, res.NotModified)
 	})
+}
+
+// TestFetchConfig_NotFound_IsTheKeysOwnRejection pins a config 404 as the
+// key's own rejection rather than a transport failure.
+// @scenario "a definitive rejection from the control plane is never overridden by the fallback"
+func TestFetchConfig_NotFound_IsTheKeysOwnRejection(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(srv.Close)
+	cp := NewClient(ClientOptions{
+		BaseURL:    srv.URL,
+		Sign:       func(_ *http.Request, _ []byte) {},
+		HTTPClient: srv.Client(),
+	})
+
+	_, err := cp.FetchConfig(context.Background(), "vk_deleted", "")
+
+	require.ErrorIs(t, err, domain.ErrInvalidAPIKey, "a deleted key is a rejection, not an outage")
 }

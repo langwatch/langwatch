@@ -1,6 +1,7 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import {
   DOMAIN_JOIN_SETTINGS,
+  JOINER_ROLES,
   type JoinLookupDecision,
 } from "@langwatch/identity";
 import { z } from "zod";
@@ -277,6 +278,9 @@ export const joinRequestsRouter = createTRPCRouter({
         organizationId: z.string().min(1),
         domainJoin: z.enum(DOMAIN_JOIN_SETTINGS),
         domains: z.array(z.string().min(1)).default([]),
+        // The seat newcomers receive (ADR-143). Optional so an older client
+        // that only moves the door keeps the seat it saved.
+        joinerRole: z.enum(JOINER_ROLES).optional(),
       }),
     )
     .permission("organization:manage")
@@ -285,6 +289,7 @@ export const joinRequestsRouter = createTRPCRouter({
         organizationId: input.organizationId,
         domainJoin: input.domainJoin,
         domains: input.domains,
+        joinerRole: input.joinerRole,
       });
 
       // Awaited, unlike the fire-and-forget audit rows elsewhere: a setting
@@ -300,6 +305,8 @@ export const joinRequestsRouter = createTRPCRouter({
           to: change.next,
           fromDomains: change.previousDomains,
           toDomains: change.nextDomains,
+          fromJoinerRole: change.previousJoinerRole,
+          toJoinerRole: change.nextJoinerRole,
         },
         targetKind: "organization",
         targetId: input.organizationId,

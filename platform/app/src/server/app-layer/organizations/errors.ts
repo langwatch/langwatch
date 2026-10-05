@@ -194,3 +194,21 @@ export class OrganizationSlugTakenError extends HandledError {
     this.name = "OrganizationSlugTakenError";
   }
 }
+
+/**
+ * The installation runs invite-only sign-up (`SIGN_UP_MODE=invite_only`), so a
+ * member joins the organizations that invited them and only an instance
+ * administrator founds a new one.
+ */
+export class OrganizationCreationRestrictedError extends HandledError {
+  declare readonly code: "organization_creation_restricted";
+
+  constructor() {
+    super(
+      "organization_creation_restricted",
+      "Only an instance administrator can create an organization on this installation.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "OrganizationCreationRestrictedError";
+  }
+}
