@@ -62,23 +62,25 @@ import {
 } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type {
-  GroupIdentity,
-  OrganizationSettingsSecret,
-  PersonalWorkspaceDiagnostics,
-  PersonalWorkspaceIdentity,
-  TeamIdentity,
-} from "../app/organization.members.ts";
 import type { GroupRepository } from "../repositories/group.repository.ts";
 import type { OrganizationRepository } from "../repositories/organization.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
+import type { GroupIdentity } from "./group-identity.service.ts";
 import { OrganizationGroupService } from "./organization-group.service.ts";
 import { OrganizationTeamAccessService } from "./organization-team-access.service.ts";
 import { OrganizationTeamMembersService } from "./organization-team-members.service.ts";
+import type { PersonalWorkspaceDiagnostics } from "./personal-workspace-diagnostics.service.ts";
+import type { PersonalWorkspaceIdentity } from "./personal-workspace-identity.service.ts";
 import {
   PersonalWorkspaceService,
   type PersonalWorkspaceNotices,
 } from "./personal-workspace.service.ts";
+import type { TeamIdentity } from "./team-identity.service.ts";
+
+export interface OrganizationSettingsSecret {
+  encrypt(value: string): string;
+  decrypt(value: string): string;
+}
 
 export class OrganizationService extends OrganizationServiceContract {
   private readonly repository: OrganizationRepository;

@@ -23,11 +23,6 @@ import {
 } from "@langwatch/organization-contract";
 import { toDate } from "@langwatch/time";
 
-import type {
-  OrganizationInvitations,
-  OrganizationJoinRequests,
-  OrganizationSignals,
-} from "../app/organization.members.ts";
 import { grantCallerOf } from "../rules/grant-caller.rules.ts";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
@@ -36,7 +31,10 @@ import type {
   OrganizationGrantCeilingService,
   OrganizationIntendedGrant,
 } from "./organization-grant-ceiling.service.ts";
+import type { OrganizationInvitations } from "./organization-invitations.service.ts";
+import type { OrganizationJoinRequests } from "./organization-join-requests.service.ts";
 import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
+import type { OrganizationSignals } from "./organization-signals.service.ts";
 
 /** What the ceremony needs beside the invitation service itself. */
 export interface OrganizationInvitationDoorDependencies {

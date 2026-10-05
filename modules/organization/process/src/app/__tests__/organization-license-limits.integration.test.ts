@@ -1,15 +1,11 @@
-import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import type { IdentityApi } from "@langwatch/identity-contract";
-import type { NotificationService } from "@langwatch/notification-contract";
-import { createLogger, type Logger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  *
@@ -23,11 +19,10 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { RecordSeatLimitReachedCommandData } from "../../eventing/seat-limit.events.ts";
-import type { InviteAssignableRoles } from "../../rules/invite-contracts.rules.ts";
+import { PrismaOrganizationSeatRepository } from "../../repositories/prisma/prisma.organization-seat.repository.ts";
 import { LicenseLimitService } from "../../services/license-limit.service.ts";
-import { SignupAnnouncementService } from "../../services/signup-announcement.service.ts";
-import { buildOrganizationInfrastructure } from "../organization-composition.build.ts";
-import type { OrganizationInviteRateLimit } from "../organization.members.ts";
+import { OrganizationSeatLicenseService } from "../../services/organization-seat-license.service.ts";
+import { SeatLimitNoticeService } from "../../services/seat-limit-notice.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -40,33 +35,21 @@ describe.skipIf(!DB_URL)("given an organization with two full members and one li
   ).client;
 
   function infrastructureOnPlan(plan: Partial<Plan>) {
-    const entitlement = createApiFixture<Pick<EntitlementApi, "getActivePlan" | "requestBound">>({
+    const entitlement = createApiFixture<Pick<EntitlementApi, "getActivePlan">>({
       getActivePlan: async () =>
         createApiFixture<Plan>({ overrideAddingLimitations: false, ...plan }),
     });
-    const infrastructure = buildOrganizationInfrastructure({
-      prisma,
-      encryption: { encrypt: (value) => value, decrypt: (value) => value },
-      logger: createApiFixture<Logger>(),
-      inviteRateLimit: createApiFixture<OrganizationInviteRateLimit>(),
-      publicBaseUrl: undefined,
-      signupAnnouncements: SignupAnnouncementService.create({
-        channel: undefined,
-        publicBaseUrl: undefined,
-        logger: createApiFixture<Logger>(),
-      }),
-      processName: "test",
-      demoProject: { userId: "demo-user", projectId: "demo-project" },
-      dependencies: {
-        projects: createApiFixture<ProjectApi>(),
-        identity: createApiFixture<Pick<IdentityApi, "verifiedEmailsOf" | "joinRequests">>(),
-        entitlement,
-        permissions: createApiFixture<AuthzApi>(),
-        roles: createApiFixture<InviteAssignableRoles>(),
-        notifications:
-          createApiFixture<Pick<NotificationService, "sendEmail" | "getMailDelivery">>(),
-      },
+    const seatLimits = SeatLimitNoticeService.create({
+      signals: { reportError: () => {} },
     });
+    const infrastructure = {
+      seatLimits,
+      seats: OrganizationSeatLicenseService.create({
+        plans: entitlement,
+        memberships: PrismaOrganizationSeatRepository.create(prisma),
+        notices: seatLimits,
+      }),
+    };
     const recorded: RecordSeatLimitReachedCommandData[] = [];
     infrastructure.seatLimits.connect({
       send: async (data: RecordSeatLimitReachedCommandData) => {

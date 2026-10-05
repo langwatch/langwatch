@@ -9,13 +9,35 @@ import type { RoleApi } from "@langwatch/role-contract";
  * an invitation neither defines a role nor binds one.
  */
 export type InviteAssignableRoles = Pick<RoleApi, "filterAssignableRoles">;
-import type {
-  OrganizationInviteMail,
-  OrganizationInviteSeatCensus,
-  OrganizationInviteWorkspaceCensus,
-} from "../app/organization.members.ts";
+import type { OrganizationInviteMail } from "../channels/organization-invite-mail.channel.ts";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import type { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
+
+/**
+ * What an organization's seats currently cost it, and what a lite seat is - two counts and one
+ * predicate for the single question "is there room for these invitations." A process with none
+ * composed is told so by name rather than handed zeroes, which would sell unlimited seats.
+ */
+export interface OrganizationInviteSeatCensus {
+  /** Members holding a FULL seat right now, live invitations included. */
+  getMemberCount(organizationId: string): Promise<number>;
+  /** Members holding a LITE seat right now, live invitations included. */
+  getMembersLiteCount(organizationId: string): Promise<number>;
+  /**
+   * Whether a custom role's permissions are view-only, which is what keeps a
+   * lite seat from being sold the permissions of a full one.
+   */
+  isViewOnlyCustomRole(permissions: string[]): boolean;
+}
+
+/**
+ * How much work is already in the workspace an invitee is being asked to
+ * join. A port, not a call into the project feature — same reason as the
+ * mail port: an uncomposed process says so by absence, not by reporting zero.
+ */
+export interface OrganizationInviteWorkspaceCensus {
+  countProjects(organizationId: string): Promise<number>;
+}
 
 /**
  * Duration in milliseconds before an invite expires (14 days, D11).

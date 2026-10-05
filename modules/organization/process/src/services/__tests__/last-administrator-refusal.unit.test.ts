@@ -7,15 +7,15 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import type {
-  OrganizationGrantCache,
-  OrganizationPromptSeed,
-  OrganizationSeatLicense,
-  OrganizationSessionRevocation,
-} from "../../app/organization.members.ts";
 import { MemoryOrganizationMembershipRepository } from "../../repositories/memory/memory.organization-membership.repository.ts";
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
+import type {
+  OrganizationGrantCache,
+  OrganizationSessionRevocation,
+} from "../organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
+import type { OrganizationPromptSeed } from "../organization-prompt-seed.service.ts";
+import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
 
 const ORGANIZATION = "org_acme";
 

@@ -30,7 +30,6 @@ function process(role: "api" | "worker") {
     .withModules([withMemoryRepositories(organizationProcessModule)])
     .withMembers({
       encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      processName: "organization-installation-test",
       publicBaseUrl: undefined,
     })
     .withRelational(createApiFixture<PrismaClient>())

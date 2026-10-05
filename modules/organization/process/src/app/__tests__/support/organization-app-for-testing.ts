@@ -4,27 +4,25 @@ import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type { OrganizationSeatRepository } from "../../../repositories/organization-seat.repository.ts";
+import type { GroupIdentity } from "../../../services/group-identity.service.ts";
 import type { InviteCreationThrottleService } from "../../../services/invite-creation-throttle.service.ts";
 import type { MemberProvenanceService } from "../../../services/member-provenance.service.ts";
+import type { OrganizationCeremony } from "../../../services/organization-ceremony.service.ts";
+import type { OrganizationDirectory } from "../../../services/organization-directory.service.ts";
 import type { OrganizationLifecycleNoticeService } from "../../../services/organization-lifecycle-notice.service.ts";
+import type { OrganizationPromptSeed } from "../../../services/organization-prompt-seed.service.ts";
+import type { OrganizationSeatLicense } from "../../../services/organization-seat-license.service.ts";
+import type { OrganizationSignals } from "../../../services/organization-signals.service.ts";
+import type { OrganizationSettingsSecret } from "../../../services/organization.service.ts";
 import type { PersonalTeamScopeReader } from "../../../services/personal-team-scope.service.ts";
+import type { PersonalWorkspaceIdentity } from "../../../services/personal-workspace-identity.service.ts";
 import type { SeatLimitNoticeService } from "../../../services/seat-limit-notice.service.ts";
+import type { TeamIdentity } from "../../../services/team-identity.service.ts";
 import {
   type OrganizationInfrastructure,
   OrganizationModule,
   type ServerOrganizationAppDependencies,
 } from "../../organization.app.ts";
-import type {
-  GroupIdentity,
-  OrganizationCeremony,
-  OrganizationDirectory,
-  OrganizationPromptSeed,
-  OrganizationSeatLicense,
-  OrganizationSettingsSecret,
-  OrganizationSignals,
-  PersonalWorkspaceIdentity,
-  TeamIdentity,
-} from "../../organization.members.ts";
 
 /**
  * The organization app over a suite's own collaborators. Anything the suite leaves out is a
@@ -36,11 +34,10 @@ export function organizationAppForTesting(setup: {
     shares?: ShareApi;
     apiKeys?: ApiKeyApi;
   };
-  members?: Partial<OrganizationInfrastructure>;
   personalTeamScope?: PersonalTeamScopeReader;
   memberProvenance?: MemberProvenanceService;
 }): OrganizationModule {
-  const members: OrganizationInfrastructure = {
+  const infrastructure: OrganizationInfrastructure = {
     identities: createApiFixture<PersonalWorkspaceIdentity>({}, "personal workspace identities"),
     teamIdentities: createApiFixture<TeamIdentity>({}, "team identities"),
     groupIdentities: createApiFixture<GroupIdentity>({}, "group identities"),
@@ -60,7 +57,6 @@ export function organizationAppForTesting(setup: {
       "invite creation throttle",
     ),
     joinRequests: null,
-    ...setup.members,
   };
   return OrganizationModule.createForTesting({
     dependencies: {
@@ -69,7 +65,7 @@ export function organizationAppForTesting(setup: {
       apiKeys:
         setup.dependencies.apiKeys ?? createApiFixture<ApiKeyApi>({}, "api key provisioning"),
     },
-    members,
+    infrastructure,
     ...(setup.personalTeamScope ? { personalTeamScope: setup.personalTeamScope } : {}),
     memberProvenance:
       setup.memberProvenance ?? createApiFixture<MemberProvenanceService>({}, "member provenance"),

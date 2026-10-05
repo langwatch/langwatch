@@ -1,10 +1,8 @@
 import { InviteNotFoundError, InviteThrottledError } from "@langwatch/organization-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  OrganizationInviteMail,
-  OrganizationInviteRateLimit,
-} from "../../app/organization.members.ts";
+import type { OrganizationInviteMail } from "../../channels/organization-invite-mail.channel.ts";
+import type { OrganizationInviteRateLimitRepository } from "../../repositories/organization-invite-rate-limit.repository.ts";
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
 import { InviteSendThrottleService } from "../invite-send-throttle.service.ts";
 import { InviteService } from "../invite.service.ts";
@@ -17,7 +15,7 @@ import { InviteService } from "../invite.service.ts";
 const sendInviteReRequestEmail = vi.fn();
 
 /** A fixed-window counter in memory, standing in for the real rate limiter. */
-function makeInMemoryRateLimiter(): OrganizationInviteRateLimit {
+function makeInMemoryRateLimiter(): OrganizationInviteRateLimitRepository {
   const counters = new Map<string, { count: number; resetAt: number }>();
   return {
     async limit({ key, windowSeconds, max }) {

@@ -9,12 +9,10 @@ import type { LimitCheckResult } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  OrganizationSeatLicense,
-  OrganizationSignals,
-} from "../../app/organization.members.ts";
 import type { RecordSeatLimitReachedCommandData } from "../../eventing/seat-limit.events.ts";
 import { LicenseLimitService } from "../license-limit.service.ts";
+import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
+import type { OrganizationSignals } from "../organization-signals.service.ts";
 import { SeatLimitNoticeService } from "../seat-limit-notice.service.ts";
 
 const ORGANIZATION = "org_acme";

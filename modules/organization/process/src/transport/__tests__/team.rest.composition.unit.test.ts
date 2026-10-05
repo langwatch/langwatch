@@ -10,20 +10,20 @@ import { Temporal, toDate, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { organizationAppForTesting } from "../../app/__tests__/support/organization-app-for-testing.ts";
-import type {
-  OrganizationGrantCache,
-  OrganizationPromptSeed,
-  OrganizationSeatLicense,
-  OrganizationSessionRevocation,
-  OrganizationSettingsSecret,
-} from "../../app/organization.members.ts";
 import { MemoryGroupRepository } from "../../repositories/memory/memory.group.repository.ts";
 import { MemoryOrganizationMembershipRepository } from "../../repositories/memory/memory.organization-membership.repository.ts";
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "../../repositories/memory/memory.organization.repository.ts";
 import { MemoryTeamRepository } from "../../repositories/memory/memory.team.repository.ts";
 import { GroupIdentityService } from "../../services/group-identity.service.ts";
+import type {
+  OrganizationGrantCache,
+  OrganizationSessionRevocation,
+} from "../../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../../services/organization-membership.service.ts";
+import type { OrganizationPromptSeed } from "../../services/organization-prompt-seed.service.ts";
+import type { OrganizationSeatLicense } from "../../services/organization-seat-license.service.ts";
+import type { OrganizationSettingsSecret } from "../../services/organization.service.ts";
 import { OrganizationService } from "../../services/organization.service.ts";
 import { PersonalWorkspaceIdentityService } from "../../services/personal-workspace-identity.service.ts";
 import { TeamIdentityService } from "../../services/team-identity.service.ts";

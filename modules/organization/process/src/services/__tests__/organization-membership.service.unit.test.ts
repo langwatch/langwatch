@@ -7,17 +7,17 @@ import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/gen
 import { nowInstant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository.ts";
 import type {
   OrganizationGrantCache,
-  OrganizationPromptSeed,
-  OrganizationSeatLicense,
   OrganizationSessionRevocation,
-} from "../../app/organization.members.ts";
-import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository.ts";
+} from "../organization-member-role.service.ts";
 import {
   OrganizationMembershipService,
   type OrganizationTestArrivals,
 } from "../organization-membership.service.ts";
+import type { OrganizationPromptSeed } from "../organization-prompt-seed.service.ts";
+import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
 
 const mockInvalidateOrganization = vi.fn();
 const mockCheckLimit = vi.fn();

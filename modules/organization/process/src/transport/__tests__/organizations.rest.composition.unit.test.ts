@@ -14,7 +14,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { organizationAppForTesting } from "../../app/__tests__/support/organization-app-for-testing.ts";
-import type { OrganizationPromptSeed } from "../../app/organization.members.ts";
 import { MemoryGroupRepository } from "../../repositories/memory/memory.group.repository.ts";
 import { MemoryOrganizationMembershipRepository } from "../../repositories/memory/memory.organization-membership.repository.ts";
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
@@ -22,6 +21,7 @@ import { MemoryOrganizationRepository } from "../../repositories/memory/memory.o
 import { MemoryTeamRepository } from "../../repositories/memory/memory.team.repository.ts";
 import { GroupIdentityService } from "../../services/group-identity.service.ts";
 import { OrganizationMembershipService } from "../../services/organization-membership.service.ts";
+import type { OrganizationPromptSeed } from "../../services/organization-prompt-seed.service.ts";
 import { OrganizationService } from "../../services/organization.service.ts";
 import { PersonalWorkspaceIdentityService } from "../../services/personal-workspace-identity.service.ts";
 import { TeamIdentityService } from "../../services/team-identity.service.ts";

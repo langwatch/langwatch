@@ -1,9 +1,9 @@
 import { nowInstant } from "@langwatch/time";
 
-import type { OrganizationInviteRateLimit } from "../../app/organization.members.ts";
+import type { OrganizationInviteRateLimitRepository } from "../organization-invite-rate-limit.repository.ts";
 
 /** The Redis counter's memory twin: one fixed window per key, held in this process. */
-export class MemoryOrganizationInviteRateLimitRepository implements OrganizationInviteRateLimit {
+export class MemoryOrganizationInviteRateLimitRepository implements OrganizationInviteRateLimitRepository {
   static create(): MemoryOrganizationInviteRateLimitRepository {
     return new MemoryOrganizationInviteRateLimitRepository();
   }

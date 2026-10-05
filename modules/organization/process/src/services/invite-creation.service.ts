@@ -21,7 +21,7 @@ import {
 } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { OrganizationInviteMail } from "../app/organization.members.ts";
+import type { OrganizationInviteMail } from "../channels/organization-invite-mail.channel.ts";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import {
   INVITE_BATCH_TXN_MAX_WAIT_MS,

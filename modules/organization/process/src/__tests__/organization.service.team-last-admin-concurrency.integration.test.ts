@@ -22,11 +22,11 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { OrganizationSettingsSecret } from "../app/organization.members.ts";
 import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository.ts";
 import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository.ts";
 import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository.ts";
 import { GroupIdentityService } from "../services/group-identity.service.ts";
+import type { OrganizationSettingsSecret } from "../services/organization.service.ts";
 import { OrganizationService } from "../services/organization.service.ts";
 import { PersonalWorkspaceIdentityService } from "../services/personal-workspace-identity.service.ts";
 import { TeamIdentityService } from "../services/team-identity.service.ts";

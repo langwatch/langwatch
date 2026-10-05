@@ -1,6 +1,8 @@
 import type { Logger } from "@langwatch/observability";
 
-import { type PersonalWorkspaceDiagnostics } from "../app/organization.members.ts";
+export interface PersonalWorkspaceDiagnostics {
+  warn(message: string, context: Record<string, unknown>): void;
+}
 
 /**
  * Where a personal-workspace warning goes. The port takes `(message, context)` and the

@@ -26,18 +26,18 @@ import type { RoleApi } from "@langwatch/role-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type {
-  OrganizationInviteMail,
-  OrganizationInviteSeatCensus,
-  OrganizationInviteRateLimit,
-} from "../../../app/organization.members.ts";
+import type { OrganizationInviteMail } from "../../../channels/organization-invite-mail.channel.ts";
+import type { OrganizationInviteRateLimitRepository } from "../../../repositories/organization-invite-rate-limit.repository.ts";
 import type {
   InviteWithOrganization,
   InviteWithRequester,
   OrganizationInviteRepository,
   WriteInviteInput,
 } from "../../../repositories/organization-invite.repository.ts";
-import type { InviteServiceDependencies } from "../../../rules/invite-contracts.rules.ts";
+import type {
+  OrganizationInviteSeatCensus,
+  InviteServiceDependencies,
+} from "../../../rules/invite-contracts.rules.ts";
 import { InviteSendThrottleService } from "../../invite-send-throttle.service.ts";
 
 const unsupported = <Method>(name: string): Method =>
@@ -516,7 +516,7 @@ export class FakeRoleService implements Pick<RoleApi, "filterAssignableRoles"> {
 }
 
 /** A per-key sliding window, close enough to the real limiter to test the throttle honestly. */
-export class FakeInviteRateLimit implements OrganizationInviteRateLimit {
+export class FakeInviteRateLimit implements OrganizationInviteRateLimitRepository {
   private readonly sends = new Map<string, number[]>();
 
   async limit({

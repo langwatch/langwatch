@@ -34,7 +34,6 @@ import {
 } from "@langwatch/organization-contract";
 import { fromDate } from "@langwatch/time";
 
-import type { TeamIdentity } from "../app/organization.members.ts";
 import type { GroupRepository } from "../repositories/group.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
 import {
@@ -48,6 +47,7 @@ import {
   OrganizationGrantCeilingService,
   type OrganizationIntendedGrant,
 } from "./organization-grant-ceiling.service.ts";
+import type { TeamIdentity } from "./team-identity.service.ts";
 
 type OrganizationTeamMembersOptions = {
   authz: AuthzApi;

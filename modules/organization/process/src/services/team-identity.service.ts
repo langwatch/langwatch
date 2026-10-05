@@ -1,8 +1,15 @@
 import { newAuthzGrantId } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 
-import type { TeamIdentity } from "../app/organization.members.ts";
 import { organizationResourceSlug } from "../rules/organization-resource-slug.rules.ts";
+
+export interface TeamIdentity {
+  createTeam(input: { name: string }): {
+    teamId: string;
+    slug: string;
+  };
+  createBindingId(): string;
+}
 
 /** KSUID resource prefixes: a persisted format, since each id is written into a customer's row. */
 const TEAM_KSUID_RESOURCE = "team";

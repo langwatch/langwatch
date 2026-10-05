@@ -31,9 +31,9 @@ import {
   type RenameOrganizationGroupInput,
 } from "@langwatch/organization-contract";
 
-import type { GroupIdentity } from "../app/organization.members.ts";
 import type { GroupRepository } from "../repositories/group.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
+import type { GroupIdentity } from "./group-identity.service.ts";
 
 /**
  * Groups: the named sets of people an organization binds to scopes, and the bindings

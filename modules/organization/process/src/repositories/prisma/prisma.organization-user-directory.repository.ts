@@ -1,5 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import { OrganizationUserDirectoryRepository } from "../organization-user-directory.repository.ts";
+
 /** Only what this repository touches, so composition names the slice it needs. */
 export type OrganizationUserDirectoryDatabase = Pick<PrismaClient, "user">;
 
@@ -8,14 +10,16 @@ export type OrganizationUserDirectoryDatabase = Pick<PrismaClient, "user">;
  * legacy verified-email column, and member display names — read narrowly
  * through this module's own repository, as every module does.
  */
-export class PrismaOrganizationUserDirectoryRepository {
+export class PrismaOrganizationUserDirectoryRepository extends OrganizationUserDirectoryRepository {
   static create(
     database: OrganizationUserDirectoryDatabase,
   ): PrismaOrganizationUserDirectoryRepository {
     return new PrismaOrganizationUserDirectoryRepository(database);
   }
 
-  private constructor(private readonly database: OrganizationUserDirectoryDatabase) {}
+  private constructor(private readonly database: OrganizationUserDirectoryDatabase) {
+    super();
+  }
 
   async findUserIdByEmail(input: Readonly<{ email: string }>): Promise<string | null> {
     const user = await this.database.user.findUnique({

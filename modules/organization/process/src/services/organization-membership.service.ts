@@ -32,13 +32,6 @@ import {
 import { nowInstant, toDate } from "@langwatch/time";
 import slugify from "slugify";
 
-import {
-  type OrganizationGrantCache,
-  type OrganizationPromptSeed,
-  type OrganizationSeatLicense,
-  type OrganizationSessionRevocation,
-  type OrganizationPlanUser,
-} from "../app/organization.members.ts";
 import type {
   AuditLogFilters,
   CreateAndAssignResult,
@@ -54,7 +47,16 @@ import type {
 import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import type { OrganizationGrantCeilingService } from "./organization-grant-ceiling.service.ts";
+import type {
+  OrganizationGrantCache,
+  OrganizationSessionRevocation,
+} from "./organization-member-role.service.ts";
 import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
+import type { OrganizationPromptSeed } from "./organization-prompt-seed.service.ts";
+import type {
+  OrganizationSeatLicense,
+  OrganizationPlanUser,
+} from "./organization-seat-license.service.ts";
 
 /**
  * Whether this person is mid-way through proving a single sign-on connection

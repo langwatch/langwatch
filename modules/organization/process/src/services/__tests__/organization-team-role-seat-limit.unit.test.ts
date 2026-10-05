@@ -6,9 +6,9 @@ import { TeamUserRole } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type { OrganizationSeatLicense } from "../../app/organization.members.ts";
 import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository.ts";
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
+import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
 
 const TARGET = { organizationId: "org-1", teamId: "team-1", userId: "user-2" };
 

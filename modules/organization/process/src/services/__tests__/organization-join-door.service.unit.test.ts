@@ -1,11 +1,9 @@
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  OrganizationDirectory,
-  OrganizationJoinRequests,
-} from "../../app/organization.members.ts";
+import type { OrganizationDirectory } from "../organization-directory.service.ts";
 import { OrganizationJoinDoorService } from "../organization-join-door.service.ts";
+import type { OrganizationJoinRequests } from "../organization-join-requests.service.ts";
 
 /** Spec: specs/identity/join-requests.feature, specs/identity/domain-auto-join.feature */
 

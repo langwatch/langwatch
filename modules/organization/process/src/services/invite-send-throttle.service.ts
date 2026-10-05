@@ -4,7 +4,7 @@
 import { InviteThrottledError } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { OrganizationInviteRateLimit } from "../app/organization.members.ts";
+import type { OrganizationInviteRateLimitRepository } from "../repositories/organization-invite-rate-limit.repository.ts";
 
 export const INVITE_SEND_WINDOW_SECONDS = 60 * 60;
 export const INVITE_SENDS_PER_WINDOW = 3;
@@ -13,9 +13,9 @@ export const INVITE_SENDS_PER_WINDOW = 3;
  * The window, spent against whichever counter the process composed.
  */
 export class InviteSendThrottleService {
-  private constructor(private readonly rateLimit: OrganizationInviteRateLimit) {}
+  private constructor(private readonly rateLimit: OrganizationInviteRateLimitRepository) {}
 
-  static create(rateLimit: OrganizationInviteRateLimit): InviteSendThrottleService {
+  static create(rateLimit: OrganizationInviteRateLimitRepository): InviteSendThrottleService {
     return new InviteSendThrottleService(rateLimit);
   }
 

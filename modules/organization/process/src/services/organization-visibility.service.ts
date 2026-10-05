@@ -13,12 +13,12 @@ import {
   type OrganizationWithMembersAndTheirTeams,
 } from "@langwatch/organization-contract";
 
-import type {
-  OrganizationDemoProject,
-  OrganizationSettingsSecret,
-} from "../app/organization.members.ts";
 import { userCanOpenTeam } from "../rules/team-visibility.rules.ts";
 import { OrganizationMembershipService } from "./organization-membership.service.ts";
+import type { OrganizationSettingsSecret } from "./organization.service.ts";
+
+/** The demo organization's person and project, or empty strings when unset. */
+export type OrganizationDemoProject = Readonly<{ userId: string; projectId: string }>;
 
 /** What this service reads the organization rows through. */
 export interface OrganizationVisibilityReader {

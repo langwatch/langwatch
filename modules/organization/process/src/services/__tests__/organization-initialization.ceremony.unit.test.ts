@@ -8,8 +8,9 @@ import type { OnboardingInitializeOrganizationInput } from "@langwatch/onboardin
 import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { OrganizationCeremony, OrganizationSignals } from "../../app/organization.members.ts";
+import type { OrganizationCeremony } from "../organization-ceremony.service.ts";
 import { OrganizationInitializationService } from "../organization-initialization.service.ts";
+import type { OrganizationSignals } from "../organization-signals.service.ts";
 
 const ORGANIZATION = { id: "org_1", name: "Acme Corp" };
 const TEAM = { id: "team_1", slug: "acme-team", name: "Acme Team" };

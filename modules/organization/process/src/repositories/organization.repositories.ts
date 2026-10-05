@@ -1,9 +1,9 @@
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 
-import type { OrganizationInviteRateLimit } from "../app/organization.members.ts";
 import type { OrganizationScopeGraphReader } from "../services/organization-scope-graph.service.ts";
 import type { PersonalTeamScopeReader } from "../services/personal-team-scope.service.ts";
 import type { GroupRepository } from "./group.repository.ts";
+import type { OrganizationInviteRateLimitRepository } from "./organization-invite-rate-limit.repository.ts";
 import type { OrganizationMembershipRepository } from "./organization-membership.repository.ts";
 import type { OrganizationRepository } from "./organization.repository.ts";
 import type { SignUpPolicyRepository } from "./sign-up-policy.repository.ts";
@@ -29,5 +29,5 @@ export interface OrganizationRepositories {
   /** The installation-wide reads the sign-up policy decides over. */
   readonly signUpPolicy: SignUpPolicyRepository;
   /** The fixed-window counter both invitation throttles spend. */
-  readonly inviteRateLimit: OrganizationInviteRateLimit;
+  readonly inviteRateLimit: OrganizationInviteRateLimitRepository;
 }

@@ -1,8 +1,13 @@
 import { newAuthzGrantId } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 
-import type { GroupIdentity } from "../app/organization.members.ts";
 import { organizationResourceSlug } from "../rules/organization-resource-slug.rules.ts";
+
+export interface GroupIdentity {
+  createGroupId(): string;
+  createBindingId(): string;
+  slugify(name: string): string;
+}
 
 /** KSUID resource prefixes: a persisted format, since each id is written into a customer's row. */
 const GROUP_KSUID_RESOURCE = "group";

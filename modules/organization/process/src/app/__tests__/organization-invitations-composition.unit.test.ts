@@ -1,5 +1,5 @@
 /**
- * `InviteServiceOrganizationInvitations` maps `InviteService`'s method names onto
+ * `OrganizationInvitationsService` maps `InviteService`'s method names onto
  * the port the door reads; the app still refuses a role it composed none for.
  * @see specs/organizations/organization-members-rest-api.feature
  */
@@ -26,11 +26,11 @@ import type { InviteCreationThrottleService } from "../../services/invite-creati
 import { InviteSendThrottleService } from "../../services/invite-send-throttle.service.ts";
 import { InviteService } from "../../services/invite.service.ts";
 import { OrganizationInvitationDoorService } from "../../services/organization-invitation-door.service.ts";
+import { OrganizationInvitationsService } from "../../services/organization-invitations.service.ts";
 import type { OrganizationLifecycleNoticeService } from "../../services/organization-lifecycle-notice.service.ts";
+import type { OrganizationSignals } from "../../services/organization-signals.service.ts";
 import { SeatLimitNoticeService } from "../../services/seat-limit-notice.service.ts";
-import { InviteServiceOrganizationInvitations } from "../organization-composition.build.ts";
 import { type ServerOrganizationAppDependencies } from "../organization.app.ts";
-import type { OrganizationSignals } from "../organization.members.ts";
 import { organizationAppForTesting } from "./support/organization-app-for-testing.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -176,7 +176,7 @@ function invitations(
     }),
   );
 
-  return InviteServiceOrganizationInvitations.create({
+  return OrganizationInvitationsService.create({
     invites: service,
     repository,
     throttle,

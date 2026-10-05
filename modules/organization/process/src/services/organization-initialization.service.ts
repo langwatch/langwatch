@@ -7,8 +7,9 @@ import type {
 import type { OrganizationCaller, OrganizationIntent } from "@langwatch/organization-contract";
 import { OnboardingProjectNotCreatedError } from "@langwatch/organization-contract";
 
-import type { OrganizationCeremony, OrganizationSignals } from "../app/organization.members.ts";
+import type { OrganizationCeremony } from "./organization-ceremony.service.ts";
 import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
+import type { OrganizationSignals } from "./organization-signals.service.ts";
 
 /**
  * The intent that ends on the personal portal rather than in a project.

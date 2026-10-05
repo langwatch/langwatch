@@ -13,12 +13,10 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  GroupIdentity,
-  PersonalWorkspaceIdentity,
-  TeamIdentity,
-} from "../../app/organization.members.ts";
+import type { GroupIdentity } from "../../services/group-identity.service.ts";
 import { OrganizationService } from "../../services/organization.service.ts";
+import type { PersonalWorkspaceIdentity } from "../../services/personal-workspace-identity.service.ts";
+import type { TeamIdentity } from "../../services/team-identity.service.ts";
 import type { GroupRepository } from "../group.repository.ts";
 import type { OrganizationRepository } from "../organization.repository.ts";
 import type { TeamRepository } from "../team.repository.ts";

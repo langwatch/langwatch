@@ -15,11 +15,11 @@ import type {
 } from "@langwatch/organization-contract";
 import { Temporal, toDate } from "@langwatch/time";
 
+import type { OrganizationDirectory } from "./organization-directory.service.ts";
 import type {
-  OrganizationDirectory,
   OrganizationJoinRequestState,
   OrganizationJoinRequests,
-} from "../app/organization.members.ts";
+} from "./organization-join-requests.service.ts";
 
 /** Shown where the ledger knows a requester's id but nobody's name. */
 const UNNAMED_COLLEAGUE = "A colleague";

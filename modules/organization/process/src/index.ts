@@ -1,11 +1,13 @@
 export type {
   OrganizationGrantCache,
-  OrganizationPromptSeed,
-  OrganizationSeatLicense,
   OrganizationSessionRevocation,
+} from "./services/organization-member-role.service.ts";
+export type { OrganizationPromptSeed } from "./services/organization-prompt-seed.service.ts";
+export type {
+  OrganizationSeatLicense,
   OrganizationPlanUser,
   OrganizationSeatDecision,
-} from "./app/organization.members.ts";
+} from "./services/organization-seat-license.service.ts";
 export {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
@@ -34,13 +36,11 @@ export type {
   OrganizationMemberWithUser,
   UpdateMemberRoleResult,
 } from "./repositories/organization-membership.repository.ts";
-export type {
-  PersonalWorkspaceDiagnostics,
-  PersonalWorkspaceIdentity,
-  OrganizationSettingsSecret,
-  GroupIdentity,
-  TeamIdentity,
-} from "./app/organization.members.ts";
+export type { PersonalWorkspaceDiagnostics } from "./services/personal-workspace-diagnostics.service.ts";
+export type { PersonalWorkspaceIdentity } from "./services/personal-workspace-identity.service.ts";
+export type { OrganizationSettingsSecret } from "./services/organization.service.ts";
+export type { GroupIdentity } from "./services/group-identity.service.ts";
+export type { TeamIdentity } from "./services/team-identity.service.ts";
 export type {
   StoredOrganizationSettings,
   PersonalWorkspaceResourceIds,
@@ -65,17 +65,19 @@ export {
 } from "./transport/organization.trpc.ts";
 export { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-workspace-features.trpc.ts";
 export { teamTrpcTransport } from "./transport/team.trpc.ts";
+export type { OrganizationCeremony } from "./services/organization-ceremony.service.ts";
+export type { OrganizationDemoProject } from "./services/organization-visibility.service.ts";
+export type { OrganizationDirectory } from "./services/organization-directory.service.ts";
 export type {
-  OrganizationCeremony,
-  OrganizationDemoProject,
-  OrganizationDirectory,
   OrganizationInvitations,
   OrganizationInviteWithOrganization,
   OrganizationInvitesCreated,
+} from "./services/organization-invitations.service.ts";
+export type {
   OrganizationJoinRequests,
   OrganizationJoinRequestState,
-  OrganizationSignals,
-} from "./app/organization.members.ts";
+} from "./services/organization-join-requests.service.ts";
+export type { OrganizationSignals } from "./services/organization-signals.service.ts";
 export { groupsRest } from "./transport/group.rest.ts";
 export { teamsRest } from "./transport/team.rest.ts";
 export { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
