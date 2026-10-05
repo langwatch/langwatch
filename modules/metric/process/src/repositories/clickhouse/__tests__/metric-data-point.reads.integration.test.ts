@@ -92,11 +92,12 @@ describe("given metric rows stored in ClickHouse", () => {
       values: [
         usageRow({ PointId: "1".repeat(64) }),
         usageRow({ PointId: "2".repeat(64), SeriesId: SERIES_B, CanonicalSourceBytes: 50 }),
-        // The first point accepted a second time: a second ledger row for one PointId.
+        // The first point accepted again in a later monthly partition, where the engine
+        // cannot collapse the two rows: only the query dedups them.
         usageRow({
           PointId: "1".repeat(64),
-          AcceptedAt: "2026-01-12 08:00:00.000",
-          AcceptedHour: "2026-01-12 08:00:00",
+          AcceptedAt: "2026-02-12 08:00:00.000",
+          AcceptedHour: "2026-02-12 08:00:00",
           DedupVersion: 2,
         }),
         // Accepted before the window: billed in an earlier one, so not counted here.
@@ -132,7 +133,7 @@ describe("given metric rows stored in ClickHouse", () => {
       const result = await repository().queryUsageEstimates({
         organizationId: ORGANIZATION,
         from: Temporal.Instant.from("2026-01-01T00:00:00Z"),
-        to: Temporal.Instant.from("2026-02-01T00:00:00Z"),
+        to: Temporal.Instant.from("2026-03-01T00:00:00Z"),
         groupBy: "organization",
       });
 
