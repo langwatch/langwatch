@@ -1,9 +1,12 @@
 import { AnalyticsApi, type LangWatchQLRunCaller } from "@langwatch/analytics-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import {
+  type InstantEvalAccessWire,
   type InstantEvalActor,
   type InstantEvalApi as InstantEvalApiContract,
   InstantEvalApi,
@@ -22,6 +25,7 @@ import {
   type InstantEvalServerConfig,
   instantEvalConfig,
 } from "@langwatch/instant-eval-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
@@ -69,6 +73,7 @@ import {
 import { InstantEvalFinishService } from "../services/instant-eval-finish.service.ts";
 import { InstantEvalFreeBudgetService } from "../services/instant-eval-free-budget.service.ts";
 import { InstantEvalJudgePageService } from "../services/instant-eval-judge-page.service.ts";
+import { InstantEvalOptInService } from "../services/instant-eval-opt-in.service.ts";
 import { InstantEvalPlanService } from "../services/instant-eval-plan.service.ts";
 import { InstantEvalReadsService } from "../services/instant-eval-reads.service.ts";
 import { InstantEvalRowSourceService } from "../services/instant-eval-row-source.service.ts";
@@ -114,6 +119,8 @@ type InstantEvalMembers = Readonly<{
   redis: InstantEvalRedis | null;
   /** The raw NODE_ENV; "production" refuses the memory judge. */
   nodeEnvironment: string | undefined;
+  /** LangWatch's own cloud: the only deployment that offers the organization's switch. */
+  isSaas: boolean;
 }>;
 
 type InstantEvalDependencies = Readonly<{
@@ -129,6 +136,12 @@ type InstantEvalDependencies = Readonly<{
   traces: typeof TraceApi;
   /** Judges a connected install's texts on LangWatch, against its licence. */
   licensing: typeof LicensingApi;
+  /** Owns the organization's Instant Evals consent columns. */
+  organizations: typeof OrganizationApi;
+  /** Whether the member asking may throw the organization's switch. */
+  permissions: typeof AuthzApi;
+  /** Where the switch's row naming the organization is written. */
+  auditLog: typeof AuditLogApi;
 }>;
 
 type InstantEvalSetup = FeatureSetup<
@@ -148,6 +161,9 @@ export class InstantEvalModule implements InstantEvalApiContract {
     gateway: GatewayApi,
     traces: TraceApi,
     licensing: LicensingApi,
+    organizations: OrganizationApi,
+    permissions: AuthzApi,
+    auditLog: AuditLogApi,
   };
   static readonly config = instantEvalConfig;
   /** LangWatch's own judge credential; a deployment without one judges nothing. */
@@ -155,9 +171,10 @@ export class InstantEvalModule implements InstantEvalApiContract {
     classifierApiKey: Secret.load("JEV_API_KEY", { optional: true }),
   } as const;
   /** `redis` is the shared token bucket that paces the judge across every pod. */
-  static readonly reads = ["redis", "nodeEnvironment"] as const;
+  static readonly reads = ["redis", "nodeEnvironment", "isSaas"] as const;
 
   private readonly access: InstantEvalAccessService;
+  private readonly optIns: InstantEvalOptInService;
   private readonly classifications: InstantEvalClassifyService;
   private readonly reads: InstantEvalReadsService;
   private readonly runs: InstantEvalRunService;
@@ -167,6 +184,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
 
   private constructor(options: {
     access: InstantEvalAccessService;
+    optIns: InstantEvalOptInService;
     classifications: InstantEvalClassifyService;
     reads: InstantEvalReadsService;
     runs: InstantEvalRunService;
@@ -175,6 +193,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
     hostedSpend: InstantEvalSpendService;
   }) {
     this.access = options.access;
+    this.optIns = options.optIns;
     this.classifications = options.classifications;
     this.reads = options.reads;
     this.runs = options.runs;
@@ -189,18 +208,23 @@ export class InstantEvalModule implements InstantEvalApiContract {
     );
   }
 
-  private static withSecrets(setup: InstantEvalSetup, apiKey: string | undefined): InstantEvalModule {
+  private static withSecrets(
+    setup: InstantEvalSetup,
+    apiKey: string | undefined,
+  ): InstantEvalModule {
     const repositories = setup.repositories;
     const judge = InstantEvalModule.judgeOf(setup, apiKey);
     setup.resources.own("Instant Evals judge", () => judge.close?.() ?? Promise.resolve());
 
-    const { analytics, projects, plans, gateway, traces } = setup.dependencies;
+    const { analytics, projects, plans, gateway, traces, organizations } = setup.dependencies;
     const access = InstantEvalAccessService.create({
       flags: setup.dependencies.featureFlags,
       projects,
       isJudgeConfigured: () => !(judge instanceof MemoryInstantEvalJudgeChannel),
       judge,
+      optIns: { isOptedIn: (input) => organizations.isInstantEvalsOptedIn(input) },
     });
+    const optIns = InstantEvalModule.optInsOf(setup, access);
     const reads = InstantEvalReadsService.create({
       runs: repositories.runs,
       judgments: repositories.judgments,
@@ -261,6 +285,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
     return new InstantEvalModule({
       hostedSpend,
       access,
+      optIns,
       classifications: InstantEvalClassifyService.create({ judge }),
       reads,
       runs: InstantEvalRunService.create({
@@ -422,6 +447,38 @@ export class InstantEvalModule implements InstantEvalApiContract {
     this.dispatcher.connect(commands);
   }
 
+  /** The organization's own switch, over the peers owning its columns, authority and audit. */
+  private static optInsOf(
+    setup: InstantEvalSetup,
+    access: InstantEvalAccessService,
+  ): InstantEvalOptInService {
+    const { projects, plans, organizations, permissions, auditLog } = setup.dependencies;
+    return InstantEvalOptInService.create({
+      isSaas: () => setup.members.isSaas,
+      peers: {
+        findOrganizationId: (projectId) => projects.findOrganizationId(projectId),
+        planTypeOf: async ({ organizationId, userId }) =>
+          (await plans.getActivePlan({ organizationId, user: { id: userId } })).type,
+        maySwitch: ({ organizationId, userId }) =>
+          permissions.hasPermission({ userId, permission: "organization:manage", organizationId }),
+        isOptedIn: (input) => organizations.isInstantEvalsOptedIn(input),
+        recordOptIn: (input) => organizations.recordInstantEvalsOptIn(input),
+        auditSwitch: async ({ organizationId, userId, projectId }) => {
+          await auditLog.record({
+            userId,
+            organizationId,
+            projectId,
+            action: "organization.instant_evals.enabled",
+            args: { projectId },
+            targetKind: "organization",
+            targetId: organizationId,
+          });
+        },
+        isReleased: (input) => access.isReleasedFor(input),
+      },
+    });
+  }
+
   /** The judge `instantEvalJudgeKind` names; `none` skips every question, refusing none. */
   private static judgeOf(
     setup: InstantEvalSetup,
@@ -462,6 +519,14 @@ export class InstantEvalModule implements InstantEvalApiContract {
 
   async isReleased(input: { projectId: string }): Promise<boolean> {
     return this.access.isReleased(input);
+  }
+
+  readAccess(input: { projectId: string; userId: string }): Promise<InstantEvalAccessWire> {
+    return this.optIns.readAccess(input);
+  }
+
+  switchOn(input: { projectId: string; userId: string }): Promise<InstantEvalAccessWire> {
+    return this.optIns.switchOn(input);
   }
 
   async findRuns(input: {

@@ -5,6 +5,7 @@ import type { Instant } from "@langwatch/time";
 import type { InstantEvalJudgement, InstantEvalQuestion } from "./instant-eval-judging.ts";
 import type { InstantEvalJudgmentStatus, InstantEvalTarget } from "./instant-eval-limits.ts";
 import type {
+  InstantEvalAccessWire,
   InstantEvalEstimateWire,
   InstantEvalResultsWire,
   InstantEvalRunWire,
@@ -96,6 +97,18 @@ export interface InstantEvalApi {
    * released project with no judge still gets the "configure a model" primer.
    */
   isReleased(input: { projectId: string }): Promise<boolean>;
+
+  /**
+   * Whether the project is released, and what the refusal popover offers the
+   * member asking. The organization is the project's, never the caller's to name.
+   */
+  readAccess(input: { projectId: string; userId: string }): Promise<InstantEvalAccessWire>;
+
+  /**
+   * The organization's own switch, thrown from the project the popover was
+   * opened in. Refused, recording nothing, where the popover offers "Contact us".
+   */
+  switchOn(input: { projectId: string; userId: string }): Promise<InstantEvalAccessWire>;
 
   /**
    * Accepts a statement, holds its price against the free budget, records the

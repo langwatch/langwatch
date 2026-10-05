@@ -64,6 +64,12 @@ class StubRepository extends OrganizationRepository {
 
   async saveSessionPolicy(): Promise<void> {}
 
+  async isInstantEvalsOptedIn(): Promise<boolean> {
+    return false;
+  }
+
+  async recordInstantEvalsOptIn(): Promise<void> {}
+
   async getGuidedOnboarding(): Promise<GuidedOnboardingRecord> {
     return this.guidedOnboarding;
   }

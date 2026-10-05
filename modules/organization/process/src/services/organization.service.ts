@@ -259,6 +259,18 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.repository.saveSessionPolicy(input);
   }
 
+  isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean> {
+    return this.repository.isInstantEvalsOptedIn(input);
+  }
+
+  recordInstantEvalsOptIn(input: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void> {
+    return this.repository.recordInstantEvalsOptIn(input);
+  }
+
   /** The guided-onboarding record, where the organization keeps it. */
   readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord> {
     return this.repository.getGuidedOnboarding(input);

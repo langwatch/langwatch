@@ -18,6 +18,7 @@ import { type RefObject, useCallback, useRef, useState } from "react";
 
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
+import type { InstantEvalOptInOffer } from "../../../../model/instant-eval-access.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
 import { explainAnyError } from "../../errors/index.ts";
 import type { InstantEvalConfirmation } from "../instant-eval-confirm-dialog.tsx";
@@ -64,6 +65,12 @@ interface InstantEvalRouteState {
   refusal: InstantEvalRefusal | null;
   /** Closes the popover; an unreleased project has no phrase to fall back to. */
   dismissRefusal: () => void;
+  /**
+   * The organization's switch, from the `opt_in` popover. Once thrown, the payload the popover was
+   * about goes on to the estimate, so the reader who said yes gets the judgement they asked for.
+   */
+  enableInstantEvals: () => void;
+  isEnabling: boolean;
   isEstimating: boolean;
   isStarting: boolean;
 }
@@ -258,15 +265,103 @@ function useInstantEvalStarter({
   return { isStarting: start.isPending, applyChip, startRun };
 }
 
+/**
+ * The refusal for an organization Instant Evals are not on for, shown before any estimate goes out.
+ * Pending stays null, so closing it applies no fallback. The payload is held aside for the switch
+ * only, so a thrown switch can go on to the estimate the reader asked for.
+ */
+function bailUnreleased({
+  outcome,
+  optInOffer,
+  heldRef,
+  payload,
+}: {
+  outcome: Pick<
+    ReturnType<typeof useInstantEvalOutcome>,
+    "pendingRef" | "setConfirmation" | "setRefusal"
+  >;
+  optInOffer: InstantEvalOptInOffer | undefined;
+  heldRef: RefObject<InstantEvalRoutePayload | null>;
+  payload: InstantEvalRoutePayload;
+}): void {
+  outcome.pendingRef.current = null;
+  outcome.setConfirmation(null);
+  heldRef.current = optInOffer === "enable" ? payload : null;
+  if (optInOffer === "enable") {
+    outcome.setRefusal({ kind: "opt_in" });
+    return;
+  }
+  outcome.setRefusal({ kind: optInOffer === "ask_admin" ? "ask_admin" : "unreleased" });
+}
+
+/**
+ * The organization's switch from the `opt_in` popover, and the popover's dismissal. Both take the
+ * sequence: a switch answered after the reader closed the popover, or submitted again, routes
+ * nothing. The access cache is still written then, since the organization really is on now.
+ */
+function useInstantEvalSwitch({
+  heldRef,
+  seqRef,
+  route,
+  outcome,
+}: {
+  heldRef: RefObject<InstantEvalRoutePayload | null>;
+  seqRef: RefObject<number>;
+  route: (payload: InstantEvalRoutePayload) => void;
+  outcome: Pick<ReturnType<typeof useInstantEvalOutcome>, "setRefusal" | "searchWordsInstead">;
+}): { enableInstantEvals: () => void; dismissRefusal: () => void; isEnabling: boolean } {
+  const enable = api.traces.instantEval.enable.useMutation();
+  const utils = api.useUtils();
+  const { setRefusal, searchWordsInstead } = outcome;
+
+  const enableInstantEvals = useCallback(() => {
+    const held = heldRef.current;
+    if (!held) return;
+    const seq = ++seqRef.current;
+    enable.mutate(
+      { projectId: held.projectId },
+      {
+        onSuccess: (access) => {
+          // Seeded before the refetch lands, so the next submit already reads "released".
+          utils.traces.instantEval.access.setData({ projectId: held.projectId }, access);
+          void utils.traces.instantEval.access.invalidate();
+          if (seq !== seqRef.current) return;
+          heldRef.current = null;
+          setRefusal(null);
+          route(held);
+        },
+        onError: (error) => {
+          if (seq !== seqRef.current) return;
+          const { title, description } = explainAnyError(error);
+          toaster.create({ title, ...(description ? { description } : {}), type: "warning" });
+        },
+      },
+    );
+  }, [enable, heldRef, route, seqRef, setRefusal, utils]);
+
+  const dismissRefusal = useCallback(() => {
+    seqRef.current += 1;
+    heldRef.current = null;
+    searchWordsInstead();
+  }, [heldRef, searchWordsInstead, seqRef]);
+
+  return { enableInstantEvals, dismissRefusal, isEnabling: enable.isPending };
+}
+
 export function useInstantEvalRoute({
   isInstantEvalAvailable,
+  optInOffer,
 }: {
   isInstantEvalAvailable: boolean;
+  /** What the popover offers when unavailable; absent until the server says. */
+  optInOffer?: InstantEvalOptInOffer | undefined;
 }): InstantEvalRouteState {
   const estimate = api.traces.instantEval.estimate.useMutation();
   const outcome = useInstantEvalOutcome();
   const { pendingRef, setConfirmation, setRefusal, refuse } = outcome;
   const seqRef = useRef(0);
+  // The payload the opt-in popover is about, apart from `pendingRef`: closing it applies nothing.
+  const heldRef = useRef<InstantEvalRoutePayload | null>(null);
   const { isStarting, applyChip, startRun } = useInstantEvalStarter({ outcome, seqRef });
 
   const confirmRun = useCallback(() => {
@@ -313,16 +408,10 @@ export function useInstantEvalRoute({
     [answerEstimate, estimate, refuse],
   );
 
-  const onInstantEvalRoute = useCallback(
+  // One payload the organization may judge: a run already registered is reused, else the estimate.
+  const route = useCallback(
     (payload: InstantEvalRoutePayload) => {
-      const seq = ++seqRef.current;
-      // Refused before any estimate goes out; with nothing pending, closing only closes.
-      if (!isInstantEvalAvailable) {
-        pendingRef.current = null;
-        setConfirmation(null);
-        setRefusal({ kind: "unreleased" });
-        return;
-      }
+      const seq = seqRef.current;
       const { timeRange, evalRuns } = useFilterStore.getState();
       const key = routeRunKey({ payload, presetId: timeRange.presetId });
       pendingRef.current = { payload, key };
@@ -338,8 +427,29 @@ export function useInstantEvalRoute({
       }
       askForEstimate({ payload, key, seq });
     },
-    [applyChip, askForEstimate, isInstantEvalAvailable, pendingRef, setConfirmation, setRefusal],
+    [applyChip, askForEstimate, pendingRef, setConfirmation, setRefusal],
   );
+
+  const onInstantEvalRoute = useCallback(
+    (payload: InstantEvalRoutePayload) => {
+      ++seqRef.current;
+      // Refused before any estimate goes out; with nothing pending, closing only closes.
+      if (!isInstantEvalAvailable) {
+        bailUnreleased({ outcome, optInOffer, heldRef, payload });
+        return;
+      }
+      heldRef.current = null;
+      route(payload);
+    },
+    [isInstantEvalAvailable, optInOffer, outcome, route],
+  );
+
+  const { enableInstantEvals, dismissRefusal, isEnabling } = useInstantEvalSwitch({
+    heldRef,
+    seqRef,
+    route,
+    outcome,
+  });
 
   return {
     onInstantEvalRoute,
@@ -348,7 +458,9 @@ export function useInstantEvalRoute({
     confirmRun,
     searchWordsInstead: outcome.searchWordsInstead,
     refusal: outcome.refusal,
-    dismissRefusal: outcome.searchWordsInstead,
+    dismissRefusal,
+    enableInstantEvals,
+    isEnabling,
     isEstimating: estimate.isPending,
     isStarting,
   };

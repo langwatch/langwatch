@@ -610,6 +610,8 @@ export const prismaModelFieldCatalogue = {
     "licenseLastValidatedAt",
     "selfHostedCustomer",
     "connectServicesDisabled",
+    "instantEvalsEnabledAt",
+    "instantEvalsEnabledByUserId",
     "connectLastSyncAt",
     "connectLastSyncError",
     "issuedLicenses",

@@ -40,10 +40,20 @@ function harness() {
   const estimateExplorerEvalRun = vi.fn<TraceApi["estimateExplorerEvalRun"]>(async () => {
     throw new InstantEvalClassifierNotConfiguredError();
   });
+  const readExplorerEvalAccess = vi.fn<TraceApi["readExplorerEvalAccess"]>(async () => ({
+    released: false,
+    offer: "ask_admin" as const,
+  }));
+  const enableExplorerEvals = vi.fn<TraceApi["enableExplorerEvals"]>(async () => ({
+    released: true,
+    offer: "enable" as const,
+  }));
   const app = createApiFixture<TraceApi>({
     getExplorerEvalRun,
     cancelExplorerEvalRun,
     estimateExplorerEvalRun,
+    readExplorerEvalAccess,
+    enableExplorerEvals,
   });
   const permissions: string[] = [];
   const trpc = initTRPC.context<TestContext>().create();
@@ -64,16 +74,20 @@ function harness() {
     caller: router.createCaller({ actor: { id: "reader-1" } }),
     cancelExplorerEvalRun,
     getExplorerEvalRun,
+    readExplorerEvalAccess,
+    enableExplorerEvals,
     permissions,
   };
 }
 
 describe("given the traces.instantEval tRPC contract", () => {
   describe("when its members are read", () => {
-    it("declares main's four nested procedures", () => {
+    it("declares main's six nested procedures", () => {
       expect(
         Object.entries(tracesInstantEvalTrpc.members).map(([name, member]) => [name, member.kind]),
       ).toEqual([
+        ["access", "query"],
+        ["enable", "mutation"],
         ["estimate", "mutation"],
         ["start", "mutation"],
         ["cancel", "mutation"],
@@ -91,6 +105,38 @@ describe("given the traces.instantEval tRPC contract", () => {
 });
 
 describe("given the traces.instantEval router", () => {
+  describe("when the popover asks what to offer", () => {
+    it("reads the access for the caller under analytics:view", async () => {
+      const { caller, readExplorerEvalAccess, permissions } = harness();
+
+      await expect(caller.access({ projectId: "project-1" })).resolves.toEqual({
+        released: false,
+        offer: "ask_admin",
+      });
+      expect(readExplorerEvalAccess).toHaveBeenCalledWith({
+        projectId: "project-1",
+        userId: "reader-1",
+      });
+      expect(permissions).toEqual(["analytics:view"]);
+    });
+  });
+
+  describe("when a member throws the organization's switch", () => {
+    it("takes organization:manage, never the project's spend permission", async () => {
+      const { caller, enableExplorerEvals, permissions } = harness();
+
+      await expect(caller.enable({ projectId: "project-1" })).resolves.toEqual({
+        released: true,
+        offer: "enable",
+      });
+      expect(enableExplorerEvals).toHaveBeenCalledWith({
+        projectId: "project-1",
+        userId: "reader-1",
+      });
+      expect(permissions).toEqual(["organization:manage"]);
+    });
+  });
+
   describe("when a run is read back", () => {
     it("reads it for the project under analytics:view", async () => {
       const { caller, getExplorerEvalRun, permissions } = harness();

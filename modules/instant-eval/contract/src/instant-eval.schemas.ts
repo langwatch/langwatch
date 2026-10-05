@@ -426,6 +426,21 @@ export const instantEvalSampleSchema = z.object({
   judgments: z.array(instantEvalJudgmentSchema).describe("The verdicts those rows received."),
 });
 
+/**
+ * What the refusal popover offers: the organization's own switch, a word with
+ * an organization admin for a member who may not throw it, or a word with us
+ * for an enterprise plan or a self-hosted install.
+ */
+export const INSTANT_EVAL_OPT_IN_OFFERS = ["enable", "ask_admin", "contact_us"] as const;
+export type InstantEvalOptInOffer = (typeof INSTANT_EVAL_OPT_IN_OFFERS)[number];
+
+/** Whether a project may be offered a judgement, and what to offer when it may not. */
+export const instantEvalAccessSchema = z.object({
+  released: z.boolean(),
+  offer: z.enum(INSTANT_EVAL_OPT_IN_OFFERS),
+});
+export type InstantEvalAccessWire = z.infer<typeof instantEvalAccessSchema>;
+
 export type InstantEvalRunWire = z.infer<typeof instantEvalRunSchema>;
 export type InstantEvalJudgmentWire = z.infer<typeof instantEvalJudgmentSchema>;
 export type InstantEvalEstimateWire = z.infer<typeof instantEvalEstimateSchema>;

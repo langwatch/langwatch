@@ -57,6 +57,7 @@ import type {
 import type { CodingAgentSessionDisplay } from "../model/coding-agent/trace/session-display.ts";
 import type { ConversationTurn } from "../model/explorer/conversation-turn.ts";
 import type { SessionGroupPayloadItem } from "../model/explorer/session-group-payload.ts";
+import type { InstantEvalAccessAnswer } from "../model/instant-eval-access.ts";
 
 /** The project every trace procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -180,6 +181,14 @@ export type TraceApiMap = {
      * @see specs/traces-v2/instant-eval-search.feature
      */
     instantEval: {
+      /** Whether the project is released, and what the refusal popover offers this member. */
+      access: {
+        query: { input: ProjectScope; output: InstantEvalAccessAnswer };
+      };
+      /** The organization's own switch, thrown from one of its projects. */
+      enable: {
+        mutation: { input: ProjectScope; output: InstantEvalAccessAnswer };
+      };
       estimate: {
         mutation: {
           input: ExplorerInstantEvalRunInput;

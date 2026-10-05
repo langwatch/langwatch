@@ -112,6 +112,25 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     this.requireOrganization(organizationId).maxSessionDurationDays = maxSessionDurationDays;
   }
 
+  async isInstantEvalsOptedIn({ organizationId }: { organizationId: string }): Promise<boolean> {
+    return this.memory.organizations.get(organizationId)?.instantEvalsEnabledAt !== undefined;
+  }
+
+  async recordInstantEvalsOptIn({
+    organizationId,
+    userId,
+    at,
+  }: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(organizationId);
+    if (!organization || organization.instantEvalsEnabledAt !== undefined) return;
+    organization.instantEvalsEnabledAt = at;
+    organization.instantEvalsEnabledByUserId = userId;
+  }
+
   async saveJoinSetting({
     organizationId,
     setting,

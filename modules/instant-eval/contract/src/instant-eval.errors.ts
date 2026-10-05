@@ -113,6 +113,28 @@ export class InstantEvalNotEnabledError extends HandledError {
 }
 
 /**
+ * The organization's own switch was thrown where the popover does not offer
+ * it: an enterprise plan, or a self-hosted install. The plan or the
+ * deployment says no, and a word with us is the remedy.
+ */
+export class InstantEvalOptInNotOfferedError extends HandledError {
+  declare readonly code: "instant_eval_opt_in_not_offered";
+
+  constructor() {
+    super(
+      "instant_eval_opt_in_not_offered",
+      "LangWatch turns on Instant Evals for enterprise plans and self-hosted installs. Contact us to get them.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("instant_eval_opt_in_not_offered"),
+      },
+    );
+    this.name = "InstantEvalOptInNotOfferedError";
+  }
+}
+
+/**
  * The project is released for Instant Evals, but the deployment has no classifier that can judge
  * for its organization (no judge key, no hosted judging through Connect). The operator can act on
  * it, which is why it is not folded into `instant_eval_not_enabled`.

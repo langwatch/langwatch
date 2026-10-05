@@ -43,6 +43,15 @@ export const explorerInstantEvalRunIdSchema = z.object({
   runId: z.string().min(1).max(200),
 });
 
+/** The access answer, under the name the Explorer reads it by. */
+export type {
+  InstantEvalAccessWire as InstantEvalAccessAnswer,
+  InstantEvalOptInOffer,
+} from "@langwatch/instant-eval-contract";
+
+/** The project the popover was opened in; its organization is resolved server-side. */
+export const explorerInstantEvalProjectSchema = z.object({ projectId: z.string() });
+
 /** The run's counters, which is all a chip and a progress bar read. */
 export const explorerInstantEvalProgressSchema = z.object({
   ...instantEvalRunSchema.pick({

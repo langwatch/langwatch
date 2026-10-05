@@ -12,10 +12,10 @@ import "@testing-library/jest-dom/vitest";
 // Enter on a sentence calls `traces.routeSearch`; the hook's own routing is
 // covered by use-submit-search.integration, so the submit is stubbed here
 // rather than mounting a tRPC provider.
-// The Instant Evals gate reads this flag; stub it enabled so nothing here
-// depends on the tRPC provider this suite doesn't mount.
-vi.mock("@langwatch/browser-host/feature-flag", () => ({
-  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+// The Instant Evals gate reads the flag and the organization's switch; stub it
+// available so nothing here depends on the tRPC provider this suite doesn't mount.
+vi.mock("../../../../../behavior/explorer/search-bar/use-instant-eval-access.ts", () => ({
+  useInstantEvalAccess: () => ({ isAvailable: true, optInOffer: undefined }),
 }));
 
 vi.mock("../use-instant-eval-route.ts", () => ({
@@ -27,6 +27,8 @@ vi.mock("../use-instant-eval-route.ts", () => ({
     searchWordsInstead: vi.fn(),
     refusal: null,
     dismissRefusal: vi.fn(),
+    enableInstantEvals: vi.fn(),
+    isEnabling: false,
     isEstimating: false,
     isStarting: false,
   }),

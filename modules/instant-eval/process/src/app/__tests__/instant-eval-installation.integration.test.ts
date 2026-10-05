@@ -10,6 +10,8 @@ import type {
   LangWatchQLJudgementCall,
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -22,6 +24,7 @@ import {
   InstantEvalMemoryJudgeInProductionError,
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import {
@@ -178,6 +181,7 @@ function installation({
       })
       .withStores(memoryStores())
       .withMember("nodeEnvironment", nodeEnvironment)
+      .withMember("isSaas", false)
       // The api role sends commands; what drains them is the worker's, and the
       // pipeline has its own tests.
       .withEventing(
@@ -220,6 +224,11 @@ function installation({
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async () => isReleased,
         }),
+        organization: createApiFixture<OrganizationApi>({
+          isInstantEvalsOptedIn: async () => false,
+        }),
+        authz: createApiFixture<AuthzApi>({}),
+        "audit-log": createApiFixture<AuditLogApi>({}),
       })
   );
 }

@@ -15,6 +15,7 @@ import {
 import type { EventingCommands, EventingParticipation } from "@langwatch/eventing";
 import { ValidationError } from "@langwatch/handled-error";
 import type {
+  InstantEvalAccessWire,
   InstantEvalApi,
   InstantEvalEstimateWire,
   InstantEvalRunProgress,
@@ -910,6 +911,20 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress> {
     return this.#instantEvals().getRun(input);
+  }
+
+  readExplorerEvalAccess(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<InstantEvalAccessWire> {
+    return this.#instantEvals().readAccess(input);
+  }
+
+  enableExplorerEvals(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<InstantEvalAccessWire> {
+    return this.#instantEvals().switchOn(input);
   }
 
   /**

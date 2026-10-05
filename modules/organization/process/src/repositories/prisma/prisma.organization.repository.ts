@@ -115,6 +115,30 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     });
   }
 
+  async isInstantEvalsOptedIn({ organizationId }: { organizationId: string }): Promise<boolean> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { instantEvalsEnabledAt: true },
+    });
+    return row?.instantEvalsEnabledAt != null;
+  }
+
+  async recordInstantEvalsOptIn({
+    organizationId,
+    userId,
+    at,
+  }: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void> {
+    // The null guard is the first-click-wins rule, held by Postgres rather than a read first.
+    await this.database.organization.updateMany({
+      where: { id: organizationId, instantEvalsEnabledAt: null },
+      data: { instantEvalsEnabledAt: toDate(at), instantEvalsEnabledByUserId: userId },
+    });
+  }
+
   async saveJoinSetting({
     organizationId,
     setting,

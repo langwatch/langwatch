@@ -19,6 +19,9 @@ type MutateOptions = {
 const mutations = vi.hoisted(() => ({
   estimate: { mutate: vi.fn<(input: unknown, options: MutateOptions) => void>(), isPending: false },
   start: { mutate: vi.fn<(input: unknown, options: MutateOptions) => void>(), isPending: false },
+  enable: { mutate: vi.fn<(input: unknown, options: MutateOptions) => void>(), isPending: false },
+  invalidateAccess: vi.fn(),
+  setAccess: vi.fn(),
 }));
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
@@ -26,8 +29,16 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
       instantEval: {
         estimate: { useMutation: () => mutations.estimate },
         start: { useMutation: () => mutations.start },
+        enable: { useMutation: () => mutations.enable },
       },
     },
+    useUtils: () => ({
+      traces: {
+        instantEval: {
+          access: { invalidate: mutations.invalidateAccess, setData: mutations.setAccess },
+        },
+      },
+    }),
   },
 }));
 
@@ -51,6 +62,13 @@ function estimateCallbacks(): MutateOptions {
   return call[1];
 }
 
+/** The last switch request: its input and callbacks. */
+function enableCall(): { input: unknown; options: MutateOptions } {
+  const call = mutations.enable.mutate.mock.calls.at(-1);
+  if (!call) throw new Error("the switch was not thrown");
+  return { input: call[0], options: call[1] };
+}
+
 /** A tRPC client error carrying a handled payload, as the client reads it. */
 function handledError({ code, meta = {} }: { code: string; meta?: Record<string, unknown> }) {
   return {
@@ -62,6 +80,9 @@ function handledError({ code, meta = {} }: { code: string; meta?: Record<string,
 beforeEach(() => {
   mutations.estimate.mutate.mockClear();
   mutations.start.mutate.mockClear();
+  mutations.enable.mutate.mockClear();
+  mutations.invalidateAccess.mockClear();
+  mutations.setAccess.mockClear();
   toast.mockClear();
   useFilterStore.getState().clearAll();
 });
@@ -134,12 +155,14 @@ describe("given the estimate fails for a reason the registry names", () => {
   });
 });
 
-describe("given the Instant Evals flag is off for the project", () => {
-  /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+describe("given Instant Evals are off for an enterprise organization", () => {
+  /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
   it("opens the unreleased popover with no estimate, and dismissing it leaves the typed query alone", () => {
     const typed = 'eval:"the user is annoyed"';
     useFilterStore.getState().applyQueryText(typed);
-    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: false }));
+    const { result } = renderHook(() =>
+      useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: "contact_us" }),
+    );
 
     act(() => result.current.onInstantEvalRoute(payload));
 
@@ -150,6 +173,119 @@ describe("given the Instant Evals flag is off for the project", () => {
 
     expect(result.current.refusal).toBeNull();
     expect(useFilterStore.getState().queryText).toBe(typed);
+  });
+
+  /** @scenario "A member who may not throw the switch is told to ask an admin" */
+  it("opens the ask-admin popover for a member who may not switch, and Enable sends nothing", () => {
+    const { result } = renderHook(() =>
+      useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: "ask_admin" }),
+    );
+    act(() => result.current.onInstantEvalRoute(payload));
+
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+    expect(result.current.refusal).toEqual({ kind: "ask_admin" });
+
+    act(() => result.current.enableInstantEvals());
+    expect(mutations.enable.mutate).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
+  it("opens the contact-us popover while the offer is still unknown", () => {
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: false }));
+    act(() => result.current.onInstantEvalRoute(payload));
+
+    expect(result.current.refusal).toEqual({ kind: "unreleased" });
+
+    act(() => result.current.enableInstantEvals());
+    expect(mutations.enable.mutate).not.toHaveBeenCalled();
+  });
+});
+
+describe("given Instant Evals are off for a self-serve organization", () => {
+  function renderOptIn() {
+    const rendered = renderHook(() =>
+      useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: "enable" }),
+    );
+    act(() => rendered.result.current.onInstantEvalRoute(payload));
+    return rendered;
+  }
+
+  /** @scenario "Instant Evals off for a self-serve organization open the enable popover" */
+  it("opens the opt-in popover with no estimate, and dismissing it leaves the typed query alone", () => {
+    const queryBefore = useFilterStore.getState().queryText;
+    const { result } = renderOptIn();
+
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+    expect(result.current.refusal).toEqual({ kind: "opt_in" });
+
+    act(() => result.current.dismissRefusal());
+
+    expect(result.current.refusal).toBeNull();
+    expect(useFilterStore.getState().queryText).toBe(queryBefore);
+  });
+
+  /** @scenario "Enable switches the organization on and the judgement goes ahead" */
+  it("throws the switch for the project, refreshes the access read, closes the popover and estimates the held payload", () => {
+    const { result } = renderOptIn();
+    act(() => result.current.enableInstantEvals());
+
+    const enable = enableCall();
+    expect(enable.input).toEqual({ projectId: "project-1" });
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+
+    act(() => enable.options.onSuccess?.({ released: true, offer: "enable" }));
+
+    expect(mutations.setAccess).toHaveBeenCalledWith(
+      { projectId: "project-1" },
+      { released: true, offer: "enable" },
+    );
+    expect(mutations.invalidateAccess).toHaveBeenCalledTimes(1);
+    expect(result.current.refusal).toBeNull();
+    expect(mutations.estimate.mutate).toHaveBeenCalledTimes(1);
+    expect(mutations.estimate.mutate.mock.calls.at(-1)?.[0]).toMatchObject({
+      projectId: "project-1",
+      question: { instructions: "the user is annoyed" },
+    });
+  });
+
+  /** @scenario "A refused switch is a warning and the popover stays" */
+  it("shows the registry's words when the server refuses the switch, and sends no estimate", () => {
+    const { result } = renderOptIn();
+    act(() => result.current.enableInstantEvals());
+
+    act(() =>
+      enableCall().options.onError?.(handledError({ code: "instant_eval_opt_in_not_offered" })),
+    );
+
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ type: "warning" }));
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+    expect(result.current.refusal).toEqual({ kind: "opt_in" });
+  });
+
+  /** @scenario "Enable switches the organization on and the judgement goes ahead" */
+  it("drops a switch answered after the reader closed the popover, but still records the access", () => {
+    const { result } = renderOptIn();
+    act(() => result.current.enableInstantEvals());
+    const enable = enableCall();
+    act(() => result.current.dismissRefusal());
+    expect(result.current.refusal).toBeNull();
+
+    act(() => enable.options.onSuccess?.({ released: true, offer: "enable" }));
+
+    expect(mutations.setAccess).toHaveBeenCalledTimes(1);
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Enable switches the organization on and the judgement goes ahead" */
+  it("drops a switch answered after a later submit superseded it", () => {
+    const { result } = renderOptIn();
+    act(() => result.current.enableInstantEvals());
+    const enable = enableCall();
+    act(() => result.current.abandonPendingRun());
+
+    act(() => enable.options.onSuccess?.({ released: true, offer: "enable" }));
+
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
   });
 });
 

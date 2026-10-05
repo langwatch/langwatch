@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   type InstantEvalFlagReader,
   InstantEvalAccessService,
+  type InstantEvalOptInReader,
   type InstantEvalProjectReader,
 } from "../instant-eval-access.service.ts";
 
@@ -36,8 +37,15 @@ function gate({
   flags?: InstantEvalFlagReader;
   projects?: InstantEvalProjectReader;
 }) {
-  return InstantEvalAccessService.create({ flags, projects, isJudgeConfigured });
+  return InstantEvalAccessService.create({
+    flags,
+    projects,
+    isJudgeConfigured,
+    optIns: NEVER_OPTED_IN,
+  });
 }
+
+const NEVER_OPTED_IN: InstantEvalOptInReader = { isOptedIn: async () => false };
 
 describe("given a deployment with no judge configured", () => {
   describe("when a project asks whether it may judge", () => {
@@ -123,6 +131,7 @@ describe("given a judge that judges for some organizations and not others", () =
         flags: released,
         projects,
         isJudgeConfigured: () => true,
+        optIns: NEVER_OPTED_IN,
         judge: {
           isAvailableForOrganization: async (organizationId) => {
             asked.push(organizationId);
@@ -143,10 +152,73 @@ describe("given a judge that judges for some organizations and not others", () =
         flags: released,
         projects,
         isJudgeConfigured: () => true,
+        optIns: NEVER_OPTED_IN,
         judge: { isAvailableForOrganization: async () => true },
       });
 
       await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(true);
+    });
+  });
+});
+
+describe("given the flag is off and the organization switched Instant Evals on itself", () => {
+  describe("when a project of that organization asks whether it may judge", () => {
+    /** @scenario "An organization that switched itself on is judged without the flag" */
+    it("answers yes from the organization's switch", async () => {
+      const asked: string[] = [];
+      const access = InstantEvalAccessService.create({
+        flags: { isEnabled: async () => false },
+        projects: { findOrganizationId: async () => "organization" },
+        isJudgeConfigured: () => true,
+        judge: { isAvailableForOrganization: async () => true },
+        optIns: {
+          isOptedIn: async ({ organizationId }) => {
+            asked.push(organizationId);
+            return organizationId === "organization";
+          },
+        },
+      });
+
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(true);
+      expect(asked).toEqual(["organization"]);
+    });
+  });
+});
+
+describe("given the flag is on for the project", () => {
+  describe("when the project asks whether it may judge", () => {
+    it("answers yes without reading the organization's switch", async () => {
+      const access = InstantEvalAccessService.create({
+        flags: { isEnabled: async () => true },
+        projects: { findOrganizationId: async () => "organization" },
+        isJudgeConfigured: () => true,
+        optIns: {
+          isOptedIn: () => {
+            throw new Error("the gate read the organization's switch");
+          },
+        },
+      });
+
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(true);
+    });
+  });
+});
+
+describe("given the flag is off for a project that belongs to no organization", () => {
+  describe("when it asks whether it is released", () => {
+    it("answers no, with no organization whose switch could say yes", async () => {
+      const access = InstantEvalAccessService.create({
+        flags: { isEnabled: async () => false },
+        projects: { findOrganizationId: async () => undefined },
+        isJudgeConfigured: () => true,
+        optIns: {
+          isOptedIn: () => {
+            throw new Error("the gate read a switch for nobody");
+          },
+        },
+      });
+
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(false);
     });
   });
 });

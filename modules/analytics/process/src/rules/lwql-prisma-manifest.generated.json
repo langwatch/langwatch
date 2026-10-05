@@ -4198,6 +4198,24 @@
           "documentation": "LangWatch-hosted services this organization has switched OFF, named the\nway its license names them (\"instant_evals\"). A service the license is\nentitled to is on unless it is listed here, so a customer who bought\nhosted judging gets it without finding a settings page first, and an\nadministrator who switched one off keeps it off across license changes\n(ADR-139, section 2). A license that names no service reaches nothing,\nwhatever this column holds."
         },
         {
+          "name": "instantEvalsEnabledAt",
+          "columnName": "instantEvalsEnabledAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When a member of this organization switched Instant Evals on from the\nsearch bar, which is the organization's consent to have judged text sent\nto the judge's provider. Null until then: a self-serve organization is\nnever opted in on its behalf, and an enterprise one is switched on by an\noperator through the release flag after asking, never here."
+        },
+        {
+          "name": "instantEvalsEnabledByUserId",
+          "columnName": "instantEvalsEnabledByUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The member who switched them on, so the audit trail names a person and\nnot just a moment."
+        },
+        {
           "name": "connectLastSyncAt",
           "columnName": "connectLastSyncAt",
           "type": "DateTime",

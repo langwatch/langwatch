@@ -280,6 +280,14 @@ export interface OrganizationApi {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<void>;
+  /** Whether a member switched Instant Evals on for the organization; an unknown one never did. */
+  isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean>;
+  /**
+   * Records the organization's consent to Instant Evals, once: a second click
+   * keeps the first record, since the moment and member that count are the
+   * ones that gave the agreement.
+   */
+  recordInstantEvalsOptIn(input: { organizationId: string; userId: string }): Promise<void>;
   /** Replaces the record, leaving every other sign-up answer where it is. */
   writeGuidedOnboardingState(input: {
     organizationId: string;

@@ -9410,6 +9410,12 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/audit-log-contract':
+        specifier: workspace:*
+        version: link:../../audit-log/contract
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client

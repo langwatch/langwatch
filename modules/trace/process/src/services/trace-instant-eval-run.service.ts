@@ -4,6 +4,7 @@
  * budget and the judging are all the peer's.
  */
 import type {
+  InstantEvalAccessWire,
   InstantEvalApi,
   InstantEvalEstimateWire,
   InstantEvalRunProgress,
@@ -74,6 +75,14 @@ export class TraceInstantEvalRunService {
     });
 
     return toExplorerRunProgress(run);
+  }
+
+  readAccess(input: { projectId: string; userId: string }): Promise<InstantEvalAccessWire> {
+    return this.#instantEvals.readAccess(input);
+  }
+
+  switchOn(input: { projectId: string; userId: string }): Promise<InstantEvalAccessWire> {
+    return this.#instantEvals.switchOn(input);
   }
 
   async getRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress> {

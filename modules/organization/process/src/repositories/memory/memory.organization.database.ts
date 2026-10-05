@@ -30,6 +30,9 @@ export interface MemoryOrganizationRow {
   joinDomains?: string[];
   /** The CLI/device session ceiling in days; absent reads as unbounded. */
   maxSessionDurationDays?: number;
+  /** The organization's Instant Evals consent; absent until a member gives it. */
+  instantEvalsEnabledAt?: Instant;
+  instantEvalsEnabledByUserId?: string;
   createdAt: Instant;
   updatedAt: Instant;
 }

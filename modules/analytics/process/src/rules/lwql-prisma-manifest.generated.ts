@@ -368,6 +368,8 @@ export interface LwqlPrismaRows {
     readonly licenseLastValidatedAt: "DateTime?";
     readonly selfHostedCustomer: "Boolean";
     readonly connectServicesDisabled: "String[]";
+    readonly instantEvalsEnabledAt: "DateTime?";
+    readonly instantEvalsEnabledByUserId: "String?";
     readonly connectLastSyncAt: "DateTime?";
     readonly connectLastSyncError: "String?";
   };

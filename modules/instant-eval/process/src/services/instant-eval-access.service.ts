@@ -1,6 +1,6 @@
 /**
- * Whether a project may run Instant Evals: the flag is the product decision,
- * a configured judge that judges for the project's organization the
+ * Whether a project may run Instant Evals: the flag or the organization's own
+ * switch is the product decision, a judge for the project's organization the
  * operational one, and a rollout rule distinguishes the PROJECT, never the member.
  * @see specs/lwql/eval-functions.feature
  */
@@ -22,22 +22,30 @@ export interface InstantEvalProjectReader {
   findOrganizationId(projectId: string): Promise<string | undefined>;
 }
 
+/** The organization's own switch, narrowed to whether it was thrown. */
+export interface InstantEvalOptInReader {
+  isOptedIn(input: { organizationId: string }): Promise<boolean>;
+}
+
 export class InstantEvalAccessService {
   private readonly flags: InstantEvalFlagReader;
   private readonly projects: InstantEvalProjectReader;
   private readonly isJudgeConfigured: () => boolean;
   private readonly judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
+  private readonly optIns: InstantEvalOptInReader;
 
   private constructor(options: {
     flags: InstantEvalFlagReader;
     projects: InstantEvalProjectReader;
     isJudgeConfigured: () => boolean;
     judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
+    optIns: InstantEvalOptInReader;
   }) {
     this.flags = options.flags;
     this.projects = options.projects;
     this.isJudgeConfigured = options.isJudgeConfigured;
     this.judge = options.judge;
+    this.optIns = options.optIns;
   }
 
   static create({
@@ -45,6 +53,7 @@ export class InstantEvalAccessService {
     projects,
     isJudgeConfigured,
     judge = {},
+    optIns,
   }: {
     flags: InstantEvalFlagReader;
     projects: InstantEvalProjectReader;
@@ -52,8 +61,9 @@ export class InstantEvalAccessService {
     isJudgeConfigured: () => boolean;
     /** The judge, where it judges for some organizations and not others. */
     judge?: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
+    optIns: InstantEvalOptInReader;
   }): InstantEvalAccessService {
-    return new InstantEvalAccessService({ flags, projects, isJudgeConfigured, judge });
+    return new InstantEvalAccessService({ flags, projects, isJudgeConfigured, judge, optIns });
   }
 
   /**
@@ -64,6 +74,11 @@ export class InstantEvalAccessService {
   async isReleased({ projectId }: { projectId: string }): Promise<boolean> {
     const organizationId = await this.projects.findOrganizationId(projectId);
     return this.releasedFor({ projectId, organizationId });
+  }
+
+  /** The same decision, for a caller that already resolved the organization. */
+  isReleasedFor(input: { projectId: string; organizationId: string }): Promise<boolean> {
+    return this.releasedFor(input);
   }
 
   /** An organization the judge does not judge for sees the functions unavailable, not skipped. */
@@ -80,17 +95,24 @@ export class InstantEvalAccessService {
     return this.releasedFor({ projectId, organizationId });
   }
 
-  private releasedFor({
+  /**
+   * The flag is asked first: it is cached and answers for the operator, so an
+   * organization the operator released never pays for the row read.
+   */
+  private async releasedFor({
     projectId,
     organizationId,
   }: {
     projectId: string;
     organizationId: string | undefined;
   }): Promise<boolean> {
-    return this.flags.isEnabled(INSTANT_EVALS_FLAG, {
+    const released = await this.flags.isEnabled(INSTANT_EVALS_FLAG, {
       kind: "project",
       projectId,
       ...(organizationId === undefined ? {} : { organizationId }),
     });
+    if (released) return true;
+    if (organizationId === undefined) return false;
+    return this.optIns.isOptedIn({ organizationId });
   }
 }

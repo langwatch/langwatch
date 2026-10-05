@@ -127,7 +127,7 @@ import { ProjectApi, type PaginatedProjects, type Project } from "@langwatch/pro
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import { ShareApi } from "@langwatch/share-contract";
-import type { Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
@@ -723,6 +723,14 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     maxSessionDurationDays: number;
   }): Promise<void> {
     return this.#dependencies.organizations.saveSessionPolicy(input);
+  }
+
+  isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean> {
+    return this.#dependencies.organizations.isInstantEvalsOptedIn(input);
+  }
+
+  recordInstantEvalsOptIn(input: { organizationId: string; userId: string }): Promise<void> {
+    return this.#dependencies.organizations.recordInstantEvalsOptIn({ ...input, at: nowInstant() });
   }
 
   readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord> {

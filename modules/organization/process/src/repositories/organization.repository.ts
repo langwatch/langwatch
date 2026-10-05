@@ -105,6 +105,13 @@ export abstract class OrganizationRepository {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<void>;
+  abstract isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean>;
+  /** First write wins: a recorded consent is never overwritten. */
+  abstract recordInstantEvalsOptIn(input: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void>;
   abstract getOldestTeamId(organizationId: string): Promise<string>;
   abstract getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile>;
   abstract getWithAdministrators(organizationId: string): Promise<OrganizationWithAdministrators>;

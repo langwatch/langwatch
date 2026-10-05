@@ -1,5 +1,6 @@
 import {
   INSTANT_EVAL_EVENT_TYPES,
+  instantEvalAccessSchema,
   instantEvalEstimateSchema,
 } from "@langwatch/instant-eval-contract";
 /**
@@ -11,11 +12,20 @@ import { defineTrpcContract } from "@langwatch/module";
 
 import {
   explorerInstantEvalProgressSchema,
+  explorerInstantEvalProjectSchema,
   explorerInstantEvalRunIdSchema,
   explorerInstantEvalRunSchema,
 } from "./trace-instant-eval.schemas.ts";
 
 export const tracesInstantEvalTrpc = defineTrpcContract("traces.instantEval")
+  .query("access")
+  .withInput(explorerInstantEvalProjectSchema)
+  .withOutput(instantEvalAccessSchema)
+
+  .mutation("enable")
+  .withInput(explorerInstantEvalProjectSchema)
+  .withOutput(instantEvalAccessSchema)
+
   .mutation("estimate")
   .withInput(explorerInstantEvalRunSchema)
   .withOutput(instantEvalEstimateSchema)
