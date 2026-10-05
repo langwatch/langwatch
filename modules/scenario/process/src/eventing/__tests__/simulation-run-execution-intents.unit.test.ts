@@ -19,6 +19,7 @@ import {
   createCancelExecutionHandler,
   createExecuteRunHandler,
   createFinishRunHandler,
+  createRecordEvaluationsHandler,
 } from "../simulation-run-execution.intent.ts";
 
 const RUN_ID = "run-1";
@@ -254,5 +255,52 @@ describe("createFinishRunHandler", () => {
     expect(finishRun).toHaveBeenCalledWith(
       expect.not.objectContaining({ error: expect.anything() }),
     );
+  });
+});
+
+describe("createRecordEvaluationsHandler", () => {
+  describe("when a record evaluations intent for two evaluators, one required, is executed", () => {
+    /** @scenario "The lost-job results reach the run through the record evaluations command" */
+    it("hands the command one errored result per evaluator with its name and whether it is required", async () => {
+      const recordEvaluations = vi.fn().mockResolvedValue(undefined);
+      const run = createRecordEvaluationsHandler(
+        TestSimulationService.create({ recordEvaluations }),
+        async () => new Map([["eval-1", "Politeness"]]),
+      );
+
+      await run(
+        {
+          scenarioRunId: RUN_ID,
+          projectId: PROJECT_ID,
+          evaluators: [
+            { evaluatorId: "eval-1", required: true },
+            { evaluatorId: "eval-2", required: false },
+          ],
+          details: "The grading job was lost",
+        },
+        makeContext(),
+      );
+
+      expect(recordEvaluations).toHaveBeenCalledTimes(1);
+      expect(recordEvaluations).toHaveBeenCalledWith({
+        tenantId: PROJECT_ID,
+        scenarioRunId: RUN_ID,
+        evaluations: [
+          expect.objectContaining({
+            evaluatorId: "eval-1",
+            name: "Politeness",
+            required: true,
+            status: "error",
+          }),
+          expect.objectContaining({
+            evaluatorId: "eval-2",
+            name: "eval-2",
+            required: false,
+            status: "error",
+          }),
+        ],
+        occurredAt: expect.any(Number),
+      });
+    });
   });
 });

@@ -463,6 +463,32 @@ describe("the scenario-events REST declaration", () => {
       expect(messageSnapshot).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Event POST rejects bodies larger than 50MB with 413 before extraction" */
+    it("refuses a body declared over 50MB before extracting or dispatching anything", async () => {
+      const messageSnapshot = vi.fn();
+      const extractInlineMedia = vi.fn(async ({ event }: { event: unknown }) => ({
+        rewrittenEvent: event,
+        refs: [],
+      }));
+      const family = await buildEventFamily({
+        simulations: { messageSnapshot },
+        extractInlineMedia,
+      });
+
+      const response = await family.request("/api/scenario-events", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "content-length": String(50 * 1024 * 1024 + 1),
+        },
+        body: JSON.stringify(messageSnapshotEvent()),
+      });
+
+      expect(response.status).toBe(413);
+      expect(extractInlineMedia).not.toHaveBeenCalled();
+      expect(messageSnapshot).not.toHaveBeenCalled();
+    });
+
     /** @scenario "Ingest logs list every stored_objects id extracted for an event" */
     it("logs every externalised object id", async () => {
       logInfo.mockClear();
