@@ -85,6 +85,10 @@ export interface LangyWorkerPort {
      * change is a probe MISS and the worker re-warms rather than mirroring under
      * the tier it booted with. */
     mirrorTier?: string;
+    /** Flag-gated skill ids the turn hides from the model. Part of the worker
+     * signature, so a probe that left them out would report a hit for a worker
+     * the dispatch then replaces. */
+    disabledSkillIds?: string[];
   }): Promise<boolean>;
 
   /**
@@ -160,6 +164,7 @@ export function createLangyWorkerPort(config: {
       githubRepoScopeKey,
       egressAllowlist,
       mirrorTier,
+      disabledSkillIds,
     }) {
       try {
         // traceparent rides along (no span of its own — the probe is a single
@@ -185,6 +190,7 @@ export function createLangyWorkerPort(config: {
             ...(githubRepoScopeKey ? { githubRepoScopeKey } : {}),
             ...(egressAllowlist?.length ? { egressAllowlist } : {}),
             ...(mirrorTier ? { mirrorTier } : {}),
+            ...(disabledSkillIds?.length ? { disabledSkillIds } : {}),
           }),
           signal: AbortSignal.timeout(AGENT_PROBE_TIMEOUT_MS),
         });

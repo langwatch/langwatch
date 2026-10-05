@@ -83,10 +83,14 @@ export function commandOf(input: unknown): string | undefined {
  * else keeps its own name.
  */
 export function effectiveToolName(name: string, input: unknown): string {
-  const command = shellCommandOf(name, input);
+  // A stored `langwatch.*` name is re-read from its command, so a turn named
+  // before a parser fix (a `--help` stamped as a create) replays correctly.
+  const stored = name.startsWith("langwatch.");
+  const command = stored ? commandOf(input) : shellCommandOf(name, input);
   if (!command) return name;
   const parsed = parseLangwatchCommand(command);
-  return parsed ? `langwatch.${parsed.resource}.${parsed.verb}` : name;
+  if (parsed) return `langwatch.${parsed.resource}.${parsed.verb}`;
+  return stored ? "bash" : name;
 }
 
 export interface LangyToolLabel {

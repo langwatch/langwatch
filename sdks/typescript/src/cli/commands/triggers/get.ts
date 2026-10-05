@@ -1,15 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
-import { redactTriggerSecrets } from "./redact";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
+import {
+  summariseGraphAlert,
+  summariseReport,
+  summariseSlackConnection,
+  type TriggerRecord,
+} from "./summary";
+import { triggerRequest } from "./triggerRequest";
 
 /**
  * Returns the trigger rather than printing it: the output port renders it in
@@ -22,53 +23,49 @@ export const getTriggerCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = resolveControlPlaneUrl();
-
   const spinner = createSpinner(`Fetching trigger "${id}"...`).start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
-      headers: buildAuthHeaders({ apiKey }),
-    });
+    const response = await triggerRequest({ path: `/${encodeURIComponent(id)}` });
 
     if (!response.ok) {
       await failSpinnerFromResponse({ spinner, response, action: `fetch trigger "${id}"` });
       process.exit(1);
     }
 
-    const trigger = await response.json() as {
-      id: string;
-      name: string;
-      action: string;
-      actionParams: Record<string, unknown>;
-      filters: Record<string, unknown>;
-      active: boolean;
-      message: string | null;
-      alertType: string | null;
-      createdAt: string;
-      updatedAt: string;
-      platformUrl?: string;
-    };
+    const trigger: TriggerRecord = await response.json();
 
     spinner.succeed(`Found trigger "${trigger.name}"`);
 
     return {
-      // actionParams holds plaintext webhook URLs and delivery secrets that
-      // the human block never prints — see ./redact.ts.
-      data: redactTriggerSecrets(trigger),
+      // `actionParams` arrives with its delivery credentials already redacted,
+      // so machine output is the response exactly as the API answered it.
+      data: trigger,
       table: () => {
         console.log();
         console.log(chalk.bold("  Trigger Details:"));
         console.log(`    ${chalk.gray("ID:")}      ${chalk.green(trigger.id)}`);
         console.log(`    ${chalk.gray("Name:")}    ${chalk.cyan(trigger.name)}`);
         console.log(`    ${chalk.gray("Action:")}  ${trigger.action}`);
+        if (trigger.kind) console.log(`    ${chalk.gray("Kind:")}    ${trigger.kind}`);
+        const slack = summariseSlackConnection({ actionParams: trigger.actionParams });
+        if (slack) console.log(`    ${chalk.gray("Slack:")}   ${slack}`);
         console.log(`    ${chalk.gray("Status:")}  ${trigger.active ? chalk.green("active") : chalk.gray("inactive")}`);
         console.log(`    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`);
         console.log(`    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`);
         console.log(`    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`);
         if (trigger.platformUrl) {
           console.log(`    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`);
+        }
+        const alert = summariseGraphAlert({
+          graphAlert: trigger.graphAlert,
+          customGraphId: trigger.customGraphId,
+        });
+        if (alert) console.log(`    ${chalk.gray("Fires when:")} ${alert}`);
+        const report = summariseReport({ report: trigger.report });
+        if (report) console.log(`    ${chalk.gray("Report:")}  ${report}`);
+        if (trigger.filterQuery) {
+          console.log(`    ${chalk.gray("Query:")}   ${trigger.filterQuery}`);
         }
 
         if (Object.keys(trigger.filters).length > 0) {

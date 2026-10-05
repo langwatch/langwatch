@@ -42,8 +42,11 @@ counted.
 | **Admin** | Every permission on every team and project in the organization, plus the organization settings: members, teams, roles, groups, billing, the audit log, AI Governance, webhook endpoints and spend data |
 | **Member** | `organization:view` and `aiTools:view`. Access to a team or a project comes from a binding on that team or that project |
 | **Lite Member** | `organization:view` and `aiTools:view`. On a team or a project a Lite Member is capped at the Viewer permissions below, plus `annotations:create` and `annotations:update`, and never sees costs, the AI Gateway pages or the audit log |
+| **Developer** | `organization:view` and `aiTools:view`. Full permissions on their own personal project, and no permission on any shared team or project. An organization-scoped binding or a group binding grants a Developer no permission |
 
 A Lite Member uses a Lite seat, which is counted separately from full seats. In the settings pages a Lite Member can only be given the Viewer role on a team or a project. A group binding above Viewer applies as Viewer for a Lite Member.
+
+A Developer uses a Developer seat, which is counted but never limited. A Developer cannot be given a binding on a shared team, a shared project or the organization; the request is refused naming the seat. Moving a member onto the seat deletes those bindings. The API accepts `DEVELOPER` wherever it accepts an organization role.
 
 **Also check:** [Members and Teams](/platform/members-and-teams) for seats, invites and how to change a member's role.
 

@@ -363,13 +363,7 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/sessions/sessions-inventory.feature",
   "specs/analytics/posthog-cost-control.feature",
   "specs/automations/dispatch-timing.feature",
-  "specs/automations/notification-templates.feature",
-  // ADR-093's design contract, every scenario @unimplemented on purpose: the
-  // ADR ships ahead of the implementation, and the reference PR (R0) binds
-  // these as it lands. Remove this entry with the first binding.
-  "specs/automations/source-merge.feature",
   "specs/automations/spam-prevention.feature",
-  "specs/automations/webhook-http-action.feature",
   "specs/batch-evaluation-results/experiment-cost-folding.feature",
   "specs/batch-evaluation-results/run-comparison.feature",
   "specs/batch-evaluation-results/target-metadata-api.feature",
@@ -472,7 +466,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-worker-isolation.feature",
   "specs/licensing/dual-pricing-model.feature",
   "specs/licensing/enforcement-hono-api.feature",
-  "specs/licensing/license-activation-ui.feature",
   "specs/licensing/license-lifecycle-e2e.feature",
   "specs/licensing/license-page-styling.feature",
   "specs/licensing/license-status-ui.feature",
@@ -511,7 +504,6 @@ const LEGACY_INERT: string[] = [
   "specs/nlp-go/proxy.feature",
   "specs/nlp-go/python-removal.feature",
   "specs/nlp-go/remove-execute-evaluation.feature",
-  "specs/nlp-go/telemetry.feature",
   "specs/nlp-go/topic-clustering.feature",
   "specs/nlp-go/tracing-parity.feature",
   "specs/npx-installer/01-bootstrap.feature",
@@ -599,7 +591,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/light-mode-contrast.feature",
   "specs/traces-v2/live-tail.feature",
   "specs/traces-v2/metadata-facet.feature",
-  "specs/traces-v2/metrics.feature",
   "specs/traces-v2/model-chip-interactive-card.feature",
   "specs/traces-v2/multiplayer-presence.feature",
   "specs/traces-v2/prompt-facets.feature",
@@ -664,6 +655,10 @@ const LEGACY_INERT: string[] = [
  *   - Every entry must still be partially tagged.
  */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when sub-cent costs stopped reading as zero;
+  // the "Cost formatting" rule is enforced. The pills, duration, token and
+  // span tab rules are described here and stay untagged.
+  "specs/traces-v2/metrics.feature",
   // Reason: left LEGACY_INERT when the CLI gained the traces.count alias
   // and the unknown-metric refusal, which its three new scenarios enforce.
   // The six older scenarios describe the query presets and stay untagged.
@@ -736,6 +731,10 @@ const LEGACY_PARTIAL: string[] = [
   // assertion, so tagging them would misstate what covers them.
   "specs/auth/auth-signin-flows.feature",
   "specs/automations/authoring-drawer.feature",
+  // Reason: left LEGACY_INERT when its two default-layout scenarios (trace
+  // excerpts, the default Slack message) gained bindings; the other
+  // nineteen Liquid-template scenarios stay untagged.
+  "specs/automations/notification-templates.feature",
   "specs/automations/process-manager-dispatch.feature",
   "specs/ci/path-filters.feature",
   // Reason: reached this branch from main already partially tagged, and its

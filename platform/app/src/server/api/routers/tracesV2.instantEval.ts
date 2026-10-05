@@ -15,15 +15,25 @@
  * @see ../../../../../specs/traces-v2/instant-eval-search.feature
  */
 
+import { auditLog } from "@ee/audit-log/auditLog";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getUserProtectionsForProject } from "~/server/api/utils";
+import {
+  instantEvalsReleased,
+  organizationOfProject,
+} from "~/server/app-layer/instant-evals/access";
+import {
+  instantEvalOptInOffer,
+  switchInstantEvalsOn,
+} from "~/server/app-layer/instant-evals/opt-in";
 import {
   getInstantEvalRunService,
   type InstantEvalRunInput,
   toInstantEvalExplorerRun,
 } from "~/server/app-layer/instant-evals/run";
 import { INSTANT_EVAL_TARGETS } from "~/server/app-layer/instant-evals/shorthand";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
 import { queryWithoutInstantEvalChips } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { combineQueries } from "~/server/app-layer/traces/query-language/mutations";
@@ -119,7 +129,113 @@ const runIdSchema = z.object({
   runId: z.string().min(1).max(200),
 });
 
+const projectScopeSchema = z.object({ projectId: z.string() });
+
+/**
+ * The action the switch's audit row is filed under: its own procedure path,
+ * which `auditLogExemptions.ts` also names so the generic middleware stands
+ * down and the row is written once.
+ */
+const INSTANT_EVALS_ENABLE_AUDIT_ACTION = "tracesV2.instantEval.enable";
+
 export const tracesV2InstantEvalRouter = createTRPCRouter({
+  /**
+   * Whether the project may be offered a judgement, and what the popover
+   * offers when it may not: the organization's own switch, a word with an
+   * organization admin for a member who may not throw it, or a word with us.
+   *
+   * The organization is the project's, resolved here and never taken from the
+   * input: the permission check covers the project only, and an organization
+   * id in the input would let a member of one organization read, or throw,
+   * another organization's switch.
+   */
+  access: protectedProcedure
+    .input(projectScopeSchema)
+    .permission("analytics:view")
+    .query(async ({ input, ctx }) => {
+      const organizationId = await organizationOfProject({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+      });
+      const [released, offer] = await Promise.all([
+        instantEvalsReleased({
+          prisma: ctx.prisma,
+          projectId: input.projectId,
+          organizationId,
+        }),
+        instantEvalOptInOffer({
+          organizationId,
+          user: ctx.session.user,
+          // The same authority `enable` declares below, so a member the
+          // mutation would refuse is offered a word with their admin instead
+          // of a button.
+          maySwitch: () =>
+            probeOrganizationPermission(
+              ctx,
+              organizationId,
+              "organization:manage",
+            ),
+        }),
+      ]);
+      return { released, offer };
+    }),
+
+  /**
+   * The organization's switch. It consents to every project's trace text
+   * leaving for the judge, so it takes the organization tier, derived from
+   * the project the popover was opened in, not the project-level spend
+   * permission the estimate takes. Refused for an organization the popover
+   * offers "Contact us" to, so an enterprise organization is never switched
+   * on by a request the popover did not make.
+   */
+  enable: protectedProcedure
+    .input(projectScopeSchema)
+    .permission("organization:manage", { via: "projectId" })
+    .mutation(async ({ input, ctx }) => {
+      let organizationId: string | undefined;
+      const impersonatorId = ctx.session.user.impersonator?.id;
+      // Audited here rather than by the generic middleware, which records
+      // only the ids the input names: the input names the project, and this
+      // switch is the organization's consent, so its row must name the
+      // organization. Refused-on-permission calls never reach this handler;
+      // the permission check records those itself.
+      const record = (error?: Error) =>
+        auditLog({
+          userId: ctx.session.user.id,
+          actorUserId: impersonatorId ?? null,
+          organizationId,
+          projectId: input.projectId,
+          action: INSTANT_EVALS_ENABLE_AUDIT_ACTION,
+          args: { projectId: input.projectId },
+          error,
+          req: ctx.req,
+          ...(organizationId
+            ? { targetKind: "organization", targetId: organizationId }
+            : {}),
+          metadata: impersonatorId ? { impersonatorId } : undefined,
+        });
+      let result: Awaited<ReturnType<typeof switchInstantEvalsOn>>;
+      try {
+        organizationId = await organizationOfProject({
+          prisma: ctx.prisma,
+          projectId: input.projectId,
+        });
+        result = await switchInstantEvalsOn({
+          prisma: ctx.prisma,
+          organizationId,
+          userId: ctx.session.user.id,
+          user: ctx.session.user,
+        });
+      } catch (error) {
+        await record(error instanceof Error ? error : new Error(String(error)));
+        throw error;
+      }
+      // Outside the try, so a failed write of this row is never recorded
+      // as a failed switch: the switch is already on by then.
+      await record();
+      return result;
+    }),
+
   estimate: protectedProcedure
     .input(explorerInstantEvalRunSchema)
     .permission("analytics:manage")

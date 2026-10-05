@@ -18,6 +18,7 @@ import {
 } from "~/generated/prisma/client";
 import { authzChecksFor } from "~/server/app-layer/authz/checks";
 import {
+  DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   MembershipDisabledError,
   ProjectPermissionDeniedError,
@@ -60,6 +61,36 @@ function membershipDisabledDenial(): TRPCError {
   });
 }
 
+/**
+ * The denial a capped seat gets instead of the generic one: a Lite Member is
+ * told the feature is not for their account, a Developer that it is outside
+ * their seat (ADR-143). Any other seat falls through to the caller's own
+ * denial.
+ */
+function throwIfSeatRestricted({
+  organizationRole,
+  permission,
+}: {
+  organizationRole: OrganizationUserRole | null | undefined;
+  permission: Permission;
+}): void {
+  const resource = permission.split(":")[0] ?? "unknown";
+  if (organizationRole === OrganizationUserRole.EXTERNAL) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "This feature is not available for your account",
+      cause: new LiteMemberRestrictedError(resource),
+    });
+  }
+  if (organizationRole === OrganizationUserRole.DEVELOPER) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "This is outside your Developer seat",
+      cause: new DeveloperSeatRestrictedError(resource),
+    });
+  }
+}
+
 /** Supports data-dependent middleware composition; fixed scopes use .permission(). */
 export const checkProjectPermission =
   (permission: Permission) =>
@@ -75,15 +106,7 @@ export const checkProjectPermission =
       if (denialReason === "membership-disabled") {
         throw membershipDisabledDenial();
       }
-      if (organizationRole === OrganizationUserRole.EXTERNAL) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "This feature is not available for your account",
-          cause: new LiteMemberRestrictedError(
-            permission.split(":")[0] ?? "unknown",
-          ),
-        });
-      }
+      throwIfSeatRestricted({ organizationRole, permission });
       // The boundary maps the handled cause to its HTTP status and customer code.
       throw new TRPCError({
         code: "UNAUTHORIZED",
@@ -112,15 +135,7 @@ export const checkTeamPermission =
       if (denialReason === "membership-disabled") {
         throw membershipDisabledDenial();
       }
-      if (organizationRole === OrganizationUserRole.EXTERNAL) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "This feature is not available for your account",
-          cause: new LiteMemberRestrictedError(
-            permission.split(":")[0] ?? "unknown",
-          ),
-        });
-      }
+      throwIfSeatRestricted({ organizationRole, permission });
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "You do not have permission to access this team resource",

@@ -107,7 +107,7 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/dataset-rest-api.feature | "Get dataset returns 404 for non-existent slug" | KEEP | 404 handler; test "returns 404 Not Found" exists |
 | specs/features/dataset-rest-api.feature | "Get dataset enforces 25MB response size limit" | KEEP | MAX_RESPONSE_SIZE check in app.ts; test "returns 400 Bad Request" exists for size limit |
 | specs/features/dataset-rest-api.feature | "Update a dataset name and column types" | KEEP | PATCH /api/dataset/:slugOrId implemented; test "updates the dataset and changes the slug" exists |
-| specs/features/dataset-rest-api.feature | "Update a dataset name regenerates the slug" | KEEP | Slug regeneration on rename; test "regenerates the slug" exists |
+| specs/features/dataset-rest-api.feature | "Renaming a dataset keeps its slug" | KEEP | Slug is stable on rename; test "keeps the slug" exists |
 | specs/features/dataset-rest-api.feature | "Update a dataset fails when new slug conflicts" | KEEP | Conflict handling; test "returns 409 Conflict" exists for slug conflict |
 | specs/features/dataset-rest-api.feature | "Update a non-existent dataset returns 404" | KEEP | 404 handler; test "returns 404 Not Found" exists for PATCH |
 | specs/features/dataset-rest-api.feature | "Update dataset does not enforce plan limits" | KEEP | No middleware on PATCH; test "updates the dataset successfully (no plan limit on PATCH)" exists |

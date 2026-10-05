@@ -20,7 +20,7 @@ import { findUserIdByEmail } from "./db";
 import { closeRedis, findPasswordResetToken } from "./redis";
 import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";
 import {
-  betterAuthRequestHeaders,
+  originGatedRequestHeaders,
   FRONT_DOOR_PASSWORD,
   generateFrontDoorEmail,
   givenARegisteredAccount,
@@ -42,7 +42,7 @@ async function requestResetToken(
     throw new Error(`No account in Postgres for ${email} to request a reset for`);
   }
   const response = await page.request.post("/api/auth/request-password-reset", {
-    headers: betterAuthRequestHeaders(),
+    headers: originGatedRequestHeaders(),
     data: { email, redirectTo: "/auth/reset-password" },
   });
   if (!response.ok()) {
@@ -149,12 +149,12 @@ test.describe("Password reset completion", () => {
       // against, whichever door leads to it.
       await whenISignOut(page);
       const withOld = await page.request.post("/api/auth/sign-in/email", {
-        headers: betterAuthRequestHeaders(),
+        headers: originGatedRequestHeaders(),
         data: { email, password: oldPassword },
       });
       expect(withOld.ok(), "the old password is refused").toBe(false);
       const withNew = await page.request.post("/api/auth/sign-in/email", {
-        headers: betterAuthRequestHeaders(),
+        headers: originGatedRequestHeaders(),
         data: { email, password: newPassword },
       });
       expect(

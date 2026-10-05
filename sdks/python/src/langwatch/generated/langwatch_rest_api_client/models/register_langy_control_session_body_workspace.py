@@ -17,6 +17,7 @@ class RegisterLangyControlSessionBodyWorkspace:
         root (str):
         name (str):
         os (str):
+        git_repository (bool | Unset):
         git_branch (str | Unset):
         git_remote (str | Unset):
         git_dirty (bool | Unset):
@@ -29,6 +30,7 @@ class RegisterLangyControlSessionBodyWorkspace:
     root: str
     name: str
     os: str
+    git_repository: bool | Unset = UNSET
     git_branch: str | Unset = UNSET
     git_remote: str | Unset = UNSET
     git_dirty: bool | Unset = UNSET
@@ -43,6 +45,8 @@ class RegisterLangyControlSessionBodyWorkspace:
         name = self.name
 
         os = self.os
+
+        git_repository = self.git_repository
 
         git_branch = self.git_branch
 
@@ -67,6 +71,8 @@ class RegisterLangyControlSessionBodyWorkspace:
                 "os": os,
             }
         )
+        if git_repository is not UNSET:
+            field_dict["gitRepository"] = git_repository
         if git_branch is not UNSET:
             field_dict["gitBranch"] = git_branch
         if git_remote is not UNSET:
@@ -93,6 +99,8 @@ class RegisterLangyControlSessionBodyWorkspace:
 
         os = d.pop("os")
 
+        git_repository = d.pop("gitRepository", UNSET)
+
         git_branch = d.pop("gitBranch", UNSET)
 
         git_remote = d.pop("gitRemote", UNSET)
@@ -111,6 +119,7 @@ class RegisterLangyControlSessionBodyWorkspace:
             root=root,
             name=name,
             os=os,
+            git_repository=git_repository,
             git_branch=git_branch,
             git_remote=git_remote,
             git_dirty=git_dirty,

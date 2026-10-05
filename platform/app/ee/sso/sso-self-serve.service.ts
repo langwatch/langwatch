@@ -10,6 +10,7 @@ import {
   SSO_DNS_PROOF_TTL_MS,
   SSO_DNS_RECORD_NAME,
   SSO_DNS_RECORD_TYPE,
+  SSO_IDP_EDITABLE_STATES,
   SSO_VERIFICATION_FILE_PATH,
   SsoActivationArrivalsUndecidedError,
   SsoActivationBreakGlassMissingError,
@@ -17,14 +18,18 @@ import {
   SsoActivationTestSignInMissingError,
   type SsoArrivalPolicy,
   SsoConnectionAlreadyRegisteredError,
+  SsoConnectionDomainTakenError,
+  SsoConnectionInvalidTransitionError,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
+  SsoCredentialsRequiredError,
   type SsoDomainClaim,
   SsoDomainClaimPendingError,
   SsoDomainFetchFailedError,
   SsoDomainFileNotFoundError,
   SsoDomainLookupFailedError,
   SsoDomainProofNotFoundError,
+  type SsoIdpDialing,
   SsoLicenseRequiredError,
   type SsoMigrationRoute,
   type SsoSelfServeAvailability,
@@ -41,6 +46,7 @@ import {
   safeEqual,
   sha256Hex,
 } from "@langwatch/identity-server";
+import { deploymentSignInFor } from "./deployment-sign-in";
 import type { SsoConnectionReadRepository } from "./sso-connection.repository";
 import type { SsoConnectionService } from "./sso-connection.service";
 import type { LegacySsoOrganizationRepository } from "./sso-connection-grandfather.service";
@@ -51,10 +57,15 @@ import {
   selfServeRegistrationCommandId,
   selfServeRegistrationConnectionId,
 } from "./sso-connection-id";
-import type { SsoCredentialStore } from "./sso-credential-store";
+import type {
+  SsoCredentialKind,
+  SsoCredentialStore,
+} from "./sso-credential-store";
 import { serviceProviderDetailsFor } from "./sso-engine-provider";
 import {
+  parseSamlIdpConfig,
   type SsoIdpRegistration,
+  type SsoIdpUpdate,
   type SsoIssuerDiscoveryPort,
   validateOidcRegistration,
   validateSamlRegistration,
@@ -65,6 +76,7 @@ import type {
   SelfServeDnsRecordLocation,
   SelfServeDomainClaimView,
   SelfServeGoLiveView,
+  SelfServeIdentityProviderView,
   SelfServeIssuedDnsRecord,
   SelfServeMigrationView,
   SelfServeSetupView,
@@ -76,7 +88,10 @@ const ACTIVATABLE_STATES: readonly string[] = ["VERIFIED"];
 
 /**
  * Self-serve commands pass through the aggregate's guarded lifecycle.
- * Every deployment requires published domain proof; only operators attest domains.
+ * The hosted service, and an organization administrator on a self-hosted
+ * installation with several organizations, prove a domain by publishing a
+ * record or file. Elsewhere on a self-hosted installation the licence is the
+ * proof. Only operators attest domains.
  */
 
 /**
@@ -87,7 +102,13 @@ const ACTIVATABLE_STATES: readonly string[] = ["VERIFIED"];
  * captured together.
  */
 export interface SsoSelfServeContextPort {
-  resolve(args: { organizationId: string }): Promise<SsoSelfServeContext>;
+  /** `actorId` is who is asking, or null when no one in particular is: on an
+   *  installation with several organizations, a platform operator is offered
+   *  a proof an organization administrator is not. */
+  resolve(args: {
+    organizationId: string;
+    actorId: string | null;
+  }): Promise<SsoSelfServeContext>;
 }
 
 /**
@@ -203,6 +224,9 @@ export interface SsoTestSignInLookup {
   findLatestForConnection(args: {
     organizationId: string;
     connectionId: string;
+    /** The connection's current issuer. A sign-in through an issuer the
+     *  connection no longer dials is not evidence for the one it dials now. */
+    issuer: string | null;
   }): Promise<SsoTestSignIn | null>;
 }
 
@@ -276,6 +300,9 @@ export interface SsoSelfServeServiceDeps {
   discovery: SsoIssuerDiscoveryPort;
   /** Whether anybody has actually come back through the connection. */
   testSignIns: SsoTestSignInLookup;
+  /** The installation's licence key, hashed into the proof when the licence
+   *  is what verifies a domain. */
+  licenseProof: SsoLicenseProofPort;
   /** The ways back in, read-only. */
   breakGlass: SsoBreakGlassReadPort;
   /** Who they can be granted to, and who holds the ones that exist. */
@@ -285,6 +312,9 @@ export interface SsoSelfServeServiceDeps {
   /** The deployment's own address, which is what LangWatch is called to an
    *  identity provider. */
   baseUrl: string;
+  /** The provider the deployment configures for itself
+   *  (`NEXTAUTH_PROVIDER`), so the page can name its redirect address too. */
+  deploymentProvider?: () => Promise<string>;
   now?: () => number;
 }
 
@@ -304,26 +334,39 @@ export class SsoSelfServeService {
    */
   async getSetup({
     organizationId,
+    viewerId = null,
   }: {
     organizationId: string;
+    /** Who is looking, so the proof offered is the one they may use. */
+    viewerId?: string | null;
   }): Promise<SelfServeSetupView> {
     const availability = ssoSelfServeAvailability(
-      await this.deps.context.resolve({ organizationId }),
+      await this.deps.context.resolve({ organizationId, actorId: viewerId }),
     );
     const { migration, state, legacy } = await this.setupState({
       organizationId,
     });
     const nowMs = this.now();
+    const deploymentSignIn = deploymentSignInFor({
+      provider: await this.deps.deploymentProvider?.(),
+      baseUrl: this.deps.baseUrl,
+    });
     return {
       availability,
-      serviceProvider: serviceProviderDetailsFor({
-        baseUrl: this.deps.baseUrl,
-        connectionId: state?.connectionId ?? null,
-      }),
-      serviceProviderBeforeRegistration: serviceProviderDetailsFor({
-        baseUrl: this.deps.baseUrl,
-        connectionId: null,
-      }),
+      serviceProvider: {
+        ...serviceProviderDetailsFor({
+          baseUrl: this.deps.baseUrl,
+          connectionId: state?.connectionId ?? null,
+        }),
+        deploymentSignIn,
+      },
+      serviceProviderBeforeRegistration: {
+        ...serviceProviderDetailsFor({
+          baseUrl: this.deps.baseUrl,
+          connectionId: null,
+        }),
+        deploymentSignIn,
+      },
       connection: toConnectionView(state),
       legacyRoute: legacy
         ? { domain: legacy.ssoDomain, provider: legacy.ssoProvider }
@@ -421,6 +464,7 @@ export class SsoSelfServeService {
       this.deps.testSignIns.findLatestForConnection({
         organizationId,
         connectionId: connection.connectionId,
+        issuer: connection.idpMetadata.issuer,
       }),
       this.liveBindings({ organizationId }),
     ]);
@@ -485,6 +529,7 @@ export class SsoSelfServeService {
     const testSignIn = await this.deps.testSignIns.findLatestForConnection({
       organizationId,
       connectionId,
+      issuer: state.idpMetadata.issuer,
     });
     if (testSignIn === null) {
       throw new SsoActivationTestSignInMissingError(
@@ -557,6 +602,205 @@ export class SsoSelfServeService {
     await this.deps.connections().renameConnection({
       ...this.command({ organizationId, connectionId, actor }),
       name,
+    });
+  }
+
+  /**
+   * The connection's current identity provider settings, for the edit form.
+   * Null for a connection with none of its own (a grandfathered one dials
+   * the deployment's legacy provider).
+   */
+  async getIdentityProvider({
+    organizationId,
+    connectionId,
+  }: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<SelfServeIdentityProviderView | null> {
+    const state = await this.requireOrganizationConnection({
+      organizationId,
+      connectionId,
+    });
+    if (state.source !== "self-serve") return null;
+    const { idpMetadata } = state;
+    if (state.type === "oidc") {
+      return {
+        protocol: "oidc",
+        issuer: idpMetadata.issuer,
+        clientId:
+          idpMetadata.clientIdRef === null
+            ? null
+            : await this.deps.credentials.read({
+                organizationId,
+                ref: idpMetadata.clientIdRef,
+              }),
+        hasClientSecret: idpMetadata.secretRef !== null,
+      };
+    }
+    const [certRef] = idpMetadata.certRefs;
+    const stored =
+      certRef === undefined
+        ? null
+        : await this.deps.credentials.read({ organizationId, ref: certRef });
+    const config = stored === null ? null : parseSamlIdpConfig(stored);
+    return {
+      protocol: "saml",
+      entryPoint: config?.entryPoint ?? null,
+      entityId: config?.entityId ?? idpMetadata.issuer,
+      metadataXml: config?.metadataXml ?? null,
+      certificate: config?.certificate ?? null,
+    };
+  }
+
+  /**
+   * Replace an existing connection's identity provider settings, keeping
+   * the connection id.
+   *
+   * The id is what the redirect address at the identity provider is keyed
+   * by (`/api/auth/sso/callback/<connection id>`), so fixing a wrong issuer
+   * this way leaves that address, the domains and their proofs, the arrival
+   * policy and every linked account where they are. Discarding and
+   * registering again would mint a new id and a new address.
+   *
+   * Checked exactly as a registration is, before anything is stored: a
+   * refused issuer (unreachable, mismatched, multi-tenant) or unreadable
+   * metadata changes nothing. A value that matches the stored one keeps its
+   * reference, so saving the form unchanged records nothing.
+   */
+  async updateIdentityProvider({
+    organizationId,
+    connectionId,
+    idp,
+    actor,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    idp: SsoIdpUpdate;
+    actor: SelfServeActor;
+  }): Promise<void> {
+    await this.requireAvailable({ organizationId });
+    const state = await this.requireOrganizationConnection({
+      organizationId,
+      connectionId,
+    });
+    if (idp.protocol !== state.type) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${connectionId} speaks ${state.type}; the protocol cannot change on an existing connection`,
+      );
+    }
+    // Refused here as well as by the aggregate, so a refused edit stores no
+    // credential records.
+    if (
+      state.source !== "self-serve" ||
+      !SSO_IDP_EDITABLE_STATES.includes(state.state)
+    ) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${connectionId} is ${state.source} in ${state.state}; its identity provider settings cannot be replaced`,
+      );
+    }
+    const dialing = await this.prepareIdpUpdate({ state, idp });
+    await this.deps.connections().updateConnectionIdp({
+      ...this.command({ organizationId, connectionId, actor }),
+      idp: dialing,
+    });
+  }
+
+  private async prepareIdpUpdate({
+    state,
+    idp,
+  }: {
+    state: SsoConnectionState;
+    idp: SsoIdpUpdate;
+  }): Promise<SsoIdpDialing> {
+    return idp.protocol === "oidc"
+      ? this.prepareOidcUpdate({ state, idp })
+      : this.prepareSamlUpdate({ state, idp });
+  }
+
+  private async prepareOidcUpdate({
+    state,
+    idp,
+  }: {
+    state: SsoConnectionState;
+    idp: Extract<SsoIdpUpdate, { protocol: "oidc" }>;
+  }): Promise<SsoIdpDialing> {
+    const current = state.idpMetadata;
+    const clientSecret = blankToNull(idp.clientSecret);
+    if (clientSecret === null && current.secretRef === null) {
+      throw new SsoCredentialsRequiredError(
+        "an openid connect connection needs a client secret",
+      );
+    }
+    const { issuer } = await validateOidcRegistration({
+      // A blank secret keeps the stored one, which satisfies the presence
+      // check the registration makes.
+      registration: { ...idp, clientSecret: clientSecret ?? "stored" },
+      discovery: this.deps.discovery,
+    });
+    const [clientIdRef, secretRef] = await Promise.all([
+      this.keptOrStoredCredential({
+        state,
+        ref: current.clientIdRef,
+        kind: "oidc-client-id",
+        value: idp.clientId,
+      }),
+      clientSecret === null
+        ? current.secretRef
+        : this.keptOrStoredCredential({
+            state,
+            ref: current.secretRef,
+            kind: "oidc-client-secret",
+            value: clientSecret,
+          }),
+    ]);
+    return { issuer, clientIdRef, secretRef, certRefs: [] };
+  }
+
+  private async prepareSamlUpdate({
+    state,
+    idp,
+  }: {
+    state: SsoConnectionState;
+    idp: Extract<SsoIdpUpdate, { protocol: "saml" }>;
+  }): Promise<SsoIdpDialing> {
+    const config = validateSamlRegistration(idp);
+    const certRef = await this.keptOrStoredCredential({
+      state,
+      ref: state.idpMetadata.certRefs[0] ?? null,
+      kind: "saml-idp-config",
+      value: JSON.stringify(config),
+    });
+    return {
+      issuer: config.entityId,
+      clientIdRef: null,
+      secretRef: null,
+      certRefs: [certRef],
+    };
+  }
+
+  /** The stored reference when it already holds this value, otherwise a new
+   *  one. A changed value always gets a new reference, so the log records
+   *  when a credential changed. */
+  private async keptOrStoredCredential({
+    state: { organizationId, connectionId },
+    ref,
+    kind,
+    value,
+  }: {
+    state: SsoConnectionState;
+    ref: string | null;
+    kind: SsoCredentialKind;
+    value: string;
+  }): Promise<string> {
+    if (ref !== null) {
+      const stored = await this.deps.credentials.read({ organizationId, ref });
+      if (stored === value) return ref;
+    }
+    return this.deps.credentials.put({
+      organizationId,
+      connectionId,
+      kind,
+      value,
     });
   }
 
@@ -908,7 +1152,7 @@ export class SsoSelfServeService {
     const credentials = this.deps.credentials;
 
     if (idp.protocol === "oidc") {
-      await validateOidcRegistration({
+      const { issuer } = await validateOidcRegistration({
         registration: idp,
         discovery: this.deps.discovery,
       });
@@ -929,7 +1173,7 @@ export class SsoSelfServeService {
       return {
         type: "oidc",
         idp: {
-          issuer: idp.issuer,
+          issuer,
           providerId,
           clientIdRef,
           secretRef,
@@ -960,7 +1204,12 @@ export class SsoSelfServeService {
     } as const;
   }
 
-  /** Records a claim; only published proof can verify it. */
+  /**
+   * Records a claim. Where the installation's licence is the proof (a
+   * self-hosted installation with one organization, or a platform operator
+   * on one with several), the claim is approved and verified in the same
+   * request. Everywhere else it waits for a published proof.
+   */
   async claimDomain({
     organizationId,
     connectionId,
@@ -971,27 +1220,97 @@ export class SsoSelfServeService {
     connectionId: string;
     domain: string;
     actor: SelfServeActor;
-  }): Promise<{ waitsForReview: boolean; disputed: boolean }> {
-    await this.requireAvailable({ organizationId });
+  }): Promise<{
+    waitsForReview: boolean;
+    disputed: boolean;
+    verified: boolean;
+  }> {
+    const availability = await this.requireAvailable({
+      organizationId,
+      actorId: actor.userId,
+    });
     // Keep the surface's tenant refusal consistent; the aggregate also enforces it.
     await this.requireOrganizationConnection({ organizationId, connectionId });
+    const provesWithLicense = availability.proof === "license-token";
+    // One organization per domain on an installation. With the licence as
+    // the proof there is no reviewer to hand a dispute to, so a domain another
+    // organization holds is refused before anything is recorded.
+    if (
+      provesWithLicense &&
+      (await this.isDisputed({ organizationId, domain }))
+    ) {
+      throw new SsoConnectionDomainTakenError(
+        `connection ${connectionId}: ${normalizeDomain(domain)} is already held by another organization on this installation`,
+      );
+    }
     await this.deps.connections().claimDomain({
       ...this.command({ organizationId, connectionId, actor }),
       domain,
     });
+    if (provesWithLicense) {
+      await this.proveWithLicense({
+        organizationId,
+        connectionId,
+        domain,
+        actor,
+      });
+      return { waitsForReview: false, disputed: false, verified: true };
+    }
     const disputed = await this.isDisputed({ organizationId, domain });
-    return { waitsForReview: disputed, disputed };
+    return { waitsForReview: disputed, disputed, verified: false };
+  }
+
+  /**
+   * Verify the domain with the installation's licence as the proof. The
+   * licence decides a waiting claim in the same commit, the way a published
+   * record does, so the history reads the same on every tier. A ceremony
+   * already asked for is not asked again, so a request that stopped part
+   * way finishes on the next press. The guards decide whether the licence
+   * may speak here at all.
+   */
+  private async proveWithLicense({
+    organizationId,
+    connectionId,
+    domain,
+    actor,
+  }: DomainProofCommand): Promise<void> {
+    const normalized = normalizeDomain(domain);
+    const connections = this.deps.connections();
+    const state = await this.requireOrganizationConnection({
+      organizationId,
+      connectionId,
+    });
+    if (state.verifiedDomains.includes(normalized)) return;
+    const pending = state.pendingVerification;
+    if (pending?.domain !== normalized || pending.method !== "license-token") {
+      const licenseKey = await this.deps.licenseProof.currentLicenseKey();
+      if (!licenseKey) {
+        throw new SsoLicenseRequiredError(
+          `organization ${organizationId}: the installation holds no genuine license`,
+        );
+      }
+      await connections.requestVerification({
+        ...this.command({ organizationId, connectionId, actor }),
+        domain: normalized,
+        method: "license-token",
+        tokenHash: `sha256:${sha256Hex(licenseKey)}`,
+        expiresAtMs: null,
+      });
+    }
+    await connections.verifyDomain({
+      ...this.command({ organizationId, connectionId, actor }),
+      domain: normalized,
+    });
   }
 
   /**
    * Ask to prove a domain.
    *
-   * A licence makes the feature available; it is not evidence that the
-   * organization controls a domain. Every self-serve installation therefore
-   * issues the same record to publish,
-   * and returns its value ONCE — the fact carries only the hash, so a
-   * customer who loses the value asks for a fresh record rather than reading
-   * an old one back out of us.
+   * Where the licence is the proof, this finishes the verification and
+   * answers `proved`. Everywhere else it issues the record to publish and
+   * returns its value ONCE. The fact carries only the hash, so a customer
+   * who loses the value asks for a fresh record rather than reading an old
+   * one back out of us.
    */
   async proveDomain({
     organizationId,
@@ -1006,8 +1325,20 @@ export class SsoSelfServeService {
   }): Promise<
     { proved: true } | { proved: false; record: SelfServeIssuedDnsRecord }
   > {
-    await this.requireAvailable({ organizationId });
+    const availability = await this.requireAvailable({
+      organizationId,
+      actorId: actor.userId,
+    });
     await this.requireClaimProvable({ organizationId, connectionId, domain });
+    if (availability.proof === "license-token") {
+      await this.proveWithLicense({
+        organizationId,
+        connectionId,
+        domain,
+        actor,
+      });
+      return { proved: true };
+    }
 
     const value = mintVerificationToken();
     const expiresAtMs = this.now() + SSO_DNS_PROOF_TTL_MS;
@@ -1130,16 +1461,18 @@ export class SsoSelfServeService {
 
   /**
    * Setup is available, or the reader is told what would change that. The
-   * three refusals are the three honest answers: activate a licence, restart
-   * for the licence you activated, or talk to us.
+   * three refusals are the three answers: activate a licence, wait a minute
+   * for the licence you activated to reach every replica, or talk to us.
    */
   private async requireAvailable({
     organizationId,
+    actorId = null,
   }: {
     organizationId: string;
+    actorId?: string | null;
   }): Promise<Extract<SsoSelfServeAvailability, { available: true }>> {
     const availability = ssoSelfServeAvailability(
-      await this.deps.context.resolve({ organizationId }),
+      await this.deps.context.resolve({ organizationId, actorId }),
     );
     if (availability.available) return availability;
     if (availability.refusal === "not_opted_in") {
@@ -1148,9 +1481,9 @@ export class SsoSelfServeService {
       );
     }
     throw new SsoLicenseRequiredError(
-      availability.refusal === "license_restart_required"
-        ? `organization ${organizationId}: a licence was activated after this process started`
-        : `organization ${organizationId}: the installation holds no genuine licence`,
+      availability.refusal === "license_activation_pending"
+        ? `organization ${organizationId}: a license was activated and has not reached this process's gate yet`
+        : `organization ${organizationId}: the installation holds no genuine license`,
     );
   }
 
@@ -1313,6 +1646,10 @@ export class SsoSelfServeService {
       source: "self-serve" as const,
     };
   }
+}
+
+function blankToNull(value: string | null): string | null {
+  return value === null || value.trim() === "" ? null : value;
 }
 
 function toConnectionView(

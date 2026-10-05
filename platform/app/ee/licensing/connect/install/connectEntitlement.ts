@@ -12,8 +12,8 @@
  * mid-term stops working without waiting for the license to expire.
  */
 
-import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { configuredSignedLicenseKey } from "../../configuredLicenseKey";
 import { PUBLIC_KEY } from "../../constants";
 import { validateLicense } from "../../validation";
 import { CONNECT_SERVICES, type ConnectService } from "../services";
@@ -78,7 +78,7 @@ export async function organizationConnectServices({
     where: { id: organizationId },
     select: { license: true },
   });
-  const licenseKey = organization?.license ?? env.LANGWATCH_LICENSE_KEY ?? null;
+  const licenseKey = organization?.license ?? configuredSignedLicenseKey();
   return licenseConnectServices({
     licenseKey,
     ...(publicKey ? { publicKey } : {}),
@@ -113,7 +113,7 @@ export async function organizationEnabledConnectServices({
     select: { license: true, connectServicesDisabled: true },
   });
   const entitled = licenseConnectServices({
-    licenseKey: organization?.license ?? env.LANGWATCH_LICENSE_KEY ?? null,
+    licenseKey: organization?.license ?? configuredSignedLicenseKey(),
     ...(publicKey ? { publicKey } : {}),
     ...(now ? { now } : {}),
   });
@@ -160,7 +160,7 @@ export async function installIsEntitled({
   if (!readConnectConfig().permitted) return false;
 
   const instanceWide = licenseConnectServices({
-    licenseKey: env.LANGWATCH_LICENSE_KEY ?? null,
+    licenseKey: configuredSignedLicenseKey(),
     ...(publicKey ? { publicKey } : {}),
     ...(now ? { now } : {}),
   });

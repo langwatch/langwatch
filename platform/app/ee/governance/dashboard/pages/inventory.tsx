@@ -3063,9 +3063,9 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
     },
     {
       key: "readSeats",
-      label: "Also record licence counts",
+      label: "Also record license counts",
       placeholder: "",
-      hint: "Reads once a day how many Copilot Studio licences the tenant has bought and how many are assigned — only pool totals, never a list of users. It needs an admin consent the other fields do not: a tenant admin must grant the app registration the Organization.Read.All application permission. Without it the read is refused and nothing is recorded.",
+      hint: "Reads once a day how many Copilot Studio licenses the tenant has bought and how many are assigned — only pool totals, never a list of users. It needs an admin consent the other fields do not: a tenant admin must grant the app registration the Organization.Read.All application permission. Without it the read is refused and nothing is recorded.",
       control: "switch",
       defaultOn: READ_SEATS_DEFAULT_ON,
       // Advanced because the default is already the answer for almost

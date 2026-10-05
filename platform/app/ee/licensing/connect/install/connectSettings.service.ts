@@ -13,6 +13,7 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 
 import type { PrismaClient } from "~/generated/prisma/client";
 import { PUBLIC_KEY } from "../../constants";
@@ -43,6 +44,24 @@ export interface ConnectSyncView {
   readonly lastError: { readonly code: string } | null;
 }
 
+const logger = createLogger("langwatch:connect:settings");
+
+/**
+ * How long the settings read waits for the hosted usage route. The page
+ * renders without spend rather than wait out the transport's own timeout.
+ */
+const USAGE_READ_TIMEOUT_MS = 10_000;
+
+/**
+ * Codes that mean LangWatch was not reached or gave no usable answer. The page
+ * shows usage as unavailable for these. Every other refusal names something
+ * the admin can act on, so it is shown as one.
+ */
+const USAGE_UNREACHABLE_CODES: ReadonlySet<string> = new Set([
+  "connect_unreachable",
+  "hosted_service_unavailable",
+]);
+
 export type ConnectStatus =
   | { readonly deployment: "off" }
   | {
@@ -53,6 +72,11 @@ export type ConnectStatus =
       readonly entitledServices: string[] | null;
       readonly usage: ConnectUsage | null;
       readonly refusal: ConnectRefusal | null;
+      /**
+       * The usage read failed without a refusal to show: LangWatch was not
+       * reached, timed out, or answered with no usable reply.
+       */
+      readonly isUsageUnavailable: boolean;
       readonly sync: ConnectSyncView;
     };
 
@@ -99,12 +123,14 @@ export class ConnectSettingsService {
         entitledServices: null,
         usage: null,
         refusal: null,
+        isUsageUnavailable: false,
       };
     }
 
     try {
       const usage = await this.client(config.gatewayEndpoint).usage({
         credential,
+        signal: AbortSignal.timeout(USAGE_READ_TIMEOUT_MS),
       });
       return {
         ...base,
@@ -112,15 +138,33 @@ export class ConnectSettingsService {
         entitledServices: usage.services,
         usage,
         refusal: null,
+        isUsageUnavailable: false,
       };
     } catch (error) {
-      if (!HandledError.isHandled(error)) throw error;
+      if (
+        HandledError.isHandled(error) &&
+        !USAGE_UNREACHABLE_CODES.has(error.code)
+      ) {
+        return {
+          ...base,
+          licensed: true,
+          entitledServices: null,
+          usage: null,
+          refusal: { code: error.code, meta: error.meta },
+          isUsageUnavailable: false,
+        };
+      }
+      logger.warn(
+        { error, organizationId },
+        "hosted usage read failed, showing usage as unavailable",
+      );
       return {
         ...base,
         licensed: true,
         entitledServices: null,
         usage: null,
-        refusal: { code: error.code, meta: error.meta },
+        refusal: null,
+        isUsageUnavailable: true,
       };
     }
   }

@@ -2,7 +2,11 @@ import { readConnectConfig } from "@ee/licensing/connect/install/connectConfig";
 import { ConnectDisabledError } from "@ee/licensing/connect/install/connectErrors";
 import { getConnectLicenseClient } from "@ee/licensing/connect/install/connectLicenseClient";
 import { installInstanceId } from "@ee/licensing/connect/install/instanceIdentity";
-import { authProviderIsMounted, platformSSOAllowed } from "@ee/sso/sso-gate";
+import {
+  authProviderIsMounted,
+  invalidateSsoGate,
+  platformSSOAllowed,
+} from "@ee/sso/sso-gate";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -104,6 +108,9 @@ export const licenseRouter = createTRPCRouter({
         // presentation registry writes customer copy against.
         throw licenseValidationError(result.error);
       }
+      // SSO turns on in this process now; other replicas re-read the gate
+      // within its deny TTL.
+      invalidateSsoGate();
 
       return {
         success: true,
@@ -141,6 +148,7 @@ export const licenseRouter = createTRPCRouter({
         answer.license,
       );
       if (!result.success) throw licenseValidationError(result.error);
+      invalidateSsoGate();
 
       return { success: true, planInfo: result.planInfo };
     }),

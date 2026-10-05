@@ -9,6 +9,8 @@ import threading
 import time
 import anyio.to_thread
 import dotenv
+
+import langevals_core.offline_defaults  # noqa: F401  (before litellm, see module)
 import litellm
 from fastapi.responses import RedirectResponse
 

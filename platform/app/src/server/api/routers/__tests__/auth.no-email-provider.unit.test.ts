@@ -5,7 +5,9 @@
  * provider (ADR-117, revision 2026-09-25).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { env } from "~/env.mjs";
 import { _resetMemoryRateLimitStore } from "~/server/rateLimit";
+import type { NextApiRequest } from "~/types/next-stubs";
 import { createInnerTRPCContext } from "../../trpc";
 import { authRouter } from "../auth";
 
@@ -53,8 +55,16 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 /** A well-formed S256 challenge: 43 base64url characters. */
 const CHALLENGE = "a".repeat(43);
 
-const signedOut = () =>
-  authRouter.createCaller(createInnerTRPCContext({ session: null }));
+/** The address the installation is set up for, whatever this run configured. */
+const APP_ORIGIN = new URL(env.NEXTAUTH_URL).origin;
+
+const signedOut = (origin = APP_ORIGIN) =>
+  authRouter.createCaller(
+    createInnerTRPCContext({
+      session: null,
+      req: { headers: { origin } } as unknown as NextApiRequest,
+    }),
+  );
 
 const signedIn = () =>
   authRouter.createCaller(
@@ -95,6 +105,32 @@ describe("auth router without an email provider", () => {
       expect(issueUnconfirmedAddressProof).toHaveBeenCalledWith({
         email: "sam@acme.com",
       });
+    });
+
+    /** @scenario "A sign-up started on a web address the installation is not set up for issues nothing" */
+    it("refuses a foreign web address before issuing a proof", async () => {
+      await expect(
+        signedOut("http://localhost:18560").requestSignUpVerification({
+          email: "sam@acme.com",
+        }),
+      ).rejects.toMatchObject({ cause: { code: "auth_invalid_origin" } });
+
+      expect(addressState).not.toHaveBeenCalled();
+      expect(issueUnconfirmedAddressProof).not.toHaveBeenCalled();
+      expect(requestVerification).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A sign-up started on a web address the installation is not set up for issues nothing" */
+    it("refuses a foreign web address before mailing a link once a provider is configured", async () => {
+      hasEmailProvider.mockReturnValue(true);
+      isEmailUnconfigured.mockReturnValue(false);
+
+      await expect(
+        signedOut("http://localhost:18560").requestSignUpVerification({
+          email: "sam@acme.com",
+        }),
+      ).rejects.toMatchObject({ cause: { code: "auth_invalid_origin" } });
+      expect(requestVerification).not.toHaveBeenCalled();
     });
 
     it("sends an address that already has an account to log in", async () => {

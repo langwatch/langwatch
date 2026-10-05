@@ -15,11 +15,8 @@ import { AgentRole } from "@langwatch/scenario";
 import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
-import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
 import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
 import {
-  createNlpFetchDispatcher,
-  type FetchInitWithDispatcher,
   NLP_FETCH_HEADROOM_MS,
   resolveFloorFetchTimeoutMs,
   resolveMaxFetchTimeoutMs,
@@ -27,6 +24,10 @@ import {
 import type { RunParameterValues } from "../../parameters";
 import { resolveFieldMappings, sourceFieldOf } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
+import type {
+  ExecuteSyncResponse,
+  ExecuteSyncTransport,
+} from "./execute-sync-transport";
 import type { NlpEngineResult } from "./format-execution-error";
 import {
   formatEngineError,
@@ -122,7 +123,14 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
   private static readonly END_NODE_ID = "end";
 
   private readonly config: CodeAgentData;
-  private readonly nlpServiceUrl: string;
+  /**
+   * How one turn reaches nlpgo. Self-hosted that is the engine itself; on
+   * SaaS it is the control plane, which invokes this project's own engine
+   * with a credential the child must not hold. Either way it answers nlpgo's
+   * own status and body, which is what every failure below is classified
+   * from. See `./execute-sync-transport.ts`.
+   */
+  private readonly transport: ExecuteSyncTransport;
   /**
    * The LangWatch platform API key (project.apiKey), sent as workflow.api_key
    * on the synthesized entry->code->end workflow. nlpgo forwards it verbatim
@@ -142,18 +150,18 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
 
   constructor({
     config,
-    nlpServiceUrl,
+    transport,
     projectApiKey,
     parameters,
   }: {
     config: CodeAgentData;
-    nlpServiceUrl: string;
+    transport: ExecuteSyncTransport;
     projectApiKey: string;
     parameters?: RunParameterValues;
   }) {
     super();
     this.config = config;
-    this.nlpServiceUrl = nlpServiceUrl;
+    this.transport = transport;
     this.projectApiKey = projectApiKey;
     this.parameters = parameters ?? {};
     this.name = "SerializedCodeAgentAdapter";
@@ -469,7 +477,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
       },
     };
 
-    const endpoint = `${this.nlpServiceUrl}/go/studio/execute_sync`;
+    const endpoint = this.transport.endpoint;
     const fetchTimeoutMs = this.fetchTimeoutMs();
 
     return tracer.withActiveSpan(
@@ -494,22 +502,13 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
         }, fetchTimeoutMs);
 
         try {
-          let response: UndiciResponse;
+          let response: ExecuteSyncResponse;
           try {
-            const fetchInit: FetchInitWithDispatcher = {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(event),
+            response = await this.transport.post({
+              event,
               signal: controller.signal,
-              dispatcher: createNlpFetchDispatcher({
-                timeoutMs: fetchTimeoutMs,
-              }),
-            };
-            // undici's own fetch, not the global one: Node's global fetch is
-            // bound to the undici bundled with Node, which rejects a
-            // dispatcher built by this package with "invalid onRequestStart
-            // method" (see mailer/providers/resend.ts for the same fix).
-            response = await undiciFetch(endpoint, fetchInit);
+              timeoutMs: fetchTimeoutMs,
+            });
           } catch (fetchError) {
             // An abort is classified once, by the outer handler, so a timeout
             // fired mid-body-read lands in the same place as one fired

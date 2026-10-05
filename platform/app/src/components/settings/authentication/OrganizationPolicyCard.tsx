@@ -36,9 +36,10 @@ export function OrganizationPolicyCard({
         // Re-mounted when the saved setting changes, so the radio and the
         // domain box start from what was actually saved rather than from a
         // draft the reader has moved on from.
-        key={`${joinRequests.joining.domainJoin}:${joinRequests.joining.joinDomains.join(",")}`}
+        key={`${joinRequests.joining.domainJoin}:${joinRequests.joining.joinDomains.join(",")}:${joinRequests.joining.joinerRole}`}
         domainJoin={joinRequests.joining.domainJoin}
         joinDomains={joinRequests.joining.joinDomains}
+        joinerRole={joinRequests.joining.joinerRole}
         saving={joinRequests.savingJoining}
         onSave={joinRequests.setJoining}
         ssoLive={ssoLive}
