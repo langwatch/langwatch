@@ -31,10 +31,10 @@ function installation(role: "api" | "worker" | "tasks") {
         blockLocalHttpCalls: true,
         allowedProxyHosts: [],
         isSaas: false,
+        publicBaseUrl: "https://app.example",
       },
     })
     .withStores(memoryStores())
-    .withMember("publicBaseUrl", "https://app.example")
     .provide({ authz: createApiFixture<AuthzApi>() })
     .withObservability((observability) => observability.withLogging(unavailable("logger")));
 }

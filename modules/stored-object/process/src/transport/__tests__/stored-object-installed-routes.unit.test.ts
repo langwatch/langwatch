@@ -12,8 +12,10 @@ import { memoryStores } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryStoredObjectSealRepository } from "../../repositories/memory/memory.stored-object-seal.repository.ts";
 import { storedObjectProcessModule } from "../../stored-object.module.ts";
 import { storedObjectFileRest } from "../stored-object-file.rest.ts";
+import { storedObjectRest } from "../stored-object.rest.ts";
 
 const PROJECT = "project_1";
 const OBJECT_ID = "so_absent";
@@ -36,10 +38,10 @@ function installed({ authz }: Scripted) {
         blockLocalHttpCalls: true,
         allowedProxyHosts: [],
         isSaas: false,
+        publicBaseUrl: "https://app.example",
       },
     })
     .withStores(memoryStores())
-    .withMember("publicBaseUrl", "https://app.example")
     .withObservability((observability) =>
       observability.withLogging(createApiFixture<Logger>({ warn: () => undefined })),
     )
@@ -82,13 +84,18 @@ async function readThroughInstalledModule({
   exhausted = false,
   path,
   headers = { authorization: `Bearer key-for:${PROJECT}` },
-}: Scripted & { path: string; headers?: Record<string, string> }) {
+  routes = storedObjectFileRest,
+}: Scripted & {
+  path: string;
+  headers?: Record<string, string>;
+  routes?: typeof storedObjectFileRest | typeof storedObjectRest;
+}) {
   const runtime = await installed({ authz });
 
   try {
     const host = restHost();
     const provided = runtime.module(storedObjectProcessModule).provided;
-    host.mount(storedObjectFileRest.router(), () => provided);
+    host.mount(routes.router(), () => provided);
 
     for (let spent = 0; exhausted && spent < READ_ALLOWANCE; spent += 1) {
       await host.app.request(new Request(`http://api.test${path}`, { headers }));
@@ -183,6 +190,46 @@ describe("given the stored-object module installed over memory stores", () => {
       });
 
       expect(read.status).toBe(403);
+    });
+  });
+
+  describe("when a read URL carries claims written by hand in place of a seal", () => {
+    const claims = JSON.stringify({
+      kind: "read",
+      projectId: PROJECT,
+      objectId: OBJECT_ID,
+      expiresAt: "2999-01-01T00:00:00.000Z",
+    });
+    const contentPath = (sig: string) =>
+      `/api/stored-objects/${OBJECT_ID}/content?${new URLSearchParams({ sig })}`;
+
+    /** @scenario "the installed module on memory stores refuses a signature written by hand" */
+    it("answers 401 and serves nothing", async () => {
+      const read = await readThroughInstalledModule({
+        authz: permitted(),
+        headers: {},
+        routes: storedObjectRest,
+        path: contentPath(claims),
+      });
+
+      expect(read.status).toBe(401);
+    });
+
+    /** @scenario "the installed module on memory stores refuses a signature written by hand" */
+    it("opens a seal made under the process's own key, which shows no claim in the clear, and reaches the read", async () => {
+      const sealed = MemoryStoredObjectSealRepository.create().seal(claims);
+
+      const read = await readThroughInstalledModule({
+        authz: permitted(),
+        headers: {},
+        routes: storedObjectRest,
+        path: contentPath(sealed),
+      });
+
+      expect({ inTheClear: sealed.includes(OBJECT_ID), status: read.status }).toEqual({
+        inTheClear: false,
+        status: 404,
+      });
     });
   });
 });

@@ -96,7 +96,7 @@ export class MemoryStoredObjectStorage extends StoredObjectBytesRepository {
   }
 }
 
-/** Seals in plaintext: the tests read what a URL carries, not the crypto. */
+/** Seals under the process's random key, as the memory tier does. */
 export function createStoredObjectTestSigner(): StoredObjectUploadSignerService {
   return StoredObjectUploadSignerService.create({
     seals: MemoryStoredObjectSealRepository.create(),

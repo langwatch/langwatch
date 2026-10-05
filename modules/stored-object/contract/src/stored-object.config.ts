@@ -4,6 +4,7 @@ import {
   Config,
   environmentOneOrTrueSchema,
   isSaas,
+  publicBaseUrl,
   type ConfigOf,
 } from "@langwatch/config";
 
@@ -19,6 +20,8 @@ export const storedObjectConfig = Config.define((c) => ({
   allowedProxyHosts,
   /** The hosted product, whose image proxy verifies the TLS of every outside picture. */
   isSaas,
+  /** The deployment's public origin; the local backend's upload URL is built on it. */
+  publicBaseUrl,
 }));
 
 export type StoredObjectServerConfig = ConfigOf<typeof storedObjectConfig>;

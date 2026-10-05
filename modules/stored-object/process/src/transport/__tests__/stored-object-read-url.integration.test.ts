@@ -18,6 +18,7 @@ import {
   MemoryStoredObjectFiles,
   createStoredObjectTestApp,
 } from "../../app/__tests__/stored-object.fixture.ts";
+import { MemoryStoredObjectSealRepository } from "../../repositories/memory/memory.stored-object-seal.repository.ts";
 import { storedObjectRest } from "../stored-object.rest.ts";
 import { storedObjectTrpcTransport } from "../stored-object.trpc.ts";
 
@@ -95,9 +96,10 @@ function installed() {
   };
 }
 
-/** A read seal as the test signer's identity cipher writes one. */
+/** A seal as the process's memory twin writes one, so the claims, not the cipher, are refused. */
 function sealOf(claims: Record<string, unknown>): string {
-  return new URLSearchParams({ sig: JSON.stringify(claims) }).toString();
+  const seals = MemoryStoredObjectSealRepository.create();
+  return new URLSearchParams({ sig: seals.seal(JSON.stringify(claims)) }).toString();
 }
 
 describe("storedObjects.getReadUrl and the signed content route", () => {

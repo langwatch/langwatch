@@ -85,12 +85,9 @@ type StoredObjectDependencies = Readonly<{
   authz: typeof AuthzApi;
 }>;
 
-/** The deployment's public origin, until the shared `publicBaseUrl` config leaf lands. */
-type StoredObjectMembers = Readonly<{ publicBaseUrl: string | undefined }>;
-
 type StoredObjectSetup = FeatureSetup<
   StoredObjectDependencies,
-  StoredObjectMembers,
+  never,
   StoredObjectServerConfig,
   StoredObjectRepositories
 >;
@@ -99,7 +96,6 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
   static readonly contract = StoredObjectApi;
   static readonly dependencies: StoredObjectDependencies = { authz: AuthzApi };
   static readonly config = storedObjectConfig;
-  static readonly reads = ["publicBaseUrl"] as const;
 
   /**
    * Builds this process's {@link StoredObjectInfrastructure} over its own
@@ -115,7 +111,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
         delivery: UnavailableStoredObjectDeliveryService.create(),
         signer: StoredObjectUploadSignerService.create({
           seals: repositories.seals,
-          publicBaseUrl: setup.members.publicBaseUrl,
+          publicBaseUrl: setup.config.publicBaseUrl,
         }),
         maximumUploadBytes: MAXIMUM_UPLOAD_BYTES,
         uploadExpiryMs: UPLOAD_EXPIRY_MS,
