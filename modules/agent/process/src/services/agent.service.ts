@@ -59,6 +59,10 @@ export class AgentService {
     return this.#repository.findAll(input);
   }
 
+  listProjectIdsWithHttpAgents(): Promise<string[]> {
+    return this.#repository.findProjectIdsWithHttpAgents();
+  }
+
   getReferenceStates(input: AgentIdsInput): Promise<AgentReferenceState[]> {
     return this.#repository.findReferenceStates(input);
   }

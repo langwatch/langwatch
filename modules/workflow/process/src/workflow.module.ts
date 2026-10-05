@@ -33,9 +33,6 @@ export const workflowProcessModule = defineProcessModule("workflow")
   .withEventing(workflowLifecycleEventing)
   .withTasks(({ repositories, dependencies }) => [
     WorkflowHttpCredentialsBackfillTask.create({
-      organizations: dependencies.organizations,
-      projects: dependencies.projects,
-      agents: dependencies.agents,
       workflows: repositories.workflows,
       httpSecrets: WorkflowHttpSecretsService.create(dependencies.secrets),
     }),

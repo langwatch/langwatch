@@ -18,10 +18,8 @@ import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
-import { ProjectApi } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -620,16 +618,12 @@ export class WorkflowModule implements WorkflowApi {
     authz: AuthzApi,
     /** Mints the key a run calls LangWatch back with. */
     apiKeys: ApiKeyApi,
-    /** The projects the HTTP-token backfill task walks. */
-    projects: ProjectApi,
     /** Registers and runs a workflow's evaluation over its batch. */
     experiments: ExperimentApi,
     /** The monitors an archived workflow's evaluators back, deleted with it. */
     monitors: MonitorApi,
     /** Stores an HTTP node's typed token; reads the listed secrets a Studio run receives. */
     secrets: SecretApi,
-    /** Every organisation, for the task that moves old inline tokens into secrets. */
-    organizations: OrganizationApi,
   };
   static readonly config = workflowConfig;
   /** `prisma` for `workflowRows`/`workflows`, via this module's `workflowRepositories`. */

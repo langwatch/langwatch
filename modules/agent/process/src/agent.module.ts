@@ -8,6 +8,9 @@ import { defineProcessModule } from "@langwatch/process";
 
 import { AgentModule } from "#app/agent.app";
 import { agentRepositories } from "#repositories/agent-repositories.registry";
+import { AgentHttpSecretsService } from "#services/agent-http-secrets.service";
+import { AgentService } from "#services/agent.service";
+import { AgentHttpCredentialsBackfillTask } from "#tasks/agent-http-credentials-backfill.task";
 import { agentConnectHeaders, createAgentConnectRest } from "#transport/agent-connect.rest";
 import { createAgentWebSocketProtocol } from "#transport/agent-connect.ws";
 import { agentLegacyRest } from "#transport/agent-legacy.rest";
@@ -26,6 +29,16 @@ export const agentProcessModule = defineProcessModule("agent")
     agentTrpcTransport,
     httpProxyTrpcTransport,
   )
+  .withTasks(({ repositories, dependencies }) => {
+    const agents = AgentService.create(repositories.agents);
+
+    return [
+      AgentHttpCredentialsBackfillTask.create({
+        agents,
+        httpSecrets: AgentHttpSecretsService.create({ secrets: dependencies.secrets, agents }),
+      }),
+    ];
+  })
   // The caller key is what the project door resolved; the rest are request headers.
   // The connect family's three are not the family's door: the application verifies
   // them itself and answers a refusal as a frame, which the agent protocol's client parses.

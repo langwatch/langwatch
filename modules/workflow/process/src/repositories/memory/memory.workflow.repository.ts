@@ -118,6 +118,11 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
     });
   }
 
+  findProjectIds(): Promise<string[]> {
+    const live = [...this.store.workflows.values()].filter((workflow) => !workflow.archivedAt);
+    return Promise.resolve([...new Set(live.map((workflow) => workflow.projectId))]);
+  }
+
   findAll(input: { projectId: string }): Promise<Workflow[]> {
     return Promise.resolve(
       this.store.workflowsOf(input.projectId).filter((workflow) => !workflow.archivedAt),

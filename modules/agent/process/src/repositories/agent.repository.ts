@@ -49,6 +49,8 @@ export interface AgentRepository {
   getByIdOnly(id: string): Promise<Agent>;
   getByIdIncludingArchived(input: GetAgentInput): Promise<Agent>;
   findAll(input: AgentProjectInput): Promise<Agent[]>;
+  /** Every project holding a live HTTP agent, for the task that walks them all. */
+  findProjectIdsWithHttpAgents(): Promise<string[]>;
   findReferenceStates(input: AgentIdsInput): Promise<AgentReferenceState[]>;
   findNamesByIds(input: AgentIdsInput): Promise<AgentName[]>;
   exists(input: GetAgentInput): Promise<boolean>;

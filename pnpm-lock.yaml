@@ -4895,6 +4895,9 @@ importers:
       '@langwatch/secret-contract':
         specifier: workspace:*
         version: link:../../secret/contract
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -15408,9 +15411,6 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
-      '@langwatch/organization-contract':
-        specifier: workspace:*
-        version: link:../../organization/contract
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
@@ -15423,9 +15423,6 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
-      '@langwatch/project-contract':
-        specifier: workspace:*
-        version: link:../../project/contract
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract

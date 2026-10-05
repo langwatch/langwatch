@@ -62,6 +62,8 @@ export abstract class WorkflowRepository {
     includeArchived?: boolean;
   }): Promise<WorkflowWithVersion | null>;
   abstract findAll(input: { projectId: string }): Promise<Workflow[]>;
+  /** Every project holding a live workflow, for the task that walks them all. */
+  abstract findProjectIds(): Promise<string[]>;
   abstract findEvaluators(input: {
     projectId: string;
   }): Promise<(Workflow & { versions: WorkflowVersion[] })[]>;
@@ -99,7 +101,9 @@ export abstract class WorkflowRepository {
   abstract updateAutoSavedVersion(
     input: PersistWorkflowVersionInput & { id: string },
   ): Promise<WorkflowVersion>;
-  /** Replaces a version's graph only while it is as it was read; false when a write came between. */
+  /**
+   * Replaces a version's graph only while it is as it was read; false when a write came between.
+   */
   abstract updateVersionDslIfUnchanged(input: {
     id: string;
     projectId: string;

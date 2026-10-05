@@ -147,6 +147,7 @@ describe("the tasks process installation", () => {
     try {
       const names = runtime.tasks(isTask).map((task) => task.name);
       expect(names).toEqual([
+        "backfill-http-agent-credentials-to-secrets",
         "backfill-annotations-to-clickhouse",
         "agent-audit-log-ids-backfill",
         "clear-stale-pending-sso-setup",

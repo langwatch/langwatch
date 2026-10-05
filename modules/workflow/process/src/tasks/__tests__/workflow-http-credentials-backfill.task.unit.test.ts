@@ -1,6 +1,3 @@
-import type { AgentApi, AgentOverview } from "@langwatch/agent-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Workflow, WorkflowVersion } from "@langwatch/workflow-contract";
@@ -49,12 +46,13 @@ function build(
     secrets?: Record<string, string>;
     latestNodes?: unknown[];
     publishedNodes?: unknown[];
+    projectIds?: string[];
   } = {},
 ) {
   const secrets: Record<string, string> = { ...options.secrets };
   const rewritten: VersionWrite[] = [];
   const attempted: VersionWrite[] = [];
-  const agentUpdates: unknown[] = [];
+  const walked: string[] = [];
   const latest = versionOf("v-latest", options.latestNodes ?? [node("n1", TOKEN)]);
   const published = versionOf("v-published", options.publishedNodes ?? [node("n1", TOKEN)]);
   const rowOf = (name: string) => createApiFixture<SecretRow>({ id: `id-${name}`, name });
@@ -70,37 +68,13 @@ function build(
     },
   });
   const task = WorkflowHttpCredentialsBackfillTask.create({
-    organizations: createApiFixture<OrganizationApi>({ findAllIds: async () => ["org-1"] }),
-    projects: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => ["project-1"] }),
-    agents: createApiFixture<Pick<AgentApi, "getAll" | "update">>({
-      getAll: async () => [
-        createApiFixture<AgentOverview>({
-          id: "agent-1",
-          type: "http",
-          config: {
-            url: "https://a.example",
-            method: "POST",
-            auth: { type: "bearer", token: TOKEN },
-          },
-        }),
-        createApiFixture<AgentOverview>({
-          id: "agent-2",
-          type: "http",
-          config: {
-            url: "https://b.example",
-            method: "POST",
-            auth: { type: "bearer", token: "{{ secrets.ALREADY }}" },
-          },
-        }),
-      ],
-      update: async (input) => {
-        agentUpdates.push(input);
-
-        return createApiFixture({});
-      },
-    }),
     workflows: {
-      findAll: async () => [createApiFixture<Workflow>({ id: "wf-1" })],
+      findProjectIds: async () => options.projectIds ?? ["project-1"],
+      findAll: async ({ projectId }) => {
+        walked.push(projectId);
+
+        return [createApiFixture<Workflow>({ id: "wf-1" })];
+      },
       findById: async () => ({
         ...createApiFixture<Workflow>({ id: "wf-1" }),
         latestVersion: latest,
@@ -118,7 +92,7 @@ function build(
     httpSecrets: WorkflowHttpSecretsService.create(secretApi),
   });
 
-  return { task, secrets, rewritten, attempted, agentUpdates };
+  return { task, secrets, rewritten, attempted, walked };
 }
 
 const run = (task: WorkflowHttpCredentialsBackfillTask) =>
@@ -131,20 +105,19 @@ describe("moving credentials typed inline before they became project secrets", (
 
     await run(task);
 
-    expect(rewritten.map((version) => version.id).sort()).toEqual(["v-latest", "v-published"]);
+    expect(rewritten.map((version) => version.id).toSorted()).toEqual(["v-latest", "v-published"]);
     expect(JSON.stringify(rewritten)).not.toContain(TOKEN);
     expect(JSON.stringify(rewritten)).toContain("{{ secrets.HTTP_PARTNER_API_AUTH_TOKEN }}");
     expect(secrets).toEqual({ HTTP_PARTNER_API_AUTH_TOKEN: TOKEN });
   });
 
   /** @scenario Credentials typed inline before this change are moved to project secrets */
-  it("updates only the agents that still hold a literal", async () => {
-    const { task, agentUpdates } = build();
+  it("walks every project its own workflow rows name", async () => {
+    const { task, walked } = build({ projectIds: ["project-1", "project-2"] });
 
     await run(task);
 
-    expect(agentUpdates).toHaveLength(1);
-    expect(agentUpdates[0]).toMatchObject({ id: "agent-1", projectId: "project-1" });
+    expect(walked).toEqual(["project-1", "project-2"]);
   });
 
   /** @scenario Credentials typed inline before this change are moved to project secrets */
