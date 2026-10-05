@@ -142,3 +142,12 @@ Date: 2026-10-05. Branch: feat/strict-feature-layout-v0. Each row stays unbound 
 | A request in flight when the listener closes is allowed to finish                            | `closeHttpServer` calls `closeAllConnections()` straight after `close()`: no drain grace (likely defect) |
 | api-process-agents, -authz, -tenancy, -eventing (host-supplied gating)                       | packages/process has no such gating; stale spec or apps/api composition                                  |
 | A misspelled shared secret is refused where it is written                                    | no typed shared-secret supply                                                                            |
+
+## Gateway
+
+| Scenario                                                          | Product does                                                                                    |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| One budget can be read on its own (field for field the list row)  | the list row carries `scope_reach`; the by-id read omits it                                     |
+| A handled refusal says who can act on it                          | the canonical envelope has no `fault` field (a platform-fault refusal answered 412 without one) |
+| personal virtual key rows (vk-scope-rbac 149, 157, 164, 183, 192) | the gateway serves neither `routingPolicy` nor `personalVirtualKeys` (governance gap?)          |
+| A ledger line with an unrecognised status is listed as written    | bound; the badge lowercases every status ("QUEUED" shows "queued")                              |
