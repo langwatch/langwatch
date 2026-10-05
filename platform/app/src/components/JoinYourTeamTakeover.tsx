@@ -3,7 +3,7 @@ import type {
   JoinLookupDecision,
   JoinRequestOrigin,
 } from "@langwatch/identity";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { orgRoleOptions } from "~/components/settings/OrganizationUserRoleField";
 import { Dialog } from "~/components/ui/dialog";
@@ -61,6 +61,11 @@ export function JoinYourTeamTakeover({
   const { settled, decision, mine, invitation, admitting } =
     useJoinTakeoverState({ currentOrganizationId, origin });
   const utils = api.useUtils();
+  // Setting the invitation aside is for this visit only: it still stands,
+  // and the mail still carries it. So it never opens the automatic door
+  // (the state hook keeps that shut while an invitation exists); the rest
+  // of the screen simply decides as if none had been shown.
+  const [invitationSetAside, setInvitationSetAside] = useState(false);
 
   // Nothing is decided until EVERY answer is in. Rendering the offer while
   // the pending query is still in flight would show "ask to join" to somebody
@@ -82,8 +87,14 @@ export function JoinYourTeamTakeover({
   // while waiting on it would let an approval land the joiner seat instead
   // of the seat the administrator chose. Only the welcome screen is handed
   // an invitation (see the state hook), so a dashboard is unchanged.
-  if (invitation) {
-    return <InvitationTakeover invitation={invitation} />;
+  if (invitation && !invitationSetAside) {
+    return (
+      <InvitationTakeover
+        invitation={invitation}
+        dismissLabel={dismissLabel}
+        onSetAside={() => setInvitationSetAside(true)}
+      />
+    );
   }
 
   const waiting = findWaitingRequest(mine, currentOrganizationId);
@@ -340,8 +351,15 @@ function useAutomaticAdmission({
  */
 function InvitationTakeover({
   invitation,
+  dismissLabel,
+  onSetAside,
 }: {
   invitation: { inviteCode: string; organizationName: string; role: string };
+  dismissLabel: string;
+  /** The way past, as on the ask screen: somebody who would rather have
+   *  their own workspace, or whose invitation was withdrawn under them, is
+   *  never stuck behind a screen with one button. */
+  onSetAside: () => void;
 }) {
   const accept = api.invite.acceptInvite.useMutation();
   const utils = api.useUtils();
@@ -369,17 +387,22 @@ function InvitationTakeover({
                 void utils.joinRequests.mine.invalidate();
                 void utils.joinRequests.offer.invalidate();
               },
-              onError: (error) =>
+              onError: (error) => {
                 showErrorToast({
                   error,
                   fallbackTitle: "Couldn't accept the invitation",
-                }),
+                });
+                // An invitation withdrawn under them drops off on the re-read
+                // instead of offering a button that can only fail again.
+                void utils.invite.pendingForMe.invalidate();
+              },
             },
           )
         }
       >
         Accept the invitation to {invitation.organizationName}
       </AuthPrimaryButton>
+      <SecondaryAction onClick={onSetAside}>{dismissLabel}</SecondaryAction>
     </Takeover>
   );
 }

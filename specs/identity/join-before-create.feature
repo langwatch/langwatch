@@ -115,6 +115,14 @@ Feature: Join before create - the choice happens before an organization is minte
     And the screen stays where it is and lets the welcome redirect carry on, the terminal's continuation included
 
   @integration
+  Scenario: The invitation can be set aside without accepting it
+    Given "ana" invited "sam@acme.com" to "acme"
+    And "acme" admits verified colleagues on "acme.com" automatically
+    When "sam" reaches the welcome screen and chooses to create a new organization instead
+    Then the invitation screen steps aside and the welcome screen beneath is reachable
+    And "sam" is not admitted to "acme" behind the invitation, which still stands
+
+  @integration
   Scenario: An invitation is only offered to somebody who proved the address
     Given "ana" invited "sam@acme.com" to "acme"
     And "sam" signed in with an account whose "sam@acme.com" address is not verified

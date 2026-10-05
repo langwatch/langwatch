@@ -35,6 +35,7 @@ const {
   invalidateOffer,
   invalidateMine,
   invalidateOrganizations,
+  invalidateInvitations,
   dismissNudge,
   signOutMock,
 } = vi.hoisted(() => ({
@@ -55,6 +56,7 @@ const {
   invalidateOffer: vi.fn(),
   invalidateMine: vi.fn(),
   invalidateOrganizations: vi.fn(),
+  invalidateInvitations: vi.fn(),
   dismissNudge: vi.fn(),
   signOutMock: vi.fn(),
 }));
@@ -66,7 +68,7 @@ vi.mock("~/utils/api", () => ({
         offer: { invalidate: invalidateOffer },
         mine: { invalidate: invalidateMine },
       },
-      invite: { pendingForMe: { invalidate: vi.fn() } },
+      invite: { pendingForMe: { invalidate: invalidateInvitations } },
       organization: { getAll: { invalidate: invalidateOrganizations } },
       user: {
         secureAccountNudge: {
@@ -549,6 +551,63 @@ describe("given somebody an administrator already invited", () => {
       // Nothing navigates from here: the welcome screen's own redirect reads
       // the organization list and honours the continuation it was given.
       expect(invalidateOrganizations).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when they would rather not accept it now", () => {
+    /** @scenario The invitation can be set aside without accepting it */
+    it("steps aside to the screen beneath and admits nobody behind it", async () => {
+      invitationsRef.current = { ...INVITED };
+      offerRef.current = {
+        data: {
+          outcome: "auto",
+          organization: {
+            organizationId: "org_acme",
+            name: "Acme",
+            colleagueCount: 10,
+          },
+        },
+        isPending: false,
+      };
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover
+            currentOrganizationId={null}
+            dismissLabel="Create a new organization instead"
+            fallback={<div data-testid="make-your-own" />}
+          />
+        </ChakraProvider>,
+      );
+
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: "Create a new organization instead",
+        }),
+      );
+
+      expect(
+        screen.queryByTestId("join-team-invitation"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("make-your-own")).toBeInTheDocument();
+      // The invitation still stands, so walking through the door now would
+      // make it impossible to accept later.
+      expect(admitMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The invitation can be set aside without accepting it */
+    it("re-reads the invitations when accepting fails, so a withdrawn one drops off", async () => {
+      invitationsRef.current = { ...INVITED };
+      acceptInviteMock.mockImplementation(
+        (_input: unknown, options?: { onError?: (error: Error) => void }) =>
+          options?.onError?.(new Error("invite_not_found")),
+      );
+      renderTakeover();
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Accept the invitation to Acme/ }),
+      );
+
+      expect(invalidateInvitations).toHaveBeenCalledTimes(1);
     });
   });
 
