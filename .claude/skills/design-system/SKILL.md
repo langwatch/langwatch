@@ -9,7 +9,7 @@ argument-hint: "[component, token or pattern]"
 
 `@langwatch/design-system` (`packages/design-system`) is the one place that
 touches Chakra v3. Read `dev/docs/ARCHITECTURE.md` §2 (the `design-system`
-bullet, ADR-001 as amended 2026-10-01) before building. Its own checklist is
+bullet; ADR-001, `packages/design-system/adrs/001-design-system-boundary.md`, as amended 2026-10-01) before building. Its own checklist is
 `packages/design-system/README.md`.
 
 ## Rules that matter
@@ -29,7 +29,8 @@ bullet, ADR-001 as amended 2026-10-01) before building. Its own checklist is
 3. **Colour is made only here.** Elsewhere, name a semantic token: `fg.*`,
    `bg.*`, `border.*`, `fg|bg|border.<status>`, `<palette>.<role>` (`red.solid`),
    `chart.N`, `accent.*`, `bg.scrim`. Never a scale step, hex, `rgb()` or bare
-   white or black (`no-raw-color`). A library that needs a string takes
+   white or black (`no-raw-color`, ruled in §2 but, like `no-direct-chakra`, not
+   in `packages/oxlint-rules` yet). A library that needs a string takes
    `useToken` / `system.token.var` (a CSS variable that follows the mode) or
    `getRawColorValue` / `useColorRawValue` from `@langwatch/design-system/color-mode`
    (a literal for the current mode). A new colour need is a semantic token in
@@ -87,8 +88,7 @@ no data) and each owning page renders it with the same entries (§10).
 
 - **`import { Box } from "@chakra-ui/react"` in a module.** Take it from
   `@langwatch/design-system/primitives`.
-- **The `chakra-ui-builder`, `chakra-ui-refactor` and `chakra-ui-migrate`
-  skills tell you to import `@chakra-ui/react`.** In this repo that is wrong
+- **The `chakra-ui-builder` and `chakra-ui-refactor` skills tell you to import `@chakra-ui/react`.** In this repo that is wrong
   (rule 1); use them for Chakra v3 API knowledge only.
 - **A colour from a scale step or hex "just here".** Add a semantic token.
 - **Pattern docs lag the record.** Where one disagrees, the record wins:

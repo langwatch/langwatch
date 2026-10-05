@@ -19,10 +19,10 @@ change that depends on it being the default.
 
 ## The two shapes
 
-| Shape | Node processes | Start | Reload |
-| --- | --- | --- | --- |
-| Split (default) | `ui` lane (Vite) + `backend` lane (api and worker in one `node`) | `pnpm dev` | `dev-supervisor.mjs --watch` restarts the whole backend process |
-| One process (trial) | one `app` lane: Vite, api and worker | `LANGWATCH_DEV_ONE_PROCESS=1 pnpm dev`, or `pnpm dev:one` alone | re-links only what a change reaches, in process |
+| Shape               | Node processes                                                   | Start                                                           | Reload                                                          |
+| ------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------- |
+| Split (default)     | `ui` lane (Vite) + `backend` lane (api and worker in one `node`) | `pnpm dev`                                                      | `dev-supervisor.mjs --watch` restarts the whole backend process |
+| One process (trial) | one `app` lane: Vite, api and worker                             | `LANGWATCH_DEV_ONE_PROCESS=1 pnpm dev`, or `pnpm dev:one` alone | re-links only what a change reaches, in process                 |
 
 - `pnpm dev` is `dev-supervisor.mjs` over `dev/scripts/dev-stack.sh`, which runs the lanes
   through `concurrently`: `ui`, `go`, `langy`, then `backend` (or `app`). It migrates once
@@ -45,7 +45,7 @@ change that depends on it being the default.
 - `backend.reload.ts`: finds the loaded modules a changed file reaches
   (`staleModuleIds`) and drops only those; honours the agent-turn hold.
 - `backend.process.ts`: `startBackend` boots the worker first, then the api;
-  `drainBackend` stops them in the reverse order.
+  `drainBackend` stops the worker first, then the api.
 
 A backend edit that touches a loaded file re-links, drains the old generation and boots the
 new one; the browser keeps its HMR socket. A change that does not link leaves the old
@@ -54,12 +54,12 @@ generation serving. A failed boot waits for the next change. Each generation log
 
 ## Reload knobs
 
-| Variable | Effect |
-| --- | --- |
-| `LANGWATCH_DEV_WATCH=0` | one-shot, no reload (diff tools measure a stack that must not move) |
-| `LANGWATCH_DEV_WATCH_DEBOUNCE_MS` | quiet window before a reload (2000) |
-| `LANGWATCH_DEV_WATCH_MAX_WAIT_MS` | never defer longer than this after the first change (30000) |
-| `LANGWATCH_DEV_HOLD_MARKER` | override the `apps/ui/.haven-hmr-gate` marker path |
+| Variable                          | Effect                                                              |
+| --------------------------------- | ------------------------------------------------------------------- |
+| `LANGWATCH_DEV_WATCH=0`           | one-shot, no reload (diff tools measure a stack that must not move) |
+| `LANGWATCH_DEV_WATCH_DEBOUNCE_MS` | quiet window before a reload (2000)                                 |
+| `LANGWATCH_DEV_WATCH_MAX_WAIT_MS` | never defer longer than this after the first change (30000)         |
+| `LANGWATCH_DEV_HOLD_MARKER`       | override the `apps/ui/.haven-hmr-gate` marker path                  |
 
 The hold marker is what `haven hmr on --ttl 60s` writes during an agent turn; a reload
 waits for it, at most 60 s. A skipped change is `.md`, `.mdx`, `.feature`, a `tsconfig*.json`,
@@ -69,8 +69,8 @@ these is `dev/scripts/dev-supervisor.mjs` and ADR-168 "Step 1, as shipped".
 ## Ports
 
 All derive from `PORT` (default 5560) in `dev/scripts/lib/derive-dev-ports.sh`: ui `PORT`,
-api `PORT+1000`, gateway `PORT+3`, worker metrics `PORT-2561`, Redis DB index
-`(PORT-5560)/10`. An explicit `API_PORT` or `WORKER_METRICS_PORT` wins. Two stacks need
+api `PORT+1000`, gateway `PORT+3`, worker metrics `PORT-2561`; `dev/scripts/dev-stack.sh`
+adds the Redis DB index `(PORT-5560)/10`. An explicit `API_PORT` or `WORKER_METRICS_PORT` wins. Two stacks need
 two `PORT`s (5570, 5580, ...). A held port stops the launcher with a line saying which.
 
 ## Failure shapes

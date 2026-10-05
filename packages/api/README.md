@@ -1,24 +1,36 @@
 # @langwatch/api
 
-LangWatch's API framework, in five entry points. What a feature declares,
-`defineTrpcContract`, lives in the light core, `@langwatch/module`, so a
-contract depends on no framework.
+LangWatch's API framework. `package.json` exports eleven entry points: five
+that features and a module's browser import, five that a process composes
+from, and `./dates`, one schema helper. What a feature declares, `defineTrpcContract`, lives in the light core,
+`@langwatch/module`, so a contract depends on no framework (ARCHITECTURE.md §2).
 
 | Import                  | What it is                                                                                                                                                                                                                                                                                                                                                    |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@langwatch/api/access` | `decide`: the one access check both transports run after the parser — the three declarations, the scope-lineage guard, the blank-scope-id refusal and the project-id mismatch refusal. Names no transport.                                                                                                                                                    |
 | `@langwatch/api`        | The transport-agnostic vocabulary: the handled-error classes and their wire envelope, the access-policy vocabulary (`requires`, `publicEndpoint`, `credentialClassFor`, …), the rate-limit and cache ports, and the Standard Schema boundary. Imports no transport framework.                                                                                 |
-| `@langwatch/api/rest`   | The contract-sealed Hono service framework: explicit version namespaces, input/output validation, OpenAPI documentation, capability middleware, SSE streaming, the route-policy registry and the REST service builder.                                                                                                                                        |
+| `@langwatch/api/rest`   | `defineRestRouter` and the REST runtime on Hono: addressing (`/api/<x>`, `/api/v1/<x>`), input and output validation, credentials and doors, route-chain capabilities, OpenAPI generated from the routes, SSE responses.                                                                                                                                      |
 | `@langwatch/api/trpc`   | The typed tRPC root and the policy spine every procedure runs through: tracing, request logging, handled-error translation, scope lineage, declared authorization and audit, all over injected ports.                                                                                                                                                         |
 | `@langwatch/api/web`    | The browser's half: `createModuleApi` derives a feature's typed tRPC hooks from its own contract, and `trpcQueryKey` / `trpcQueryFilter` / `useInvalidateProcedure` reach a procedure no contract the package names declares yet. React and `@trpc/react-query` live here and nowhere else in the package. It is the ONLY entry a browser package may import. |
+
+The five a process composes from, and `./dates`:
+
+| Import                             | What it is                                                                                          |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `@langwatch/api/hosting`           | One muxer for the process: the API door (`bindApiDoor`), `/api` and the browser app behind `/`      |
+| `@langwatch/api/hosting/selection` | `TransportSelection`: which surfaces (REST, the browser bundle) a process serves, and their headers |
+| `@langwatch/api/hosting/mux`       | The HTTP muxer's listener and its types (`HttpHandler`, `HttpMiddleware`, `HttpTarget`)             |
+| `@langwatch/api/policy`            | The base response policies a process composes from (browser origin, client address, …)              |
+| `@langwatch/api/composition`       | `createTrpcHandlerBinding`: how a process binds a declared procedure                                |
+| `@langwatch/api/dates`             | `flexibleDateSchema`, an epoch-or-ISO date schema (analytics' and trace's contracts import it)      |
 
 None re-exports another. A consumer that wants the error vocabulary imports
 `@langwatch/api`; one that wants the REST builder imports `@langwatch/api/rest`;
 one wiring tRPC imports `@langwatch/api/trpc`; one _declaring_ procedures for
 both a process and a browser imports `@langwatch/module`; a module's browser
-package imports `@langwatch/api/web`. Most REST call sites need two of the five,
-and that is the point — the import says which half of the framework a file
-depends on.
+package imports `@langwatch/api/web`. Most REST call sites need two of the
+first five, and that is the point — the import says which half of the framework
+a file depends on.
 
 REST is built on top of [Hono](https://hono.dev) and [hono-openapi](https://github.com/rhinobase/hono-openapi). Existing services accept Standard Schema; the public REST surface requires Zod 4 so it can derive HTTP documentation from one input object. tRPC is built on [@trpc/server](https://trpc.io) and chooses none of its concretes.
 

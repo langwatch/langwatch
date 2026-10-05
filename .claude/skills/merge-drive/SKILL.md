@@ -219,8 +219,8 @@ require manufacturing a commit.
 The merge lives in a single working tree, so merge lanes **cannot run in
 parallel** the way module lanes do - two agents staging into one index will
 interleave resolutions. Run them one at a time, or give each a disjoint path
-prefix and collect between them. The coordinator's three-lane ceiling does not
-apply here; one is the ceiling.
+prefix and collect between them. The coordinator's lane ceiling (six, record §18)
+does not apply here; one is the ceiling.
 
 Decompose by area, not by count: an area whose conflicts share a cause
 (a rename, a moved package, a renamed export) is one lane and one decision

@@ -25,12 +25,12 @@ available.
 
 In this order, and nothing else up front:
 
-| File                                      | What it gives you                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------- |
-| `.claude/coordinator/COORDINATOR.md`      | how you coordinate: events, the three-lane ceiling, model routing, slices |
-| `.claude/skills/core/repository-rules.md` | what binds you and every lane                                             |
-| `.claude/skills/core/handoff-rules.md`    | the seven statuses and the handoff contract                               |
-| the handover named in step 1              | this drive: where it is, what is next                                     |
+| File                                      | What it gives you                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------- |
+| `.claude/coordinator/COORDINATOR.md`      | how you coordinate: events, the lane ceiling, model routing, slices |
+| `.claude/skills/core/repository-rules.md` | what binds you and every lane                                       |
+| `.claude/skills/core/handoff-rules.md`    | the seven statuses and the handoff contract                         |
+| the handover named in step 1              | this drive: where it is, what is next                               |
 
 The drive document the handover points at (a queue or plan under
 `dev/docs/plans/`) is the content. Read a section when a task needs it, not up
@@ -59,7 +59,9 @@ If the handover names one, do that. If it names a manifest, spawn it:
    this particular task.
 
 State model, effort and context size at every spawn, with one clause saying why.
-The routing table is COORDINATOR.md section 3.
+The routing table is COORDINATOR.md section 3. The ceiling is the record's: at most
+six lanes at once, owned paths disjoint at every spawn, never two lanes in one module
+(`dev/docs/ARCHITECTURE.md` §18).
 
 ## 5. When a lane reports
 

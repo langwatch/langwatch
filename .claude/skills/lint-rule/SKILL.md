@@ -10,7 +10,8 @@ argument-hint: "<rule name or the message that fired>"
 Every rule lives in `packages/oxlint-rules/src/rules/<rule>.rule.mjs`, is registered once in
 the `rules` map of `packages/oxlint-rules/src/index.mjs` (keyed by the name its `defineRule`
 declaration carries), and is enabled once, at `error`, in
-`packages/architecture-enforcer/oxlint.architecture.jsonc`. The plugin-config guard
+`packages/architecture-enforcer/oxlint.architecture.jsonc` (which `.oxlintrc.plugin.jsonc` extends;
+`pnpm lint` runs it beside the native config, ARCHITECTURE.md §17). The plugin-config guard
 (`packages/oxlint-rules/tests/plugin-config.unit.test.mjs`) refuses a rule at `warn`, a
 registered rule no config enables, and a configured rule the registry does not hold.
 `dev/docs/lint-rules.md` is generated from those declarations — read it before writing a new
@@ -60,6 +61,17 @@ A message is `what` + `fix`, joined. `why` is documentation and the linter never
 - Name something the reader can see — a user-visible path or identifier, never an
   internal helper.
 - The bar is `condition-shape` and `comment-block-size`. Read them before writing yours.
+- A rule that catches drift from the architecture is a prompt to the agent reading it (§17):
+  `what` says why the shape is wrong, `fix` says what to use instead. The linter prints `what`
+  plus `fix` (plus the escape sentence below), never `why`.
+
+**Escapable rules** (§17). A disable naming a `langwatch/*` rule is itself an error
+(`langwatch/suppression-states-why`). Only a rule where the framework may genuinely not cover a
+case (API middleware, a route opened to any caller) opts in, with
+`defineRule({ escape: { framework: "<what it cannot express>" } })`. Its message then ends with
+one sentence: extend the framework, or disable the line with `-- <why it cannot>`, and ask the
+human when the case is confusing. A bare disable stays an error. Escape is for new framework
+guards, not a sweep of old directives.
 
 ## 4. Write it fixture-first
 
@@ -83,8 +95,8 @@ A message is `what` + `fix`, joined. `why` is documentation and the linter never
 3. Write `packages/oxlint-rules/src/rules/<rule>.rule.mjs` with `defineRule`. Gate on
    `classify(context)` through the `applies` predicate — never parse the filename yourself,
    and never re-derive what `classify` already computed.
-4. Register it: import it in `packages/oxlint-rules/src/index.mjs` and add it to `RULES` (and the
-   export list), then add one `"langwatch/<rule>": "error"` line to
+4. Register it: import it in `packages/oxlint-rules/src/index.mjs` and add it to `HOUSE_RULES` (and
+   the export list; `RULES` adds `suppression-states-why`, built from `HOUSE_RULES`), then add one `"langwatch/<rule>": "error"` line to
    `packages/architecture-enforcer/oxlint.architecture.jsonc` `rules` (no filename lists).
    `pnpm --filter @langwatch/oxlint-rules test tests/plugin-config.unit.test.mjs` proves the two agree.
 5. Regenerate the reference and commit it:

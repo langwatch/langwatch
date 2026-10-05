@@ -18,9 +18,14 @@ document disagree, the finding is right and the document is the defect.
 | architecture enforcer           | `pnpm lint:architecture`         | The whole tree: package graph, ownership, cycles, dead exports | `packages/architecture-enforcer/README.md`       |
 
 The plugin lives in `packages/oxlint-rules` (rules under `src/rules/`, grammar
-tables under `grammar/`). `.oxlintrc.jsonc` extends
-`packages/architecture-enforcer/oxlint.architecture.jsonc`, which turns every
-`langwatch/*` rule on at `error`. The enforcer's policies are one registry in
+tables under `grammar/`). `pnpm lint` (`dev/nx/lint.mjs`) runs two oxlint
+processes in parallel (§17): `.oxlintrc.native.jsonc`, the stock rules, and
+`.oxlintrc.plugin.jsonc`, which extends
+`packages/architecture-enforcer/oxlint.architecture.jsonc` and turns every
+`langwatch/*` rule on at `error`. Type-aware rules sit in
+`.oxlintrc.types.jsonc` (`pnpm lint:types`; CI runs it). `.oxlintrc.jsonc`
+extends all three, for one scoped run over your paths. The commands are in
+`dev/docs/TOOLING.md`. The enforcer's policies are one registry in
 `packages/architecture-enforcer/src/policies/index.ts`; each names the spec its
 scenarios live in.
 
@@ -28,13 +33,17 @@ scenarios live in.
 
 1. **A message is `what` plus `fix`.** `fix` is one imperative you can apply
    without opening another file. Do it. The `why` is only in the generated doc.
+   An escapable rule's message adds one sentence: how to disable it with a reason.
 2. **Never game a rule by renaming.** A file renamed `*.rules.ts` to dodge a
    service check is the defect, not the fix.
 3. **No autofixers on `langwatch/*` rules.** Almost none have one on purpose. Do
    not run `oxlint --fix` across the tree to clear them.
 4. **A suppression that suppresses nothing is an error**
-   (`reportUnusedDisableDirectives`). Comment size is unsuppressible
-   (`CLAUDE.md`: five lines including delimiters).
+   (`reportUnusedDisableDirectives`). A disable naming a `langwatch/*` rule is
+   itself an error (`langwatch/suppression-states-why`), except on the few
+   escapable rules (§17), and there only with `-- <why the framework cannot>`;
+   a bare disable is an error. When the case is confusing, ask the human.
+   Comment size is unsuppressible (`CLAUDE.md`: five lines including delimiters).
 5. **The grammar file is the authority on file names**, not the record (§3.2):
    `packages/oxlint-rules/grammar/feature-layout-policy.mjs`. Layer imports
    are `grammar/module-layers.mjs`.
@@ -92,12 +101,12 @@ The installer stem is `<f>.module.ts` (`modules/monitor/process/src/monitor.modu
 
 ## Which finding comes from where
 
-| Finding looks like                             | Source                                        |
-| ---------------------------------------------- | --------------------------------------------- |
-| `langwatch/<rule>` with file and line          | the plugin; `dev/docs/lint-rules.md`          |
-| `<policy-id>` with a package or edge, no line  | an enforcer policy                            |
-| a name you cannot find in the generated doc    | the policy id; grep `src/policies/index.ts`   |
-| `import/no-cycle`, `typescript/*`, `unicorn/*` | stock oxlint, configured in `.oxlintrc.jsonc` |
+| Finding looks like                             | Source                                               |
+| ---------------------------------------------- | ---------------------------------------------------- |
+| `langwatch/<rule>` with file and line          | the plugin; `dev/docs/lint-rules.md`                 |
+| `<policy-id>` with a package or edge, no line  | an enforcer policy                                   |
+| a name you cannot find in the generated doc    | the policy id; grep `src/policies/index.ts`          |
+| `import/no-cycle`, `typescript/*`, `unicorn/*` | stock oxlint, configured in `.oxlintrc.native.jsonc` |
 
 ## Traps
 

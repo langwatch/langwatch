@@ -6,8 +6,8 @@ user-invocable: true
 
 # API transports: REST, tRPC, streams
 
-Record: `dev/docs/ARCHITECTURE.md` section 8 (transports), section 12 (errors), the "Read hints" and
-"Projection cursor reads" paragraphs of section 10.1. This skill teaches the shape and the traps and does
+Record: `dev/docs/ARCHITECTURE.md` section 8 (transports), section 12 (errors), the read-hint ("The server never
+answers `unchanged`") and "Projection cursor reads" paragraphs of section 10. This skill teaches the shape and the traps and does
 not restate rulings. Deleted spellings are section 15; target names are section 16.
 
 A transport file **declares**. It never implements. The module's `*Api` operation holds the behaviour.
