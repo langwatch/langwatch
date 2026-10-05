@@ -4,7 +4,7 @@ import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_LICENSE_KEY } from "../../ee/licen
 // The key the app boots with when LANGWATCH_LICENSE_PUBLIC_KEY is unset,
 // which is what `haven up` runs. The vitest setup swaps `PUBLIC_KEY` for the
 // test-suite key, so that export would test the wrong deployment.
-import { PLACEHOLDER_PUBLIC_KEY as DEFAULT_PUBLIC_KEY } from "../../ee/licensing/constants";
+import { EMBEDDED_PUBLIC_KEY } from "../../ee/licensing/constants";
 import {
   parseLicenseKey,
   verifySignature,
@@ -37,7 +37,7 @@ describe("LOCAL_DEV_ENTERPRISE_LICENSE_KEY", () => {
         expect(
           isSignedFor({
             licenseKey: LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
-            publicKey: DEFAULT_PUBLIC_KEY,
+            publicKey: EMBEDDED_PUBLIC_KEY,
           }),
         ).toBe(true);
       });
@@ -50,7 +50,7 @@ describe("LOCAL_DEV_ENTERPRISE_LICENSE_KEY", () => {
         expect(
           isSignedFor({
             licenseKey: TEST_SUITE_LICENSE_KEY,
-            publicKey: DEFAULT_PUBLIC_KEY,
+            publicKey: EMBEDDED_PUBLIC_KEY,
           }),
         ).toBe(false);
       });
@@ -65,7 +65,7 @@ describe("resolveSeedLicense", () => {
         expect(
           resolveSeedLicense({
             stored: null,
-            publicKey: DEFAULT_PUBLIC_KEY,
+            publicKey: EMBEDDED_PUBLIC_KEY,
             candidates: SEED_CANDIDATES,
           }),
         ).toBe(LOCAL_DEV_ENTERPRISE_LICENSE_KEY);
@@ -77,7 +77,7 @@ describe("resolveSeedLicense", () => {
         expect(
           resolveSeedLicense({
             stored: "not-a-license",
-            publicKey: DEFAULT_PUBLIC_KEY,
+            publicKey: EMBEDDED_PUBLIC_KEY,
             candidates: SEED_CANDIDATES,
           }),
         ).toBe(LOCAL_DEV_ENTERPRISE_LICENSE_KEY);
@@ -87,7 +87,7 @@ describe("resolveSeedLicense", () => {
         expect(
           resolveSeedLicense({
             stored: TEST_SUITE_LICENSE_KEY,
-            publicKey: DEFAULT_PUBLIC_KEY,
+            publicKey: EMBEDDED_PUBLIC_KEY,
             candidates: SEED_CANDIDATES,
           }),
         ).toBe(LOCAL_DEV_ENTERPRISE_LICENSE_KEY);
@@ -102,7 +102,7 @@ describe("resolveSeedLicense", () => {
         expect(
           resolveSeedLicense({
             stored: activated,
-            publicKey: DEFAULT_PUBLIC_KEY,
+            publicKey: EMBEDDED_PUBLIC_KEY,
             candidates: [TEST_SUITE_LICENSE_KEY],
           }),
         ).toBe(activated);

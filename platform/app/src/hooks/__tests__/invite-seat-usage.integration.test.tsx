@@ -15,7 +15,11 @@ import { MemberSeatUsage } from "../../components/settings/MemberSeatUsage";
 import { useInviteActions } from "../useInviteActions";
 
 type Scope = { organizationId: string };
-type Usage = { membersCount: number; membersLiteCount: number };
+type Usage = {
+  membersCount: number;
+  membersLiteCount: number;
+  membersDeveloperCount: number;
+};
 const { readUsage, createInvite, revokeInvite, resendInvite, showErrorToast } =
   vi.hoisted(() => ({
     readUsage: vi.fn<(scope: Scope) => Promise<Usage>>(),
@@ -170,6 +174,7 @@ describe("when invitations change reserved seats in an open directory", () => {
       readUsage.mockImplementation(async ({ organizationId }) => ({
         membersCount: 2,
         membersLiteCount: organizationId === "org_acme" ? reserved : 7,
+        membersDeveloperCount: 4,
       }));
       createInvite.mockImplementation(async () => {
         reserved = change.after;
@@ -197,7 +202,11 @@ describe("when invitations change reserved seats in an open directory", () => {
   }
 
   it("keeps the reserved seat when revocation is refused", async () => {
-    readUsage.mockResolvedValue({ membersCount: 2, membersLiteCount: 1 });
+    readUsage.mockResolvedValue({
+      membersCount: 2,
+      membersLiteCount: 1,
+      membersDeveloperCount: 4,
+    });
     revokeInvite.mockRejectedValue(new Error("Revocation refused"));
     const seats = renderInvites();
     expect(await seats.findByText("1")).toBeInTheDocument();

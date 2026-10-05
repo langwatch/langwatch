@@ -9,10 +9,13 @@
  * @see specs/lwql/eval-functions.feature
  */
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "~/generated/prisma/client";
-import { instantEvalsEnabled } from "../access";
+import { instantEvalsEnabled, organizationOfProject } from "../access";
+
+const flag = vi.hoisted(() => ({ isEnabled: vi.fn(async () => false) }));
+vi.mock("~/server/featureFlag", () => ({ featureFlagService: flag }));
 
 /** A Prisma that fails loudly, so a reach for it is observable either way. */
 const REACHED = "the gate read the project";
@@ -64,6 +67,68 @@ const QUIET_PRISMA = {
     findUnique: async () => ({ team: { organizationId: "organization" } }),
   },
 } as unknown as PrismaClient;
+
+beforeEach(() => {
+  flag.isEnabled.mockClear();
+  flag.isEnabled.mockResolvedValue(false);
+});
+
+describe("given the flag is off and the organization switched Instant Evals on itself", () => {
+  describe("when a project of that organization asks whether it may judge", () => {
+    /** @scenario "An organization that switched itself on is judged without the flag" */
+    it("answers yes from the organization's switch", async () => {
+      const isOptedIn = vi.fn(async (organizationId: string) => {
+        return organizationId === "organization";
+      });
+      await expect(
+        instantEvalsEnabled({
+          prisma: QUIET_PRISMA,
+          projectId: "project-of-an-opted-in-organization",
+          isClassifierConfigured: () => true,
+          isClassifierAvailableForOrganization: async () => true,
+          isOptedIn,
+        }),
+      ).resolves.toBe(true);
+      expect(isOptedIn).toHaveBeenCalledWith("organization");
+    });
+  });
+});
+
+describe("given the flag is on for the project", () => {
+  describe("when the project asks whether it may judge", () => {
+    it("answers yes without reading the organization's switch", async () => {
+      flag.isEnabled.mockResolvedValue(true);
+      const isOptedIn = vi.fn(async () => false);
+      await expect(
+        instantEvalsEnabled({
+          prisma: QUIET_PRISMA,
+          projectId: "project-the-operator-released",
+          isClassifierConfigured: () => true,
+          isClassifierAvailableForOrganization: async () => true,
+          isOptedIn,
+        }),
+      ).resolves.toBe(true);
+      expect(isOptedIn).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a project with no organization behind it", () => {
+  describe("when a router resolves the organization it may not take from its input", () => {
+    it("throws a handled not-found rather than answering for nobody", async () => {
+      const prisma = {
+        project: { findUnique: async () => null },
+      } as unknown as PrismaClient;
+      await expect(
+        organizationOfProject({ prisma, projectId: "gone" }),
+      ).rejects.toMatchObject({
+        name: "NotFoundError",
+        code: "project_not_found",
+        httpStatus: 404,
+      });
+    });
+  });
+});
 
 describe("given a classifier that judges for some organizations only", () => {
   describe("when a project of an organization it does not judge for asks", () => {

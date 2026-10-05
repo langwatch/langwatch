@@ -1,0 +1,67 @@
+# values-autogen-off.yaml: an install where the operator owns every Secret,
+# the way Argo CD or a secret manager runs the chart. autogen is off, every
+# credential comes from a pre-created Secret, and every key carries the dashed
+# name Azure Key Vault produces through an ExternalSecret dataFrom.
+#
+# Rendered by tests/autogen-off-and-argocd.sh and by the "render every
+# published preset" CI step. Nothing here may need cluster access to render.
+#
+# Secrets the operator creates first:
+#   acme-app         credentials-encryption-key, cron-api-key, nextauth-secret,
+#                    virtual-key-pepper, gateway-internal-secret,
+#                    gateway-jwt-secret, langy-internal-secret,
+#                    nlp-internal-secret, lwql-clickhouse-password,
+#                    lwql-postgres-reader-password
+#   acme-clickhouse  clickhouse-password, clickhouse-cluster-secret
+#   acme-redis       redis-password
+#   acme-postgresql  postgres-admin-password, postgres-password
+
+autogen:
+  enabled: false
+
+secrets:
+  existingSecret: acme-app
+  secretKeys:
+    credentialsEncryptionKey: credentials-encryption-key
+    cronApiKey: cron-api-key
+    nextAuthSecret: nextauth-secret
+    virtualKeyPepper: virtual-key-pepper
+    lwqlClickhousePassword: lwql-clickhouse-password
+    lwqlPostgresReaderPassword: lwql-postgres-reader-password
+
+postgresql:
+  chartManaged: true
+  auth:
+    existingSecret: acme-postgresql
+    secretKeys:
+      adminPasswordKey: postgres-admin-password
+      passwordKey: postgres-password
+
+clickhouse:
+  auth:
+    existingSecret: acme-clickhouse
+    secretKeys:
+      passwordKey: clickhouse-password
+      clusterSecretKey: clickhouse-cluster-secret
+
+redis:
+  chartManaged: true
+  auth:
+    existingSecret: acme-redis
+    secretKeys:
+      passwordKey: redis-password
+
+gateway:
+  secrets:
+    existingSecretName: acme-app
+    internalSecretKey: gateway-internal-secret
+    jwtSecretKey: gateway-jwt-secret
+
+langyagent:
+  secrets:
+    existingSecretName: acme-app
+    internalSecretKey: langy-internal-secret
+
+langwatch_nlp:
+  secrets:
+    internalSecretKey: nlp-internal-secret

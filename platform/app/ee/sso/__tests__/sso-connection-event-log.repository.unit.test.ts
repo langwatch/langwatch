@@ -129,6 +129,9 @@ describe("given a connection with a history of facts", () => {
             // chose and reads on the card above this panel, not a scrap of
             // the raw event payload.
             "name",
+            // The issuer an identity provider update sets: the public address
+            // the provider identifies itself by, shown on the same card.
+            "issuer",
             "note",
             "occurredAtMs",
             "policy",

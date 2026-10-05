@@ -431,6 +431,40 @@ describe("explainHandledError", () => {
       expect(description).toContain("key or its permissions");
     });
 
+    /** @scenario "A provider's own access code reads as a refused credential" */
+    it.each([
+      "access_denied",
+      "permission_denied_error",
+      "authentication_error",
+      "permission_error",
+      "invalid_api_key",
+      "AccessDeniedException",
+    ])("explains the provider's own %s code as a refused credential", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toBe(
+        "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",
+      );
+    });
+
+    /** @scenario "A provider that does not know the model gets its own remediation copy" */
+    it.each([
+      "upstream_not_found",
+      "model_not_found",
+      "not_found_error",
+      "ResourceNotFoundException",
+    ])("explains a %s reason as a model the provider does not serve", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toBe(
+        "The model provider does not serve this model to this key. Check the model name, or pick a different model.",
+      );
+    });
+
     /** @scenario "A provider rate limit gets its own remediation copy" */
     it("explains an upstream_rate_limited reason as a wait-and-retry", () => {
       const { description } = explainHandledError(
@@ -721,6 +755,11 @@ describe("explainHandledError", () => {
         // recipients to test-fire to."), and it names WHICH piece is missing.
         // Authored in `trigger-template.service.ts`, never relayed.
         test_fire_unavailable: new Set(["reason"]),
+        // Same shape: `reason` is the sentence naming WHICH piece of the alert
+        // is missing ("State the severity this alert fires at."), which the
+        // generic line cannot do. Authored in the automations app layer, never
+        // relayed.
+        graph_alert_incomplete: new Set(["reason"]),
         // `reason` is the sentence the agent test prefetch or the type check
         // wrote for this exact agent ("Only HTTP, code, workflow and connected
         // agents can be tested"). Authored in `agent-test-run.ts` and

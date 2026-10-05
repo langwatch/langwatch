@@ -1,6 +1,9 @@
 import {
   explainHandledError,
   type HandledErrorShape,
+  PROVIDER_CREDENTIAL_REASONS,
+  PROVIDER_INVALID_REQUEST_REASONS,
+  PROVIDER_MODEL_MISSING_REASONS,
   readHandledError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "~/features/errors";
@@ -224,14 +227,29 @@ const PLAN_LIMIT_REASONS: ReadonlySet<string> = new Set([
  * `decodeProviderErrorBody`): `rate_limit_exceeded` from OpenAI and Azure
  * OpenAI, `rate_limit_error` from Anthropic, `RESOURCE_EXHAUSTED` from
  * Google. A real 429 arrives this way far more often than as the bare
- * `upstream_rate_limited`. A provider body with a code this list does not
- * name stays on the generic card: promotion is by exact code, never by the
- * presence of an upstream failure alone.
+ * `upstream_rate_limited`.
+ *
+ * The proxy's own `llm_upstream_error` promotes on its own: it already says
+ * the provider answered with a failure, whatever discriminant sits beneath
+ * it. The discriminants only select which sentence the card says, and one no
+ * list names gets the generic provider line. Promotion is still by exact
+ * code, never by reading a message.
  *
  * `llm_upstream_error` already writes one sentence per group, so promoting to
  * it reuses that copy rather than restating it here.
  */
 const UPSTREAM_PROVIDER_REASONS: ReadonlySet<string> = new Set([
+  // The proxy's own code for "the provider answered with a failure". Its
+  // reason beneath is the provider's discriminant, which may be one no list
+  // here names (Bedrock's "access_denied"), so the code itself is what says
+  // the provider refused.
+  "llm_upstream_error",
+  // The gateway's own codes for a provider failure it named in its envelope
+  // rather than forwarding the provider's body: an unusable answer, no
+  // answer in time, or no connection at all.
+  "provider_error",
+  "provider_timeout",
+  "provider_connection_failed",
   "upstream_stream_error",
   "upstream_bad_request",
   "upstream_unauthorized",
@@ -647,6 +665,26 @@ export function explainLangyError(
       // still landing on `langy_agent_errored` is a rejection we cannot name,
       // so the registry's line plus the trace id is the honest answer.
       return { ...copy, render: "card", action: retry, ...debug };
+    }
+
+    case "llm_upstream_error": {
+      // The provider was reached and refused. A refused key, a model it
+      // does not serve or a request it reads as invalid fails the same way
+      // every time, so the card offers the model settings; anything else (a
+      // rate limit, an outage) can pass, so it offers another try.
+      const deterministic =
+        hasReasonKind(domain.reasons, PROVIDER_CREDENTIAL_REASONS) ||
+        hasReasonKind(domain.reasons, PROVIDER_MODEL_MISSING_REASONS) ||
+        hasReasonKind(domain.reasons, PROVIDER_INVALID_REQUEST_REASONS);
+      return {
+        ...copy,
+        render: "card",
+        action: deterministic
+          ? { label: "Configure model", kind: "configure-model" }
+          : retry,
+        traceId: domain.traceId,
+        ...debug,
+      };
     }
 
     case "langy_worker_spawn_failed":

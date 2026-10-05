@@ -14,14 +14,20 @@
  * `CredentialAccountService`'s, and its own test drives them over fakes.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SignUpRestrictedError } from "~/server/auth/errors";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
+import type { NextApiRequest } from "~/types/next-stubs";
 import { createInnerTRPCContext } from "../../trpc";
 import { userRouter } from "../user";
 
 // The raw env names an IdP; what this route keys off is the RESOLVED provider
 // below, so the two can disagree and that is the point of the coercion tests.
 vi.mock("../../../../env.mjs", () => ({
-  env: { NEXTAUTH_PROVIDER: "auth0", BASE_HOST: "http://localhost:5560" },
+  env: {
+    NEXTAUTH_PROVIDER: "auth0",
+    BASE_HOST: "http://localhost:5560",
+    NEXTAUTH_URL: "http://localhost:5560",
+  },
 }));
 
 const { rateLimitMock } = vi.hoisted(() => ({
@@ -66,6 +72,9 @@ const { registerMock } = vi.hoisted(() => ({
 const { localSignUpDecisionMock } = vi.hoisted(() => ({
   localSignUpDecisionMock: vi.fn(),
 }));
+const { assertSignUpMock } = vi.hoisted(() => ({
+  assertSignUpMock: vi.fn(),
+}));
 
 // The account-creating call is what sends the confirmation link, so the two
 // services it drives are the seam this suite reads. The verification service's
@@ -77,6 +86,7 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
   >()),
   credentialAccounts: () => ({ register: registerMock }),
   localSignUpDecision: localSignUpDecisionMock,
+  signUpPolicy: () => ({ assertSignUp: assertSignUpMock }),
   signUpVerification: () => ({
     claimAddressProof: claimAddressProofMock,
     claimUnconfirmedAddressProof: claimUnconfirmedAddressProofMock,
@@ -108,6 +118,7 @@ describe("userRouter.register()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     registerMock.mockResolvedValue({ id: "user-1" });
+    assertSignUpMock.mockResolvedValue(undefined);
     // Most cases here are the coerced/email-mode deployment; the licensed-SSO
     // case overrides this.
     resolveAuthProviderMock.mockResolvedValue("email");
@@ -122,8 +133,92 @@ describe("userRouter.register()", () => {
     isEmailUnconfiguredMock.mockReturnValue(false);
   });
 
-  const createCaller = () =>
-    userRouter.createCaller(createInnerTRPCContext({ session: null }));
+  /** A browser request carrying these headers, as the tRPC route hands it on. */
+  const requestWith = (headers: Record<string, string>) =>
+    ({ headers }) as unknown as NextApiRequest;
+
+  const createCaller = (
+    headers: Record<string, string> = { origin: "http://localhost:5560" },
+  ) =>
+    userRouter.createCaller(
+      createInnerTRPCContext({ session: null, req: requestWith(headers) }),
+    );
+
+  describe("when the browser is on a web address the installation is not set up for", () => {
+    /** @scenario "A sign-up on a web address the installation is not set up for writes no account" */
+    it("refuses with the invalid origin code before the proof is spent or the account written", async () => {
+      await expect(
+        createCaller({ origin: "http://localhost:18560" }).register({
+          email: "sam@acme.com",
+          password: "correct horse battery staple",
+          addressProof: "unconfirmed-proof",
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: { code: "auth_invalid_origin" },
+      });
+
+      expect(claimAddressProofMock).not.toHaveBeenCalled();
+      expect(claimUnconfirmedAddressProofMock).not.toHaveBeenCalled();
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A sign-up request that names no web address is refused" */
+    it("refuses a request carrying neither an origin nor a referer", async () => {
+      await expect(
+        createCaller({}).register({
+          email: "sam@acme.com",
+          password: "correct horse battery staple",
+          addressProof: "proof-1",
+        }),
+      ).rejects.toMatchObject({ cause: { code: "auth_invalid_origin" } });
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the installation's sign-up policy refuses the address", () => {
+    /** @scenario "A refused registration spends no address proof and writes no account" */
+    it("refuses with the restricted code before the proof is spent or the account written", async () => {
+      assertSignUpMock.mockRejectedValue(
+        new SignUpRestrictedError("invite_only"),
+      );
+
+      await expect(
+        createCaller().register({
+          email: "Stranger@Example.com",
+          password: "correct horse battery staple",
+          addressProof: "proof-1",
+        }),
+      ).rejects.toMatchObject({
+        cause: { code: "auth_sign_up_restricted" },
+      });
+
+      expect(assertSignUpMock).toHaveBeenCalledWith({
+        email: "stranger@example.com",
+      });
+      // Probing addresses spends the same per-caller budget as signing up.
+      expect(rateLimitMock).toHaveBeenCalledWith(
+        expect.objectContaining({ key: "user.register:198.51.100.11" }),
+      );
+      expect(claimAddressProofMock).not.toHaveBeenCalled();
+      expect(claimUnconfirmedAddressProofMock).not.toHaveBeenCalled();
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the browser is on the configured address and sends only a referer", () => {
+    it("accepts the sign-up", async () => {
+      await expect(
+        createCaller({
+          referer: "http://localhost:5560/auth/signup",
+        }).register({
+          email: "sam@acme.com",
+          password: "correct horse battery staple",
+          addressProof: "proof-1",
+        }),
+      ).resolves.toEqual({ id: "user-1" });
+    });
+  });
 
   describe("when registration succeeds", () => {
     it("answers with the id of the account that was opened", async () => {

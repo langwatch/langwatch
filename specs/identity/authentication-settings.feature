@@ -103,7 +103,40 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When the sign-in addresses are listed
     Then nothing offers to send a confirmation link
 
+  # Two facts can say an address is confirmed: the account's email identifier
+  # (VERIFIED through the emailed ceremony) and `User.emailVerified`. The fold
+  # writes the column from the identifier, never the other way, and sign-in
+  # linking reads the column. An operator who confirms an address by setting
+  # the column directly, on an installation that cannot send email, moves only
+  # the column. The list follows the column for the account's own address, so
+  # the screen never calls an address unconfirmed that sign-in already trusts.
+  @unit
+  Scenario: The account's own address confirmed outside the app shows as confirmed
+    Given "sam"'s own address identifier was never verified
+    And "sam"'s account says the address is confirmed
+    When the sign-in addresses are listed
+    Then the account's own address is shown as confirmed
+    And nothing offers to send it a confirmation link
+    And another address that was never confirmed still shows as not confirmed yet
+
   # ── Adding another address ─────────────────────────────────────────────
+
+  # Adding an address is sending it a link. Where the installation has no email
+  # provider no link can go out, so the offer stands down and says what is
+  # missing, and the route refuses with a named error whatever the screen drew.
+  @integration
+  Scenario: An installation that cannot send email does not offer to add an address
+    Given the installation has no email provider configured
+    When the authentication settings are shown
+    Then adding an email address is not offered
+    And the reason given says an administrator needs to set up an email provider
+
+  @unit
+  Scenario: Adding or resending an address without a way to send email is refused with a named error
+    Given the installation has no email provider configured
+    When "sam" asks to add an address or to send an address its link again
+    Then it is refused with "auth_email_sending_unavailable"
+    And no identifier is attached and nothing is sent
 
   @integration
   Scenario: Adding a second address starts a confirmation rather than a sign-in method
@@ -324,6 +357,20 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When "sam" asks to remove the password
     Then the confirmation names the ways in that stay behind
     And nothing is removed until "sam" confirms
+
+  # ── Connecting a provider ──────────────────────────────────────────────
+
+  # The Connect offers come from the deployment's sign-in policy, carried on
+  # the public settings read. An operator who removes a provider restarts the
+  # app, and a tab that was open across that restart still holds the old list.
+  # The read is kept briefly and asked again on mount and on focus, so a plain
+  # reload, or coming back to the tab, shows the deployment's current set.
+  @unit
+  Scenario: A provider the deployment stopped offering leaves the Connect offers on reload
+    Given the deployment offered "Microsoft" when "sam" opened the page
+    And the operator removed it and restarted the app
+    When "sam" reloads or comes back to the page
+    Then the deployment's settings are asked for again rather than read from a long-lived cache
 
   # ── Unlinking single sign-on ───────────────────────────────────────────
 

@@ -20,6 +20,7 @@ import {
   updateTraceMetadata,
 } from "~/server/app-layer/traces/trace-metadata.service";
 import { prisma } from "~/server/db";
+import { assertLegacyFiltersKeyed } from "~/server/filters/assertLegacyFiltersKeyed";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import type { Trace } from "~/server/tracer/types";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
@@ -342,6 +343,10 @@ export function registerTracesRoutes(
         ...searchFields
       } = params;
       const format = formatParam ?? (llmMode ? "digest" : "json");
+      assertLegacyFiltersKeyed({
+        filters: searchFields.filters,
+        offersFilterString: true,
+      });
 
       logger.info({ projectId: project.id }, "Searching traces for project");
 

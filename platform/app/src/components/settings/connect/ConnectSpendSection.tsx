@@ -32,9 +32,7 @@ export function ConnectSpendSection({
   onSaved,
 }: ConnectSpendSectionProps) {
   const usage = status.usage;
-  if (!usage) return null;
-
-  const contract = usage.contract;
+  if (!usage && !status.isUsageUnavailable) return null;
 
   return (
     <SettingsSection
@@ -42,16 +40,26 @@ export function ConnectSpendSection({
       description="What this install has spent on hosted services, and the cap it stops at."
       testId="connect-spend"
     >
-      {contract ? (
+      {!usage ? (
+        <Text
+          fontSize="sm"
+          color="fg.muted"
+          data-testid="connect-usage-unavailable"
+        >
+          Usage unavailable. LangWatch could not be reached, so spend and the
+          cap cannot be shown right now. The hosted services keep their
+          settings.
+        </Text>
+      ) : usage.contract ? (
         <VStack width="full" align="stretch" gap={5}>
           <SpendFigures
-            contract={contract}
+            contract={usage.contract}
             spendAvailable={usage.spendAvailable}
           />
           {canManage ? (
             <CapField
               organizationId={organizationId}
-              contract={contract}
+              contract={usage.contract}
               onSaved={onSaved}
             />
           ) : null}

@@ -703,19 +703,25 @@ export class GrantsLedgerWriter {
     const revokedAtMs = this.now();
     const batchId = newLedgerCommandId();
     const senders = (await this.commands()).commands;
-    await Promise.all(
-      bindingIds.map((grantId) =>
-        senders.revokeGrant.send({
-          tenantId: organizationId,
-          organizationId,
-          commandId: `${batchId}:${grantId}`,
-          grantId,
-          ...(reason ? { reason } : {}),
-          actor,
-          occurredAtMs: revokedAtMs,
-        }),
-      ),
-    );
+    // One send at a time, not a Promise.all. In memory mode (no Redis) a
+    // send resolves only once its job has run, and the job in turn sends its
+    // projection jobs to the same queue and waits for them; a batch as wide
+    // as the queue's concurrency (five) fills every slot with command jobs
+    // and none of their projections can start. A seat change to the
+    // Developer seat (ADR-143) revokes that many rows as a matter of course.
+    // On Redis a send returns at enqueue, so the cost there is a few short
+    // round trips instead of one.
+    for (const grantId of bindingIds) {
+      await senders.revokeGrant.send({
+        tenantId: organizationId,
+        organizationId,
+        commandId: `${batchId}:${grantId}`,
+        grantId,
+        ...(reason ? { reason } : {}),
+        actor,
+        occurredAtMs: revokedAtMs,
+      });
+    }
     await this.enforcement.enforceGrantRevocation({
       organizationId,
       grantIds: bindingIds,

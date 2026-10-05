@@ -3,7 +3,8 @@
  *
  * Three conditions, all server-side, and all have to hold:
  *
- *  - the feature flag is on for the project, which is the product decision;
+ *  - the feature flag is on for the project, or its organization switched
+ *    Instant Evals on itself (`./opt-in.ts`), which is the product decision;
  *  - a classifier is configured for the deployment, which is the operational
  *    one. Publishing the functions as available where nothing can answer them
  *    would put a caller in front of a query that always comes back null;
@@ -25,6 +26,7 @@
  * @see ../../../../specs/lwql/eval-functions.feature
  */
 
+import { NotFoundError } from "@langwatch/handled-error";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { featureFlagService } from "~/server/featureFlag";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
@@ -32,19 +34,27 @@ import {
   isInstantEvalClassifierAvailableForOrganization,
   isInstantEvalClassifierConfigured,
 } from "./classifier";
+import { instantEvalsOptedIn } from "./opt-in";
 
 export const INSTANT_EVALS_FLAG = "release_instant_evals";
 
 /**
- * The product decision alone: whether the flag is on for the project, whatever
- * the deployment has configured. The search router reads this one, because a
- * released project with no classifier still gets the "configure a model"
- * primer, while an unreleased one is never offered a judgement at all.
+ * The product decision alone: whether the flag is on for the project or its
+ * organization switched Instant Evals on itself, whatever the deployment has
+ * configured. The search router reads this one, because a released project
+ * with no classifier still gets the "can't run right now" popover, while an
+ * unreleased one is never offered a judgement at all.
+ *
+ * The flag is asked first: it is cached and answers for the operator, and an
+ * organization the operator released never pays for the row read. The opt-in
+ * is the organization's own answer, and it is read only when the flag says no.
  */
 export async function instantEvalsReleased({
   prisma,
   projectId,
   organizationId,
+  isOptedIn = (organizationId) =>
+    instantEvalsOptedIn({ prisma, organizationId }),
 }: {
   prisma: PrismaClient;
   projectId: string;
@@ -53,15 +63,20 @@ export async function instantEvalsReleased({
    * otherwise, so the common call stays a single argument pair.
    */
   organizationId?: string;
+  /** Injectable so a test can state the organization's answer. */
+  isOptedIn?: (organizationId: string) => Promise<boolean>;
 }): Promise<boolean> {
   const resolved =
     organizationId ?? (await organizationOf({ prisma, projectId }));
 
-  return featureFlagService.isEnabled(INSTANT_EVALS_FLAG, {
+  const released = await featureFlagService.isEnabled(INSTANT_EVALS_FLAG, {
     distinctId: projectId,
     projectId,
     organizationId: resolved ?? NOT_TARGETED,
   });
+  if (released) return true;
+  if (!resolved) return false;
+  return await isOptedIn(resolved);
 }
 
 async function organizationOf({
@@ -78,11 +93,33 @@ async function organizationOf({
   return project?.team?.organizationId;
 }
 
+/**
+ * The project's organization, for a caller that must not take it from its
+ * input. A project the permission check let through always has one; a missing
+ * row here is a project deleted between the check and this read, which is a
+ * handled not-found like every other refusal this feature raises, not an
+ * internal failure.
+ */
+export async function organizationOfProject({
+  prisma,
+  projectId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+}): Promise<string> {
+  const organizationId = await organizationOf({ prisma, projectId });
+  if (!organizationId) {
+    throw new NotFoundError("project_not_found", "Project", projectId);
+  }
+  return organizationId;
+}
+
 export async function instantEvalsEnabled({
   prisma,
   projectId,
   isClassifierConfigured = isInstantEvalClassifierConfigured,
   isClassifierAvailableForOrganization = isInstantEvalClassifierAvailableForOrganization,
+  isOptedIn,
 }: {
   prisma: PrismaClient;
   projectId: string;
@@ -96,6 +133,8 @@ export async function instantEvalsEnabled({
   isClassifierAvailableForOrganization?: (
     organizationId: string,
   ) => Promise<boolean>;
+  /** The same, for the organization's own switch. */
+  isOptedIn?: (organizationId: string) => Promise<boolean>;
 }): Promise<boolean> {
   if (!isClassifierConfigured()) return false;
 
@@ -108,5 +147,10 @@ export async function instantEvalsEnabled({
     return false;
   }
 
-  return instantEvalsReleased({ prisma, projectId, organizationId });
+  return instantEvalsReleased({
+    prisma,
+    projectId,
+    organizationId,
+    ...(isOptedIn ? { isOptedIn } : {}),
+  });
 }

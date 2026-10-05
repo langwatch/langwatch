@@ -310,6 +310,82 @@ describe("authz engine decide()", () => {
     });
   });
 
+  describe("given a Developer seat (DEVELOPER org role)", () => {
+    /** @scenario A Developer works inside their own project */
+    it("grants through a direct binding on their own team", () => {
+      const grants = makeGrants({
+        organizationRole: "DEVELOPER",
+        bindings: [
+          binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM }),
+        ],
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "traces:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
+      expect(
+        engine.decide({
+          grants,
+          permission: "datasets:manage",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
+    });
+
+    /** @scenario A Developer never sees a shared project */
+    it("gets nothing from an ORGANIZATION-scoped binding, even admin", () => {
+      const grants = makeGrants({
+        organizationRole: "DEVELOPER",
+        bindings: [
+          binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG }),
+        ],
+      });
+      const denied = engine.decide({
+        grants,
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(denied.allowed).toBe(false);
+      expect(denied.denialReason).toBe("developer-restricted");
+    });
+
+    /** @scenario A Developer never sees a shared project */
+    it("gets nothing from a group-delivered binding on a shared team", () => {
+      const grants = makeGrants({
+        organizationRole: "DEVELOPER",
+        bindings: [
+          binding({
+            roleKey: "member",
+            scopeType: "TEAM",
+            scopeId: TEAM,
+            viaGroupId: "group-9",
+          }),
+        ],
+      });
+      const denied = engine.decide({
+        grants,
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(denied.allowed).toBe(false);
+      expect(denied.denialReason).toBe("developer-restricted");
+    });
+
+    it("still receives the organization floor at organization scope", () => {
+      const grants = makeGrants({ organizationRole: "DEVELOPER" });
+      expect(
+        engine.decide({
+          grants,
+          permission: "organization:view",
+          scope: orgScope,
+        }).allowed,
+      ).toBe(true);
+    });
+  });
+
   describe("given an empty custom role", () => {
     it("denies instead of inheriting the viewer bag", () => {
       const grants = makeGrants({

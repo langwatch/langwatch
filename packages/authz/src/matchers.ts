@@ -26,7 +26,7 @@ export function bindingGrants({
   grants,
   permission,
 }: {
-  binding: Pick<CollectedBinding, "roleKey" | "scopeType">;
+  binding: Pick<CollectedBinding, "roleKey" | "scopeType" | "viaGroupId">;
   grants: CollectedGrants;
   permission: string;
 }): boolean {
@@ -39,6 +39,17 @@ export function bindingGrants({
     })
   ) {
     return false;
+  }
+
+  // ADR-143: a Developer seat holds its personal team and nothing shared.
+  // The write paths keep it that way for direct rows; this is the cap for
+  // the two routes a row rule never sees. An ORGANIZATION-scoped binding
+  // reaches every project, and a group-delivered binding reaches whatever
+  // the group was mapped to, so neither grants a Developer anything. A
+  // direct TEAM or PROJECT row (their own personal team) grants normally.
+  if (grants.organizationRole === "DEVELOPER") {
+    if (binding.scopeType === "ORGANIZATION") return false;
+    if (binding.viaGroupId) return false;
   }
 
   const { roleKey } = binding;

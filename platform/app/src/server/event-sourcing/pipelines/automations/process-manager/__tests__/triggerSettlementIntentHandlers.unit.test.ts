@@ -180,6 +180,7 @@ function makeDeps(activeTrigger: TriggerSummary) {
       skipped: 0,
     }),
     handlePersistCapBreach: vi.fn().mockResolvedValue(undefined),
+    resolveSlackDestination: vi.fn().mockResolvedValue(null),
   };
   return {
     deps: deps as unknown as TriggerSettlementDispatchDeps,
@@ -860,6 +861,7 @@ describe("trigger settlement intent handlers integration", () => {
   });
 
   describe("given a webhook retry after one trace was already claimed", () => {
+    /** @scenario "Every attempt of one fire carries the same event id" */
     it("keeps X-LangWatch-Event-Id stable from the outbox message key", async () => {
       const activeTrigger = trigger(TriggerAction.SEND_WEBHOOK, {
         actionParams: {

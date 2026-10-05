@@ -48,6 +48,7 @@ import {
   markAsHandledByMissingModelHandler,
   markAsHandledByProviderDisabledHandler,
 } from "./trpcError";
+import { logTrpcOperation } from "./trpcRequestLog";
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined") return window.location.origin; // browser should use origin for full URLs
@@ -143,6 +144,7 @@ function createTRPCLinks() {
       enabled: (opts) =>
         process.env.NODE_ENV === "development" ||
         (opts.direction === "down" && opts.result instanceof Error),
+      logger: logTrpcOperation,
     }),
     // Top layer: subscriptions ride the existing SSE link; everything else
     // goes through the WS-or-HTTP router below.

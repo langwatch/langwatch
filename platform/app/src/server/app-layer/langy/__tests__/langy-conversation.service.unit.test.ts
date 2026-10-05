@@ -862,6 +862,103 @@ describe("LangyConversationService", () => {
         expect(parsed.kind).toBe("langy_agent_session_lost");
       });
     });
+
+    describe("when the failed turn wrote a plan and ran calls before it failed", () => {
+      /** @scenario "A failed turn keeps the plan and the calls it ran as its message" */
+      it("records them as a failed agent response carrying the error", async () => {
+        const recordAgentResponse = vi.fn<
+          LangyConversationCommands["recordAgentResponse"]
+        >(async () => {});
+        const failAgentResponse = vi.fn<
+          LangyConversationCommands["failAgentResponse"]
+        >(async () => {});
+        const todos = [{ content: "Wire tracing in", status: "in_progress" }];
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands({ recordAgentResponse, failAgentResponse }),
+          undefined,
+          null,
+          {
+            readTurnOrder: vi.fn(async () => []),
+            readTurnAccount: vi.fn(async () => ({
+              order: [
+                { kind: "text" as const, text: "Reading your agent first." },
+                { kind: "tool" as const, id: "plan" },
+                { kind: "tool" as const, id: "ls" },
+              ],
+              toolCalls: [
+                { id: "plan", name: "todowrite", input: { todos }, output: "" },
+                {
+                  id: "ls",
+                  name: "bash",
+                  input: { command: "ls" },
+                  output: "agent.py",
+                },
+              ],
+              closingText: "",
+            })),
+          },
+        );
+
+        await svc.ingestAgentTurnResult({
+          projectId: "p1",
+          conversationId: "c1",
+          turnId: "turn-9",
+          status: "failed",
+          errorCode: "session-not-found",
+        });
+
+        expect(failAgentResponse).not.toHaveBeenCalled();
+        expect(recordAgentResponse).toHaveBeenCalledTimes(1);
+        const arg = recordAgentResponse.mock.calls[0]![0];
+        expect(arg).toMatchObject({ turnId: "turn-9", outcome: "failed" });
+        expect(JSON.parse(arg.error ?? "{}")).toMatchObject({
+          kind: "langy_agent_session_lost",
+        });
+        expect(arg.parts.map((part) => part.type)).toEqual([
+          "text",
+          "tool-todowrite",
+          "tool-bash",
+        ]);
+        expect(arg.parts[1]).toMatchObject({ input: { todos } });
+      });
+    });
+
+    describe("when the failed turn left nothing on its stream", () => {
+      it("fails the turn without a message", async () => {
+        const recordAgentResponse = vi.fn<
+          LangyConversationCommands["recordAgentResponse"]
+        >(async () => {});
+        const failAgentResponse = vi.fn<
+          LangyConversationCommands["failAgentResponse"]
+        >(async () => {});
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands({ recordAgentResponse, failAgentResponse }),
+          undefined,
+          null,
+          {
+            readTurnOrder: vi.fn(async () => []),
+            readTurnAccount: vi.fn(async () => ({
+              order: [],
+              toolCalls: [],
+              closingText: "",
+            })),
+          },
+        );
+
+        await svc.ingestAgentTurnResult({
+          projectId: "p1",
+          conversationId: "c1",
+          turnId: "turn-9",
+          status: "failed",
+          errorCode: "agent error",
+        });
+
+        expect(recordAgentResponse).not.toHaveBeenCalled();
+        expect(failAgentResponse).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 
   describe("getEventsAfter — the tail the browser folds (ADR-059)", () => {
@@ -1138,7 +1235,10 @@ describe("LangyConversationService", () => {
         makeCommands({ recordAgentResponse }),
         undefined,
         null,
-        { readTurnOrder: vi.fn(async () => account) },
+        {
+          readTurnOrder: vi.fn(async () => account),
+          readTurnAccount: vi.fn(),
+        },
       );
 
       await svc.ingestAgentTurnResult({
@@ -1171,6 +1271,7 @@ describe("LangyConversationService", () => {
           readTurnOrder: vi.fn(async () => {
             throw new Error("redis is down");
           }),
+          readTurnAccount: vi.fn(),
         },
       );
 
