@@ -37297,7 +37297,7 @@ The SDKs automatically detect and use materialized prompts when available, falli
     ```
 
     **Behavior:**
-    1. SDK checks for `./prompts/.materialized/customer-support-bot.prompt.yaml`
+    1. SDK looks the handle up in `prompts.json` and resolves the materialized file through `prompts-lock.json`
     2. If found, loads prompt from local file (no network call)
     3. If not found, attempts to fetch from LangWatch API
     4. Throws error if both local file and API are unavailable
@@ -37373,87 +37373,104 @@ Include these files in your deployment package:
 ### 3. Deploy to Air-Gapped Environment
 
 The application runs entirely offline, using only materialized prompts. No LangWatch API access required.
-{/*
-## Advanced Fetch Policies (Future Feature)
 
-<Note>
-  **Coming Soon**: Advanced fetch policies will provide fine-grained control
-  over when prompts are fetched vs. using materialized versions.
-</Note>
+## Fetch Policies
+
+A fetch policy decides whether `prompts.get` reads the materialized file, calls the LangWatch API, or both. The Python and TypeScript SDKs ship the same four policies. When you don't pass one, both use `MATERIALIZED_FIRST`.
+
+| Policy                         | Behavior                                                                                                    | Use Case                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `MATERIALIZED_FIRST` (default) | Uses the local file if there is one, otherwise fetches from the API                                         | Most applications                         |
+| `ALWAYS_FETCH`                 | Fetches from the API, and uses the local file only if that call fails                                       | Live updates with an offline fallback     |
+| `CACHE_TTL`                    | Fetches from the API and keeps the result in memory for the TTL (default 5 minutes). Uses the local file if a fetch fails | Controlled update frequency               |
+| `MATERIALIZED_ONLY`            | Never calls the API, and fails if there is no local file                                                    | Air-gapped or strict offline environments |
 
 
-  ### Python SDK (Future)
+  ### Python SDK
 
     ```python fetch_policies.py
     import langwatch
-    from langwatch.prompt import FetchPolicy
+    from langwatch import FetchPolicy
 
-    # Always fetch from API, use materialized as fallback
-    prompt = langwatch.prompt.get_prompt(
+    langwatch.setup()
+
+    # Default (MATERIALIZED_FIRST): the local file if there is one, otherwise the API
+    prompt = langwatch.prompts.get("customer-support-bot")
+
+    # The API first, the local file only if the call fails
+    prompt = langwatch.prompts.get(
         "customer-support-bot",
-        fetch_policy=FetchPolicy.ALWAYS_FETCH
+        fetch_policy=FetchPolicy.ALWAYS_FETCH,
     )
 
-    # Fetch every 5 minutes, use materialized between fetches
-    prompt = langwatch.prompt.get_prompt(
+    # The API at most every 10 minutes, the cached result in between
+    prompt = langwatch.prompts.get(
         "customer-support-bot",
         fetch_policy=FetchPolicy.CACHE_TTL,
-        cache_ttl_minutes=5
+        cache_ttl_minutes=10,
     )
 
-    # Never fetch, use materialized only (air-gapped mode)
-    prompt = langwatch.prompt.get_prompt(
+    # The local file only, never the API
+    prompt = langwatch.prompts.get(
         "customer-support-bot",
-        fetch_policy=FetchPolicy.MATERIALIZED_ONLY
-    )
-
-    # Default behavior: use materialized if available, otherwise fetch
-    prompt = langwatch.prompt.get_prompt(
-        "customer-support-bot",
-        fetch_policy=FetchPolicy.MATERIALIZED_FIRST  # default
+        fetch_policy=FetchPolicy.MATERIALIZED_ONLY,
     )
     ```
 
 
 
-  ### TypeScript SDK (Future)
+  ### TypeScript SDK
 
     ```typescript fetch_policies.ts
-    import { getPrompt, FetchPolicy } from "langwatch";
+    import { LangWatch, FetchPolicy } from "langwatch";
 
-    // Always fetch from API, use materialized as fallback
-    const prompt = await getPrompt("customer-support-bot", {
-      fetchPolicy: FetchPolicy.ALWAYS_FETCH
+    const langwatch = new LangWatch({
+      apiKey: process.env.LANGWATCH_API_KEY,
     });
 
-    // Fetch every 5 minutes, use materialized between fetches
-    const prompt = await getPrompt("customer-support-bot", {
+    // Default (MATERIALIZED_FIRST): the local file if there is one, otherwise the API
+    const prompt = await langwatch.prompts.get("customer-support-bot");
+
+    // The API first, the local file only if the call fails
+    const latest = await langwatch.prompts.get("customer-support-bot", {
+      fetchPolicy: FetchPolicy.ALWAYS_FETCH,
+    });
+
+    // The API at most every 10 minutes, the cached result in between
+    const cached = await langwatch.prompts.get("customer-support-bot", {
       fetchPolicy: FetchPolicy.CACHE_TTL,
-      cacheTtlMinutes: 5
+      cacheTtlMinutes: 10,
     });
 
-    // Never fetch, use materialized only (air-gapped mode)
-    const prompt = await getPrompt("customer-support-bot", {
-      fetchPolicy: FetchPolicy.MATERIALIZED_ONLY
-    });
-
-    // Default behavior: use materialized if available, otherwise fetch
-    const prompt = await getPrompt("customer-support-bot", {
-      fetchPolicy: FetchPolicy.MATERIALIZED_FIRST // default
+    // The local file only, never the API
+    const offline = await langwatch.prompts.get("customer-support-bot", {
+      fetchPolicy: FetchPolicy.MATERIALIZED_ONLY,
     });
     ```
 
 
 
 
-### Fetch Policy Options
+### How the SDKs Find the Local File
 
-| Policy               | Behavior                                              | Use Case                                         |
-| -------------------- | ----------------------------------------------------- | ------------------------------------------------ |
-| `MATERIALIZED_FIRST` | Use local file if available, otherwise fetch from API | Default behavior, best for most applications     |
-| `ALWAYS_FETCH`       | Always try API first, fall back to materialized       | Live updates with offline fallback               |
-| `CACHE_TTL`          | Fetch every X minutes, use materialized between       | Hot deployments with controlled update frequency |
-| `MATERIALIZED_ONLY`  | Never fetch, use materialized files only              | Air-gapped or strict offline environments        | */}
+Both SDKs only read a local file for prompts listed in `prompts.json`. They then look for the file in different places.
+
+The TypeScript SDK tries three sources, in order:
+
+1. A `file:` path given for the prompt in `prompts.json`
+2. The `materialized` path recorded for the prompt in `prompts-lock.json`
+3. A `.prompt.yaml` file under `prompts/` whose path, without the extension, matches the handle (the `.materialized` folder is skipped)
+
+The Python SDK only uses the second source, the `materialized` path in `prompts-lock.json`. It does not follow `file:` paths or scan the `prompts/` folder, so run `langwatch prompt pull` before Python can load a prompt locally.
+
+### Versions and Tags
+
+The local file holds the version you last pulled. `MATERIALIZED_FIRST` returns it even when you pass a specific version. To get a specific or the latest version from the server, use `ALWAYS_FETCH`.
+
+Tags differ between the SDKs:
+
+- **Python:** a `tag` makes `MATERIALIZED_FIRST` skip the local file and ask the API, because only the server can resolve a tag. Passing a `tag` with `MATERIALIZED_ONLY` raises a `ValueError`.
+- **TypeScript:** `MATERIALIZED_FIRST` returns the local file even when you pass a `tag`. Use `ALWAYS_FETCH` to resolve a tag on the server.
 
 ## CI/CD Integration
 

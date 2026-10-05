@@ -150,7 +150,7 @@ The SDK loads prompts dynamically at runtime, and fetches both kinds from LangWa
 - **Remote prompts**: Also fetched from LangWatch after being synced from the materialized files
 
 <Info>
-For production deployments, the CLI materializes prompts locally so you have a complete snapshot of all dependencies. The SDK can automatically use these materialized prompts for [guaranteed availability](/prompt-management/features/advanced/guaranteed-availability) in offline or air-gapped environments. However, when online, the SDK always fetches the latest version from the server unless you specify a version.
+For production deployments, the CLI materializes prompts locally so you have a complete snapshot of all dependencies. The SDK can automatically use these materialized prompts for [guaranteed availability](/prompt-management/features/advanced/guaranteed-availability) in offline or air-gapped environments. By default, the SDK uses a materialized copy whenever one exists, online or not, and only calls the server when it doesn't. To always get the latest version from the server, use the `ALWAYS_FETCH` fetch policy.
 
 Learn more about [guaranteed availability and offline deployments](/prompt-management/features/advanced/guaranteed-availability).
 </Info>
