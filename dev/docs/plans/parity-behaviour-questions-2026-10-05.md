@@ -131,3 +131,14 @@ Date: 2026-10-05. Branch: feat/strict-feature-layout-v0. Each row stays unbound 
 | A process with no snapshot store / no queue Redis says so by name                                        | ops takes `members.redis` as required: boot refusal, or degrade?                                |
 | The worker starts all three loops / shutdown stops every loop                                            | three scheduled process managers plus one resource-owned writer (wording)                       |
 | rbac scenarios naming resolveOpsScope and checkOpsPermission                                             | those functions no longer exist; bound to operatorScope / getScope behaviour, wording to update |
+
+## Process framework
+
+| Scenario                                                                                     | Product does                                                                                             |
+| -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| task-modules-loader (2 rows)                                                                 | nothing reads `LANGWATCH_TASK_MODULES`                                                                   |
+| The named members do not cover the module's interface                                        | neither tsc nor boot reports a module naming fewer members than its interface reads                      |
+| A main loop stalled past the budget fails liveness; metrics proxy through to the main thread | no heartbeat, stall budget or metrics proxy in packages/process                                          |
+| A request in flight when the listener closes is allowed to finish                            | `closeHttpServer` calls `closeAllConnections()` straight after `close()`: no drain grace (likely defect) |
+| api-process-agents, -authz, -tenancy, -eventing (host-supplied gating)                       | packages/process has no such gating; stale spec or apps/api composition                                  |
+| A misspelled shared secret is refused where it is written                                    | no typed shared-secret supply                                                                            |
