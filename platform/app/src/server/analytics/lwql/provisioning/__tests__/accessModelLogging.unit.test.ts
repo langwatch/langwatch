@@ -5,14 +5,14 @@
  * and reconvergence both log `clickHouseErrorSummary(error)`, never the raw
  * error.
  *
- * @see ../clickhouseStatementRunner.ts — clickHouseErrorSummary
+ * @see ../clickhouseErrors.ts — clickHouseErrorSummary
  * @see ../selfProvisioning.ts — probeAppFunctionStore error log
  * @see ../reconvergence.ts — probe / converge error logs
  */
 
 import { describe, expect, it } from "vitest";
 
-import { clickHouseErrorSummary } from "../clickhouseStatementRunner";
+import { clickHouseErrorSummary } from "../clickhouseErrors";
 
 const SECRET = "s3cr3t-lwql-password";
 const STATEMENT = `CREATE USER OR REPLACE langwatch_lwql IDENTIFIED WITH sha256_password BY '${SECRET}' SETTINGS PROFILE p`;
