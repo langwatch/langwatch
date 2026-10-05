@@ -24,12 +24,10 @@ import {
   type UpdateSecretInput,
 } from "@langwatch/secret-contract";
 
-import type { SecretEncryption } from "../app/secret.app.ts";
 import type { SecretRepository } from "../repositories/secret.repository.ts";
 
 export interface SecretServiceOptions {
   repository: SecretRepository;
-  encryption: SecretEncryption;
   reservedNames: readonly string[];
   maximumPerProject?: number;
   permissions: Pick<AuthzApi, "getScope" | "listTeamMemberBindings">;
@@ -60,13 +58,10 @@ export class SecretService {
     const values: Record<string, string> = {};
 
     for (const row of rows) {
-      try {
-        values[row.name] = this.options.encryption.decrypt(row.encryptedValue);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-
-        throw new Error(`Failed to decrypt project secret "${row.name}": ${message}`);
+      if (!row.readable) {
+        throw new Error(`Failed to decrypt project secret "${row.name}": ${row.reason}`);
       }
+      values[row.name] = row.value;
     }
 
     return values;
@@ -84,11 +79,8 @@ export class SecretService {
     });
     const values: Record<string, string> = {};
     for (const row of rows) {
-      try {
-        values[row.name] = this.options.encryption.decrypt(row.encryptedValue);
-      } catch {
-        throw new SecretUnreadableError(row.name);
-      }
+      if (!row.readable) throw new SecretUnreadableError(row.name);
+      values[row.name] = row.value;
     }
 
     return values;
@@ -111,7 +103,7 @@ export class SecretService {
     return this.options.repository.create({
       projectId: input.projectId,
       name: input.name,
-      encryptedValue: this.options.encryption.encrypt(input.value),
+      value: input.value,
       actorId: await this.getAttributedUserId(input.projectId, by),
     });
   }
@@ -122,7 +114,7 @@ export class SecretService {
     return this.options.repository.update({
       projectId: input.projectId,
       id: input.id,
-      encryptedValue: this.options.encryption.encrypt(input.value),
+      value: input.value,
       actorId: await this.getAttributedUserId(input.projectId, by),
     });
   }
@@ -137,7 +129,7 @@ export class SecretService {
       await this.options.repository.create({
         projectId: input.projectId,
         name: input.name,
-        encryptedValue: this.options.encryption.encrypt(input.value),
+        value: input.value,
         actorId: input.actorId,
       });
 
@@ -158,8 +150,9 @@ export class SecretService {
     const rows = await this.options.repository.findAllValues({ projectId: input.projectId });
     const stored = rows.find((row) => row.name === input.name);
     if (!stored) throw new Error(`Project secret "${input.name}" vanished after a duplicate write`);
+    if (!stored.readable) throw new Error(stored.reason);
 
-    return this.options.encryption.decrypt(stored.encryptedValue);
+    return stored.value;
   }
 
   /** A key bound to nobody writes as the first member of the project's team, as main did. */

@@ -1,4 +1,5 @@
 import type { ShareRepositories } from "../share.repositories.ts";
+import { MemoryShareCacheRepository } from "./memory.share-cache.repository.ts";
 import { MemoryShareGrantRepository } from "./memory.share-grant.repository.ts";
 import { MemoryShareDatabase } from "./memory.share.database.ts";
 import { MemoryShareRepository } from "./memory.share.repository.ts";
@@ -12,6 +13,7 @@ export class MemoryShareRepositories {
     return {
       shares: MemoryShareRepository.create({ memory }),
       grants: MemoryShareGrantRepository.create({ memory }),
+      cache: MemoryShareCacheRepository.create(),
     };
   }
 }

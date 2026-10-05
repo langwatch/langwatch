@@ -5,7 +5,6 @@ import {
   type PinTraceInput,
 } from "@langwatch/data-retention-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   ShareApi,
@@ -22,18 +21,12 @@ import {
 } from "@langwatch/share-contract";
 
 import { LedgerShareRepository } from "../repositories/ledger/ledger.share.repository.ts";
-import { RedisShareCacheRepository } from "../repositories/redis/redis.share-cache.repository.ts";
 import type { ShareRepositories } from "../repositories/share.repositories.ts";
 import { ShareService } from "../services/share.service.ts";
 
-/**
- * The viewer cache runs on the process's own `redis` member. A deployment that
- * named no Redis refuses at boot naming this module, rather than serving every
- * viewer check uncached and looking healthy while it does it.
- */
 type ShareSetup = FeatureSetup<
   typeof ShareModule.dependencies,
-  MembersRead<typeof ShareModule.reads>,
+  never,
   undefined,
   ShareRepositories
 >;
@@ -45,7 +38,6 @@ export class ShareModule implements ShareApiContract {
     authorization: AuthzApi,
     projects: ProjectApi,
   };
-  static readonly reads = ["redis"] as const;
 
   readonly #shares: ShareService;
   readonly #retention: DataRetentionApi;
@@ -70,7 +62,7 @@ export class ShareModule implements ShareApiContract {
         dataRetention,
         permissions: authorization,
         projects,
-        cache: RedisShareCacheRepository.create({ redis: setup.members.redis }),
+        cache: setup.repositories.cache,
       }),
       dataRetention,
     );

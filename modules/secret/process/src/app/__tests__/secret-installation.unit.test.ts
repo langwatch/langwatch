@@ -1,16 +1,20 @@
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp, ResourceScope } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { SecretApi, SecretNotFoundError } from "@langwatch/secret-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import { secretProcessModule } from "../../secret.module.ts";
-import { ReversibleTestSecretEncryption, teamWithMembers } from "./secret.fixture.ts";
+import { teamWithMembers } from "./secret.fixture.ts";
 
 function process(role: "api" | "worker") {
   const team = teamWithMembers(["user-first"]);
 
   return createApp({ role })
-    .withModules([withMemoryRepositories(secretProcessModule)])
-    .withEncryption(new ReversibleTestSecretEncryption())
+    .withModules([secretProcessModule])
+    .withStores(memoryStores())
     .provide({ authz: team.permissions });
 }
 
@@ -66,17 +70,23 @@ describe("secret app installation", () => {
 
   /** @scenario "A process with no key composes no secret service" */
   it("refuses at boot, naming the missing encryption, when the process has no key", async () => {
-    const team = teamWithMembers(["user-first"]);
-    const keyless = createApp({ role: "api" })
-      .withModules([withMemoryRepositories(secretProcessModule)])
-      .provide({ authz: team.permissions });
+    const resources = new ResourceScope();
 
     await expect(
-      Promise.resolve().then(() =>
-        // @ts-expect-error MissingSupply: the compiler refuses a process supplying no encryption
-        keyless.boot(),
-      ),
+      secretProcessModule.install({
+        resources,
+        config: undefined,
+        members: {},
+        repositorySelection: {
+          tier: "live",
+          members: { prisma: prismaDouble(), redis: redisDouble() },
+        },
+        role: "api",
+        secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+        resolve: () => teamWithMembers(["user-first"]).permissions,
+      }),
     ).rejects.toThrow(/encryption/i);
+    await resources.close();
   });
 
   /** @scenario "The first read returns the secret and the second refuses" */

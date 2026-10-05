@@ -4,16 +4,15 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { MemorySecretRepositories } from "../../repositories/memory/memory.secret.repositories.ts";
-import type { SecretRepositories } from "../../repositories/secret.repositories.ts";
-import type { SecretEncryption } from "../secret.app.ts";
+import type { SecretCipher, SecretRepositories } from "../../repositories/secret.repositories.ts";
 import { SecretModule } from "../secret.app.ts";
 
 /**
  * A reversible stand-in for AES-GCM. It is not a cipher and does not pretend
- * to be one: what a service test needs from encryption is that what went in
+ * to be one: what a repository test needs from encryption is that what went in
  * comes back and that a ciphertext is not the plaintext.
  */
-export class ReversibleTestSecretEncryption implements SecretEncryption {
+export class ReversibleTestSecretEncryption implements SecretCipher {
   encrypt(value: string): string {
     return `encrypted(${value})`;
   }
@@ -60,14 +59,12 @@ export function teamWithMembers(userIds: readonly string[]): SecretTestPeers {
 export function createSecretTestApp(
   input: Readonly<{
     repositories?: SecretRepositories;
-    encryption?: SecretEncryption;
     peers?: SecretTestPeers;
   }> = {},
 ): SecretModule {
   return SecretModule.create({
     repositories: input.repositories ?? MemorySecretRepositories.create(),
     dependencies: input.peers ?? teamWithMembers([]),
-    members: { encryption: input.encryption ?? new ReversibleTestSecretEncryption() },
     config: void 0,
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

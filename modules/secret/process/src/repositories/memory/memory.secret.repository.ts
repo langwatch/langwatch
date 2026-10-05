@@ -12,18 +12,18 @@ import type {
   CreateStoredSecretInput,
   SecretIdentity,
   NamedSecretsScope,
+  OpenedSecretValue,
   SecretProjectScope,
   SecretRepository,
-  StoredSecretValue,
   UpdateStoredSecretInput,
 } from "../secret.repository.ts";
 
-type StoredRow = Readonly<{ secret: Secret; encryptedValue: string }>;
+type StoredRow = Readonly<{ secret: Secret; value: string }>;
 
 /**
  * The Prisma repository's observable behaviour over a map: name ordering, the
  * duplicate refusal on `(projectId, name)`, the not-found refusal on a write
- * addressing another project's row. Ciphertext sits beside metadata, never in it.
+ * addressing another project's row. The plaintext value sits beside metadata.
  */
 export class MemorySecretRepository implements SecretRepository {
   #rows = new Map<string, StoredRow>();
@@ -40,14 +40,15 @@ export class MemorySecretRepository implements SecretRepository {
       .toSorted((left, right) => left.name.localeCompare(right.name));
   }
 
-  async findAllValues(input: SecretProjectScope): Promise<StoredSecretValue[]> {
+  async findAllValues(input: SecretProjectScope): Promise<OpenedSecretValue[]> {
     return this.#ofProject(input.projectId).map((row) => ({
       name: row.secret.name,
-      encryptedValue: row.encryptedValue,
+      readable: true,
+      value: row.value,
     }));
   }
 
-  async findValuesByName(input: NamedSecretsScope): Promise<StoredSecretValue[]> {
+  async findValuesByName(input: NamedSecretsScope): Promise<OpenedSecretValue[]> {
     const values = await this.findAllValues({ projectId: input.projectId });
 
     return values.filter((value) => input.names.includes(value.name));
@@ -79,7 +80,7 @@ export class MemorySecretRepository implements SecretRepository {
       updatedBy: { name: null },
     });
 
-    this.#rows.set(secret.id, { secret, encryptedValue: input.encryptedValue });
+    this.#rows.set(secret.id, { secret, value: input.value });
 
     return structuredClone(secret);
   }
@@ -92,7 +93,7 @@ export class MemorySecretRepository implements SecretRepository {
       ...row.secret,
       updatedAt: toDate(nowInstant()),
     });
-    this.#rows.set(secret.id, { secret, encryptedValue: input.encryptedValue });
+    this.#rows.set(secret.id, { secret, value: input.value });
 
     return structuredClone(secret);
   }

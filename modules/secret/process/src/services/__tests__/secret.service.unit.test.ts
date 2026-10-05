@@ -10,17 +10,14 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  ReversibleTestSecretEncryption,
-  teamWithMembers,
-} from "../../app/__tests__/secret.fixture.ts";
+import { teamWithMembers } from "../../app/__tests__/secret.fixture.ts";
 import { MemorySecretRepository } from "../../repositories/memory/memory.secret.repository.ts";
 import type {
   CreateStoredSecretInput,
   NamedSecretsScope,
   SecretIdentity,
+  OpenedSecretValue,
   SecretRepository,
-  StoredSecretValue,
   UpdateStoredSecretInput,
 } from "../../repositories/secret.repository.ts";
 import { SecretService } from "../secret.service.ts";
@@ -43,7 +40,7 @@ function row(input: Partial<Secret> = {}): Secret {
 /** Records what the service asked persistence for, and answers from arrays. */
 class RecordingSecretRepository implements SecretRepository {
   readonly rows: Secret[] = [];
-  readonly values: StoredSecretValue[] = [];
+  readonly values: OpenedSecretValue[] = [];
   readonly createCall = vi.fn();
   readonly updateCall = vi.fn();
   readonly deleteCall = vi.fn();
@@ -53,13 +50,13 @@ class RecordingSecretRepository implements SecretRepository {
     return Promise.resolve(this.rows);
   }
 
-  findAllValues(): Promise<StoredSecretValue[]> {
+  findAllValues(): Promise<OpenedSecretValue[]> {
     return Promise.resolve(this.values);
   }
 
   readonly findValuesCall = vi.fn();
 
-  findValuesByName(input: NamedSecretsScope): Promise<StoredSecretValue[]> {
+  findValuesByName(input: NamedSecretsScope): Promise<OpenedSecretValue[]> {
     this.findValuesCall(input);
 
     return Promise.resolve(this.values.filter((value) => input.names.includes(value.name)));
@@ -96,13 +93,11 @@ class RecordingSecretRepository implements SecretRepository {
   }
 }
 
-/** Refuses one stored value, as a row written under another key would be refused. */
-class EncryptionRefusingCorruptRows extends ReversibleTestSecretEncryption {
-  override decrypt(value: string): string {
-    if (value === "corrupt") throw new Error("unsupported state or unable to authenticate data");
-
-    return super.decrypt(value);
-  }
+/** A row as the live repository opens it; `corrupt` reads as a row sealed under another key. */
+function opened(name: string, value: string): OpenedSecretValue {
+  return value === "corrupt"
+    ? { name, readable: false, reason: "unsupported state or unable to authenticate data" }
+    : { name, readable: true, value };
 }
 
 function createService(options?: {
@@ -113,7 +108,6 @@ function createService(options?: {
   const repository = new RecordingSecretRepository();
   const service = SecretService.create({
     repository,
-    encryption: new EncryptionRefusingCorruptRows(),
     reservedNames: options?.reservedNames ?? ["LANGY_KEY"],
     maximumPerProject: options?.maximumPerProject,
     ...teamWithMembers(options?.teamMembers ?? []),
@@ -132,12 +126,9 @@ describe("SecretService", () => {
     await expect(service.list({ projectId: "project-1" })).resolves.toEqual([row()]);
   });
 
-  it("decrypts every project secret for trusted server execution", async () => {
+  it("reads every opened project secret for trusted server execution", async () => {
     const { repository, service } = createService();
-    repository.values.push(
-      { name: "OPENAI_API_KEY", encryptedValue: "encrypted(openai)" },
-      { name: "LANGY_KEY", encryptedValue: "encrypted(internal)" },
-    );
+    repository.values.push(opened("OPENAI_API_KEY", "openai"), opened("LANGY_KEY", "internal"));
 
     await expect(service.getValues({ projectId: "project-1" })).resolves.toEqual({
       OPENAI_API_KEY: "openai",
@@ -149,10 +140,10 @@ describe("SecretService", () => {
     function storedValues() {
       const { repository, service } = createService();
       repository.values.push(
-        { name: "OPENAI_API_KEY", encryptedValue: "encrypted(openai)" },
-        { name: "OTHER_KEY", encryptedValue: "encrypted(other)" },
-        { name: "BROKEN_KEY", encryptedValue: "corrupt" },
-        { name: "LANGY_KEY", encryptedValue: "encrypted(internal)" },
+        opened("OPENAI_API_KEY", "openai"),
+        opened("OTHER_KEY", "other"),
+        opened("BROKEN_KEY", "corrupt"),
+        opened("LANGY_KEY", "internal"),
       );
 
       return { repository, service };
@@ -241,7 +232,7 @@ describe("SecretService", () => {
     expect(repository.createCall).not.toHaveBeenCalled();
   });
 
-  it("enforces the project limit before encrypting or writing", async () => {
+  it("enforces the project limit before writing", async () => {
     const { repository, service } = createService({ maximumPerProject: 1 });
     repository.countValue = 1;
 
@@ -259,7 +250,7 @@ describe("SecretService", () => {
   });
 
   /** @scenario "Writes use the authenticated user actor" */
-  it("encrypts writes and records the authenticated actor", async () => {
+  it("writes the value and records the authenticated actor", async () => {
     const { repository, service } = createService();
     repository.rows.push(row());
 
@@ -271,7 +262,7 @@ describe("SecretService", () => {
     expect(repository.updateCall).toHaveBeenCalledWith({
       projectId: "project-1",
       id: "secret-1",
-      encryptedValue: "encrypted(rotated)",
+      value: "rotated",
       actorId: "user-2",
     });
   });
@@ -312,7 +303,6 @@ describe("SecretService", () => {
       const repository = new RecordingSecretRepository();
       const service = SecretService.create({
         repository,
-        encryption: new EncryptionRefusingCorruptRows(),
         reservedNames: [],
         permissions: createApiFixture<AuthzApi>({
           getScope: async ({ projectId }) => {
@@ -355,7 +345,6 @@ describe("SecretService", () => {
       const repository = MemorySecretRepository.create();
       const service = SecretService.create({
         repository,
-        encryption: new ReversibleTestSecretEncryption(),
         reservedNames: ["LANGY_KEY"],
         maximumPerProject: 0,
         ...teamWithMembers([]),
@@ -365,7 +354,7 @@ describe("SecretService", () => {
     }
 
     /** @scenario "The feature that owns a reserved name stores its credential once" */
-    it("stores it encrypted, outside the project limit, and still hides it", async () => {
+    it("stores it outside the project limit and still hides it", async () => {
       const { repository, service } = createReservedService();
 
       await expect(
@@ -377,7 +366,7 @@ describe("SecretService", () => {
         }),
       ).resolves.toEqual({ value: "vk-first" });
       await expect(repository.findAllValues({ projectId: "project-1" })).resolves.toEqual([
-        { name: "LANGY_KEY", encryptedValue: "encrypted(vk-first)" },
+        { name: "LANGY_KEY", readable: true, value: "vk-first" },
       ]);
       await expect(service.list({ projectId: "project-1" })).resolves.toEqual([]);
     });
@@ -396,7 +385,7 @@ describe("SecretService", () => {
       expect(repository.createCall).toHaveBeenCalledWith({
         projectId: "project-1",
         name: "LANGY_KEY",
-        encryptedValue: "encrypted(vk)",
+        value: "vk",
         actorId: "user-7",
       });
     });

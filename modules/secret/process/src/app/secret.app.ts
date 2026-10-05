@@ -1,7 +1,5 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/process";
-/** The secret feature application shared by all transports. */
-import { type MembersRead } from "@langwatch/process-stores/members";
 import {
   RESERVED_PROJECT_SECRET_NAMES,
   SecretApi,
@@ -25,14 +23,10 @@ import type { SecretRepositories } from "../repositories/secret.repositories.ts"
 import { OneTimeRevealService } from "../services/one-time-reveal.service.ts";
 import { SecretService } from "../services/secret.service.ts";
 
-/**
- * The cipher is the process's own `encryption` member; the key never reaches
- * this package, and a deployment that configured none refuses at boot naming
- * this module rather than storing a project's value in the clear.
- */
+/** The secret feature application shared by all transports; its live stores seal values. */
 type SecretSetup = FeatureSetup<
   typeof SecretModule.dependencies,
-  MembersRead<typeof SecretModule.reads>,
+  never,
   undefined,
   SecretRepositories
 >;
@@ -40,7 +34,6 @@ type SecretSetup = FeatureSetup<
 export class SecretModule implements SecretApiContract {
   static readonly contract = SecretApi;
   static readonly dependencies = { permissions: AuthzApi };
-  static readonly reads = ["encryption"] as const;
 
   #secrets: SecretService;
   #reveals: OneTimeRevealService;
@@ -54,13 +47,11 @@ export class SecretModule implements SecretApiContract {
     return new SecretModule(
       SecretService.create({
         repository: setup.repositories.secrets,
-        encryption: setup.members.encryption,
         reservedNames: RESERVED_PROJECT_SECRET_NAMES,
         permissions: setup.dependencies.permissions,
       }),
       OneTimeRevealService.create({
         store: setup.repositories.reveals,
-        encryption: setup.members.encryption,
       }),
     );
   }
@@ -114,9 +105,4 @@ export class SecretModule implements SecretApiContract {
   createReserved(input: CreateReservedSecretInput): Promise<{ value: string }> {
     return this.#secrets.createReserved(input);
   }
-}
-
-export interface SecretEncryption {
-  encrypt(value: string): string;
-  decrypt(value: string): string;
 }

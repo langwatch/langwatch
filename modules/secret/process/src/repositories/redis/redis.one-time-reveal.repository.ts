@@ -1,6 +1,7 @@
 /**
- * One-time reveals in Redis: the sealed secret under one key, and the marker
- * a served read leaves behind under another. Both expire on the same clock.
+ * One-time reveals in Redis: the secret, sealed with the process's cipher, under one
+ * key, and the marker a served read leaves behind under another. Both expire on the
+ * same clock.
  */
 import type { RedisConnection } from "@langwatch/redis-client";
 
@@ -9,6 +10,10 @@ import type {
   StoredReveal,
   TakenReveal,
 } from "../one-time-reveal.repository.ts";
+import type { SecretCipher } from "../secret.repositories.ts";
+
+/** The value at rest, as every process before this one wrote it. */
+type SealedReveal = Omit<StoredReveal, "secret"> & { sealed: string };
 
 const secretKey = (organizationId: string, revealId: string) =>
   `secret_reveal:${organizationId}:${revealId}`;
@@ -22,11 +27,20 @@ function isUnknownCommand(error: unknown): boolean {
 }
 
 export class RedisOneTimeRevealRepository implements OneTimeRevealRepository {
-  static create({ redis }: { redis: RedisConnection }): RedisOneTimeRevealRepository {
-    return new RedisOneTimeRevealRepository(redis);
+  static create({
+    redis,
+    cipher,
+  }: {
+    redis: RedisConnection;
+    cipher: SecretCipher;
+  }): RedisOneTimeRevealRepository {
+    return new RedisOneTimeRevealRepository(redis, cipher);
   }
 
-  private constructor(private readonly redis: RedisConnection) {}
+  private constructor(
+    private readonly redis: RedisConnection,
+    private readonly cipher: SecretCipher,
+  ) {}
 
   async put({
     organizationId,
@@ -39,7 +53,13 @@ export class RedisOneTimeRevealRepository implements OneTimeRevealRepository {
     reveal: StoredReveal;
     ttlMs: number;
   }): Promise<void> {
-    await this.redis.set(secretKey(organizationId, revealId), JSON.stringify(reveal), "PX", ttlMs);
+    const sealed: SealedReveal = {
+      kind: reveal.kind,
+      keyId: reveal.keyId,
+      preview: reveal.preview,
+      sealed: this.cipher.encrypt(reveal.secret),
+    };
+    await this.redis.set(secretKey(organizationId, revealId), JSON.stringify(sealed), "PX", ttlMs);
   }
 
   async take({
@@ -52,7 +72,8 @@ export class RedisOneTimeRevealRepository implements OneTimeRevealRepository {
     const raw = await this.getdel(secretKey(organizationId, revealId));
     if (raw === null) return { taken: false };
 
-    return { taken: true, reveal: JSON.parse(raw) as StoredReveal };
+    const { sealed, ...reveal } = JSON.parse(raw) as SealedReveal;
+    return { taken: true, reveal: { ...reveal, secret: this.cipher.decrypt(sealed) } };
   }
 
   async markServed({

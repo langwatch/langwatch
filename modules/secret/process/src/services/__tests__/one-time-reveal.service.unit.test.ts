@@ -5,7 +5,6 @@
 import { ONE_TIME_REVEAL_TTL_MS } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
 
-import { ReversibleTestSecretEncryption } from "../../app/__tests__/secret.fixture.ts";
 import { MemoryOneTimeRevealRepository } from "../../repositories/memory/memory.one-time-reveal.repository.ts";
 import { OneTimeRevealService } from "../one-time-reveal.service.ts";
 
@@ -26,10 +25,7 @@ function fixture() {
     pass: (ms: number) => {
       nowMs += ms;
     },
-    service: OneTimeRevealService.create({
-      store,
-      encryption: new ReversibleTestSecretEncryption(),
-    }),
+    service: OneTimeRevealService.create({ store }),
   };
 }
 
@@ -47,21 +43,9 @@ async function codeOf(run: () => Promise<unknown>): Promise<unknown> {
 describe("the one-time reveal", () => {
   /** @scenario "The first read returns the secret and the second refuses" */
   it("serves the secret once and refuses every read after it", async () => {
-    const { service, store } = fixture();
+    const { service } = fixture();
 
     const { revealId } = await service.stash(STASH);
-    // Sealed at rest: what the store holds went through the cipher, so a dump
-    // of it is not a list of plaintext credentials.
-    const parked = await store.take({ organizationId: STASH.organizationId, revealId });
-    if (!parked.taken) throw new Error("the stash parked nothing");
-    expect(parked.reveal.sealed).toBe(new ReversibleTestSecretEncryption().encrypt(STASH.secret));
-    expect(parked.reveal.sealed).not.toBe(STASH.secret);
-    await store.put({
-      organizationId: STASH.organizationId,
-      revealId,
-      reveal: parked.reveal,
-      ttlMs: ONE_TIME_REVEAL_TTL_MS,
-    });
 
     await expect(
       service.reveal({ organizationId: STASH.organizationId, revealId }),

@@ -16,16 +16,12 @@ import {
   type StashRevealInput,
 } from "@langwatch/secret-contract";
 
-import type { SecretEncryption } from "../app/secret.app.ts";
 import type { OneTimeRevealRepository } from "../repositories/one-time-reveal.repository.ts";
 
 const logger = createLogger("langwatch:secret:one-time-reveal");
 
 export interface OneTimeRevealDeps {
   store: OneTimeRevealRepository;
-  /** The process's own cipher: the reveal is sealed at rest, so a store dump
-   *  is not a list of plaintext credentials. */
-  encryption: SecretEncryption;
   ttlMs?: number;
 }
 
@@ -46,7 +42,7 @@ export class OneTimeRevealService {
         kind: input.kind,
         keyId: input.keyId,
         preview: input.preview,
-        sealed: this.deps.encryption.encrypt(input.secret),
+        secret: input.secret,
       },
       ttlMs: this.ttlMs,
     });
@@ -81,7 +77,7 @@ export class OneTimeRevealService {
       kind: stored.kind,
       keyId: stored.keyId,
       preview: stored.preview,
-      secret: this.deps.encryption.decrypt(stored.sealed),
+      secret: stored.secret,
     };
   }
 
