@@ -1,0 +1,184 @@
+/**
+ * An organization's own switch for Instant Evals.
+ *
+ * A run sends the judged text to the judge's provider, and that is a data flow
+ * an organization agrees to rather than one a release turns on for it. So a
+ * self-serve organization switches Instant Evals on itself, from the popover
+ * the search bar opens when a judged query is refused; an enterprise
+ * organization asks us instead, and an operator switches it on through the
+ * release flag once the paperwork is where the customer wants it. Nothing ever
+ * opts an organization in on its behalf.
+ *
+ * The release flag stays what it was: the operator's switch, per project or
+ * organization. The two are combined in `./access.ts`; this file is only the
+ * organization's half.
+ *
+ * @see ./access.ts
+ * @see ../../../../../specs/instant-evals/instant-eval-opt-in.feature
+ */
+
+import { env } from "~/env.mjs";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { isEnterpriseTier } from "~/server/api/enterprise";
+import { getApp } from "~/server/app-layer/app";
+import type { PlanProviderUser } from "~/server/app-layer/subscription/plan-provider";
+import { InstantEvalOptInNotOfferedError } from "./errors";
+
+/**
+ * What the popover offers a refused organization, to the member reading it.
+ *
+ * - `enable`: a self-serve organization on the hosted service, read by a
+ *   member who may manage the organization and so may switch Instant Evals on
+ *   for it.
+ * - `ask_admin`: the same organization, read by a member who may not: the
+ *   explanation is the same, but the switch is an organization admin's to
+ *   throw, so the popover offers no button that the server would refuse.
+ * - `contact_us`: an enterprise organization, whose agreement is negotiated
+ *   rather than clicked; and any self-hosted install, whose judging is a matter
+ *   of its Connect license and not of this switch.
+ */
+export type InstantEvalOptInOffer = "enable" | "ask_admin" | "contact_us";
+
+/** Whether the organization switched Instant Evals on itself. */
+export async function instantEvalsOptedIn({
+  prisma,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+}): Promise<boolean> {
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { instantEvalsEnabledAt: true },
+  });
+  return !!organization?.instantEvalsEnabledAt;
+}
+
+/**
+ * Whether the organization is one the switch is offered to at all: on the
+ * hosted service, and not on an enterprise plan. This is the organization's
+ * half of the offer; whether the member asking may throw the switch is the
+ * other half, and `instantEvalOptInOffer` puts the two together.
+ *
+ * The plan and the deployment are injectable so a test can state them; the
+ * defaults read the process. The plan is resolved with the caller's user
+ * because the SaaS provider needs it to answer at all for an impersonated
+ * session.
+ */
+export async function instantEvalSwitchOffered({
+  organizationId,
+  user,
+  isSaas = () => env.IS_SAAS === true,
+  planTypeOf = async () =>
+    (await getApp().planProvider.getActivePlan({ organizationId, user })).type,
+}: {
+  organizationId: string;
+  user?: PlanProviderUser;
+  isSaas?: () => boolean;
+  planTypeOf?: () => Promise<string>;
+}): Promise<boolean> {
+  if (!isSaas()) return false;
+  return !isEnterpriseTier(await planTypeOf());
+}
+
+/**
+ * The offer for one organization, decided from its plan, the deployment, and
+ * whether the member asking may throw the switch.
+ *
+ * Whether the member may switch is the caller's to answer, from the same
+ * authority the `enable` mutation declares, so the popover never offers a
+ * button the server would refuse: a member without it is told to ask an
+ * organization admin instead. It is only asked once the organization itself
+ * is one the switch is offered to.
+ */
+export async function instantEvalOptInOffer({
+  organizationId,
+  user,
+  maySwitch,
+  isSaas,
+  planTypeOf,
+}: {
+  organizationId: string;
+  user?: PlanProviderUser;
+  maySwitch: () => Promise<boolean>;
+  isSaas?: () => boolean;
+  planTypeOf?: () => Promise<string>;
+}): Promise<InstantEvalOptInOffer> {
+  const offered = await instantEvalSwitchOffered({
+    organizationId,
+    ...(user ? { user } : {}),
+    ...(isSaas ? { isSaas } : {}),
+    ...(planTypeOf ? { planTypeOf } : {}),
+  });
+  if (!offered) return "contact_us";
+  if (!(await maySwitch())) return "ask_admin";
+  return "enable";
+}
+
+/**
+ * The switch as the popover throws it: refused, and nothing recorded, for an
+ * organization the popover offers "Contact us" to, so an enterprise
+ * organization is never switched on by a request the popover did not make.
+ * Returns what the access read will now say.
+ *
+ * The member's authority is not asked again here: the `enable` mutation
+ * declares it, and a request that reached this far has passed that check. So
+ * only the organization's half of the offer is checked, directly.
+ */
+export async function switchInstantEvalsOn({
+  prisma,
+  organizationId,
+  userId,
+  user,
+  isSaas,
+  planTypeOf,
+  now,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  userId: string;
+  user?: PlanProviderUser;
+  isSaas?: () => boolean;
+  planTypeOf?: () => Promise<string>;
+  now?: () => Date;
+}): Promise<{ released: true; offer: "enable" }> {
+  const offered = await instantEvalSwitchOffered({
+    organizationId,
+    ...(user ? { user } : {}),
+    ...(isSaas ? { isSaas } : {}),
+    ...(planTypeOf ? { planTypeOf } : {}),
+  });
+  if (!offered) throw new InstantEvalOptInNotOfferedError();
+  await enableInstantEvals({
+    prisma,
+    organizationId,
+    userId,
+    ...(now ? { now } : {}),
+  });
+  return { released: true, offer: "enable" };
+}
+
+/**
+ * Switches Instant Evals on for the organization, once. A second click keeps
+ * the first record: the moment and the member that count are the ones that
+ * gave the agreement.
+ */
+export async function enableInstantEvals({
+  prisma,
+  organizationId,
+  userId,
+  now = () => new Date(),
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  userId: string;
+  now?: () => Date;
+}): Promise<void> {
+  await prisma.organization.updateMany({
+    where: { id: organizationId, instantEvalsEnabledAt: null },
+    data: {
+      instantEvalsEnabledAt: now(),
+      instantEvalsEnabledByUserId: userId,
+    },
+  });
+}

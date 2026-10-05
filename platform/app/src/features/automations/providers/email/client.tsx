@@ -1,4 +1,5 @@
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -25,6 +26,7 @@ import {
   LiquidEditor,
   TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 import { TestFireButton } from "../TestFireButton";
 import type {
@@ -110,6 +112,8 @@ function EmailConfigForm({
   onChange,
   ctx,
 }: ConfigFormProps<EmailSlice, EmailPreview>) {
+  const publicEnv = usePublicEnv();
+  const cannotSendEmail = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY === false;
   const teamWithMembers = api.team.getTeamWithMembers.useQuery(
     { slug: ctx.teamSlug ?? "", organizationId: ctx.organizationId ?? "" },
     { enabled: !!ctx.teamSlug && !!ctx.organizationId },
@@ -190,6 +194,23 @@ function EmailConfigForm({
 
   return (
     <VStack align="stretch" gap={4}>
+      {cannotSendEmail ? (
+        <Alert.Root
+          status="warning"
+          size="sm"
+          variant="subtle"
+          data-testid="email-provider-missing"
+        >
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description textStyle="xs">
+              This installation cannot send email yet. You can save this
+              automation, but no email goes out until an administrator sets up
+              an email provider.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      ) : null}
       <Field.Root>
         <Field.Label>Recipients</Field.Label>
         <VStack align="stretch" gap={1}>
@@ -277,14 +298,6 @@ function EmailConfigForm({
         ) : null}
       </Box>
 
-      {/* Try the real message straight from the recipients section. */}
-      <TestFireButton
-        onTestFire={ctx.onTestFire}
-        loading={ctx.testFireLoading}
-        disabled={!isComplete(slice)}
-        hint={isComplete(slice) ? undefined : "Add a recipient first"}
-      />
-
       <VStack align="stretch" gap={2}>
         <Text textStyle="sm" fontWeight="semibold">
           Message
@@ -342,6 +355,14 @@ function EmailConfigForm({
           previewHeight="520px"
         />
       ) : null}
+      {/* Sits after the message section — a test fire renders whatever is
+          configured above, so it belongs after there is something to try. */}
+      <TestFireButton
+        onTestFire={ctx.onTestFire}
+        loading={ctx.testFireLoading}
+        disabled={!isComplete(slice)}
+        hint={isComplete(slice) ? undefined : "Add a recipient first"}
+      />
     </VStack>
   );
 }

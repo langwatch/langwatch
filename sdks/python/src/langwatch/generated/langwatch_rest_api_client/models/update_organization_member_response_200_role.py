@@ -3,6 +3,7 @@ from enum import Enum
 
 class UpdateOrganizationMemberResponse200Role(str, Enum):
     ADMIN = "ADMIN"
+    DEVELOPER = "DEVELOPER"
     EXTERNAL = "EXTERNAL"
     MEMBER = "MEMBER"
 

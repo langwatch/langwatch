@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TiktokenClient } from "../tiktoken.client";
 import { NullTokenizerClient } from "../tokenizer.client";
@@ -239,6 +242,56 @@ describe("TiktokenClient", () => {
       expect(globalThis.fetch).toHaveBeenCalled();
       expect(elapsed).toBeGreaterThanOrEqual(40);
       expect(elapsed).toBeLessThan(5000);
+    });
+  });
+
+  describe("when TIKTOKENS_PATH holds the encoding file", () => {
+    const ORIGINAL_TIKTOKENS_PATH = process.env.TIKTOKENS_PATH;
+    let dir: string;
+    let loadedRanks: string | undefined;
+
+    beforeEach(async () => {
+      // The image bundles every registry file here (TIKTOKENS_PATH), so a
+      // self-hosted install never fetches from openaipublic at runtime.
+      dir = await fs.mkdtemp(path.join(os.tmpdir(), "tiktokens-"));
+      await fs.writeFile(path.join(dir, "o200k_base.tiktoken"), "bundled");
+      process.env.TIKTOKENS_PATH = dir;
+      loadedRanks = undefined;
+
+      loadMock.mockImplementation(
+        async (
+          registry: Record<string, unknown>,
+          customFetch: (url: string) => Promise<string>,
+        ) => {
+          loadedRanks = await customFetch(registry.load_tiktoken_bpe as string);
+          return {
+            explicit_n_vocab: undefined,
+            pat_str: registry.pat_str,
+            special_tokens: registry.special_tokens,
+            bpe_ranks: loadedRanks,
+          };
+        },
+      );
+      vi.spyOn(globalThis, "fetch");
+    });
+
+    afterEach(async () => {
+      vi.restoreAllMocks();
+      await fs.rm(dir, { recursive: true, force: true });
+      if (ORIGINAL_TIKTOKENS_PATH === undefined) {
+        delete process.env.TIKTOKENS_PATH;
+      } else {
+        process.env.TIKTOKENS_PATH = ORIGINAL_TIKTOKENS_PATH;
+      }
+    });
+
+    /** @scenario "Token counting reads the tokenizer files the image ships" */
+    it("reads the local file and makes no network call", async () => {
+      const count = await new TiktokenClient().countTokens("gpt-4o", "hi");
+
+      expect(count).toBeGreaterThan(0);
+      expect(loadedRanks).toBe("bundled");
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     });
   });
 });

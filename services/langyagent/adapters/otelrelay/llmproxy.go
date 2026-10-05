@@ -211,7 +211,9 @@ func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error
 			// (OpenAI's insufficient_quota) as an in-stream error event
 			// after the stream opens. Watch the frames as they pass through
 			// untouched; a clean end clears the capture, an error event
-			// captures and latches (see llmStreamSniffer).
+			// captures and latches (see llmStreamSniffer). An answered
+			// stream is not a 429, so it ends a run of them.
+			entry.resetRateLimitStrikes()
 			resp.Body = newLLMStreamSniffer(resp.Body, entry, clog.Get(r.baseCtx))
 			return nil
 		}

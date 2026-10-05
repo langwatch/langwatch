@@ -8,6 +8,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 export type ModelProvidersListResponse =
   paths["/api/model-providers"]["get"]["responses"]["200"]["content"]["application/json"];
@@ -38,6 +39,7 @@ export class ModelProvidersApiService {
     const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: extractStatusFromResponse(error),
     } });
+    throwIfHandledError({ operation, error, message });
     throw new ModelProvidersApiError(message, operation, error);
   }
 

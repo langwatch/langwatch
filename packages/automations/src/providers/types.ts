@@ -69,6 +69,9 @@ export interface SharedDef {
    *  graph alert (which fires once when a metric crosses a threshold, not
    *  per trace). Omit when the trace description reads fine for both. */
   readonly alertDescription?: string;
+  /** Report-flavoured variant: a report sends on its schedule, never because
+   *  a trace matched. Omit when the trace description reads fine for both. */
+  readonly reportDescription?: string;
   /** Zod schema for the `actionParams` JSON column. Used by the upsert
    *  route to validate input before persisting. */
   readonly actionParamsSchema: ZodTypeAny;

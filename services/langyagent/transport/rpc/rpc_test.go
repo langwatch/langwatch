@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/langwatch/langwatch/services/langyagent/adapters/github"
+	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
@@ -79,6 +81,26 @@ func TestProbe_BindsSignatureToPrincipal(t *testing.T) {
 	}
 	if pool.lastSig.ProjectID != "project-1" || pool.lastSig.ActorUserID != "user-a" {
 		t.Fatalf("probe signature principal = %q/%q", pool.lastSig.ProjectID, pool.lastSig.ActorUserID)
+	}
+}
+
+// The disabled skills are part of the signature Acquire compares. A probe that
+// dropped them answered "alive" for a worker the turn then replaced with a
+// keyless spawn, which the manager refused with credentials_required.
+//
+// @scenario "The warm and the turn's probe carry the same disabled skills"
+func TestProbe_SignatureCarriesDisabledSkills(t *testing.T) {
+	pool := &stubPool{liveWorker: true}
+	router := newTestRouter(pool)
+	rec := post(t, router, "/worker/probe", `{"conversationId":"c1","projectId":"project-1","actorUserId":"user-a","model":"m","disabledSkillIds":["playground-widgets"]}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	want := domain.SignatureOf("project-1", "user-a", "m", nil,
+		app.SignatureKeys([]app.Capability{github.New("", "", "")}),
+		[]string{"playground-widgets"}, "")
+	if pool.lastSig != want {
+		t.Fatalf("probe signature = %+v, want the one a turn with those disabled skills acquires: %+v", pool.lastSig, want)
 	}
 }
 

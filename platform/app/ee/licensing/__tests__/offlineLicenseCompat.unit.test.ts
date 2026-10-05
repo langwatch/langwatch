@@ -10,7 +10,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import { assertMemberTypeLimitNotExceeded } from "~/server/license-enforcement/license-limit-guard";
-import { PLACEHOLDER_PUBLIC_KEY } from "../constants";
+import { EMBEDDED_PUBLIC_KEY } from "../constants";
 import { LicenseHandler } from "../licenseHandler";
 import { mapToPlanInfo } from "../planMapping";
 import { LicenseDataSchema } from "../types";
@@ -85,6 +85,7 @@ function repositoryWith(memberCount: number): ILicenseEnforcementRepository {
   return {
     getMemberCount: vi.fn().mockResolvedValue(memberCount),
     getMembersLiteCount: vi.fn().mockResolvedValue(0),
+    getMembersDeveloperCount: vi.fn().mockResolvedValue(0),
     getCurrentMonthCost: vi.fn(),
     getCurrentMonthCostForProjects: vi.fn(),
   };
@@ -142,7 +143,7 @@ describe("a license minted by main before this change", () => {
     });
 
     it("is still verified against the production public key main shipped", () => {
-      expect(PLACEHOLDER_PUBLIC_KEY.trim()).toBe(
+      expect(EMBEDDED_PUBLIC_KEY.trim()).toBe(
         fixture.productionPublicKey.trim(),
       );
     });

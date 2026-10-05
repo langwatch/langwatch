@@ -16,6 +16,7 @@ const preference = vi.hoisted(() => ({
   current: null as "github" | null,
 }));
 const clearPreference = vi.hoisted(() => vi.fn());
+const viewer = vi.hoisted(() => ({ managesOrganization: true }));
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -27,8 +28,17 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({ openDrawer: vi.fn() }),
+}));
+
 vi.mock("~/utils/api", () => ({
   api: {
+    slackIntegration: {
+      list: {
+        useQuery: () => ({ data: undefined, isLoading: true, error: null }),
+      },
+    },
     github: {
       getConnectionStatus: {
         useQuery: () => ({
@@ -73,6 +83,8 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1", name: "Acme Corp" },
     project: { id: "p_1", slug: "acme" },
+    hasPermission: (permission: string) =>
+      permission !== "organization:manage" || viewer.managesOrganization,
   }),
 }));
 
@@ -91,7 +103,10 @@ vi.mock("~/components/ui/toaster", () => ({
 import IntegrationsSettings from "../integrations";
 
 afterEach(cleanup);
-beforeEach(() => clearPreference.mockClear());
+beforeEach(() => {
+  clearPreference.mockClear();
+  viewer.managesOrganization = true;
+});
 
 const renderPage = () =>
   render(
@@ -129,5 +144,27 @@ describe("given nothing was remembered", () => {
   it("says nothing, because there is no choice to change", () => {
     renderPage();
     expect(screen.queryByText("Langy uses GitHub for code changes")).toBeNull();
+  });
+});
+
+describe("given a member who does not manage the organization", () => {
+  beforeEach(() => {
+    preference.current = "github";
+    viewer.managesOrganization = false;
+  });
+
+  /** @scenario "The remembered choice can be cleared from the integrations settings" */
+  it("still shows the remembered choice, outside the GitHub card, and clears it", () => {
+    renderPage();
+
+    expect(screen.queryByText("Connect GitHub")).toBeNull();
+    expect(
+      screen.getByText("Langy uses GitHub for code changes"),
+    ).toBeDefined();
+    fireEvent.click(screen.getByText("Change"));
+    expect(clearPreference).toHaveBeenCalledWith({
+      projectId: "p_1",
+      preference: null,
+    });
   });
 });

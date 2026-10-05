@@ -1,7 +1,7 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
@@ -31,8 +31,7 @@ export const deleteSecretCommand = async (
     });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "delete secret" });
+      await failSpinnerFromResponse({ spinner, response, action: "delete secret" });
       process.exit(1);
     }
 

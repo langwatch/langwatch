@@ -21,6 +21,13 @@
 		"userPrompt": "How is my agent performing?"
 	},
 	{
+		"id": "automations",
+		"label": "Automations",
+		"description": "Set up LangWatch automations, alerts and reports that deliver to Slack, email, a webhook, a dataset or an annotation queue. Use when the user wants to be told when something happens (\"alert #support-alerts when errors spike\", \"email me when a trace gets a thumbs-down\"), wants matching traces collected automatically, wants a scheduled report, or wants to pause, resume, test or review an existing automation.",
+		"category": "skill",
+		"userPrompt": "Alert me on Slack when my agent's error rate goes up"
+	},
+	{
 		"id": "code-changes",
 		"label": "Code changes",
 		"description": "Change the user's own program, on their machine or through GitHub. Use when a request needs a change to the user's code (instrument tracing, wire the SDK, fix the agent behind a failing scenario, add a run parameter to a connected agent, version a hardcoded prompt) and not when the platform alone can do it (create a scenario, an evaluation, a prompt version, read traces).",

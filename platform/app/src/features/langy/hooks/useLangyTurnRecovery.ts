@@ -20,9 +20,11 @@ import {
  * The retry re-drives the TURN. It must NOT re-post the user's message — that
  * message was persisted server-side before the turn ran, so a `sendMessage`
  * would append a second copy of the same question. `onRetry` is expected to be
- * `useChat`'s `regenerate`, which truncates the dead assistant message, keeps
- * the user's message where it is, and POSTs with `trigger: "regenerate-message"`
- * — which the chat route reads to skip `recordUserMessage`.
+ * the engine's `retryTurn`: it re-drives the turn through `useChat`'s
+ * `regenerate`, which POSTs with `trigger: "regenerate-message"` (the chat
+ * route reads it to skip `recordUserMessage`), and keeps whatever the dead
+ * assistant message already showed, such as its plan. The retried answer
+ * lands as a new message below it.
  *
  * The caller renders the calm recovering line while `isRecovering` is true and
  * holds the red error card back until it isn't.

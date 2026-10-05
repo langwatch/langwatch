@@ -51,3 +51,15 @@ Feature: Azure AD accounts keep signing in after the better-auth 1.7 upgrade
     Then the sign-in fails without a session
     And no second user or account is created and the account keeps its old key
     And signing in again moves the account and signs the user in
+
+  # The Azure app registration lists the redirect URI LangWatch sends. Before
+  # 3.17 that was /api/auth/callback/azure-ad, and the self-hosting docs give
+  # the same path, so Microsoft sign-in keeps sending it even though
+  # better-auth mounts the provider as `microsoft`. An app registration made
+  # for an earlier release keeps working across the upgrade.
+  @integration
+  Scenario: Microsoft sign-in sends the redirect URI registered with Azure
+    Given Microsoft sign-in configured by the deployment
+    When a sign-in starts
+    Then the redirect URI sent to Microsoft is /api/auth/callback/azure-ad
+    And the callback arriving at that path completes the sign-in
