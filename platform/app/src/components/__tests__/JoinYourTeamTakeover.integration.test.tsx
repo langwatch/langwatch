@@ -26,19 +26,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const {
   offerRef,
   mineRef,
+  invitationsRef,
   dismissMock,
   requestMock,
+  admitMock,
+  acceptInviteMock,
   invalidateOffer,
   invalidateMine,
+  invalidateOrganizations,
   dismissNudge,
   signOutMock,
 } = vi.hoisted(() => ({
   offerRef: { current: { data: undefined as unknown, isPending: false } },
   mineRef: { current: { data: [] as unknown[], isPending: false } },
+  invitationsRef: { current: { data: [] as unknown[], isPending: false } },
   dismissMock: vi.fn(),
   requestMock: vi.fn(),
+  admitMock: vi.fn(),
+  acceptInviteMock: vi.fn(),
   invalidateOffer: vi.fn(),
   invalidateMine: vi.fn(),
+  invalidateOrganizations: vi.fn(),
   dismissNudge: vi.fn(),
   signOutMock: vi.fn(),
 }));
@@ -50,6 +58,8 @@ vi.mock("~/utils/api", () => ({
         offer: { invalidate: invalidateOffer },
         mine: { invalidate: invalidateMine },
       },
+      invite: { pendingForMe: { invalidate: vi.fn() } },
+      organization: { getAll: { invalidate: invalidateOrganizations } },
       user: {
         secureAccountNudge: {
           invalidate: vi.fn(),
@@ -66,6 +76,15 @@ vi.mock("~/utils/api", () => ({
       },
       request: {
         useMutation: () => ({ mutate: requestMock, isPending: false }),
+      },
+      admitAutomatically: {
+        useMutation: () => ({ mutate: admitMock, isPending: false }),
+      },
+    },
+    invite: {
+      pendingForMe: { useQuery: () => invitationsRef.current },
+      acceptInvite: {
+        useMutation: () => ({ mutate: acceptInviteMock, isPending: false }),
       },
     },
     user: {
@@ -139,6 +158,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   offerRef.current = { ...OFFERED };
   mineRef.current = { data: [], isPending: false };
+  invitationsRef.current = { data: [], isPending: false };
 });
 
 afterEach(() => cleanup());
@@ -170,6 +190,7 @@ describe("given an existing account whose domain matches an organization", () =>
       expect(requestMock).toHaveBeenCalledTimes(1);
       expect(requestMock.mock.calls[0]?.[0]).toEqual({
         organizationId: "org_acme",
+        origin: "web",
       });
     });
 
@@ -424,5 +445,161 @@ describe("given a password sign-in that also earns a passkey offer", () => {
     expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
     expect(waiting.closest('[aria-hidden="true"]')).toBeNull();
     expect(screen.queryByTestId("secure-account-nudge")).toBeNull();
+  });
+});
+
+describe("given somebody an administrator already invited", () => {
+  const INVITED = {
+    data: [
+      { inviteCode: "code_1", organizationName: "Acme", role: "DEVELOPER" },
+    ],
+    isPending: false,
+  };
+
+  describe("when they reach the welcome screen", () => {
+    /** @scenario A pending invitation is offered before asking to join */
+    it("leads with accepting the invitation, naming the seat, and offers no ask beside it", () => {
+      invitationsRef.current = { ...INVITED };
+      renderTakeover();
+
+      expect(screen.getByTestId("join-team-takeover")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Accept the invitation to Acme/ }),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/Developer/)).toBeInTheDocument();
+      // The admin already answered; asking them again is the mistake this
+      // prevents.
+      expect(
+        screen.queryByRole("button", { name: /Ask to join/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario Accepting the invitation from the welcome screen lands the invited seat */
+    it("accepts through the invitation's own path and lets the welcome redirect carry on", async () => {
+      invitationsRef.current = { ...INVITED };
+      acceptInviteMock.mockImplementation(
+        (_input: unknown, options?: { onSuccess?: () => void }) =>
+          options?.onSuccess?.(),
+      );
+      renderTakeover();
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Accept the invitation to Acme/ }),
+      );
+
+      expect(acceptInviteMock.mock.calls[0]?.[0]).toEqual({
+        inviteCode: "code_1",
+      });
+      // Nothing navigates from here: the welcome screen's own redirect reads
+      // the organization list and honours the continuation it was given.
+      expect(invalidateOrganizations).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when they are on a dashboard that already has an organization in view", () => {
+    /** @scenario The welcome screen honours an automatic door */
+    it("is not covered by the invitation", () => {
+      invitationsRef.current = { ...INVITED };
+      offerRef.current = { data: { outcome: "none" }, isPending: false };
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover
+            currentOrganizationId="org_current"
+            fallback={<div data-testid="current-organization" />}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(
+        screen.queryByRole("button", { name: /Accept the invitation/ }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("current-organization")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a sign-up the device page sent to the welcome screen", () => {
+  describe("when they ask to join", () => {
+    /** @scenario A request made from the terminal lands as a Developer when approved */
+    it("stamps the request as made from the terminal", async () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover currentOrganizationId={null} origin="cli" />
+        </ChakraProvider>,
+      );
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Ask to join Acme/ }),
+      );
+
+      expect(requestMock.mock.calls[0]?.[0]).toEqual({
+        organizationId: "org_acme",
+        origin: "cli",
+      });
+    });
+  });
+
+  describe("when the door is automatic", () => {
+    /** @scenario The welcome screen honours an automatic door */
+    it("admits them once, stamped from the terminal, and refreshes the organization list", async () => {
+      offerRef.current = {
+        data: {
+          outcome: "auto",
+          organization: {
+            organizationId: "org_acme",
+            name: "Acme",
+            colleagueCount: 10,
+          },
+        },
+        isPending: false,
+      };
+      admitMock.mockImplementation(
+        (_input: unknown, options?: { onSettled?: () => void }) =>
+          options?.onSettled?.(),
+      );
+      const { rerender } = render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover currentOrganizationId={null} origin="cli" />
+        </ChakraProvider>,
+      );
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover currentOrganizationId={null} origin="cli" />
+        </ChakraProvider>,
+      );
+
+      await waitFor(() => expect(admitMock).toHaveBeenCalledTimes(1));
+      expect(admitMock.mock.calls[0]?.[0]).toEqual({ origin: "cli" });
+      expect(invalidateOrganizations).toHaveBeenCalled();
+      expect(
+        screen.queryByRole("button", { name: /Ask to join/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario The welcome screen honours an automatic door */
+    it("admits nobody on a dashboard that already has an organization in view", () => {
+      offerRef.current = {
+        data: {
+          outcome: "auto",
+          organization: {
+            organizationId: "org_acme",
+            name: "Acme",
+            colleagueCount: 10,
+          },
+        },
+        isPending: false,
+      };
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover
+            currentOrganizationId="org_current"
+            fallback={<div data-testid="current-organization" />}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(admitMock).not.toHaveBeenCalled();
+      expect(screen.getByTestId("current-organization")).toBeInTheDocument();
+    });
   });
 });

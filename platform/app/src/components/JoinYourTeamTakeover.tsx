@@ -1,6 +1,11 @@
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
-import type { JoinLookupDecision } from "@langwatch/identity";
+import type {
+  JoinLookupDecision,
+  JoinRequestOrigin,
+} from "@langwatch/identity";
+import { useEffect, useRef } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
+import { orgRoleOptions } from "~/components/settings/OrganizationUserRoleField";
 import { Dialog } from "~/components/ui/dialog";
 import { AuthPrimaryButton } from "~/features/auth/components/AuthPrimaryButton";
 import { AUTH_SECONDARY_STYLE } from "~/features/auth/components/AuthSecondaryButton";
@@ -26,6 +31,7 @@ export function JoinYourTeamTakeover({
   onDismissed,
   fallback = null,
   currentOrganizationId,
+  origin = "web",
 }: {
   /** What the way past is called where "keep working on my own" is not what
    *  declining means. On the onboarding path it means "carry on and make an
@@ -44,26 +50,23 @@ export function JoinYourTeamTakeover({
    * omission is a type error, not a silent "not resolved yet".
    */
   currentOrganizationId: string | null | undefined;
+  /**
+   * Where a request made from here is coming from (ADR-143 v6). The welcome
+   * screen passes `cli` when `langwatch login`'s device-approval page sent
+   * the person here; a `cli` request lands a Developer seat whatever the
+   * organization's joiner seat says. Everything else is `web`.
+   */
+  origin?: JoinRequestOrigin;
 }) {
-  // The shell renders on public pages too (a shared trace), where there is no
-  // session to ask about — and a protected query fired there is a refusal
-  // nobody asked for.
-  const { data: session } = useSession();
-  const enabled = !!session?.user;
-
-  const offer = api.joinRequests.offer.useQuery(void 0, { enabled });
-  const mine = api.joinRequests.mine.useQuery(void 0, { enabled });
-  const dismiss = api.joinRequests.dismissOffer.useMutation();
-  const askToJoin = api.joinRequests.request.useMutation();
+  const { settled, decision, mine, invitation, admitting } =
+    useJoinTakeoverState({ currentOrganizationId, origin });
   const utils = api.useUtils();
 
-  // Nothing is decided until BOTH answers are in. Rendering the offer while
+  // Nothing is decided until EVERY answer is in. Rendering the offer while
   // the pending query is still in flight would show "ask to join" to somebody
   // who already asked — the same class of mistake that made the old button
   // look inert.
-  if (offer.isPending || mine.isPending) return null;
-
-  const decision = offer.data;
+  if (!settled) return null;
 
   // The dashboard's OWN organization read is still in flight — a distinct
   // state from "no organization context" (onboarding passes explicit
@@ -73,7 +76,7 @@ export function JoinYourTeamTakeover({
   // answered, so nothing here decides.
   if (currentOrganizationId === undefined) return fallback;
 
-  const waiting = findWaitingRequest(mine.data, currentOrganizationId);
+  const waiting = findWaitingRequest(mine, currentOrganizationId);
 
   if (waiting) {
     return (
@@ -84,24 +87,125 @@ export function JoinYourTeamTakeover({
     );
   }
 
-  // A dashboard already has an organization context. Do not replace it with
-  // a domain offer for another organization; onboarding has no such context
-  // and keeps the offer visible. `undefined` cannot reach here (returned
-  // above), so this is `null` (no context) versus a real organization id.
-  if (
-    currentOrganizationId !== null &&
-    decision?.outcome === "ask" &&
-    !decision.organizations.some(
-      (organization) => organization.organizationId === currentOrganizationId,
-    )
-  ) {
-    return fallback;
+  // An administrator already answered the question this screen would ask,
+  // by inviting them. Lead with that, and offer no ask beside it. Only the
+  // welcome screen is handed one (see the state hook).
+  if (invitation) {
+    return <InvitationTakeover invitation={invitation} />;
   }
 
   if (!decision || decision.outcome === "none") return fallback;
+
   // An automatic match is not an offer to weigh — the arrival admits them.
-  if (decision.outcome === "auto") return fallback;
-  if (decision.organizations.length === 0) return fallback;
+  // On the welcome screen that admission is running now (above); a dashboard
+  // leaves it to the sign-up path and shows nothing.
+  if (decision.outcome === "auto") {
+    return admitting ? (
+      <AdmittingTakeover organizationName={decision.organization.name} />
+    ) : (
+      fallback
+    );
+  }
+
+  if (offerIsNotForHere({ decision, currentOrganizationId })) return fallback;
+
+  return (
+    <AskToJoinTakeover
+      organizations={decision.organizations}
+      origin={origin}
+      dismissLabel={dismissLabel}
+      onDismissed={onDismissed}
+    />
+  );
+}
+
+/**
+ * The three answers the takeover waits on, and the one side effect it runs.
+ *
+ * The shell renders on public pages too (a shared trace), where there is no
+ * session to ask about — and a protected query fired there is a refusal nobody
+ * asked for, so nothing is asked without one. Two behaviours belong only to the
+ * welcome screen: leading with a pending invitation, and walking through an
+ * automatic door. A dashboard has an organization in view, and covering it
+ * with an invitation, or quietly adding its member to another organization,
+ * would be wrong there — so both are keyed on `onboarding`.
+ */
+function useJoinTakeoverState({
+  currentOrganizationId,
+  origin,
+}: {
+  currentOrganizationId: string | null | undefined;
+  origin: JoinRequestOrigin;
+}) {
+  const { data: session } = useSession();
+  const enabled = !!session?.user;
+  const onboarding = currentOrganizationId === null;
+
+  const offer = api.joinRequests.offer.useQuery(void 0, { enabled });
+  const mine = api.joinRequests.mine.useQuery(void 0, { enabled });
+  const invitations = api.invite.pendingForMe.useQuery(
+    {},
+    { enabled: enabled && onboarding },
+  );
+  const admitting = useAutomaticAdmission({
+    admit: onboarding && offer.data?.outcome === "auto",
+    origin,
+  });
+
+  const settled =
+    !offer.isPending &&
+    !mine.isPending &&
+    !(onboarding && invitations.isPending);
+
+  return {
+    settled,
+    decision: offer.data,
+    mine: mine.data,
+    invitation: onboarding ? invitations.data?.[0] : undefined,
+    admitting,
+  };
+}
+
+/**
+ * A dashboard already has an organization context. Do not replace it with a
+ * domain offer for another organization; onboarding has no such context and
+ * keeps the offer visible. `undefined` never reaches here (the caller returned
+ * on it), so this is `null` (no context) versus a real organization id. An
+ * offer naming no organization at all is nothing to show either.
+ */
+function offerIsNotForHere({
+  decision,
+  currentOrganizationId,
+}: {
+  decision: Extract<JoinLookupDecision, { outcome: "ask" }>;
+  currentOrganizationId: string | null;
+}): boolean {
+  if (decision.organizations.length === 0) return true;
+  if (currentOrganizationId === null) return false;
+  return !decision.organizations.some(
+    (organization) => organization.organizationId === currentOrganizationId,
+  );
+}
+
+/**
+ * The offer itself: one button per organization on the domain, and the way
+ * past. Joining LEADS. Creating your own is what happens if you decline, and
+ * it is already what you have — so it needs no button here.
+ */
+function AskToJoinTakeover({
+  organizations,
+  origin,
+  dismissLabel,
+  onDismissed,
+}: {
+  organizations: ReadonlyArray<{ organizationId: string; name: string }>;
+  origin: JoinRequestOrigin;
+  dismissLabel: string;
+  onDismissed?: () => void;
+}) {
+  const dismiss = api.joinRequests.dismissOffer.useMutation();
+  const askToJoin = api.joinRequests.request.useMutation();
+  const utils = api.useUtils();
 
   const refuse = () =>
     dismiss.mutate(
@@ -119,7 +223,7 @@ export function JoinYourTeamTakeover({
 
   const ask = (organizationId: string) =>
     askToJoin.mutate(
-      { organizationId },
+      { organizationId, origin },
       {
         onSuccess: () => {
           // Straight to the waiting half, from the same queries that drew
@@ -138,9 +242,7 @@ export function JoinYourTeamTakeover({
       intro="Join them instead of building in a workspace of your own."
       testId="join-team-takeover"
     >
-      {decision.organizations.map((organization) => (
-        // Joining LEADS. Creating your own is what happens if you decline,
-        // and it is already what you have — so it needs no button here.
+      {organizations.map((organization) => (
         <AuthPrimaryButton
           key={organization.organizationId}
           isBusy={askToJoin.isPending}
@@ -155,6 +257,108 @@ export function JoinYourTeamTakeover({
       <Text fontSize="12.5px" color="fg.subtle" textAlign="center">
         We will not ask about this domain again.
       </Text>
+    </Takeover>
+  );
+}
+
+/** What the welcome screen shows for the moment the automatic door takes. */
+function AdmittingTakeover({ organizationName }: { organizationName: string }) {
+  return (
+    <Takeover
+      title={`Joining ${organizationName}`}
+      intro="Your colleagues are already here, and this organization lets people on your domain straight in."
+      testId="join-team-admitting"
+    >
+      <Text fontSize="13px" color="fg.muted" textAlign="center">
+        One moment.
+      </Text>
+    </Takeover>
+  );
+}
+
+/**
+ * Walking through an automatic door from the welcome screen (ADR-143 v6).
+ *
+ * Fired once per mount, whatever React renders in between: an admission that
+ * ran twice would be the same request made twice, and the second is refused
+ * as already pending. Nothing navigates on success; the organization list is
+ * refreshed and the welcome screen's own redirect carries on, honouring the
+ * continuation the device page gave it.
+ */
+function useAutomaticAdmission({
+  admit,
+  origin,
+}: {
+  admit: boolean;
+  origin: JoinRequestOrigin;
+}): boolean {
+  const admitAutomatically = api.joinRequests.admitAutomatically.useMutation();
+  const utils = api.useUtils();
+  const fired = useRef(false);
+
+  useEffect(() => {
+    if (!admit || fired.current) return;
+    fired.current = true;
+    admitAutomatically.mutate(
+      { origin },
+      {
+        onSettled: () => {
+          void utils.organization.getAll.invalidate();
+          void utils.joinRequests.offer.invalidate();
+          void utils.joinRequests.mine.invalidate();
+        },
+      },
+    );
+  }, [admit, origin, admitAutomatically, utils]);
+
+  return admit;
+}
+
+/**
+ * An invitation that was already waiting (ADR-143 v6), led with instead of
+ * the ask. Accepting runs the invitation's own path, so the seat is the one
+ * the invitation names and any open request is withdrawn as it always was.
+ * Nothing navigates from here either: the welcome screen reads the
+ * organization list and carries on to wherever it was going.
+ */
+function InvitationTakeover({
+  invitation,
+}: {
+  invitation: { inviteCode: string; organizationName: string; role: string };
+}) {
+  const accept = api.invite.acceptInvite.useMutation();
+  const utils = api.useUtils();
+  const seat =
+    orgRoleOptions.find((option) => option.value === invitation.role)?.label ??
+    invitation.role;
+
+  return (
+    <Takeover
+      title={`You’re invited to join ${invitation.organizationName}`}
+      intro={`An administrator has already invited you, as a ${seat}.`}
+      testId="join-team-takeover"
+    >
+      <AuthPrimaryButton
+        isBusy={accept.isPending}
+        onClick={() =>
+          accept.mutate(
+            { inviteCode: invitation.inviteCode },
+            {
+              onSuccess: () => {
+                void utils.organization.getAll.invalidate();
+                void utils.invite.pendingForMe.invalidate();
+              },
+              onError: (error) =>
+                showErrorToast({
+                  error,
+                  fallbackTitle: "Couldn't accept the invitation",
+                }),
+            },
+          )
+        }
+      >
+        Accept the invitation to {invitation.organizationName}
+      </AuthPrimaryButton>
     </Takeover>
   );
 }

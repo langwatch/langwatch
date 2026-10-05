@@ -153,6 +153,16 @@ vi.mock("~/utils/api", () => ({
       dismissOffer: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
+      admitAutomatically: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    // ...and with a pending invitation when one is waiting (ADR-143 v6).
+    invite: {
+      pendingForMe: { useQuery: () => ({ data: [], isPending: false }) },
+      acceptInvite: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
     },
     useUtils: () => ({
       organization: { getAll: { invalidate: invalidateOrganizations } },
@@ -160,6 +170,7 @@ vi.mock("~/utils/api", () => ({
         mine: { invalidate: vi.fn() },
         offer: { invalidate: vi.fn() },
       },
+      invite: { pendingForMe: { invalidate: vi.fn() } },
     }),
   },
 }));
