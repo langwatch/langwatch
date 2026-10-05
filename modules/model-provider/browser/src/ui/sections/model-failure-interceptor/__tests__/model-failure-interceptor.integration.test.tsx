@@ -4,9 +4,9 @@
  * one reader over every failed mutation, and that reader raises main's toasts by cause code.
  */
 
+import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import { installedModuleFailures } from "@langwatch/browser/application";
 import type { UiFailureHost } from "@langwatch/browser/feature-install";
-import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { cleanup, screen } from "@testing-library/react";
@@ -42,6 +42,7 @@ describe("Feature: Missing-model toast when a feature can't resolve a model", ()
     expect(installedModuleFailures([modelProviderWeb])).toEqual([reportModelFailure]);
   });
 
+  /** @scenario A tRPC call that throws ModelNotConfigured opens the toast */
   it("A tRPC call that throws ModelNotConfigured opens the toast", async () => {
     const error = failedCall({
       data: {
