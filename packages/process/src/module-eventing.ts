@@ -1,15 +1,17 @@
 /**
  * The seam between a module and the event-sourced half of a process (ADR-144).
- * The declaration types live in `@langwatch/eventing`; composition names no
- * pipeline, projection or subscriber and imports those types only.
+ * Composition names no pipeline, projection or subscriber: it takes the
+ * declaration types and the store it hands each pipeline from `@langwatch/eventing`.
  */
-import type {
-  EventingParticipation,
-  FeatureEventingSetup,
-  FeatureEventing,
-  PriorEventsRead,
-  ReadHintTarget,
-  ReadHintMap,
+import {
+  PipelineEventStore,
+  type EventingParticipation,
+  type EventStore,
+  type FeatureEventingSetup,
+  type FeatureEventing,
+  type OwnEventLog,
+  type ReadHintTarget,
+  type ReadHintMap,
 } from "@langwatch/eventing";
 import type { TrpcContract, TrpcContractMember } from "@langwatch/module";
 
@@ -26,68 +28,26 @@ export function participationForRole(role: ServerRole): EventingParticipation {
   return role === "worker" ? "consume" : "produce";
 }
 
-/** The one event-log read the kernel takes off a runtime; the kernel binds the aggregate type. */
-export interface AggregateEventLog {
-  getEvents(request: {
-    aggregateId: string;
-    context: Readonly<{ tenantId: string }>;
-    aggregateType: string;
-  }): Promise<readonly unknown[]>;
-}
-
-/** The aggregate a built definition declares, read without asserting a shape it may not have. */
-function aggregateTypeOf(definition: unknown): string | undefined {
-  if (typeof definition !== "object" || definition === null) return void 0;
-  if (!("aggregate" in definition)) return void 0;
-  const aggregate = definition.aggregate;
-  if (typeof aggregate !== "object" || aggregate === null || !("type" in aggregate)) return void 0;
-  return typeof aggregate.type === "string" ? aggregate.type : void 0;
-}
-
-/** A pipeline's read of its own aggregate, bound to the type its definition declares once built. */
-class OwnAggregateHistory {
-  #aggregateType: string | undefined;
-
-  constructor(
-    private readonly log: () => AggregateEventLog | undefined,
-    private readonly pipeline: string,
-  ) {}
-
-  readonly read: PriorEventsRead = async ({ tenantId, aggregateId, accepts }) => {
-    const aggregateType = this.#aggregateType;
-    if (aggregateType === void 0) {
-      throw new Error(
-        `${this.pipeline} read its earlier events before its definition named an aggregate.`,
-      );
-    }
-    const log = this.log();
-    if (log === void 0) {
-      throw new Error(
-        `${this.pipeline} reads its earlier events, but this process's eventing holds no event log.`,
-      );
-    }
-    const events = await log.getEvents({ aggregateId, context: { tenantId }, aggregateType });
-    return events.filter(accepts);
-  };
-
-  bindTo(definition: unknown): void {
-    if (definition instanceof PendingPipelines) {
-      definition.readHistoryFrom(this.log);
-      return;
-    }
-    this.#aggregateType = aggregateTypeOf(definition);
-  }
-}
-
-/** Builds a module's eventing with each pipeline's read bound to its own aggregate. */
+/** Builds a module's eventing with each pipeline handed its own store, bound to its aggregate. */
 export function buildModuleEventing(input: {
   readonly eventing: FeatureEventing;
-  readonly setup: Omit<FeatureEventingSetup<unknown, unknown, unknown>, "priorEvents">;
-  readonly log: () => AggregateEventLog | undefined;
+  readonly setup: Omit<
+    FeatureEventingSetup<unknown, unknown, unknown>,
+    "priorEvents" | "eventStore"
+  >;
+  readonly log: OwnEventLog;
 }): unknown {
-  const history = new OwnAggregateHistory(input.log, input.eventing.pipeline);
-  const definition = input.eventing.build({ ...input.setup, priorEvents: history.read });
-  history.bindTo(definition);
+  const eventStore = PipelineEventStore.create({
+    pipeline: input.eventing.pipeline,
+    log: input.log,
+  });
+  const definition = input.eventing.build({
+    ...input.setup,
+    priorEvents: eventStore.read,
+    eventStore,
+  });
+  if (definition instanceof PendingPipelines) definition.readHistoryFrom(input.log);
+  else eventStore.bindTo(definition);
   return definition;
 }
 
@@ -111,14 +71,14 @@ class ModulePipelines implements FeatureEventing {
 
 /** Built one at a time at registration, so each connects before the next builds. */
 class PendingPipelines {
-  #log: () => AggregateEventLog | undefined = () => void 0;
+  #log: OwnEventLog = () => void 0;
 
   constructor(
     private readonly declarations: readonly FeatureEventing[],
     private readonly setup: FeatureEventingSetup<unknown, unknown, unknown>,
   ) {}
 
-  readHistoryFrom(log: () => AggregateEventLog | undefined): void {
+  readHistoryFrom(log: OwnEventLog): void {
     this.#log = log;
   }
 
@@ -160,7 +120,7 @@ export interface EventingHost {
   readonly participation: EventingParticipation;
   readonly processStore: unknown;
   /** Read at call time: a runtime opens its event store only once it initialises. */
-  readonly eventStore?: AggregateEventLog;
+  readonly eventStore?: Pick<EventStore, "getEvents" | "storeEvents">;
   register(definition: unknown): unknown;
   /** Lists a definition without starting it; absent on a runtime that cannot describe. */
   describe?(definition: unknown): void;

@@ -17,7 +17,6 @@ import { z } from "zod";
 import { bootInstalledProcess } from "./boot-installed-process.ts";
 import { storesBackedMembers } from "./module-members.ts";
 import { observabilityOwner } from "./observability-owner.ts";
-import { processOwner } from "./owner.ts";
 import {
   ApiProcessContainer,
   TasksProcessContainer,
@@ -137,12 +136,6 @@ export class ProcessServer implements ProcessBoot {
         .into(observabilityOwner.secrets.otlpHeaders, (rawHeaders) =>
           telemetryExporterOf({ observability: this.config.observability, rawHeaders }),
         );
-      // Resolved once at the root and handed on as a member: its destinations
-      // are a request header and a scenario child's environment, so unlike a
-      // client credential it cannot stay inside the closure.
-      const nlpInternalSecret = await this.resolver
-        .scopeTo(processOwner.name, Object.values(processOwner.secrets))
-        .into(processOwner.secrets.nlpInternal, (secret) => secret);
       const stores = await openStores({
         name: this.server.name,
         config,
@@ -219,9 +212,7 @@ export class ProcessServer implements ProcessBoot {
               telemetryExporter,
               nodeEnvironment: this.settings.nodeEnvironment,
               isSaas: this.settings.isSaas ?? false,
-              nlpServiceUrl: this.settings.nlpServiceUrl,
               nlpCodeBlockTimeoutSeconds: this.settings.nlpCodeBlockTimeoutSeconds,
-              nlpInternalSecret,
               // The proxy spellings, raw; each module's outbound calls parse and follow them.
               outboundProxy: this.settings.outboundProxy ?? {},
               // The raw-socket door's port, which a module tunnelling to that door reads.

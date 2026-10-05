@@ -95,6 +95,13 @@ Feature: Composing a process declaratively
     And only the events the command's guard accepts come back
 
   @unit
+  Scenario: A pipeline is handed its own event store
+    Given a module whose pipeline declares the simulation_run aggregate
+    When the process boots with an eventing runtime on its pool
+    Then the pipeline's setup carries an event store bound to the simulation_run aggregate
+    And an append through it of another aggregate type's event is refused
+
+  @unit
   Scenario: The draining role installs the framework's maintenance pipelines
     Given an eventing runtime that offers its blob and process-manager maintenance pipelines
     When a worker boots over it, and an api boots over it

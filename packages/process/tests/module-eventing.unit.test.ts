@@ -1,7 +1,11 @@
-import type { FeatureEventing, FeatureEventingSetup } from "@langwatch/eventing";
+import {
+  createTenantId,
+  EventUtils,
+  type FeatureEventing,
+  type FeatureEventingSetup,
+} from "@langwatch/eventing";
 /**
- * The module/eventing seam, with structural shapes: composition depends on
- * nothing from `@langwatch/eventing`, so neither does this file.
+ * The module/eventing seam, with structural shapes standing in for a runtime.
  * Spec: specs/server/declarative-process-composition.feature
  */
 import { describe, expect, it, vi } from "vitest";
@@ -10,6 +14,18 @@ import { createApp } from "../src/application.ts";
 import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { defineRepositories } from "../src/repository-registry.ts";
 import { liveMemberSourceOf } from "./member-source.ts";
+
+/** One stored event of the given aggregate type, for the pipeline's own store to append. */
+function eventFixture({ aggregateType }: { aggregateType: string }) {
+  return EventUtils.createEvent({
+    aggregateType,
+    aggregateId: "run_1",
+    tenantId: createTenantId("project_1"),
+    type: "lw.test.run_queued",
+    version: "2026-10-05",
+    data: {},
+  });
+}
 
 /** One row store, so two graphs over the same rows are distinguishable. */
 class KeyDatabase {
@@ -208,6 +224,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
             reads.push(request);
             return Promise.resolve([{ type: "queued" }, "not an event", { type: "finished" }]);
           },
+          storeEvents: () => Promise.resolve(),
         },
         register: () => ({}),
       };
@@ -235,6 +252,52 @@ describe("given a module that declares its event sourcing with withEventing", ()
         },
       ]);
       expect(events).toEqual([{ type: "queued" }, { type: "finished" }]);
+    });
+  });
+
+  describe("when a pipeline is handed its own event store", () => {
+    /** @scenario "A pipeline is handed its own event store" */
+    it("appends under the aggregate its definition declares and refuses another", async () => {
+      const appended: unknown[] = [];
+      const setups: FeatureEventingSetup<KeyRepositories, KeyApp, unknown>[] = [];
+      const host = {
+        processStore: {},
+        eventStore: {
+          getEvents: () => Promise.resolve([]),
+          storeEvents: (events: readonly unknown[], context: unknown, aggregateType: string) => {
+            appended.push({ events, context, aggregateType });
+            return Promise.resolve();
+          },
+        },
+        register: () => ({}),
+      };
+      const module = defineProcessModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApi(ComposedKeyApp)
+        .withEventing({
+          pipeline: "simulation_processing",
+          build: (setup) => {
+            setups.push(setup);
+            return { name: "simulation_processing", aggregate: { type: "simulation_run" } };
+          },
+        });
+
+      await createApp({ role: "worker", members: liveMemberSourceOf({ eventing: host }) })
+        .withModules([module])
+        .boot();
+
+      const eventStore = setups[0]!.eventStore!;
+      const own = eventFixture({ aggregateType: "simulation_run" });
+      await eventStore.append({ tenantId: "project_1", events: [own] });
+      expect(appended).toEqual([
+        { events: [own], context: { tenantId: "project_1" }, aggregateType: "simulation_run" },
+      ]);
+
+      const foreign = eventFixture({ aggregateType: "scenario" });
+      await expect(eventStore.append({ tenantId: "project_1", events: [foreign] })).rejects.toThrow(
+        /appends only its own "simulation_run" aggregate/,
+      );
+      expect(appended).toHaveLength(1);
     });
   });
 

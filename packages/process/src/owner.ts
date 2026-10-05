@@ -2,7 +2,13 @@
  * The process-server's own declaration (§6): framework globals declare at
  * their framework owner, with the same primitive a module uses.
  */
-import { Config, isSaas, nlpServiceUrl, publicBaseUrl } from "@langwatch/config";
+import {
+  Config,
+  isSaas,
+  nlpCodeBlockTimeoutSeconds,
+  nlpServiceUrl,
+  publicBaseUrl,
+} from "@langwatch/config";
 import { nlpInternalSecret } from "@langwatch/secrets";
 import { z } from "zod";
 
@@ -31,13 +37,10 @@ export const processOwner = {
      */
     nlpServiceUrl,
     /**
-     * How long a code block may run inside the engine, raw as the engine reads it.
-     * One owner for a fact workflow and scenario both read; each clamps its own way.
+     * How long a code block may run inside the engine, raw: the shared leaf, so
+     * workflow and scenario holding it too read the same fact without a collision.
      */
-    nlpCodeBlockTimeoutSeconds: c.env(
-      "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS",
-      z.string().optional(),
-    ),
+    nlpCodeBlockTimeoutSeconds,
     /** Keeps the development badge off a development build (demos, screenshots). */
     hideDevIndicator: c.env(
       "HIDE_DEV_INDICATOR",

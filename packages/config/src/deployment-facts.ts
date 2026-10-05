@@ -81,6 +81,17 @@ export const { publicBaseUrl } = Config.define((c) => ({
   ),
 }));
 
+/**
+ * How long a code block may run inside the NLP engine, raw as the engine reads it. Workflow
+ * pushes it to the studio engine and scenario clamps by it; each holds this one leaf.
+ */
+export const { nlpCodeBlockTimeoutSeconds } = Config.define((c) => ({
+  nlpCodeBlockTimeoutSeconds: c.env(
+    "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS",
+    z.string().optional(),
+  ),
+}));
+
 const optionalNonBlank = z.preprocess(
   (value) => (value === "" ? undefined : value),
   z.string().min(1).optional(),

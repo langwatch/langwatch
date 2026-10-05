@@ -1,4 +1,9 @@
-import { nlpServiceUrl, parseProcessConfig, publicBaseUrl } from "@langwatch/config";
+import {
+  nlpCodeBlockTimeoutSeconds,
+  nlpServiceUrl,
+  parseProcessConfig,
+  publicBaseUrl,
+} from "@langwatch/config";
 import {
   nlpInternalSecret,
   refuseDoubleClaims,
@@ -50,6 +55,21 @@ describe("the process owner's own declaration", () => {
 
       expect(config.process.nlpServiceUrl).toBe("http://nlp.langwatch.test");
       expect(config.evaluation.nlpServiceUrl).toBe("http://nlp.langwatch.test");
+    });
+  });
+
+  describe("given a module holding the shared code-block timeout leaf beside the process", () => {
+    /** @scenario "The process and a module both holding the code-block timeout leaf parse it" */
+    it("parses NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS once for both, raw", () => {
+      const scenario = { name: "scenario", config: { nlpCodeBlockTimeoutSeconds } } as const;
+
+      const config = parseProcessConfig({
+        owners: [processOwner, scenario],
+        environment: { NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: "9000" },
+      });
+
+      expect(config.process.nlpCodeBlockTimeoutSeconds).toBe("9000");
+      expect(config.scenario.nlpCodeBlockTimeoutSeconds).toBe("9000");
     });
   });
 
