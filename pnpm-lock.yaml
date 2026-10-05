@@ -6285,6 +6285,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../packages/redis-client
       '@langwatch/system-migrations':
         specifier: workspace:*
         version: link:../../../packages/system-migrations
