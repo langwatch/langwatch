@@ -63338,7 +63338,8 @@
                 },
                 "required": [
                   "name"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           }
