@@ -254,8 +254,8 @@ export const eSBatchEvaluationRESTParamsSchema = eSBatchEvaluationSchema
        * when there is no Optimization Studio workflow to read it from.
        * `dataset_id` wins when both are sent.
        */
-      dataset_id: z.string().optional().nullable(),
-      dataset_slug: z.string().optional().nullable(),
+      dataset_id: z.string().min(1).optional().nullable(),
+      dataset_slug: z.string().min(1).optional().nullable(),
       name: z.string().optional().nullable(),
       targets: z.array(eSBatchEvaluationTargetRESTSchema).optional().nullable(),
       timestamps: z
