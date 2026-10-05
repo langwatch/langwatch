@@ -100,11 +100,12 @@ OPENAPI_PYTHON_CLIENT_VERSION := 0.28.4
 ensure-openapi-python-client:
 	@uv pip install --quiet "openapi-python-client==$(OPENAPI_PYTHON_CLIENT_VERSION)"
 
+# Generate into .tmp first and replace the committed client only once the
+# generator has produced one. Deleting it up front left the SDK with no
+# client (about 4,000 files) whenever the generator could not run.
 generate/api-client: ensure-openapi-python-client
 	@echo "Generating OpenAPI spec..."
 	@cd ../../platform/app && pnpm run task generateOpenAPISpec
-	@echo "Deleting old API client..."
-	@rm -rf src/langwatch/generated/langwatch_rest_api_client
 	@echo "Building API client..."
 	@mkdir -p .tmp/api-client
 	@python3 scripts/spec-for-python-generator.py \
@@ -115,7 +116,9 @@ generate/api-client: ensure-openapi-python-client
 		--output-path .tmp/api-client \
 		--custom-template-path openapi-templates \
 		--overwrite
-	@echo "Copying necessary files to SDK..."
+	@test -d .tmp/api-client/lang_watch_api_client || { echo "The generator produced no client; keeping the committed one."; exit 1; }
+	@echo "Replacing the old API client..."
+	@rm -rf src/langwatch/generated/langwatch_rest_api_client
 	@mkdir -p src/langwatch/generated/langwatch_rest_api_client
 	@cp -r .tmp/api-client/lang_watch_api_client/ src/langwatch/generated/langwatch_rest_api_client/
 	@echo "Cleaning up..."
