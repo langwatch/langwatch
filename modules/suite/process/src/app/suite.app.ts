@@ -150,7 +150,7 @@ export class SuiteModule implements SuiteApi {
     evaluators: EvaluatorApi,
     /** Owns `LANGWATCH_DEFAULT_RETENTION_DAYS`; a suite run is stamped with its default. */
     retention: DataRetentionApi,
-    /** Decides which testing interface a run plan's platform link opens in. */
+    /** Picks a run plan link's testing interface; refuses a voice target while voice is off. */
     featureFlags: FeatureFlagApi,
     /** The project's default model per role, stamped on each queued run as main did. */
     modelProviders: ModelProviderApi,
@@ -179,6 +179,7 @@ export class SuiteModule implements SuiteApi {
       agents: dependencies.agents,
       prompts: dependencies.prompts,
       evaluators: dependencies.evaluators,
+      featureFlags: dependencies.featureFlags,
       execution: infrastructure.execution,
       connectedPresence: infrastructure.connectedPresence,
     });
@@ -297,6 +298,7 @@ export class SuiteModule implements SuiteApi {
       agents: setup.dependencies.agents,
       prompts: setup.dependencies.prompts,
       evaluators: setup.dependencies.evaluators,
+      featureFlags: setup.dependencies.featureFlags,
       execution: infrastructure.execution,
       connectedPresence: infrastructure.connectedPresence,
       ...(setup.generateId ? { generateId: setup.generateId } : {}),

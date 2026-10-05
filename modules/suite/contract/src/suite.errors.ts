@@ -21,6 +21,20 @@ export class SuiteNameTakenError extends HandledError {
   }
 }
 
+/** Voice agents are behind the project's release flag (AC29); a run naming a voice target is
+ * refused while it is off, so the API cannot bypass the run dialog's own gate. */
+export class VoiceAgentsDisabledError extends HandledError {
+  declare readonly code: "voice_agents_disabled";
+
+  constructor() {
+    super("voice_agents_disabled", "Voice agents are not enabled for this project", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "VoiceAgentsDisabledError";
+  }
+}
+
 /** A suite execution was rejected before any work was scheduled. */
 export class SuiteExecutionError extends HandledError {
   constructor(code: string, message: string) {
