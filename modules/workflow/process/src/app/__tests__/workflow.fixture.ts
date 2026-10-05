@@ -145,6 +145,7 @@ export function createWorkflowTestInfrastructure(
     codeCompletions: noCodeCompletions,
     studioRuns: noStudioRuns,
     signals: silentSignals,
+    executeSyncRelay: createApiFixture<WorkflowInfrastructure["executeSyncRelay"]>(),
     lifecycle: buildWorkflowLifecyclePipeline(),
     ...overrides,
   };

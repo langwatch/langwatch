@@ -378,10 +378,9 @@ export type WorkflowHostMembers = Omit<
   | "signals"
 >;
 
-/** The engine's code-block ceiling and the public origin are process facts. */
+/** The engine's code-block ceiling is a process fact. */
 type WorkflowProcessFacts = Readonly<{
   nlpCodeBlockTimeoutSeconds: string | undefined;
-  publicBaseUrl: string | undefined;
 }>;
 
 type WorkflowSetup = FeatureSetup<
@@ -468,7 +467,7 @@ function lambdaEngine({
       subnetIds: fields.subnet_ids,
       securityGroupIds: fields.security_group_ids,
     },
-    langwatchEndpoint: setup.members.publicBaseUrl ?? "",
+    langwatchEndpoint: setup.config.publicBaseUrl ?? "",
     codeBlockTimeoutRawValue: setup.members.nlpCodeBlockTimeoutSeconds,
     stagingThresholdBytesRawValue: setup.config.stagingThresholdBytes,
     stagingTtlSecondsRawValue: setup.config.stagingTtlSeconds,
@@ -645,7 +644,7 @@ export class WorkflowModule implements WorkflowApi {
   };
   static readonly config = workflowConfig;
   /** `prisma` for `workflowRows`/`workflows`, via this module's `workflowRepositories`. */
-  static readonly reads = ["prisma", "nlpCodeBlockTimeoutSeconds", "publicBaseUrl"] as const;
+  static readonly reads = ["prisma", "nlpCodeBlockTimeoutSeconds"] as const;
   static readonly repositories = workflowRepositories;
   static readonly secrets = {
     nlpLambdaFleet: nlpLambdaFleetSecret,
@@ -700,9 +699,9 @@ export class WorkflowModule implements WorkflowApi {
       codeCompletions: WorkflowCodeCompletionService.create({ modelProviders }),
       studioDispatch,
       studioRuns: studioDispatch,
-      ...(setup.members.publicBaseUrl === undefined
+      ...(setup.config.publicBaseUrl === undefined
         ? {}
-        : { publicBaseUrl: setup.members.publicBaseUrl }),
+        : { publicBaseUrl: setup.config.publicBaseUrl }),
       workflows,
       datasets,
       evaluators: setup.dependencies.evaluators,

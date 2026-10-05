@@ -91,7 +91,6 @@ function appWith({
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
       nlpCodeBlockTimeoutSeconds: void 0,
-      publicBaseUrl: "https://app.test",
     },
     dependencies: {
       evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
@@ -112,6 +111,7 @@ function appWith({
       stagingThresholdBytes: void 0,
       stagingTtlSeconds: 600,
       relayTurnCeilingMs: void 0,
+      publicBaseUrl: "https://app.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (handle, build) =>

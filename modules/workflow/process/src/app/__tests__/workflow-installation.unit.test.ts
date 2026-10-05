@@ -47,6 +47,7 @@ function process_() {
         stagingThresholdBytes: undefined,
         stagingTtlSeconds: 600,
         relayTurnCeilingMs: undefined,
+        publicBaseUrl: undefined,
       },
     })
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
@@ -55,7 +56,6 @@ function process_() {
       decrypt: (value: string) => value,
     })
     .withMember("nlpCodeBlockTimeoutSeconds", undefined)
-    .withMember("publicBaseUrl", undefined)
     .provide({
       authz: createApiFixture({}, "AuthzApi"),
       evaluator: members.evaluators,

@@ -28,7 +28,9 @@ export const workflowExecuteSyncRest = defineRestRouter(WorkflowApi)
     because: "the engine's own status and body, from which the child's adapters classify a failure",
   })
   .withDocs({ hide: true })
-  .handle(async ({ app, input, scope, signal, response }) =>
-    response.pass(await app.relayExecuteSync({ projectId: scope.id, event: input, signal })),
+  .handle(async ({ app, input, scope, request, response }) =>
+    response.pass(
+      await app.relayExecuteSync({ projectId: scope.id, event: input, signal: request.signal }),
+    ),
   )
   .build();

@@ -3,6 +3,7 @@ import {
   langevalsStagingThresholdBytes,
   langevalsStagingTtlSeconds,
   nlpServiceUrl,
+  publicBaseUrl,
   type ConfigOf,
 } from "@langwatch/config";
 import { z } from "zod";
@@ -80,6 +81,8 @@ export const workflowConfig = Config.define(() => ({
   stagingTtlSeconds: langevalsStagingTtlSeconds,
   /** The relayed turn's ceiling; an unusable value reads as 15 minutes. */
   relayTurnCeilingMs: nlpFetchMaxTimeoutMs,
+  /** The deployment's public origin, for `platformUrl` and the studio Lambda's endpoint. */
+  publicBaseUrl,
 }));
 
 export type WorkflowServerConfig = ConfigOf<typeof workflowConfig>;

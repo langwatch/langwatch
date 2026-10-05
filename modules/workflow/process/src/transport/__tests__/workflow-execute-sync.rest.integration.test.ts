@@ -89,7 +89,9 @@ describe("POST /api/scenario/execute-sync", () => {
   describe("given a project key", () => {
     /** @scenario "The project comes from the key" */
     it("runs the turn on the key's project, asking scenarios:create", async () => {
-      const dispatch = vi.fn(async () => engineAnswer({ status: 200, body: "{}" }));
+      const dispatch = vi.fn<WorkflowNlpRuntime["dispatch"]>(async () =>
+        engineAnswer({ status: 200, body: "{}" }),
+      );
       const { app, asked } = mount({ dispatch });
 
       const response = await post(app, JSON.stringify(EVENT));
@@ -103,7 +105,9 @@ describe("POST /api/scenario/execute-sync", () => {
 
     /** @scenario "A body naming another project changes nothing" */
     it("ignores a project the event names", async () => {
-      const dispatch = vi.fn(async () => engineAnswer({ status: 200, body: "{}" }));
+      const dispatch = vi.fn<WorkflowNlpRuntime["dispatch"]>(async () =>
+        engineAnswer({ status: 200, body: "{}" }),
+      );
       const { app } = mount({ dispatch });
       const event = {
         ...EVENT,
@@ -119,7 +123,9 @@ describe("POST /api/scenario/execute-sync", () => {
 
     // Main forwarded this too; the framework refuses any input whose projectId is not the key's.
     it("refuses a top-level projectId naming another project, reaching no engine", async () => {
-      const dispatch = vi.fn(async () => engineAnswer({ status: 200, body: "{}" }));
+      const dispatch = vi.fn<WorkflowNlpRuntime["dispatch"]>(async () =>
+        engineAnswer({ status: 200, body: "{}" }),
+      );
       const { app } = mount({ dispatch });
 
       const response = await post(app, JSON.stringify({ ...EVENT, projectId: "project_other" }));
@@ -130,7 +136,9 @@ describe("POST /api/scenario/execute-sync", () => {
 
     /** @scenario "The body reaches the engine unchanged" */
     it("forwards the api_key, secrets and params exactly as written", async () => {
-      const dispatch = vi.fn(async () => engineAnswer({ status: 200, body: "{}" }));
+      const dispatch = vi.fn<WorkflowNlpRuntime["dispatch"]>(async () =>
+        engineAnswer({ status: 200, body: "{}" }),
+      );
       const { app } = mount({ dispatch });
 
       await post(app, JSON.stringify(EVENT));
@@ -140,7 +148,9 @@ describe("POST /api/scenario/execute-sync", () => {
 
     /** @scenario "A relayed turn sends no causality depth" */
     it("sends no causality depth and no parent trace, under the platform's ceiling", async () => {
-      const dispatch = vi.fn(async () => engineAnswer({ status: 200, body: "{}" }));
+      const dispatch = vi.fn<WorkflowNlpRuntime["dispatch"]>(async () =>
+        engineAnswer({ status: 200, body: "{}" }),
+      );
       const { app } = mount({ dispatch });
 
       await post(app, JSON.stringify(EVENT));
@@ -153,7 +163,9 @@ describe("POST /api/scenario/execute-sync", () => {
 
     /** @scenario "A large turn is accepted" */
     it("accepts a workflow of several megabytes and forwards all of it", async () => {
-      const dispatch = vi.fn(async () => engineAnswer({ status: 200, body: "{}" }));
+      const dispatch = vi.fn<WorkflowNlpRuntime["dispatch"]>(async () =>
+        engineAnswer({ status: 200, body: "{}" }),
+      );
       const { app } = mount({ dispatch });
       const event = { ...EVENT, payload: { dataset: "x".repeat(8 * 1024 * 1024) } };
 
@@ -167,7 +179,9 @@ describe("POST /api/scenario/execute-sync", () => {
   describe("given no credential", () => {
     /** @scenario "A turn with no credential is refused" */
     it("refuses as unauthenticated and reaches no engine", async () => {
-      const dispatch = vi.fn(async () => engineAnswer({ status: 200, body: "{}" }));
+      const dispatch = vi.fn<WorkflowNlpRuntime["dispatch"]>(async () =>
+        engineAnswer({ status: 200, body: "{}" }),
+      );
       const { app } = mount({ dispatch, authenticated: false });
 
       const response = await post(app, JSON.stringify(EVENT));
@@ -252,7 +266,9 @@ describe("POST /api/scenario/execute-sync", () => {
   });
 
   it("answers a body that is not JSON with the 400 malformed_request", async () => {
-    const dispatch = vi.fn(async () => engineAnswer({ status: 200, body: "{}" }));
+    const dispatch = vi.fn<WorkflowNlpRuntime["dispatch"]>(async () =>
+      engineAnswer({ status: 200, body: "{}" }),
+    );
     const { app } = mount({ dispatch });
 
     const response = await post(app, "not json");
