@@ -134,12 +134,18 @@ export class ApiDoorService {
     return caller;
   }
 
-  /** Any API key, fanned out by the feature rather than pinned to a project here. */
+  /** Any API key, with no project demanded: a permission is asked at the key's own reach. */
   #keyDoor(): RestIdentity {
     return {
-      authenticate: () => {
-        throw new Error("The key door asks no permission: the feature decides what the key reads.");
-      },
+      authenticate: async ({ request, permission, reach }) =>
+        keyCaller(
+          request,
+          await this.#credentials.authenticateKey({
+            request,
+            permission,
+            ...(reach ? { reach } : {}),
+          }),
+        ),
       identify: async ({ request }) =>
         keyCaller(request, await this.#credentials.identifyKey({ request })),
     };

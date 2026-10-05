@@ -37,6 +37,7 @@ export {
   type RestDeprecation,
   type RestDoorCredential,
   type RestMethodName,
+  type RestPermissionReach,
   type RestPermissionTarget,
   type RestRouteAnswers,
   type RestTransportDeclaration,

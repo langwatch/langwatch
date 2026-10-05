@@ -74,6 +74,7 @@ const peers: ApiDoorPeers = {
     hasApiKeyPermission: refuseEverything,
     hasProjectPermission: refuseEverything,
     getApiKeyProjectDecision: refuseEverything,
+    listApiKeyBindings: refuseEverything,
     getDecision: refuseEverything,
     getProjectAnyDecision: refuseEverything,
     checkScopeLineage: refuseEverything,

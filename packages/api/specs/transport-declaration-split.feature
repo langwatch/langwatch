@@ -226,6 +226,15 @@ Feature: Transport declaration split
     And a mount that cannot ask the question is refused, naming the route
 
   @unit
+  Scenario: A route says how far the key door asks its permission
+    Given a family behind the key door, whose keys need not name a project
+    When a route declares its permission at the key's grants, or at the organization
+    Then the door is asked that permission with the reach the route declared
+    And a route that declares no reach asks the door the permission alone
+    And a caller the door refuses never reaches the handler
+    And a mount that puts such a route behind any other door is refused, naming the route
+
+  @unit
   Scenario: A family behind a deployment secret names no tenant
     Given a declaration that names the deployment-secret door
     When the process's door accepts the secret and resolves no scope

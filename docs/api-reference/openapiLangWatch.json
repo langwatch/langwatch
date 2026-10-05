@@ -44116,7 +44116,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "virtualKeys:view"
+          ]
         },
         "parameters": [
           {
@@ -44709,7 +44711,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "virtualKeys:create"
+          ]
         },
         "requestBody": {
           "required": true,
@@ -45525,7 +45529,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "virtualKeys:view"
+          ]
         },
         "parameters": [
           {
@@ -46342,7 +46348,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "virtualKeys:update"
+          ]
         },
         "parameters": [
           {
@@ -46680,7 +46688,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "gatewayUsage:view"
+          ]
         },
         "parameters": [
           {
@@ -47212,7 +47222,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "virtualKeys:rotate"
+          ]
         }
       }
     },
@@ -47705,7 +47717,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "virtualKeys:update"
+          ]
         },
         "parameters": [
           {
@@ -48193,7 +48207,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "virtualKeys:update"
+          ]
         },
         "parameters": [
           {
@@ -48681,7 +48697,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "virtualKeys:delete"
+          ]
         },
         "parameters": [
           {
@@ -49189,7 +49207,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "gatewayBudgets:view"
+          ]
         },
         "parameters": [
           {
@@ -49783,7 +49803,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "gatewayBudgets:create"
+          ]
         },
         "requestBody": {
           "required": true,
@@ -50488,7 +50510,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "gatewayBudgets:view"
+          ]
         },
         "parameters": [
           {
@@ -51051,7 +51075,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "gatewayBudgets:update"
+          ]
         },
         "parameters": [
           {
@@ -51542,7 +51568,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "gatewayBudgets:delete"
+          ]
         },
         "parameters": [
           {
@@ -52051,7 +52079,9 @@
           "credential": [
             "project_api_key"
           ],
-          "permissions": []
+          "permissions": [
+            "gatewayBudgets:update"
+          ]
         },
         "parameters": [
           {

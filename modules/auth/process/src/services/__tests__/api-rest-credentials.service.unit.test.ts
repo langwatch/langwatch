@@ -62,6 +62,7 @@ function doorOver(store: KeyStore): ApiRestCredentialsService {
       hasApiKeyPermission: () => Promise.reject(new Error("the key door asks no permission")),
       getApiKeyProjectDecision: () => Promise.reject(new Error("the key door asks no permission")),
       hasProjectPermission: () => Promise.reject(new Error("the key door asks no permission")),
+      listApiKeyBindings: () => Promise.reject(new Error("the key door asks no permission")),
     },
     cliProjects: {
       getCliAccessProject: () => Promise.reject(new Error("the key door reads no CLI session")),
@@ -232,6 +233,7 @@ describe("a project-bound CLI access token", () => {
       authz: {
         hasApiKeyPermission: () => Promise.reject(new Error("an access token asks no key grant")),
         getApiKeyProjectDecision: () => Promise.reject(new Error("an access token asks no key")),
+        listApiKeyBindings: () => Promise.reject(new Error("an access token lists no grants")),
         hasProjectPermission: (input) => {
           asked.push(input);
           return Promise.resolve(holds);

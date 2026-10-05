@@ -26,7 +26,6 @@ import type {
   GatewayAuthorizedKeyCaller,
   GatewayAuthorizedVirtualKeyCaller,
   GatewayKeyCaller,
-  GatewayKeyCallerReach,
   GatewayVirtualKeyCaller,
   gatewayRequestCredentialSchema,
 } from "./gateway-platform.schemas.ts";
@@ -520,15 +519,10 @@ export interface GatewayApi extends GatewayInternalProtocol {
     actorUserId: string;
   };
   /**
-   * Authorizes any API key for one permission, at the key's own reach or at
-   * the whole organization. Refuses with `permission_denied` naming the
-   * permission, never with a credential error: the key itself was valid.
+   * Any API key the key door admitted, as the organization it acts in and who a write is
+   * recorded as. The door asked the route's permission; this asks none.
    */
-  authorizeKeyCaller(input: {
-    caller: GatewayKeyCaller;
-    permission: string;
-    reach: GatewayKeyCallerReach;
-  }): Promise<GatewayAuthorizedKeyCaller>;
+  getKeyCaller(input: { caller: GatewayKeyCaller }): Promise<GatewayAuthorizedKeyCaller>;
   /** Tenant-wide write by project credential, checked at the organization. */
   authorizeOrganizationWideOperation(input: {
     actor: GatewayCaller;
@@ -649,12 +643,11 @@ export interface GatewayApi extends GatewayInternalProtocol {
     id: string;
   }): Promise<GatewayVirtualKeyRecord>;
   /**
-   * Who a virtual key route was called by. A credential acting in one project is asked the
-   * permission there; a key that names no project is asked per key, at that key's scopes.
+   * Who a virtual key route was called by, with the one project the credential acts in or none.
+   * The door asked the route's permission; each key's own scopes are asked where it is read.
    */
-  authorizeVirtualKeyCaller(input: {
+  getVirtualKeyCaller(input: {
     caller: GatewayVirtualKeyCaller;
-    permission: string;
   }): Promise<GatewayAuthorizedVirtualKeyCaller>;
   /**
    * A page narrowed to what the caller reads: for one project, org-scoped keys, its team's and

@@ -12,7 +12,9 @@ import {
   canonicalErrorResponse,
   createRestRuntime,
   type IdempotentRunner,
+  type RestPermissionReach,
 } from "@langwatch/api/rest";
+import { PermissionDeniedError } from "@langwatch/authorization";
 import {
   type GatewayApi,
   GatewayBudgetCycleAnchorInvalidError,
@@ -83,19 +85,31 @@ const passthroughIdempotency: IdempotentRunner = async ({ handler }) => {
   return { isReplayed: false, status: response.status, response };
 };
 
-function mount(overrides: Partial<GatewayApi> = {}, refuse?: () => never) {
+/** What the key door was asked for one request: the route's permission and its declared reach. */
+type KeyDoorQuestion = Readonly<{
+  permission: string;
+  reach: RestPermissionReach["at"] | undefined;
+}>;
+
+type KeyDoorInput = { request: Request; permission: string; reach?: RestPermissionReach["at"] };
+
+function mount(
+  overrides: Partial<GatewayApi> = {},
+  refuse?: (question: KeyDoorQuestion) => never,
+  asked: KeyDoorQuestion[] = [],
+) {
   const app = createApiFixture<GatewayApi>({
     organizationIdForProject: async () => ORGANIZATION_ID,
     actorForCredential: ({ projectId }) => ({
       actor: { kind: "legacyProjectKey" },
       actorUserId: `svc_${projectId}`,
     }),
-    authorizeKeyCaller: async () => ({
+    getKeyCaller: async () => ({
       organizationId: ORGANIZATION_ID,
       actor: { kind: "legacyProjectKey" },
       actorUserId: `svc_${PROJECT_ID}`,
     }),
-    authorizeVirtualKeyCaller: async () => ({
+    getVirtualKeyCaller: async () => ({
       organizationId: ORGANIZATION_ID,
       actor: { kind: "legacyProjectKey" },
       actorUserId: `svc_${PROJECT_ID}`,
@@ -105,19 +119,25 @@ function mount(overrides: Partial<GatewayApi> = {}, refuse?: () => never) {
   });
   const door = ({ request }: { request: Request }) => {
     if (!request.headers.get("Authorization")) throw new ProjectMissingCredentialsError();
-    if (refuse) refuse();
     return {
       actor: { type: "api_key" as const, id: "gateway-key" },
       scope: { tier: "project" as const, id: PROJECT_ID },
     };
   };
-  const keyDoor = ({ request }: { request: Request }) => ({
+  const identifyKey = ({ request }: { request: Request }) => ({
     ...door({ request }),
     scope: { tier: "organization" as const, id: ORGANIZATION_ID },
   });
+  /** The key door reads the credential first, then answers the permission the route declared. */
+  const authenticateKey = ({ request, permission, reach }: KeyDoorInput) => {
+    const caller = identifyKey({ request });
+    asked.push({ permission, reach });
+    if (refuse) refuse({ permission, reach });
+    return caller;
+  };
   const runtime = createRestRuntime({
     identity: { authenticate: door, identify: door },
-    doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
+    doors: { api_key: { authenticate: authenticateKey, identify: identifyKey } },
     idempotency: passthroughIdempotency,
   });
   const hono = runtime.mount(gatewayPlatformRest.router(), {
@@ -180,6 +200,53 @@ describe("the gateway platform family's public wire", () => {
         type: "permission_denied",
         code: "api_key_permission_denied",
       });
+    });
+  });
+
+  describe("given a key the door refuses for the route's permission", () => {
+    const refuseByPermission = ({ permission }: KeyDoorQuestion): never => {
+      throw new PermissionDeniedError({
+        permission,
+        scope: { type: "organization", id: ORGANIZATION_ID },
+        denialReason: "no-binding",
+      });
+    };
+
+    it("answers 403 permission_denied on a virtual key route, asked at the key's grants", async () => {
+      const asked: KeyDoorQuestion[] = [];
+      const createVirtualKey = vi.fn();
+      const call = mount({ createVirtualKey }, refuseByPermission, asked);
+
+      const answer = await call("POST", "/virtual-keys", { body: { name: "ci-key" } });
+
+      expect([answer.status, answer.body.code]).toEqual([403, "permission_denied"]);
+      expect(answer.body.type).toBe("permission_denied");
+      expect(asked).toEqual([{ permission: "virtualKeys:create", reach: "grants" }]);
+      expect(createVirtualKey).not.toHaveBeenCalled();
+    });
+
+    it("answers 403 permission_denied on a budget write, asked at the organization", async () => {
+      const asked: KeyDoorQuestion[] = [];
+      const archiveBudget = vi.fn();
+      const call = mount({ archiveBudget }, refuseByPermission, asked);
+
+      const answer = await call("DELETE", "/budgets/bgt_1");
+
+      expect([answer.status, answer.body.code]).toEqual([403, "permission_denied"]);
+      expect(asked).toEqual([{ permission: "gatewayBudgets:delete", reach: "organization" }]);
+      expect(archiveBudget).not.toHaveBeenCalled();
+    });
+
+    it("answers 403 permission_denied on a budget read, asked with no reach", async () => {
+      const asked: KeyDoorQuestion[] = [];
+      const listBudgetPageWithHealth = vi.fn();
+      const call = mount({ listBudgetPageWithHealth }, refuseByPermission, asked);
+
+      const answer = await call("GET", "/budgets");
+
+      expect([answer.status, answer.body.code]).toEqual([403, "permission_denied"]);
+      expect(asked).toStrictEqual([{ permission: "gatewayBudgets:view", reach: undefined }]);
+      expect(listBudgetPageWithHealth).not.toHaveBeenCalled();
     });
   });
 
@@ -397,7 +464,7 @@ describe("the gateway platform family's public wire", () => {
         scopeReach: new Map(),
       });
       const answer = await mount({
-        authorizeKeyCaller: async () => ({
+        getKeyCaller: async () => ({
           organizationId: ORGANIZATION_ID,
           actor: { kind: "legacyProjectKey" },
           actorUserId: `svc_${PROJECT_ID}`,

@@ -282,6 +282,7 @@ describe.skipIf(!stores)("given the organization key a CLI login holds", () => {
   let billingProjectId: string;
   let loginKey: string;
   let teamKey: string;
+  let emptyKey: string;
   let virtualKeyId: string;
   let checkoutKeyId: string;
   let billingKeyId: string;
@@ -350,10 +351,12 @@ describe.skipIf(!stores)("given the organization key a CLI login holds", () => {
       name,
       scopeType,
       scopeId,
+      roleKey = "admin",
     }: {
       name: string;
       scopeType: "ORGANIZATION" | "TEAM";
       scopeId: string;
+      roleKey?: string;
     }) => {
       const lookupId = randomBytes(8).toString("hex");
       const secret = randomBytes(24).toString("hex");
@@ -374,7 +377,7 @@ describe.skipIf(!stores)("given the organization key a CLI login holds", () => {
           organizationId,
           principalType: "API_KEY",
           principalId: apiKey.id,
-          roleKey: "admin",
+          roleKey,
           source: "grants-service",
           scopeType,
           scopeId,
@@ -386,6 +389,13 @@ describe.skipIf(!stores)("given the organization key a CLI login holds", () => {
     };
     loginKey = await seedKey({ name: "login", scopeType: "ORGANIZATION", scopeId: organizationId });
     teamKey = await seedKey({ name: "team", scopeType: "TEAM", scopeId: teamId });
+    // A role no catalogue names gives its key no permission at all.
+    emptyKey = await seedKey({
+      name: "empty",
+      scopeType: "TEAM",
+      scopeId: teamId,
+      roleKey: `--test-role-without-permissions-${ns}`,
+    });
 
     const createIn = async (projectId: string) => {
       const created = await installation.send({
@@ -537,6 +547,20 @@ describe.skipIf(!stores)("given the organization key a CLI login holds", () => {
         expect.arrayContaining([virtualKeyId, checkoutKeyId]),
       );
       expect(read).toMatchObject({ status: 404, answer: { code: "virtual_key_not_found" } });
+    });
+  });
+
+  describe("given a key whose grants hold no virtual key permission, naming no project", () => {
+    /** @scenario "A key that holds a virtual key permission on none of its grants is refused" */
+    it("is refused before any virtual key is read", async () => {
+      const listed = await installation.send({ path: "/virtual-keys", token: emptyKey });
+      const read = await installation.send({
+        path: `/virtual-keys/${virtualKeyId}`,
+        token: emptyKey,
+      });
+
+      expect(listed).toMatchObject({ status: 403, answer: { code: "permission_denied" } });
+      expect(read).toMatchObject({ status: 403, answer: { code: "permission_denied" } });
     });
   });
 

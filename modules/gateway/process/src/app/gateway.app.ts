@@ -23,7 +23,6 @@ import {
   type GatewayAuthorizedKeyCaller,
   type GatewayAuthorizedVirtualKeyCaller,
   type GatewayKeyCaller,
-  type GatewayKeyCallerReach,
   type GatewayVirtualKeyCaller,
   type GatewayRequestCredential,
   type GatewayVirtualKeyScope,
@@ -2433,29 +2432,13 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   }
 
   /**
-   * Who a virtual key route was called by. A credential acting in one project is asked the
-   * route's permission there, as the project door asked it; a key that names no project reaches
-   * its organization and is asked per virtual key, at the scopes that key lives in.
+   * Who a virtual key route was called by. The door asked the route's permission at the
+   * credential's reach; a key that names no project is asked again per virtual key it touches.
    */
-  async authorizeVirtualKeyCaller(input: {
+  async getVirtualKeyCaller(input: {
     caller: GatewayVirtualKeyCaller;
-    permission: AuthzPermission;
   }): Promise<GatewayAuthorizedVirtualKeyCaller> {
-    const authorized = await this.#virtualKeyCallerOf(input.caller);
-    if (authorized.projectId !== null) {
-      await this.#dependencies.assertCanOperateOnAnyScope({
-        actor: authorized.actor,
-        scopes: [{ scopeType: "PROJECT", scopeId: authorized.projectId }],
-        permission: input.permission,
-      });
-    }
-
-    return authorized;
-  }
-
-  async #virtualKeyCallerOf(
-    caller: GatewayVirtualKeyCaller,
-  ): Promise<GatewayAuthorizedVirtualKeyCaller> {
+    const { caller } = input;
     switch (caller.kind) {
       case "project":
         return {
@@ -2486,55 +2469,26 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     }
   }
 
-  /**
-   * One gate for every kind of API key, at the key's own reach or at the whole
-   * organization. A legacy project key reaches its own project, and passes the
-   * organization-wide gate as on main; a scoped key is checked with its owner.
-   */
-  async authorizeKeyCaller(input: {
-    caller: GatewayKeyCaller;
-    permission: AuthzPermission;
-    reach: GatewayKeyCallerReach;
-  }): Promise<GatewayAuthorizedKeyCaller> {
-    const { caller, permission, reach } = input;
-    const authorized =
-      caller.kind === "project"
-        ? {
-            organizationId: await this.organizationIdForProject(caller.projectId),
-            projectId: caller.projectId,
-            actor: { kind: "legacyProjectKey", projectId: caller.projectId } as const,
-            actorUserId: `svc_${caller.projectId}`,
-          }
-        : {
-            organizationId: caller.organizationId,
-            projectId: caller.resolvedProject?.id ?? null,
-            actor: {
-              kind: "apiKey",
-              apiKeyId: caller.apiKeyId,
-              userId: caller.userId,
-              organizationId: caller.organizationId,
-            } as const,
-            actorUserId: caller.userId ?? `svc_${caller.resolvedProject?.id ?? caller.apiKeyId}`,
-          };
-
-    if (reach === "caller" && authorized.projectId) {
-      await this.#dependencies.assertCanOperateOnAnyScope({
-        actor: authorized.actor,
-        scopes: [{ scopeType: "PROJECT", scopeId: authorized.projectId }],
-        permission,
-      });
-    } else {
-      await this.#dependencies.assertCanOperateAtOrganization({
-        actor: authorized.actor,
-        organizationId: authorized.organizationId,
-        permission,
-      });
+  /** Any API key the key door admitted. A legacy project key is its project's organization. */
+  async getKeyCaller(input: { caller: GatewayKeyCaller }): Promise<GatewayAuthorizedKeyCaller> {
+    const { caller } = input;
+    if (caller.kind === "project") {
+      return {
+        organizationId: await this.organizationIdForProject(caller.projectId),
+        actor: { kind: "legacyProjectKey", projectId: caller.projectId },
+        actorUserId: `svc_${caller.projectId}`,
+      };
     }
 
     return {
-      organizationId: authorized.organizationId,
-      actor: authorized.actor,
-      actorUserId: authorized.actorUserId,
+      organizationId: caller.organizationId,
+      actor: {
+        kind: "apiKey",
+        apiKeyId: caller.apiKeyId,
+        userId: caller.userId,
+        organizationId: caller.organizationId,
+      },
+      actorUserId: caller.userId ?? `svc_${caller.resolvedProject?.id ?? caller.apiKeyId}`,
     };
   }
 }

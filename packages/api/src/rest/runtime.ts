@@ -339,6 +339,8 @@ function assertPortsBound<Api>({
 
     const door = doorOf({ credential: route.credential ?? declaration.credential, ports });
 
+    assertReachDoor({ address, route, credential: route.credential ?? declaration.credential });
+
     if (route.permissionTarget && !door.authorize) {
       throw new Error(
         `REST ${address} checks "${route.permission}" at the scope its path names, and this ` +
@@ -368,6 +370,24 @@ function assertPortsBound<Api>({
       );
     }
   }
+}
+
+/** A permission reach is the key door's question; behind any other door it has no answer. */
+function assertReachDoor({
+  address,
+  route,
+  credential,
+}: {
+  address: string;
+  route: RestTransportRoute<unknown>;
+  credential: RestDoorCredential;
+}): void {
+  if (!route.permissionReach || credential === "api_key") return;
+
+  throw new Error(
+    `REST ${address} asks "${route.permission}" at the reach of a key's grants, and only ` +
+      'the "api_key" door reads a key that names no project',
+  );
 }
 
 /** The store behind each capability a route declared, named when it is missing. */
@@ -1560,7 +1580,11 @@ async function callerOf({
   if (kind === "authenticated" || kind === "deferred")
     return requireIdentify(door)({ request, ...(rawBody === void 0 ? {} : { rawBody }) });
 
-  return door.authenticate({ request, permission: permissionOf(route.permission) });
+  return door.authenticate({
+    request,
+    permission: permissionOf(route.permission),
+    ...(route.permissionReach ? { reach: route.permissionReach } : {}),
+  });
 }
 
 /**

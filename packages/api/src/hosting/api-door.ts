@@ -20,7 +20,11 @@ export type ApiDoor = Readonly<{
   /** The decisions REST and tRPC both authorize through, and the session version tRPC carries. */
   authz: Authorize & TrpcSessionVersions;
   /** The API-key doors: a project key, an organization key, and any key with no project asked. */
-  identities: Readonly<{ project: RestIdentity; organization: RestIdentity; api_key: RestIdentity }>;
+  identities: Readonly<{
+    project: RestIdentity;
+    organization: RestIdentity;
+    api_key: RestIdentity;
+  }>;
   /** The plan every declared entitlement gate asks. */
   entitlements: Entitlements;
   /** Where every declared trail lands, on each transport. */
@@ -101,6 +105,8 @@ export type RestIdentity = Readonly<{
   authenticate(input: {
     request: Request;
     permission: AuthzPermission;
+    /** How far a key door asks the permission; only a route that declared one carries it. */
+    reach?: "grants" | "organization";
   }): Promise<RestCaller> | RestCaller;
   /**
    * The door, opened with no permission asked of it. Only a declaration
