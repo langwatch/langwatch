@@ -12,7 +12,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { GatewaySpendConfirmation } from "../../app/gateway.members.ts";
 import { MemoryElevenLabsConversationChannel } from "../../channels/memory/memory.elevenlabs-conversation.channel.ts";
 import { MemoryGatewayRealtimeSessionRepository } from "../../repositories/memory/memory.gateway-realtime-session.repository.ts";
 import { GatewayElevenLabsCredentialService } from "../../services/gateway-elevenlabs-credential.service.ts";
@@ -21,6 +20,7 @@ import {
   realtimeSessionReconciliationConfig,
 } from "../../services/gateway-realtime-session-reconciliation.service.ts";
 import { GatewayRealtimeSessionSweepService } from "../../services/gateway-realtime-session-sweep.service.ts";
+import type { GatewaySpendConfirmation } from "../../services/gateway-realtime-session.service.ts";
 import { GatewayRealtimeSessionService } from "../../services/gateway-realtime-session.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
 import { runGatewayRealtimeSessionReconcile } from "../gateway-realtime-session-reconcile.intent.ts";

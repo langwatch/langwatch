@@ -11,14 +11,16 @@ import type {
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type {
-  AppendGatewayChangeEventInput,
-  BudgetDebitRow,
-  GatewayBudgetSpend,
-  GatewayChangeEvents,
-} from "../../app/gateway.members.ts";
 import { writeGatewayDebitsSchema } from "../../eventing/gateway-debit.intent.ts";
 import { GatewayBudgetChangeDedupeRepository } from "../../repositories/gateway-budget-change-dedupe.repository.ts";
+import type {
+  BudgetDebitRow,
+  GatewayBudgetSpendRepository,
+} from "../../repositories/gateway-budget-spend.repository.ts";
+import type {
+  AppendGatewayChangeEventInput,
+  GatewayChangeEventsRepository,
+} from "../../repositories/gateway-change-event.repository.ts";
 import { GatewayBudgetChangeDedupeService } from "../gateway-budget-change-dedupe.service.ts";
 import type { GatewayBudgetCrossingService } from "../gateway-budget-crossing.service.ts";
 import { GatewaySpendDebitService } from "../gateway-spend-debit.service.ts";
@@ -83,7 +85,7 @@ class StaticBudgets implements Pick<GatewayService, "resolveApplicableBudgets"> 
   }
 }
 
-class RecordingLedger implements Pick<GatewayBudgetSpend, "insertDebitsForBudgets"> {
+class RecordingLedger implements Pick<GatewayBudgetSpendRepository, "insertDebitsForBudgets"> {
   readonly batches: BudgetDebitRow[][] = [];
 
   constructor(private readonly refusal?: Error) {}
@@ -117,7 +119,7 @@ class RecordingCrossings implements Pick<GatewayBudgetCrossingService, "detect">
   }
 }
 
-class RecordingChanges implements Pick<GatewayChangeEvents, "append"> {
+class RecordingChanges implements Pick<GatewayChangeEventsRepository, "append"> {
   readonly appended: AppendGatewayChangeEventInput[] = [];
 
   async append(input: AppendGatewayChangeEventInput): Promise<{ revision: bigint }> {

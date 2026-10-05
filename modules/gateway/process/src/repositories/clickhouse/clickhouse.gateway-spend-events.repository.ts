@@ -20,7 +20,6 @@ import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
-import type { GatewayClickHouseResolver } from "../../app/gateway.members.ts";
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
 import {
   GatewaySpendEventsRepository,
@@ -34,6 +33,7 @@ import {
   EMPTY_SPEND_USAGE,
   GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
 } from "../../rules/gateway-spend-projection.rules.ts";
+import type { GatewayClickHouseResolver } from "./clickhouse.gateway-session.store.ts";
 
 const asString = (value: unknown): string =>
   typeof value === "string" || typeof value === "number" || typeof value === "bigint"

@@ -15,12 +15,13 @@ import {
 } from "@langwatch/gateway-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
-import type { GatewayBudgetSpend, GatewaySettlementPolicy } from "../app/gateway.members.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
 import {
   decodeSpendEventsCursor,
   decodeSpendSummariesCursor,
 } from "../rules/gateway-spend-cursor.rules.ts";
 import { spendFiltersFromQuery } from "../rules/gateway-spend-filters.rules.ts";
+import type { GatewaySettlementPolicy } from "../rules/gateway-spend-grouping.rules.ts";
 import { assertGroupingIsWalkable } from "../rules/gateway-spend-grouping.rules.ts";
 import type { GatewayEndUserCap } from "./gateway-end-user-caps.service.ts";
 import type { GatewaySpendEventsService } from "./gateway-spend-events.service.ts";
@@ -51,7 +52,7 @@ export type GatewaySpendApp = Readonly<{
    */
   getSpendEvents(): GatewaySpendEventsService;
   /** The budget ledger the per-end-user caps are read against. */
-  getBudgetSpend(): GatewayBudgetSpend;
+  getBudgetSpend(): GatewayBudgetSpendRepository;
 
   /**
    * One spend row rendered as the canonical billing envelope. The wire format
@@ -75,7 +76,7 @@ export type GatewaySpendApp = Readonly<{
     endUserId: string;
     tenantIds: string[];
     virtualKeyId?: string;
-    budgetRepository: GatewayBudgetSpend;
+    budgetRepository: GatewayBudgetSpendRepository;
   }): Promise<GatewayEndUserCap[]>;
 }>;
 

@@ -15,7 +15,7 @@ import type {
   ResourceMetadata,
 } from "@langwatch/gateway-contract";
 
-import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
+import type { GatewayPersistenceTransaction } from "./gateway-transaction.repository.ts";
 
 /** A CONNECT key with the license facts licensing wrote onto it. */
 export type GatewayLicensedKey = Readonly<{

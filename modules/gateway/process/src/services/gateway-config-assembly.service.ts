@@ -14,11 +14,11 @@ import { llmModels, toLegacyCompatibleCustomModels } from "@langwatch/model-prov
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import {
-  type GatewayModelProviderCredentials,
-  type GatewayConfigAssembly,
-} from "../app/gateway.members.ts";
 import type { GatewayScopeResolutionRepository } from "../repositories/gateway-scope-resolution.repository.ts";
+import type {
+  GatewayModelProviderCredentials,
+  GatewayConfigAssembly,
+} from "../rules/gateway-config-wire.rules.ts";
 import {
   GatewayScopeResolutionService,
   type GatewayPlatformProviders,

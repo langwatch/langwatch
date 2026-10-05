@@ -6,7 +6,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type { GatewayAudit } from "../app/gateway.members.ts";
+import type { GatewayAuditRepository } from "../repositories/gateway-audit.repository.ts";
 import {
   GatewayBudgetRepository,
   type GatewayBudgetCheckReadInput,
@@ -147,7 +147,7 @@ function unusedMonitors(): MonitorApi {
   return new Proxy({}, { get: () => refuse, has: () => true }) as MonitorApi;
 }
 
-class NullGatewayAudit implements GatewayAudit {
+class NullGatewayAudit implements GatewayAuditRepository {
   append(): Promise<void> {
     return Promise.resolve();
   }

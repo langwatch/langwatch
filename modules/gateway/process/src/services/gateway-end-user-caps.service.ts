@@ -8,7 +8,7 @@ import {
 } from "@langwatch/gateway-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
-import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
 import type {
   AttributedUserBudgetTemplate,
   GatewayBudgetRepository,
@@ -32,14 +32,14 @@ export type GatewayEndUserCap = {
 export class GatewayEndUserCapsService {
   static create(options: {
     budgets: GatewayBudgetRepository;
-    spend: GatewayBudgetSpend;
+    spend: GatewayBudgetSpendRepository;
   }): GatewayEndUserCapsService {
     return new GatewayEndUserCapsService(options.budgets, options.spend);
   }
 
   private constructor(
     private readonly budgets: GatewayBudgetRepository,
-    private readonly spend: GatewayBudgetSpend,
+    private readonly spend: GatewayBudgetSpendRepository,
   ) {}
 
   async forEndUser(input: {
@@ -83,7 +83,7 @@ export class GatewayEndUserCapsService {
         ),
       };
     });
-    const spends = await this.spend.getSpendForTargetsAcrossTenants(input.tenantIds, targets, now);
+    const spends = await this.spend.findSpendForTargetsAcrossTenants(input.tenantIds, targets, now);
     const spentByBudget = new Map(spends.map((entry) => [entry.budgetId, entry.spentUsd]));
 
     return templates.map((template) => {

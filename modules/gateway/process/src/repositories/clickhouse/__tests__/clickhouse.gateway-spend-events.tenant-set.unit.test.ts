@@ -5,7 +5,7 @@
 import { TenantGuard } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
-import type { GatewayClickHouseClient } from "../../../app/gateway.members.ts";
+import type { GatewayClickHouseClient } from "../clickhouse.gateway-session.store.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
 
 const PROJECTS = ["project-a", "project-b"];

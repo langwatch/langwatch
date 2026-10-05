@@ -7,8 +7,6 @@ import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 
 import { nowInstant } from "@langwatch/time";
 
-import { type GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
-
 const VK_PREFIX = "vk-lw-";
 
 // Crockford base32 alphabet (no I L O U to avoid visual ambiguity).
@@ -109,4 +107,16 @@ export class VirtualKeyCryptoService implements GatewayVirtualKeyCrypto {
     const displayPrefix = secret.slice(0, VirtualKeyCryptoService.displayPrefixLength);
     return { ulid, displayPrefix };
   }
+}
+
+/**
+ * The virtual-key cipher, as the write path sees it: mint a secret, read
+ * its display prefix back, hash or verify one. An adapter composes the
+ * peppered implementation; the service never reaches for it directly.
+ */
+export interface GatewayVirtualKeyCrypto {
+  mintSecret(nowMs?: number): string;
+  parseSecret(secret: string): { displayPrefix: string; ulid: string };
+  hashSecret(secret: string): string;
+  verifySecret(secret: string, hashedSecret: string): boolean;
 }

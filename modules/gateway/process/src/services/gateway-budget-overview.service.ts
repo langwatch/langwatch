@@ -11,8 +11,8 @@ import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization
 import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import { type GatewayBudgetSpend } from "../app/gateway.members.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
 import type { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 import { budgetSpendTargetsFor } from "../rules/gateway-budget-spend-targets.rules.ts";
 import {
@@ -98,7 +98,7 @@ export class BudgetOverviewService {
   private readonly modelSpend: Pick<TraceApi, "findModelSpend">;
   private readonly budgetDecisions: GatewayService;
   private readonly providerLabels: GatewayProviderLabelRepository;
-  private readonly chRepo?: GatewayBudgetSpend;
+  private readonly chRepo?: GatewayBudgetSpendRepository;
 
   private constructor({
     repository,
@@ -117,7 +117,7 @@ export class BudgetOverviewService {
     modelSpend: Pick<TraceApi, "findModelSpend">;
     budgetDecisions: GatewayService;
     providerLabels: GatewayProviderLabelRepository;
-    chRepo?: GatewayBudgetSpend;
+    chRepo?: GatewayBudgetSpendRepository;
   }) {
     this.repository = repository;
     this.organizations = organizations;
@@ -144,7 +144,7 @@ export class BudgetOverviewService {
     budgetDecisions: GatewayService;
     providerLabels: GatewayProviderLabelRepository;
     modelSpend: Pick<TraceApi, "findModelSpend">;
-    budgetRepository?: GatewayBudgetSpend;
+    budgetRepository?: GatewayBudgetSpendRepository;
   }): BudgetOverviewService {
     return new BudgetOverviewService({
       repository: options.repository,
@@ -302,7 +302,7 @@ export class BudgetOverviewService {
 
     const now = nowInstant();
     try {
-      const spends = await this.chRepo.getSpendForTargetsAcrossTenants(
+      const spends = await this.chRepo.findSpendForTargetsAcrossTenants(
         tenantIds,
         budgetSpendTargetsFor({ budgets: [budget], now }),
         now,

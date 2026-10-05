@@ -5,9 +5,10 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type { GatewayPermissionScope, GatewayScopePermissions } from "../../app/gateway.members.ts";
 import { VirtualKeyAuthorizationRepository } from "../../repositories/virtual-key-authorization.repository.ts";
 import {
+  type GatewayPermissionScope,
+  type GatewayScopePermissions,
   type Scope,
   VirtualKeyAuthorizationService,
 } from "../virtual-key-authorization.service.ts";

@@ -131,7 +131,7 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
           amountNanoUsd: i <= 3 ? 1_000_000_000 : 100_000_000,
         });
       }
-      buckets = await repo.getBucketSpendBreakdownForBudget({
+      buckets = await repo.findBucketSpendBreakdownForBudget({
         budget: template,
         tenantIds: [TENANT_ID],
         boundaries: [],
@@ -173,7 +173,7 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
         amountNanoUsd: 500_000_000,
         status: "PROVIDER_ERROR",
       });
-      buckets = await repo.getBucketSpendBreakdownForBudget({
+      buckets = await repo.findBucketSpendBreakdownForBudget({
         budget: template,
         tenantIds: [TENANT_ID],
         boundaries: [],
@@ -220,7 +220,7 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
         bucketScopeId: `${neighbourAnchorId}:user1`,
         amountNanoUsd: 7_000_000_000,
       });
-      buckets = await repo.getBucketSpendBreakdownForBudget({
+      buckets = await repo.findBucketSpendBreakdownForBudget({
         budget: template,
         tenantIds: [TENANT_ID],
         boundaries: [],
@@ -268,13 +268,13 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
         bucketScopeId: `${anchorId}:pinneduser${PROVIDER_BUCKET_SEPARATOR}${PROVIDER_KEY}`,
         amountNanoUsd: 3_000_000_000,
       });
-      unfilteredBuckets = await repo.getBucketSpendBreakdownForBudget({
+      unfilteredBuckets = await repo.findBucketSpendBreakdownForBudget({
         budget: unfiltered,
         tenantIds: [TENANT_ID],
         boundaries: [],
         now: NOW,
       });
-      filteredBuckets = await repo.getBucketSpendBreakdownForBudget({
+      filteredBuckets = await repo.findBucketSpendBreakdownForBudget({
         budget: filtered,
         tenantIds: [TENANT_ID],
         boundaries: [],
@@ -311,7 +311,7 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
           occurredAt: NOW.subtract({ milliseconds: 60_000 }),
         });
       }
-      buckets = await repo.getBucketSpendBreakdownForBudget({
+      buckets = await repo.findBucketSpendBreakdownForBudget({
         budget: template,
         tenantIds: [TENANT_ID],
         // The reset landed after the spend, so nothing survives the floor
@@ -374,7 +374,7 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
         window: "MANUAL",
         occurredAt: NOW.subtract({ milliseconds: 60_000 }),
       });
-      buckets = await repo.getBucketSpendBreakdownForBudget({
+      buckets = await repo.findBucketSpendBreakdownForBudget({
         budget: template,
         tenantIds: [TENANT_ID],
         boundaries: [],
@@ -402,7 +402,7 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
 
     /** @scenario "A per-person template nobody has used yet says so instead of showing a dash" */
     it("returns no buckets rather than inventing one", async () => {
-      const buckets = await repo.getBucketSpendBreakdownForBudget({
+      const buckets = await repo.findBucketSpendBreakdownForBudget({
         budget: template,
         tenantIds: [TENANT_ID],
         boundaries: [],

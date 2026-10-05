@@ -17,12 +17,12 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
-import type {
-  GatewayBudgetSpend,
-  GatewayBudgetSpendRecord,
-  GatewayClickHouseResolver,
-} from "../../app/gateway.members.ts";
 import { budgetSpendTargetsFor } from "../../rules/gateway-budget-spend-targets.rules.ts";
+import type {
+  GatewayBudgetSpendRepository,
+  GatewayBudgetSpendRecord,
+} from "../gateway-budget-spend.repository.ts";
+import type { GatewayClickHouseResolver } from "./clickhouse.gateway-session.store.ts";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
@@ -214,7 +214,7 @@ type BucketQueryShape = {
   budgetFloorMs: number | undefined;
 };
 
-export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
+export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepository {
   static create(resolveClient: GatewayClickHouseResolver): GatewayBudgetClickHouseRepository {
     return new GatewayBudgetClickHouseRepository(resolveClient);
   }
@@ -560,7 +560,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
    * view. Returns one ScopeSpend per budget requested; missing budgets
    * are reported with spentUsd = "0".
    */
-  async getSpendForBudgets(
+  async findSpendForBudgets(
     tenantId: string,
     budgets: GatewayBudgetResource[] | BudgetSpendTarget[],
     // The instant the read is anchored to. Injectable so a test that wrote
@@ -568,7 +568,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
     // instead of racing the wall clock across a MINUTE or HOUR boundary.
     now: Instant = nowInstant(),
   ): Promise<ScopeSpend[]> {
-    return this.getSpendForTargetsAcrossTenants(
+    return this.findSpendForTargetsAcrossTenants(
       [tenantId],
       GatewayBudgetClickHouseRepository.toSpendTargets(budgets, now),
       now,
@@ -576,11 +576,11 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
   }
 
   /**
-   * Same as `getSpendForBudgets` but sums across tenants (projects): an ORG/TEAM/PRINCIPAL-scoped
+   * Same as `findSpendForBudgets` but sums across tenants (projects): an ORG/TEAM/PRINCIPAL-scoped
    * budget accumulates ledger rows under whichever project actually emitted the trace, since
    * TenantId on the ledger row is the project, not the budget's scope.
    */
-  async getSpendForBudgetsAcrossTenants(
+  async findSpendForBudgetsAcrossTenants(
     tenantIds: string[],
     budgets: GatewayBudgetResource[] | BudgetSpendTarget[],
     now: Instant = nowInstant(),
@@ -592,8 +592,8 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
     });
   }
 
-  /** The same read as `getSpendForBudgetsAcrossTenants`, abandoned (retries too) on abort. */
-  async getSpendForBudgetsAcrossTenantsUntil({
+  /** The same read as `findSpendForBudgetsAcrossTenants`, abandoned (retries too) on abort. */
+  async findSpendForBudgetsAcrossTenantsUntil({
     tenantIds,
     budgets,
     signal,
@@ -615,7 +615,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
    * The one spend read. Sums the rollup for each target's bucket in its own
    * current period, across every tenant given.
    */
-  async getSpendForTargetsAcrossTenants(
+  async findSpendForTargetsAcrossTenants(
     tenantIds: string[],
     targets: BudgetSpendTarget[],
     now: Instant = nowInstant(),
@@ -794,7 +794,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
    * Every bucket of one fanned-out budget, with what that bucket has spent in the
    * current period.
    */
-  async getBucketSpendBreakdownForBudget(args: {
+  async findBucketSpendBreakdownForBudget(args: {
     budget: GatewayBudgetSpendRecord;
     tenantIds: string[];
     boundaries: BudgetBucketBoundary[];

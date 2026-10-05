@@ -204,7 +204,7 @@ async function spentUsdFor({
   now?: Instant;
 }): Promise<string[]> {
   const budgets = await prisma.gatewayBudget.findMany({ where: { id: { in: budgetIds } } });
-  const spends = await chRepo.getSpendForBudgetsAcrossTenants(
+  const spends = await chRepo.findSpendForBudgetsAcrossTenants(
     [PROJECT_ID],
     budgetIds.map((id) => toBudgetRow(budgets.find((b) => b.id === id)!)),
     now,
@@ -486,7 +486,7 @@ describe.skipIf(!databaseUrl || !chUrl)("sibling budgets on one virtual key", ()
           const budget = toBudgetRow(
             await prisma.gatewayBudget.findUniqueOrThrow({ where: { id } }),
           );
-          return chRepo.getBucketSpendBreakdownForBudget({
+          return chRepo.findBucketSpendBreakdownForBudget({
             budget,
             tenantIds: [PROJECT_ID],
             boundaries: [],

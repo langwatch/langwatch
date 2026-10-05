@@ -17,9 +17,10 @@ import {
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
 
-import type { GatewayAudit, GatewayChangeEvents } from "../../app/gateway.members.ts";
 import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
+import type { GatewayAuditRepository } from "../gateway-audit.repository.ts";
 import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository.ts";
+import type { GatewayChangeEventsRepository } from "../gateway-change-event.repository.ts";
 
 /**
  * The client slice cache-rule persistence binds to, transaction included:
@@ -32,16 +33,16 @@ export type GatewayCacheRuleDatabase = Pick<PrismaClient, "gatewayCacheRule" | "
 export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository {
   static create(input: {
     database: GatewayCacheRuleDatabase;
-    changes: GatewayChangeEvents;
-    audit: GatewayAudit;
+    changes: GatewayChangeEventsRepository;
+    audit: GatewayAuditRepository;
   }): PrismaGatewayCacheRuleRepository {
     return new PrismaGatewayCacheRuleRepository(input.database, input.changes, input.audit);
   }
 
   private constructor(
     private readonly database: GatewayCacheRuleDatabase,
-    private readonly changes: GatewayChangeEvents,
-    private readonly audit: GatewayAudit,
+    private readonly changes: GatewayChangeEventsRepository,
+    private readonly audit: GatewayAuditRepository,
   ) {
     super();
   }

@@ -6,11 +6,11 @@
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 
-import {
-  type GatewayAudit,
-  type AppendGatewayAuditInput,
-  type GatewayAuditTransaction,
-} from "../../app/gateway.members.ts";
+import type {
+  GatewayAuditRepository,
+  AppendGatewayAuditInput,
+  GatewayAuditTransaction,
+} from "../gateway-audit.repository.ts";
 
 // Dotted-lowercase past-tense convention (Stripe / GitHub / Vercel / Datadog).
 // Namespaced under `gateway.` so a single `LIKE 'gateway.%'` filter scopes
@@ -56,7 +56,7 @@ export type GatewayAuditTargetKind = (typeof GATEWAY_AUDIT_TARGET_KINDS)[number]
 /** The client slice an audit row needs. */
 export type GatewayAuditDatabase = Pick<PrismaClient, "auditLog">;
 
-export class PrismaGatewayAuditRepository implements GatewayAudit {
+export class PrismaGatewayAuditRepository implements GatewayAuditRepository {
   static create(database: GatewayAuditDatabase): PrismaGatewayAuditRepository {
     return new PrismaGatewayAuditRepository(database);
   }

@@ -11,12 +11,12 @@ import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import type { AppendGatewayChangeEventInput } from "../../../app/gateway.members.ts";
 import { writeGatewayDebitsSchema } from "../../../eventing/gateway-debit.intent.ts";
 import { GatewayBudgetChangeDedupeService } from "../../../services/gateway-budget-change-dedupe.service.ts";
 import { GatewayBudgetCrossingService } from "../../../services/gateway-budget-crossing.service.ts";
 import { GatewaySpendDebitService } from "../../../services/gateway-spend-debit.service.ts";
 import type { BucketBoundaryRow } from "../../gateway-budget.repository.ts";
+import type { AppendGatewayChangeEventInput } from "../../gateway-change-event.repository.ts";
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 import {
   createTestClickHouseClient,
@@ -135,7 +135,7 @@ describe.skipIf(!chUrl)("given a debit whose crossing could not be recorded", ()
 
     /** @scenario "The calendar-window total counts a re-driven request once" */
     it("reads the request's cost once from the month's rollup, and records its breach", async () => {
-      const [spend] = await repo.getSpendForBudgets(TENANT_ID, [resolved.budget]);
+      const [spend] = await repo.findSpendForBudgets(TENANT_ID, [resolved.budget]);
 
       expect(spend?.spentUsd).toBe("2");
       expect(facts.recorded.map((c) => [c.kind, c.spent_usd])).toEqual([["breached", "2.000000"]]);

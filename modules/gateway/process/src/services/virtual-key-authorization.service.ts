@@ -9,7 +9,6 @@ import {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import type { GatewayScopePermissions } from "../app/gateway.members.ts";
 import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository.ts";
 import {
   isMemberNotFound,
@@ -609,4 +608,31 @@ export class VirtualKeyAuthorizationService {
 
     return vk;
   }
+}
+
+/** The scope a virtual key is reachable from, as the key's own rows spell it. */
+export type GatewayPermissionScope =
+  | { type: "org"; id: string }
+  | { type: "team"; id: string }
+  | { type: "project"; id: string; teamId: string };
+
+/**
+ * The one authorization seam the virtual-key write paths decide on. Two
+ * questions, not one, because a scoped API key resolves through its own
+ * ceiling (`effective = key ∩ user`) rather than the session's full cascade.
+ */
+export interface GatewayScopePermissions {
+  sessionHolds(input: {
+    userId: string;
+    permission: AuthzPermission;
+    scope: GatewayPermissionScope;
+  }): Promise<boolean>;
+
+  apiKeyHolds(input: {
+    apiKeyId: string;
+    userId: string | null;
+    organizationId: string;
+    permission: AuthzPermission;
+    scope: GatewayPermissionScope;
+  }): Promise<boolean>;
 }

@@ -1,10 +1,9 @@
+import { createHash } from "crypto";
 /**
  * @see ADR-097
  * The record of brokered realtime voice sessions. A session outlives its minting request, its
  * report can land on any replica, and the per-key cap must be counted where every replica sees it.
  */
-
-import { createHash } from "crypto";
 
 import type {
   GatewayRealtimeSessionRecord,
@@ -16,16 +15,13 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { ATTR_KEYS as ATTR, DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 
-import type {
-  GatewaySpanIngestion,
-  GatewaySpendConfirmation,
-  GatewaySpendRating,
-} from "../app/gateway.members.ts";
+import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
 import type {
   GatewayRealtimeSessionRepository,
   ReserveResult,
 } from "../repositories/gateway-realtime-session.repository.ts";
 import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
+import type { GatewaySpendRating } from "./model-catalog-gateway-spend-rating.service.ts";
 
 const logger = createLogger("langwatch:gateway:realtime-session");
 
@@ -474,4 +470,42 @@ async function recordRealtimeSessionSpan(params: {
       "a voice session settled but its cost was not written to the trace; the spend record is unaffected",
     );
   }
+}
+
+/**
+ * Writes one already-normalized span (the gateway's voice-settlement span)
+ * through the same seam OTLP and REST route through, so its dedup gate makes
+ * a resent webhook write the span once rather than adding a second cost.
+ */
+export interface GatewaySpanIngestion {
+  ingestNormalizedSpan(input: {
+    tenantId: string;
+    span: {
+      traceId: string;
+      spanId: string;
+      name: string;
+      kind: number;
+      startTimeUnixNano: string;
+      endTimeUnixNano: string;
+      attributes: unknown[];
+      events: unknown[];
+      links: unknown[];
+      status: { message: string | null; code: number | null };
+      droppedAttributesCount: number;
+      droppedEventsCount: number;
+      droppedLinksCount: number;
+    };
+    resource: null;
+    instrumentationScope: null;
+    piiRedactionLevel: string;
+  }): Promise<void>;
+}
+
+/**
+ * Hands a confirmation to the gateway spend pipeline. The port exists so
+ * voice settlement reaches the SAME pipeline the drainer sends to. No
+ * pipeline registered refuses by name — a dropped one settles as unknown.
+ */
+export interface GatewaySpendConfirmation {
+  confirmSpend(data: ConfirmSpendCommandData): Promise<void>;
 }

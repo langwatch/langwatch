@@ -1,4 +1,5 @@
 import {
+  type GatewayConnectUpstream,
   type parseVirtualKeyConfig,
   type GatewayBudget,
   type ModelProvider,
@@ -20,11 +21,6 @@ import {
 import type { LangyMirrorTier } from "@langwatch/langy-contract";
 import { modelProviders } from "@langwatch/model-provider-contract";
 import { type Instant, toDate } from "@langwatch/time";
-
-import type {
-  GatewayConfigAssembly,
-  GatewayModelProviderCredentials,
-} from "../app/gateway.members.ts";
 
 export type GuardrailWire = {
   id: string;
@@ -560,4 +556,45 @@ export function decimalUSDStringToMicroUSD(s: string): number {
   }
 
   return Math.round(n * 1_000_000);
+}
+
+/**
+ * What the gateway bundle is assembled from besides the materialiser's own
+ * logic: the version token, tier fallthrough, and a provider's model
+ * catalog. A port because each reads something outside the service.
+ */
+export interface GatewayConfigAssembly {
+  /** The `ETag` for one key's bundle, moved by a hosted provider slot as much as by the key. */
+  versionToken(
+    virtualKey: VirtualKeyWithScopes,
+    connectUpstream?: GatewayConnectUpstream,
+  ): Promise<string>;
+
+  /** The alias map the gateway receives, reserved tiers filled in. */
+  withTierFallthrough(input: {
+    aliases: Record<string, string>;
+    defaultModel: string | null;
+  }): Record<string, string>;
+
+  /** The models a provider row declares; empty when it declares none. */
+  findDeclaredModelsForProvider(modelProvider: {
+    provider: string;
+    customModels: unknown;
+    customEmbeddingsModels: unknown;
+  }): string[];
+
+  /** One provider row's decrypted credentials, in the gateway's wire shape. */
+  buildCredentials(
+    modelProvider: ModelProvider,
+    credentialReader: GatewayModelProviderCredentials,
+  ): Record<string, unknown>;
+}
+
+/**
+ * Reads a model provider's stored custom keys, encrypted at rest with a
+ * cipher the Model Provider feature owns — a gateway package may not depend
+ * on another feature's server package directly, hence this port.
+ */
+export interface GatewayModelProviderCredentials {
+  readCustomKeys(stored: unknown): Record<string, unknown>;
 }

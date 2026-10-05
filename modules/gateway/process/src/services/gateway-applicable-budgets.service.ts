@@ -13,7 +13,10 @@ import {
  */
 import type { ProjectApi, TraceDestinationProject } from "@langwatch/project-contract";
 
-import { type BudgetSpendTarget, type GatewayBudgetSpend } from "../app/gateway.members.ts";
+import type {
+  BudgetSpendTarget,
+  GatewayBudgetSpendRepository,
+} from "../repositories/gateway-budget-spend.repository.ts";
 import type { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 import type { GatewayService } from "./gateway.service.ts";
 
@@ -48,7 +51,7 @@ export class GatewayApplicableBudgetsService {
   async resolveApplicableBudgetsForDraftKey(
     projects: ProjectApi,
     draft: DraftVirtualKey,
-    chRepo?: GatewayBudgetSpend,
+    chRepo?: GatewayBudgetSpendRepository,
   ): Promise<ApplicableBudget[]> {
     // Where this key's traces land decides whether team/project-scoped
     // budgets reach it. An existing key's stored destination is the same
@@ -86,7 +89,7 @@ export class GatewayApplicableBudgetsService {
    */
   async resolveApplicableBudgetsForTarget(
     target: GatewayBudgetResolutionTarget,
-    chRepo?: GatewayBudgetSpend,
+    chRepo?: GatewayBudgetSpendRepository,
   ): Promise<ApplicableBudget[]> {
     const resolved = await this.budgetDecisions.resolveApplicableBudgets(target);
     if (resolved.length === 0) {
@@ -164,7 +167,7 @@ async function loadSpend({
   budgetDecisions: GatewayService;
   organizationId: string;
   resolved: GatewayResolvedBudget[];
-  chRepo?: GatewayBudgetSpend;
+  chRepo?: GatewayBudgetSpendRepository;
 }): Promise<Map<string, string>> {
   if (!chRepo) {
     return new Map();
@@ -184,7 +187,7 @@ async function loadSpend({
     periodFloorMs: computeBudgetPeriodFloorMs(r.budget),
   }));
   try {
-    const spends = await chRepo.getSpendForTargetsAcrossTenants(tenantIds, targets);
+    const spends = await chRepo.findSpendForTargetsAcrossTenants(tenantIds, targets);
 
     return new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
   } catch {

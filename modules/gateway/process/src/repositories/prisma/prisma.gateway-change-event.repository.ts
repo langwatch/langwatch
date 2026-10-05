@@ -6,17 +6,17 @@
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 
-import {
-  type GatewayChangeEvents,
-  type AppendGatewayChangeEventInput,
-  type GatewayChangeEventKind,
-  type GatewayPersistenceTransaction,
-} from "../../app/gateway.members.ts";
+import type {
+  GatewayChangeEventsRepository,
+  AppendGatewayChangeEventInput,
+  GatewayChangeEventKind,
+} from "../gateway-change-event.repository.ts";
+import type { GatewayPersistenceTransaction } from "../gateway-transaction.repository.ts";
 
 /** The client slice the revision feed needs. */
 export type GatewayChangeEventDatabase = Pick<PrismaClient, "gatewayChangeEvent">;
 
-export class PrismaGatewayChangeEventsRepository implements GatewayChangeEvents {
+export class PrismaGatewayChangeEventsRepository implements GatewayChangeEventsRepository {
   static create(database: GatewayChangeEventDatabase): PrismaGatewayChangeEventsRepository {
     return new PrismaGatewayChangeEventsRepository(database);
   }

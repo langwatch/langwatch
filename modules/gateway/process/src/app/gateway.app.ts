@@ -166,6 +166,8 @@ import {
   GatewaySpendProducerAdapter,
 } from "../eventing/gateway-spend.pipeline.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
+import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 import type { GatewayOpenAdmissionsRepository } from "../repositories/gateway-open-admissions.repository.ts";
 import type { GatewayPrincipalSpendRepository } from "../repositories/gateway-principal-spend.repository.ts";
 import type { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
@@ -253,7 +255,6 @@ import {
   buildGatewayControlPlane,
   GatewayEndUserCapsAdapter,
 } from "./gateway-composition.build.ts";
-import { type GatewayBudgetSpend, type GatewayChangeEvents } from "./gateway.members.ts";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped
@@ -458,9 +459,9 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
    * which is why every read of it degrades explicitly rather than reporting a
    * confident zero.
    */
-  budgetSpend: GatewayBudgetSpend | undefined;
+  budgetSpend: GatewayBudgetSpendRepository | undefined;
   /** The change feed the Go data plane long-polls for budget and key revisions. */
-  changeEvents: GatewayChangeEvents;
+  changeEvents: GatewayChangeEventsRepository;
   /** The ClickHouse principal-scope ledger reader. Absent likewise. */
   principalSpend: GatewayPrincipalSpendRepository | undefined;
   /** The spend-event ledger reader. Absent likewise. */
@@ -1354,7 +1355,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     endUserId: string;
     tenantIds: string[];
     virtualKeyId?: string;
-    budgetRepository: GatewayBudgetSpend;
+    budgetRepository: GatewayBudgetSpendRepository;
   }): Promise<GatewayEndUserCap[]> {
     const { budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId } = input;
 
@@ -1435,7 +1436,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return this.getSpendEvents().countUsage(input);
   }
 
-  getBudgetSpend(): GatewayBudgetSpend {
+  getBudgetSpend(): GatewayBudgetSpendRepository {
     const budgetSpend = this.#coreDependencies?.budgetSpend;
     if (!budgetSpend) throw this.spendStoreUnavailable();
     return budgetSpend;

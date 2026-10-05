@@ -93,7 +93,7 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
       ]);
     }
 
-    const spend = await repo.getSpendForBudgets(TENANT_ID, budgets, occurredAt);
+    const spend = await repo.findSpendForBudgets(TENANT_ID, budgets, occurredAt);
     spendByBudgetId = new Map(spend.map((s) => [s.budgetId, s.spentUsd]));
   }, 120_000);
 
@@ -179,7 +179,7 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
     /** @scenario "Spend stays visible when the ClickHouse server does not run in UTC" */
     it.each(TZ_WINDOWS)("still reports non-zero spend on a %s budget", async (window) => {
       const budget = tzBudgets.find((b) => b.window === window)!;
-      const spend = await repo.getSpendForBudgets(TENANT_ID, [budget], tzOccurredAt);
+      const spend = await repo.findSpendForBudgets(TENANT_ID, [budget], tzOccurredAt);
 
       expect(Number.parseFloat(spend[0]!.spentUsd)).toBeGreaterThan(0);
     });
@@ -203,7 +203,7 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
         buckets: string;
       }[];
 
-      // Every window produced a rollup bucket, and getSpendForBudgets above
+      // Every window produced a rollup bucket, and findSpendForBudgets above
       // found all of them. A window present here but missing from the spend
       // map is the exact drift this test exists to catch.
       expect(rows.map((r) => r.Window).toSorted()).toEqual([...ALL_WINDOWS].toSorted());

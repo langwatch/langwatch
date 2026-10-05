@@ -11,9 +11,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { GatewayPermissionScope, GatewayScopePermissions } from "../../app/gateway.members.ts";
 import { VirtualKeyAuthorizationRepository } from "../../repositories/virtual-key-authorization.repository.ts";
 import {
+  type GatewayPermissionScope,
+  type GatewayScopePermissions,
   type ActorContext,
   type Scope,
   VirtualKeyAuthorizationService,

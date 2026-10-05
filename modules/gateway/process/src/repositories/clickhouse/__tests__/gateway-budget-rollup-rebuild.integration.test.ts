@@ -127,7 +127,7 @@ async function readSpend(
   budgets: GatewayBudget[],
   at: Instant,
 ): Promise<Map<string, string>> {
-  const spend = await repo.getSpendForBudgets(TENANT_ID, budgets, at);
+  const spend = await repo.findSpendForBudgets(TENANT_ID, budgets, at);
 
   return new Map(spend.map((row) => [row.budgetId, row.spentUsd]));
 }

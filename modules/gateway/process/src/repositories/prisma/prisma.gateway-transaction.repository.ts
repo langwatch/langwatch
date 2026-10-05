@@ -1,15 +1,15 @@
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import {
-  type GatewayPersistenceTransaction,
-  type GatewayTransaction,
-} from "../../app/gateway.members.ts";
+import type {
+  GatewayPersistenceTransaction,
+  GatewayTransactionRepository,
+} from "../gateway-transaction.repository.ts";
 
 /** The one client slice a transaction needs. */
-export type GatewayTransactionDatabase = Pick<ProcessMembers["prisma"], "$transaction">;
+export type GatewayTransactionDatabase = Pick<PrismaClient, "$transaction">;
 
 /** Prisma's interactive transaction, handed to services as an opaque handle. */
-export class PrismaGatewayTransactionRepository implements GatewayTransaction {
+export class PrismaGatewayTransactionRepository implements GatewayTransactionRepository {
   static create(input: {
     database: GatewayTransactionDatabase;
   }): PrismaGatewayTransactionRepository {

@@ -586,7 +586,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
         },
       ]);
 
-      const spends = await chRepo.getSpendForTargetsAcrossTenants(
+      const spends = await chRepo.findSpendForTargetsAcrossTenants(
         [PROJECT_ID],
         [filtered, unfiltered].map((r) => ({
           budgetId: r.budget.id,
@@ -719,7 +719,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
       const unfilteredBudget = await prisma.gatewayBudget.findUniqueOrThrow({
         where: { id: BUDGET_GROUP_ID },
       });
-      const spends = await chRepo.getSpendForBudgetsAcrossTenants(
+      const spends = await chRepo.findSpendForBudgetsAcrossTenants(
         [PROJECT_ID],
         [toBudgetRow(unfilteredBudget), toBudgetRow(filteredBudget)],
       );

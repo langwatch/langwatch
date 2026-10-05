@@ -12,7 +12,10 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
-import { type BucketSpend, type GatewayBudgetSpend } from "../app/gateway.members.ts";
+import type {
+  BucketSpend,
+  GatewayBudgetSpendRepository,
+} from "../repositories/gateway-budget-spend.repository.ts";
 
 function stubTemplate(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
   return {
@@ -73,7 +76,7 @@ function mockPrisma(budgets: GatewayBudget[], boundaries: unknown[] = []) {
  * Composed the way `PrismaGatewayAdapter` composes it — see
  * dev/docs/best_practices/service-repository-adapter-port.md.
  */
-function serviceOver(prisma: PrismaClient, spend: GatewayBudgetSpend) {
+function serviceOver(prisma: PrismaClient, spend: GatewayBudgetSpendRepository) {
   return PrismaGatewayAdapter.create({
     database: prisma,
     organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
@@ -91,12 +94,12 @@ function serviceOver(prisma: PrismaClient, spend: GatewayBudgetSpend) {
 
 function mockChRepo(args: {
   breakdown?: BucketSpend[];
-  breakdownSpy?: GatewayBudgetSpend["getBucketSpendBreakdownForBudget"];
+  breakdownSpy?: GatewayBudgetSpendRepository["findBucketSpendBreakdownForBudget"];
   throwOnBreakdown?: boolean;
-}): GatewayBudgetSpend {
-  return createApiFixture<GatewayBudgetSpend>({
-    getSpendForBudgetsAcrossTenants: async () => [],
-    getBucketSpendBreakdownForBudget:
+}): GatewayBudgetSpendRepository {
+  return createApiFixture<GatewayBudgetSpendRepository>({
+    findSpendForBudgetsAcrossTenants: async () => [],
+    findBucketSpendBreakdownForBudget:
       args.breakdownSpy ??
       (async () => {
         if (args.throwOnBreakdown) throw new Error("clickhouse unavailable");

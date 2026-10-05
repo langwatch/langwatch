@@ -19,12 +19,12 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
-import type { BudgetDebitRow } from "../app/gateway.members.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import type { BudgetDebitRow } from "../repositories/gateway-budget-spend.repository.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
 
@@ -228,7 +228,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
       }),
     ]);
 
-    const spends = await chRepo.getSpendForTargetsAcrossTenants(
+    const spends = await chRepo.findSpendForTargetsAcrossTenants(
       [PROJECT_ID],
       [
         {
@@ -333,7 +333,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
       }),
     ]);
 
-    const before = await chRepo.getSpendForTargetsAcrossTenants(
+    const before = await chRepo.findSpendForTargetsAcrossTenants(
       [PROJECT_ID],
       [
         {
@@ -357,7 +357,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
     });
     expect(reset.lastResetAt).not.toBeNull();
 
-    const after = await chRepo.getSpendForTargetsAcrossTenants(
+    const after = await chRepo.findSpendForTargetsAcrossTenants(
       [PROJECT_ID],
       [
         {
@@ -428,7 +428,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
     expect(boundary).not.toBeNull();
 
     const read = async (bucket: string, floorMs?: number) => {
-      const spends = await chRepo.getSpendForTargetsAcrossTenants(
+      const spends = await chRepo.findSpendForTargetsAcrossTenants(
         [PROJECT_ID],
         [
           {
@@ -470,7 +470,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
     );
 
     const readAt = async ({ budget, now }: { budget: typeof anchored; now: Instant }) => {
-      const spends = await chRepo.getSpendForTargetsAcrossTenants(
+      const spends = await chRepo.findSpendForTargetsAcrossTenants(
         [PROJECT_ID],
         [
           {
@@ -585,7 +585,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
       }),
     ]);
 
-    const spends = await chRepo.getSpendForTargetsAcrossTenants(
+    const spends = await chRepo.findSpendForTargetsAcrossTenants(
       [PROJECT_ID],
       [
         {

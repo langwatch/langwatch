@@ -15,7 +15,14 @@ import {
   type GatewayClickHouseInstance,
 } from "../repositories/clickhouse/clickhouse.gateway-open-admissions-sweep.repository.ts";
 import { ClickHouseGatewayPrincipalSpendRepository } from "../repositories/clickhouse/clickhouse.gateway-principal-spend.repository.ts";
+import type {
+  GatewayClickHouseClient,
+  GatewayClickHouseResolver,
+} from "../repositories/clickhouse/clickhouse.gateway-session.store.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
+import type { GatewayAuditRepository } from "../repositories/gateway-audit.repository.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
+import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 import type { GatewayOpenAdmissionsRepository } from "../repositories/gateway-open-admissions.repository.ts";
 import { PrismaGatewayAuditRepository } from "../repositories/prisma/prisma.gateway-audit.repository.ts";
 import {
@@ -42,6 +49,7 @@ import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma
 import { GatewayApplicableBudgetsService } from "../services/gateway-applicable-budgets.service.ts";
 import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
 import { GatewayEndUserCapsService } from "../services/gateway-end-user-caps.service.ts";
+import type { GatewayGovernanceSignals } from "../services/gateway-governance-events.service.ts";
 import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
 import { GatewayOrganizationDirectoryService } from "../services/gateway-organization-directory.service.ts";
 import {
@@ -53,21 +61,15 @@ import { GatewayUsageService } from "../services/gateway-spend-summary.service.t
 import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
 import { GatewayService, type GatewayBudgetOrganizations } from "../services/gateway.service.ts";
 import { VirtualKeyAuthorizationService } from "../services/virtual-key-authorization.service.ts";
-import type { VirtualKeyActor } from "../services/virtual-key-authorization.service.ts";
+import type {
+  VirtualKeyActor,
+  GatewayPermissionScope,
+  GatewayScopePermissions,
+} from "../services/virtual-key-authorization.service.ts";
 import { VirtualKeyCryptoService } from "../services/virtual-key-crypto.service.ts";
 import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service.ts";
 import { VirtualKeyService } from "../services/virtual-key.service.ts";
 import type { GatewayAppDependencies } from "./gateway.app.ts";
-import type {
-  GatewayClickHouseClient,
-  GatewayClickHouseResolver,
-  GatewayGovernanceSignals,
-  GatewayPermissionScope,
-  GatewayScopePermissions,
-  GatewayAudit,
-  GatewayBudgetSpend,
-  GatewayChangeEvents,
-} from "./gateway.members.ts";
 
 const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
 
@@ -602,9 +604,9 @@ export class PrismaGatewayAdapter {
     organizations: GatewayBudgetOrganizations;
     evaluators: EvaluatorApi;
     monitors: MonitorApi;
-    changes: GatewayChangeEvents;
-    audit: GatewayAudit;
-    budgetSpend?: GatewayBudgetSpend;
+    changes: GatewayChangeEventsRepository;
+    audit: GatewayAuditRepository;
+    budgetSpend?: GatewayBudgetSpendRepository;
   }): PrismaGatewayAdapter {
     const budgetRepository = PrismaGatewayBudgetRepository.create(
       options.database,
@@ -650,7 +652,7 @@ export class GatewayEndUserCapsAdapter {
 
   static create(options: {
     database: GatewayBudgetDatabase;
-    spend: GatewayBudgetSpend;
+    spend: GatewayBudgetSpendRepository;
   }): GatewayEndUserCapsService {
     return GatewayEndUserCapsService.create({
       budgets: PrismaGatewayBudgetRepository.create(options.database, options.spend),

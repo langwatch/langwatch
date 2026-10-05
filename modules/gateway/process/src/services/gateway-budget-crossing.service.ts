@@ -6,14 +6,17 @@ import {
 } from "@langwatch/gateway-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type { BudgetSpendTarget, GatewayBudgetSpend } from "../app/gateway.members.ts";
+import type {
+  BudgetSpendTarget,
+  GatewayBudgetSpendRepository,
+} from "../repositories/gateway-budget-spend.repository.ts";
 import { budgetCrossingKind } from "../rules/gateway-budget-crossing.rules.ts";
 import type { GatewayGovernanceEventsService } from "./gateway-governance-events.service.ts";
 import type { GatewayService } from "./gateway.service.ts";
 
 type GatewayBudgetCrossingCollaborators = Readonly<{
   budgets: Pick<GatewayService, "listSpendTenantIds" | "findBucketBoundaries">;
-  spend: Pick<GatewayBudgetSpend, "getSpendForTargetsAcrossTenants">;
+  spend: Pick<GatewayBudgetSpendRepository, "findSpendForTargetsAcrossTenants">;
   facts: Pick<GatewayGovernanceEventsService, "recordBudgetCrossing">;
   clock?: () => Instant;
 }>;
@@ -65,7 +68,7 @@ export class GatewayBudgetCrossingService {
         now,
       ),
     }));
-    const spends = await this.collaborators.spend.getSpendForTargetsAcrossTenants(
+    const spends = await this.collaborators.spend.findSpendForTargetsAcrossTenants(
       tenantIds,
       targets,
       now,

@@ -1,6 +1,5 @@
 import { createLogger } from "@langwatch/observability";
 
-import type { GatewayClickHouseClient } from "../../app/gateway.members.ts";
 import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../rules/gateway-spend-settlement.rules.ts";
 import {
   GatewayOpenAdmissionsRepository,
@@ -8,6 +7,7 @@ import {
   type OpenAdmissionQuery,
 } from "../gateway-open-admissions.repository.ts";
 import { ClickHouseGatewayOpenAdmissionsRepository } from "./clickhouse.gateway-open-admissions.repository.ts";
+import type { GatewayClickHouseClient } from "./clickhouse.gateway-session.store.ts";
 
 export { ClickHouseGatewayOpenAdmissionsRepository };
 

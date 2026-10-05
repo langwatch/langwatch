@@ -36,8 +36,11 @@ import { Prisma } from "@langwatch/prisma-client/generated";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
 
-import type { BudgetBucketBoundary, GatewayBudgetSpend } from "../../app/gateway.members.ts";
 import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
+import type {
+  BudgetBucketBoundary,
+  GatewayBudgetSpendRepository,
+} from "../gateway-budget-spend.repository.ts";
 import {
   type GatewayBudgetScopeReach,
   GatewayBudgetRepository,
@@ -282,7 +285,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   private readonly changeEvents: PrismaGatewayChangeEventsRepository;
   private readonly auditLog: PrismaGatewayAuditRepository;
   private readonly scopeReach: PrismaGatewayBudgetScopeReachRepository;
-  private readonly chRepo?: GatewayBudgetSpend;
+  private readonly chRepo?: GatewayBudgetSpendRepository;
 
   constructor({
     prisma,
@@ -295,7 +298,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     changeEvents?: PrismaGatewayChangeEventsRepository;
     auditLog?: PrismaGatewayAuditRepository;
     scopeReach?: PrismaGatewayBudgetScopeReachRepository;
-    chRepo?: GatewayBudgetSpend;
+    chRepo?: GatewayBudgetSpendRepository;
   }) {
     super();
     this.prisma = prisma;
@@ -307,7 +310,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
 
   static create(
     database: GatewayBudgetDatabase,
-    chRepo?: GatewayBudgetSpend,
+    chRepo?: GatewayBudgetSpendRepository,
   ): PrismaGatewayBudgetRepository {
     return new PrismaGatewayBudgetRepository({
       prisma: database,
@@ -447,7 +450,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     let spends;
     let seats: Map<string, { seen: number; over: number }>;
     try {
-      spends = await this.chRepo.getSpendForBudgetsAcrossTenants(tenantIds, budgets, now);
+      spends = await this.chRepo.findSpendForBudgetsAcrossTenants(tenantIds, budgets, now);
       seats = await this.seatStandings({
         budgets,
         tenantIds,
@@ -582,7 +585,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
 
     for (const budget of args.budgets) {
       if (budget.scopeType !== "ATTRIBUTED_USER") continue;
-      const buckets = await this.chRepo.getBucketSpendBreakdownForBudget({
+      const buckets = await this.chRepo.findBucketSpendBreakdownForBudget({
         budget,
         tenantIds: args.tenantIds,
         boundaries: args.boundariesByBudget.get(budget.id) ?? [],
@@ -1246,7 +1249,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       ? await (async () => {
           const tenantIds = input.tenantIds;
           if (tenantIds.length === 0) return new Map<string, string>();
-          const spends = await this.chRepo!.getSpendForBudgetsAcrossTenants(
+          const spends = await this.chRepo!.findSpendForBudgetsAcrossTenants(
             tenantIds,
             resolved.map((r) => ({
               budgetId: r.budget.id,

@@ -7,14 +7,12 @@
 import { VirtualKeyRevokedError } from "@langwatch/gateway-contract";
 import { nowInstant } from "@langwatch/time";
 
-import {
-  type GatewayAudit,
-  type GatewayChangeEvents,
-  type GatewayTransaction,
-  type GatewayVirtualKeyCrypto,
-  type GatewayGovernanceSignals,
-} from "../app/gateway.members.ts";
+import type { GatewayAuditRepository } from "../repositories/gateway-audit.repository.ts";
+import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
+import type { GatewayTransactionRepository } from "../repositories/gateway-transaction.repository.ts";
 import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
+import type { GatewayGovernanceSignals } from "./gateway-governance-events.service.ts";
+import type { GatewayVirtualKeyCrypto } from "./virtual-key-crypto.service.ts";
 import {
   ROTATION_GRACE_MS,
   VirtualKeyValidationService,
@@ -23,10 +21,10 @@ import {
 } from "./virtual-key-validation.service.ts";
 
 export class VirtualKeyRotationService {
-  private readonly transactions: GatewayTransaction;
+  private readonly transactions: GatewayTransactionRepository;
   private readonly repository: GatewayVirtualKeyRepository;
-  private readonly changeEvents: GatewayChangeEvents;
-  private readonly auditLog: GatewayAudit;
+  private readonly changeEvents: GatewayChangeEventsRepository;
+  private readonly auditLog: GatewayAuditRepository;
   private readonly crypto: GatewayVirtualKeyCrypto;
   private readonly validation: VirtualKeyValidationService;
   private readonly governanceSignals?: GatewayGovernanceSignals;
@@ -40,10 +38,10 @@ export class VirtualKeyRotationService {
     validation,
     governanceSignals,
   }: {
-    transactions: GatewayTransaction;
+    transactions: GatewayTransactionRepository;
     repository: GatewayVirtualKeyRepository;
-    changeEvents: GatewayChangeEvents;
-    auditLog: GatewayAudit;
+    changeEvents: GatewayChangeEventsRepository;
+    auditLog: GatewayAuditRepository;
     crypto: GatewayVirtualKeyCrypto;
     validation: VirtualKeyValidationService;
     governanceSignals?: GatewayGovernanceSignals;
@@ -58,10 +56,10 @@ export class VirtualKeyRotationService {
   }
 
   static create(input: {
-    transactions: GatewayTransaction;
+    transactions: GatewayTransactionRepository;
     repository: GatewayVirtualKeyRepository;
-    changeEvents: GatewayChangeEvents;
-    auditLog: GatewayAudit;
+    changeEvents: GatewayChangeEventsRepository;
+    auditLog: GatewayAuditRepository;
     crypto: GatewayVirtualKeyCrypto;
     validation: VirtualKeyValidationService;
     governanceSignals?: GatewayGovernanceSignals;

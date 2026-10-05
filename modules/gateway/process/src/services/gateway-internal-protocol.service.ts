@@ -33,16 +33,13 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
-import type {
-  GatewayBudgetSpend,
-  GatewayChangeEvents,
-  GatewaySpendRating,
-} from "../app/gateway.members.ts";
 import {
   admitSpendWireSchema,
   confirmSpendWireSchema,
   failSpendWireSchema,
 } from "../eventing/gateway-spend-commands.process.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
+import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 import type { GatewayInternalStoreRepository } from "../repositories/gateway-internal-store.repository.ts";
 import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
 import type { GatewayConfigMaterialiserService } from "./gateway-config-materialisation.service.ts";
@@ -52,6 +49,7 @@ import {
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
 } from "./gateway-realtime-session.service.ts";
+import type { GatewaySpendRating } from "./model-catalog-gateway-spend-rating.service.ts";
 import type { VirtualKeyService } from "./virtual-key.service.ts";
 
 const asString = (value: unknown): string =>
@@ -85,11 +83,11 @@ export type GatewayInternalProtocolMembers = Readonly<{
   /** The row reads no service on this package owns. */
   store: GatewayInternalStoreRepository;
   /** The durable revision feed the configuration long-poll walks. */
-  changes: GatewayChangeEvents;
+  changes: GatewayChangeEventsRepository;
   /** Builds one key's warm-cache configuration bundle. */
   config: GatewayConfigMaterialiserService;
   /** Absent with no ClickHouse; the bucket read then reports zero spend, not an invented figure. */
-  budgetSpend: GatewayBudgetSpend | undefined;
+  budgetSpend: GatewayBudgetSpendRepository | undefined;
   /** Owns the Codex session a 401 on a Codex-backed provider is recovered through. */
   modelProviders: Pick<ModelProviderApi, "refreshCodexForGateway">;
   /** All-or-nothing; a guardrail that cannot verdict must refuse, never answer allow. */
@@ -333,7 +331,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
  */
 async function bucketSpentMicroUsd(params: {
   projects: Pick<ProjectApi, "listIdsByOrganization">;
-  budgetRepository: GatewayBudgetSpend;
+  budgetRepository: GatewayBudgetSpendRepository;
   budget: GatewayBudget;
   bucketScopeId: string;
   periodFloorMs: number | undefined;
@@ -343,7 +341,7 @@ async function bucketSpentMicroUsd(params: {
   });
   if (projectIds.length === 0) return 0;
 
-  const spends = await params.budgetRepository.getSpendForTargetsAcrossTenants(projectIds, [
+  const spends = await params.budgetRepository.findSpendForTargetsAcrossTenants(projectIds, [
     {
       budgetId: params.budget.id,
       scope: params.budget.scopeType,

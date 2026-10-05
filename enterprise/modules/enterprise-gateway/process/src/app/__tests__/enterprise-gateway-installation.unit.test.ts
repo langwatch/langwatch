@@ -21,7 +21,6 @@ function boot() {
   return createApp({ role: "api" })
     .withModules([enterpriseGatewayProcessModule])
     .withStores(memoryStores())
-    .withMembers({ isSaas: false })
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
       gateway: createApiFixture<GatewayApi>(),

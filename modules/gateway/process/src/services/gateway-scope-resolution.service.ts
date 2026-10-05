@@ -7,11 +7,11 @@ import { MANAGED_MODELS, type VirtualKeyWithScopes } from "@langwatch/gateway-co
 import { isDispatchableProvider, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 import type {
   EligibleModelProvider,
   GatewayScopeResolutionRepository,
 } from "../repositories/gateway-scope-resolution.repository.ts";
+import type { GatewayPersistenceTransaction } from "../repositories/gateway-transaction.repository.ts";
 import { platformProviderRows } from "../rules/gateway-platform-providers.rules.ts";
 
 /** The providers the deployment holds its own keys for, as the model-provider peer answers them. */

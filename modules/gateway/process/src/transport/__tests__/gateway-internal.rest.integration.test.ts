@@ -14,8 +14,8 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi, type Mock } from "vitest";
 
-import type { GatewayChangeEvents } from "../../app/gateway.members.ts";
 import { gatewayProcessModule } from "../../gateway.module.ts";
+import type { GatewayChangeEventsRepository } from "../../repositories/gateway-change-event.repository.ts";
 import {
   GatewayGuardrailRepository,
   type GatewayGuardrailCheckRow,
@@ -37,8 +37,10 @@ import {
 const ORGANIZATION_ID = "organization-1";
 
 /** The revision feed, as the long poll reads it. */
-function testChangeEvents(): GatewayChangeEvents & { since: Mock<GatewayChangeEvents["since"]> } {
-  const since = vi.fn<GatewayChangeEvents["since"]>(async () => ({
+function testChangeEvents(): GatewayChangeEventsRepository & {
+  since: Mock<GatewayChangeEventsRepository["since"]>;
+} {
+  const since = vi.fn<GatewayChangeEventsRepository["since"]>(async () => ({
     currentRevision: 42n,
     events: [
       {

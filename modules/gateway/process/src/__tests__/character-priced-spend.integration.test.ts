@@ -96,7 +96,10 @@ async function serveRequest(model: string, usage: SpendUsage): Promise<void> {
 
 async function spentNanoUsd(): Promise<number> {
   const budget = await prisma.gatewayBudget.findUniqueOrThrow({ where: { id: BUDGET_ID } });
-  const [spend] = await chRepo.getSpendForBudgetsAcrossTenants([PROJECT_ID], [toBudgetRow(budget)]);
+  const [spend] = await chRepo.findSpendForBudgetsAcrossTenants(
+    [PROJECT_ID],
+    [toBudgetRow(budget)],
+  );
   if (!spend) throw new Error("no spend row for the budget");
   return spend.spentNanoUsd;
 }

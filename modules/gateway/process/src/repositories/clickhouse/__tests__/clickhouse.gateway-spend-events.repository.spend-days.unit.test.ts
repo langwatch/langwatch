@@ -5,7 +5,7 @@
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type { GatewayClickHouseClient } from "../../../app/gateway.members.ts";
+import type { GatewayClickHouseClient } from "../clickhouse.gateway-session.store.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
 
 type SentQuery = Parameters<GatewayClickHouseClient["query"]>[0];

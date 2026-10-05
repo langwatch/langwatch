@@ -180,7 +180,10 @@ async function createBudget(input: {
 /** What the repository says one budget has spent, in both units. */
 async function spendFor(budgetId: string): Promise<{ spentNanoUsd: number; spentUsd: string }> {
   const budget = await prisma.gatewayBudget.findUniqueOrThrow({ where: { id: budgetId } });
-  const [spend] = await chRepo.getSpendForBudgetsAcrossTenants([PROJECT_ID], [toBudgetRow(budget)]);
+  const [spend] = await chRepo.findSpendForBudgetsAcrossTenants(
+    [PROJECT_ID],
+    [toBudgetRow(budget)],
+  );
   if (!spend) throw new Error(`no spend row for ${budgetId}`);
   return { spentNanoUsd: spend.spentNanoUsd, spentUsd: spend.spentUsd };
 }

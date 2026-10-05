@@ -14,7 +14,6 @@ import { Temporal } from "@langwatch/time";
 import { webhookEnvelopeFromSpendRow } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { GatewaySpendRating } from "../app/gateway.members.ts";
 import {
   GATEWAY_DEBITS_PROCESS_NAME,
   GatewayDebitProcess,
@@ -32,6 +31,7 @@ import {
   GatewayInternalProtocolService,
   type GatewayInternalProtocolMembers,
 } from "../services/gateway-internal-protocol.service.ts";
+import type { GatewaySpendRating } from "../services/model-catalog-gateway-spend-rating.service.ts";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;

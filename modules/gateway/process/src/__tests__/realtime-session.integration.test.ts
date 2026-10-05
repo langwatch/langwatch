@@ -14,10 +14,11 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import type { GatewaySpanIngestion, GatewaySpendConfirmation } from "../app/gateway.members.ts";
 import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import {
+  type GatewaySpanIngestion,
+  type GatewaySpendConfirmation,
   GatewayRealtimeSessionService,
   REALTIME_OPEN_SESSION_WINDOW_MS,
   type GatewayRealtimeSessionCollaborators,

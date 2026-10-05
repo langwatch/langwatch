@@ -6,11 +6,14 @@ import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
-import { type GatewayBudgetSpend, type LedgerEventRow } from "../app/gateway.members.ts";
+import type {
+  GatewayBudgetSpendRepository,
+  LedgerEventRow,
+} from "../repositories/gateway-budget-spend.repository.ts";
 
 function mockChRepoWithEvents(
   events: (Partial<LedgerEventRow> & Pick<LedgerEventRow, "id">)[],
-): GatewayBudgetSpend {
+): GatewayBudgetSpendRepository {
   const fullEvents: LedgerEventRow[] = events.map((e) => ({
     id: e.id,
     budgetId: e.budgetId ?? "b_01",
@@ -24,9 +27,9 @@ function mockChRepoWithEvents(
     status: e.status ?? "SUCCESS",
     occurredAt: e.occurredAt ?? nowInstant(),
   }));
-  return createApiFixture<GatewayBudgetSpend>({
+  return createApiFixture<GatewayBudgetSpendRepository>({
     recentEventsForBudget: async () => fullEvents,
-    getSpendForBudgetsAcrossTenants: async () => [],
+    findSpendForBudgetsAcrossTenants: async () => [],
   });
 }
 
@@ -75,7 +78,7 @@ function mockPrismaWithBudgets(budgets: GatewayBudget[]): PrismaClient {
  * Composed the way `PrismaGatewayAdapter` composes it — see
  * dev/docs/best_practices/service-repository-adapter-port.md.
  */
-function serviceOver(prisma: PrismaClient, spend?: GatewayBudgetSpend) {
+function serviceOver(prisma: PrismaClient, spend?: GatewayBudgetSpendRepository) {
   return PrismaGatewayAdapter.create({
     database: prisma,
     organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
@@ -211,8 +214,8 @@ describe("GatewayService.check", () => {
         limitUsd: new Prisma.Decimal("100.00"),
         spentUsd: new Prisma.Decimal("0.00"), // dormant post-cutover
       });
-      const chRepoStub = createApiFixture<GatewayBudgetSpend>({
-        getSpendForBudgetsAcrossTenants: async () => [
+      const chRepoStub = createApiFixture<GatewayBudgetSpendRepository>({
+        findSpendForBudgetsAcrossTenants: async () => [
           {
             budgetId: "b_ch_sourced",
             scope: "PROJECT",

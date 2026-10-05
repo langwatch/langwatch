@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { Config, type ConfigOf, gatewayLegacyUrl, gatewayPublicUrl } from "@langwatch/config";
+import {
+  Config,
+  type ConfigOf,
+  gatewayLegacyUrl,
+  gatewayPublicUrl,
+  isSaas,
+} from "@langwatch/config";
 import { resolveGatewayBaseUrl } from "@langwatch/config/public-app-config/projection";
 
 /** Where issued personal keys send traffic. */
 export const enterpriseGatewayConfig = Config.define(() => ({
   gatewayPublicUrl,
   gatewayLegacyUrl,
+  /** The hosted product, which picks the default gateway address. */
+  isSaas,
 }));
 export type EnterpriseGatewayConfig = ConfigOf<typeof enterpriseGatewayConfig>;
 

@@ -47,7 +47,7 @@ import { RoutingPolicyService } from "../services/routing-policy.service.ts";
 
 type EnterpriseGatewaySetup = FeatureSetup<
   typeof EnterpriseGatewayModule.dependencies,
-  Readonly<{ isSaas: boolean }>,
+  never,
   EnterpriseGatewayConfig | undefined,
   EnterpriseGatewayRepositories
 >;
@@ -56,7 +56,6 @@ type EnterpriseGatewaySetup = FeatureSetup<
 export class EnterpriseGatewayModule implements EnterpriseGatewayApiContract {
   static readonly contract = EnterpriseGatewayApi;
   static readonly config = enterpriseGatewayConfig;
-  static readonly reads = ["isSaas"] as const;
   static readonly dependencies = {
     gateway: GatewayApi,
     projects: ProjectApi,
@@ -82,7 +81,6 @@ export class EnterpriseGatewayModule implements EnterpriseGatewayApiContract {
   static create({
     dependencies,
     config,
-    members,
     repositories,
   }: EnterpriseGatewaySetup): EnterpriseGatewayModule {
     const policies = RoutingPolicyService.create({
@@ -96,7 +94,7 @@ export class EnterpriseGatewayModule implements EnterpriseGatewayApiContract {
       issuer: PersonalVirtualKeyIssuerService.create(dependencies.gateway),
       organizations: dependencies.organizations,
       policies,
-      gatewayBaseUrl: enterpriseGatewayBaseUrl({ config, isSaas: members.isSaas }),
+      gatewayBaseUrl: enterpriseGatewayBaseUrl({ config, isSaas: config?.isSaas ?? false }),
     });
     return new EnterpriseGatewayModule({
       policies,

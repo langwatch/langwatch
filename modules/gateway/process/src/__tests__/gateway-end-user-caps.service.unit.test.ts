@@ -46,7 +46,7 @@ function capsWith(options: {
       },
     },
     spend: {
-      getSpendForTargetsAcrossTenants: async (
+      findSpendForTargetsAcrossTenants: async (
         tenantIds: string[],
         targets: Record<string, unknown>[],
       ) => {

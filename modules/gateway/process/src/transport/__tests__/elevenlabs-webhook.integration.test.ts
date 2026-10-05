@@ -29,12 +29,12 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { GatewayModule } from "../../app/gateway.app.ts";
-import type { GatewaySpendConfirmation } from "../../app/gateway.members.ts";
 import type { ConfirmSpendCommandData } from "../../eventing/gateway-spend-commands.process.ts";
 import { gatewayProcessModule } from "../../gateway.module.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../services/gateway-elevenlabs-credential.service.ts";
 import {
+  type GatewaySpendConfirmation,
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
 } from "../../services/gateway-realtime-session.service.ts";

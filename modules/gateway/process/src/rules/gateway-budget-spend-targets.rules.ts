@@ -6,7 +6,7 @@ import {
 } from "@langwatch/gateway-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type { BudgetSpendTarget } from "../app/gateway.members.ts";
+import type { BudgetSpendTarget } from "../repositories/gateway-budget-spend.repository.ts";
 
 /**
  * Read targets for a plain list of budgets, no request context (a GROUP

@@ -6,8 +6,6 @@ import {
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 
-import { type GatewaySpendRating } from "../app/gateway.members.ts";
-
 const logger = createLogger("langwatch:gateway-spend:rating");
 
 const FAULT_MESSAGES = {
@@ -53,4 +51,16 @@ export class ModelCatalogGatewaySpendRatingService implements GatewaySpendRating
     }
     return rated;
   }
+}
+
+/**
+ * Prices measured quantities. One rating seam for the whole vertical: voice
+ * settlement and the drainer must not price the same call twice, which is
+ * how two money surfaces come to disagree.
+ */
+export interface GatewaySpendRating {
+  rate(input: { model: string; usage: SpendUsage; rateVersion?: string }): {
+    costNanoUsd: number;
+    rateVersion: string;
+  };
 }

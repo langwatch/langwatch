@@ -33,28 +33,28 @@ export type {
   BudgetDebitRow,
   PulledUsageRow,
   PulledUsageTotals,
-  GatewayBudgetSpend,
-} from "./app/gateway.members.ts";
+  GatewayBudgetSpendRepository,
+} from "./repositories/gateway-budget-spend.repository.ts";
 export type {
   GatewayChangeEventKind,
   GatewayChangeEvent,
   AppendGatewayChangeEventInput,
-  GatewayPersistenceTransaction,
-  GatewayChangeEvents,
-} from "./app/gateway.members.ts";
+  GatewayChangeEventsRepository,
+} from "./repositories/gateway-change-event.repository.ts";
+export type { GatewayPersistenceTransaction } from "./repositories/gateway-transaction.repository.ts";
 export type {
   GatewayAuditAction,
   GatewayAuditTargetKind,
   AppendGatewayAuditInput,
   GatewayAuditTransaction,
-  GatewayAudit,
-} from "./app/gateway.members.ts";
+  GatewayAuditRepository,
+} from "./repositories/gateway-audit.repository.ts";
 export type {
   GatewayClickHouseClient,
   GatewayClickHouseResolver,
   GatewayClickHouse,
-} from "./app/gateway.members.ts";
-export type { GatewaySettlementPolicy } from "./app/gateway.members.ts";
+} from "./repositories/clickhouse/clickhouse.gateway-session.store.ts";
+export type { GatewaySettlementPolicy } from "./rules/gateway-spend-grouping.rules.ts";
 export * from "./eventing/gateway-spend.intent.ts";
 export {
   GatewayBudgetCycleAnchorInvalidError,
@@ -140,14 +140,17 @@ export {
 export type {
   GatewayGovernanceSignals,
   GatewayVirtualKeyLifecycleSignal,
-} from "./app/gateway.members.ts";
-export type { GatewayModelProviderCredentials } from "./app/gateway.members.ts";
-export type { GatewayScopePermissions, GatewayPermissionScope } from "./app/gateway.members.ts";
-export type { GatewayConfigAssembly } from "./app/gateway.members.ts";
-export type { GatewayVirtualKeyCrypto } from "./app/gateway.members.ts";
-export type { GatewaySpanIngestion } from "./app/gateway.members.ts";
-export type { GatewaySpendConfirmation } from "./app/gateway.members.ts";
-export type { GatewaySpendRating } from "./app/gateway.members.ts";
+} from "./services/gateway-governance-events.service.ts";
+export type { GatewayModelProviderCredentials } from "./rules/gateway-config-wire.rules.ts";
+export type {
+  GatewayScopePermissions,
+  GatewayPermissionScope,
+} from "./services/virtual-key-authorization.service.ts";
+export type { GatewayConfigAssembly } from "./rules/gateway-config-wire.rules.ts";
+export type { GatewayVirtualKeyCrypto } from "./services/virtual-key-crypto.service.ts";
+export type { GatewaySpanIngestion } from "./services/gateway-realtime-session.service.ts";
+export type { GatewaySpendConfirmation } from "./services/gateway-realtime-session.service.ts";
+export type { GatewaySpendRating } from "./services/model-catalog-gateway-spend-rating.service.ts";
 
 // The R3 config walk, main's `scripts/migrations/backfill-vk-config-to-rp.ts`.
 export {

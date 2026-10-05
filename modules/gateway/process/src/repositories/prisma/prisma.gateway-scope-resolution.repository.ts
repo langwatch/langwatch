@@ -1,12 +1,12 @@
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
 
-import type { GatewayPersistenceTransaction } from "../../app/gateway.members.ts";
 import {
   GatewayScopeResolutionRepository,
   type EligibleModelProvider,
   type GatewayRoutingPolicyOrder,
 } from "../gateway-scope-resolution.repository.ts";
+import type { GatewayPersistenceTransaction } from "../gateway-transaction.repository.ts";
 
 /** The client slice the scope graph is read through. */
 export type GatewayScopeResolutionDatabase = Pick<

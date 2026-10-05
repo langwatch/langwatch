@@ -13,7 +13,7 @@ import {
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import type { GatewayAudit } from "../app/gateway.members.ts";
+import type { GatewayAuditRepository } from "../repositories/gateway-audit.repository.ts";
 import type { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository.ts";
 
 /** Private guardrail catalogue collaborator owned by the singular Gateway service. */
@@ -23,7 +23,7 @@ export class GatewayGuardrailService {
     evaluators: EvaluatorApi;
     monitors: MonitorApi;
     projects: ProjectApi;
-    audit: GatewayAudit;
+    audit: GatewayAuditRepository;
   }): GatewayGuardrailService {
     return new GatewayGuardrailService({
       repository: input.repository,
@@ -38,7 +38,7 @@ export class GatewayGuardrailService {
   private readonly evaluators: EvaluatorApi;
   private readonly monitors: MonitorApi;
   private readonly projects: ProjectApi;
-  private readonly audit: GatewayAudit;
+  private readonly audit: GatewayAuditRepository;
 
   private constructor({
     repository,
@@ -51,7 +51,7 @@ export class GatewayGuardrailService {
     evaluators: EvaluatorApi;
     monitors: MonitorApi;
     projects: ProjectApi;
-    audit: GatewayAudit;
+    audit: GatewayAuditRepository;
   }) {
     this.repository = repository;
     this.evaluators = evaluators;

@@ -1,20 +1,21 @@
 import type { GatewayBudgetChangeInput, GatewayBudgetDebitRow } from "@langwatch/gateway-contract";
 
-import type { GatewayBudgetSpend, GatewayChangeEvents } from "../app/gateway.members.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
+import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 
 /** The budget-ledger writes a spend priced outside the gateway's own pipeline lands through. */
 export class GatewayBudgetLedgerService {
   private constructor(
-    private readonly spend: Pick<GatewayBudgetSpend, "insertDebit"> | undefined,
-    private readonly changes: Pick<GatewayChangeEvents, "append">,
+    private readonly spend: Pick<GatewayBudgetSpendRepository, "insertDebit"> | undefined,
+    private readonly changes: Pick<GatewayChangeEventsRepository, "append">,
   ) {}
 
   static create({
     spend,
     changes,
   }: {
-    spend: Pick<GatewayBudgetSpend, "insertDebit"> | undefined;
-    changes: Pick<GatewayChangeEvents, "append">;
+    spend: Pick<GatewayBudgetSpendRepository, "insertDebit"> | undefined;
+    changes: Pick<GatewayChangeEventsRepository, "append">;
   }): GatewayBudgetLedgerService {
     return new GatewayBudgetLedgerService(spend, changes);
   }
