@@ -823,7 +823,10 @@ describe("given a CLI starting a device login", () => {
         project_id: projectId,
       });
 
-    /** @scenario project-login approval rejects another user's personal project id */
+    /**
+     * @scenario project-login approval rejects another user's personal project id
+     * @scenario the server still refuses a personal project that is not the caller's own
+     */
     it("refuses another user's personal project by name and discloses no key", async () => {
       const world = deviceFlowWorld();
       world.project = liveProject({
@@ -992,6 +995,33 @@ describe("given a CLI starting a device login", () => {
    * poll, and a second redemption would hand out a second credential.
    */
   describe("given an approved device code being redeemed", () => {
+    describe("when two exchanges for the same approval arrive together", () => {
+      /** @scenario Two exchanges racing the same approval redeem it once */
+      it("hands the credential to one and tells the other to slow down", async () => {
+        const world = deviceFlowWorld();
+        const api = mount(world);
+        const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+          device_code: string;
+          user_code: string;
+        };
+        await api.post("/api/auth/cli/approve", {
+          user_code: grant.user_code,
+          organization_id: ORGANIZATION_ID,
+        });
+
+        const settled = await Promise.all([
+          api.post("/api/auth/cli/exchange", { device_code: grant.device_code }),
+          api.post("/api/auth/cli/exchange", { device_code: grant.device_code }),
+        ]);
+
+        expect(settled.map((response) => response.status).toSorted((a, b) => a - b)).toEqual([
+          200, 429,
+        ]);
+        const refused = settled.find((response) => response.status === 429)!;
+        await expect(refused.json()).resolves.toMatchObject({ error: "slow_down" });
+      });
+    });
+
     const claims = (world: ReturnType<typeof deviceFlowWorld>) =>
       world.store.keys().filter((key) => key.includes("claim:"));
 
