@@ -102,77 +102,109 @@ In this example:
 
 If you are using LangChain, LangWatch provides utilities to simplify capturing RAG data from retrievers and tools.
 
+### Initial Setup & Installation
+
+```bash
+pip install langwatch
+pip install langchain langchain-unstructured unstructured langchain_text_splitters langchain-openai langchain-qdrant
+```
+
 ### Capturing RAG from a Retriever
 
-You can wrap your LangChain retriever with `langwatch.langchain.capture_rag_from_retriever`. This function takes your retriever and a lambda function to transform the retrieved `Document` objects into `RAGChunk` objects.
+With LangChain's Agent API, you expose retrieval as a tool and capture the retrieved documents by wrapping the tool body in a `@langwatch.span(type="rag")` and updating the span with `RAGChunk` objects. The example below builds a Qdrant-backed retriever over the LangWatch docs and drives it with `create_agent`.
 
 ```python
 import langwatch
 from langwatch.types import RAGChunk
 
-from langchain_community.document_loaders import WebBaseLoader
-from langchain_community.vectorstores.faiss import FAISS
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_unstructured import UnstructuredLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.tools.retriever import create_retriever_tool
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema.runnable.config import RunnableConfig
+
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import Distance, VectorParams
+
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain.messages import SystemMessage, HumanMessage
+from langchain.agents import create_agent
+
+import os
+os.environ['OPENAI_API_KEY'] = "<replace-with-your-openai-api-key>"
 
 # 1. Setup LangWatch (if not done globally)
 # langwatch.setup()
 
 # 2. Prepare your retriever
-loader = WebBaseLoader("https://docs.langwatch.ai/introduction") # Example source
+loader = UnstructuredLoader(
+    web_url="https://docs.langwatch.ai/introduction",
+    chunking_strategy="basic",
+    max_characters=1_000_000,
+)
+
 docs = loader.load()
 documents = RecursiveCharacterTextSplitter(
     chunk_size=1000, chunk_overlap=200
 ).split_documents(docs)
-vector = FAISS.from_documents(documents, OpenAIEmbeddings())
-retriever = vector.as_retriever()
 
-# 3. Wrap the retriever for LangWatch RAG capture
-# This lambda tells LangWatch how to extract data for RAGChunk from LangChain's Document
-langwatch_retriever_tool = create_retriever_tool(
-    langwatch.langchain.capture_rag_from_retriever(
-        retriever,
-        lambda document: RAGChunk(
-            document_id=document.metadata.get("source", "unknown_source"), # Use a fallback for source
-            content=document.page_content,
-            # You can add other fields like 'score' if available in document.metadata
-        ),
-    ),
-    "langwatch_docs_search", # Tool name
-    "Search for information about LangWatch.", # Tool description
+client = QdrantClient(path="/tmp/db")
+
+client.create_collection(
+    collection_name="langwatch-docs",
+    vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
 )
 
-# 4. Use the wrapped retriever in your agent/chain
-tools = [langwatch_retriever_tool]
-model = ChatOpenAI(model="gpt-5", streaming=True)
-prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", "You are a helpful assistant. Answer questions based on the retrieved context.\n{agent_scratchpad}"),
-        ("human", "{question}"),
-    ]
+embed_model = OpenAIEmbeddings(model="text-embedding-3-small")
+
+vector = QdrantVectorStore(
+    client=client, collection_name="langwatch-docs", embedding=embed_model,
 )
-agent = create_tool_calling_agent(model, tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True) # type: ignore
+
+vector.add_documents(documents)
+
+# 3. Expose retrieval as a tool and capture the retrieved documents as a RAG span
+@langwatch.span(type="rag", name="langwatch_docs_search")
+def langwatch_docs_search(query: str) -> str:
+    """Search for information about LangWatch."""
+    docs = vector.similarity_search(query, k=4)
+
+    langwatch.get_current_span().update(
+        contexts=[
+            RAGChunk(
+                document_id=d.metadata.get("source", "unknown_source"),
+                content=d.page_content,
+            )
+            for d in docs
+        ]
+    )
+    return "\n\n".join(d.page_content for d in docs)
+
+# 4. Use the tool in your agent
+system_prompt = SystemMessage(
+    "You are a helpful assistant. Answer questions based on the retrieved context."
+)
+
+agent = create_agent(
+    model=ChatOpenAI(model="gpt-5"),
+    tools=[langwatch_docs_search],
+    system_prompt=system_prompt,
+)
 
 @langwatch.trace(name="LangChain RAG Agent Execution")
-def run_langchain_rag(user_input: str):
+def run_langchain_rag(user_input: str) -> str:
     current_trace = langwatch.get_current_trace()
     current_trace.update(metadata={"user_id": "lc_rag_user"})
 
     # Ensure the LangChain callback is used to capture all LangChain steps
-    response = agent_executor.invoke(
-        {"question": user_input},
-        config=RunnableConfig(
-            callbacks=[current_trace.get_langchain_callback()]
-        ),
-    )
+    final_state = None
+    for state in agent.stream(
+        {"messages": [HumanMessage(user_input)]},
+        config={"callbacks": [current_trace.get_langchain_callback()]},
+        stream_mode="values",
+    ):
+        state["messages"][-1].pretty_print()
+        final_state = state
 
-    output = response.get("output", "No output found.")=
-    return output
+    return final_state["messages"][-1].content
 
 if __name__ == "__main__":
     question = "What is LangWatch?"
@@ -182,10 +214,10 @@ if __name__ == "__main__":
 ```
 
 #### Key elements
-- `langwatch.langchain.capture_rag_from_retriever(retriever, lambda document: ...)`: This wraps your existing retriever.
-- The lambda function `lambda document: RAGChunk(...)` defines how to map fields from LangChain's `Document` to LangWatch's `RAGChunk`. This is crucial for providing detailed context information.
-- The wrapped retriever is then used to create a tool, which is subsequently used in an agent or chain.
-- Remember to include `langwatch.get_current_trace().get_langchain_callback()` in your `RunnableConfig` when invoking the chain/agent to capture all LangChain operations.
+- `@langwatch.span(type="rag")` on the retrieval tool marks it as a RAG step so LangWatch tracks the retrieved contexts.
+- `langwatch.get_current_span().update(contexts=[RAGChunk(...)])` logs the retrieved documents. Mapping each `Document` to a `RAGChunk` (`document_id`, `content`, and any other available metadata) is what gives you detailed, per-chunk context information.
+- The tool is passed to `create_agent` and invoked like any other tool by the agent.
+- Remember to include `langwatch.get_current_trace().get_langchain_callback()` in the `config` callbacks when invoking the agent to capture all LangChain operations.
 
 ### Capturing RAG from a Tool
 
@@ -195,36 +227,57 @@ Alternatively, if your RAG mechanism is encapsulated within a generic LangChain 
 import langwatch
 from langwatch.types import RAGChunk
 
+from langchain.agents import create_agent
+from langchain.messages import HumanMessage
+from langchain.tools import tool
+from langchain_openai import ChatOpenAI
+
+
+@tool
+def langwatch_docs_search(query: str) -> list[dict]:
+    """Search for information about LangWatch."""
+    results = vector_store.similarity_search(query, k=4)
+    return [
+        {
+            "id": d.metadata.get("source", "unknown_source"),
+            "chunk_id": d.metadata.get("element_id", str(i)),
+            "content": d.page_content,
+        }
+        for i, d in enumerate(results)
+    ]
+
+
+wrapped_tool = langwatch.langchain.capture_rag_from_tool(
+    langwatch_docs_search,
+    lambda response: [
+        RAGChunk(
+            document_id=r["id"],
+            chunk_id=r["chunk_id"],
+            content=r["content"],
+        )
+        for r in response
+    ],
+)
+
+agent = create_agent(
+    model=ChatOpenAI(model="gpt-5.6-luna", use_responses_api=True),
+    tools=[wrapped_tool],
+    system_prompt=(
+        "You are a helpful assistant that only replies in short tweet-like responses, "
+        "using lots of emojis. Use tools only once."
+    ),
+)
+
+
 @langwatch.trace()
-def main():
-    my_custom_tool = ...
-    wrapped_tool = langwatch.langchain.capture_rag_from_tool(
-        my_custom_tool, lambda response: [
-          RAGChunk(
-            document_id=response["id"], # optional
-            chunk_id=response["chunk_id"], # optional
-            content=response["content"]
-          )
-        ]
+def main(user_input: str):
+    trace = langwatch.get_current_trace()
+    response = agent.invoke(
+        {"messages": [HumanMessage(user_input)]},
+        config={"callbacks": [trace.get_langchain_callback()]},
     )
-
-    tools = [wrapped_tool] # use the new wrapped tool in your agent instead of the original one
-    model = ChatOpenAI(streaming=True)
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis and use tools only once.\n\n{agent_scratchpad}",
-            ),
-            ("human", "{question}"),
-        ]
-    )
-    agent = create_tool_calling_agent(model, tools, prompt)
-    executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-    return executor.invoke(user_input, config=RunnableConfig(
-        callbacks=[langWatchCallback]
-    ))
+    return response["messages"][-1].text
 ```
-The `capture_rag_from_tool` approach is generally less direct for RAG from retrievers because you have to parse the tool's output (which is usually a string) to extract structured context information. `capture_rag_from_retriever` is preferred when dealing directly with LangChain retrievers.
+`capture_rag_from_tool` needs you to parse the tool's output to get structured chunks. Tool output is usually a plain string, so this takes extra work. If you're using a LangChain retriever, use `capture_rag_from_retriever` instead. It reads the Document objects directly.
 
-Refer to the SDK examples for more detailed implementations.
+For complete implementations, see the SDK examples.
