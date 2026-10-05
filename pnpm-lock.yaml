@@ -3823,6 +3823,9 @@ importers:
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../../packages/authorization
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../../packages/config
       '@langwatch/enterprise-license-signing':
         specifier: workspace:*
         version: link:../../../packages/license-signing
@@ -3853,6 +3856,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../../packages/observability
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../../../modules/ops/contract
