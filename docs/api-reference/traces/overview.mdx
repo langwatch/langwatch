@@ -13,8 +13,8 @@ Both search and get-trace endpoints support a `format` parameter:
 - **`json`**, Returns the full raw trace data with all fields.
 
 For data-team ETL, `POST /api/v1/traces/search` also accepts a **projection DSL**
-(`from` + `select`) that returns exactly the fields you ask for — including
-nested events, annotations, and evaluations joined server-side — so a daily pull
+(`from` + `select`) that returns exactly the fields you ask for (including
+nested events, annotations, and evaluations joined server-side), so a daily pull
 becomes one paginated loop instead of a per-trace fan-out. It pairs with a
 `dateField` option to page by when traces were **last modified** rather than when
 they occurred. See [Projection DSL & field catalog](/api-reference/traces/projection-dsl).

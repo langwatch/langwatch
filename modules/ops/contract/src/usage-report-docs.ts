@@ -82,7 +82,7 @@ function opsHealthSection(): string[] {
   return [
     "### Inside `ops_health`",
     "",
-    "Optional, like the rest of this category. Counts only, keyed by LangWatch's own queue, pipeline and migration names: never an id, a payload, an error message, or a tenant or project name. A queue, pipeline or migration with nothing wrong is left out, and a section that could not be read is `null` rather than empty.",
+    "Optional, like the rest of this category. Counts only, keyed by LangWatch's own queue, pipeline and migration names: never an id, a payload, an error message, or a tenant or project name. A queue, pipeline or migration with no problem is left out, and a section that could not be read is `null` rather than empty.",
     "",
     "| Key | What it counts |",
     "|---|---|",

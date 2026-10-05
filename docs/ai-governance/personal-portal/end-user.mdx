@@ -115,7 +115,7 @@ provider; the policy does.
 ### If issuance returns "routing_policy_has_no_providers" (HTTP 422)
 
 The org-default routing policy exists but has zero providers bound, so
-the gateway would have nothing to forward to. The portal (and the CLI
+the gateway would have no upstream to forward to. The portal (and the CLI
 device-flow login) refuse to mint a key in that state, you'll see an
 HTTP 422 response with an actionable hint rather than a green key that
 returns 504 on every call.

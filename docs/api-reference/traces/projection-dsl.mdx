@@ -1,6 +1,6 @@
 ---
 title: "Projection DSL & field catalog"
-description: "Declare exactly which trace fields to return from POST /api/v1/traces/search — including nested events, annotations, and evaluations — so a daily ETL becomes one paginated loop instead of a per-trace fan-out."
+description: "Declare exactly which trace fields to return from POST /api/v1/traces/search, including nested events, annotations, and evaluations, so a daily ETL becomes one paginated loop instead of a per-trace fan-out."
 ---
 
 ## Why
@@ -9,8 +9,8 @@ By default `POST /api/v1/traces/search` returns the full trace shape. For an ETL
 pipeline that only needs a handful of fields across thousands of traces, that is
 both more data than required and forces a second call per trace to read
 event-level feedback. The projection DSL lets a caller declare the columns of
-interest up front; the server returns exactly that shape — with nested events,
-annotations, and evaluations joined server-side — in one paginated response.
+interest up front; the server returns exactly that shape, with nested events,
+annotations, and evaluations joined server-side, in one paginated response.
 
 The feature is fully additive: a request without `from`/`select` behaves exactly
 as before.
@@ -53,7 +53,7 @@ Paths group by their root, so the response mirrors the selection:
 - **`metadata.*`** nests under a `metadata` object.
 - **`metrics.*`** nests under a `metrics` object.
 - **`events.*`**, **`annotations.*`**, **`evaluations.*`** return as **nested
-  arrays** — one row per trace, with each child record projected to the
+  arrays**: one row per trace, with each child record projected to the
   requested sub-fields.
 
 A request for the `select` above yields rows shaped like:
@@ -73,7 +73,7 @@ A request for the `select` above yields rows shaped like:
 ## The `schema` response field
 
 When `select` is present, the response envelope gains a top-level `schema`
-object listing the resolved columns — their dotted path, value type, and whether
+object listing the resolved columns: their dotted path, value type, and whether
 they belong to a nested collection. Use it to pre-allocate a typed reader
 (pandas, a Parquet writer, a warehouse table) without inferring types from the
 data:
@@ -105,9 +105,9 @@ you can correct the whole `select` in one round-trip.
 | ------------- | ------ | ------------------------------------------------------------------------------------- |
 | `trace_id`    | string |                                                                                       |
 | `project_id`  | string |                                                                                       |
-| `started_at`  | number | Epoch ms — when the trace occurred.                                                   |
-| `inserted_at` | number | Epoch ms — when first stored.                                                         |
-| `updated_at`  | number | Epoch ms — when last modified.                                                        |
+| `started_at`  | number | Epoch ms: when the trace occurred.                                                   |
+| `inserted_at` | number | Epoch ms: when first stored.                                                         |
+| `updated_at`  | number | Epoch ms: when last modified.                                                        |
 | `input`       | string | Captured input. Requires input-visibility permission; redacted to `null` otherwise.   |
 | `output`      | string | Captured output. Requires output-visibility permission; redacted to `null` otherwise. |
 
@@ -128,7 +128,7 @@ object.
 | `metrics.reasoning_tokens`            | number                                                                     |
 | `metrics.cache_read_input_tokens`     | number                                                                     |
 | `metrics.cache_creation_input_tokens` | number                                                                     |
-| `metrics.total_cost`                  | number — requires cost-visibility permission; redacted to `null` otherwise |
+| `metrics.total_cost`                  | number, requires cost-visibility permission; redacted to `null` otherwise |
 | `metrics.tokens_estimated`            | boolean                                                                    |
 
 ### `evaluations.<field>` (nested array)
@@ -169,7 +169,7 @@ object.
 
 <Info>
   Annotations are manual reviews captured in the LangWatch UI (thumbs, scores, comments). They live
-  alongside SDK-emitted `events` and are joined into the same response — no separate annotations
+  alongside SDK-emitted `events` and are joined into the same response, with no separate annotations
   call needed.
 </Info>
 
@@ -177,7 +177,7 @@ object.
 
 By default the `startDate`/`endDate` window filters traces by **when they
 occurred**. For incremental ETL you usually want **everything changed since your
-last pull** — a trace can occur weeks before it gains a later evaluation or
+last pull**: a trace can occur weeks before it gains a later evaluation or
 annotation. Set `dateField` to switch the axis:
 
 | `dateField`          | Window applies to                | Use for                  |
@@ -196,13 +196,13 @@ annotation. Set `dateField` to switch the axis:
 
 Delivery contract on the `updated` axis: **at-least-once across pulls,
 at-most-once within a single scroll**. A trace modified again _while you are
-paging_ moves past the cursor and is not re-delivered in the current scroll —
+paging_ moves past the cursor and is not re-delivered in the current scroll:
 but its new `updated_at` lands in your **next** pull's window (which starts at
 your last watermark), so no change is ever lost across pulls. A CDC loop that
 advances its watermark to the previous pull's start time gets every change.
 
 <Note>
-  The `updated` watermark advances on every ClickHouse-side change to a trace — evaluations,
+  The `updated` watermark advances on every ClickHouse-side change to a trace: evaluations,
   metadata updates, spans, and annotation **creates** and **deletes**. **One gap today:** an
   **in-place edit** to an existing annotation (e.g. changing a score from 3 to 5) writes Postgres
   only and does not advance the trace's ClickHouse `updated_at`, so `dateField: "updated"` does not
@@ -215,7 +215,7 @@ advances its watermark to the previous pull's start time gets every change.
 
 The projection drives column selection, so asking for only lightweight fields
 keeps the query lightweight. In particular, the heavy captured `input`/`output`
-columns are only read when you `select` them — omit them and a wide window stays
+columns are only read when you `select` them: omit them and a wide window stays
 fast. Each page is capped at 1000 rows; keep following `pagination.scrollId`
 until it is absent to sweep a full window.
 

@@ -32,7 +32,7 @@ The instance administrator credential, as a Bearer token:
 Authorization: Bearer <LANGWATCH_INSTANCE_ADMIN_API_KEY>
 ```
 
-Set the variable on the deployment, generate it the way you generate any other secret (`openssl rand -hex 32` is fine), and treat it as the most powerful credential in the instance: it can create organizations, and each organization comes with an admin key. It is not an organization API key and cannot be used anywhere else in the API.
+Set the variable on the deployment, generate it the way you generate any other secret (`openssl rand -hex 32` is fine), and treat it as the highest-privilege credential in the instance: it can create organizations, and each organization comes with an admin key. It is not an organization API key and cannot be used anywhere else in the API.
 
 ## Endpoints
 

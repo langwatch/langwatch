@@ -19,7 +19,9 @@ sidebarTitle: MCP server
   `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, write tools and admin reads
   resolve the caller's user session to its RBAC scopes and reject with `FORBIDDEN` (or
   `AUTH_REQUIRED` when no user is bound) if the required permission is missing; the plain
-  `list`/`get` read tools are available to a project API key without a user. No tool can bypass the
+  `list`/`get` read tools are available to a project API key without a user.
+
+  No tool can bypass the
   service-layer or the multitenancy middleware, the same defense-in-depth that protects the REST API
   protects the MCP surface, even though MCP doesn't go through the REST surface.
 </Note>
@@ -90,7 +92,9 @@ The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` fr
   **Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp`
   + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev
   (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies
-  the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add
+  the seven MCP route prefixes through to the API port.
+
+  Local Claude Code runbook: `claude mcp add
   langwatch http://localhost:5560/mcp` (or the OAuth flow at
   `http://localhost:5560/api/v1/mcp/authorize` for write tools). All 9 tools register over that proxy,
   read tools return the catalog with a project apiKey Bearer, and write tools return
@@ -133,7 +137,9 @@ In both cases no record is created and no audit row is emitted (failed calls are
 
 The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
 
-- **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool asks the same permission probe the tRPC and REST surfaces ask, `AuthzService.hasPermission` (`modules/authz/contract/src/authz.service.ts`, resolved against the built-in role sets in `modules/authz/contract/src/roles.ts`), and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
+- **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool asks the same permission probe the tRPC and REST surfaces ask, `AuthzService.hasPermission` (`modules/authz/contract/src/authz.service.ts`, resolved against the built-in role sets in `modules/authz/contract/src/roles.ts`), and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time.
+
+  This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
 - **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/api/v1/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
 - **Snake_case ↔ camelCase boundary**: MCP tool inputs use snake_case (`source_template_id`, `template_id`) per public-surface convention; the tool maps to camelCase (`sourceTemplateId`, `templateId`) before calling the service, since service signatures are camelCase. The mapping is the tool's job, not the service's.
 
@@ -150,7 +156,9 @@ Every state-changing tool call emits an audit row with `AuditLog.metadata.surfac
 
 Payload shapes are identical to the REST API's audit rows apart from `metadata.surface`, every other field (actorUserId, apiKeyId, target, error) follows the same shape. This lets incident response queries answer "what did the agent do?" without changing the audit-row event-kind taxonomy.
 
-The contract is asserted at the application layer by `enterprise/modules/governance/process/src/app/__tests__/governance.app.unit.test.ts`, in the scenario "audit rows are identical apart from metadata.surface": the same template creation is driven over all four surfaces, tRPC, Hono REST, CLI and MCP, and the four writes come out field-for-field identical apart from `surface`. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at). The `AUTH_REQUIRED:` negative path, a write tool with no `callerUserId` failing before any audit row is written, is contract rather than covered ground: it carries no test of its own today.
+The contract is asserted at the application layer by `enterprise/modules/governance/process/src/app/__tests__/governance.app.unit.test.ts`, in the scenario "audit rows are identical apart from metadata.surface": the same template creation is driven over all four surfaces, tRPC, Hono REST, CLI and MCP, and the four writes come out field-for-field identical apart from `surface`.
+
+No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at). The `AUTH_REQUIRED:` negative path, a write tool with no `callerUserId` failing before any audit row is written, is contract rather than covered ground: it carries no test of its own today.
 
 ## Agent setup from scratch
 

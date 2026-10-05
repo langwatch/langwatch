@@ -151,7 +151,7 @@ LangWatch organizes what your LLM application sends into threads, traces and spa
 
 Field: `thread_id`
 
-Think of a **Thread** as the entire journey a user takes in a single session. It's the complete chat with your AI travel buddy, from "Where should I go?" to booking the flight. For the blog post generator, a `thread_id` bundles up the whole session – from brainstorming headlines to polishing the final SEO-optimized draft. It groups _all_ the back-and-forth interactions (Traces) for a specific task or conversation.
+Think of a **Thread** as the entire journey a user takes in a single session. It's the complete chat with your AI travel buddy, from "Where should I go?" to booking the flight. For the blog post generator, a `thread_id` bundles up the whole session, from brainstorming headlines to polishing the final SEO-optimized draft. It groups _all_ the back-and-forth interactions (Traces) for a specific task or conversation.
 
 ### Traces: One Task, End-to-End
 
@@ -165,7 +165,7 @@ Field: `trace_id`
 Zooming in from Threads, a **Trace** represents a single, complete task performed by your AI. It's one round trip.
 
 - **Travel Bot:** A user asking, "What are the cheapest flights to Bali in July?" is one Trace. Asking, "Does the hotel allow llamas?" is another Trace.
-- **Blog Tool:** Generating headline options? That's a Trace. Drafting the intro paragraph? Another Trace. Optimizing for keywords? You guessed it – a Trace.
+- **Blog Tool:** Generating headline options? That's a Trace. Drafting the intro paragraph? Another Trace. Optimizing for keywords? You guessed it, a Trace.
 
 Each `trace_id` captures an entire end-to-end generation, no matter how many internal steps (Spans) it takes.
 
@@ -9467,7 +9467,9 @@ A call with an API key that lacks the route's permission gets HTTP 403 `api_key_
 
 ## Changing the permission matrix
 
-Default roles are code-defined in `modules/authz/contract/src/roles.ts`, declared as differences rather than duplicate lists: `viewer` is the base set, `member` is `viewer` plus its additions, `admin` is `member` plus its additions, and `builtinRolePermissions()` resolves a role key to the permissions it ends up with. **Do not edit the default matrix in production**: a change to those built-in sets affects every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
+Default roles are code-defined in `modules/authz/contract/src/roles.ts`, declared as differences rather than duplicate lists: `viewer` is the base set, `member` is `viewer` plus its additions, `admin` is `member` plus its additions, and `builtinRolePermissions()` resolves a role key to the permissions it ends up with.
+
+**Do not edit the default matrix in production**: a change to those built-in sets affects every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
 
 ## SCIM + SSO
 
@@ -14081,9 +14083,13 @@ without LangWatch ever participating in the upstream tool's authentication.
 
 You install a template, paste an **ingestion key** into your tool's OTLP exporter, and
 traces land at `/me/traces` already shaped into the canonical `gen_ai.*` form, cost,
-tokens, and model populated automatically. An ingestion key is one
+tokens, and model populated automatically.
+
+An ingestion key is one
 [API key](/platform/api-keys) row with an `ik-lw-…` prefix, scoped to one project with a
-write-only, ingest-only role: it can create traces and nothing else. That is a much
+write-only, ingest-only role: it can only create traces.
+
+That is a much
 smaller blast radius than a full project key (`sk-lw-…`), which can read and change your
 project data, so the prefix tells you which one you are holding at a glance. An ingestion
 key is still a secret: the traces it writes carry your prompts and your tool content, and
@@ -14114,7 +14120,9 @@ That's an Ingestion Template:
 - **Admin/platform side:** a curated catalog row (slug, source identifier, credential
   schema, optional `ottlRules`). Platform-published rows ship empty `ottlRules`:
   Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*` canonical
-  spans natively, so no transform is needed for the common case. **Org admins can clone
+  spans natively, so no transform is needed for the common case.
+
+  **Org admins can clone
   a platform-default template into an org-authored template** and author OTTL via the
   OttlEditor at `/governance/inventory?tab=catalog → Ingestion Templates → Clone to
 customise → Edit OTTL`, to adapt a template to their org's upstream-tool quirks (an
@@ -14234,7 +14242,9 @@ An `IngestionTemplate` row has:
 - `ottlRules`, an optional OTTL transform applied to the span before the receiver's
   authoritative re-stamp pass. **Platform-default templates ship empty `ottlRules`**
   because Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*`
-  canonical spans natively, there is nothing to reshape for the common case. **Org
+  canonical spans natively, there is no reshaping to do for the common case.
+
+  **Org
   admins can fork a platform-default template into an org-authored template and author
   OTTL via the OttlEditor** in `/governance/inventory?tab=catalog → Ingestion
 Templates → Edit OTTL`. Forking lets the admin adapt a template to their org's
@@ -14248,7 +14258,7 @@ Templates → Edit OTTL`. Forking lets the admin adapt a template to their org's
 
 | schema           | what the install drawer captures             | covers v1                                             |
 | ---------------- | -------------------------------------------- | ----------------------------------------------------- |
-| `null`           | nothing, drawer auto-mints the ingestion key | claude_code, cursor, claude_cowork, raw_otlp_advanced |
+| `null`           | empty, drawer auto-mints the ingestion key | claude_code, cursor, claude_cowork, raw_otlp_advanced |
 | `static_api_key` | one labeled API key field                    | (deferred to v1.1+)                                   |
 | `agent_id`       | a labeled agent-identifier text input        | (deferred to v1.1+)                                   |
 
@@ -14265,7 +14275,7 @@ receiver:
 2. **Verifies** the key (HMAC + pepper) and resolves the `ApiKey` row, the same path
    any SDK or management key takes.
 3. **Ceilings to ingest-only.** An ingestion key carries a write-only, ingest-only role
-   that grants `traces:create` and nothing else, so the receiver rejects any non-ingest
+   that grants `traces:create` and no other permission, so the receiver rejects any non-ingest
    operation regardless of what the payload claims.
 4. **Sets `tenantId`** to the key's bound project, credential-as-scope. This is
    authoritative.
@@ -14503,7 +14513,9 @@ sidebarTitle: MCP server
   `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, write tools and admin reads
   resolve the caller's user session to its RBAC scopes and reject with `FORBIDDEN` (or
   `AUTH_REQUIRED` when no user is bound) if the required permission is missing; the plain
-  `list`/`get` read tools are available to a project API key without a user. No tool can bypass the
+  `list`/`get` read tools are available to a project API key without a user.
+
+  No tool can bypass the
   service-layer or the multitenancy middleware, the same defense-in-depth that protects the REST API
   protects the MCP surface, even though MCP doesn't go through the REST surface.
 </Note>
@@ -14574,7 +14586,9 @@ The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` fr
   **Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp`
   + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev
   (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies
-  the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add
+  the seven MCP route prefixes through to the API port.
+
+  Local Claude Code runbook: `claude mcp add
   langwatch http://localhost:5560/mcp` (or the OAuth flow at
   `http://localhost:5560/api/v1/mcp/authorize` for write tools). All 9 tools register over that proxy,
   read tools return the catalog with a project apiKey Bearer, and write tools return
@@ -14617,7 +14631,9 @@ In both cases no record is created and no audit row is emitted (failed calls are
 
 The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
 
-- **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool asks the same permission probe the tRPC and REST surfaces ask, `AuthzService.hasPermission` (`modules/authz/contract/src/authz.service.ts`, resolved against the built-in role sets in `modules/authz/contract/src/roles.ts`), and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
+- **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool asks the same permission probe the tRPC and REST surfaces ask, `AuthzService.hasPermission` (`modules/authz/contract/src/authz.service.ts`, resolved against the built-in role sets in `modules/authz/contract/src/roles.ts`), and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time.
+
+  This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
 - **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/api/v1/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
 - **Snake_case ↔ camelCase boundary**: MCP tool inputs use snake_case (`source_template_id`, `template_id`) per public-surface convention; the tool maps to camelCase (`sourceTemplateId`, `templateId`) before calling the service, since service signatures are camelCase. The mapping is the tool's job, not the service's.
 
@@ -14634,7 +14650,9 @@ Every state-changing tool call emits an audit row with `AuditLog.metadata.surfac
 
 Payload shapes are identical to the REST API's audit rows apart from `metadata.surface`, every other field (actorUserId, apiKeyId, target, error) follows the same shape. This lets incident response queries answer "what did the agent do?" without changing the audit-row event-kind taxonomy.
 
-The contract is asserted at the application layer by `enterprise/modules/governance/process/src/app/__tests__/governance.app.unit.test.ts`, in the scenario "audit rows are identical apart from metadata.surface": the same template creation is driven over all four surfaces, tRPC, Hono REST, CLI and MCP, and the four writes come out field-for-field identical apart from `surface`. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at). The `AUTH_REQUIRED:` negative path, a write tool with no `callerUserId` failing before any audit row is written, is contract rather than covered ground: it carries no test of its own today.
+The contract is asserted at the application layer by `enterprise/modules/governance/process/src/app/__tests__/governance.app.unit.test.ts`, in the scenario "audit rows are identical apart from metadata.surface": the same template creation is driven over all four surfaces, tRPC, Hono REST, CLI and MCP, and the four writes come out field-for-field identical apart from `surface`.
+
+No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at). The `AUTH_REQUIRED:` negative path, a write tool with no `callerUserId` failing before any audit row is written, is contract rather than covered ground: it carries no test of its own today.
 
 ## Agent setup from scratch
 
@@ -14812,7 +14830,11 @@ it, which is the usual third-party-notices entry rather than a constraint on how
 you license your own code. The rows are read most-specific
 first: the SDK directories are MIT even though they sit outside `enterprise/`.
 
-The header is the first line of the file, written as `SPDX-License-Identifier: <identifier>` behind whatever the language uses for a line comment: `//` in TypeScript and Go, `#` in Python and YAML. It is a single line, no block comment, no preamble, no copyright assignment. Tooling (REUSE, GitHub linguist) reads SPDX identifiers natively, and contributors moving a file across the boundary flip one line to record the result. Recording it is not the same as making it true: the SPDX line states a file's license, it does not relicense existing contributions, so a move across the boundary needs the rights checked and any applicable notices preserved before the line changes. The Enterprise identifier is a `LicenseRef-*` because LangWatch EE is not a registered SPDX license; the canonical text lives in [`enterprise/LICENSE.md`](https://github.com/langwatch/langwatch/blob/main/enterprise/LICENSE.md), and the per-directory breakdown is in [`NOTICE`](https://github.com/langwatch/langwatch/blob/main/NOTICE).
+The header is the first line of the file, written as `SPDX-License-Identifier: <identifier>` behind whatever the language uses for a line comment: `//` in TypeScript and Go, `#` in Python and YAML. It is a single line, no block comment, no preamble, no copyright assignment. Tooling (REUSE, GitHub linguist) reads SPDX identifiers natively, and contributors moving a file across the boundary flip one line to record the result.
+
+Recording it is not the same as making it true: the SPDX line states a file's license, it does not relicense existing contributions, so a move across the boundary needs the rights checked and any applicable notices preserved before the line changes.
+
+The Enterprise identifier is a `LicenseRef-*` because LangWatch EE is not a registered SPDX license; the canonical text lives in [`enterprise/LICENSE.md`](https://github.com/langwatch/langwatch/blob/main/enterprise/LICENSE.md), and the per-directory breakdown is in [`NOTICE`](https://github.com/langwatch/langwatch/blob/main/NOTICE).
 
 The directory is what the license follows, read most-specific row first rather than as a single Apache-2.0-unless-`ee` rule. The SPDX header records the result per file, and files that predate the convention do not carry one yet.
 
@@ -15021,7 +15043,9 @@ portal renders tiles from day one:
 The provisioned set is org-scoped and editable like any other entry.
 You can reorder, scope, disable, or archive entries afterward.
 Auto-provisioning only ever runs on a catalog that has never had any
-entry, so a catalog you curated down to nothing stays empty. The
+entry, so a catalog you curated down to zero entries stays empty.
+
+The
 **Import starter pack** button in the editor adds starter tiles the
 catalog never had, such as tiles added to the pack after your org was
 provisioned. Tiles you archived are respected as removed: import skips
@@ -15247,7 +15271,7 @@ provider; the policy does.
 ### If issuance returns "routing_policy_has_no_providers" (HTTP 422)
 
 The org-default routing policy exists but has zero providers bound, so
-the gateway would have nothing to forward to. The portal (and the CLI
+the gateway would have no upstream to forward to. The portal (and the CLI
 device-flow login) refuse to mint a key in that state, you'll see an
 HTTP 422 response with an actionable hint rather than a green key that
 returns 504 on every call.
@@ -20287,7 +20311,7 @@ The [OpenInference Google ADK instrumentor](https://github.com/Arize-ai/openinfe
 Here's the simplest way to instrument your application:
 
 <Info>
-  Set `LANGWATCH_API_KEY` in the environment before you run this. Without it the SDK sends nothing.
+  Set `LANGWATCH_API_KEY` in the environment before you run this. Without it the SDK sends no data.
 </Info>
 
 ```python
@@ -25034,9 +25058,9 @@ In **Analytics > LLM Metrics** you get time-to-first-token graphs with the usual
 
 ## Troubleshooting
 
-- **TTFT shows "—" in the table**: the trace has no LLM span reporting any of the signals above. For non-streaming calls this is expected, there is no "first token" moment distinct from the response itself.
+- **TTFT shows an empty dash in the table**: the trace has no LLM span reporting any of the signals above. For non-streaming calls this is expected, there is no "first token" moment distinct from the response itself.
 - **Value looks wrong by orders of magnitude**: check the units. `first_token_at` is an epoch timestamp in milliseconds; `gen_ai.server.time_to_first_token` and `first_token_ms` are durations in milliseconds.
-- **You set timestamps but nothing shows**: make sure the values go through `span.update(timestamps=...)` rather than mutating `span.timestamps` in place.
+- **You set timestamps but no timing shows**: make sure the values go through `span.update(timestamps=...)` rather than mutating `span.timestamps` in place.
 
 ---
 
@@ -27409,7 +27433,7 @@ setupObservability({
 
 ## Troubleshooting
 
-- Nothing exported: try `filters: []`, then add rules back
+- No spans exported: try `filters: []`, then add rules back
 - Too much noise: apply `excludeHttpRequests`, add specific `exclude` rules
 - Case surprises: add `ignoreCase: true` where needed
 - Check values: log `span.name` and `span.instrumentationScope.name` in dev
@@ -29170,7 +29194,7 @@ When more than one LLM span in a trace reports a TTFT, the trace-level value is 
 
 <Note>
   If you stream through the Vercel AI SDK with `experimental_telemetry` enabled, TTFT is captured
-  automatically from `ai.response.msToFirstChunk`, nothing to do.
+  automatically from `ai.response.msToFirstChunk`, with no extra step.
 </Note>
 
 ## Setting TTFT manually
@@ -29277,7 +29301,7 @@ In **Analytics > LLM Metrics** you get time-to-first-token graphs with the usual
 
 ## Troubleshooting
 
-- **TTFT shows "—" in the table**: the trace has no LLM span reporting any of the signals above. For non-streaming calls this is expected, there is no "first token" moment distinct from the response itself.
+- **TTFT shows an empty dash in the table**: the trace has no LLM span reporting any of the signals above. For non-streaming calls this is expected, there is no "first token" moment distinct from the response itself.
 - **Value looks wrong by orders of magnitude**: check the units. `gen_ai.server.time_to_first_token` is a duration in milliseconds; `first_token_at` inside `langwatch.timestamps` is an epoch timestamp in milliseconds.
 
 ---
@@ -60433,7 +60457,7 @@ Langy runs one isolated worker per conversation. `LANGY_MAX_WORKERS` caps how ma
 
 ### Idle worker reap
 
-A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so nothing sensitive stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. See [Sandbox](/langy/security/sandbox).
+A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so no sensitive data stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. See [Sandbox](/langy/security/sandbox).
 
 ### Per-session LangWatch API key
 
@@ -60782,7 +60806,7 @@ The lane is allow-list based (never a denylist), with three tiers set per organi
 | ------------ | -------------------------------------------------------------------------------------------------------------------- |
 | `content`    | Adds an explicit content allow-list: `gen_ai.input.messages`, `gen_ai.output.messages`, and named tool-payload keys. |
 | `structural` | Timings, tokens, status, and enums only. No prompts, completions, or tool output.                                    |
-| `skip`       | Nothing.                                                                                                             |
+| `skip`       | No action.                                                                                                          |
 
 <Note>
   On a self-hosted install the mirror lane is **off** unless `langyagent.mirror.existingSecretName`
@@ -60823,7 +60847,7 @@ Langy contributes to your code in exactly one way: **bot-authored pull requests 
 
 - **No per-user OAuth.** Installing the app does not ask a user to authorize it against their GitHub account. The bot-authored flow uses no user OAuth at all.
 - **The app private key is the only stored credential.** It lives only in the control plane (as `GITHUB_LANGY_PRIVATE_KEY`) and never reaches a worker. When it is unset, the GitHub feature is silently off.
-- **Installation tokens are minted per turn.** Each turn mints a fresh 1-hour installation token, cached in Redis just under its lifetime and never persisted. The worker receives it as the `GH_TOKEN` environment variable only; nothing is written to disk.
+- **Installation tokens are minted per turn.** Each turn mints a fresh 1-hour installation token, cached in Redis just under its lifetime and never persisted. The worker receives it as the `GH_TOKEN` environment variable only; no token is written to disk.
 - **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories, or to a single repository when the turn targets one.
 
 Inside the worker, `git config credential.helper '!gh auth git-credential'` wires `git` to read the token from the environment, so there is no `.gitconfig` or `.git-credentials` on disk.
@@ -61773,7 +61797,7 @@ LangWatch is configured through environment variables. How you set them depends 
 | `CRON_API_KEY`                        | Bearer secret the scheduled jobs send to the app's internal cron routes. Unset, those routes refuse every call. The Helm chart generates it                                                                                                                                                                                                                                                                           | For scheduled jobs |
 | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | Key for the stand-in that replaces an erased identifier. At least 32 characters. Needed once anyone is erased, with the same value on the app and the workers (Helm: `app.extraEnvs` and `workers.extraEnvs`). Never change it after the first erasure                                                                                                                                                                | For erasure        |
 | `LANGWATCH_INSTANCE_ADMIN_API_KEY`    | Bearer credential for the organization provisioning API (`/api/organizations`). At least 32 characters. Unset, that API answers 404                                                                                                                                                                                                                                                                                   | No                 |
-| `API_TOKEN_JWT_SECRET`                | Not used by any feature. Nothing reads it; it can be left unset                                                                                                                                                                                                                                                                                                                                                       | No                 |
+| `API_TOKEN_JWT_SECRET`                | Not used by any feature. No code reads it; it can be left unset                                                                                                                                                                                                                                                                                                                                                       | No                 |
 
 The AI Gateway uses three more secrets, `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET` and `LW_VIRTUAL_KEY_PEPPER`. Set all three or none. See [AI Gateway security](/ai-gateway/security).
 
@@ -64815,7 +64839,7 @@ runs the event sourcing pipeline (see below).
 
 ### LangWatch NLP (port 5561)
 
-A Go binary (`nlpgo`, image `langwatch/langwatch_nlp`) for:
+Go service (`services/nlpgo`, shipped as the `langwatch_nlp` image) for:
 
 - Optimization Studio workflow execution, synchronous and streamed
 - The prompt playground's model calls, proxied to the configured provider
@@ -65221,7 +65245,7 @@ Fill in these fields:
   for a new registration.
 </Note>
 
-Set the repository permissions to exactly these, nothing more. Tighter scope means a smaller blast radius.
+Set the repository permissions to exactly these, with no extra permissions. Tighter scope means a smaller blast radius.
 
 | Permission    | Access       |
 | ------------- | ------------ |
@@ -65229,7 +65253,7 @@ Set the repository permissions to exactly these, nothing more. Tighter scope mea
 | Pull requests | Read & write |
 | Metadata      | Read         |
 
-Under **Subscribe to events**, select **Pull request**. GitHub sends the installation lifecycle events (`installation`, `installation_repositories`) on its own. Subscribe to nothing else.
+Under **Subscribe to events**, select **Pull request**. GitHub sends the installation lifecycle events (`installation`, `installation_repositories`) on its own. Subscribe to no other events.
 
 The `pull_request` event links a pull request to its coding-agent sessions as soon as GitHub announces it. Without the event, linkage still works, but it waits for the periodic sweep, which can take up to a day for a branch that has been asked about a few times already.
 
@@ -65241,7 +65265,7 @@ Click **Create GitHub App**. On the resulting page:
 
 ## Plumb the secrets
 
-Add these to the control-plane env (`.env` or your secret manager). All are optional in the environment schema (`apps/api/src/platform/config/api.config.ts`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
+Add these to the control-plane env (`.env` or your secret manager). All are optional in the environment schema (`modules/github/contract/src/github.config.ts`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
 
 ```bash title=".env"
 GITHUB_LANGY_APP_ID="<App ID from registration>"
@@ -65260,7 +65284,7 @@ GITHUB_LANGY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRI
   let it reach the Langy agent pod. It stays in the control plane.
 </Warning>
 
-There is no client id or secret; the bot-authored flow uses no user OAuth. `CREDENTIALS_SECRET` (already required for any production install) signs the install round-trip's state, so nothing new is needed there.
+There is no client id or secret; the bot-authored flow uses no user OAuth. `CREDENTIALS_SECRET` (already required for any production install) signs the install round-trip's state, so no new secret is needed there.
 
 For the full env-var reference, see [Environment variables](/self-hosting/langy/environment-variables#github).
 
@@ -65354,7 +65378,7 @@ Go to **Settings > Integrations > Disconnect**, which opens GitHub's uninstall p
 ## Operational notes
 
 - **Token in the agent pod, not on disk.** Langy workers receive a 1-hour installation token via `GH_TOKEN` env. The github skill wires `git config credential.helper '!gh auth git-credential'` so git pushes read it from env, with no `.gitconfig` and no `.git-credentials`. The clone directory lives inside the per-worker home that the idle reaper deletes (within 10 min).
-- **Nothing at rest.** No token or refresh token is stored control-plane side. The app private key is the only credential; it never leaves the control plane and never reaches the Langy agent pod. Tokens are minted per turn, cached in Redis a hair under their 1h lifetime, and self-expire. The cache key carries the GitHub host, so two GitHub instances cannot share an entry.
+- **No data at rest.** No token or refresh token is stored control-plane side. The app private key is the only credential; it never leaves the control plane and never reaches the Langy agent pod. Tokens are minted per turn, cached in Redis a hair under their 1h lifetime, and self-expire. The cache key carries the GitHub host, so two GitHub instances cannot share an entry.
 - **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories (or a single repository when the turn targets one).
 - **Sticky worker tokens.** A worker spawned with token T keeps T until the idle reaper kills it. Removing the installation cuts off new turns immediately; a live worker may hold a token for up to the idle TTL (within 10 min) or until it self-expires (within 1h).
 - **Egress.** The control plane reaches `api.github.com` to mint installation tokens and read installation metadata, or `<GITHUB_LANGY_HOST>` when one is set. Workers need `github.com`, `api.github.com`, and `codeload.github.com` to clone and push, which requires outbound egress to be enabled. See [Networking and egress](/self-hosting/langy/networking-and-egress).
@@ -66448,7 +66472,7 @@ Buttons for **Format**, **Copy**, and **Reset** are available in the header.
 
 The execution controls at the bottom of the sidebar let you send the configured trace:
 
-- **Run N times**: batch count (1–100)
+- **Run N times**: batch count (1 to 100)
 - **Stagger (ms)**: delay between batch items to avoid overwhelming the system
 - **Send Traces**: executes the batch
 
@@ -68806,7 +68830,7 @@ Switched off as a whole from **Settings, Checkup**. `hostname` has a switch of i
 
 ### Inside `ops_health`
 
-Optional, like the rest of this category. Counts only, keyed by LangWatch's own queue, pipeline and migration names: never an id, a payload, an error message, or a tenant or project name. A queue, pipeline or migration with nothing wrong is left out, and a section that could not be read is `null` rather than empty.
+Optional, like the rest of this category. Counts only, keyed by LangWatch's own queue, pipeline and migration names: never an id, a payload, an error message, or a tenant or project name. A queue, pipeline or migration with no problem is left out, and a section that could not be read is `null` rather than empty.
 
 | Key | What it counts |
 |---|---|
@@ -71125,7 +71149,7 @@ description: "Create and manage access groups, their members, and role bindings 
 
 ## Intro
 
-The Groups API lets you manage LangWatch access groups via REST. Groups are collections of users that share the same role bindings — when you assign a role to a group, every member inherits that access.
+The Groups API lets you manage LangWatch access groups via REST. Groups are collections of users that share the same role bindings: when you assign a role to a group, every member inherits that access.
 
 Groups can be created manually via the API or provisioned automatically from your identity provider via [SCIM](/platform/scim).
 
@@ -71517,7 +71541,7 @@ Every invite comes back with its `inviteCode` and a ready `inviteUrl`. A deploym
 }
 ```
 
-## The batch is all or nothing
+## The batch is all or none
 
 Validation runs over the whole batch before anything is written, and a problem refuses the batch rather than creating part of it. This is deliberate: silently granting someone less access than the call asked for is worse than an error you can read.
 
@@ -71642,7 +71666,7 @@ Disabled members are left out of the list unless you pass `includeDisabled=true`
 
 ## Disable, or remove
 
-Disabling keeps the membership and everything attached to it, and takes away the role that membership carried, so the person reaches nothing in the organization any more. Their live sessions are ended in the same call rather than running until the token happens to expire. Removing takes them out of the organization and every team in it.
+Disabling keeps the membership and everything attached to it, and takes away the role that membership carried, so the person can no longer reach any resource in the organization. Their live sessions are ended in the same call rather than running until the token happens to expire. Removing takes them out of the organization and every team in it.
 
 Both are undoable in the sense that you can bring the person back, but only disabling keeps the membership in place, so it is the safer move while an offboarding is still in progress.
 
@@ -71946,7 +71970,7 @@ The instance administrator credential, as a Bearer token:
 Authorization: Bearer <LANGWATCH_INSTANCE_ADMIN_API_KEY>
 ```
 
-Set the variable on the deployment, generate it the way you generate any other secret (`openssl rand -hex 32` is fine), and treat it as the most powerful credential in the instance: it can create organizations, and each organization comes with an admin key. It is not an organization API key and cannot be used anywhere else in the API.
+Set the variable on the deployment, generate it the way you generate any other secret (`openssl rand -hex 32` is fine), and treat it as the highest-privilege credential in the instance: it can create organizations, and each organization comes with an admin key. It is not an organization API key and cannot be used anywhere else in the API.
 
 ## Endpoints
 
@@ -72039,7 +72063,7 @@ description: "Create, list, update, and archive LangWatch projects programmatica
 
 ## Intro
 
-The Projects API lets you manage LangWatch projects via REST. When you create a project, a project-scoped service API key is automatically generated and returned — ready to use for sending traces.
+The Projects API lets you manage LangWatch projects via REST. When you create a project, a project-scoped service API key is automatically generated and returned, ready to use for sending traces.
 
 This API is designed for service-to-service automation (e.g. an internal tool that scaffolds new projects), not for end-user access.
 
@@ -72051,7 +72075,7 @@ The Projects API requires an **organization-level API key** (created in Settings
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
-Project API keys (`X-Auth-Token`) cannot be used here — they lack organization context.
+Project API keys (`X-Auth-Token`) cannot be used here, because they lack organization context.
 
 ## Endpoints
 
@@ -72095,7 +72119,7 @@ LANGWATCH_PROJECT_ID=<project id>
 ```
 
 <Info>
-  The `serviceApiKey` is shown only once in the create response. Store it securely — you cannot
+  The `serviceApiKey` is shown only once in the create response. Store it securely, because you cannot
   retrieve it later.
 </Info>
 
@@ -72914,7 +72938,7 @@ curl -X POST https://app.langwatch.ai/api/v1/role-bindings \
 
 ## `hasLegacyAccessNotice`
 
-A create response can carry `hasLegacyAccessNotice: true`. It means this is the person's first explicit binding, and until now their access came from plain team membership, which this write switches off. Nothing failed, and nothing is blocked: it is there so a tool can tell an operator that this user's access is now described entirely by bindings.
+A create response can carry `hasLegacyAccessNotice: true`. It means this is the person's first explicit binding, and until now their access came from plain team membership, which this write switches off. No call failed and no call is blocked: it is there so a tool can tell an operator that this user's access is now described entirely by bindings.
 
 ## Errors
 
@@ -72936,7 +72960,7 @@ A create response can carry `hasLegacyAccessNotice: true`. It means this is the 
 
 ## Migrating to grants
 
-Grants and role bindings are the same records, so existing bindings appear in `GET /api/v1/grants` straight away and nothing needs copying. Change the calls:
+Grants and role bindings are the same records, so existing bindings appear in `GET /api/v1/grants` straight away and no copying is needed. Change the calls:
 
 | Role bindings                                              | Grants                                                         |
 | ---------------------------------------------------------- | -------------------------------------------------------------- |
@@ -73027,7 +73051,7 @@ description: "Build custom roles out of the permission catalog and keep them up 
 
 The Roles API manages custom roles: named permission sets your organization defines, for when the built-in roles are not the shape you need. It also lists the built-in roles, addressed by the stable ids `admin`, `member` and `viewer`.
 
-A role on its own grants nothing. It becomes access when a [grant](/api-reference/grants/overview) hands it to a user, a group or an API key at a scope. Roles are what, grants are who and where. See [Roles & access](/platform/roles-and-access).
+A role on its own grants no access. It becomes access when a [grant](/api-reference/grants/overview) hands it to a user, a group or an API key at a scope. Roles are what, grants are who and where. See [Roles & access](/platform/roles-and-access).
 
 ## Authentication
 
@@ -73527,7 +73551,9 @@ description: "The SCIM 2.0 endpoints an identity provider calls to provision and
   **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted
   deployment needs an Enterprise license. The plan is checked on every call, not only when a token
   is minted, so if the plan lapses, tokens that already exist stop verifying and your identity
-  provider's requests are refused with HTTP 403. Minting a token through the [SCIM
+  provider's requests are refused with HTTP 403.
+
+  Minting a token through the [SCIM
   Tokens](/api-reference/scim-tokens/overview) API without an Enterprise plan is refused with HTTP
   402 and the error code `enterprise_plan_required`. To enable it, reach out to
   [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
@@ -73836,7 +73862,9 @@ description: "Deprecated. The /api/v1/suites family is a frozen alias. New integ
 
 ## Intro
 
-Deprecated. The `/api/v1/suites` family stays for the clients that already call it, and its shapes do not change. New integrations use [Run Plans](/api-reference/run-plans/overview) (`/api/v1/run-plans`) and [Test Suites](/api-reference/test-suites/overview) (`/api/v1/test-suites`). On this family, `kind: folder` names what the rest of the API calls a test suite, `kind: custom` names a run plan, and the scope `{ "mode": "folders", "folderIds": [...] }` is the same as `{ "mode": "test_suites", "testSuiteIds": [...] }` on `/api/v1/run-plans`. The scope `{ "mode": "cases" }` is `{ "mode": "scenarios" }` there.
+Deprecated. The `/api/v1/suites` family stays for the clients that already call it, and its shapes do not change. New integrations use [Run Plans](/api-reference/run-plans/overview) (`/api/v1/run-plans`) and [Test Suites](/api-reference/test-suites/overview) (`/api/v1/test-suites`).
+
+On this family, `kind: folder` names what the rest of the API calls a test suite, `kind: custom` names a run plan, and the scope `{ "mode": "folders", "folderIds": [...] }` is the same as `{ "mode": "test_suites", "testSuiteIds": [...] }` on `/api/v1/run-plans`. The scope `{ "mode": "cases" }` is `{ "mode": "scenarios" }` there.
 
 ---
 
@@ -73933,7 +73961,7 @@ The Teams API requires an **organization-level API key** with `team:manage` perm
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
-Project API keys (`X-Auth-Token`) cannot be used here — they lack organization context.
+Project API keys (`X-Auth-Token`) cannot be used here, because they lack organization context.
 
 ## Endpoints
 
@@ -74135,8 +74163,8 @@ Both search and get-trace endpoints support a `format` parameter:
 - **`json`**, Returns the full raw trace data with all fields.
 
 For data-team ETL, `POST /api/v1/traces/search` also accepts a **projection DSL**
-(`from` + `select`) that returns exactly the fields you ask for — including
-nested events, annotations, and evaluations joined server-side — so a daily pull
+(`from` + `select`) that returns exactly the fields you ask for (including
+nested events, annotations, and evaluations joined server-side), so a daily pull
 becomes one paginated loop instead of a per-trace fan-out. It pairs with a
 `dateField` option to page by when traces were **last modified** rather than when
 they occurred. See [Projection DSL & field catalog](/api-reference/traces/projection-dsl).
@@ -74168,7 +74196,7 @@ Pass your LangWatch API key in the `X-Auth-Token` header. Your API key can be fo
 
 ---
 title: "Projection DSL & field catalog"
-description: "Declare exactly which trace fields to return from POST /api/v1/traces/search — including nested events, annotations, and evaluations — so a daily ETL becomes one paginated loop instead of a per-trace fan-out."
+description: "Declare exactly which trace fields to return from POST /api/v1/traces/search, including nested events, annotations, and evaluations, so a daily ETL becomes one paginated loop instead of a per-trace fan-out."
 ---
 
 ## Why
@@ -74177,8 +74205,8 @@ By default `POST /api/v1/traces/search` returns the full trace shape. For an ETL
 pipeline that only needs a handful of fields across thousands of traces, that is
 both more data than required and forces a second call per trace to read
 event-level feedback. The projection DSL lets a caller declare the columns of
-interest up front; the server returns exactly that shape — with nested events,
-annotations, and evaluations joined server-side — in one paginated response.
+interest up front; the server returns exactly that shape, with nested events,
+annotations, and evaluations joined server-side, in one paginated response.
 
 The feature is fully additive: a request without `from`/`select` behaves exactly
 as before.
@@ -74221,7 +74249,7 @@ Paths group by their root, so the response mirrors the selection:
 - **`metadata.*`** nests under a `metadata` object.
 - **`metrics.*`** nests under a `metrics` object.
 - **`events.*`**, **`annotations.*`**, **`evaluations.*`** return as **nested
-  arrays** — one row per trace, with each child record projected to the
+  arrays**: one row per trace, with each child record projected to the
   requested sub-fields.
 
 A request for the `select` above yields rows shaped like:
@@ -74241,7 +74269,7 @@ A request for the `select` above yields rows shaped like:
 ## The `schema` response field
 
 When `select` is present, the response envelope gains a top-level `schema`
-object listing the resolved columns — their dotted path, value type, and whether
+object listing the resolved columns: their dotted path, value type, and whether
 they belong to a nested collection. Use it to pre-allocate a typed reader
 (pandas, a Parquet writer, a warehouse table) without inferring types from the
 data:
@@ -74273,9 +74301,9 @@ you can correct the whole `select` in one round-trip.
 | ------------- | ------ | ------------------------------------------------------------------------------------- |
 | `trace_id`    | string |                                                                                       |
 | `project_id`  | string |                                                                                       |
-| `started_at`  | number | Epoch ms — when the trace occurred.                                                   |
-| `inserted_at` | number | Epoch ms — when first stored.                                                         |
-| `updated_at`  | number | Epoch ms — when last modified.                                                        |
+| `started_at`  | number | Epoch ms: when the trace occurred.                                                   |
+| `inserted_at` | number | Epoch ms: when first stored.                                                         |
+| `updated_at`  | number | Epoch ms: when last modified.                                                        |
 | `input`       | string | Captured input. Requires input-visibility permission; redacted to `null` otherwise.   |
 | `output`      | string | Captured output. Requires output-visibility permission; redacted to `null` otherwise. |
 
@@ -74296,7 +74324,7 @@ object.
 | `metrics.reasoning_tokens`            | number                                                                     |
 | `metrics.cache_read_input_tokens`     | number                                                                     |
 | `metrics.cache_creation_input_tokens` | number                                                                     |
-| `metrics.total_cost`                  | number — requires cost-visibility permission; redacted to `null` otherwise |
+| `metrics.total_cost`                  | number, requires cost-visibility permission; redacted to `null` otherwise |
 | `metrics.tokens_estimated`            | boolean                                                                    |
 
 ### `evaluations.<field>` (nested array)
@@ -74337,7 +74365,7 @@ object.
 
 <Info>
   Annotations are manual reviews captured in the LangWatch UI (thumbs, scores, comments). They live
-  alongside SDK-emitted `events` and are joined into the same response — no separate annotations
+  alongside SDK-emitted `events` and are joined into the same response, with no separate annotations
   call needed.
 </Info>
 
@@ -74345,7 +74373,7 @@ object.
 
 By default the `startDate`/`endDate` window filters traces by **when they
 occurred**. For incremental ETL you usually want **everything changed since your
-last pull** — a trace can occur weeks before it gains a later evaluation or
+last pull**: a trace can occur weeks before it gains a later evaluation or
 annotation. Set `dateField` to switch the axis:
 
 | `dateField`          | Window applies to                | Use for                  |
@@ -74364,13 +74392,13 @@ annotation. Set `dateField` to switch the axis:
 
 Delivery contract on the `updated` axis: **at-least-once across pulls,
 at-most-once within a single scroll**. A trace modified again _while you are
-paging_ moves past the cursor and is not re-delivered in the current scroll —
+paging_ moves past the cursor and is not re-delivered in the current scroll:
 but its new `updated_at` lands in your **next** pull's window (which starts at
 your last watermark), so no change is ever lost across pulls. A CDC loop that
 advances its watermark to the previous pull's start time gets every change.
 
 <Note>
-  The `updated` watermark advances on every ClickHouse-side change to a trace — evaluations,
+  The `updated` watermark advances on every ClickHouse-side change to a trace: evaluations,
   metadata updates, spans, and annotation **creates** and **deletes**. **One gap today:** an
   **in-place edit** to an existing annotation (e.g. changing a score from 3 to 5) writes Postgres
   only and does not advance the trace's ClickHouse `updated_at`, so `dateField: "updated"` does not
@@ -74383,7 +74411,7 @@ advances its watermark to the previous pull's start time gets every change.
 
 The projection drives column selection, so asking for only lightweight fields
 keeps the query lightweight. In particular, the heavy captured `input`/`output`
-columns are only read when you `select` them — omit them and a wide window stays
+columns are only read when you `select` them: omit them and a wide window stays
 fast. Each page is capped at 1000 rows; keep following `pagination.scrollId`
 until it is absent to sweep a full window.
 

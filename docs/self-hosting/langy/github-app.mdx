@@ -55,7 +55,7 @@ Fill in these fields:
   for a new registration.
 </Note>
 
-Set the repository permissions to exactly these, nothing more. Tighter scope means a smaller blast radius.
+Set the repository permissions to exactly these, with no extra permissions. Tighter scope means a smaller blast radius.
 
 | Permission    | Access       |
 | ------------- | ------------ |
@@ -63,7 +63,7 @@ Set the repository permissions to exactly these, nothing more. Tighter scope mea
 | Pull requests | Read & write |
 | Metadata      | Read         |
 
-Under **Subscribe to events**, select **Pull request**. GitHub sends the installation lifecycle events (`installation`, `installation_repositories`) on its own. Subscribe to nothing else.
+Under **Subscribe to events**, select **Pull request**. GitHub sends the installation lifecycle events (`installation`, `installation_repositories`) on its own. Subscribe to no other events.
 
 The `pull_request` event links a pull request to its coding-agent sessions as soon as GitHub announces it. Without the event, linkage still works, but it waits for the periodic sweep, which can take up to a day for a branch that has been asked about a few times already.
 
@@ -94,7 +94,7 @@ GITHUB_LANGY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRI
   let it reach the Langy agent pod. It stays in the control plane.
 </Warning>
 
-There is no client id or secret; the bot-authored flow uses no user OAuth. `CREDENTIALS_SECRET` (already required for any production install) signs the install round-trip's state, so nothing new is needed there.
+There is no client id or secret; the bot-authored flow uses no user OAuth. `CREDENTIALS_SECRET` (already required for any production install) signs the install round-trip's state, so no new secret is needed there.
 
 For the full env-var reference, see [Environment variables](/self-hosting/langy/environment-variables#github).
 
@@ -188,7 +188,7 @@ Go to **Settings > Integrations > Disconnect**, which opens GitHub's uninstall p
 ## Operational notes
 
 - **Token in the agent pod, not on disk.** Langy workers receive a 1-hour installation token via `GH_TOKEN` env. The github skill wires `git config credential.helper '!gh auth git-credential'` so git pushes read it from env, with no `.gitconfig` and no `.git-credentials`. The clone directory lives inside the per-worker home that the idle reaper deletes (within 10 min).
-- **Nothing at rest.** No token or refresh token is stored control-plane side. The app private key is the only credential; it never leaves the control plane and never reaches the Langy agent pod. Tokens are minted per turn, cached in Redis a hair under their 1h lifetime, and self-expire. The cache key carries the GitHub host, so two GitHub instances cannot share an entry.
+- **No data at rest.** No token or refresh token is stored control-plane side. The app private key is the only credential; it never leaves the control plane and never reaches the Langy agent pod. Tokens are minted per turn, cached in Redis a hair under their 1h lifetime, and self-expire. The cache key carries the GitHub host, so two GitHub instances cannot share an entry.
 - **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories (or a single repository when the turn targets one).
 - **Sticky worker tokens.** A worker spawned with token T keeps T until the idle reaper kills it. Removing the installation cuts off new turns immediately; a live worker may hold a token for up to the idle TTL (within 10 min) or until it self-expires (within 1h).
 - **Egress.** The control plane reaches `api.github.com` to mint installation tokens and read installation metadata, or `<GITHUB_LANGY_HOST>` when one is set. Workers need `github.com`, `api.github.com`, and `codeload.github.com` to clone and push, which requires outbound egress to be enabled. See [Networking and egress](/self-hosting/langy/networking-and-egress).

@@ -52,7 +52,7 @@ Every invite comes back with its `inviteCode` and a ready `inviteUrl`. A deploym
 }
 ```
 
-## The batch is all or nothing
+## The batch is all or none
 
 Validation runs over the whole batch before anything is written, and a problem refuses the batch rather than creating part of it. This is deliberate: silently granting someone less access than the call asked for is worse than an error you can read.
 
