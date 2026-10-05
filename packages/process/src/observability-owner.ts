@@ -3,7 +3,12 @@
  * config slice and secret handles at its framework owner exactly as a module
  * does (§6). The handles come from `@langwatch/observability`, which reads them.
  */
-import { Config, telemetryExporterEndpoint } from "@langwatch/config";
+import {
+  Config,
+  otelResourceAttributes,
+  serviceVersion,
+  telemetryExporterEndpoint,
+} from "@langwatch/config";
 import { metricsScrapeTokenSecret, otlpHeadersSecret } from "@langwatch/observability/node";
 import { z } from "zod";
 
@@ -21,8 +26,9 @@ export const observabilityOwner = {
   config: Config.define((c) => ({
     otlpEndpoint: telemetryExporterEndpoint,
     environment: c.env("ENVIRONMENT", z.string().min(1).default("local")),
-    serviceVersion: c.env("SERVICE_VERSION", optionalString),
-    resourceAttributes: c.env("OTEL_RESOURCE_ATTRIBUTES", optionalString),
+    /** The shared release leaves, so a module reporting its version holds the same instances. */
+    serviceVersion,
+    resourceAttributes: otelResourceAttributes,
     tracesSampleRatio: c.env("OTEL_TRACES_SAMPLER_ARG", z.coerce.number().min(0).max(1).optional()),
     logs: {
       format: c.env("LOG_FORMAT", z.enum(["pretty", "json"]).optional()),

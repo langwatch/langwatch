@@ -1,7 +1,8 @@
 import { RawHttpHost, RawSocketHost, type TransportPeers, WebSocketHost } from "@langwatch/api";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
+import { releaseVersionOf } from "@langwatch/config";
 import { ModuleApiToken } from "@langwatch/module";
-import { otlpHeadersFrom, resourceAttributesFrom } from "@langwatch/observability/node";
+import { otlpHeadersFrom } from "@langwatch/observability/node";
 import { OperatorReadsResolver } from "@langwatch/prisma-client";
 import {
   MEMBER_NAMES,
@@ -282,17 +283,13 @@ const releaseSettings = z.object({
   resourceAttributes: z.string().optional(),
 });
 
-/**
- * The release this install runs, as the license sync, usage report and checkup
- * name it: `SERVICE_VERSION`, then `service.version` in
- * `OTEL_RESOURCE_ATTRIBUTES`, and `unknown` rather than a number made up here.
- */
+/** The release this install runs, read from observability's slice of the shared leaves. */
 export function serviceVersionOf(observability: unknown): string {
   const settings = releaseSettings.parse(observability ?? {});
-  const explicit = settings.serviceVersion?.trim();
-  if (explicit) return explicit;
-  const attribute = resourceAttributesFrom(settings.resourceAttributes)["service.version"];
-  return attribute || "unknown";
+  return releaseVersionOf({
+    serviceVersion: settings.serviceVersion,
+    otelResourceAttributes: settings.resourceAttributes,
+  });
 }
 
 const exporterSettings = z.object({ otlpEndpoint: z.string().optional() });

@@ -1,4 +1,10 @@
-import { Config, type ConfigOf, isSaas } from "@langwatch/config";
+import {
+  Config,
+  type ConfigOf,
+  isSaas,
+  otelResourceAttributes,
+  serviceVersion,
+} from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
@@ -61,6 +67,9 @@ export const licensingConfig = Config.define((c) => ({
   ),
   /** The hosted product: plan resolution reads cloud, and no configured code is redeemed. */
   isSaas,
+  /** The release this install reports to Connect, read through `releaseVersionOf`. */
+  serviceVersion,
+  otelResourceAttributes,
 }));
 
 export type LicensingServerConfig = ConfigOf<typeof licensingConfig>;

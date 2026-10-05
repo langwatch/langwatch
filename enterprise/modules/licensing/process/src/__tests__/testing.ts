@@ -38,6 +38,8 @@ export const TEST_LICENSING_CONFIG: LicensingServerConfig = {
   connectLicenseEndpoint: CONNECT_DEFAULT_LICENSE_ENDPOINT,
   connectInstanceId: void 0,
   isSaas: false,
+  serviceVersion: "test",
+  otelResourceAttributes: void 0,
 };
 
 /**

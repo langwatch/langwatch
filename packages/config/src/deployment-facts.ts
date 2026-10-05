@@ -81,6 +81,64 @@ export const { publicBaseUrl } = Config.define((c) => ({
   ),
 }));
 
+const optionalNonBlank = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().min(1).optional(),
+);
+
+/**
+ * The release this install runs, as the deployment names it: observability and every module that
+ * reports a version hold these two leaves. Read them through `releaseVersionOf`.
+ */
+export const { serviceVersion, otelResourceAttributes } = Config.define((c) => ({
+  serviceVersion: c.env("SERVICE_VERSION", optionalNonBlank),
+  otelResourceAttributes: c.env("OTEL_RESOURCE_ATTRIBUTES", optionalNonBlank),
+}));
+
+/**
+ * `SERVICE_VERSION`, then `service.version` in `OTEL_RESOURCE_ATTRIBUTES` (the OTLP
+ * `key=value,...` encoding, values percent-decoded), and `unknown` rather than a made-up number.
+ */
+export function releaseVersionOf({
+  serviceVersion,
+  otelResourceAttributes,
+}: {
+  serviceVersion: string | undefined;
+  otelResourceAttributes: string | undefined;
+}): string {
+  const explicit = serviceVersion?.trim();
+  if (explicit) return explicit;
+  return (
+    resourceAttributeOf({ attributes: otelResourceAttributes, key: "service.version" }) || "unknown"
+  );
+}
+
+/** The last pair naming `key` wins, as a later attribute overrides an earlier one. */
+function resourceAttributeOf({
+  attributes,
+  key,
+}: {
+  attributes: string | undefined;
+  key: string;
+}): string | undefined {
+  let found: string | undefined;
+  for (const pair of attributes?.split(",") ?? []) {
+    const separator = pair.indexOf("=");
+    if (separator <= 0 || pair.slice(0, separator).trim() !== key) continue;
+    found = percentDecoded(pair.slice(separator + 1).trim());
+  }
+  return found;
+}
+
+/** A value that does not decode is kept as it was written. */
+function percentDecoded(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 /**
  * The NLP engine's address (`LANGWATCH_NLP_SERVICE`): the process and every module that calls
  * the engine hold this one leaf. Absent and blank both mean "named none".

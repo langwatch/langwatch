@@ -1,5 +1,10 @@
 // @vitest-environment node
-import { ConfigLeaf, parseProcessConfig } from "@langwatch/config";
+import {
+  ConfigLeaf,
+  otelResourceAttributes,
+  parseProcessConfig,
+  serviceVersion,
+} from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
 import { observabilityOwner } from "../observability-owner.ts";
@@ -41,6 +46,31 @@ describe("the observability owner's declaration", () => {
     /** @scenario "An optional field is left blank in the environment" */
     it("treats it as unconfigured instead of refusing the parse", () => {
       expect(parse({ OTEL_EXPORTER_OTLP_ENDPOINT: "" }).otlpEndpoint).toBeUndefined();
+    });
+  });
+
+  describe("given a module holding the shared release leaves beside observability", () => {
+    /** @scenario "Observability and a module both holding the release leaves parse them" */
+    it("parses SERVICE_VERSION and OTEL_RESOURCE_ATTRIBUTES once for both, with no collision", () => {
+      const licensing = {
+        name: "licensing",
+        config: { serviceVersion, otelResourceAttributes },
+      } as const;
+
+      const config = parseProcessConfig({
+        owners: [observabilityOwner, licensing],
+        environment: {
+          SERVICE_VERSION: "3.17.0",
+          OTEL_RESOURCE_ATTRIBUTES: "service.name=langwatch",
+        },
+      });
+
+      expect(config.observability.serviceVersion).toBe("3.17.0");
+      expect(config.observability.resourceAttributes).toBe("service.name=langwatch");
+      expect(config.licensing).toEqual({
+        serviceVersion: "3.17.0",
+        otelResourceAttributes: "service.name=langwatch",
+      });
     });
   });
 
