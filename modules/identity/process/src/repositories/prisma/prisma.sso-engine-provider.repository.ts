@@ -1,3 +1,9 @@
+import {
+  sealedProviderConfigCipher,
+  type SsoProviderConfigCipher,
+} from "@langwatch/identity-contract";
+import type { Encryption } from "@langwatch/process-stores/members";
+
 import type { SsoEngineProviderRow } from "../../rules/sso-engine-provider.rules.ts";
 import { SsoEngineProviderRepository } from "../sso-engine-provider.repository.ts";
 
@@ -20,21 +26,30 @@ export type PrismaSsoEngineProviderDatabase = {
   };
 };
 
-/** The engine's provider rows, as the connection fold keeps them (D09). */
+/**
+ * The engine's provider rows, as the connection fold keeps them (D09). The dialing documents
+ * hold the client secret, so they are sealed here, at rest, under the deployment's cipher.
+ */
 export class PrismaSsoEngineProviderRepository extends SsoEngineProviderRepository {
-  static create(database: PrismaSsoEngineProviderDatabase): PrismaSsoEngineProviderRepository {
-    return new PrismaSsoEngineProviderRepository(database);
+  static create(
+    database: PrismaSsoEngineProviderDatabase,
+    encryption: Pick<Encryption, "encrypt" | "decrypt">,
+  ): PrismaSsoEngineProviderRepository {
+    return new PrismaSsoEngineProviderRepository(database, sealedProviderConfigCipher(encryption));
   }
 
-  private constructor(private readonly database: PrismaSsoEngineProviderDatabase) {
+  private constructor(
+    private readonly database: PrismaSsoEngineProviderDatabase,
+    private readonly providerConfig: SsoProviderConfigCipher,
+  ) {
     super();
   }
 
   async put(row: SsoEngineProviderRow): Promise<void> {
     const columns = {
       issuer: row.issuer,
-      oidcConfig: row.oidcConfig,
-      samlConfig: row.samlConfig,
+      oidcConfig: row.oidcConfig === null ? null : this.providerConfig.seal(row.oidcConfig),
+      samlConfig: row.samlConfig === null ? null : this.providerConfig.seal(row.samlConfig),
       providerId: row.providerId,
       organizationId: row.organizationId,
       domain: row.domain,

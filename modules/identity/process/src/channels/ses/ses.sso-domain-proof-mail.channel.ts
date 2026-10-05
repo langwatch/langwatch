@@ -5,7 +5,7 @@ import {
 } from "@langwatch/mail";
 import { Temporal } from "@langwatch/time";
 
-import type { SsoDomainProofMail } from "../../app/identity.members.ts";
+import type { SsoDomainProofMail } from "../sso-domain-proof-mail.channel.ts";
 import { SsoDomainProofMailChannel } from "../sso-domain-proof-mail.channel.ts";
 
 type Input<Name extends keyof SsoDomainProofMail> = Parameters<SsoDomainProofMail[Name]>[0];

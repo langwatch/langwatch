@@ -19,11 +19,11 @@ import {
 import type { ZodType } from "zod";
 
 import type { IdentityModule } from "../app/identity.app.ts";
-import type { JoinRequestMail } from "../app/identity.members.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
 import { JoinRequestLifecycleDispatcherService } from "../services/join-request-lifecycle-dispatcher.service.ts";
+import type { JoinRequestMail } from "../services/join-request-notification.service.ts";
 import { JoinRequestNotificationService } from "../services/join-request-notification.service.ts";
 import { JoinRequestService } from "../services/join-request.service.ts";
 import { AppendingJoinRequestLedgerStore } from "./join-request-appending-ledger.store.ts";

@@ -9,8 +9,8 @@ import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
@@ -67,15 +67,10 @@ async function installed() {
     role: "worker",
     secrets: (owner, declared) => noSecretsChain.scopeTo(owner, declared),
   })
-    .withModules([withMemoryRepositories(identityProcessModule)])
-    .withMembers({
-      publicBaseUrl: undefined,
-      isSaas: false,
-      rateLimiter: { check: async () => ({ allowed: true }) },
-    })
-    .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
-    .withConfig({ identity: { ssoDomainProofDnsServers: [] } })
-    .withRelational(createApiFixture<PrismaClient>())
+    .withModules([identityProcessModule])
+    .withStores(memoryStores())
+    .withMembers({ publicBaseUrl: undefined })
+    .withConfig({ identity: { ssoDomainProofDnsServers: [], isSaas: false } })
     .withEventing(eventSourcing)
     .provide({
       organization: createApiFixture<OrganizationApi>(),

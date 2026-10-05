@@ -5,13 +5,13 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import { EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
+import type { EventSourcing } from "@langwatch/eventing";
 import {
   type AccountIdentifier,
   type EmailIdentifierAdded,
   IdentityApi,
   IdentityCapabilityUnavailableError,
   identityConfig,
-  sealedProviderConfigCipher,
   type IdentityEmailResolution,
   type IdentityLookupAnswer,
   type IdentityLookupApi,
@@ -46,7 +46,6 @@ import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { Temporal, nowInstant } from "@langwatch/time";
@@ -65,10 +64,14 @@ import {
 import { SSO_DOMAIN_PROOF_PUBLIC_EGRESS } from "../channels/sso-domain-proof-file.channel.ts";
 import { ssoDomainProofMailChannels } from "../channels/sso-domain-proof-mail-channels.registry.ts";
 import { ssoIssuerDiscoveryChannels } from "../channels/sso-issuer-discovery-channels.registry.ts";
+import { ConnectedIdentityEventing } from "../eventing/identity-command-senders.store.ts";
+import { IdentityLedgerStore } from "../eventing/identity-ledger.store.ts";
+import { JoinRequestLedgerStore } from "../eventing/join-request-ledger.store.ts";
 import {
   composeJoinRequestPipeline,
   type JoinRequestPipeline,
 } from "../eventing/join-request.pipeline.ts";
+import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
 import {
   composeSsoConnectionGraph,
   type SsoConnectionPipeline,
@@ -77,6 +80,11 @@ import {
   composeIdentityPipeline,
   type IdentityPipeline,
 } from "../eventing/user-identity.pipeline.ts";
+import {
+  EventingSsoConnectionHistoryRepository,
+  type SsoConnectionEventReads,
+} from "../repositories/eventing/eventing.sso-connection-history.repository.ts";
+import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
 import { breakGlassHolderEligibility } from "../rules/break-glass-eligibility.rules.ts";
@@ -119,7 +127,11 @@ import { MicrosoftAccountRekeyService } from "../services/microsoft-account-reke
 import { OrganizationMfaNotifierService } from "../services/organization-mfa-notifier.service.ts";
 import { OrganizationMfaService } from "../services/organization-mfa.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
-import { CachedIdentityLatchService } from "../services/per-subject-cached-latch.service.ts";
+import {
+  CachedIdentityLatchService,
+  IDENTITY_LATCH_CACHE_MAX_USERS,
+  IDENTITY_LATCH_CACHE_TTL_MS,
+} from "../services/per-subject-cached-latch.service.ts";
 import { SignInAccountLookupService } from "../services/signin-account-lookup.service.ts";
 import { SignInRouterService } from "../services/signin-router.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
@@ -168,24 +180,19 @@ import { IdentitySecretHealMigrationService } from "../services/system-migration
 import { SsoDomainOwnershipMigrationService } from "../services/system-migration-sso-domain-ownership.service.ts";
 import { TwoStepAccountService } from "../services/two-step-account.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
-import {
-  buildIdentityInfrastructure,
-  ConnectedIdentityEventing,
-} from "./identity-composition.build.ts";
 /**
  * The boundary `reservations().reapOrphans()` call takes no args, so it bounds
  * itself per pass the same way `IdentityNewbornReconciliationService`'s own
  * internal reap of this exact repository call does.
  */
 const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
-type IdentityMembers = MembersRead<readonly ["prisma", "eventing", "encryption", "rateLimiter"]> &
-  Readonly<{
-    /** LangWatch's own cloud: what licenses federation, and so automatic joining. */
-    isSaas: boolean;
-    /** Where this deployment answers, which is what a SAML identity provider
-     *  is told LangWatch is called. A process fact, not one of the fourteen. */
-    publicBaseUrl: string | undefined;
-  }>;
+type IdentityMembers = Readonly<{
+  /** The event stack the appending ledgers and the connection history reach. */
+  eventing: EventSourcing;
+  /** Where this deployment answers, which is what a SAML identity provider
+   *  is told LangWatch is called. A process fact, not one of the fourteen. */
+  publicBaseUrl: string | undefined;
+}>;
 
 type IdentitySetup = FeatureSetup<
   typeof IdentityModule.dependencies,
@@ -392,8 +399,29 @@ function joinSettingAudit(auditLog: AuditLogApi): JoinSettingAudit {
   };
 }
 
+/**
+ * How the history reaches this process's log, resolved per read so a stack
+ * that is not up yet at compose time still answers later.
+ */
+function ssoConnectionHistoryStore(options: {
+  eventing: EventSourcing;
+}): () => Promise<SsoConnectionEventReads> {
+  const { eventing } = options;
+  return async () => {
+    const store = eventing.getEventStore<SsoConnectionEvent>();
+    if (!store) {
+      // A plain Error on purpose (error doctrine): the reader cannot act on
+      // an unavailable event stack, so this degrades to a retryable failure.
+      throw new Error(
+        "sso connection history cannot read: the event-sourcing stack is unavailable",
+      );
+    }
+    return store;
+  };
+}
+
 /** The process's one counter, in the window and allowance the join throttles name. */
-function joinRateLimit(limiter: RateLimiter): JoinRequestsServiceDeps["rateLimit"] {
+function joinRateLimit(limiter: IdentityRateLimitRepository): JoinRequestsServiceDeps["rateLimit"] {
   return async ({ key, windowSeconds, max }) => {
     const decision = await limiter.check(key, { requests: max, seconds: windowSeconds });
     const retryAfterMs = (decision.retryAfterSeconds ?? windowSeconds) * 1000;
@@ -426,14 +454,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     /** Where every mail identity sends goes out; notification owns the gateway. */
     notifications: NotificationService,
   };
-  static readonly reads = [
-    "prisma",
-    "eventing",
-    "encryption",
-    "rateLimiter",
-    "isSaas",
-    "publicBaseUrl",
-  ] as const;
+  static readonly reads = ["eventing", "publicBaseUrl"] as const;
   /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and auth. */
   static readonly secrets = { internalSlackSignupsWebhook } as const;
 
@@ -454,13 +475,15 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       credentials: setup.repositories.ssoCredentials,
       rows: setup.repositories.ssoEngineProviders,
       baseUrl: setup.members.publicBaseUrl ?? "",
-      providerConfig: sealedProviderConfigCipher(setup.members.encryption),
     });
     const identityEventing = ConnectedIdentityEventing.create();
-    const infrastructure = buildIdentityInfrastructure({
-      repositories: setup.repositories,
-      eventing: setup.members.eventing,
-      identityEventing,
+    const ledger = IdentityLedgerStore.create({
+      projectionStore: setup.repositories.identityProjection,
+      eventing: identityEventing,
+    });
+    const joinRequestLedger = JoinRequestLedgerStore.create({
+      projectionStore: setup.repositories.joinRequestProjection,
+      eventing: identityEventing,
     });
     const reservations = setup.repositories.reservations;
     const identityGuards = IdentityGuardsService.create({
@@ -472,13 +495,13 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     const mfaGuards = MfaGuardsService.create(setup.repositories.mfaEnrollment);
     const latch = CachedIdentityLatchService.create({
       repository: setup.repositories.latch,
-      ttlMs: infrastructure.latch.ttlMs,
-      maxUsers: infrastructure.latch.maxUsers,
-      now: infrastructure.latch.now,
+      ttlMs: IDENTITY_LATCH_CACHE_TTL_MS,
+      maxUsers: IDENTITY_LATCH_CACHE_MAX_USERS,
+      now: () => nowInstant().epochMilliseconds,
     });
     const isLatched = latch.gate();
     const emails = IdentityEmailService.create(setup.repositories.heads, isLatched);
-    const identity = IdentityService.create(identityGuards, infrastructure.ledger);
+    const identity = IdentityService.create(identityGuards, ledger);
     const verification = VerificationCeremonyService.create({
       store: setup.repositories.verification,
       heads: setup.repositories.heads,
@@ -493,7 +516,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       clock: { now: () => nowInstant().epochMilliseconds, newCommandId: newIdentityCommandId },
     });
     const newbornSweep = IdentityNewbornReconciliationService.create({ reservations });
-    const secrets = IdentitySecretCarryService.create(infrastructure.secrets);
+    const secrets = IdentitySecretCarryService.create(setup.repositories.secretCarry);
     const backfill = IdentityBackfillService.create({
       reads: setup.repositories.backfill,
       users: setup.repositories.users,
@@ -531,8 +554,14 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     });
     const ssoConnectionGuards = ssoConnectionGraph.guards;
     const ssoConnections: SsoConnectionService | null = ssoConnectionGraph.connections;
-    const ssoConnectionHistory = infrastructure.ssoConnectionHistory
-      ? SsoConnectionHistoryService.create({ history: infrastructure.ssoConnectionHistory })
+    // Absent where this process composed no event stack: the history refuses by name rather
+    // than reading as empty, indistinguishable from a connection nothing ever happened to.
+    const ssoConnectionHistory = setup.members.eventing.isEnabled
+      ? SsoConnectionHistoryService.create({
+          history: EventingSsoConnectionHistoryRepository.create({
+            eventStore: ssoConnectionHistoryStore({ eventing: setup.members.eventing }),
+          }),
+        })
       : null;
     const ssoBackoffice =
       ssoConnections && ssoConnectionHistory
@@ -600,11 +629,11 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
         connections: setup.repositories.ssoConnections,
         directory: setup.dependencies.scim,
         memberships: setup.dependencies.organizations,
-        isHosted: setup.members.isSaas,
+        isHosted: setup.config.isSaas,
       }),
     });
     const joinRequests = JoinRequestsService.create({
-      requests: JoinRequestService.create(joinRequestGuards, infrastructure.joinRequestLedger),
+      requests: JoinRequestService.create(joinRequestGuards, joinRequestLedger),
       reads: setup.repositories.joinRequests,
       candidates: setup.repositories.joinCandidates,
       membership: joinMemberships(setup.dependencies.organizations),
@@ -616,7 +645,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
         isEnterpriseTier(
           (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,
         ),
-      rateLimit: joinRateLimit(setup.members.rateLimiter),
+      rateLimit: joinRateLimit(setup.repositories.rateLimits),
     });
     // `notifications` is unanswered on purpose: an automatic admission's
     // durable notice needs a mail this process does not compose.
@@ -718,7 +747,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
         federationLicensed: () => setup.dependencies.licensing.isPlatformSsoLicensed(),
         offersPasskeys: () => auth.offersPasskeys(),
         issuesOwnPasswords: () => auth.issuesOwnPasswords(),
-        selfHosted: () => !setup.members.isSaas,
+        selfHosted: () => !setup.config.isSaas,
       }),
       breakGlass: InProcessBreakGlassLimiterService.create(),
       accounts: SignInAccountLookupService.create({
@@ -744,7 +773,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
           mailer,
           baseUrl: setup.members.publicBaseUrl ?? "",
         }),
-        rateLimiter: setup.members.rateLimiter,
+        rateLimiter: setup.repositories.rateLimits,
         sessions: setup.dependencies.auth,
         accountAddress: async ({ userId }) => {
           const user = await setup.dependencies.users.findById({ id: userId });
@@ -790,13 +819,13 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
           guards: LinkProposalGuardsService.create({
             proposals: setup.repositories.identityHistory,
           }),
-          ledger: infrastructure.ledger,
+          ledger,
           proposals: setup.repositories.identityHistory,
           accounts: setup.dependencies.auth,
         }),
         authorization: setup.dependencies.permissions,
         auditLog: setup.dependencies.auditLog,
-        rateLimiter: setup.members.rateLimiter,
+        rateLimiter: setup.repositories.rateLimits,
         sessions: setup.dependencies.auth,
         invitations: setup.dependencies.organizations,
       }),

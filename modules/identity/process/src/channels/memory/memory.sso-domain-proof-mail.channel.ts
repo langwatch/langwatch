@@ -1,4 +1,4 @@
-import type { SsoDomainProofMail } from "../../app/identity.members.ts";
+import type { SsoDomainProofMail } from "../sso-domain-proof-mail.channel.ts";
 import { SsoDomainProofMailChannel } from "../sso-domain-proof-mail.channel.ts";
 
 type Sent<Name extends keyof SsoDomainProofMail> = Parameters<SsoDomainProofMail[Name]>[0];

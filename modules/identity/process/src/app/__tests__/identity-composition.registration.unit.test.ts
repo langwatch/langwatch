@@ -5,7 +5,7 @@
 import { IDENTITY_PIPELINE_NAME, JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
-import { ConnectedIdentityEventing } from "../identity-composition.build.ts";
+import { ConnectedIdentityEventing } from "../../eventing/identity-command-senders.store.ts";
 
 const IDENTITY_VERBS = [
   "attachIdentifier",

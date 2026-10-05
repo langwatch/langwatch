@@ -1,6 +1,6 @@
 import type { EventSourcing } from "@langwatch/eventing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { Encryption } from "@langwatch/process-stores/members";
+import type { Encryption, RateLimiter } from "@langwatch/process-stores/members";
 
 import { newSsoAuthenticationActivityId } from "../../rules/sso-connection-id.rules.ts";
 import { EventingIdentityHistoryRepository } from "../eventing/eventing.identity-history.repository.ts";
@@ -9,6 +9,7 @@ import type {
   IdentityPipelineRepositories,
   IdentityRepositories,
 } from "../identity.repositories.ts";
+import { RedisIdentityRateLimitRepository } from "../redis/redis.identity-rate-limit.repository.ts";
 import { PrismaIdentityAccountRekeyRepository } from "./prisma.identity-account-rekey.repository.ts";
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
 import { PrismaIdentityHeadsRepository } from "./prisma.identity-heads.repository.ts";
@@ -49,13 +50,14 @@ import { PrismaTwoStepVerificationRepository } from "./prisma.two-step-verificat
 
 /** The live tier: every identity row over the one Prisma client. */
 export class PostgresIdentityRepositories {
-  static readonly requires = ["prisma", "encryption", "eventing"] as const;
+  static readonly requires = ["prisma", "encryption", "eventing", "rateLimiter"] as const;
 
   static create(
     members: Readonly<{
       prisma: PrismaClient;
       encryption: Encryption;
       eventing: EventSourcing;
+      rateLimiter: RateLimiter;
     }>,
   ): IdentityRepositories {
     const database = members.prisma;
@@ -84,7 +86,7 @@ export class PostgresIdentityRepositories {
       ssoBackoffice: PrismaSsoConnectionBackofficeRepository.create(database),
       ssoReproofTargets: PrismaSsoDomainReproofTargetRepository.create(database),
       ssoCredentials: PrismaSsoCredentialRepository.create(database, members.encryption),
-      ssoEngineProviders: PrismaSsoEngineProviderRepository.create(database),
+      ssoEngineProviders: PrismaSsoEngineProviderRepository.create(database, members.encryption),
       ssoRegistrants: PrismaSsoRegistrantReadRepository.create(database),
       ssoMigrationEvidence: PrismaSsoMigrationEvidenceRepository.create(
         database,
@@ -104,6 +106,7 @@ export class PostgresIdentityRepositories {
       ssoDomainOwnership: PrismaSsoDomainOwnershipRepository.create(database),
       identityLookup: PrismaIdentityLookupRepository.create(database),
       identityHistory: EventingIdentityHistoryRepository.create({ eventing: members.eventing }),
+      rateLimits: RedisIdentityRateLimitRepository.create(members.rateLimiter),
     };
   }
 }

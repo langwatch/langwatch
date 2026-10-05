@@ -102,7 +102,8 @@ function harness({
     ),
   } satisfies JoinMembership;
   const settings = {
-    read: vi.fn(async () => setting),
+    // Most cases leave the joiner role unset, as rows written before the field were.
+    read: vi.fn(async () => setting as Awaited<ReturnType<JoinSetting["read"]>>),
     write: vi.fn(async () => undefined),
   } satisfies JoinSetting;
   const rejectedAt = lastRejectionAt

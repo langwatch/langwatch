@@ -1,7 +1,7 @@
 import { JoinRequestNotFoundError } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { JoinRequestNotificationMail } from "../../app/identity.members.ts";
+import type { JoinRequestNotificationMail } from "../../channels/join-request-notification-mail.channel.ts";
 import type { JoinRequestAudienceRepository } from "../../repositories/join-request-audience.repository.ts";
 import type { JoinRequestNotificationContextRepository } from "../../repositories/join-request-notification-context.repository.ts";
 import { JoinRequestNotifierService } from "../join-request-notifier.service.ts";

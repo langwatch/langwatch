@@ -10,5 +10,6 @@ export function liveRepositories(prisma: PrismaClient): IdentityRepositories {
     prisma,
     encryption: { encrypt: (value) => value, decrypt: (value) => value },
     eventing: new EventSourcing({ enabled: false, processManagerMode: "producer-only" }),
+    rateLimiter: { check: async () => ({ allowed: true }) },
   });
 }

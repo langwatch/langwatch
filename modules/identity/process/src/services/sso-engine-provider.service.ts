@@ -7,7 +7,6 @@ import {
   canonicalEntraIssuer,
   parseSamlIdpConfig,
   type SsoConnectionState,
-  type SsoProviderConfigCipher,
 } from "@langwatch/identity-contract";
 
 import type { SsoCredentialRepository } from "../repositories/sso-credential.repository.ts";
@@ -30,10 +29,6 @@ export type SsoEngineProviderDeps = {
   /** The deployment's own address: a SAML service provider has to say what it
    *  is called, and what LangWatch is called is where LangWatch lives. */
   baseUrl: string;
-  /** Seals the dialing document. It carries the client secret just read OUT
-   *  of the vault, so emitting it in the clear would put every customer's
-   *  live credential in a second table with nothing over it. */
-  providerConfig: SsoProviderConfigCipher;
 };
 
 export class SsoEngineProviderService implements SsoEngineProviderProjection {
@@ -97,13 +92,11 @@ export class SsoEngineProviderService implements SsoEngineProviderProjection {
       ...base,
       // Compared to the token's `iss` exactly: an Entra ID issuer stored with a slash refused all.
       issuer: canonicalEntraIssuer(issuer),
-      oidcConfig: this.deps.providerConfig.seal(
-        oidcProviderDocument({
-          clientId: clientId.value,
-          clientSecret: clientSecret.value,
-          discoveryEndpoint: discoveryEndpointFor({ issuer }),
-        }),
-      ),
+      oidcConfig: oidcProviderDocument({
+        clientId: clientId.value,
+        clientSecret: clientSecret.value,
+        discoveryEndpoint: discoveryEndpointFor({ issuer }),
+      }),
       samlConfig: null,
     };
   }
@@ -130,12 +123,10 @@ export class SsoEngineProviderService implements SsoEngineProviderProjection {
       ...base,
       issuer: config.entityId ?? connection.idpMetadata.issuer ?? base.issuer,
       oidcConfig: null,
-      samlConfig: this.deps.providerConfig.seal(
-        samlProviderDocument({
-          config,
-          serviceProviderEntityId: ssoServiceProviderEntityId({ baseUrl: this.deps.baseUrl }),
-        }),
-      ),
+      samlConfig: samlProviderDocument({
+        config,
+        serviceProviderEntityId: ssoServiceProviderEntityId({ baseUrl: this.deps.baseUrl }),
+      }),
     };
   }
 }

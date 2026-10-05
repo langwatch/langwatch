@@ -12,11 +12,11 @@ import {
   type MethodsLastUsed,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
-import type { RateLimiter } from "@langwatch/process-stores";
 import { Temporal } from "@langwatch/time";
 
 import type { AddressConfirmationMailChannel } from "../channels/address-confirmation-mail.channel.ts";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
+import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import { assertDetachKeepsWayBack } from "../rules/identity-detach.rules.ts";
 import type { IdentityService } from "./identity.service.ts";
@@ -31,7 +31,7 @@ export interface AccountIdentifiersServiceDeps {
   identity: Pick<IdentityService, "attachIdentifier" | "markPrimary" | "detachIdentifier">;
   ceremony: Pick<VerificationCeremonyService, "mintEmailVerification">;
   mail: AddressConfirmationMailChannel;
-  rateLimiter: RateLimiter;
+  rateLimiter: IdentityRateLimitRepository;
   sessions: Pick<AuthApi, "listBrowserSessions">;
   /**
    * The account's own address and whether `User.emailVerified` holds it as

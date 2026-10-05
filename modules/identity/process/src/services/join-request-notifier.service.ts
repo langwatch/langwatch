@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
-import type { JoinRequestNotificationMail } from "../app/identity.members.ts";
+import type { JoinRequestNotificationMail } from "../channels/join-request-notification-mail.channel.ts";
 import type {
   JoinRequestAdmin,
   JoinRequestAudienceRepository,

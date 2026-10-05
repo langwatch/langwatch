@@ -7,6 +7,7 @@ import { MemoryIdentityAccountRekeyRepository } from "./memory.identity-account-
 import { MemoryIdentityHistoryRepository } from "./memory.identity-history.repository.ts";
 import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
 import { MemoryIdentityLookupRepository } from "./memory.identity-lookup.repository.ts";
+import { MemoryIdentityRateLimitRepository } from "./memory.identity-rate-limit.repository.ts";
 import { MemoryIdentitySecretCarryRepository } from "./memory.identity-secret-carry.repository.ts";
 import { MemoryIdentitySignInAccountsRepository } from "./memory.identity-signin-accounts.repository.ts";
 import {
@@ -92,5 +93,6 @@ export function identityRepositoriesOverMemory(store: MemoryIdentityStore): Iden
     ssoDomainOwnership: MemorySsoDomainOwnershipRepository.create(store),
     identityLookup: MemoryIdentityLookupRepository.create(store),
     identityHistory: MemoryIdentityHistoryRepository.create(store),
+    rateLimits: MemoryIdentityRateLimitRepository.create(),
   };
 }

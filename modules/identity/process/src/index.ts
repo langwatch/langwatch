@@ -4,10 +4,12 @@
  * heads/ledger/records ports. The pure half is `@langwatch/identity-contract`.
  */
 export { identityProcessModule } from "./identity.module.ts";
-export type { IdentityInfrastructure } from "./app/identity.members.ts";
 export { SsoConnectionLedgerStore } from "./eventing/sso-connection-ledger.store.ts";
 export type { SsoConnectionEvent } from "./eventing/sso-connection-state.projection.ts";
-export type { DeriveIdentifierIdInput, IdentifierIdentity } from "./app/identity.members.ts";
+export type {
+  DeriveIdentifierIdInput,
+  IdentifierIdentity,
+} from "./services/crypto-identifier-identity.service.ts";
 export type {
   BackfillAccountRow,
   BackfillUserRow,
@@ -74,7 +76,8 @@ export type {
 } from "./services/signin-callback-linking.service.ts";
 export type { JoinRequestGuardsDeps } from "./services/join-request-guards.service.ts";
 export type { JoinRequestAudienceRepository } from "./repositories/join-request-audience.repository.ts";
-export type { JoinRequestMail, SsoDomainProofMail } from "./app/identity.members.ts";
+export type { JoinRequestMail } from "./services/join-request-notification.service.ts";
+export type { SsoDomainProofMail } from "./channels/sso-domain-proof-mail.channel.ts";
 export type { JoinRequestLedger } from "./rules/join-request-ledger.rules.ts";
 export type {
   SsoConnectionGrandfatherDeps,
@@ -92,7 +95,10 @@ export type {
 // layer/identity/`: the Postgres repositories the guards and the fold read and write through, the
 // two ledger writers, the join-request orchestration around the event-sourced lifecycle, and the
 // instance's sign-in method policy.
-export type { IdentityEventing, IdentityPipelineCommand } from "./app/identity.members.ts";
+export type {
+  IdentityEventing,
+  IdentityPipelineCommand,
+} from "./eventing/identity-command-senders.store.ts";
 export {
   IDENTITY_CONVERGENCE_POLL_MS,
   IDENTITY_CONVERGENCE_TIMEOUT_MS,
@@ -107,7 +113,7 @@ export {
   type JoinRequestLedgerWriterDeps,
   type JoinRequestStagedSender,
 } from "./eventing/join-request-ledger.store.ts";
-export type { JoinRequestNotificationMail } from "./app/identity.members.ts";
+export type { JoinRequestNotificationMail } from "./channels/join-request-notification-mail.channel.ts";
 export type { SsoConnectionBackofficePage } from "./repositories/sso-connection-backoffice.repository.ts";
 export type { PrismaSsoConnectionBackofficeDatabase } from "./repositories/prisma/prisma.sso-connection-backoffice.repository.ts";
 export type { SsoConnectionRoutingRepository } from "./repositories/sso-connection-routing.repository.ts";
@@ -130,7 +136,7 @@ export type {
   IdentityNewbornReconciliationDeps,
   IdentityNewbornSweepSummary,
 } from "./services/identity-newborn-reconciliation.service.ts";
-export type { IdentityWriteGateState } from "./app/identity.members.ts";
+export type { IdentityWriteGateState } from "./services/identity-write-gate.service.ts";
 
 // better-auth's `database:` entry and its two account ceremonies (ADR-116 §1,
 // §5). Exported because the process that mounts better-auth composes them; a

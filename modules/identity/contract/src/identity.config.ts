@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, type ConfigOf, isSaas } from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -18,6 +18,8 @@ const nameserversSchema = z
 
 export const identityConfig = Config.define((c) => ({
   ssoDomainProofDnsServers: c.env("SSO_DOMAIN_PROOF_DNS_SERVERS", nameserversSchema),
+  /** LangWatch's own cloud: what licenses federation, and so automatic joining. */
+  isSaas,
 }));
 
 export type IdentityServerConfig = ConfigOf<typeof identityConfig>;

@@ -23,8 +23,8 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { Counter, Histogram, register } from "prom-client";
 
-import { type IdentityEventing } from "../app/identity.members.ts";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
+import type { IdentityEventing } from "./identity-command-senders.store.ts";
 import { identityEventsFor } from "./identity-events.intent.ts";
 import type { IdentityEvent, IdentityFoldState } from "./identity-state.projection.ts";
 

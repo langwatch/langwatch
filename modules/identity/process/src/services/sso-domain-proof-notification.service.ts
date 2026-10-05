@@ -6,7 +6,7 @@ import {
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 
-import type { SsoDomainProofMail } from "../app/identity.members.ts";
+import type { SsoDomainProofMail } from "../channels/sso-domain-proof-mail.channel.ts";
 import type { SsoDomainProofNotifications } from "../eventing/sso-domain-proof-notification.process.ts";
 import type {
   JoinRequestAdmin,

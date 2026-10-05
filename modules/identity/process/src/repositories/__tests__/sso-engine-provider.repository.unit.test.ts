@@ -1,3 +1,4 @@
+import { sealedProviderConfigCipher } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
 import type { SsoEngineProviderRow } from "../../rules/sso-engine-provider.rules.ts";
@@ -29,14 +30,21 @@ function row(connectionId: string): SsoEngineProviderRow {
   };
 }
 
+/** A reversible stand-in for the deployment's cipher. */
+const encryption = {
+  encrypt: (plaintext: string) => Buffer.from(plaintext).toString("base64"),
+  decrypt: (ciphertext: string) => Buffer.from(ciphertext, "base64").toString("utf8"),
+};
+
 /** The one delegate, over a map: enough of it for the three verbs. */
-function stubDatabase(): PrismaSsoEngineProviderDatabase {
+function stubDatabase(written: Map<string, unknown> = new Map()): PrismaSsoEngineProviderDatabase {
   const rows = new Map<string, { id: string }>();
 
   return {
     ssoProvider: {
       upsert: async ({ where, create }) => {
         rows.set(where.id, { id: create.id });
+        written.set(where.id, create);
 
         return create;
       },
@@ -53,7 +61,7 @@ const tiers: { name: string; build: () => SsoEngineProviderRepository }[] = [
   },
   {
     name: "prisma",
-    build: () => PrismaSsoEngineProviderRepository.create(stubDatabase()),
+    build: () => PrismaSsoEngineProviderRepository.create(stubDatabase(), encryption),
   },
 ];
 
@@ -94,5 +102,20 @@ describe.each(tiers)("SsoEngineProviderRepository ($name)", ({ build }) => {
         repository.findRegisteredProvider({ connectionId: "ssoc_globex" }),
       ).resolves.toBe(false);
     });
+  });
+});
+
+describe("given the live tier writes a connection's dialing document", () => {
+  it("keeps the client secret out of the row at rest", async () => {
+    const written = new Map<string, unknown>();
+    const repository = PrismaSsoEngineProviderRepository.create(stubDatabase(written), encryption);
+    const document = JSON.stringify({ clientId: "client-1", clientSecret: "shhh" });
+
+    await repository.put({ ...row(CONNECTION), oidcConfig: document });
+
+    const stored = written.get(CONNECTION) as { oidcConfig: string; samlConfig: null };
+    expect(stored.oidcConfig).not.toContain("shhh");
+    expect(sealedProviderConfigCipher(encryption).open(stored.oidcConfig)).toBe(document);
+    expect(stored.samlConfig).toBeNull();
   });
 });

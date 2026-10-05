@@ -1,8 +1,24 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
-import type { JoinRequestMail } from "../app/identity.members.ts";
 import type { JoinRequestAudienceRepository } from "../repositories/join-request-audience.repository.ts";
+
+/**
+ * The two mails a join request's own timers send (D12). The port takes
+ * resolved names/addresses: WHO is told is this package's job, WHAT they
+ * read is the composition root's.
+ */
+export interface JoinRequestMail {
+  /** The one nudge, on the seventh day. Sent to one organization admin. */
+  sendStillWaiting(input: {
+    adminEmail: string;
+    organizationName: string;
+    requesterName: string;
+  }): Promise<void>;
+
+  /** Nobody answered in time. Sent to the requester, who may ask again. */
+  sendExpired(input: { requesterEmail: string; organizationName: string }): Promise<void>;
+}
 
 const logger = createLogger("langwatch:identity:join-request-notification");
 

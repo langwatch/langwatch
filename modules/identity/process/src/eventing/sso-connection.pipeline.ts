@@ -20,7 +20,7 @@ import {
 import type { ZodType } from "zod";
 
 import type { IdentityModule } from "../app/identity.app.ts";
-import type { SsoDomainProofMail } from "../app/identity.members.ts";
+import type { SsoDomainProofMail } from "../channels/sso-domain-proof-mail.channel.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
 import type { SsoEngineProviderProjection } from "../repositories/sso-engine-provider.repository.ts";

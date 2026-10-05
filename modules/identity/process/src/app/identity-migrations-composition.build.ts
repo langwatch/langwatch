@@ -5,6 +5,7 @@
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
+import type { IdentityEventing } from "../eventing/identity-command-senders.store.ts";
 import { IdentityLedgerStore } from "../eventing/identity-ledger.store.ts";
 import { composeIdentityGuards } from "../eventing/user-identity.pipeline.ts";
 import { identityMigrationRepositories } from "../repositories/identity-repositories.registry.ts";
@@ -19,7 +20,6 @@ import { SsoDomainOwnershipBackfillService } from "../services/sso-domain-owners
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationService } from "../services/system-migration-identity-secret-heal.service.ts";
 import { SsoDomainOwnershipMigrationService } from "../services/system-migration-sso-domain-ownership.service.ts";
-import type { IdentityEventing } from "./identity.members.ts";
 
 export type IdentityMigrationsOptions = {
   /** The composition root's own typed client, handed to the registry and nowhere else. */

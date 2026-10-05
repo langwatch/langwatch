@@ -111,7 +111,7 @@ export class JoinDomainSettingService {
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }> {
+  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[]; joinerRole: JoinerRole }> {
     return this.deps.settings.read({ organizationId });
   }
 

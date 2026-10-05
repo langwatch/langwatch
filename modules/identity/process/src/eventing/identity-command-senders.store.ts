@@ -1,31 +1,25 @@
-/**
- * Builds the {@link IdentityInfrastructure} `IdentityModule.create` hands its services, from the
- * module's own rows and the process's `eventing` member plus its own config.
- */
-import type { EventSourcing } from "@langwatch/eventing";
 import {
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 
-import { IdentityLedgerStore } from "../eventing/identity-ledger.store.ts";
-import { JoinRequestLedgerStore } from "../eventing/join-request-ledger.store.ts";
-import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
-import {
-  EventingSsoConnectionHistoryRepository,
-  type SsoConnectionEventReads,
-} from "../repositories/eventing/eventing.sso-connection-history.repository.ts";
-import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
-import {
-  IDENTITY_LATCH_CACHE_MAX_USERS,
-  IDENTITY_LATCH_CACHE_TTL_MS,
-} from "../services/per-subject-cached-latch.service.ts";
-import type {
-  IdentityEventing,
-  IdentityInfrastructure,
-  IdentityPipelineCommand,
-} from "./identity.members.ts";
+/** One pipeline command's sender, or that this process registered none for it. */
+export type IdentityPipelineCommand =
+  | { kind: "registered"; sender: { send(data: unknown): Promise<unknown> } }
+  | { kind: "unregistered" };
+
+/**
+ * The event-sourcing stack an identity ledger STAGES through. ONE method, by
+ * doctrine (ADR-110): the queued run is the sole appender, so appending here
+ * too would double-write every fact.
+ */
+export interface IdentityEventing {
+  resolvePipelineCommand(input: {
+    pipeline: string;
+    command: string;
+  }): Promise<IdentityPipelineCommand>;
+}
 
 /** The one shape a command dispatcher has, checked rather than asserted. */
 type IdentityCommandSender = { send(data: unknown): Promise<unknown> };
@@ -152,66 +146,4 @@ export class ConnectedIdentityEventing implements IdentityEventing {
     const sender = this.#senders.get(input.pipeline)?.get(input.command);
     return sender ? { kind: "registered", sender } : { kind: "unregistered" };
   }
-}
-
-/**
- * How the history reaches this process's log, resolved per read so a stack
- * that is not up yet at compose time still answers later.
- */
-function ssoConnectionHistoryStore(options: {
-  eventing: EventSourcing;
-}): () => Promise<SsoConnectionEventReads> {
-  const { eventing } = options;
-  return async () => {
-    const store = eventing.getEventStore<SsoConnectionEvent>();
-    if (!store) {
-      // A plain Error on purpose (error doctrine): the reader cannot act on
-      // an unavailable event stack, so this degrades to a retryable failure.
-      throw new Error(
-        "sso connection history cannot read: the event-sourcing stack is unavailable",
-      );
-    }
-    return store;
-  };
-}
-
-/**
- * What this process hands `IdentityModule` at boot, built from its own rows, members and config.
- */
-export function buildIdentityInfrastructure(input: {
-  repositories: Pick<
-    IdentityRepositories,
-    "identityProjection" | "joinRequestProjection" | "secretCarry" | "joinRequestAudience"
-  >;
-  eventing: EventSourcing;
-  identityEventing: ConnectedIdentityEventing;
-}): IdentityInfrastructure {
-  const { repositories, eventing, identityEventing } = input;
-
-  return {
-    eventing: identityEventing,
-    latch: {
-      ttlMs: IDENTITY_LATCH_CACHE_TTL_MS,
-      maxUsers: IDENTITY_LATCH_CACHE_MAX_USERS,
-      now: Date.now,
-    },
-    ledger: IdentityLedgerStore.create({
-      projectionStore: repositories.identityProjection,
-      eventing: identityEventing,
-    }),
-    joinRequestLedger: JoinRequestLedgerStore.create({
-      projectionStore: repositories.joinRequestProjection,
-      eventing: identityEventing,
-    }),
-    secrets: repositories.secretCarry,
-    joinRequestAudience: repositories.joinRequestAudience,
-    // Absent where this process composed no event stack: the history refuses
-    // by name rather than reading as empty, which is indistinguishable from
-    // a connection nothing ever happened to.
-    ssoConnectionHistory: eventing.isEnabled
-      ? EventingSsoConnectionHistoryRepository.create({
-          eventStore: ssoConnectionHistoryStore({ eventing }),
-        })
-      : null,
-  };
 }
