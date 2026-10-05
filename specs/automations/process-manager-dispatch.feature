@@ -39,6 +39,14 @@ Feature: Automation dispatch on the process-manager substrate
     Then the evaluation post-fold subscriber records the trigger match on the automations pipeline
     And the trace-pipeline subscriber leaves that automation to the evaluation pipeline
 
+  @regression @integration
+  Scenario: An evaluation-filtered automation is confirmed at dispatch
+    Given an active automation whose condition reads an evaluation verdict
+    And the trace's evaluation runs are stored
+    When the settled match is re-checked at dispatch
+    Then the evaluation read returns the latest version of each run on the trace
+    And the automation is confirmed when the verdict matches and dropped when it does not
+
   Scenario: Replays never cause automation reactions
     Given committed trace, evaluation, and automation events
     When any pipeline rebuilds its projections by replaying those events
