@@ -197,10 +197,47 @@ export function reservesModelOrToolName({ key, value }: { key: string; value: st
   );
 }
 
+/** The span kind attribute; the trace contract's `ATTR_KEYS.SPAN_TYPE`. */
+const SPAN_TYPE_ATTRIBUTE_KEY = "langwatch.span.type";
+
 /**
- * Held back from PII analysis: reserved by name, or a value that's
- * exclusively one opaque identifier token. Attribute values only — free
- * text (a log body, a status message, chat content) is always analysed.
+ * The span kinds the trace format knows (the trace contract's `spanTypesSchema`).
+ * Copied because this leaf package has no workspace deps; a data-privacy test
+ * fails when the two lists drift apart.
+ */
+export const KNOWN_SPAN_TYPES: ReadonlySet<string> = new Set([
+  "span",
+  "llm",
+  "chain",
+  "tool",
+  "agent",
+  "rag",
+  "guardrail",
+  "evaluation",
+  "workflow",
+  "component",
+  "module",
+  "server",
+  "client",
+  "producer",
+  "consumer",
+  "task",
+  "unknown",
+]);
+
+/**
+ * The span kind holding one of {@link KNOWN_SPAN_TYPES}: the name pass read `agent` as a
+ * first name, so strict stored `[PERSON]`. Gated on the exact list, not a shape: anyone
+ * can write this key, so a name under it is still analysed.
+ */
+export function reservesSpanType({ key, value }: { key: string; value: string }): boolean {
+  return key.toLowerCase() === SPAN_TYPE_ATTRIBUTE_KEY && KNOWN_SPAN_TYPES.has(value);
+}
+
+/**
+ * Held back from PII analysis: reserved by name as a trace address, a known span
+ * kind, or a value that's exclusively one opaque identifier token. Attribute
+ * values only — free text (a log body, a status message, chat content) is always analysed.
  */
 export function isHeldOutIdentifierAttribute({
   key,
@@ -209,5 +246,9 @@ export function isHeldOutIdentifierAttribute({
   key: string;
   value: string;
 }): boolean {
-  return reservesTraceAddress({ key, value }) || isOpaqueIdentifierValue(value);
+  return (
+    reservesTraceAddress({ key, value }) ||
+    reservesSpanType({ key, value }) ||
+    isOpaqueIdentifierValue(value)
+  );
 }

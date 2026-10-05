@@ -5,7 +5,8 @@
  */
 import { EMPTY_AUDIENCE, type ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import { createTenantId } from "@langwatch/eventing";
-import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
+import { KNOWN_SPAN_TYPES } from "@langwatch/redaction/pii";
+import { type OtlpKeyValue, type OtlpSpan, spanTypesSchema } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";
@@ -31,7 +32,7 @@ function policyAt(level: "essential" | "strict"): ResolvedDataPrivacy {
 
 /** The redaction service with only the analysis transport doubled; `submitted()` is its intake. */
 function makeService(level: "essential" | "strict") {
-  const batchSpy = vi.fn(async (texts: string[]) => texts.map(() => null));
+  const batchSpy = vi.fn(async (texts: string[]) => texts.map((): string | null => null));
   const transport: Pick<PiiAnalysisService, "clearGoogleDlp" | "clearPresidio" | "close"> = {
     clearGoogleDlp: async (): Promise<PiiClearing> => ({ kind: "unchanged" }),
     clearPresidio: async ({ texts }) => batchSpy(texts),
@@ -46,8 +47,11 @@ function makeService(level: "essential" | "strict") {
     dataPrivacy: new DataPrivacyResolutionFake(policyAt(level)),
   });
   const submitted = (): string[] => batchSpy.mock.calls.flatMap(([texts]) => texts);
+  /** Makes the analysis read every submitted value as a person's name. */
+  const namesEverything = () =>
+    batchSpy.mockImplementation(async (texts: string[]) => texts.map(() => "[PERSON]"));
 
-  return { service, submitted };
+  return { service, submitted, namesEverything };
 }
 
 function spanWith(attributes: Record<string, string>): OtlpSpan {
@@ -290,6 +294,48 @@ describe("given a reserved trace identifier name holding personal data", () => {
     await ingest(harness, span, "ESSENTIAL");
 
     expect(attr(span, "trace_id")).not.toContain(CARD);
+  });
+});
+
+// The name detector reads some span kinds as first names, so under strict mode
+// top-level spans stored `[PERSON]` as their kind. A known kind is a fixed word,
+// so it is never submitted and is stored unchanged.
+describe("given a strict tenant and the span kind attribute", () => {
+  const PROSE = "Jane Doe asked for a refund";
+
+  /** @scenario "A known span kind is never sent for analysis" */
+  it.each(["agent", "workflow", "llm"])(
+    "keeps the known kind %s and never submits it",
+    async (value) => {
+      const harness = makeService("strict");
+      harness.namesEverything();
+      const span = spanWith({ "langwatch.span.type": value, "app.support_note": PROSE });
+
+      await ingest(harness, span, "STRICT");
+
+      expect(harness.submitted()).toContain(PROSE);
+      expect(harness.submitted()).not.toContain(value);
+      expect(attr(span, "langwatch.span.type")).toBe(value);
+      expect(attr(span, "app.support_note")).toBe("[PERSON]");
+    },
+  );
+
+  /** @scenario "A name written under the span kind attribute is still redacted" */
+  it("still redacts a name written under the kind attribute", async () => {
+    const harness = makeService("strict");
+    harness.namesEverything();
+    const span = spanWith({ "langwatch.span.type": "Jane Doe" });
+
+    await ingest(harness, span, "STRICT");
+
+    expect(attr(span, "langwatch.span.type")).toBe("[PERSON]");
+  });
+
+  it("holds back exactly the span kinds the trace format knows", () => {
+    // The redaction package is a leaf with no workspace deps, so it keeps its own copy.
+    expect([...KNOWN_SPAN_TYPES].toSorted()).toEqual(
+      spanTypesSchema.options.map((o) => o.value).toSorted(),
+    );
   });
 });
 

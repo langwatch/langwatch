@@ -11,10 +11,12 @@ export {
 } from "./essentialPii.ts";
 export {
   isHeldOutIdentifierAttribute,
+  KNOWN_SPAN_TYPES,
   METADATA_SUBKEY_PREFIXES,
   isOpaqueIdentifierValue,
   isReservedIdentifierAttributeKey,
   reservesModelOrToolName,
+  reservesSpanType,
   reservesTraceAddress,
 } from "./identifierHoldout.ts";
 export {
