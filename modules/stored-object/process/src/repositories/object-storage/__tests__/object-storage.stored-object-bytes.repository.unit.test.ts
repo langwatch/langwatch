@@ -7,8 +7,8 @@ import { memoryObjectStorage, type ObjectStorage } from "@langwatch/process-stor
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { StoredObjectStorageAddress } from "../../app/stored-object.members.ts";
-import { StoredObjectStorageService } from "../stored-object-storage.service.ts";
+import type { StoredObjectStorageAddress } from "../../stored-object-bytes.repository.ts";
+import { ObjectStorageStoredObjectBytesRepository } from "../object-storage.stored-object-bytes.repository.ts";
 
 /** The memory twin, counting every call that reached it. */
 function recordingStorage() {
@@ -40,7 +40,7 @@ function recordingStorage() {
     probe: (projectId) => inner.probe(projectId),
   };
 
-  return { reached, storage: StoredObjectStorageService.create({ objectStorage }) };
+  return { reached, storage: ObjectStorageStoredObjectBytesRepository.create({ objectStorage }) };
 }
 
 async function* bytes(text: string): AsyncGenerator<Uint8Array> {
@@ -59,7 +59,7 @@ const otherProjects: readonly StoredObjectStorageAddress[] = [
   { provider: "memory", destinationId: "memory", relativeId: "object-1" },
 ];
 
-describe("StoredObjectStorageService", () => {
+describe("ObjectStorageStoredObjectBytesRepository", () => {
   describe("given an object held for the requesting project", () => {
     it("reads it back at its recorded address", async () => {
       const { storage } = recordingStorage();
@@ -95,7 +95,7 @@ describe("StoredObjectStorageService", () => {
             return inner.remove(at);
           },
         };
-        const storage = StoredObjectStorageService.create({ objectStorage });
+        const storage = ObjectStorageStoredObjectBytesRepository.create({ objectStorage });
 
         await storage.probe({ projectId: "project-1" });
 

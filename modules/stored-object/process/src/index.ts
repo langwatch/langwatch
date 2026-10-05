@@ -11,7 +11,7 @@ export type { StoredObjectStorageProject } from "./services/stored-object-storag
 export type {
   StoredObjectsClickHouse,
   StoredObjectsClickHouseClient,
-} from "./app/stored-object.members.ts";
+} from "./repositories/clickhouse/stored-objects.repository.ts";
 export type { StoredObject } from "./rules/stored-object-row.rules.ts";
 export {
   auditQueuesForCutover,

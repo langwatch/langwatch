@@ -14,18 +14,18 @@ import {
 import type { Instant } from "@langwatch/time";
 
 import {
-  StoredObjectStorage,
+  StoredObjectBytesRepository,
   type StoredObjectPlacement,
   type StoredObjectStorageAddress,
-} from "../app/stored-object.members.ts";
+} from "../stored-object-bytes.repository.ts";
 
 /** Azure Put Blob's single-request ceiling; there are no block uploads (ADR-158 §3). */
 const AZURE_PUT_BLOB_MAX_BYTES = 5000 * 1024 * 1024;
 
-/** The recorded address of an object the process's `objectStorage` member holds. */
-export class StoredObjectStorageService extends StoredObjectStorage {
-  static create(input: { objectStorage: ObjectStorage }): StoredObjectStorageService {
-    return new StoredObjectStorageService(input.objectStorage);
+/** The recorded address of an object in the `objectStorage` store this registry was handed. */
+export class ObjectStorageStoredObjectBytesRepository extends StoredObjectBytesRepository {
+  static create(input: { objectStorage: ObjectStorage }): ObjectStorageStoredObjectBytesRepository {
+    return new ObjectStorageStoredObjectBytesRepository(input.objectStorage);
   }
 
   private constructor(private readonly objects: ObjectStorage) {

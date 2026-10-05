@@ -17,10 +17,23 @@ import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
 import { parseS3Uri } from "#rules/s3-uri.rules";
 
-import type {
-  StoredObjectS3Target,
-  StoredObjectS3TargetResolver,
-} from "../../app/stored-object.members.ts";
+/** S3 connection details for one project; separate from bucket selection. */
+export type StoredObjectS3Credentials = Readonly<{
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+}>;
+
+export type StoredObjectS3Target = Readonly<{
+  endpoint?: string;
+  region?: string;
+  credentials?: StoredObjectS3Credentials;
+}>;
+
+/** Resolves the S3 connection one project's objects are reached through. */
+export interface StoredObjectS3TargetResolver {
+  resolve(projectId: string): Promise<StoredObjectS3Target>;
+}
 
 /**
  * The process's shared AWS transport policy, as this driver asks for it.

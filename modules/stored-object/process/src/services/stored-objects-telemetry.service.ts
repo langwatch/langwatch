@@ -3,7 +3,11 @@
  */
 import { Counter, register } from "prom-client";
 
-import { type StoredObjectsTelemetry } from "../app/stored-object.members.ts";
+/** What the legacy index reports about its own work. */
+export interface StoredObjectsTelemetry {
+  /** A read reached the storage backend and it failed for anything but a 404. */
+  recordReadFailure(): void;
+}
 
 // Counter: GET failures (storage backend rejected the read)
 register.removeSingleMetric("stored_object_read_failures_total");

@@ -1,6 +1,6 @@
 import type { AuthzDenialReason, PermissionDecision } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
+import { memoryObjectStorage } from "@langwatch/process-stores";
 import {
   StoredObjectNotFoundError,
   type StoredObjectDeliveryCapability,
@@ -16,20 +16,23 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type { ExternalImageChannel } from "../../channels/external-image.channel.ts";
 import { MemoryExternalImageChannel } from "../../channels/memory/memory.external-image.channel.ts";
+import { MemoryStoredObjectSealRepository } from "../../repositories/memory/memory.stored-object-seal.repository.ts";
 import { MemoryStoredObjectRepositories } from "../../repositories/memory/memory.stored-object.repositories.ts";
+import {
+  StoredObjectBytesRepository,
+  type StoredObjectPlacement,
+  type StoredObjectStorageAddress,
+} from "../../repositories/stored-object-bytes.repository.ts";
 import type { StoredObjectRepositories } from "../../repositories/stored-object.repositories.ts";
+import type {
+  StoredObjectFileStreamRead,
+  StoredObjectProbe,
+} from "../../rules/stored-object-file-access.rules.ts";
+import { StoredObjectDelivery } from "../../services/stored-object-delivery.service.ts";
 import { StoredObjectUploadSignerService } from "../../services/stored-object-upload-signer.service.ts";
 import type { StoredObjectPermissions } from "../../services/stored-object.service.ts";
+import type { StoredObjectFileReader } from "../../services/stored-objects.service.ts";
 import { StoredObjectModule, type StoredObjectInfrastructure } from "../stored-object.app.ts";
-import {
-  StoredObjectDelivery,
-  StoredObjectStorage,
-  type StoredObjectFileReader,
-  type StoredObjectFileStreamRead,
-  type StoredObjectPlacement,
-  type StoredObjectProbe,
-  type StoredObjectStorageAddress,
-} from "../stored-object.members.ts";
 
 export const STORED_OBJECT_TEST_SHA256 = "a".repeat(64);
 
@@ -39,7 +42,7 @@ export const storedObjectTestAddress: StoredObjectStorageAddress = {
   relativeId: "project_1/so_aaaaaaaa",
 };
 
-export class MemoryStoredObjectStorage extends StoredObjectStorage {
+export class MemoryStoredObjectStorage extends StoredObjectBytesRepository {
   bytes = new Uint8Array([1, 2, 3]);
   deleted = false;
   deleteFailuresRemaining = 0;
@@ -93,10 +96,10 @@ export class MemoryStoredObjectStorage extends StoredObjectStorage {
   }
 }
 
-/** Seals with the identity cipher: the tests read what a URL carries, not the crypto. */
+/** Seals in plaintext: the tests read what a URL carries, not the crypto. */
 export function createStoredObjectTestSigner(): StoredObjectUploadSignerService {
   return StoredObjectUploadSignerService.create({
-    encryption: { encrypt: (value) => value, decrypt: (value) => value },
+    seals: MemoryStoredObjectSealRepository.create(),
     publicBaseUrl: "https://app.example",
   });
 }
@@ -173,7 +176,7 @@ export function createStoredObjectTestInfrastructure(
 export function createStoredObjectTestApp(
   input: Readonly<{
     repositories?: StoredObjectRepositories;
-    members?: Partial<StoredObjectInfrastructure>;
+    parts?: Partial<StoredObjectInfrastructure>;
     permissions?: StoredObjectPermissions;
     images?: ExternalImageChannel;
   }> = {},
@@ -184,9 +187,10 @@ export function createStoredObjectTestApp(
     permissions: createApiFixture<AuthzApi>({
       getDecision: (args) => permissions.getDecision(args),
     }),
-    rateLimiter: createApiFixture<RateLimiter>({}),
-    repositories: input.repositories ?? MemoryStoredObjectRepositories.create(),
-    infrastructure: createStoredObjectTestInfrastructure(input.members ?? {}),
+    repositories:
+      input.repositories ??
+      MemoryStoredObjectRepositories.create({ objectStorage: memoryObjectStorage() }),
+    infrastructure: createStoredObjectTestInfrastructure(input.parts ?? {}),
     images: input.images ?? MemoryExternalImageChannel.create(),
   });
 }

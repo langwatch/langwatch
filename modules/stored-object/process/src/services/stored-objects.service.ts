@@ -13,10 +13,14 @@ import {
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
-import type { StoredObjectsTelemetry } from "../app/stored-object.members.ts";
 import type { StoredObjectStorageRepository } from "../repositories/stored-object-storage.repository.ts";
 import type { StoredObjectsRepository } from "../repositories/stored-objects.repository.ts";
+import type {
+  StoredObjectFileStreamRead,
+  StoredObjectProbe,
+} from "../rules/stored-object-file-access.rules.ts";
 import type { StoredObject } from "../rules/stored-object-row.rules.ts";
+import type { StoredObjectsTelemetry } from "./stored-objects-telemetry.service.ts";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.service");
 const logger = createLogger("langwatch:stored-objects:service");
@@ -24,6 +28,13 @@ const logger = createLogger("langwatch:stored-objects:service");
 type RegistryResolver =
   | StoredObjectStorageRepository
   | ((projectId: string) => StoredObjectStorageRepository);
+
+/** The legacy index's reads the byte surface and the probe perform (ADR-158 §5). */
+export interface StoredObjectFileReader {
+  headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectProbe>;
+  /** Throws `StoredObjectNotFoundError` when the project holds no such row. */
+  getById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectFileStreamRead>;
+}
 
 /** What the process composes this service from. */
 export type StoredObjectsServiceOptions = Readonly<{

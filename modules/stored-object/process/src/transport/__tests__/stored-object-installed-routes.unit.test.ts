@@ -2,7 +2,6 @@ import { ProjectMissingCredentialsError } from "@langwatch/api";
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { BearerIdentity, RestHost } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { Logger } from "@langwatch/observability";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -19,12 +18,16 @@ import { storedObjectFileRest } from "../stored-object-file.rest.ts";
 const PROJECT = "project_1";
 const OBJECT_ID = "so_absent";
 
+/** The file door's fixed window: 120 reads a minute per caller. */
+const READ_ALLOWANCE = 120;
+
 type Scripted = {
   authz: AuthzApi;
-  allowed?: boolean;
+  /** Spend the caller's whole read allowance before the read under test. */
+  exhausted?: boolean;
 };
 
-function installed({ authz, allowed = true }: Scripted) {
+function installed({ authz }: Scripted) {
   return createApp({ role: "api" })
     .withModules([storedObjectProcessModule])
     .withConfig({
@@ -32,19 +35,11 @@ function installed({ authz, allowed = true }: Scripted) {
         azureSpoolRetentionConfirmed: false,
         blockLocalHttpCalls: true,
         allowedProxyHosts: [],
+        isSaas: false,
       },
     })
     .withStores(memoryStores())
-    .withMember("isSaas", false)
-    .withMember("encryption", {
-      encrypt: (value: string) => value,
-      decrypt: (value: string) => value,
-    })
     .withMember("publicBaseUrl", "https://app.example")
-    .withMember("rateLimiter", {
-      check: async () => (allowed ? { allowed: true } : { allowed: false, retryAfterSeconds: 30 }),
-    })
-    .withAnalytical(createApiFixture<ClickHouseQueryClient>({ query: async () => ({ rows: [] }) }))
     .withObservability((observability) =>
       observability.withLogging(createApiFixture<Logger>({ warn: () => undefined })),
     )
@@ -84,17 +79,20 @@ function restHost(): RestHost {
 
 async function readThroughInstalledModule({
   authz,
-  allowed,
+  exhausted = false,
   path,
   headers = { authorization: `Bearer key-for:${PROJECT}` },
 }: Scripted & { path: string; headers?: Record<string, string> }) {
-  const runtime = await installed({ authz, ...(allowed === undefined ? {} : { allowed }) });
+  const runtime = await installed({ authz });
 
   try {
     const host = restHost();
     const provided = runtime.module(storedObjectProcessModule).provided;
     host.mount(storedObjectFileRest.router(), () => provided);
 
+    for (let spent = 0; exhausted && spent < READ_ALLOWANCE; spent += 1) {
+      await host.app.request(new Request(`http://api.test${path}`, { headers }));
+    }
     const response = await host.app.request(new Request(`http://api.test${path}`, { headers }));
 
     return {
@@ -146,15 +144,19 @@ describe("given the stored-object module installed over memory stores", () => {
     it("answers 429 with a retry hint", async () => {
       const read = await readThroughInstalledModule({
         authz: permitted(),
-        allowed: false,
+        exhausted: true,
         path: `/api/files/${PROJECT}/${OBJECT_ID}`,
       });
 
       expect({
         status: read.status,
         code: JSON.parse(read.body).code,
-        retryAfter: read.headers["retry-after"],
-      }).toEqual({ status: 429, code: "stored_object_files_rate_limited", retryAfter: "30" });
+        retryAfter: Number(read.headers["retry-after"]),
+      }).toEqual({
+        status: 429,
+        code: "stored_object_files_rate_limited",
+        retryAfter: expect.toSatisfy((seconds: number) => seconds > 0 && seconds <= 60),
+      });
     });
   });
 

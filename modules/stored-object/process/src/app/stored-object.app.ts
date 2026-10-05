@@ -5,7 +5,6 @@
  */
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import type { ProcessMembers, RateLimiter } from "@langwatch/process-stores/members";
 import {
   StoredObjectApi,
   storedObjectConfig,
@@ -37,27 +36,39 @@ import { nowInstant } from "@langwatch/time";
 
 import type { ExternalImageChannel } from "../channels/external-image.channel.ts";
 import { HttpExternalImageChannel } from "../channels/http/http.external-image.channel.ts";
+import type { StoredObjectBytesRepository } from "../repositories/stored-object-bytes.repository.ts";
+import type { StoredObjectRateLimitRepository } from "../repositories/stored-object-rate-limit.repository.ts";
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
+import type {
+  StoredObjectFileBytes,
+  StoredObjectFileReadInput,
+  StoredObjectFileStreamRead,
+} from "../rules/stored-object-file-access.rules.ts";
 import { ImageProxyService } from "../services/image-proxy.service.ts";
+import {
+  type StoredObjectDelivery,
+  UnavailableStoredObjectDeliveryService,
+} from "../services/stored-object-delivery.service.ts";
 import {
   StoredObjectFileReadService,
   type StoredObjectFileAllowance,
 } from "../services/stored-object-file-read.service.ts";
-import type { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
+import { StoredObjectOwnerUnresolvedService } from "../services/stored-object-owner-unresolved.service.ts";
+import { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
+import { StoredObjectsTelemetryService } from "../services/stored-objects-telemetry.service.ts";
+import {
+  type StoredObjectFileReader,
+  StoredObjectsService,
+} from "../services/stored-objects.service.ts";
 import type { StoredObjectFileApi } from "../transport/stored-object-file.rest.ts";
-import { buildStoredObjectInfrastructure } from "./stored-object-composition.build.ts";
-import type {
-  StoredObjectDelivery,
-  StoredObjectFileBytes,
-  StoredObjectFileReadInput,
-  StoredObjectFileReader,
-  StoredObjectFileStreamRead,
-  StoredObjectStorage,
-} from "./stored-object.members.ts";
+
+/** The in-process write ceiling, and the 15-minute pending-upload TTL (ADR-158 §4). */
+const MAXIMUM_UPLOAD_BYTES = 100 * 1024 * 1024;
+const UPLOAD_EXPIRY_MS = 15 * 60 * 1000;
 
 export type StoredObjectInfrastructure = Readonly<{
-  storage: StoredObjectStorage;
+  storage: StoredObjectBytesRepository;
   delivery: StoredObjectDelivery;
   /** Seals the local backend's upload URL (ADR-158 §4). */
   signer: StoredObjectUploadSignerService;
@@ -74,11 +85,8 @@ type StoredObjectDependencies = Readonly<{
   authz: typeof AuthzApi;
 }>;
 
-type StoredObjectMembers = Pick<
-  ProcessMembers,
-  "clickhouse" | "logger" | "objectStorage" | "encryption" | "rateLimiter"
-> &
-  Readonly<{ publicBaseUrl: string | undefined; isSaas: boolean }>;
+/** The deployment's public origin, until the shared `publicBaseUrl` config leaf lands. */
+type StoredObjectMembers = Readonly<{ publicBaseUrl: string | undefined }>;
 
 type StoredObjectSetup = FeatureSetup<
   StoredObjectDependencies,
@@ -91,34 +99,40 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
   static readonly contract = StoredObjectApi;
   static readonly dependencies: StoredObjectDependencies = { authz: AuthzApi };
   static readonly config = storedObjectConfig;
-  static readonly reads = [
-    "clickhouse",
-    "logger",
-    "objectStorage",
-    "encryption",
-    "rateLimiter",
-    "publicBaseUrl",
-    "isSaas",
-  ] as const;
+  static readonly reads = ["publicBaseUrl"] as const;
 
   /**
-   * Builds this process's own {@link StoredObjectInfrastructure} from the
-   * members it reads and its own config, then composes over it exactly as
+   * Builds this process's {@link StoredObjectInfrastructure} over its own
+   * repositories and config, then composes over it exactly as
    * {@link StoredObjectModule.fromInfrastructure} does.
    */
   static create(setup: StoredObjectSetup): StoredObjectModule {
-    const infrastructure = buildStoredObjectInfrastructure({ members: setup.members });
+    const { repositories } = setup;
 
     return StoredObjectModule.fromInfrastructure({
-      infrastructure,
-      repositories: setup.repositories,
+      infrastructure: {
+        storage: repositories.bytes,
+        delivery: UnavailableStoredObjectDeliveryService.create(),
+        signer: StoredObjectUploadSignerService.create({
+          seals: repositories.seals,
+          publicBaseUrl: setup.members.publicBaseUrl,
+        }),
+        maximumUploadBytes: MAXIMUM_UPLOAD_BYTES,
+        uploadExpiryMs: UPLOAD_EXPIRY_MS,
+        files: StoredObjectsService.create({
+          repository: repositories.legacyIndex,
+          registry: (projectId) => repositories.legacyStorage.forProject(projectId),
+          telemetry: StoredObjectsTelemetryService.create(),
+        }),
+        owners: StoredObjectOwnerUnresolvedService.create(),
+      },
+      repositories,
       permissions: setup.dependencies.authz,
-      rateLimiter: setup.members.rateLimiter,
       images: HttpExternalImageChannel.create({
         policy: {
           blockLocal: setup.config.blockLocalHttpCalls,
           allowedHosts: setup.config.allowedProxyHosts,
-          verifyTls: setup.members.isSaas,
+          verifyTls: setup.config.isSaas,
         },
       }),
     });
@@ -126,32 +140,31 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
 
   /**
    * Composes over an already-built {@link StoredObjectInfrastructure}. Kept
-   * because every unit test's fixture still builds one directly rather than
-   * reading process members.
+   * because the unit fixture swaps a part (a fixed delivery, a scripted
+   * legacy read) that `create` composes as absent.
    */
   static fromInfrastructure(setup: {
     infrastructure: StoredObjectInfrastructure;
     repositories: StoredObjectRepositories;
     permissions: AuthzApi;
-    rateLimiter: RateLimiter;
     images: ExternalImageChannel;
   }): StoredObjectModule {
-    const { infrastructure: members, repositories } = setup;
+    const { infrastructure: parts, repositories } = setup;
 
     return new StoredObjectModule({
       storage: StoredObjectService.create({
         records: repositories.records,
-        storage: members.storage,
-        delivery: members.delivery,
-        signer: members.signer,
-        legacy: members.files,
+        storage: parts.storage,
+        delivery: parts.delivery,
+        signer: parts.signer,
+        legacy: parts.files,
         permissions: setup.permissions,
-        maximumUploadBytes: members.maximumUploadBytes,
-        uploadExpiryMs: members.uploadExpiryMs,
+        maximumUploadBytes: parts.maximumUploadBytes,
+        uploadExpiryMs: parts.uploadExpiryMs,
       }),
-      owners: members.owners,
+      owners: parts.owners,
       permissions: setup.permissions,
-      rateLimiter: setup.rateLimiter,
+      rateLimits: repositories.rateLimits,
       images: ImageProxyService.create({ images: setup.images }),
     });
   }
@@ -159,7 +172,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
   readonly #storage: StoredObjectService;
   readonly #owners: StoredObjectOwnerResolver;
   readonly #permissions: AuthzApi;
-  readonly #rateLimiter: RateLimiter;
+  readonly #rateLimits: StoredObjectRateLimitRepository;
   readonly #images: ImageProxyService;
   readonly #files: StoredObjectFileReadService;
 
@@ -167,13 +180,13 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
     storage: StoredObjectService;
     owners: StoredObjectOwnerResolver;
     permissions: AuthzApi;
-    rateLimiter: RateLimiter;
+    rateLimits: StoredObjectRateLimitRepository;
     images: ImageProxyService;
   }) {
     this.#storage = parts.storage;
     this.#owners = parts.owners;
     this.#permissions = parts.permissions;
-    this.#rateLimiter = parts.rateLimiter;
+    this.#rateLimits = parts.rateLimits;
     this.#images = parts.images;
     this.#files = StoredObjectFileReadService.create({
       countRead: (input) => this.countRead(input),
@@ -194,13 +207,13 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
     return this.#images.proxy(input);
   }
 
-  /** One fixed-window count of the caller's reads, on the process's own limiter. */
+  /** One fixed-window count of the caller's reads, on the module's rate-limit repository. */
   async countRead(input: {
     key: string;
     windowSeconds: number;
     max: number;
   }): Promise<StoredObjectFileAllowance> {
-    const decision = await this.#rateLimiter.check(input.key, {
+    const decision = await this.#rateLimits.check(input.key, {
       requests: input.max,
       seconds: input.windowSeconds,
     });

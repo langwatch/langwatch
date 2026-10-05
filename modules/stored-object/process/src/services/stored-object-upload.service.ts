@@ -30,9 +30,9 @@ import {
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 import type {
-  StoredObjectStorage,
+  StoredObjectBytesRepository,
   StoredObjectStorageAddress,
-} from "../app/stored-object.members.ts";
+} from "../repositories/stored-object-bytes.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
@@ -42,7 +42,7 @@ import type { StoredObjectUploadSignerService } from "./stored-object-upload-sig
 
 export type StoredObjectUploadServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
-  storage: StoredObjectStorage;
+  storage: StoredObjectBytesRepository;
   signer: StoredObjectUploadSignerService;
   maximumUploadBytes: number;
   uploadExpiryMs: number;

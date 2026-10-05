@@ -43,7 +43,7 @@ function installed() {
     stream: Readable.from([BYTES]),
   };
   const app = createStoredObjectTestApp({
-    members: { files },
+    parts: { files },
     permissions: new GrantedStoredObjectPermissions(["traces:view"]),
   });
 

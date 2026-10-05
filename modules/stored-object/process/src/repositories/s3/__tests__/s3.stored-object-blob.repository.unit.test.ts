@@ -12,9 +12,10 @@ import {
 } from "@langwatch/stored-object-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StoredObjectBlobS3Repository } from "#repositories/s3/s3.stored-object-blob.repository";
-
-import type { StoredObjectS3TargetResolver } from "../../../app/stored-object.members.ts";
+import {
+  StoredObjectBlobS3Repository,
+  type StoredObjectS3TargetResolver,
+} from "../s3.stored-object-blob.repository.ts";
 
 // ---------------------------------------------------------------------------
 // Mocks

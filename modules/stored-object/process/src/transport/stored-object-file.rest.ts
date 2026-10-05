@@ -17,7 +17,10 @@ import {
   storedObjectFileRouteScopedParamsSchema,
 } from "@langwatch/stored-object-contract";
 
-import type { StoredObjectFileBytes, StoredObjectFileReadInput } from "#app/stored-object.members";
+import type {
+  StoredObjectFileBytes,
+  StoredObjectFileReadInput,
+} from "../rules/stored-object-file-access.rules.ts";
 
 /** What the byte door reaches: one read that counts, authorizes and streams. */
 export interface StoredObjectFileApi {

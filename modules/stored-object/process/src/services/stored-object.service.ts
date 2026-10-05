@@ -33,23 +33,25 @@ import {
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import type {
-  StoredObjectDelivery,
-  StoredObjectFileBytes,
-  StoredObjectFileReader,
-  StoredObjectFileStreamRead,
-  StoredObjectProbe,
-  StoredObjectStorage,
+  StoredObjectBytesRepository,
   StoredObjectStorageAddress,
-} from "../app/stored-object.members.ts";
+} from "../repositories/stored-object-bytes.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,
 } from "../repositories/stored-object-record.repository.ts";
+import type {
+  StoredObjectFileBytes,
+  StoredObjectFileStreamRead,
+  StoredObjectProbe,
+} from "../rules/stored-object-file-access.rules.ts";
 import { requiredPermissionForPurpose } from "../rules/stored-object-purpose-permission.rules.ts";
 import { storedObjectMetadataOf } from "../rules/stored-object-view.rules.ts";
+import type { StoredObjectDelivery } from "./stored-object-delivery.service.ts";
 import { StoredObjectFileReadService } from "./stored-object-file-read.service.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
 import { StoredObjectUploadService } from "./stored-object-upload.service.ts";
+import type { StoredObjectFileReader } from "./stored-objects.service.ts";
 
 /** The peer decision a probe asks once the row names its purpose. */
 export type StoredObjectPermissions = Pick<AuthzApi, "getDecision">;
@@ -60,7 +62,7 @@ const READ_URL_EXPIRY_MS = 15 * 60 * 1000;
 export type StoredObjectServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
   permissions: StoredObjectPermissions;
-  storage: StoredObjectStorage;
+  storage: StoredObjectBytesRepository;
   delivery: StoredObjectDelivery;
   signer: StoredObjectUploadSignerService;
   /** The legacy ClickHouse index, read only where no Postgres row answers (ADR-158 §5). */

@@ -19,14 +19,15 @@ import {
 } from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
 
+import { requiredPermissionForPurpose } from "#rules/stored-object-purpose-permission.rules";
+
 import type {
   StoredObjectFileBytes,
   StoredObjectFileCaller,
   StoredObjectFileReadInput,
   StoredObjectFileStreamRead,
-} from "#app/stored-object.members";
-import { isPermissionDenial } from "#rules/stored-object-file-access.rules";
-import { requiredPermissionForPurpose } from "#rules/stored-object-purpose-permission.rules";
+} from "../rules/stored-object-file-access.rules.ts";
+import { isPermissionDenial } from "../rules/stored-object-file-access.rules.ts";
 
 /** Per-caller rate limit on the read routes. */
 const FILES_RATE_LIMIT_WINDOW_SECONDS = 60;

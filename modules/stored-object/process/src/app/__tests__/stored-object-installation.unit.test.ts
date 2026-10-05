@@ -1,7 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 /**
  * @vitest-environment node
@@ -31,18 +30,12 @@ function installation(role: "api" | "worker" | "tasks") {
         azureSpoolRetentionConfirmed: false,
         blockLocalHttpCalls: true,
         allowedProxyHosts: [],
+        isSaas: false,
       },
     })
     .withStores(memoryStores())
-    .withMember("isSaas", false)
-    .withMember("encryption", {
-      encrypt: (value: string) => value,
-      decrypt: (value: string) => value,
-    })
     .withMember("publicBaseUrl", "https://app.example")
-    .withMember("rateLimiter", createApiFixture<RateLimiter>({}))
     .provide({ authz: createApiFixture<AuthzApi>() })
-    .withAnalytical(unavailable("analytical store"))
     .withObservability((observability) => observability.withLogging(unavailable("logger")));
 }
 

@@ -3,6 +3,7 @@ import {
   blockLocalHttpCalls,
   Config,
   environmentOneOrTrueSchema,
+  isSaas,
   type ConfigOf,
 } from "@langwatch/config";
 
@@ -16,6 +17,8 @@ export const storedObjectConfig = Config.define((c) => ({
   /** The address fence the image proxy judges an outbound picture by. */
   blockLocalHttpCalls,
   allowedProxyHosts,
+  /** The hosted product, whose image proxy verifies the TLS of every outside picture. */
+  isSaas,
 }));
 
 export type StoredObjectServerConfig = ConfigOf<typeof storedObjectConfig>;

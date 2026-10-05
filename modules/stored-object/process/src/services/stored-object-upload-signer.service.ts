@@ -1,9 +1,8 @@
 /**
  * The local backend's upload URL and every backend's read URL: claims sealed by
- * the process's `encryption` member (AES-256-GCM, whose seal is its own signature). ADR-158 §4.
+ * the module's seal repository (AES-256-GCM live, whose seal is its own signature). ADR-158 §4.
  */
 import { UnauthorizedError } from "@langwatch/api/rest";
-import type { Encryption } from "@langwatch/process-stores/members";
 import {
   DirectUploadUnavailableError,
   UploadExpiredError,
@@ -11,6 +10,8 @@ import {
 } from "@langwatch/stored-object-contract";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { z } from "zod";
+
+import type { StoredObjectSealRepository } from "../repositories/stored-object-seal.repository.ts";
 
 const sealedUploadSchema = z
   .object({
@@ -37,14 +38,14 @@ export type SealedRead = z.infer<typeof sealedReadSchema>;
 
 export class StoredObjectUploadSignerService {
   static create(input: {
-    encryption: Encryption;
+    seals: StoredObjectSealRepository;
     publicBaseUrl: string | undefined;
   }): StoredObjectUploadSignerService {
-    return new StoredObjectUploadSignerService(input.encryption, input.publicBaseUrl);
+    return new StoredObjectUploadSignerService(input.seals, input.publicBaseUrl);
   }
 
   private constructor(
-    private readonly encryption: Encryption,
+    private readonly seals: StoredObjectSealRepository,
     private readonly publicBaseUrl: string | undefined,
   ) {}
 
@@ -58,7 +59,7 @@ export class StoredObjectUploadSignerService {
   }): string {
     if (this.publicBaseUrl === undefined) throw new DirectUploadUnavailableError();
 
-    const seal = this.encryption.encrypt(
+    const seal = this.seals.seal(
       JSON.stringify({ ...input, expiresAt: toDate(input.expiresAt).toISOString() }),
     );
     const url = new URL(
@@ -88,7 +89,7 @@ export class StoredObjectUploadSignerService {
     filename?: string | undefined;
     expiresAt: Instant;
   }): string {
-    const seal = this.encryption.encrypt(
+    const seal = this.seals.seal(
       JSON.stringify({
         kind: "read",
         projectId: input.projectId,
@@ -117,7 +118,7 @@ export class StoredObjectUploadSignerService {
 
   private readClaimsOf(signature: string): SealedRead {
     try {
-      return sealedReadSchema.parse(JSON.parse(this.encryption.decrypt(signature)));
+      return sealedReadSchema.parse(JSON.parse(this.seals.open(signature)));
     } catch {
       throw new UnauthorizedError("unauthenticated");
     }
@@ -125,7 +126,7 @@ export class StoredObjectUploadSignerService {
 
   private claimsOf(signature: string): SealedUpload {
     try {
-      return sealedUploadSchema.parse(JSON.parse(this.encryption.decrypt(signature)));
+      return sealedUploadSchema.parse(JSON.parse(this.seals.open(signature)));
     } catch {
       throw new UploadTokenInvalidError();
     }
