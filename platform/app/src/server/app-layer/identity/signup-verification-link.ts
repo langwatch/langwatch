@@ -22,25 +22,15 @@ export function buildSignUpVerificationUrl({
    * continuation, and the link opens a FRESH tab, so the continuation only
    * survives the hop if the link carries it. A redirect target, so only a
    * path on this site is carried; anything else is dropped, never mailed.
+   * Anyone can ask for a sign-up mail to any address, so what is kept here
+   * is what a stranger can make LangWatch mail to a victim: the same rule
+   * the client applies before it follows a `return_to`.
    */
   callbackUrl?: string;
 }): string {
   const url = `${env.BASE_HOST}/auth/signup?verify=${encodeURIComponent(token)}`;
-  const continuation = sameSiteContinuation(callbackUrl);
+  const continuation = getSafeReturnToPath(callbackUrl);
   return continuation
     ? `${url}&callbackUrl=${encodeURIComponent(continuation)}`
     : url;
-}
-
-/**
- * A continuation that stays on this site. The same rule the client applies
- * before it follows a `return_to`: one leading slash, no `//` or `/\` that a
- * browser would read as another host, no control characters, bounded length.
- * Anyone can ask for a sign-up mail to any address, so what this keeps is
- * what a stranger can make LangWatch mail to a victim.
- */
-export function sameSiteContinuation(
-  callbackUrl: string | undefined,
-): string | null {
-  return getSafeReturnToPath(callbackUrl);
 }
