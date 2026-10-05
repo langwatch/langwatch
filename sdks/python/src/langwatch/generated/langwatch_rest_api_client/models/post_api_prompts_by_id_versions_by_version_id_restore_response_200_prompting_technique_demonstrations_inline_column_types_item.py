@@ -20,8 +20,8 @@ class PostApiPromptsByIdVersionsByVersionIdRestoreResponse200PromptingTechniqueD
     Attributes:
         name (str):
         type_ (Literal['annotations'] | Literal['boolean'] | Literal['chat_messages'] | Literal['date'] |
-            Literal['evaluations'] | Literal['image'] | Literal['json'] | Literal['list'] | Literal['number'] |
-            Literal['rag_contexts'] | Literal['spans'] | Literal['string']):
+            Literal['evaluations'] | Literal['file'] | Literal['image'] | Literal['json'] | Literal['list'] |
+            Literal['number'] | Literal['rag_contexts'] | Literal['spans'] | Literal['string']):
         id (str | Unset):
     """
 
@@ -32,6 +32,7 @@ class PostApiPromptsByIdVersionsByVersionIdRestoreResponse200PromptingTechniqueD
         | Literal["chat_messages"]
         | Literal["date"]
         | Literal["evaluations"]
+        | Literal["file"]
         | Literal["image"]
         | Literal["json"]
         | Literal["list"]
@@ -52,6 +53,7 @@ class PostApiPromptsByIdVersionsByVersionIdRestoreResponse200PromptingTechniqueD
             | Literal["chat_messages"]
             | Literal["date"]
             | Literal["evaluations"]
+            | Literal["file"]
             | Literal["image"]
             | Literal["json"]
             | Literal["list"]
@@ -90,6 +92,7 @@ class PostApiPromptsByIdVersionsByVersionIdRestoreResponse200PromptingTechniqueD
             | Literal["chat_messages"]
             | Literal["date"]
             | Literal["evaluations"]
+            | Literal["file"]
             | Literal["image"]
             | Literal["json"]
             | Literal["list"]
@@ -146,6 +149,10 @@ class PostApiPromptsByIdVersionsByVersionIdRestoreResponse200PromptingTechniqueD
             if type_type_11 != "image":
                 raise ValueError(f"type_type_11 must match const 'image', got '{type_type_11}'")
             return type_type_11
+            type_type_12 = cast(Literal["file"], data)
+            if type_type_12 != "file":
+                raise ValueError(f"type_type_12 must match const 'file', got '{type_type_12}'")
+            return type_type_12
 
         type_ = _parse_type_(d.pop("type"))
 

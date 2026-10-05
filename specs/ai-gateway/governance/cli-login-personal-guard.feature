@@ -151,3 +151,25 @@ Feature: CLI login never lands a user on a personal project
       Given the resolved project list contains the user's last project "acme-prod"
       When the CLI-auth project default is computed
       Then "acme-prod" is the pre-selected project
+
+  Rule: a Developer seat logs in to its own personal project only (ADR-143)
+
+    A Developer holds their personal project and nothing shared, so the only
+    project the CLI may hand a key for is that one. Bound to
+    `auth-cli-personal-guard.integration.test.ts`; the seat itself is in
+    specs/members/developer-seat.feature.
+
+    @integration @developer-seat
+    Scenario: project-login approval refuses a shared project for a Developer, naming the seat
+      Given the caller holds a Developer seat in the organization
+      And a pending device code with credential_type "project_api_key"
+      When the caller approves it picking a shared team project
+      Then the response is 400 with error "developer_seat_personal_only"
+      And the shared project's API key is not returned
+
+    @integration @developer-seat
+    Scenario: project-login approval honours a Developer's own personal project
+      Given the caller holds a Developer seat in the organization
+      And a pending device code with credential_type "project_api_key"
+      When the caller approves it picking their own personal project
+      Then the response is 200 and names the personal project

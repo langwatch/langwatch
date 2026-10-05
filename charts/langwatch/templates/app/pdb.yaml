@@ -1,3 +1,4 @@
+{{- if include "langwatch.pdbRenders" (dict "name" "app" "spec" .Values.app.podDisruptionBudget "replicas" .Values.app.replicaCount) }}
 {{- with .Values.app.podDisruptionBudget }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -11,4 +12,5 @@ spec:
       app.kubernetes.io/name: {{ $.Release.Name }}-app
       app.kubernetes.io/instance: {{ $.Release.Name }}
   {{- toYaml . | nindent 2 }}
+{{- end }}
 {{- end }}

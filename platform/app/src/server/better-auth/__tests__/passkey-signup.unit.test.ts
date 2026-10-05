@@ -21,6 +21,7 @@ import { PasskeySignUpAddressTakenError } from "~/server/users/credential-user";
 import {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
+  PASSKEY_SIGNUP_RESTRICTED,
   PasskeySignUpRegistration,
 } from "../passkey-signup";
 
@@ -37,13 +38,17 @@ const createPasskeyUser = vi.fn();
 const validateAddressProof = vi.fn();
 const claimAddressProof = vi.fn();
 const localSignUpIsAllowed = vi.fn();
+const signUpPolicyAdmits = vi.fn();
 
 const signUpContext = (email: string, claim = "a".repeat(43)) =>
   JSON.stringify({ email, claim, addressProof: "proof-1" });
 
 const registration = () =>
   new PasskeySignUpRegistration({
-    eligibility: { isAllowed: localSignUpIsAllowed },
+    eligibility: {
+      isAllowed: localSignUpIsAllowed,
+      policyAdmits: signUpPolicyAdmits,
+    },
     directory: { findAddressHolder },
     accounts: { createPasskeyUser },
     verification: { validateAddressProof, claimAddressProof },
@@ -105,8 +110,52 @@ describe("given passkey sign-up, which creates an account with no session", () =
     validateAddressProof.mockResolvedValue(true);
     claimAddressProof.mockResolvedValue(true);
     localSignUpIsAllowed.mockResolvedValue(true);
+    signUpPolicyAdmits.mockResolvedValue(true);
     // Nobody signed in, which is the case this whole block is about.
     getSessionFromCtx.mockResolvedValue(null);
+  });
+
+  describe("when the installation's sign-up policy refuses the address", () => {
+    beforeEach(() => {
+      signUpPolicyAdmits.mockResolvedValue(false);
+    });
+
+    /** @scenario "A refused passkey sign-up creates no account" */
+    it("refuses to start the ceremony with the restricted code", async () => {
+      await expect(
+        resolveUser({
+          ctx: fakeContext().ctx,
+          context: signUpContext("stranger@example.com"),
+        }),
+      ).rejects.toMatchObject({
+        body: { code: PASSKEY_SIGNUP_RESTRICTED },
+      });
+      expect(signUpPolicyAdmits).toHaveBeenCalledWith("stranger@example.com");
+    });
+
+    /** @scenario "A refused passkey sign-up creates no account" */
+    it("refuses after the ceremony too, and writes no account", async () => {
+      const { ctx } = fakeContext();
+      await expect(
+        afterVerification({
+          ctx,
+          context: signUpContext("stranger@example.com"),
+        }),
+      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_RESTRICTED } });
+      expect(claimAddressProof).not.toHaveBeenCalled();
+      expect(createPasskeyUser).not.toHaveBeenCalled();
+    });
+
+    it("does not answer a caller holding no valid address proof", async () => {
+      validateAddressProof.mockResolvedValue(false);
+      await expect(
+        resolveUser({
+          ctx: fakeContext().ctx,
+          context: signUpContext("stranger@example.com"),
+        }),
+      ).rejects.toMatchObject({ body: { code: "VERIFICATION_REQUIRED" } });
+      expect(signUpPolicyAdmits).not.toHaveBeenCalled();
+    });
   });
 
   describe("when the address already has an account", () => {

@@ -168,6 +168,8 @@ LangWatch uses TTL rules to manage data retention and tiered storage in ClickHou
 
 **Before starting the migration**, set the TTL to a very high value so all migrated data stays in hot storage:
 
+A per-table variable such as `CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS` takes precedence over the default. If you set any of them on the app or workers, raise or remove them too, then check the effective TTL with `SHOW CREATE TABLE` before you import history.
+
 #### Docker Compose
 
 Add to your app and workers environment:
@@ -176,10 +178,10 @@ Add to your app and workers environment:
 services:
   app:
     environment:
-      TIERED_STORAGE_DEFAULT_HOT_DAYS: "9999"
+      CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS: "9999"
   workers:
     environment:
-      TIERED_STORAGE_DEFAULT_HOT_DAYS: "9999"
+      CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS: "9999"
 ```
 
 Then restart:
@@ -190,15 +192,12 @@ docker compose up -d
 
 #### Helm Chart
 
+The chart sets `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS` on the app and workers from `clickhouse.cold.defaultTtlDays` when cold storage is on. Raise that value instead of adding the variable through `extraEnvs`:
+
 ```yaml
-app:
-  extraEnvs:
-    - name: TIERED_STORAGE_DEFAULT_HOT_DAYS
-      value: "9999"
-workers:
-  extraEnvs:
-    - name: TIERED_STORAGE_DEFAULT_HOT_DAYS
-      value: "9999"
+clickhouse:
+  cold:
+    defaultTtlDays: 9999
 ```
 
 Then upgrade:
@@ -214,7 +213,7 @@ The TTL reconciler runs on startup and updates the ClickHouse table metadata wit
 
 #### After Migration: Restore TTLs
 
-Once the migration is complete, set `TIERED_STORAGE_DEFAULT_HOT_DAYS` back to your desired retention value and restart LangWatch. ClickHouse handles the offloading gracefully in the background.
+Once the migration is complete, set `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS` (Helm: `clickhouse.cold.defaultTtlDays`) back to your desired value and restart LangWatch. ClickHouse handles the offloading gracefully in the background.
 
 <Tip>
 We recommend setting TTL values to a **multiple of 7** (e.g., 7, 14, 28, 49) to align with ClickHouse partition boundaries for more efficient data management.

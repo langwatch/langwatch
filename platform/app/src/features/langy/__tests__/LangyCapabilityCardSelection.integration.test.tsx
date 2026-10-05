@@ -28,7 +28,7 @@ import { toCliToolResult } from "@langwatch/langy";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { toTimeseriesShape } from "../../../../../../sdks/typescript/src/cli/commands/analytics/timeseriesShape";
 
@@ -248,6 +248,236 @@ describe("given a listing that carries neither a trend nor a total", () => {
       expect(screen.getByText("Virtual keys")).toBeTruthy();
       expect(screen.getByText("checkout-agent")).toBeTruthy();
       expect(plot()).toBeNull();
+    });
+  });
+});
+
+/**
+ * `langwatch analytics query --metric trace-count --group-by metadata.model
+ * --time-scale full`, as the analytics API answers it: one bucket for the
+ * whole range, the count nested under the dimension and then the model (see
+ * `parseTimeseriesRows`), plus the resolved metric the CLI attaches. One bucket
+ * is not a trend, so the CLI adds no chart shape and the metrics card draws it.
+ */
+function traceCountByModelPayload() {
+  return {
+    currentPeriod: [
+      {
+        date: "full",
+        "metadata.model": {
+          "gpt-5-mini": { "0/metadata.trace_id/cardinality": 7 },
+        },
+      },
+    ],
+    previousPeriod: [],
+    metric: "metadata.trace_id",
+    aggregation: "cardinality",
+  };
+}
+
+/** The ticker springs up from zero; reduced motion paints the settled value. */
+function preferReducedMotion() {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes("prefers-reduced-motion"),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+      onchange: null,
+    })),
+  );
+}
+
+describe("given the CLI counted the project's traces split by model", () => {
+  beforeEach(preferReducedMotion);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  describe("when the panel renders the call", () => {
+    function renderTraceCount() {
+      renderCall(
+        settledCall({
+          name: "langwatch.analytics.query",
+          resource: "analytics",
+          verb: "query",
+          payload: traceCountByModelPayload(),
+        }),
+      );
+    }
+
+    /** @scenario A trace count split by model reads as a count of traces */
+    it("titles the card by what was counted", () => {
+      renderTraceCount();
+
+      expect(screen.getByText("Traces")).toBeTruthy();
+      expect(screen.queryByText("Trace id")).toBeNull();
+    });
+
+    /** @scenario A trace count split by model reads as a count of traces */
+    it("reads the grouped count as the headline figure", () => {
+      renderTraceCount();
+
+      expect(screen.getByText("traces")).toBeTruthy();
+      expect(screen.getAllByText("7")).toHaveLength(2);
+      expect(screen.queryByText("0")).toBeNull();
+    });
+
+    /** @scenario A trace count split by model reads as a count of traces */
+    it("captions the model's figure with the model's name", () => {
+      renderTraceCount();
+
+      expect(screen.getByText("gpt-5-mini")).toBeTruthy();
+      expect(screen.getByText("By model")).toBeTruthy();
+    });
+
+    /** @scenario A trace count split by model reads as a count of traces */
+    it("never shows the aggregation name or a bucket count", () => {
+      renderTraceCount();
+
+      expect(screen.queryByText("cardinality")).toBeNull();
+      expect(screen.queryByText("point")).toBeNull();
+      expect(screen.queryByText("1")).toBeNull();
+      expect(plot()).toBeNull();
+    });
+  });
+});
+
+/**
+ * `--metric avg-latency --group-by metadata.model --time-scale full`: one
+ * bucket, each model's average nested under the dimension. Averages of groups
+ * do not add up, so the card must not draw their sum as the period's figure.
+ */
+function averageLatencyByModelPayload() {
+  return {
+    currentPeriod: [
+      {
+        date: "full",
+        "metadata.model": {
+          "gpt-5-mini": { "0/performance.completion_time/avg": 1 },
+          "gpt-5.6-terra": { "0/performance.completion_time/avg": 3 },
+        },
+      },
+    ],
+    previousPeriod: [],
+    metric: "performance.completion_time",
+    aggregation: "avg",
+  };
+}
+
+describe("given the CLI averaged latency split by model", () => {
+  beforeEach(preferReducedMotion);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  describe("when the panel renders the call", () => {
+    /** @scenario A grouped average is never summed into one figure */
+    it("draws each model's average and no summed headline", () => {
+      renderCall(
+        settledCall({
+          name: "langwatch.analytics.query",
+          resource: "analytics",
+          verb: "query",
+          payload: averageLatencyByModelPayload(),
+        }),
+      );
+
+      expect(screen.getByText("gpt-5-mini")).toBeTruthy();
+      expect(screen.getByText("gpt-5.6-terra")).toBeTruthy();
+      expect(screen.getByText("1")).toBeTruthy();
+      expect(screen.getByText("3")).toBeTruthy();
+      expect(screen.queryByText("4")).toBeNull();
+      expect(screen.queryByText("average")).toBeNull();
+    });
+
+    /** @scenario A grouped average is never summed into one figure */
+    it("says there is no single figure when every group spans several days", () => {
+      const byModel = (mini: number, terra: number) => ({
+        "metadata.model": {
+          "gpt-5-mini": { "0/performance.completion_time/avg": mini },
+          "gpt-5.6-terra": { "0/performance.completion_time/avg": terra },
+        },
+      });
+      renderCall(
+        settledCall({
+          name: "langwatch.analytics.query",
+          resource: "analytics",
+          verb: "query",
+          payload: {
+            ...averageLatencyByModelPayload(),
+            currentPeriod: [
+              { date: "2026-09-28", ...byModel(1, 3) },
+              { date: "2026-09-29", ...byModel(2, 4) },
+            ],
+          },
+        }),
+      );
+
+      expect(
+        screen.getByText(
+          /spans several periods or groups, so it has no single/,
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByText("No data for this period.")).toBeNull();
+      expect(screen.queryByText("10")).toBeNull();
+    });
+  });
+});
+
+/** A distinct count of `metric` per day, as the analytics API answers it. */
+function dailyDistinctPayload(metric: string, values: number[]) {
+  return {
+    currentPeriod: values.map((v, i) => ({
+      date: `2026-09-2${8 + i}`,
+      [`0/${metric}/cardinality`]: v,
+    })),
+    previousPeriod: [],
+    metric,
+    aggregation: "cardinality",
+  };
+}
+
+describe("given the CLI counted distinct ids per day", () => {
+  beforeEach(preferReducedMotion);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const renderDaily = (metric: string) =>
+    renderCall(
+      settledCall({
+        name: "langwatch.analytics.query",
+        resource: "analytics",
+        verb: "query",
+        payload: dailyDistinctPayload(metric, [3, 4]),
+      }),
+    );
+
+  describe("when it counted traces", () => {
+    /** @scenario A distinct count is added up only where each id falls once */
+    it("totals the days, since each trace falls on one", () => {
+      renderDaily("metadata.trace_id");
+
+      expect(screen.getByText("7")).toBeTruthy();
+    });
+  });
+
+  describe("when it counted users", () => {
+    /** @scenario A distinct count is added up only where each id falls once */
+    it("never totals the days, since a user can come back", () => {
+      renderDaily("metadata.user_id");
+
+      expect(screen.queryByText("7")).toBeNull();
+      expect(
+        screen.getByText(
+          /spans several periods or groups, so it has no single/,
+        ),
+      ).toBeTruthy();
     });
   });
 });

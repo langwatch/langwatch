@@ -164,8 +164,10 @@ async function waitForNlpgoHealth(
  * parallel suites don't collide.
  *
  * `env` is merged over the defaults (NLPGO_CHILD_BYPASS=true so no Python
- * uvicorn child is spawned, SERVER_ADDR bound to the port). Pass e.g.
- * LANGWATCH_ENDPOINT when the workflow under test calls back out.
+ * uvicorn child is spawned, SERVER_ADDR bound to the port,
+ * LANGWATCH_NLP_INTERNAL_SECRET blank so /go routes stay unguarded). Pass e.g.
+ * LANGWATCH_ENDPOINT when the workflow under test calls back out, or
+ * LANGWATCH_NLP_INTERNAL_SECRET to exercise the guarded posture.
  */
 export async function startNlpgoSubprocess(opts: {
   port: number;
@@ -182,6 +184,12 @@ export async function startNlpgoSubprocess(opts: {
       ...process.env,
       NLPGO_CHILD_BYPASS: "true",
       SERVER_ADDR: `:${opts.port}`,
+      // Blank unless a caller asks otherwise: with a secret the engine
+      // requires X-LangWatch-NLP-Secret on every /go route, and the suites
+      // here post to /go directly rather than through nlpgoFetch. Inheriting
+      // the developer's own value would 401 them while CI, which has none,
+      // stayed green.
+      LANGWATCH_NLP_INTERNAL_SECRET: "",
       ...opts.env,
     },
     stdio: ["ignore", "pipe", "pipe"],

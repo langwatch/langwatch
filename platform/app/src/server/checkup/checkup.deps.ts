@@ -35,6 +35,7 @@ import {
 import {
   buildSmtpTransportOptions,
   isSmtpConfigured,
+  smtpSendsCredentials,
 } from "~/server/mailer/providers/smtp";
 import { assertTestConnectionWithinBudget } from "~/server/modelProviders/modelProvider.service";
 import { validateProviderApiKey } from "~/server/modelProviders/providerValidation";
@@ -380,6 +381,7 @@ export function realCheckupDeps(scope: CheckupScope): CheckupDeps {
     email: {
       provider: emailProviderName(),
       smtpConfigured: isSmtpConfigured(),
+      smtpSendsCredentials: smtpSendsCredentials(),
       verifySmtp: async () => {
         await nodemailer.createTransport(buildSmtpTransportOptions()).verify();
       },

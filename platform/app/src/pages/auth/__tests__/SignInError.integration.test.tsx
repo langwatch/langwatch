@@ -13,6 +13,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { signInErrorMayCross } from "~/features/auth/logic/signInErrorCodes";
+
 const { searchParamsRef } = vi.hoisted(() => ({
   searchParamsRef: { current: new URLSearchParams("") },
 }));
@@ -137,6 +139,32 @@ describe("given a failure whose cause was withheld", () => {
     draw("sign_in_failed");
 
     expect(screen.queryByTestId("sign-in-error-trace")).toBeNull();
+  });
+});
+
+describe("given a sign-in refused because an unconfirmed account holds the address", () => {
+  describe("when the person lands on the sign-in error screen", () => {
+    /** @scenario "The refusal reaches the sign-in screen with words the reader can act on" */
+    it("crosses the boundary as itself and says how to get in", () => {
+      expect(signInErrorMayCross("sso_existing_account_unconfirmed")).toBe(
+        true,
+      );
+      searchParamsRef.current = new URLSearchParams({
+        error: "sso_existing_account_unconfirmed",
+      });
+
+      draw("sso_existing_account_unconfirmed");
+
+      expect(
+        screen.getByText(/An account with this address already exists/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Sign in the way you did before/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryAllByText(/Something went wrong signing you in/i),
+      ).toHaveLength(0);
+    });
   });
 });
 

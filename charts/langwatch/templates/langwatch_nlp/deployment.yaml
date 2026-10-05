@@ -123,6 +123,18 @@ spec:
             - name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
               value: {{ include "langwatch.codeBlockTimeoutSeconds" . | quote }}
 
+            # Shared credential with the app and the workers, read from the same
+            # key of the same Secret (see langwatch.sharedEnv) so the two ends
+            # can never hold different values. Unset, this service accepts
+            # unauthenticated requests, which is what keeps an install whose
+            # Secret predates the key working across the upgrade.
+            - name: LANGWATCH_NLP_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langwatch.appSecretName" . }}
+                  key: {{ include "langwatch.nlpInternalSecretKey" . }}
+                  optional: true
+
             {{- with .Values.langwatch_nlp.extraEnvs}}
             {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "langwatch_nlp.extraEnvs") }}
             {{- toYaml . | nindent 12 }}

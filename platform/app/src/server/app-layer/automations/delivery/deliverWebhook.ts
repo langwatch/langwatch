@@ -63,6 +63,7 @@ export async function deliverWebhook({
   headers,
   signingSecrets,
   body,
+  contentType,
   triggerName,
 }: {
   /** The sender — defaults to the real one; the graph-alert path injects its
@@ -83,6 +84,9 @@ export async function deliverWebhook({
    *  does and what every webhook automation did before the field existed. */
   signingSecrets?: readonly string[];
   body: string;
+  /** What that body is, sent as `Content-Type`. Derived from the automation's
+   *  body format; absent leaves the sender's JSON default in place. */
+  contentType?: string;
   triggerName: string;
 }): Promise<WebhookSendResult> {
   const startedAt = Date.now();
@@ -107,6 +111,7 @@ export async function deliverWebhook({
       headers,
       signingSecrets,
       body,
+      contentType,
       triggerName,
       projectId,
       eventId,

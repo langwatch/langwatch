@@ -29,6 +29,7 @@ class PostApiAnalyticsBody:
         filters (PostApiAnalyticsBodyFilters | Unset):
         trace_ids (list[str] | Unset):
         negate_filters (bool | Unset):
+        exclude_origins (list[str] | Unset):
         group_by (PostApiAnalyticsBodyGroupBy | Unset):
         group_by_key (str | Unset):
         time_scale (int | PostApiAnalyticsBodyTimeScaleType0 | Unset):
@@ -42,6 +43,7 @@ class PostApiAnalyticsBody:
     filters: PostApiAnalyticsBodyFilters | Unset = UNSET
     trace_ids: list[str] | Unset = UNSET
     negate_filters: bool | Unset = UNSET
+    exclude_origins: list[str] | Unset = UNSET
     group_by: PostApiAnalyticsBodyGroupBy | Unset = UNSET
     group_by_key: str | Unset = UNSET
     time_scale: int | PostApiAnalyticsBodyTimeScaleType0 | Unset = UNSET
@@ -69,6 +71,10 @@ class PostApiAnalyticsBody:
             trace_ids = self.trace_ids
 
         negate_filters = self.negate_filters
+
+        exclude_origins: list[str] | Unset = UNSET
+        if not isinstance(self.exclude_origins, Unset):
+            exclude_origins = self.exclude_origins
 
         group_by: str | Unset = UNSET
         if not isinstance(self.group_by, Unset):
@@ -102,6 +108,8 @@ class PostApiAnalyticsBody:
             field_dict["traceIds"] = trace_ids
         if negate_filters is not UNSET:
             field_dict["negateFilters"] = negate_filters
+        if exclude_origins is not UNSET:
+            field_dict["excludeOrigins"] = exclude_origins
         if group_by is not UNSET:
             field_dict["groupBy"] = group_by
         if group_by_key is not UNSET:
@@ -143,6 +151,8 @@ class PostApiAnalyticsBody:
 
         negate_filters = d.pop("negateFilters", UNSET)
 
+        exclude_origins = cast(list[str], d.pop("excludeOrigins", UNSET))
+
         _group_by = d.pop("groupBy", UNSET)
         group_by: PostApiAnalyticsBodyGroupBy | Unset
         if isinstance(_group_by, Unset):
@@ -176,6 +186,7 @@ class PostApiAnalyticsBody:
             filters=filters,
             trace_ids=trace_ids,
             negate_filters=negate_filters,
+            exclude_origins=exclude_origins,
             group_by=group_by,
             group_by_key=group_by_key,
             time_scale=time_scale,

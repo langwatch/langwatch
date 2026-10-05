@@ -14,6 +14,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 /**
  * Service for retrieving evaluator resources via the LangWatch API.
@@ -31,6 +32,7 @@ export class EvaluatorsApiService {
     const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: extractStatusFromResponse(error),
     } });
+    throwIfHandledError({ operation, error, message });
     throw new EvaluatorsApiError(message, operation, error);
   }
 

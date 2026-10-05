@@ -22,6 +22,7 @@
  * @see specs/self-hosting/connected-services/license-sync.feature
  */
 
+import { configuredSignedLicenseKey } from "@ee/licensing/configuredLicenseKey";
 import { ConnectLicenseRequiredError } from "@ee/licensing/connect/errors";
 import {
   type ConnectConfig,
@@ -41,7 +42,6 @@ import { createLicenseHandler } from "@ee/licensing/server";
 import { parseLicenseKey } from "@ee/licensing/validation";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { env } from "~/env.mjs";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { prisma as defaultPrisma } from "~/server/db";
 import { readInstallVersion } from "~/server/installVersion";
@@ -148,7 +148,7 @@ export async function syncLicenseNow({
   });
   if (
     licenseConnectServices({
-      licenseKey: organization?.license ?? env.LANGWATCH_LICENSE_KEY ?? null,
+      licenseKey: organization?.license ?? configuredSignedLicenseKey(),
     }).length === 0
   ) {
     throw new ConnectLicenseRequiredError();
@@ -189,7 +189,7 @@ async function organizationsToSync(prisma: PrismaClient): Promise<string[]> {
     .filter(
       (organization) =>
         licenseConnectServices({
-          licenseKey: organization.license ?? env.LANGWATCH_LICENSE_KEY ?? null,
+          licenseKey: organization.license ?? configuredSignedLicenseKey(),
         }).length > 0,
     )
     .map((organization) => organization.id);

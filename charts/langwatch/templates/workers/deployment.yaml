@@ -9,9 +9,17 @@ metadata:
     {{- if .Values.workers.deployment.labels }}
     {{- toYaml .Values.workers.deployment.labels | nindent 4 }}
     {{- end }}
-  {{- with .Values.workers.deployment.annotations }}
+  {{- $serializeUpgrades := eq (include "langwatch.storedObjects.serializeUpgradesActive" .) "true" }}
+  {{- if or .Values.workers.deployment.annotations $serializeUpgrades }}
   annotations:
+    {{- with .Values.workers.deployment.annotations }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if $serializeUpgrades }}
+    {{- /* Read by the stored-objects upgrade hooks. Metadata only, so a new
+           value never rolls a pod. */}}
+    langwatch.ai/stored-objects-upgrade-fingerprint: {{ include "langwatch.storedObjects.upgradeFingerprint" . | quote }}
+    {{- end }}
   {{- end }}
 spec:
   replicas: {{ .Values.workers.replicaCount }}
@@ -170,10 +178,7 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
-          {{- with .Values.workers.extraEnvFrom}}
-          envFrom:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+          {{- include "langwatch.envFromWithOfflineDefaults" (dict "root" $ "extraEnvFrom" .Values.workers.extraEnvFrom) | nindent 10 }}
 
           # Probe the worker's HTTP listener (the metrics server port, 2999)
           # rather than just PID 1 liveness — an answered request proves the

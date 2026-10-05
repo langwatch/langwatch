@@ -73,10 +73,22 @@
     mount (subPath mounts do not pick up later Secret updates) until the next
     upgrade. `before-hook-creation` clears a prior hook Job of the same name first.
 
-  The Job name carries .Release.Revision because a Job's pod template is
-  immutable — a fresh name each revision sidesteps that and keeps install and
-  hook Jobs distinct; helm prunes the previous one (ttlSecondsAfterFinished and,
-  on the hook, before-hook-creation).
+  The Job name carries a hash of its own spec. A Job's pod template is
+  immutable, so any change to it (a new image, new env) gets a new name instead
+  of an immutable-field error. The name does not depend on .Release.Revision:
+  Argo CD renders every sync as revision 1, so a revision-named Job kept its
+  name across chart upgrades and failed the sync. With an unchanged spec the
+  name stays the same, so the completed Job stays in place and in sync.
+  Only the upgrade hook has ttlSecondsAfterFinished: helm does not track hook
+  objects, so the TTL is what removes them. The main-phase Job has none, since
+  a GitOps controller would recreate a Job the TTL deleted, every few minutes.
+  The TTL is part of the spec, so the install Job and the upgrade hook never
+  share a name.
+
+  Missing passwords do not fail the Job. Without LWQL_CLICKHOUSE_PASSWORD or
+  LWQL_POSTGRES_READER_PASSWORD it writes the same empty documents as
+  lwql.enabled=false and logs which keys are missing, so ClickHouse always
+  starts and LangWatchQL stays off until the keys exist.
 
   Why no `SYSTEM RELOAD CONFIG` hook and no per-secret checksum: ClickHouse 25.10
   hot-reloads users.d and config.d from disk within ~3s of a file change
@@ -100,8 +112,9 @@
 */}}
 {{- if .Values.clickhouse.chartManaged }}
 {{- $name := printf "%s-lwql-access-render" .Release.Name }}
-{{- $jobName := printf "%s-lwql-access-render-%d" .Release.Name (.Release.Revision | int) }}
 {{- $secretName := include "langwatch.lwql.accessSecretName" . }}
+{{- $jobSpec := include "langwatch.lwql.renderJobSpec" (dict "ctx" . "name" $name "secretName" $secretName) }}
+{{- $jobName := printf "%s-lwql-access-render-%s" .Release.Name ($jobSpec | sha256sum | trunc 10) }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -173,12 +186,19 @@ roleRef:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  # Name carries the revision because a Job's pod template is immutable — a
-  # fresh name each `helm upgrade` avoids the immutable-field error, and helm
-  # prunes the previous revision's Job.
+  # Name carries a hash of the spec: a changed pod template gets a new Job
+  # rather than an immutable-field error, an unchanged one keeps its name.
   name: {{ $jobName }}
   labels:
     {{- include "langwatch.labels" . | nindent 4 }}
+  {{- if not .Release.IsUpgrade }}
+  # Argo CD applies waves in order and waits for a Job to complete before the
+  # next wave. Wave -1 puts the render after the Secrets it reads (-2) and
+  # before the ClickHouse StatefulSet (0), so a changed access model is
+  # written before the pods roll and mount it. Helm ignores the annotation.
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  {{- end }}
   {{- if .Release.IsUpgrade }}
   # On upgrade and rollback (both set .Release.IsUpgrade), run as a
   # pre-upgrade/pre-rollback hook so the new access Secret is written BEFORE the
@@ -195,14 +215,22 @@ metadata:
     helm.sh/hook-weight: "5"
     helm.sh/hook-delete-policy: before-hook-creation
   {{- end }}
-spec:
+spec:{{ $jobSpec }}
+{{- end }}
+{{/* The render Job's spec, kept in one define so its hash names the Job. */}}
+{{- define "langwatch.lwql.renderJobSpec" -}}
+{{- $ctx := .ctx -}}
+{{- $name := .name -}}
+{{- $secretName := .secretName }}
   backoffLimit: 2
   activeDeadlineSeconds: 300
+  {{- if $ctx.Release.IsUpgrade }}
   ttlSecondsAfterFinished: 600
+  {{- end }}
   template:
     metadata:
       labels:
-        {{- include "langwatch.labels" . | nindent 8 }}
+        {{- include "langwatch.labels" $ctx | nindent 8 }}
     spec:
       serviceAccountName: {{ $name }}
       # This Job is the one LWQL workload that calls the Kubernetes API: it writes
@@ -219,7 +247,7 @@ spec:
       # This Job runs under its OWN ServiceAccount, so pull secrets attached to
       # the namespace's default ServiceAccount do not reach it; it takes its own
       # declared, documented value (same rationale as the stored-objects hooks).
-      {{- with .Values.lwql.imagePullSecrets }}
+      {{- with $ctx.Values.lwql.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -227,19 +255,19 @@ spec:
       # every other pod does (topologySpreadConstraints are deliberately NOT
       # copied: on a single-run Job a DoNotSchedule spread can only wedge the
       # release — matching langwatch.storedObjects.upgradeHookPodSpec).
-      {{- with .Values.global.scheduling.nodeSelector }}
+      {{- with $ctx.Values.global.scheduling.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.global.scheduling.tolerations }}
+      {{- with $ctx.Values.global.scheduling.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.global.scheduling.affinity }}
+      {{- with $ctx.Values.global.scheduling.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.global.scheduling.priorityClassName }}
+      {{- with $ctx.Values.global.scheduling.priorityClassName }}
       priorityClassName: {{ . | quote }}
       {{- end }}
       # Reuse the app component's pod security context (uid 1000, fsGroup 1000,
@@ -248,26 +276,33 @@ spec:
       # refuse the pod ("container has runAsNonRoot and image will run as root").
       # The helper pins the same uid the app Deployment runs as.
       securityContext:
-        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 8 }}
+        {{- include "langwatch.podSecurityContext" (dict "ctx" $ctx "component" $ctx.Values.app) | nindent 8 }}
       containers:
         - name: lwql-access-render
-          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
-          imagePullPolicy: {{ .Values.images.app.pullPolicy }}
+          image: "{{ $ctx.Values.images.app.repository }}:{{ $ctx.Values.images.app.tag }}"
+          imagePullPolicy: {{ $ctx.Values.images.app.pullPolicy }}
           # Same hardened container context as the app (read-only root, non-root,
           # no privilege escalation, all capabilities dropped). `pnpm run task`
           # keeps its cache and temp files under $HOME, which HOME below points
           # at the writable /tmp emptyDir, so read-only root needs no exception.
           securityContext:
-            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 12 }}
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" $ctx "component" $ctx.Values.app) | nindent 12 }}
           env:
-            {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            {{- include "langwatch.sharedEnv" $ctx | nindent 12 }}
             # Give pnpm/node a writable HOME on the read-only root filesystem.
             - name: HOME
               value: /tmp
             - name: LWQL_ENABLED
-              value: {{ .Values.lwql.enabled | quote }}
+              value: {{ $ctx.Values.lwql.enabled | quote }}
             - name: LWQL_RENDER_SECRET_NAME
               value: {{ $secretName | quote }}
+            # Named in the log line when a password is missing.
+            - name: LWQL_PASSWORD_SECRET
+              value: {{ include "langwatch.lwql.passwordSecret" $ctx | quote }}
+            - name: LWQL_CLICKHOUSE_PASSWORD_KEY
+              value: {{ include "langwatch.lwql.clickhousePasswordKey" $ctx | quote }}
+            - name: LWQL_POSTGRES_READER_PASSWORD_KEY
+              value: {{ include "langwatch.lwql.postgresReaderPasswordKey" $ctx | quote }}
             # node trusts the in-cluster API server's serving cert via the SA CA.
             - name: NODE_EXTRA_CA_CERTS
               value: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
@@ -276,6 +311,14 @@ spec:
             - |
               set -eu
               mkdir -p /render/users.d /render/config.d
+
+              if [ "${LWQL_ENABLED}" = "true" ] && { [ -z "${LWQL_CLICKHOUSE_PASSWORD:-}" ] || [ -z "${LWQL_POSTGRES_READER_PASSWORD:-}" ]; }; then
+                # The passwords are optional keys of the operator's Secret. A
+                # missing one turns LangWatchQL off rather than failing the Job,
+                # which would leave every ClickHouse pod waiting on this Secret.
+                echo "lwql-access-render: LangWatchQL is off: Secret ${LWQL_PASSWORD_SECRET} has no ${LWQL_CLICKHOUSE_PASSWORD_KEY} or ${LWQL_POSTGRES_READER_PASSWORD_KEY} key. ClickHouse starts without the LangWatchQL identity. To turn it on, add both keys, delete this Job so it runs again, then restart the ClickHouse pods." >&2
+                LWQL_ENABLED=false
+              fi
 
               if [ "${LWQL_ENABLED}" = "true" ]; then
                 # Render the two files from the same env the app reads for LWQL.
@@ -377,4 +420,4 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi
-{{- end }}
+{{- end -}}

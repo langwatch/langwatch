@@ -25,6 +25,7 @@ import type {
   SsoDomainProofLookup,
   SsoDomainTxtLookup,
 } from "../sso-self-serve.service";
+import { PrismaSsoDomainReproofTargets } from "../sso-self-serve-adapters";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
@@ -439,6 +440,92 @@ describe("re-reading the record that proves a domain", () => {
         domainProofFor({ state: attested!, domain: "beta.example" })
           ?.proofState,
       ).toBe("VERIFIED");
+    });
+  });
+
+  describe("given a self-hosted installation verified a domain with its licence", () => {
+    /** @scenario "Re-checking published proof leaves a domain the installation's licence verified" */
+    it("never reads it at DNS or at its file, and leaves it verified", async () => {
+      const licensed = {
+        ...emptySsoConnection({ connectionId: "ssoc_licensed" }),
+        organizationId: "org_beta",
+        state: "ACTIVE" as const,
+        verifiedDomains: ["beta.example"],
+        domainVerifications: [
+          {
+            domain: "beta.example",
+            method: "license-token" as const,
+            actorId: ANA.id,
+            verifiedAtMs: T0,
+            proofState: "VERIFIED" as const,
+            firstAbsentAtMs: null,
+            graceEndsAtMs: null,
+            tokenHash: null,
+            evidenceRef: "sha256:installation-licence",
+            verifier: ANA,
+          },
+        ],
+        testLoginAccountId: "acc_beta",
+      };
+      connections.seed(licensed);
+      // The production target read, over rows shaped as the projection
+      // stores them: one domain a record proved, one the licence proved.
+      const rows = [
+        {
+          id: CONNECTION,
+          organizationId: ORG,
+          verifiedDomains: ["acme.com"],
+          domainVerifications: (await held())?.domainVerifications,
+        },
+        {
+          id: licensed.connectionId,
+          organizationId: licensed.organizationId,
+          verifiedDomains: licensed.verifiedDomains,
+          domainVerifications: licensed.domainVerifications,
+        },
+      ];
+      const prismaTargets = new PrismaSsoDomainReproofTargets({
+        ssoConnection: {
+          findMany: async ({ where }) =>
+            "is" in where.reproofCursor ? rows : [],
+        },
+        ssoConnectionReproofCursor: {
+          createMany: async () => undefined,
+          updateMany: async () => undefined,
+        },
+      });
+      proofs.answer = { outcome: "absent" };
+      fileReads.answer = { outcome: "absent" };
+      reproof = new SsoDomainReproofService({
+        connections: () => connectionService,
+        targets: prismaTargets,
+        proofs,
+        files: fileReads,
+        now: () => clock,
+      });
+
+      await reproof.sweep();
+      clock = T0 + SSO_DNS_REPROOF_GRACE_MS + HOUR_MS;
+      await reproof.sweep();
+
+      expect(proofs.asked).not.toContain(
+        ssoDnsRecordName({ domain: "beta.example" }),
+      );
+      expect(fileReads.asked).toEqual([]);
+      expect(
+        committed.filter(
+          (entry) => entry.command.data.connectionId === "ssoc_licensed",
+        ),
+      ).toEqual([]);
+      const after = await connections.findConnection({
+        connectionId: "ssoc_licensed",
+      });
+      expect(after?.verifiedDomains).toEqual(["beta.example"]);
+      expect(
+        domainProofFor({ state: after!, domain: "beta.example" })?.proofState,
+      ).toBe("VERIFIED");
+      // The domain a record proved was still re-read, so the sweep ran.
+      expect(proofs.asked).toContain(ssoDnsRecordName({ domain: "acme.com" }));
     });
   });
 
