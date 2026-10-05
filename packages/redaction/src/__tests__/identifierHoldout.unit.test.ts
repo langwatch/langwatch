@@ -8,6 +8,7 @@ import {
   MAX_MODEL_OR_TOOL_NAME_LENGTH,
   METADATA_SUBKEY_PREFIXES,
   reservesModelOrToolName,
+  reservesSpanType,
 } from "../identifierHoldout.ts";
 
 /** A decimal trace address, the case the reserved names exist for. */
@@ -254,6 +255,32 @@ describe("given the identifier hold-out rules", () => {
           value: "claude-sonnet-4-6",
         }),
       ).toBe(false);
+    });
+  });
+
+  /** A known kind is a fixed word the name detector can read as a first name. */
+  describe("given the span kind attribute", () => {
+    it.each(["agent", "workflow", "llm", "tool", "chain"])(
+      "holds back the known kind %s",
+      (value) => {
+        expect(isHeldOutIdentifierAttribute({ key: "langwatch.span.type", value })).toBe(true);
+        expect(reservesSpanType({ key: "langwatch.span.type", value })).toBe(true);
+      },
+    );
+
+    it.each([
+      ["a person name", "Jane Doe"],
+      ["a single-token name", "jane"],
+      ["an email address", "jane@example.com"],
+      ["a known kind in the wrong case", "Agent"],
+      ["an empty value", ""],
+    ])("still analyses %s written under the kind attribute", (_case, value) => {
+      expect(reservesSpanType({ key: "langwatch.span.type", value })).toBe(false);
+    });
+
+    it("does not hold back a known kind under another attribute", () => {
+      expect(reservesSpanType({ key: "app.role", value: "agent" })).toBe(false);
+      expect(isHeldOutIdentifierAttribute({ key: "app.role", value: "agent" })).toBe(false);
     });
   });
 });

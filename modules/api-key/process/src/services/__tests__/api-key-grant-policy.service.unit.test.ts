@@ -6,6 +6,7 @@
 
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import type { ApiKeyScope } from "@langwatch/api-key-contract";
+import { MemberNotFoundError } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
@@ -18,6 +19,7 @@ type Fakes = {
   scopeBindings?: { apiKeyId: string; role: string; expiresAt?: Date | null }[];
   customRoles?: { id: string; permissions: unknown }[];
   team?: "found" | "missing";
+  seat?: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER" | "absent";
   project?: { archivedAt?: Date | null; team: { id: string; organizationId: string } };
   personalOwner?: string | null;
   attached?: { attached: string[]; duplicates: string[] };
@@ -52,6 +54,10 @@ function policyWith(fakes: Fakes = {}) {
       getTeam: async () => {
         if (fakes.team === "missing") throw new Error("no such team");
         return { id: "team-1" };
+      },
+      getMember: async (input: { userId: string }) => {
+        if (fakes.seat === "absent") throw new MemberNotFoundError(input.userId);
+        return { role: fakes.seat ?? "ADMIN" };
       },
     },
     projects: {
@@ -519,6 +525,45 @@ describe("ApiKeyGrantPolicyService", () => {
               expiresAt: new Date("2020-01-01T00:00:00.000Z"),
             },
           ],
+        });
+
+        await expect(service.isOrgAdmin({ userId: "user-1", organizationId: ORG })).resolves.toBe(
+          false,
+        );
+      });
+    });
+
+    describe("given an organization admin binding left on a Developer seat", () => {
+      it("does not count it", async () => {
+        const { service } = policyWith({
+          seat: "DEVELOPER",
+          userBindings: [{ scopeType: "ORGANIZATION", scopeId: ORG, role: "ADMIN" }],
+        });
+
+        await expect(service.isOrgAdmin({ userId: "user-1", organizationId: ORG })).resolves.toBe(
+          false,
+        );
+      });
+    });
+
+    describe("given an organization admin binding left on a Lite Member seat", () => {
+      it("does not count it", async () => {
+        const { service } = policyWith({
+          seat: "EXTERNAL",
+          userBindings: [{ scopeType: "ORGANIZATION", scopeId: ORG, role: "ADMIN" }],
+        });
+
+        await expect(service.isOrgAdmin({ userId: "user-1", organizationId: ORG })).resolves.toBe(
+          false,
+        );
+      });
+    });
+
+    describe("given an organization admin binding for someone no longer a member", () => {
+      it("does not count it", async () => {
+        const { service } = policyWith({
+          seat: "absent",
+          userBindings: [{ scopeType: "ORGANIZATION", scopeId: ORG, role: "ADMIN" }],
         });
 
         await expect(service.isOrgAdmin({ userId: "user-1", organizationId: ORG })).resolves.toBe(

@@ -1,8 +1,5 @@
-import {
-  availableFilters,
-  type FilterDefinition,
-  type FilterField,
-} from "@langwatch/analytics-filters";
+import { availableFilters } from "./registry.ts";
+import type { FilterDefinition, FilterField } from "./types.ts";
 
 /** A keyed field written without its key, and the shape it should have had. */
 export interface UnkeyedFilterField {

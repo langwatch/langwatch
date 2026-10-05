@@ -294,6 +294,19 @@ describe("the product-switcher top bar", () => {
       ).not.toBeInTheDocument();
     });
 
+    /** @scenario A Developer is offered the Me product and nothing organisation-wide */
+    it("offers a Developer the Me product and no organization-wide one, whatever the flags and permissions say", async () => {
+      renderShell({
+        readings: { organizationRole: "DEVELOPER", pathname: "/me" },
+        personalScope: true,
+      });
+      await openProductSwitcher();
+
+      expect(screen.getByText("Track your coding assistants")).toBeInTheDocument();
+      expect(screen.queryByText("Gateway")).not.toBeInTheDocument();
+      expect(screen.queryByText("Governance")).not.toBeInTheDocument();
+    });
+
     /** @scenario Switching product opens that product's home */
     it("opens the picked product's home", async () => {
       renderShell();

@@ -77,7 +77,7 @@ const spanStatusRead: CategoricalRead = (t) =>
  * Pairs SQL predicates with in-memory evaluations for each field.
  */
 
-function expressionFacet(key: string): ExpressionCategoricalDef | RangeFacetDef {
+export function expressionFacet(key: string): ExpressionCategoricalDef | RangeFacetDef {
   const def = FACET_BY_KEY.get(key);
   if (!def) throw new Error(`facet '${key}' is missing from FACET_REGISTRY`);
   if (!("expression" in def)) {

@@ -155,8 +155,12 @@ describe("OrganizationMembershipService", () => {
   });
 
   describe("when a join admits somebody", () => {
+    /** @scenario The joiner seat setting is Full by default */
     it("lands the organization grant audited to the approving admin, then clears the marker", async () => {
-      vi.mocked(mockRepo.createMembership).mockResolvedValue("created");
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "created",
+        seat: "MEMBER",
+      });
 
       await service.createMembership({
         organizationId: "org-123",
@@ -181,7 +185,10 @@ describe("OrganizationMembershipService", () => {
     });
 
     it("attaches nothing for somebody who was already a member", async () => {
-      vi.mocked(mockRepo.createMembership).mockResolvedValue("already-present");
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "already-present",
+        seat: "MEMBER",
+      });
 
       await service.createMembership({
         organizationId: "org-123",
@@ -194,9 +201,33 @@ describe("OrganizationMembershipService", () => {
     });
   });
 
+  describe("when a join lands somebody on a Developer seat (ADR-171)", () => {
+    /** @scenario The joiner seat setting lands email joiners as Developers */
+    it("attaches no grant and leaves no admission to complete", async () => {
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "created",
+        seat: "DEVELOPER",
+      });
+
+      const admission = await service.createMembership({
+        organizationId: "org-123",
+        userId: "user-456",
+        admittedBy: { actor: { type: "system", id: "system:join-requests" }, commandId: "c-1" },
+      });
+
+      expect(admission).toEqual({ outcome: "created", seat: "DEVELOPER" });
+      expect(attached).toEqual([]);
+      expect(completed).toEqual([]);
+      expect(vi.mocked(mockRepo.createMembership).mock.calls.at(-1)?.[0].via).toBe("domain-join");
+    });
+  });
+
   describe("createMembership()", () => {
     it("mints one admission intent per membership, in the ledger's own scheme", async () => {
-      vi.mocked(mockRepo.createMembership).mockResolvedValue("created");
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "created",
+        seat: "MEMBER",
+      });
 
       await service.createMembership({ organizationId: "org-123", userId: "user-456" });
       await service.createMembership({ organizationId: "org-123", userId: "user-789" });
@@ -208,11 +239,14 @@ describe("OrganizationMembershipService", () => {
     });
 
     it("reports a row a concurrent callback already created rather than refusing", async () => {
-      vi.mocked(mockRepo.createMembership).mockResolvedValue("already-present");
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "already-present",
+        seat: "MEMBER",
+      });
 
       await expect(
         service.createMembership({ organizationId: "org-123", userId: "user-456" }),
-      ).resolves.toBe("already-present");
+      ).resolves.toEqual({ outcome: "already-present", seat: "MEMBER" });
     });
   });
 

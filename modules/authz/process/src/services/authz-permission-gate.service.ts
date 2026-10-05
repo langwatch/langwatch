@@ -4,6 +4,7 @@
  * so the caller sees the permission and scope that were missing.
  */
 import {
+  DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   PermissionDeniedError,
   ProjectPermissionDeniedError,
@@ -193,6 +194,9 @@ export class AuthzPermissionGateService {
 
     if (result.organizationRole === "EXTERNAL") {
       throw new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown");
+    }
+    if (result.organizationRole === "DEVELOPER") {
+      throw new DeveloperSeatRestrictedError(permission.split(":")[0] ?? "unknown");
     }
 
     throw new ProjectPermissionDeniedError(permission);

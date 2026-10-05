@@ -5,8 +5,10 @@
  */
 import { OrganizationUserRole } from "@langwatch/authorization";
 
-export type MemberType = "FullMember" | "LiteMember";
-export type RoleChangeType = "no-change" | "lite-to-full" | "full-to-lite";
+/** Full and Lite are metered by the plan; a Developer (ADR-171) is counted and never capped. */
+export type MemberType = "FullMember" | "LiteMember" | "Developer";
+/** Named after the pool the change ENTERS; "to-developer" enters one no plan meters. */
+export type RoleChangeType = "no-change" | "lite-to-full" | "full-to-lite" | "to-developer";
 
 export function isViewOnlyPermission(permission: string): boolean {
   return permission.split(":")[1] === "view";
@@ -22,6 +24,7 @@ export function classifyMemberType(
 ): MemberType {
   if (role === OrganizationUserRole.ADMIN || role === OrganizationUserRole.MEMBER)
     return "FullMember";
+  if (role === OrganizationUserRole.DEVELOPER) return "Developer";
   if (role === OrganizationUserRole.EXTERNAL && permissions && !isViewOnlyCustomRole(permissions))
     return "FullMember";
   return "LiteMember";
@@ -41,6 +44,14 @@ export function isLiteMember(
   return classifyMemberType(role, permissions) === "LiteMember";
 }
 
+/** A Developer seat (ADR-171); permissions never move it. */
+export function isDeveloper(
+  role: OrganizationUserRole,
+  permissions: string[] | undefined,
+): boolean {
+  return classifyMemberType(role, permissions) === "Developer";
+}
+
 export function getRoleChangeType({
   oldRole,
   oldPermissions,
@@ -52,8 +63,9 @@ export function getRoleChangeType({
   newRole: OrganizationUserRole;
   newPermissions: string[] | undefined;
 }): RoleChangeType {
-  const wasFull = isFullMember(oldRole, oldPermissions);
-  const willBeFull = isFullMember(newRole, newPermissions);
-  if (wasFull === willBeFull) return "no-change";
-  return wasFull ? "full-to-lite" : "lite-to-full";
+  const was = classifyMemberType(oldRole, oldPermissions);
+  const willBe = classifyMemberType(newRole, newPermissions);
+  if (was === willBe) return "no-change";
+  if (willBe === "Developer") return "to-developer";
+  return willBe === "FullMember" ? "lite-to-full" : "full-to-lite";
 }

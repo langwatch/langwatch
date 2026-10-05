@@ -285,6 +285,16 @@ jobs:
         if: "!cancelled()"
         run: node tests/env-contract.mjs
 
+      # A default install calls LangWatch only for the license sync and the
+      # usage report. The offline defaults that switch off library calls to
+      # third parties (Prisma checkpoint, the voice quick tunnel, RAGAS
+      # analytics) sit in a ConfigMap listed first in envFrom, so the
+      # operator's extraEnvs and extraEnvFrom win; that order is only visible
+      # in the render.
+      - name: "assert third-party calls are off by default and overridable"
+        if: "!cancelled()"
+        run: ./tests/privacy-defaults.sh
+
       # release-please bumps the gateway and langyagent subchart versions on
       # every release, and clickhouse-serverless on its own releases. The
       # umbrella must still build its dependencies right after that bump,

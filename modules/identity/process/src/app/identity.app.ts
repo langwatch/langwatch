@@ -353,8 +353,11 @@ function joinMemberships(organizations: OrganizationApi): JoinMembership {
 function joinSettings(organizations: OrganizationApi): JoinSetting {
   return {
     read: (args) => organizations.getJoinSetting(args),
-    write: ({ organizationId, domainJoin, joinDomains }) =>
-      organizations.saveJoinSetting({ organizationId, setting: { domainJoin, joinDomains } }),
+    write: ({ organizationId, domainJoin, joinDomains, joinerRole }) =>
+      organizations.saveJoinSetting({
+        organizationId,
+        setting: { domainJoin, joinDomains, joinerRole },
+      }),
   };
 }
 
@@ -379,6 +382,8 @@ function joinSettingAudit(auditLog: AuditLogApi): JoinSettingAudit {
           to: change.next,
           fromDomains: [...change.previousDomains],
           toDomains: [...change.nextDomains],
+          fromJoinerRole: change.previousJoinerRole,
+          toJoinerRole: change.nextJoinerRole,
         },
         targetKind: "organization",
         targetId: organizationId,

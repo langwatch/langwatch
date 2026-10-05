@@ -28,7 +28,7 @@ export type SubscriptionBillingInterval = z.infer<typeof subscriptionBillingInte
 /** One invitation a checkout was started to pay a seat for. */
 export const subscriptionInviteSchema = z.object({
   email: z.string().email(),
-  role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
+  role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
 });
 export type SubscriptionInvite = z.infer<typeof subscriptionInviteSchema>;
 

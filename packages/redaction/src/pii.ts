@@ -15,6 +15,7 @@ export {
   isOpaqueIdentifierValue,
   isReservedIdentifierAttributeKey,
   reservesModelOrToolName,
+  reservesSpanType,
   reservesTraceAddress,
 } from "./identifierHoldout.ts";
 export {

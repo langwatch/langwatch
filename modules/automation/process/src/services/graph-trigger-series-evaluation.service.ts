@@ -79,7 +79,6 @@ export class GraphTriggerSeriesEvaluationService {
           projectId: plan.request.projectId,
           triggerId: plan.request.triggerId,
           reason: plan.request.reason,
-          groupBy: plan.graph.groupBy,
           timePeriodMinutes: plan.timePeriod,
           maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
         },
@@ -121,8 +120,8 @@ export class GraphTriggerSeriesEvaluationService {
 
   private values(plan: GraphEvaluationPlan, result: TimeseriesResult): GraphSeriesEvaluation {
     const key = graphSeriesName(plan.timeseriesInput.series[0]!, 0);
-    const currentPoints = extractSeriesPoints(result.currentPeriod, key, plan.graph.groupBy);
-    const previousPoints = extractSeriesPoints(result.previousPeriod, key, plan.graph.groupBy);
+    const currentPoints = extractSeriesPoints(result.currentPeriod, key);
+    const previousPoints = extractSeriesPoints(result.previousPeriod, key);
 
     return {
       currentPoints,

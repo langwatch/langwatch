@@ -324,6 +324,15 @@ export const automationRestUpdateInputSchema = z.object({
   filterQuery: filterQuerySchema.optional(),
   // Accepted so writing the whole read back is answered: a different channel is refused.
   action: automationRestActionSchema.optional(),
+  customGraphId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "The graph this alert watches, which an update cannot change. Accepted " +
+        "so that writing the read response back works; a different graph is " +
+        "refused. Create an alert on the other graph and delete this one.",
+    ),
   actionParams: automationRestAnyActionParamsSchema
     .optional()
     .describe(

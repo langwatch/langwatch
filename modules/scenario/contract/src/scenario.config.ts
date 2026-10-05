@@ -3,9 +3,11 @@ import {
   allowLoopbackVoiceProviders,
   blockLocalHttpCalls,
   Config,
+  isSaas,
   langwatchDefaultModel,
   type ConfigOf,
 } from "@langwatch/config";
+import { nlpFetchMaxTimeoutMs } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
 import { SCENARIO_WORKER } from "./scenario-execution.constants.ts";
@@ -20,20 +22,21 @@ const trimmedOptional = z
   .optional()
   .transform((value) => value?.trim() || void 0);
 const passthrough = z.string().optional();
-/** On unless the value is the literal "false" (case-insensitive). */
-const onUnlessFalse = z
+/** The explicit "true" or "false" (case-insensitive); else the caller picks the default. */
+const explicitSwitch = z
   .string()
   .optional()
-  .transform((value) => (value ?? "").trim().toLowerCase() !== "false");
+  .transform((value) => {
+    const setting = (value ?? "").trim().toLowerCase();
+    if (setting === "true") return true;
+    if (setting === "false") return false;
+    return void 0;
+  });
 /** Off unless the value is the literal "true" (case-insensitive). */
 const offUnlessTrue = z
   .string()
   .optional()
   .transform((value) => (value ?? "").trim().toLowerCase() === "true");
-const optionalNumber = z
-  .string()
-  .optional()
-  .transform((value) => (value === void 0 ? void 0 : Number(value)));
 
 const allResourceClasses = Object.keys(SCENARIO_RESOURCE_CLASSES).filter(isScenarioResourceClass);
 /** A comma list of runtime classes; unset means every class, an unknown name is refused. */
@@ -77,8 +80,11 @@ export const scenarioConfig = Config.define((c) => ({
   langwatchEndpoint: c.env("LANGWATCH_ENDPOINT", trimmedOptional),
   /** The worker media listener's public origin, forwarded only to voice children. */
   voicePublicBaseUrl: c.env("VOICE_PUBLIC_BASE_URL", trimmedOptional),
-  /** The worker's quick-tunnel fallback when no public origin is set. */
-  voiceTunnel: c.env("VOICE_TUNNEL", onUnlessFalse),
+  /** The operator's explicit quick-tunnel choice; unset takes `isVoiceTunnelEnabled`'s default. */
+  voiceTunnel: c.env("VOICE_TUNNEL", explicitSwitch),
+  /** The tunnel defaults on for the hosted product, a self-hosted production install off. */
+  isSaas,
+  nodeEnvironment: c.env("NODE_ENV", passthrough),
   /** A voice-only worker refuses to boot without a public https origin. */
   voiceWorkerOnly: c.env("VOICE_WORKER_ONLY", offUnlessTrue),
   /** The runtime classes this worker admits; a refused job retries on a worker that consumes it. */
@@ -94,7 +100,7 @@ export const scenarioConfig = Config.define((c) => ({
   defaultModel: langwatchDefaultModel,
   /** The nlpgo deadlines an agent-test turn answers inside; unusable values clamp to defaults. */
   nlpTimeouts: {
-    maxTimeoutMs: c.env("NLP_FETCH_MAX_TIMEOUT_MS", optionalNumber),
+    maxTimeoutMs: nlpFetchMaxTimeoutMs,
   },
   childParentEnvironment: {
     path: c.env("PATH", passthrough),
@@ -111,3 +117,15 @@ export const scenarioConfig = Config.define((c) => ({
 }));
 
 export type ScenarioServerConfig = ConfigOf<typeof scenarioConfig>;
+
+/**
+ * Whether the worker may open a Cloudflare quick tunnel when no public origin
+ * is set: the operator's choice if made, else on for the hosted product and
+ * development, off for a self-hosted production install.
+ */
+export const isVoiceTunnelEnabled = (deployment: {
+  voiceTunnel: boolean | undefined;
+  isSaas: boolean;
+  nodeEnvironment: string | undefined;
+}): boolean =>
+  deployment.voiceTunnel ?? (deployment.isSaas || deployment.nodeEnvironment !== "production");

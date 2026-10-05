@@ -28,7 +28,37 @@ function authzWithNoBindings() {
   });
 }
 
+/** The user holds a Developer seat and no binding on this shared project. */
+function authzForDeveloperSeat() {
+  return AuthzService.create({
+    isOnEngine: async () => true,
+    repository: makeReader({
+      findProjectLineage: vi.fn().mockResolvedValue(PROJECT),
+      findOrganizationMembership: vi.fn().mockResolvedValue({ role: "DEVELOPER", disabled: false }),
+    }),
+    listing: new StubAuthzListingRepository(),
+    bindings: new StubAuthzManagedGrantRepository(),
+  });
+}
+
 describe("AuthzService.authorizeProjectPermission", () => {
+  describe("given a Developer seat asking for a shared project", () => {
+    /** @scenario A Developer never sees a shared project */
+    it("refuses with the seat's own code and the resource", async () => {
+      await expect(
+        authzForDeveloperSeat().authorizeProjectPermission({
+          userId: "user-developer",
+          projectId: PROJECT.projectId,
+          permission: "traces:view",
+        }),
+      ).rejects.toMatchObject({
+        code: "developer_seat_restricted",
+        httpStatus: 401,
+        meta: { resource: "traces" },
+      });
+    });
+  });
+
   describe("given a user without the required permission on a project", () => {
     /** @scenario "A project permission denial names itself" */
     it("refuses with a code, the customer's fault, and the permission", async () => {

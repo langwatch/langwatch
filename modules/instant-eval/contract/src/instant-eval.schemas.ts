@@ -462,3 +462,18 @@ export const instantEvalRestCredential = defineRestMiddleware(
   "instantEvalRestCredential",
   instantEvalRestCredentialSchema,
 );
+
+/**
+ * What the refusal popover offers an organization that may not judge: its own
+ * switch (`enable`), a word with an organization admin for a member who may not
+ * throw it (`ask_admin`), or a word with us (`contact_us`: enterprise, self-hosted).
+ */
+export const instantEvalOptInOfferSchema = z.enum(["enable", "ask_admin", "contact_us"]);
+export type InstantEvalOptInOffer = z.infer<typeof instantEvalOptInOfferSchema>;
+
+/** Whether the project is released, and what the popover offers when it is not. */
+export const instantEvalOptInAccessSchema = z.object({
+  released: z.boolean(),
+  offer: instantEvalOptInOfferSchema,
+});
+export type InstantEvalOptInAccess = z.infer<typeof instantEvalOptInAccessSchema>;

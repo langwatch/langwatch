@@ -48,3 +48,18 @@ export type EvaluationRunOutcome = z.infer<typeof evaluationRunOutcomeSchema>;
 /** What the evaluator-runtime warm-up answers with. */
 export const evaluationWarmupSchema = z.object({ success: z.boolean(), count: z.number() });
 export type EvaluationWarmup = z.infer<typeof evaluationWarmupSchema>;
+
+/** Which of an evaluator's records a run reads its settings from. */
+export const evaluatorSettingsSourceSchema = z.enum([
+  "config-settings",
+  "top-level-recovery",
+  "monitor-parameters",
+]);
+export type EvaluatorSettingsSource = z.infer<typeof evaluatorSettingsSourceSchema>;
+
+/** The settings a run hands the judge, and where they came from. */
+export const evaluatorEffectiveSettingsSchema = z.object({
+  settings: z.record(z.string(), z.unknown()).nullable().optional(),
+  source: evaluatorSettingsSourceSchema,
+});
+export type EvaluatorEffectiveSettings = z.infer<typeof evaluatorEffectiveSettingsSchema>;

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  findEvaluationFilterReferences,
-  findUnkeyedFilterFields,
-} from "../trigger-filter-shape.rules.ts";
+import { findEvaluationFilterReferences, findUnkeyedFilterFields } from "../unkeyed-filters.ts";
 
 describe("findUnkeyedFilterFields()", () => {
   describe("when a keyed field is written as a bare list", () => {

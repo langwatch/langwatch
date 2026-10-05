@@ -20,6 +20,10 @@ vi.mock("../../hooks/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
+vi.mock("../../hooks/use-instant-eval-access.ts", () => ({
+  useInstantEvalAccess: () => ({ isAvailable: true, optInOffer: "enable" }),
+}));
+
 // SearchBar mounts TokenValuePicker, which now calls useFacetSearch (a tRPC
 // query) at the top level. This suite renders SearchBar without a tRPC
 // provider, so stub the hook out — server search has its own dedicated suite.

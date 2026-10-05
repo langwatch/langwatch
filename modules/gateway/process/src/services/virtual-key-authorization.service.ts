@@ -11,7 +11,10 @@ import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { GatewayScopePermissions } from "../app/gateway.members.ts";
 import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository.ts";
-import { isMemberNotFound } from "../rules/gateway-organization-peer.rules.ts";
+import {
+  isMemberNotFound,
+  seatSharesOrganizationKeys,
+} from "../rules/gateway-organization-peer.rules.ts";
 import type { VirtualKeyService } from "./virtual-key.service.ts";
 
 /**
@@ -368,7 +371,7 @@ export class VirtualKeyAuthorizationService {
         : [];
 
     return {
-      isOrgMember: organizationRole !== null,
+      isOrgMember: organizationRole !== null && seatSharesOrganizationKeys(organizationRole.role),
       isOrgAdmin: organizationRole?.role === "ADMIN",
       teamIds,
       projectIds: new Set(projectIds),

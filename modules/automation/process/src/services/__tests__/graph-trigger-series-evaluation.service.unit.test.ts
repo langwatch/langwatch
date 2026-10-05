@@ -26,7 +26,7 @@ function planThatFailsWith(error: unknown) {
         },
       },
     },
-    graph: { groupBy: "metadata.user_id" },
+    graph: {},
     series: { metric: "metadata.trace_id", aggregation: "cardinality" },
     seriesName: "0/metadata.trace_id/cardinality",
     timePeriod: 60,
@@ -78,7 +78,6 @@ describe("GraphTriggerSeriesEvaluationService.evaluate", () => {
       expect(logged[0]).toMatchObject({
         triggerId: "trigger-1",
         projectId: "project-1",
-        groupBy: "metadata.user_id",
       });
     });
   });

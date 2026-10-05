@@ -34,3 +34,11 @@ export const evaluationInputsQuerySchema = z.object({
   evaluationId: z.string(),
 });
 export type EvaluationInputsQuery = z.infer<typeof evaluationInputsQuerySchema>;
+
+/** An evaluator's saved row and the parameters a monitor stored beside it. */
+export const evaluatorEffectiveSettingsQuerySchema = z.object({
+  config: z.json().nullable(),
+  parameters: z.record(z.string(), z.unknown()).nullable().optional(),
+  evaluatorRecordType: z.string().nullable().optional(),
+});
+export type EvaluatorEffectiveSettingsQuery = z.infer<typeof evaluatorEffectiveSettingsQuerySchema>;

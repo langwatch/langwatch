@@ -19,6 +19,9 @@ type MutateOptions = {
 const mutations = vi.hoisted(() => ({
   estimate: { mutate: vi.fn<(input: unknown, options: MutateOptions) => void>(), isPending: false },
   start: { mutate: vi.fn<(input: unknown, options: MutateOptions) => void>(), isPending: false },
+  enable: { mutate: vi.fn<(input: unknown, options: MutateOptions) => void>(), isPending: false },
+  setAccess: vi.fn(),
+  invalidateAccess: vi.fn(async () => undefined),
 }));
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
@@ -26,8 +29,16 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
       instantEval: {
         estimate: { useMutation: () => mutations.estimate },
         start: { useMutation: () => mutations.start },
+        enable: { useMutation: () => mutations.enable },
       },
     },
+    useUtils: () => ({
+      traces: {
+        instantEval: {
+          access: { setData: mutations.setAccess, invalidate: mutations.invalidateAccess },
+        },
+      },
+    }),
   },
 }));
 
@@ -62,6 +73,9 @@ function handledError({ code, meta = {} }: { code: string; meta?: Record<string,
 beforeEach(() => {
   mutations.estimate.mutate.mockClear();
   mutations.start.mutate.mockClear();
+  mutations.enable.mutate.mockClear();
+  mutations.setAccess.mockClear();
+  mutations.invalidateAccess.mockClear();
   toast.mockClear();
   useFilterStore.getState().clearAll();
 });
@@ -135,7 +149,7 @@ describe("given the estimate fails for a reason the registry names", () => {
 });
 
 describe("given the Instant Evals flag is off for the project", () => {
-  /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+  /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
   it("opens the unreleased popover with no estimate, and dismissing it leaves the typed query alone", () => {
     const typed = 'eval:"the user is annoyed"';
     useFilterStore.getState().applyQueryText(typed);
@@ -207,5 +221,126 @@ describe("given the router answered instant_eval", () => {
     act(() => result.current.confirmRun());
 
     expect(mutations.start.mutate).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** The last request's input and callbacks on one mutation. */
+function lastCall(mutation: { mutate: { mock: { calls: [unknown, MutateOptions][] } } }) {
+  const call = mutation.mutate.mock.calls.at(-1);
+  if (!call) throw new Error("the mutation was not requested");
+  return { input: call[0], options: call[1] };
+}
+
+describe("given Instant Evals are off and the reader may not switch them on", () => {
+  /** @scenario "A member who may not throw the switch is told to ask an admin" */
+  it("opens the ask-admin popover, and Enable sends nothing", () => {
+    const { result } = renderHook(() =>
+      useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: "ask_admin" }),
+    );
+    act(() => result.current.onInstantEvalRoute(payload));
+
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+    expect(result.current.refusal).toEqual({ kind: "ask_admin" });
+
+    act(() => result.current.enableInstantEvals());
+    expect(mutations.enable.mutate).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
+  it("opens the contact-us popover for an enterprise organization or an unknown offer", () => {
+    for (const optInOffer of ["contact_us", undefined] as const) {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+
+      expect(result.current.refusal).toEqual({ kind: "unreleased" });
+      act(() => result.current.enableInstantEvals());
+    }
+    expect(mutations.enable.mutate).not.toHaveBeenCalled();
+  });
+});
+
+describe("given Instant Evals are off for a self-serve organization", () => {
+  /** @scenario "Instant Evals off for a self-serve organization open the enable popover" */
+  it("opens the opt-in popover with no estimate, and dismissing it leaves the typed query alone", () => {
+    const typed = 'eval:"the user is annoyed"';
+    useFilterStore.getState().applyQueryText(typed);
+    const { result } = renderHook(() =>
+      useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: "enable" }),
+    );
+    act(() => result.current.onInstantEvalRoute(payload));
+
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+    expect(result.current.refusal).toEqual({ kind: "opt_in" });
+
+    act(() => result.current.dismissRefusal());
+    expect(result.current.refusal).toBeNull();
+    expect(useFilterStore.getState().queryText).toBe(typed);
+  });
+
+  /** @scenario "Enable switches the organization on and the judgement goes ahead" */
+  it("throws the switch, primes the access read, closes the popover and estimates the held submit", () => {
+    const { result } = renderHook(() =>
+      useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: "enable" }),
+    );
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() => result.current.enableInstantEvals());
+
+    const enable = lastCall(mutations.enable);
+    expect(enable.input).toEqual({ projectId: "project-1" });
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+
+    act(() => enable.options.onSuccess?.({ released: true, offer: "enable" }));
+
+    expect(mutations.setAccess).toHaveBeenCalledWith(
+      { projectId: "project-1" },
+      { released: true, offer: "enable" },
+    );
+    expect(mutations.invalidateAccess).toHaveBeenCalledTimes(1);
+    expect(result.current.refusal).toBeNull();
+    expect(lastCall(mutations.estimate).input).toMatchObject({
+      projectId: "project-1",
+      question: { instructions: "the user is annoyed" },
+    });
+  });
+
+  /** @scenario "A refused switch is a warning and the popover stays" */
+  it("warns with the registry's words when the server refuses, and sends no estimate", () => {
+    const { result } = renderHook(() =>
+      useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: "enable" }),
+    );
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() => result.current.enableInstantEvals());
+    act(() =>
+      lastCall(mutations.enable).options.onError?.(
+        handledError({ code: "instant_eval_opt_in_not_offered" }),
+      ),
+    );
+
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ type: "warning" }));
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+    expect(result.current.refusal).toEqual({ kind: "opt_in" });
+  });
+
+  /** @scenario "Enable switches the organization on and the judgement goes ahead" */
+  it("drops a switch answered after the popover closed or a later submit, but keeps the access", () => {
+    const { result } = renderHook(() =>
+      useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: "enable" }),
+    );
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() => result.current.enableInstantEvals());
+    const dismissed = lastCall(mutations.enable);
+    act(() => result.current.dismissRefusal());
+    act(() => dismissed.options.onSuccess?.({ released: true, offer: "enable" }));
+
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() => result.current.enableInstantEvals());
+    const superseded = lastCall(mutations.enable);
+    act(() => result.current.abandonPendingRun());
+    act(() => superseded.options.onSuccess?.({ released: true, offer: "enable" }));
+
+    expect(mutations.setAccess).toHaveBeenCalledTimes(2);
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
   });
 });

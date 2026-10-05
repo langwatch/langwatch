@@ -338,7 +338,7 @@ export const organizationManagementRest: Readonly<{
         invites: input.invites.map((invite) => ({
           email: invite.email,
           role: invite.role as OrganizationUserRole,
-          teams: invite.teams.map((team) => ({
+          teams: (invite.teams ?? []).map((team) => ({
             teamId: team.teamId,
             role: requestedTeamRole(team),
           })),

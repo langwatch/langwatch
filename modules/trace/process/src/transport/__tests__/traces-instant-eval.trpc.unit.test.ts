@@ -33,14 +33,23 @@ const PROGRESS: ExplorerInstantEvalProgress = {
   finishedAtMs: null,
 };
 
-function harness() {
+const OFFERED = { released: false, offer: "enable" } as const;
+
+function harness({ permitted = () => true }: { permitted?: (permission: string) => boolean } = {}) {
   const getExplorerEvalRun = vi.fn<TraceApi["getExplorerEvalRun"]>(async () => PROGRESS);
   const cancelExplorerEvalRun = vi.fn<TraceApi["cancelExplorerEvalRun"]>(async () => PROGRESS);
   // A released project on a deployment with no judge, refused by the run service.
   const estimateExplorerEvalRun = vi.fn<TraceApi["estimateExplorerEvalRun"]>(async () => {
     throw new InstantEvalClassifierNotConfiguredError();
   });
+  const getExplorerEvalAccess = vi.fn<TraceApi["getExplorerEvalAccess"]>(async () => OFFERED);
+  const enableExplorerEvals = vi.fn<TraceApi["enableExplorerEvals"]>(async () => ({
+    released: true,
+    offer: "enable" as const,
+  }));
   const app = createApiFixture<TraceApi>({
+    getExplorerEvalAccess,
+    enableExplorerEvals,
     getExplorerEvalRun,
     cancelExplorerEvalRun,
     estimateExplorerEvalRun,
@@ -51,7 +60,7 @@ function harness() {
     permits: (permission) => {
       permissions.push(permission);
 
-      return true;
+      return permitted(permission);
     },
   });
   const router = createTrpcRuntime<TestContext>({
@@ -64,13 +73,15 @@ function harness() {
     caller: router.createCaller({ actor: { id: "reader-1" } }),
     cancelExplorerEvalRun,
     getExplorerEvalRun,
+    getExplorerEvalAccess,
+    enableExplorerEvals,
     permissions,
   };
 }
 
 describe("given the traces.instantEval tRPC contract", () => {
   describe("when its members are read", () => {
-    it("declares main's four nested procedures", () => {
+    it("declares main's six nested procedures", () => {
       expect(
         Object.entries(tracesInstantEvalTrpc.members).map(([name, member]) => [name, member.kind]),
       ).toEqual([
@@ -78,6 +89,8 @@ describe("given the traces.instantEval tRPC contract", () => {
         ["start", "mutation"],
         ["cancel", "mutation"],
         ["get", "query"],
+        ["access", "query"],
+        ["enable", "mutation"],
       ]);
     });
 
@@ -128,6 +141,50 @@ describe("given the traces.instantEval router", () => {
       ).rejects.toMatchObject({
         cause: { code: "instant_eval_classifier_not_configured", httpStatus: 403 },
       });
+    });
+  });
+});
+
+describe("given the opt-in procedures", () => {
+  describe("when a member reads what the popover offers", () => {
+    it("asks for the reader under analytics:view", async () => {
+      const { caller, getExplorerEvalAccess, permissions } = harness();
+
+      await expect(caller.access({ projectId: "project-1" })).resolves.toEqual(OFFERED);
+      expect(getExplorerEvalAccess).toHaveBeenCalledWith({
+        projectId: "project-1",
+        userId: "reader-1",
+      });
+      expect(permissions).toEqual(["analytics:view"]);
+    });
+  });
+
+  describe("when an organization manager throws the switch", () => {
+    it("switches it on under organization:manage for the caller", async () => {
+      const { caller, enableExplorerEvals, permissions } = harness();
+
+      await expect(caller.enable({ projectId: "project-1" })).resolves.toEqual({
+        released: true,
+        offer: "enable",
+      });
+      expect(enableExplorerEvals).toHaveBeenCalledWith({
+        projectId: "project-1",
+        userId: "reader-1",
+      });
+      expect(permissions).toEqual(["organization:manage"]);
+    });
+  });
+
+  describe("when a member without organization:manage throws the switch", () => {
+    it("is refused before anything is recorded", async () => {
+      const { caller, enableExplorerEvals } = harness({
+        permitted: (permission) => permission !== "organization:manage",
+      });
+
+      await expect(caller.enable({ projectId: "project-1" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      expect(enableExplorerEvals).not.toHaveBeenCalled();
     });
   });
 });

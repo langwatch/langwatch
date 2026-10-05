@@ -14,3 +14,9 @@ export const LIMIT_TYPE_DISPLAY_LABELS: Record<LimitType, string> = {
   members: "Team Members",
   membersLite: "Lite Members",
 } as const;
+
+/**
+ * The Developer seat (ADR-171) is not a `LimitType`: it is counted beside the
+ * metered seats and never compared to a limit, so it has a label and no limit.
+ */
+export const DEVELOPER_SEAT_DISPLAY_LABEL = "Developers";

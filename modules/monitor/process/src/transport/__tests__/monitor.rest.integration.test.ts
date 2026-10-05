@@ -205,6 +205,187 @@ describe("the monitors REST family", () => {
     });
   });
 
+  describe("when the evaluator carries its own settings", () => {
+    const blocklist = (competitors: string[]) => ({
+      evaluatorType: "langevals/competitor_blocklist",
+      settings: { competitors },
+    });
+    const evaluatorConfigs = {
+      "evaluator-1": blocklist(["Acme"]),
+      "evaluator-2": blocklist(["Initech"]),
+    };
+    const blocklistCreate = (parameters?: Record<string, unknown>) => ({
+      ...create,
+      checkType: "langevals/competitor_blocklist",
+      ...(parameters === undefined ? {} : { parameters }),
+    });
+    const refusal = async (response: Response) => {
+      const body: { code?: string; meta?: { evaluatorId?: string } } = await response.json();
+
+      return { status: response.status, code: body.code, evaluatorId: body.meta?.evaluatorId };
+    };
+
+    it("refuses a create whose parameters would never run", async () => {
+      const api = mountMonitorRest({ evaluatorConfigs });
+
+      const response = await api.post(
+        "/api/monitors",
+        blocklistCreate({ competitors: ["Globex"] }),
+      );
+
+      await expect(refusal(response)).resolves.toEqual({
+        status: 422,
+        code: "monitor_parameters_unused",
+        evaluatorId: "evaluator-1",
+      });
+      await expect(api.repository.findAll({ projectId: TEST_PROJECT.id })).resolves.toHaveLength(0);
+    });
+
+    it("accepts parameters that repeat the evaluator's settings", async () => {
+      const api = mountMonitorRest({ evaluatorConfigs });
+
+      const response = await api.post("/api/monitors", blocklistCreate({ competitors: ["Acme"] }));
+
+      expect(response.status).toBe(201);
+    });
+
+    it("accepts a create without parameters", async () => {
+      const api = mountMonitorRest({ evaluatorConfigs });
+
+      const response = await api.post("/api/monitors", blocklistCreate({}));
+
+      expect(response.status).toBe(201);
+    });
+
+    it("refuses an update whose parameters would never run", async () => {
+      const api = mountMonitorRest({
+        evaluatorConfigs,
+        seed: [{ ...seeded, parameters: {} }],
+      });
+
+      const response = await api.patch("/api/monitors/monitor-1", {
+        parameters: { competitors: ["Globex"] },
+      });
+
+      await expect(refusal(response)).resolves.toEqual({
+        status: 422,
+        code: "monitor_parameters_unused",
+        evaluatorId: "evaluator-1",
+      });
+      await expect(
+        api.repository.findById({ id: "monitor-1", projectId: TEST_PROJECT.id }),
+      ).resolves.toMatchObject({ parameters: {} });
+    });
+
+    it("checks the parameters against the evaluator the update moves to", async () => {
+      const api = mountMonitorRest({ evaluatorConfigs, seed: [{ ...seeded, parameters: {} }] });
+
+      const response = await api.patch("/api/monitors/monitor-1", {
+        evaluatorId: "evaluator-2",
+        parameters: { competitors: ["Acme"] },
+      });
+
+      await expect(refusal(response)).resolves.toMatchObject({
+        status: 422,
+        evaluatorId: "evaluator-2",
+      });
+    });
+
+    it("refuses a move that would leave the stored parameters unused", async () => {
+      const api = mountMonitorRest({
+        evaluatorConfigs,
+        seed: [{ ...seeded, parameters: { competitors: ["Acme"] } }],
+      });
+
+      const response = await api.patch("/api/monitors/monitor-1", { evaluatorId: "evaluator-2" });
+
+      await expect(refusal(response)).resolves.toEqual({
+        status: 422,
+        code: "monitor_parameters_unused",
+        evaluatorId: "evaluator-2",
+      });
+      await expect(
+        api.repository.findById({ id: "monitor-1", projectId: TEST_PROJECT.id }),
+      ).resolves.toMatchObject({ evaluatorId: "evaluator-1" });
+    });
+
+    it("accepts a move that clears the parameters", async () => {
+      const api = mountMonitorRest({
+        evaluatorConfigs,
+        seed: [{ ...seeded, parameters: { competitors: ["Acme"] } }],
+      });
+
+      const response = await api.patch("/api/monitors/monitor-1", {
+        evaluatorId: "evaluator-2",
+        parameters: {},
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        evaluatorId: "evaluator-2",
+        parameters: {},
+      });
+    });
+
+    it("renames a monitor whose stored parameters predate the refusal", async () => {
+      const api = mountMonitorRest({
+        evaluatorConfigs,
+        seed: [{ ...seeded, parameters: { competitors: ["Globex"] } }],
+      });
+
+      const response = await api.patch("/api/monitors/monitor-1", { name: "Renamed" });
+
+      expect(response.status).toBe(200);
+    });
+
+    describe("when the settings sit at the top of the config", () => {
+      const topLevel = {
+        "evaluator-1": { evaluatorType: "langevals/llm_boolean", prompt: "Polite?" },
+      };
+      const createOverTopLevelPrompt = (api: ReturnType<typeof mountMonitorRest>) =>
+        api.post("/api/monitors", { ...create, parameters: { prompt: "Rude?" } });
+
+      it("refuses parameters over a prompt the runner recovers", async () => {
+        const api = mountMonitorRest({ evaluatorConfigs: topLevel });
+
+        const response = await createOverTopLevelPrompt(api);
+
+        await expect(refusal(response)).resolves.toMatchObject({
+          status: 422,
+          code: "monitor_parameters_unused",
+        });
+      });
+
+      it("accepts them once the operator has rolled the recovery back", async () => {
+        const api = mountMonitorRest({ evaluatorConfigs: topLevel });
+        api.effectiveSettings.recoveryDisabled = true;
+
+        const response = await createOverTopLevelPrompt(api);
+
+        expect(response.status).toBe(201);
+        await expect(response.json()).resolves.toMatchObject({ parameters: { prompt: "Rude?" } });
+      });
+    });
+  });
+
+  describe("when a monitor without an evaluator is given parameters", () => {
+    it("stores them, since they are what runs", async () => {
+      const api = mountMonitorRest({
+        evaluatorConfigs: { "evaluator-1": { evaluatorType: "x", settings: { a: 1 } } },
+        seed: [{ ...seeded, id: "monitor-legacy", evaluatorId: null }],
+      });
+
+      const response = await api.patch("/api/monitors/monitor-legacy", {
+        parameters: { competitors: ["Globex"] },
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        parameters: { competitors: ["Globex"] },
+      });
+    });
+  });
+
   describe("when the project has no such monitor", () => {
     it("answers 404 on the read", async () => {
       const api = mountMonitorRest();

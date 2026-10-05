@@ -164,6 +164,9 @@ function AddToTeamDialog({
     () =>
       (orgMembers.data?.members ?? [])
         .filter((m) => !existingMemberIds.includes(m.userId))
+        // A Developer seat (ADR-171) cannot be added to a team, so the seat
+        // is not offered; the service refuses it by name if it is asked anyway.
+        .filter((m) => m.role !== OrganizationUserRole.DEVELOPER)
         .map((m) => ({
           label: `${m.user.name ?? m.user.email} (${m.user.email})`,
           value: m.userId,

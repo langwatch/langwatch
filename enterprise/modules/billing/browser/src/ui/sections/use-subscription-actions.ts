@@ -15,8 +15,10 @@ import { type PlannedUser } from "../../model/subscription-types.ts";
 
 type TRPCRefetchFn = { refetch: () => unknown };
 
-function memberTypeToRole(memberType: MemberType): "MEMBER" | "EXTERNAL" {
-  return memberType === "FullMember" ? "MEMBER" : "EXTERNAL";
+function memberTypeToRole(memberType: MemberType): "MEMBER" | "EXTERNAL" | "DEVELOPER" {
+  if (memberType === "FullMember") return "MEMBER";
+  if (memberType === "Developer") return "DEVELOPER";
+  return "EXTERNAL";
 }
 
 /** The planned users that carry an address, as checkout invites. */

@@ -379,7 +379,7 @@ Rule: Feedback is displayed as events
     And the user opens a trace drawer
 
   Scenario: Feedback appears in the Events accordion
-    Given the trace has a "user.feedback" event with vote "up"
+    Given the trace has a "thumbs_up_down" event with vote "up"
     When the user expands the Events accordion
     Then the feedback event is visible alongside other events
 
@@ -389,16 +389,14 @@ Rule: Feedback is displayed as events
     Then there is no dedicated feedback section or field on the summary
 
   Scenario: Feedback can be filtered via the event facet
-    When the user applies the filter "event:user.feedback"
+    When the user applies the filter "event:thumbs_up_down"
     Then only traces with feedback events are shown
     # `event` is a real facet field exposed by Trace query metadata
     # and the "Trace" facet group in the sidebar.
 
-  @planned
+  @unit
   Scenario: `@has:feedback` shorthand
-    # Not yet implemented as of 2026-05-01 — the query language supports
-    # `has:eval`, `has:user`, `has:conversation`, etc., but no `has:feedback`
-    # shorthand is registered.
+    # Feedback is the `thumbs_up_down` tracked event, from the REST API or the SDK.
     When the user applies the filter "has:feedback"
     Then only traces with feedback events are shown
 

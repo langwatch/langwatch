@@ -17,6 +17,7 @@ import { ValidationError } from "@langwatch/handled-error";
 import type {
   InstantEvalApi,
   InstantEvalEstimateWire,
+  InstantEvalOptInAccess,
   InstantEvalRunProgress,
   InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
@@ -910,6 +911,20 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress> {
     return this.#instantEvals().getRun(input);
+  }
+
+  getExplorerEvalAccess(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<InstantEvalOptInAccess> {
+    return this.#instantEvals().getAccess(input);
+  }
+
+  enableExplorerEvals(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<InstantEvalOptInAccess> {
+    return this.#instantEvals().enable(input);
   }
 
   /**

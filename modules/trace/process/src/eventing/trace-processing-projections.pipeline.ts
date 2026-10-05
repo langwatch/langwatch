@@ -99,6 +99,8 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
       });
   }
 
+  // The annotation commands edit one trace's annotation set, so they share
+  // the trace's lane: on separate groups a delete could precede its add.
   const commands = EventingTraceProcessingAdapter.create();
 
   return definePipeline({
@@ -163,9 +165,15 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
       coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
     })
     .withCommand("resolveOrigin", EventingTraceOriginAdapter)
-    .withCommand("addAnnotation", commands.addAnnotationCommand)
-    .withCommand("removeAnnotation", commands.removeAnnotationCommand)
-    .withCommand("bulkSyncAnnotations", commands.bulkSyncAnnotationsCommand)
+    .withCommand("addAnnotation", commands.addAnnotationCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("removeAnnotation", commands.removeAnnotationCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("bulkSyncAnnotations", commands.bulkSyncAnnotationsCommand, {
+      serializeByAggregate: true,
+    })
     .withCommand("changeTraceName", commands.changeTraceNameCommand);
 }
 

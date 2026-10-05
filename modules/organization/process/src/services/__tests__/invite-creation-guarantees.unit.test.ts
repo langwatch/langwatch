@@ -53,5 +53,44 @@ describe("given an organization id that names no organization", () => {
         expect(organization.id).toBe("org-1");
       });
     });
+
+    describe("when a Developer invitation names a team", () => {
+      /** @scenario A Developer cannot be given a role on a shared team */
+      it("refuses it naming the seat and writes no invite row", async () => {
+        const invites = new FakeOrganizationInviteRepository();
+        invites.seedOrganization(makeOrganization({ id: "org-1", name: "Acme" }));
+        const service = InviteCreationService.create(makeInviteDeps({ invites }));
+
+        await expect(
+          service.createAdminInviteRecord({
+            email: "dev@example.com",
+            role: "DEVELOPER",
+            organizationId: "org-1",
+            teamIds: "team-1",
+            teamAssignments: [{ teamId: "team-1", role: "VIEWER" }],
+          }),
+        ).rejects.toMatchObject({ code: "developer_seat_no_shared_access" });
+
+        expect(invites.allInvites()).toHaveLength(0);
+      });
+    });
+
+    describe("when a Developer invitation names no team", () => {
+      /** @scenario An administrator invites a Developer while the plan is at its seat cap */
+      it("writes the pending invite on the Developer seat", async () => {
+        const invites = new FakeOrganizationInviteRepository();
+        invites.seedOrganization(makeOrganization({ id: "org-1", name: "Acme" }));
+        const service = InviteCreationService.create(makeInviteDeps({ invites }));
+
+        const { invite } = await service.createAdminInviteRecord({
+          email: "dev@example.com",
+          role: "DEVELOPER",
+          organizationId: "org-1",
+          teamIds: "",
+        });
+
+        expect(invite).toMatchObject({ status: "PENDING", role: "DEVELOPER" });
+      });
+    });
   });
 });

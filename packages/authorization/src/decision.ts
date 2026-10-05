@@ -7,7 +7,7 @@ import { z } from "zod";
 import { authzPermissionSchema } from "./registry.ts";
 import { declaredScopeIdSchema } from "./scope-tiers.ts";
 
-export const organizationRoleSchema = z.enum(["ADMIN", "MEMBER", "EXTERNAL"]);
+export const organizationRoleSchema = z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]);
 export type OrganizationRole = z.infer<typeof organizationRoleSchema>;
 export const OrganizationUserRole = organizationRoleSchema.enum;
 export type OrganizationUserRole = OrganizationRole;
@@ -17,6 +17,7 @@ export const authzDenialReasonSchema = z.enum([
   "membership-disabled",
   "no-binding",
   "lite-member-restricted",
+  "developer-restricted",
   "owner-ceiling",
 ]);
 export type AuthzDenialReason = z.infer<typeof authzDenialReasonSchema>;

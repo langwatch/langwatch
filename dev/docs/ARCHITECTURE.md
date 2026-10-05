@@ -139,7 +139,8 @@ surface until migrated, not licence to query a peer's tables (Alex, 2026-10-01; 
 open item of 2026-09-29).
 Analytics' filter field registry (`availableFilters` and its field types) is `modules/analytics/filters`
 (`@langwatch/analytics-filters`), an analytics-owned package, portable and framework-free on the same
-terms; analytics' browser and automation's process import it (Alex, 2026-09-30).
+terms; analytics' browser, automation's process and trace's process import it (Alex, 2026-09-30;
+trace's process for the unkeyed-filter detector, 2026-10-05).
 
 ---
 

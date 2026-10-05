@@ -90,6 +90,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     return {
       domainJoin: organization.domainJoin ?? "request",
       joinDomains: [...(organization.joinDomains ?? [])],
+      joinerRole: organization.joinerRole ?? "MEMBER",
     };
   }
 
@@ -112,6 +113,21 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     this.requireOrganization(organizationId).maxSessionDurationDays = maxSessionDurationDays;
   }
 
+  async isInstantEvalsOptedIn({ organizationId }: { organizationId: string }): Promise<boolean> {
+    return !!this.memory.organizations.get(organizationId)?.instantEvalsEnabledAt;
+  }
+
+  async recordInstantEvalsOptIn(input: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization || organization.instantEvalsEnabledAt) return;
+    organization.instantEvalsEnabledAt = input.at;
+    organization.instantEvalsEnabledByUserId = input.userId;
+  }
+
   async saveJoinSetting({
     organizationId,
     setting,
@@ -122,6 +138,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     const organization = this.requireOrganization(organizationId);
     organization.domainJoin = setting.domainJoin;
     organization.joinDomains = [...setting.joinDomains];
+    organization.joinerRole = setting.joinerRole;
   }
 
   async getGuidedOnboarding({

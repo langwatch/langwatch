@@ -632,6 +632,13 @@ const registry = {
     ],
     docsPath: "/evaluations/evaluators/list",
   },
+  monitor_parameters_unused: {
+    tips: [
+      "Change the settings on the evaluator named in meta.evaluatorId: PUT /api/evaluators/{evaluatorId}",
+      "Or send parameters as {}; the evaluator's settings are what run, and a move to another evaluator re-checks the stored parameters",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
   monitor_not_found: {
     tips: [
       "List what this project has: langwatch monitor list",
@@ -895,8 +902,15 @@ const registry = {
   },
   instant_eval_not_enabled: {
     tips: [
-      "Instant Evals are behind a release flag; ask LangWatch to enable them for this project",
+      "Instant Evals are off for this organization; a self-serve organization on the hosted service is switched on by an organization admin from the search bar, and any other organization or install asks LangWatch to",
     ],
+    docsPath: "/features/instant-evals/limits-and-cost",
+  },
+  instant_eval_opt_in_not_offered: {
+    tips: [
+      "An enterprise organization, or a self-hosted install, is switched on by LangWatch rather than from the search bar; contact support@langwatch.ai",
+    ],
+    docsPath: "/features/instant-evals/limits-and-cost",
   },
   instant_eval_not_found: {
     tips: [

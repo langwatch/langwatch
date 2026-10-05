@@ -57,10 +57,26 @@ export const nlpLambdaFleetFromSecret = z
     return fields.data;
   });
 
+/**
+ * The platform's maximum for one scenario turn on the engine, in milliseconds. Workflow owns the
+ * leaf; scenario holds this same instance, so the one variable has one meaning.
+ */
+export const { nlpFetchMaxTimeoutMs } = Config.define((c) => ({
+  nlpFetchMaxTimeoutMs: c.env(
+    "NLP_FETCH_MAX_TIMEOUT_MS",
+    z
+      .string()
+      .optional()
+      .transform((value) => (value === void 0 ? void 0 : Number(value))),
+  ),
+}));
+
 export const workflowConfig = Config.define(() => ({
   /** Above this many bytes a payload is staged rather than sent inline. */
   stagingThresholdBytes: langevalsStagingThresholdBytes,
   stagingTtlSeconds: langevalsStagingTtlSeconds,
+  /** The relayed turn's ceiling; an unusable value reads as 15 minutes. */
+  relayTurnCeilingMs: nlpFetchMaxTimeoutMs,
 }));
 
 export type WorkflowServerConfig = ConfigOf<typeof workflowConfig>;

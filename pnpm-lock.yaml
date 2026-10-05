@@ -9407,6 +9407,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
@@ -14447,6 +14450,9 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
+      '@langwatch/analytics-filters':
+        specifier: workspace:*
+        version: link:../../analytics/filters
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../../annotation/contract

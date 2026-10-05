@@ -134,21 +134,26 @@ export class ScimProvisioningService {
       return;
     }
 
+    // A Developer seat (ADR-171) holds no organization-wide grant, so a sync asserts none for it.
+    const membership = await this.prisma.findMembership({ organizationId, userId });
+    const holdsOrganizationGrant = membership?.role !== "DEVELOPER";
     await this.grants.reconcile({
       scope: {
         kind: "organization-membership",
         organizationId,
         userId,
       },
-      desired: [
-        {
-          principal: { userId },
-          role: "MEMBER" as TeamUserRole,
-          customRoleId: null,
-          scopeType: "ORGANIZATION" as GrantScopeTier,
-          scopeId: organizationId,
-        },
-      ],
+      desired: holdsOrganizationGrant
+        ? [
+            {
+              principal: { userId },
+              role: "MEMBER" as TeamUserRole,
+              customRoleId: null,
+              scopeType: "ORGANIZATION" as GrantScopeTier,
+              scopeId: organizationId,
+            },
+          ]
+        : [],
       actor: ScimProvisioningService.ACTOR,
     });
   }

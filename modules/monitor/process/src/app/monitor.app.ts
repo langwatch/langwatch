@@ -91,6 +91,7 @@ export class MonitorModule implements MonitorApi {
     this.#monitors = MonitorService.create({
       repository: repositories.monitors,
       evaluators: dependencies.evaluators,
+      evaluation: dependencies.evaluation,
       generateId: () => generate(MONITOR_KSUID_RESOURCE).toString(),
     });
     this.#catalogue = MonitorCatalogService.create({ repository: repositories.monitors });
@@ -182,6 +183,7 @@ export class MonitorModule implements MonitorApi {
   async patch(input: MonitorPatchInput): Promise<Monitor> {
     const { id, projectId, changes } = input;
     const existing = await this.#monitors.getById({ id, projectId });
+    await this.#monitors.assertPatchParametersWillRun({ existing, changes });
 
     // Settings that no longer parse against their evaluator's schema are
     // replaced with an empty object rather than carried forward, so a monitor

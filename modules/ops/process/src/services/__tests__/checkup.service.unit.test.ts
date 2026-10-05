@@ -431,6 +431,32 @@ describe("CheckupService", () => {
     });
   });
 
+  describe("when the deployment sets LANGWATCH_CONNECT_DISABLED and the reach checks are asked for", () => {
+    /** @scenario "Connect switched off by the deployment probes no LangWatch host" */
+    it("opens no connection and names the variable", async () => {
+      const reach = vi.fn(async () => undefined);
+      const { rows } = await CheckupService.create(
+        healthyDeps({
+          reach,
+          connect: async () => ({
+            ...CONNECTED,
+            deployment: "off",
+            licensed: false,
+            entitledServices: [],
+            lastSyncAt: undefined,
+          }),
+        }),
+      ).explicit({ checks: ["reach_connect_host", "reach_gateway_host"] });
+
+      expect(reach).not.toHaveBeenCalled();
+      for (const id of ["reach_connect_host", "reach_gateway_host"] as const) {
+        const verdict = rowOf(rows, id);
+        expect(verdict.outcome).toBe("unchecked");
+        expect(verdict.detail).toContain("LANGWATCH_CONNECT_DISABLED");
+      }
+    });
+  });
+
   describe("when the connect host cannot be reached", () => {
     /** @scenario "Reaching the connect host names the host and port a firewall rule must allow" */
     it("fails with connect_unreachable naming host and port", async () => {

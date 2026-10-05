@@ -17,12 +17,13 @@ export interface JoinedOrganization {
  */
 export interface SsoArrivalMemberships {
   isMember(args: { organizationId: string; userId: string }): Promise<boolean>;
-  /** Makes them a MEMBER, carrying the grant intent an unfinished admission
-   *  is resumed from. `"already-present"` is a retry, not a failure. */
+  /** Admits them on the joiner seat (ADR-171): a MEMBER carries the grant
+   *  intent an unfinished admission resumes from, a DEVELOPER none.
+   *  `"already-present"` is a retry, not a failure. */
   createMembership(args: {
     organizationId: string;
     userId: string;
-  }): Promise<"created" | "already-present">;
+  }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
   /**
    * Applies the PENDING invitation this address already holds, as ONE
    * decision: an invitation that exists wins, and its role and team
@@ -62,7 +63,8 @@ export interface SsoArrivalNotifications {
     organizationId: string;
     requesterUserId: string;
     domain: string;
-    admissionId: string;
+    /** The grant a MEMBER's admission attached; a DEVELOPER holds none (ADR-171). */
+    admissionId?: string;
   }): Promise<void>;
   /** Starts the nurturing sequence an automatically added member gets. */
   startNurturing(args: {

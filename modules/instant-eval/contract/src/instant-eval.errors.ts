@@ -36,6 +36,28 @@ export class InstantEvalQueryBudgetExceededError extends HandledError {
   }
 }
 
+/**
+ * The organization's own switch was thrown where the popover does not offer it:
+ * an enterprise plan, or a self-hosted install. A word with us is the remedy.
+ * @see specs/instant-evals/instant-eval-opt-in.feature
+ */
+export class InstantEvalOptInNotOfferedError extends HandledError {
+  declare readonly code: "instant_eval_opt_in_not_offered";
+
+  constructor() {
+    super(
+      "instant_eval_opt_in_not_offered",
+      "LangWatch turns on Instant Evals for enterprise plans and self-hosted installs. Contact us to get them.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("instant_eval_opt_in_not_offered"),
+      },
+    );
+    this.name = "InstantEvalOptInNotOfferedError";
+  }
+}
+
 /** The questions alone fill the judge's state, leaving no room for any text. */
 export class InstantEvalQuestionsTooLongError extends HandledError {
   declare readonly code: "instant_eval_questions_too_long";

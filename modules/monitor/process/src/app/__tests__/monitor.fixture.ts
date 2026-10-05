@@ -6,6 +6,8 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   EvaluationApi,
+  EvaluatorEffectiveSettings,
+  EvaluatorEffectiveSettingsQuery,
   MonitorPerformanceQuery,
   OnlineEvaluationPerformance,
 } from "@langwatch/evaluation-contract";
@@ -29,6 +31,7 @@ function evaluatorRow(input: {
   id: string;
   projectId: string;
   workflowId?: string | null;
+  config?: unknown;
 }): Evaluator {
   return evaluatorSchema.parse({
     id: input.id,
@@ -36,7 +39,7 @@ function evaluatorRow(input: {
     name: "Quality",
     slug: "quality",
     type: "evaluator",
-    config: {},
+    config: input.config ?? {},
     workflowId: input.workflowId ?? null,
     copiedFromEvaluatorId: null,
     archivedAt: null,
@@ -50,20 +53,52 @@ export class FakeMonitorEvaluators {
   readonly archived: { id: string; projectId: string }[] = [];
   #known = new Set<string>();
 
-  constructor(known: readonly string[] = ["evaluator_1"]) {
+  #configs: Readonly<Record<string, unknown>>;
+
+  constructor(known: readonly string[] = ["evaluator_1"], configs: Record<string, unknown> = {}) {
     this.#known = new Set(known);
+    this.#configs = configs;
   }
 
   async getById(input: { id: string; projectId: string }): Promise<Evaluator> {
     if (!this.#known.has(input.id)) throw new EvaluatorNotFoundError(input.id);
 
-    return evaluatorRow(input);
+    return evaluatorRow({ ...input, config: this.#configs[input.id] });
+  }
+
+  async findById(input: { id: string; projectId: string }): Promise<Evaluator | undefined> {
+    return this.#known.has(input.id) ? this.getById(input) : undefined;
   }
 
   async archive(input: { id: string; projectId: string }): Promise<Evaluator> {
     this.archived.push(input);
 
     return evaluatorRow(input);
+  }
+}
+
+/**
+ * What the evaluation module answers for an evaluator's effective settings, in
+ * miniature: nested settings win, a top-level config is recovered unless the
+ * operator's rollback is on, and otherwise the monitor's own parameters run.
+ */
+export class FakeEvaluatorSettings {
+  recoveryDisabled = false;
+
+  async getEvaluatorEffectiveSettings(
+    query: EvaluatorEffectiveSettingsQuery,
+  ): Promise<EvaluatorEffectiveSettings> {
+    const config = (query.config ?? {}) as Record<string, unknown>;
+    const nested = config.settings;
+    if (nested && typeof nested === "object" && Object.keys(nested).length > 0) {
+      return { settings: nested as Record<string, unknown>, source: "config-settings" };
+    }
+    const { evaluatorType: _type, settings: _settings, ...recovered } = config;
+    if (!this.recoveryDisabled && Object.keys(recovered).length > 0) {
+      return { settings: recovered, source: "top-level-recovery" };
+    }
+
+    return { settings: query.parameters, source: "monitor-parameters" };
   }
 }
 
@@ -121,12 +156,14 @@ export function createMonitorTestApp(
     repositories?: MonitorRepositories;
     permissions?: AuthzApi;
     evaluators?: FakeMonitorEvaluators;
+    effectiveSettings?: FakeEvaluatorSettings;
     performance?: FakeMonitorPerformance;
     replication?: FakeMonitorReplication;
     publicBaseUrl?: string;
   }> = {},
 ): MonitorModule {
   const evaluators = input.evaluators ?? new FakeMonitorEvaluators();
+  const effectiveSettings = input.effectiveSettings ?? new FakeEvaluatorSettings();
   const performance = input.performance ?? new FakeMonitorPerformance();
   const replication =
     input.replication ?? new FakeMonitorReplication({ id: "evaluator_copy", workflowId: null });
@@ -139,11 +176,14 @@ export function createMonitorTestApp(
         input.permissions ?? createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
       evaluators: createApiFixture<EvaluatorApi>({
         getById: (scope) => evaluators.getById(scope),
+        findById: (scope) => evaluators.findById(scope),
         archive: (scope) => evaluators.archive(scope),
         copy: (copy) => replication.copy(copy),
       }),
       evaluation: createApiFixture<EvaluationApi>({
         getMonitorPerformance: (query) => performance.getMonitorPerformance(query),
+        getEvaluatorEffectiveSettings: (query) =>
+          effectiveSettings.getEvaluatorEffectiveSettings(query),
       }),
       workflows: createApiFixture<WorkflowApi>({
         deleteUncommitted: (reference) => replication.deleteUncommitted(reference),

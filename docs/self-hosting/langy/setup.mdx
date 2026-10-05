@@ -309,8 +309,10 @@ kubectl -n langwatch patch secret langwatch-app-secrets \
   -p "{\"stringData\":{\"LANGY_INTERNAL_SECRET\":\"$(openssl rand -hex 32)\"}}"
 ```
 
-The install checks for the key and stops with a message naming it, rather than
-leaving three pods in `CreateContainerConfigError`.
+Under plain `helm`, the install reads the existing Secret, checks for the key and
+stops with a message naming it, rather than leaving three pods in
+`CreateContainerConfigError`. Argo CD renders without cluster access, so there
+the pods wait in `CreateContainerConfigError` naming the key instead.
 
 ## Turning it off
 

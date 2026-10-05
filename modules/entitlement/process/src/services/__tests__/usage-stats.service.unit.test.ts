@@ -55,7 +55,7 @@ function serviceOn(plan: Plan, count: UsageCount = 4_200): UsageStatsService {
   return UsageStatsService.create({
     membership: new StubMembership(),
     seats: createApiFixture<Pick<OrganizationApi, "countMemberSeats">>({
-      countMemberSeats: async () => ({ fullMembers: 3, liteMembers: 1 }),
+      countMemberSeats: async () => ({ fullMembers: 3, liteMembers: 1, developers: 2 }),
     }),
     counter: new StubCounter(count),
     plans,
@@ -95,6 +95,18 @@ describe("UsageStatsService", () => {
 
       expect(stats.messageLimitInfo.max).toBe(10_000);
       expect(stats.messageLimitInfo.status).toBe("warning");
+      expect(() => usageStatsSchema.parse(stats)).not.toThrow();
+    });
+  });
+
+  describe("given an organization holding Developer seats", () => {
+    /** @scenario Developers are counted and never capped */
+    it("reports the Developer count beside the metered seats", async () => {
+      const stats = await serviceOn(planWith(10_000)).getUsageStats("org-1", { id: "user-1" });
+
+      expect(stats.membersCount).toBe(3);
+      expect(stats.membersLiteCount).toBe(1);
+      expect(stats.membersDeveloperCount).toBe(2);
       expect(() => usageStatsSchema.parse(stats)).not.toThrow();
     });
   });

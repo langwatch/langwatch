@@ -466,3 +466,62 @@ describe("getRoleChangeType", () => {
     });
   });
 });
+
+describe("given a Developer seat", () => {
+  /** @scenario Developers are counted and never capped */
+  it("classifies DEVELOPER as Developer whatever permissions are passed", () => {
+    expect(
+      MemberClassificationService.classifyMemberType(OrganizationUserRole.DEVELOPER, undefined),
+    ).toBe("Developer");
+    expect(
+      MemberClassificationService.classifyMemberType(OrganizationUserRole.DEVELOPER, [
+        "project:manage",
+      ]),
+    ).toBe("Developer");
+    expect(MemberClassificationService.isDeveloper(OrganizationUserRole.DEVELOPER, undefined)).toBe(
+      true,
+    );
+    expect(
+      MemberClassificationService.isFullMember(OrganizationUserRole.DEVELOPER, undefined),
+    ).toBe(false);
+    expect(
+      MemberClassificationService.isLiteMember(OrganizationUserRole.DEVELOPER, undefined),
+    ).toBe(false);
+  });
+
+  /** @scenario Developers are counted and never capped */
+  it("returns to-developer when moving onto a Developer seat from either pool", () => {
+    for (const oldRole of [OrganizationUserRole.MEMBER, OrganizationUserRole.EXTERNAL]) {
+      expect(
+        MemberClassificationService.getRoleChangeType({
+          oldRole,
+          oldPermissions: undefined,
+          newRole: OrganizationUserRole.DEVELOPER,
+          newPermissions: undefined,
+        }),
+      ).toBe("to-developer");
+    }
+  });
+
+  it("enters the Full pool when a Developer becomes a Member", () => {
+    expect(
+      MemberClassificationService.getRoleChangeType({
+        oldRole: OrganizationUserRole.DEVELOPER,
+        oldPermissions: undefined,
+        newRole: OrganizationUserRole.MEMBER,
+        newPermissions: undefined,
+      }),
+    ).toBe("lite-to-full");
+  });
+
+  it("enters the Lite pool when a Developer becomes a Lite Member", () => {
+    expect(
+      MemberClassificationService.getRoleChangeType({
+        oldRole: OrganizationUserRole.DEVELOPER,
+        oldPermissions: undefined,
+        newRole: OrganizationUserRole.EXTERNAL,
+        newPermissions: undefined,
+      }),
+    ).toBe("full-to-lite");
+  });
+});

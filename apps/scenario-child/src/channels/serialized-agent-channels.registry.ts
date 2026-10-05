@@ -8,6 +8,7 @@ import type { AgentAdapter } from "@langwatch/scenario";
 import {
   CodeAgentDataSchema,
   ConnectedAgentDataSchema,
+  type ExecuteSyncRoute,
   HttpAgentDataSchema,
   type LiteLLMParams,
   PromptConfigDataSchema,
@@ -23,6 +24,8 @@ import {
 } from "@langwatch/scenario-contract";
 import type { z } from "zod";
 
+import type { ExecuteSyncTransport } from "./execute-sync.channel.ts";
+import { childExecuteSyncTransport } from "./http/http.execute-sync.channel.ts";
 import { HttpSerializedCodeAgentChannel } from "./http/http.serialized-code-agent.channel.ts";
 import { HttpSerializedConnectedAgentChannel } from "./http/http.serialized-connected-agent.channel.ts";
 import {
@@ -33,6 +36,23 @@ import { HttpSerializedPromptConfigChannel } from "./http/http.serialized-prompt
 import { HttpSerializedWorkflowAgentChannel } from "./http/http.serialized-workflow-agent.channel.ts";
 import type { NlpFetchTimeouts } from "./nlp-fetch.channel.ts";
 
+/** The job's route as a transport; a job queued before the route existed posts direct. */
+function executeSyncTransportOf({
+  input,
+  projectApiKey,
+}: {
+  input: AgentAdapterBuildInput;
+  projectApiKey: string;
+}): ExecuteSyncTransport {
+  const route = input.executeSyncRoute;
+  return childExecuteSyncTransport({
+    relayBaseUrl: route?.mode === "relay" ? route.relayBaseUrl : undefined,
+    nlpServiceUrl: route?.mode === "direct" ? route.nlpServiceUrl : input.nlpServiceUrl,
+    nlpInternalSecret: input.nlpInternalSecret,
+    projectApiKey,
+  });
+}
+
 /** The serialized description one agent adapter is built from. */
 export type AgentAdapterBuildInput = {
   adapterData: TargetAdapterData;
@@ -41,6 +61,8 @@ export type AgentAdapterBuildInput = {
   /** The engine hop's shared credential, as the parent stated it for this child. */
   nlpInternalSecret?: string | undefined;
   projectApiKey?: string;
+  /** Where a code or workflow turn posts, as the parent chose it; absent posts direct. */
+  executeSyncRoute?: ExecuteSyncRoute | undefined;
   parameters?: RunParameterValues;
   httpPort?: ScenarioHttp;
   logger?: Logger;
@@ -136,6 +158,7 @@ export const SERIALIZED_AGENT_RUNTIMES = {
         projectApiKey: input.projectApiKey,
         parameters: input.parameters,
         timeouts: nlpTimeouts,
+        transport: executeSyncTransportOf({ input, projectApiKey: input.projectApiKey }),
       });
     },
   }),
@@ -154,6 +177,7 @@ export const SERIALIZED_AGENT_RUNTIMES = {
         projectApiKey: input.projectApiKey,
         parameters: input.parameters,
         timeouts: nlpTimeouts,
+        transport: executeSyncTransportOf({ input, projectApiKey: input.projectApiKey }),
       });
     },
   }),

@@ -10,7 +10,9 @@ import type {
   TargetConfig,
 } from "@langwatch/scenario-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import { resolveExecuteSyncRoute } from "../rules/execute-sync-route.rules.ts";
 import type {
   RunSuite,
   ScenarioExecutionLookupService,
@@ -92,6 +94,8 @@ type CompletionOptions = {
   traces: TraceApi;
   /** Mints the per-run key a code agent's sandbox holds. */
   runKeys: Pick<ScenarioRunKeyService, "sandboxTokenFor">;
+  /** Whether a code or workflow turn relays to the project's own engine. */
+  workflows: Pick<WorkflowApi, "hasPerProjectEngines">;
 };
 
 export class ScenarioPrefetchCompletionService {
@@ -464,6 +468,12 @@ export class ScenarioPrefetchCompletionService {
         simulatorModelParams: prepared.simulator.params,
         judgeModelParams: prepared.judge.params,
         nlpServiceUrl: this.options.config.nlpServiceUrl,
+        executeSyncRoute: resolveExecuteSyncRoute({
+          perProjectEngines: this.options.workflows.hasPerProjectEngines(),
+          langwatchEndpoint: this.options.config.langwatchEndpoint,
+          baseHost: this.options.config.publicBaseUrl ?? "",
+          nlpServiceUrl: this.options.config.nlpServiceUrl,
+        }),
         target,
         ...(target.type === "voice" ? { callerVoice: validated.scenario.callerVoice } : {}),
         ...(traceWaitTimeoutMs !== void 0 ? { traceWaitTimeoutMs } : {}),

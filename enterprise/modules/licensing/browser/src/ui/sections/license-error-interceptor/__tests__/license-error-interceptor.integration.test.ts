@@ -4,9 +4,9 @@
  * reader over every failed mutation, and that reader opens the upgrade modal.
  */
 
-import { installedModuleFailures } from "@langwatch/browser/application";
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
+import { installedModuleFailures } from "@langwatch/browser/application";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { licensingWeb } from "../../../../licensing.web.ts";
@@ -61,6 +61,20 @@ describe("Feature: Upgrade modal when a call is refused by the licence", () => {
       resource: "prompts",
     });
     expect(isHandledByGlobalHandler(error)).toBe(true);
+  });
+
+  it("leaves a Developer seat denial to the generic error path, with no upgrade modal", () => {
+    const error = failedCall({
+      data: {
+        code: "UNAUTHORIZED",
+        error: { code: "developer_seat_restricted", meta: { resource: "project" } },
+      },
+    });
+
+    expect(reportLicenseFailure(error)).toBe(false);
+
+    expect(useUpgradeModalStore.getState().variant).toBeNull();
+    expect(isHandledByGlobalHandler(error)).toBe(false);
   });
 
   it("A refusal the licence does not explain is left to the screen", () => {

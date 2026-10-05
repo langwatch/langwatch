@@ -86,11 +86,18 @@ export class MemoryGroupRepository extends GroupRepository {
     groupIds: string[];
     organizationId: string;
   }): Promise<Map<string, OrganizationGroupMember[]>> {
+    // A Developer seat gets nothing through a group (ADR-171), as in the Prisma twin.
+    const developers = new Set(
+      this.memory.organizationUsers
+        .filter((row) => row.organizationId === input.organizationId && row.role === "DEVELOPER")
+        .map((row) => row.userId),
+    );
     const result = new Map<string, OrganizationGroupMember[]>();
     for (const groupId of input.groupIds) {
+      const members = await this.findMembers({ groupId, organizationId: input.organizationId });
       result.set(
         groupId,
-        await this.findMembers({ groupId, organizationId: input.organizationId }),
+        members.filter((member) => !developers.has(member.userId)),
       );
     }
     return result;

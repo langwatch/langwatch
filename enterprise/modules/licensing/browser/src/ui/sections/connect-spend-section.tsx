@@ -4,7 +4,7 @@ import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
 import type { ConnectContractView } from "@langwatch/enterprise-licensing-contract";
 import { CircleDollarSign, Gauge, PiggyBank, Wallet } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { connectApi } from "../../behavior/connect-api.ts";
 import { formatPeriodStart, formatUsd } from "../../model/hosted-services.ts";
@@ -26,16 +26,20 @@ export function ConnectSpendSection({
 }) {
   const host = useLicensingHost();
   const usage = status.usage;
-  if (!usage) return null;
+  if (!usage) {
+    return status.isUsageUnavailable ? (
+      <SpendSection>
+        <Text fontSize="sm" color="fg.muted" data-testid="connect-usage-unavailable">
+          Usage unavailable. LangWatch could not be reached, so spend and the cap cannot be shown
+          right now. The hosted services keep their settings.
+        </Text>
+      </SpendSection>
+    ) : null;
+  }
   const contract = usage.contract;
 
   return (
-    <SettingsSection
-      icon={<CircleDollarSign size={18} />}
-      title="Spend"
-      hint="What this install has spent on hosted services, and the cap it stops at."
-      data-testid="connect-spend"
-    >
+    <SpendSection>
       {contract ? (
         <VStack width="full" align="stretch" gap={5}>
           <SpendFigures contract={contract} spendAvailable={usage.spendAvailable} />
@@ -50,6 +54,19 @@ export function ConnectSpendSection({
           description="No spend limit has been agreed for hosted services yet. Contact LangWatch to agree one."
         />
       )}
+    </SpendSection>
+  );
+}
+
+function SpendSection({ children }: { children: ReactNode }) {
+  return (
+    <SettingsSection
+      icon={<CircleDollarSign size={18} />}
+      title="Spend"
+      hint="What this install has spent on hosted services, and the cap it stops at."
+      data-testid="connect-spend"
+    >
+      {children}
     </SettingsSection>
   );
 }

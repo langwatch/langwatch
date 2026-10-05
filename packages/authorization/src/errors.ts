@@ -8,6 +8,21 @@ import { HandledError } from "@langwatch/handled-error";
 import type { AuthzDenialReason } from "./decision.ts";
 import type { ScopeTier } from "./scope-tiers.ts";
 
+/** The copy a denial carries: a capped seat is named, anything else names the scope. */
+function permissionDeniedMessage({
+  denialReason,
+  scopeType,
+}: {
+  denialReason: AuthzDenialReason;
+  scopeType: string;
+}): string {
+  if (denialReason === "lite-member-restricted") {
+    return "This feature is not available for your account";
+  }
+  if (denialReason === "developer-restricted") return "This is outside your Developer seat";
+  return `You do not have permission to access this ${scopeType}`;
+}
+
 /**
  * ADR-092 §2 — the one denial error. `denialReason` replaces the legacy
  * pattern of smuggling `organizationRole` out of permission checks so error
@@ -31,20 +46,14 @@ export class PermissionDeniedError extends HandledError {
     };
     denialReason: AuthzDenialReason;
   }) {
-    super(
-      "permission_denied",
-      denialReason === "lite-member-restricted"
-        ? "This feature is not available for your account"
-        : `You do not have permission to access this ${scope.type}`,
-      {
-        httpStatus: 403,
-        meta: {
-          permission,
-          scopeType: scope.type,
-          denialReason,
-        },
+    super("permission_denied", permissionDeniedMessage({ denialReason, scopeType: scope.type }), {
+      httpStatus: 403,
+      meta: {
+        permission,
+        scopeType: scope.type,
+        denialReason,
       },
-    );
+    });
     this.name = "PermissionDeniedError";
   }
 
@@ -76,6 +85,22 @@ export class LiteMemberRestrictedError extends HandledError {
       httpStatus: 401,
     });
     this.name = "LiteMemberRestrictedError";
+  }
+}
+
+/**
+ * A Developer seat (ADR-171) asked for something outside its personal project.
+ * The seat is the reason, not a missing binding, so the way forward is another seat.
+ */
+export class DeveloperSeatRestrictedError extends HandledError {
+  declare readonly code: "developer_seat_restricted";
+
+  constructor(resource: string) {
+    super("developer_seat_restricted", "This is outside your Developer seat", {
+      meta: { resource },
+      httpStatus: 401,
+    });
+    this.name = "DeveloperSeatRestrictedError";
   }
 }
 

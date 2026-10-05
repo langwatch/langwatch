@@ -65,6 +65,20 @@ export class PrismaAuthDirectoryRepository {
     return membership !== null;
   }
 
+  async findActiveMemberRole({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<string | null> {
+    const membership = await this.database.organizationUser.findFirst({
+      where: { userId, organizationId, disabledAt: null },
+      select: { role: true },
+    });
+    return membership?.role ?? null;
+  }
+
   async getLiveProject({
     projectId,
     organizationId,

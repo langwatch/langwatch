@@ -68,6 +68,22 @@ export const PRODUCTS: readonly ProductDefinition[] = [
   },
 ];
 
+/**
+ * Whether a seat may open a product at all, before any flag or permission is asked.
+ * A Developer (ADR-171) owns a personal project and nothing shared, so no
+ * organization-wide product is open to them, whatever the permissions say.
+ */
+export function seatReachesProduct({
+  product,
+  organizationRole,
+}: {
+  product: Pick<ProductDefinition, "scopeKind">;
+  organizationRole: string | null | undefined;
+}): boolean {
+  if (organizationRole !== "DEVELOPER") return true;
+  return product.scopeKind !== "organization";
+}
+
 export function productById(id: ProductId): ProductDefinition {
   const product = PRODUCTS.find((candidate) => candidate.id === id);
   if (!product) throw new Error(`Unknown product id "${id}"`);

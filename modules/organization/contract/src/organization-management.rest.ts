@@ -129,19 +129,33 @@ export const organizationManagementRestInviteSchema = z.object({
 export const organizationManagementRestCreateInvitesSchema = z.object({
   invites: z
     .array(
-      z.object({
-        email: z.string().trim().min(1).email(),
-        role: organizationApiMemberRoleSchema,
-        teams: z
-          .array(
-            z.object({
-              teamId: z.string().min(1),
-              role: teamUserRoleSchema,
-              customRoleId: z.string().min(1).optional(),
-            }),
-          )
-          .min(1),
-      }),
+      z
+        .object({
+          email: z.string().trim().min(1).email(),
+          role: organizationApiMemberRoleSchema,
+          teams: z
+            .array(
+              z.object({
+                teamId: z.string().min(1),
+                role: teamUserRoleSchema,
+                customRoleId: z.string().min(1).optional(),
+              }),
+            )
+            .optional(),
+        })
+        // Every seat names a team except a Developer, who is invited onto none (ADR-171).
+        .superRefine((invite, ctx) => {
+          if (invite.role !== "DEVELOPER" && !invite.teams?.length) {
+            ctx.addIssue({
+              code: "too_small",
+              origin: "array",
+              minimum: 1,
+              inclusive: true,
+              path: ["teams"],
+              message: "Too small: expected array to have >=1 items",
+            });
+          }
+        }),
     )
     .min(1)
     .max(50),

@@ -8,10 +8,12 @@ import { createHash, createPublicKey } from "node:crypto";
 import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import {
   ConnectBudgetExhaustedError,
+  ConnectUnreachableError,
+  HostedServiceUnavailableError,
   DEFAULT_LICENSE_PUBLIC_KEY,
 } from "@langwatch/enterprise-licensing-contract";
 import { Temporal, type Instant } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   TEST_PRIVATE_KEY,
@@ -256,7 +258,50 @@ describe("reading the settings when the host refuses", () => {
       licensed: true,
       usage: null,
       refusal: { code: "connect_budget_exhausted" },
+      isUsageUnavailable: false,
     });
+  });
+});
+
+describe("reading the settings when LangWatch cannot be reached", () => {
+  describe.each([
+    [
+      "the host is unreachable",
+      () => new ConnectUnreachableError({ host: "gateway.test", port: 443 }),
+    ],
+    [
+      "the host answers with no usable reply",
+      () => new HostedServiceUnavailableError({ reasons: [new Error("502 from a proxy")] }),
+    ],
+    ["the read fails unexpectedly", () => new Error("socket hang up")],
+  ])("when %s", (_label, failure) => {
+    /** @scenario "A usage read that cannot reach LangWatch shows usage as unavailable" */
+    it("reports usage as unavailable instead of a refusal or a failed read", async () => {
+      const { service } = install({
+        license: licenseNaming(["instant_evals"]),
+        gateway: MemoryConnectGatewayChannel.create({ usage: failure() }),
+      });
+
+      const status = await service.getStatus(ORGANIZATION);
+
+      expect(status).toMatchObject({
+        deployment: "on",
+        licensed: true,
+        usage: null,
+        refusal: null,
+        isUsageUnavailable: true,
+      });
+    });
+  });
+
+  it("gives the read a ten second deadline", async () => {
+    const gateway = MemoryConnectGatewayChannel.create();
+    const usage = vi.spyOn(gateway, "usage");
+    const { service } = install({ license: licenseNaming(["instant_evals"]), gateway });
+
+    await service.getStatus(ORGANIZATION);
+
+    expect(usage.mock.calls[0]?.[0].signal).toBeInstanceOf(AbortSignal);
   });
 });
 

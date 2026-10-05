@@ -26,7 +26,7 @@ const organizationInviteRowSchema = z
     organizationId: z.string().min(1),
     teamIds: z.string(),
     teamAssignments: z.unknown().nullable(),
-    role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
+    role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
     requestedBy: z.string().nullable(),
     subscriptionId: z.string().nullable(),
     acceptedByUserId: z.string().nullable(),
@@ -130,7 +130,7 @@ export const organizationUserRowsSchema = organizationMemberUserSchema.array();
 export const organizationMemberRecordSchema = z.object({
   userId: z.string().min(1),
   organizationId: z.string().min(1),
-  role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
+  role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
   createdAt: z.date(),
   updatedAt: z.date(),
   departmentId: z.string().nullable(),
@@ -157,7 +157,7 @@ export const organizationMemberDirectorySchema = z.object({
     z.object({
       userId: z.string().min(1),
       organizationId: z.string().min(1),
-      role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
+      role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
       createdAt: z.date(),
       updatedAt: z.date(),
       departmentId: z.string().nullable(),

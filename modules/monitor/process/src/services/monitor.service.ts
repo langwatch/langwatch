@@ -1,7 +1,11 @@
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { isDeepStrictEqual } from "node:util";
+
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
   MonitorEvaluatorRequiredError,
   MonitorNotFoundError,
+  MonitorParametersUnusedError,
   monitorCreateInputSchema,
   monitorEnabledGuardrailInputSchema,
   monitorExecutionModeSchema,
@@ -9,6 +13,7 @@ import {
   monitorIdInputSchema,
   monitorMappingsInputSchema,
   monitorNameAvailabilityInputSchema,
+  monitorSettingsSchema,
   monitorReplicationInputSchema,
   monitorToggleInputSchema,
   monitorUpdateInputSchema,
@@ -19,6 +24,7 @@ import {
   type MonitorExperimentUpsertInput,
   type MonitorIdInput,
   type MonitorNameAvailabilityInput,
+  type MonitorPatchInput,
   type MonitorReplicationInput,
   type MonitorToggleInput,
   type MonitorUpdateInput,
@@ -29,7 +35,8 @@ import type { MonitorRepository } from "../repositories/monitor.repository.ts";
 
 export type MonitorServiceOptions = {
   repository: MonitorRepository;
-  evaluators: Pick<EvaluatorApi, "getById">;
+  evaluators: Pick<EvaluatorApi, "getById" | "findById">;
+  evaluation: Pick<EvaluationApi, "getEvaluatorEffectiveSettings">;
   generateId: () => string;
 };
 
@@ -106,10 +113,11 @@ export class MonitorService {
 
     if (!parsed.evaluatorId) throw new MonitorEvaluatorRequiredError();
 
-    await this.options.evaluators.getById({
+    const evaluator = await this.options.evaluators.getById({
       id: parsed.evaluatorId,
       projectId: parsed.projectId,
     });
+    await this.assertParametersWillRun({ evaluator, parameters: parsed.parameters });
 
     const name = await this.uniqueName(parsed.projectId, parsed.name);
     const id = this.options.generateId();
@@ -140,6 +148,57 @@ export class MonitorService {
       slug: slugify(parsed.name),
       mappings: monitorMappingsInputSchema.parse(parsed.mappings),
     });
+  }
+
+  /**
+   * Checks a patch against the evaluator the monitor runs with afterwards: the
+   * one it moves to, else its own when the patch names parameters. A move
+   * re-checks the stored parameters too.
+   */
+  async assertPatchParametersWillRun(input: {
+    existing: MonitorWithEvaluator;
+    changes: MonitorPatchInput["changes"];
+  }): Promise<void> {
+    const { existing, changes } = input;
+    // Clearing the evaluator is refused by the update itself, ahead of any parameters.
+    if (changes.evaluatorId === null) return;
+    const scope = { projectId: existing.projectId };
+    let evaluator: Evaluator | undefined;
+
+    if (changes.evaluatorId) {
+      evaluator = await this.options.evaluators.getById({ ...scope, id: changes.evaluatorId });
+    } else if (changes.parameters !== undefined && existing.evaluatorId) {
+      evaluator = await this.options.evaluators.findById({ ...scope, id: existing.evaluatorId });
+    }
+    if (!evaluator) return;
+
+    const stored = monitorSettingsSchema.safeParse(existing.parameters);
+    await this.assertParametersWillRun({
+      evaluator,
+      parameters: changes.parameters ?? (stored.success ? stored.data : undefined),
+    });
+  }
+
+  /**
+   * Refuses `parameters` the run would never read: the runner hands the judge
+   * the evaluator's own settings whenever it has some, so parameters that
+   * disagree with them would read back as the configuration while never running.
+   */
+  private async assertParametersWillRun(input: {
+    evaluator: Pick<Evaluator, "id" | "type" | "config">;
+    parameters: Record<string, unknown> | undefined;
+  }): Promise<void> {
+    const { evaluator, parameters } = input;
+    if (!parameters || Object.keys(parameters).length === 0) return;
+
+    const { settings, source } = await this.options.evaluation.getEvaluatorEffectiveSettings({
+      config: evaluator.config,
+      parameters,
+      evaluatorRecordType: evaluator.type,
+    });
+    if (source === "monitor-parameters" || isDeepStrictEqual(settings, parameters)) return;
+
+    throw new MonitorParametersUnusedError(evaluator.id);
   }
 
   async delete(input: MonitorIdInput): Promise<{ success: true }> {

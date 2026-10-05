@@ -83,4 +83,30 @@ describe("Analytics timeseries route table", () => {
       ).toBe("evaluation_runs");
     });
   });
+
+  describe("given a metadata.key filter on a blocklisted key sent with · for .", () => {
+    it("falls back to trace_summaries (the builders read the dotted key)", () => {
+      const table = pickAnalyticsTable({
+        series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+        filters: { "metadata.key": ["input·value"] },
+      });
+      expect(table).toBe("trace_summaries");
+    });
+  });
+
+  describe("given an evaluation metric filtered by custom metadata", () => {
+    // The eval slim row carries only the evaluation events' metadata, never
+    // the trace's, so it would count nothing (langwatch/tasks#919).
+    it.each([{ "metadata.key": ["outcome"] }, { "metadata.value": { outcome: ["ok"] } }])(
+      "routes %j to evaluation_runs",
+      (filters) => {
+        const query = {
+          series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality" }],
+          groupBy: "evaluations.evaluation_label",
+        };
+        expect(pickAnalyticsTable(query as never)).toBe("evaluation_analytics");
+        expect(pickAnalyticsTable({ ...query, filters } as never)).toBe("evaluation_runs");
+      },
+    );
+  });
 });

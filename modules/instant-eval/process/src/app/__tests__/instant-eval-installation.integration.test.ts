@@ -10,6 +10,7 @@ import type {
   LangWatchQLJudgementCall,
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -22,6 +23,7 @@ import {
   InstantEvalMemoryJudgeInProductionError,
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import {
@@ -139,6 +141,7 @@ function projectWithTeam(id: string): ProjectWithTeam {
 /** The peers a run resolves through, each answering the one question it asks. */
 function installation({
   isReleased = true,
+  isOptedIn = false,
   isFreePlan = true,
   classifier = "jev",
   judgeKey = "test-judge-key",
@@ -147,8 +150,14 @@ function installation({
   isConnectOn = false,
   nodeEnvironment = "test",
   analytics = {},
+  isSaas = true,
+  planType,
+  mayManageOrganization = true,
+  recordOptIn = async () => undefined,
 }: {
   isReleased?: boolean;
+  /** Whether the organization switched Instant Evals on itself, as organization answers. */
+  isOptedIn?: boolean;
   isFreePlan?: boolean;
   classifier?: "jev" | "null" | "memory" | undefined;
   /** `null` is an install that configured no key of its own. */
@@ -161,6 +170,12 @@ function installation({
   nodeEnvironment?: string;
   /** Analytics operations a test answers itself, over the defaults below. */
   analytics?: Partial<AnalyticsApi>;
+  isSaas?: boolean;
+  /** The active plan's tier, which decides whether the switch is offered at all. */
+  planType?: string;
+  /** What authz answers for `organization:manage` on the project's organization. */
+  mayManageOrganization?: boolean;
+  recordOptIn?: OrganizationApi["recordInstantEvalsOptIn"];
 } = {}) {
   return (
     createApp({ role: "api", secrets: judgeSecrets(judgeKey ?? undefined) })
@@ -178,6 +193,7 @@ function installation({
       })
       .withStores(memoryStores())
       .withMember("nodeEnvironment", nodeEnvironment)
+      .withMember("isSaas", isSaas)
       // The api role sends commands; what drains them is the worker's, and the
       // pipeline has its own tests.
       .withEventing(
@@ -210,13 +226,21 @@ function installation({
           findWithTeam: async (id) => projectWithTeam(id),
         }),
         entitlement: createApiFixture<EntitlementApi>({
-          getActivePlan: async () => planFor({ free: isFreePlan }),
+          getActivePlan: async () => ({
+            ...planFor({ free: isFreePlan }),
+            ...(planType ? { type: planType } : {}),
+          }),
         }),
         gateway: createApiFixture<GatewayApi>(gateway),
         licensing: createApiFixture<LicensingApi>({
           isConnectServiceEnabled: async () => isConnectOn,
         }),
         trace: createApiFixture<TraceApi>({}),
+        organization: createApiFixture<OrganizationApi>({
+          isInstantEvalsOptedIn: async () => isOptedIn,
+          recordInstantEvalsOptIn: recordOptIn,
+        }),
+        authz: createApiFixture<AuthzApi>({ can: async () => mayManageOrganization }),
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async () => isReleased,
         }),
@@ -268,6 +292,16 @@ describe("given a process that installs Instant Evals over the memory tier", () 
         await expect(
           codeOf(api.createRun({ projectId: PROJECT, actor: ACTOR, input: runOf() })),
         ).resolves.toBe("instant_eval_not_enabled");
+      });
+    });
+  });
+
+  describe("when a project's flag is off and its organization switched Instant Evals on", () => {
+    /** @scenario "An organization that switched itself on is judged without the flag" */
+    it("may judge, from the organization's switch", async () => {
+      await withInstallation({ isReleased: false, isOptedIn: true }, async (api) => {
+        await expect(api.isReleased({ projectId: PROJECT })).resolves.toBe(true);
+        await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(true);
       });
     });
   });
@@ -532,6 +566,67 @@ describe("given a hosted Connect call judged on LangWatch Cloud", () => {
           );
         },
       );
+    });
+  });
+});
+
+describe("given an organization's own Instant Evals switch", () => {
+  describe("when a member who may manage the organization reads the offer", () => {
+    it("offers the switch on the hosted service", async () => {
+      const access = await withInstallation({ isReleased: false }, (api) =>
+        api.getOptInAccess({ projectId: PROJECT, userId: "member-1" }),
+      );
+
+      expect(access).toEqual({ released: false, offer: "enable" });
+    });
+  });
+
+  describe("when a member who may not manage the organization reads the offer", () => {
+    it("tells them to ask an admin", async () => {
+      const access = await withInstallation(
+        { isReleased: false, mayManageOrganization: false },
+        (api) => api.getOptInAccess({ projectId: PROJECT, userId: "member-1" }),
+      );
+
+      expect(access.offer).toBe("ask_admin");
+    });
+  });
+
+  describe("when the switch is thrown", () => {
+    it("records the project's own organization and the member", async () => {
+      const recorded: unknown[] = [];
+      const access = await withInstallation(
+        {
+          isReleased: false,
+          recordOptIn: async (input) => {
+            recorded.push(input);
+          },
+        },
+        (api) => api.optIn({ projectId: PROJECT, userId: "member-1" }),
+      );
+
+      expect(access).toEqual({ released: true, offer: "enable" });
+      expect(recorded).toEqual([{ organizationId: ORGANIZATION, userId: "member-1" }]);
+    });
+  });
+
+  describe("when an enterprise organization's switch is thrown", () => {
+    it("refuses it by code and records nothing", async () => {
+      const recorded: unknown[] = [];
+
+      await expect(
+        withInstallation(
+          {
+            isReleased: false,
+            planType: "ENTERPRISE",
+            recordOptIn: async (input) => {
+              recorded.push(input);
+            },
+          },
+          (api) => api.optIn({ projectId: PROJECT, userId: "member-1" }),
+        ),
+      ).rejects.toMatchObject({ code: "instant_eval_opt_in_not_offered" });
+      expect(recorded).toEqual([]);
     });
   });
 });

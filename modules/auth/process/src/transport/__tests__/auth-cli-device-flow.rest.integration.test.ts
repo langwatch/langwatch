@@ -884,6 +884,40 @@ describe("given a CLI starting a device login", () => {
       await expect(exchanged.json()).resolves.toMatchObject({ project: { id: "project-shared" } });
     });
 
+    describe("when the caller holds a Developer seat (ADR-171)", () => {
+      /** @scenario CLI login refuses a shared project for a Developer */
+      /** @scenario project-login approval refuses a shared project for a Developer, naming the seat */
+      it("refuses a shared project, naming the seat", async () => {
+        const world = deviceFlowWorld();
+        world.memberRole = "DEVELOPER";
+        world.project = liveProject();
+        const api = mount(world);
+        const grant = await pendingProjectKeyCode(api);
+
+        const approved = await approveProject(api, grant, "project-shared");
+        const body = await approved.text();
+
+        expect(approved.status).toBe(400);
+        expect(JSON.parse(body)).toMatchObject({ error: "developer_seat_personal_only" });
+        expect(body).not.toContain("sk-lw-shared");
+      });
+
+      /** @scenario A Developer works inside their own project */
+      /** @scenario project-login approval honours a Developer's own personal project */
+      it("still honours their own personal project", async () => {
+        const world = deviceFlowWorld();
+        world.memberRole = "DEVELOPER";
+        world.project = liveProject({ id: "project-mine", isPersonal: true, ownerUserId: USER_ID });
+        const api = mount(world);
+        const grant = await pendingProjectKeyCode(api);
+
+        const approved = await approveProject(api, grant, "project-mine");
+
+        expect(approved.status).toBe(200);
+        await expect(approved.json()).resolves.toMatchObject({ project: { id: "project-mine" } });
+      });
+    });
+
     /** @scenario project-login approval denies a project the caller cannot manage */
     it("refuses a shared project the caller does not administer and discloses no key", async () => {
       const world = deviceFlowWorld();
@@ -1346,6 +1380,7 @@ function deviceFlowWorld(
   /** What the world answers right now — every field a test may move mid-flow. */
   interface DeviceFlowWorld {
     activeMembership: boolean;
+    memberRole: string;
     /** The project the directory answers NOW, moved between approve and exchange. */
     project: LiveProject | null;
     /** Whether the person still administers it NOW. */
@@ -1366,6 +1401,7 @@ function deviceFlowWorld(
   }
   const world: DeviceFlowWorld = {
     activeMembership: true,
+    memberRole: "ADMIN",
     project: null,
     administersProject: true,
     personExists: true,
@@ -1391,6 +1427,7 @@ function deviceFlowWorld(
         ? Promise.reject(new Error("directory unavailable"))
         : Promise.resolve(world.maxSessionDurationDays),
     hasActiveMembership: () => Promise.resolve(world.activeMembership),
+    findActiveMemberRole: () => Promise.resolve(world.activeMembership ? world.memberRole : null),
     getLiveProject: () =>
       world.project === null
         ? Promise.reject(new ProjectNotFoundError())

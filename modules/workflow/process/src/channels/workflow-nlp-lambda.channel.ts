@@ -1,8 +1,12 @@
+import { STATUS_CODES } from "node:http";
+
 import { createLogger } from "@langwatch/observability";
 
+import { readLwaResponsePayload } from "../rules/lambda-web-adapter-stream.rules.ts";
 import { sealStagedPayload } from "../rules/staged-payload-seal.rules.ts";
 import {
   type NlpLambdaInvoke,
+  type NlpLambdaInvokeResult,
   type NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
   STAGED_PAYLOAD_KEY_HEADER,
@@ -35,6 +39,80 @@ export class InvokePayloadTooLargeError extends Error {
   }
 }
 
+/** AWS ran the function and it raised, so the engine gave no answer: a gateway status. */
+const FUNCTION_ERROR_STATUS = 502;
+
+/** The call ran past the `timeoutMs` its caller set, on either lane: the engine was still busy. */
+export class NlpInvokeTimeoutError extends Error {
+  constructor(options: { path: string; timeoutMs: number }) {
+    super(`nlpgo call to ${options.path} exceeded its ${options.timeoutMs}ms deadline`);
+    this.name = "NlpInvokeTimeoutError";
+  }
+}
+
+/** The caller's own `signal` aborted the call, on either lane: the answer is no longer wanted. */
+export class NlpInvokeAbortedError extends Error {
+  constructor(options: { path: string }) {
+    super(`nlpgo call to ${options.path} was cancelled by its caller`);
+    this.name = "NlpInvokeAbortedError";
+  }
+}
+
+type Deadline = Readonly<{
+  signal: AbortSignal | undefined;
+  hasTimedOut: () => boolean;
+  isCancelled: () => boolean;
+}>;
+
+/** One signal for the transport, and which of the caller's two limits fired. */
+function armDeadline(request: NlpInvokeRequest): Deadline {
+  const timeoutSignal =
+    request.timeoutMs === undefined ? undefined : AbortSignal.timeout(request.timeoutMs);
+  const signals = [request.signal, timeoutSignal].filter(
+    (candidate): candidate is AbortSignal => candidate !== undefined,
+  );
+  return {
+    signal: signals.length <= 1 ? signals[0] : AbortSignal.any(signals),
+    hasTimedOut: () => timeoutSignal?.aborted ?? false,
+    isCancelled: () => request.signal?.aborted ?? false,
+  };
+}
+
+/** Runs one transport call, re-raising a fired deadline or cancellation as its typed error. */
+async function classifyingLimits<R>(input: {
+  run: () => Promise<R>;
+  deadline: Deadline;
+  request: NlpInvokeRequest;
+}): Promise<R> {
+  const { deadline, request } = input;
+  try {
+    return await input.run();
+  } catch (error) {
+    if (deadline.isCancelled()) throw new NlpInvokeAbortedError({ path: request.path });
+    if (deadline.hasTimedOut() && request.timeoutMs !== undefined) {
+      throw new NlpInvokeTimeoutError({ path: request.path, timeoutMs: request.timeoutMs });
+    }
+    throw error;
+  }
+}
+
+/** A FunctionError is a 502; a refused invoke keeps AWS's status; else the engine's own. */
+function answeredStatus(input: {
+  result: NlpLambdaInvokeResult;
+  engineStatus: number | null;
+}): number {
+  const { result, engineStatus } = input;
+  if (result.functionError) return FUNCTION_ERROR_STATUS;
+  const invocationSucceeded = result.statusCode >= 200 && result.statusCode < 300;
+  if (!invocationSucceeded) return result.statusCode;
+  return engineStatus ?? result.statusCode;
+}
+
+/** The reason phrase `fetch` would give, so both lanes describe one engine answer alike. */
+function reasonPhrase(status: number): string {
+  return STATUS_CODES[status] ?? `HTTP ${status}`;
+}
+
 /** The staging policy as a value, so the transport never reads the environment. */
 export type NlpInvokeStagingConfig = Readonly<{
   /** Unset falls back to the built-in default rather than disabling staging. */
@@ -50,6 +128,10 @@ export type NlpInvokeRequest = Readonly<{
   body?: string;
   /** Scopes the staging client and key; without it nothing is ever staged. */
   projectId?: string;
+  /** A deadline for the whole call on either lane; absent imposes none. */
+  timeoutMs?: number;
+  /** The caller's cancellation on either lane; already aborted, nothing is staged or sent. */
+  signal?: AbortSignal;
 }>;
 
 export type NlpInvokeResponse = Readonly<{
@@ -89,16 +171,23 @@ export class NlpInvokeTransportAdapter {
   ) {}
 
   async send(request: NlpInvokeRequest): Promise<NlpInvokeResponse> {
+    const deadline = armDeadline(request);
     const targetIsLambdaArn = this.options.target.startsWith("arn:aws:lambda");
     if (targetIsLambdaArn) {
-      return this.invokeLambda(request);
+      return this.invokeLambda({ request, deadline });
     }
 
     const call = this.options.fetch ?? fetch;
-    const response = await call(`${this.options.target.replace(/\/$/, "")}${request.path}`, {
-      method: request.method ?? "GET",
-      ...(request.headers ? { headers: request.headers } : {}),
-      ...(request.body === undefined ? {} : { body: request.body }),
+    const response = await classifyingLimits({
+      run: () =>
+        call(`${this.options.target.replace(/\/$/, "")}${request.path}`, {
+          method: request.method ?? "GET",
+          ...(request.headers ? { headers: request.headers } : {}),
+          ...(request.body === undefined ? {} : { body: request.body }),
+          ...(deadline.signal ? { signal: deadline.signal } : {}),
+        }),
+      deadline,
+      request,
     });
     return {
       ok: response.ok,
@@ -109,7 +198,16 @@ export class NlpInvokeTransportAdapter {
     };
   }
 
-  private async invokeLambda(request: NlpInvokeRequest): Promise<NlpInvokeResponse> {
+  private async invokeLambda({
+    request,
+    deadline,
+  }: {
+    request: NlpInvokeRequest;
+    deadline: Deadline;
+  }): Promise<NlpInvokeResponse> {
+    // A turn whose caller already gave up must not upload a payload or start user code.
+    if (request.signal?.aborted) throw new NlpInvokeAbortedError({ path: request.path });
+
     const lambda = this.options.lambda;
     if (!lambda) {
       throw new Error(
@@ -157,7 +255,13 @@ export class NlpInvokeTransportAdapter {
 
     let result;
     try {
-      result = await lambda.invoke({ functionArn: this.options.target, payload });
+      // The channel's retries sit inside this try, so a staged object outlives every attempt.
+      result = await classifyingLimits({
+        run: () =>
+          lambda.invoke({ functionArn: this.options.target, payload, signal: deadline.signal }),
+        deadline,
+        request,
+      });
     } finally {
       // By the time the invoke settles the receiver has already fetched the
       // presigned URL. In a finally so a failed invoke still reaps the object;
@@ -165,13 +269,16 @@ export class NlpInvokeTransportAdapter {
       if (staged) await staged.discard();
     }
 
-    // A Lambda response payload can carry NUL-separated frames; the last
-    // non-empty one is the body.
-    const body = result.payload.split("\u0000").filter(Boolean).pop() ?? "";
+    // A FunctionError or a refused invoke carries no engine answer; only a successful
+    // invocation's prelude states nlpgo's own status, and a payload without one keeps AWS's.
+    const { status: engineStatus, body } = readLwaResponsePayload(
+      Buffer.from(result.payload, "utf-8"),
+    );
+    const status = answeredStatus({ result, engineStatus });
     return {
-      ok: result.statusCode >= 200 && result.statusCode < 300,
-      status: result.statusCode,
-      statusText: result.functionError ?? "OK",
+      ok: status >= 200 && status < 300,
+      status,
+      statusText: result.functionError ?? reasonPhrase(status),
       json: () => Promise.resolve(JSON.parse(body) as unknown),
       text: () => Promise.resolve(body),
     };

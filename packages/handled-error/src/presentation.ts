@@ -309,6 +309,10 @@ const label = (map: Record<string, string>, key: string): string | undefined => 
 
 const presentations = {
   // ---- traces & spans ----
+  annotation_not_found: {
+    title: "Annotation not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
   trace_not_found: {
     title: "Trace not found",
     describe: () =>
@@ -773,6 +777,11 @@ const presentations = {
     title: "This evaluation needs an evaluator",
     describe: () =>
       "Pick an existing evaluator or create one first, then attach it to the evaluation.",
+  },
+  monitor_parameters_unused: {
+    title: "These settings belong to the evaluator",
+    describe: () =>
+      "This evaluation runs with its evaluator's settings. Change them on the evaluator instead.",
   },
   monitor_not_found: {
     title: "Online evaluation not found",
@@ -3276,11 +3285,16 @@ const presentations = {
   instant_eval_not_enabled: {
     title: "Instant Evals aren't available yet",
     describe: () =>
-      "This project can't run Instant Evals. Ask us to turn them on for your workspace.",
+      "Instant Evals are off for this organization. Ask an organization admin how to switch them on, or contact us.",
   },
   instant_eval_not_found: {
     title: "That run doesn't exist",
     describe: () => "The run may have been deleted, or the id may belong to another project.",
+  },
+  instant_eval_opt_in_not_offered: {
+    title: "Ask us to switch Instant Evals on",
+    describe: () =>
+      "LangWatch turns on Instant Evals for enterprise plans and self-hosted installs. Contact us to get them.",
   },
   instant_eval_query_budget_exceeded: {
     title: "That's too much text to judge in one query",
@@ -3623,6 +3637,23 @@ const presentations = {
   dataset_name_taken: {
     title: "That name is taken",
     describe: () => "Pick a different name for this dataset.",
+  },
+  developer_seat_no_shared_access: {
+    // Not a field to correct: the seat sets the ceiling. The scope can be a
+    // team, a project or the organization, so the copy names the seat.
+    title: "A Developer seat has no shared access",
+    describe: (error) => {
+      const scopeName = str(error, "scopeName", "");
+      const scope = scopeName ? ` on "${scopeName}"` : "";
+      return `A Developer seat works in its own project only, so no role can be given${scope}. Move them to a Member seat to give them shared access.`;
+    },
+  },
+  developer_seat_restricted: {
+    // A Developer seat reaches its own project only (ADR-143). No admin can
+    // grant a role here, so the copy names the seat rather than a permission.
+    title: "This is outside your Developer seat",
+    describe: () =>
+      "A Developer seat works in your own project only. Ask an admin for a Member seat if you need shared projects.",
   },
   dataset_column_type_change_unsupported: {
     // Customer fault in the ADR-045 sense: they asked for something the format
@@ -4154,6 +4185,13 @@ const presentations = {
         ? `This project has sent as many as a minute allows. Try again in ${seconds} second${seconds === 1 ? "" : "s"}.`
         : "This project has sent as many as a minute allows. Try again now.";
     },
+  },
+
+  trigger_graph_immutable: {
+    title: "This alert stays on its graph",
+    describe: () =>
+      "An alert keeps the graph it was created on. Create an alert on the " +
+      "graph you want and delete this one.",
   },
 
   trigger_kind_immutable: {

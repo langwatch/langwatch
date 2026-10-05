@@ -127,6 +127,7 @@ import {
   type AgentTestTurnJob,
   type ScenarioLogContext,
   type TakenPendingNavigate,
+  isVoiceTunnelEnabled,
   scenarioConfig,
   type ScenarioServerConfig,
 } from "@langwatch/scenario-contract";
@@ -365,7 +366,7 @@ export class ScenarioModule implements ScenarioApi {
     const voice = await VoicePublicUrlService.create().resolveForRole({
       role: setup.role,
       configuredUrl: setup.config.voicePublicBaseUrl,
-      tunnelEnabled: setup.config.voiceTunnel,
+      tunnelEnabled: isVoiceTunnelEnabled(setup.config),
       workerOnly: setup.config.voiceWorkerOnly,
       port: setup.members.rawSocketPort,
     });
@@ -413,6 +414,7 @@ export class ScenarioModule implements ScenarioApi {
       langwatchEndpoint: config.langwatchEndpoint ?? "",
       nlpServiceUrl: setup.members.nlpServiceUrl ?? "",
       legacyDefaultModel: config.defaultModel ?? DEFAULT_MODEL,
+      publicBaseUrl: setup.members.publicBaseUrl,
     };
     const { redis } = setup.members;
     const broadcast = setup.dependencies.presence;

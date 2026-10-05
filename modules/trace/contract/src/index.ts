@@ -21,6 +21,7 @@ export * from "./trace-instant-eval.schemas.ts";
 export * from "./trace-langwatch-ql-filter.ts";
 export * from "./trace-query-analysis.ts";
 export * from "./trace-query-ast.ts";
+export * from "./trace-custom-metadata-conditions.ts";
 export * from "./trace-query-evaluator-group.ts";
 export * from "./trace-query-examples.ts";
 export * from "./trace-query-grammar.ts";

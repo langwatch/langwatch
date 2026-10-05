@@ -38,6 +38,9 @@ class PatchApiTriggersByIdBody:
         filter_query (None | str | Unset): The trace query this automation is about, in the syntax the traces view uses.
             When set it supersedes `filters`.
         action (PatchApiTriggersByIdBodyAction | Unset):
+        custom_graph_id (None | str | Unset): The graph this alert watches, which an update cannot change. Accepted so
+            that writing the read response back works; a different graph is refused. Create an alert on the other graph and
+            delete this one.
         action_params (PatchApiTriggersByIdBodyActionParamsType0 | PatchApiTriggersByIdBodyActionParamsType1 |
             PatchApiTriggersByIdBodyActionParamsType2 | PatchApiTriggersByIdBodyActionParamsType3 |
             PatchApiTriggersByIdBodyActionParamsType4 | Unset): Replaces the delivery configuration as a whole rather than
@@ -66,6 +69,7 @@ class PatchApiTriggersByIdBody:
     filters: PatchApiTriggersByIdBodyFilters | Unset = UNSET
     filter_query: None | str | Unset = UNSET
     action: PatchApiTriggersByIdBodyAction | Unset = UNSET
+    custom_graph_id: None | str | Unset = UNSET
     action_params: (
         PatchApiTriggersByIdBodyActionParamsType0
         | PatchApiTriggersByIdBodyActionParamsType1
@@ -127,6 +131,12 @@ class PatchApiTriggersByIdBody:
         if not isinstance(self.action, Unset):
             action = self.action.value
 
+        custom_graph_id: None | str | Unset
+        if isinstance(self.custom_graph_id, Unset):
+            custom_graph_id = UNSET
+        else:
+            custom_graph_id = self.custom_graph_id
+
         action_params: dict[str, Any] | Unset
         if isinstance(self.action_params, Unset):
             action_params = UNSET
@@ -176,6 +186,8 @@ class PatchApiTriggersByIdBody:
             field_dict["filterQuery"] = filter_query
         if action is not UNSET:
             field_dict["action"] = action
+        if custom_graph_id is not UNSET:
+            field_dict["customGraphId"] = custom_graph_id
         if action_params is not UNSET:
             field_dict["actionParams"] = action_params
         if graph_alert is not UNSET:
@@ -267,6 +279,15 @@ class PatchApiTriggersByIdBody:
         else:
             action = PatchApiTriggersByIdBodyAction(_action)
 
+        def _parse_custom_graph_id(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        custom_graph_id = _parse_custom_graph_id(d.pop("customGraphId", UNSET))
+
         def _parse_action_params(
             data: object,
         ) -> (
@@ -357,6 +378,7 @@ class PatchApiTriggersByIdBody:
             filters=filters,
             filter_query=filter_query,
             action=action,
+            custom_graph_id=custom_graph_id,
             action_params=action_params,
             graph_alert=graph_alert,
             report=report,

@@ -10,7 +10,6 @@ import { createLogger } from "@langwatch/observability";
 import {
   InviteNotFoundError,
   InviteNotReadyError,
-  OrganizationUserRole,
   TeamUserRole,
   type OrganizationInvite,
 } from "@langwatch/organization-contract";
@@ -21,7 +20,10 @@ import {
   type InviteServiceDependencies,
 } from "../rules/invite-contracts.rules.ts";
 import { resolveInviteTeamMemberships } from "../rules/invite-memberships.rules.ts";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
+import {
+  holdsOrganizationBinding,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "../rules/member-role-constraints.rules.ts";
 
 const logger = createLogger("langwatch:invites");
 
@@ -90,6 +92,7 @@ export class InviteAcceptanceService {
         userId,
         organizationId: invite.organizationId,
         role: invite.role,
+        admission: { inviteId: invite.id, actorUserId: invite.requestedBy ?? null },
       });
 
       return true;
@@ -219,7 +222,7 @@ export class InviteAcceptanceService {
   }
 
   /**
-   * The grant tail of `applyInvite`: the ORGANIZATION-scoped grant (skipped for EXTERNAL)
+   * The grant tail of `applyInvite`: the ORGANIZATION-scoped grant (Full seats only)
    * and each team's grant. Idempotent (revoke-then-attach, duplicates skipped), so both the
    * fresh-accept caller and the retry-repair caller in `applyInvite` can run it safely.
    */
@@ -241,7 +244,7 @@ export class InviteAcceptanceService {
       fallback: "inviteService",
     });
 
-    if (invite.role !== OrganizationUserRole.EXTERNAL) {
+    if (holdsOrganizationBinding(invite.role)) {
       await this.attachOrganizationGrant({ userId, invite, actor });
     }
 

@@ -710,7 +710,7 @@ export interface paths {
         delete: operations["deleteApiTriggersById"];
         options?: never;
         head?: never;
-        /** @description Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be changed. */
+        /** @description Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an alert's graph cannot be changed. */
         patch: operations["patchApiTriggersById"];
         trace?: never;
     };
@@ -11085,6 +11085,8 @@ export interface operations {
                     filterQuery?: string | null;
                     /** @enum {string} */
                     action?: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                    /** @description The graph this alert watches, which an update cannot change. Accepted so that writing the read response back works; a different graph is refused. Create an alert on the other graph and delete this one. */
+                    customGraphId?: string | null;
                     /** @description Replaces the delivery configuration as a whole rather than merging into it: send the fields this automation should have from now on, and anything left out is removed. The one exception is a credential the read hid: send back the `[redacted]` placeholder and the stored credential is kept (a Slack automation not yet on a connection has its stored secret moved into one), so reading an automation, changing one field and writing the whole object back is safe. Only this channel's fields are accepted; anything else is refused rather than dropped, and the rule this automation fires by belongs in `graphAlert` or `report`. */
                     actionParams?: ({
                         /** @description Who receives the email. Any address, not only teammates. */
@@ -28281,7 +28283,7 @@ export interface operations {
                         members: {
                             userId: string;
                             /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                             disabled: boolean;
                             disabledAt: string | null;
                             /** Format: date-time */
@@ -28320,7 +28322,7 @@ export interface operations {
                     "application/json": {
                         userId: string;
                         /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                         disabled: boolean;
                         disabledAt: string | null;
                         /** Format: date-time */
@@ -28383,7 +28385,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    role?: "ADMIN" | "MEMBER" | "EXTERNAL";
+                    role?: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                     disabled?: boolean;
                 };
             };
@@ -28398,7 +28400,7 @@ export interface operations {
                     "application/json": {
                         userId: string;
                         /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                         disabled: boolean;
                         disabledAt: string | null;
                         /** Format: date-time */
@@ -28495,7 +28497,7 @@ export interface operations {
                             id: string;
                             email: string;
                             /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                             status: string;
                             expiration: string | null;
                             inviteCode: string;
@@ -28527,8 +28529,8 @@ export interface operations {
                         /** Format: email */
                         email: string;
                         /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
-                        teams: {
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
+                        teams?: {
                             teamId: string;
                             /** @enum {string} */
                             role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
@@ -28550,7 +28552,7 @@ export interface operations {
                             id: string;
                             email: string;
                             /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                             status: string;
                             expiration: string | null;
                             inviteCode: string;

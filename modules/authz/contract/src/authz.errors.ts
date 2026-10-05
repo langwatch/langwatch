@@ -215,6 +215,20 @@ export class AuthzLiteMemberViewerOnlyError extends HandledError {
   }
 }
 
+/** A role on anything shared was asked for somebody on a Developer seat (ADR-171). */
+export class AuthzDeveloperSeatNoSharedAccessError extends HandledError {
+  declare readonly code: "developer_seat_no_shared_access";
+
+  constructor(scopeName?: string | null) {
+    super(
+      "developer_seat_no_shared_access",
+      "A Developer seat holds no role outside its own personal project.",
+      { meta: scopeName ? { scopeName } : {}, httpStatus: 409, fault: "customer" },
+    );
+    this.name = "AuthzDeveloperSeatNoSharedAccessError";
+  }
+}
+
 /** Storage signal lifted by AuthzGrantsService into DuplicateGrantError. */
 export class DuplicateBindingError extends Error {
   readonly code = "role_binding_already_exists" as const;

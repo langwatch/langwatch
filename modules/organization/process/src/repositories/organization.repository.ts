@@ -105,6 +105,14 @@ export abstract class OrganizationRepository {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<void>;
+  /** An unknown organization reads as not opted in. */
+  abstract isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean>;
+  /** First write wins: the moment and member that gave the agreement are kept. */
+  abstract recordInstantEvalsOptIn(input: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void>;
   abstract getOldestTeamId(organizationId: string): Promise<string>;
   abstract getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile>;
   abstract getWithAdministrators(organizationId: string): Promise<OrganizationWithAdministrators>;

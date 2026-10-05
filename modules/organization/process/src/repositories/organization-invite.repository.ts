@@ -127,10 +127,12 @@ export abstract class OrganizationInviteRepository {
     acceptedByUserId: string;
     acceptedViaIdentifierId: string | null;
   }): Promise<number>;
+  /** A Developer row also writes its admission audit row, in the same write (ADR-171). */
   abstract addMembership(input: {
     userId: string;
     organizationId: string;
     role: OrganizationUserRole;
+    admission?: { inviteId: string; actorUserId: string | null };
   }): Promise<void>;
   /** Throws `InviteNotFoundError`. */
   abstract getInviteStatus(input: { inviteId: string }): Promise<{ status: string }>;

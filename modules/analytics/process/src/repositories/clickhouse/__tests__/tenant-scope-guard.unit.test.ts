@@ -82,16 +82,26 @@ describe("tenant scope guard vs the timeseries builders", () => {
     expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
   });
 
-  it("passes buildEvalSlimTimeseriesQuery when a filter clause carries its own OR", () => {
+  it("passes buildEvalSlimTimeseriesQuery with no filters", () => {
     const { sql, params } = buildEvalSlimTimeseriesQuery({
       projectId: "tenant-a",
       ...dates,
       series: [{ metric: "evaluations.evaluation_score", aggregation: "avg" } as AnalyticsSeries],
       timeScale: 60,
-      filters: { "metadata.key": ["a", "b"] },
     });
 
-    expect(sql).toContain(" OR ");
     expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+  });
+
+  it("refuses a filter on the eval slim, which the router sends to evaluation_runs", () => {
+    expect(() =>
+      buildEvalSlimTimeseriesQuery({
+        projectId: "tenant-a",
+        ...dates,
+        series: [{ metric: "evaluations.evaluation_score", aggregation: "avg" } as AnalyticsSeries],
+        timeScale: 60,
+        filters: { "metadata.key": ["a", "b"] },
+      }),
+    ).toThrow(/Eval slim builder cannot serve filter "metadata.key"/);
   });
 });

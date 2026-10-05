@@ -77,6 +77,7 @@ make deps
 
 # Install with local values
 helm upgrade --install lw . \
+  --namespace lw-local --create-namespace \
   -f examples/values-local.yaml \
   --wait --timeout 10m
 ```
@@ -111,19 +112,21 @@ Each profile uses the corresponding `examples/values-{profile}.yaml` file.
 
 The `values-local.yaml` profile deploys:
 
-| Component         | Replicas | Notes                     |
-| ----------------- | -------- | ------------------------- |
-| LangWatch App     | 1        | NodePort on 30560         |
-| LangWatch Workers | 1        | Separate pod              |
-| LangWatch NLP     | 1        |                           |
-| LangEvals         | 1        |                           |
-| PostgreSQL        | 1        | Chart-managed             |
-| ClickHouse        | 1        | Chart-managed, standalone |
-| Redis             | 1        | Chart-managed             |
+| Component         | Replicas | Notes                                    |
+| ----------------- | -------- | ---------------------------------------- |
+| LangWatch App     | 1        | NodePort on 30560                        |
+| LangWatch Workers | 1        | Separate pod                             |
+| LangWatch NLP     | 1        |                                          |
+| LangEvals         | 1        |                                          |
+| PostgreSQL        | 1        | Chart-managed                            |
+| ClickHouse        | 1        | Chart-managed, standalone                |
+| Redis             | 1        | Chart-managed                            |
+| AI Gateway        | 2 to 10  | Autoscaled, image pulled from Docker Hub |
+| Langy assistant   | 1        | Image pulled from Docker Hub             |
 
 - `autogen.enabled: true`, secrets are auto-generated
-- `pullPolicy: Never`, uses locally-built images
-- Prometheus is disabled to save resources
+- `pullPolicy: Never` for the app, NLP, LangEvals and ClickHouse images, so they must be built and loaded first
+- Prometheus and CronJobs are disabled to save resources
 
 ## Teardown
 

@@ -128,7 +128,22 @@ export class SsoArrivalService {
       return;
     }
 
-    await this.deps.memberships.createMembership({ organizationId: org.id, userId: user.id });
+    const written = await this.deps.memberships.createMembership({
+      organizationId: org.id,
+      userId: user.id,
+    });
+    if (written.seat === "DEVELOPER") {
+      // No grant, so nothing to resume: the row is the admission (ADR-171).
+      // Only the arrival that created it announces.
+      if (written.outcome !== "created") return;
+      await this.deps.notifications?.joinedAutomatically({
+        organizationId: org.id,
+        requesterUserId: user.id,
+        domain,
+      });
+      this.announceAutoJoin({ user, org, inviteId: null });
+      return;
+    }
     await this.resumeAdmission({ user, organizationId: org.id, domain });
   }
 

@@ -25,10 +25,11 @@ import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts
 import { profileNameMaySave, sanitizeProfileName } from "../../model/profile-name.ts";
 import { AvatarUploadControl } from "./avatar-upload-control.tsx";
 
-/** "Admin", "Guest" or "Member": the words a colleague would use. */
+/** "Admin", "Guest", "Developer" or "Member": the words a colleague would use. */
 function roleLabel(role: string): string {
   if (role === "ADMIN") return "Admin";
   if (role === "EXTERNAL") return "Guest";
+  if (role === "DEVELOPER") return "Developer";
   return "Member";
 }
 

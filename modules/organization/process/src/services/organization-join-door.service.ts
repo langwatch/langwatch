@@ -160,6 +160,7 @@ export class OrganizationJoinDoorService {
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      joinerRole?: JoinRequestJoining["joinerRole"];
       actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged> {
@@ -170,6 +171,8 @@ export class OrganizationJoinDoorService {
       next: change.next,
       previousDomains: [...change.previousDomains],
       nextDomains: [...change.nextDomains],
+      previousJoinerRole: change.previousJoinerRole,
+      nextJoinerRole: change.nextJoinerRole,
     };
   }
 }

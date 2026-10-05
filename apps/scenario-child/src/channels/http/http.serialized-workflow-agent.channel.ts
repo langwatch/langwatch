@@ -6,15 +6,15 @@
 import { randomBytes } from "crypto";
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
-import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import { resolveFieldMappings } from "@langwatch/scenario-contract";
 import type { RunParameterValues, WorkflowAgentData } from "@langwatch/scenario-contract";
-import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
 
-import { type FetchInitWithDispatcher, type NlpFetchTimeouts } from "../nlp-fetch.channel.ts";
+import { type ExecuteSyncResponse, type ExecuteSyncTransport } from "../execute-sync.channel.ts";
+import { type NlpFetchTimeouts } from "../nlp-fetch.channel.ts";
 import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
+import { directExecuteSyncTransport } from "./http.execute-sync.channel.ts";
 import { HttpNlpFetchChannel } from "./http.nlp-fetch.channel.ts";
 
 /**
@@ -39,6 +39,8 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
     timeouts?: NlpFetchTimeouts;
     /** The engine hop's shared credential, as the parent stated it for this child. */
     nlpInternalSecret?: string | undefined;
+    /** How the turn reaches the project's engine; absent posts to `nlpServiceUrl` directly. */
+    transport?: ExecuteSyncTransport;
   }): HttpSerializedWorkflowAgentChannel {
     return new HttpSerializedWorkflowAgentChannel(options);
   }
@@ -61,6 +63,8 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
   private readonly timeouts: NlpFetchTimeouts;
   /** The engine hop's shared credential, as the parent stated it for this child. */
   private readonly nlpInternalSecret: string | undefined;
+  /** How the turn reaches the project's engine. */
+  private readonly transport: ExecuteSyncTransport;
 
   constructor({
     config,
@@ -69,6 +73,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
     parameters,
     timeouts,
     nlpInternalSecret,
+    transport,
   }: {
     config: WorkflowAgentData;
     nlpServiceUrl: string;
@@ -76,6 +81,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
     parameters?: RunParameterValues;
     timeouts?: NlpFetchTimeouts;
     nlpInternalSecret?: string | undefined;
+    transport?: ExecuteSyncTransport;
   }) {
     super();
     this.config = config;
@@ -84,6 +90,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
     this.parameters = parameters ?? {};
     this.timeouts = timeouts ?? {};
     this.nlpInternalSecret = nlpInternalSecret;
+    this.transport = transport ?? directExecuteSyncTransport({ nlpServiceUrl, nlpInternalSecret });
     this.name = "SerializedWorkflowAgentAdapter";
   }
 
@@ -210,7 +217,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
 
     try {
       const response = await this.postExecuteSync({
-        body: JSON.stringify(event),
+        event,
         signal: controller.signal,
         timeoutMs,
       });
@@ -235,7 +242,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
         );
       }
 
-      const result = (await response.json()) as {
+      const result = JSON.parse(await response.text()) as {
         trace_id: string;
         status: string;
         result: Record<string, unknown> | null;
@@ -247,37 +254,23 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
   }
 
   private async postExecuteSync({
-    body,
+    event,
     signal,
     timeoutMs,
   }: {
-    body: string;
+    event: unknown;
     signal: AbortSignal;
     timeoutMs: number;
-  }): Promise<UndiciResponse> {
+  }): Promise<ExecuteSyncResponse> {
     try {
-      const fetchInit: FetchInitWithDispatcher = {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...nlpInternalSecretHeaders({ secret: this.nlpInternalSecret }),
-        },
-        body,
-        signal,
-        dispatcher: HttpNlpFetchChannel.create().dispatcher({ timeoutMs }),
-      };
-      // undici's own fetch, not the global one: Node's global fetch is bound
-      // to the undici bundled with Node, which rejects a dispatcher built by
-      // this package with "invalid onRequestStart method" (see
-      // mailer/providers/resend.ts for the same fix).
-      return await undiciFetch(`${this.nlpServiceUrl}/go/studio/execute_sync`, fetchInit);
+      return await this.transport.post({ event, signal, timeoutMs });
     } catch (fetchError) {
       const cause =
         fetchError instanceof Error && "cause" in fetchError
           ? ` (cause: ${String((fetchError as Error & { cause?: unknown }).cause)})`
           : "";
       throw new Error(
-        `Workflow execution failed: fetch to ${this.nlpServiceUrl}/go/studio/execute_sync failed - ${
+        `Workflow execution failed: fetch to ${this.transport.endpoint} failed - ${
           fetchError instanceof Error ? fetchError.message : String(fetchError)
         }${cause}`,
       );

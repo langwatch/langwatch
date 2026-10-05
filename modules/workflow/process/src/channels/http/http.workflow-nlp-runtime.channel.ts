@@ -73,6 +73,8 @@ export type NlpDispatchRequest = Readonly<{
   projectId: string;
   causalityDepth?: number;
   parentTrace?: { traceId: string; parentSpanId: string };
+  timeoutMs?: number;
+  signal?: AbortSignal;
 }>;
 
 /** How the adapter is composed, whichever engine it reaches. */
@@ -157,6 +159,8 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
       projectId: input.projectId,
       ...(input.causalityDepth === undefined ? {} : { causalityDepth: input.causalityDepth }),
       ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
+      ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+      ...(input.signal ? { signal: input.signal } : {}),
     });
   }
 
@@ -211,6 +215,8 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
       headers,
       body: JSON.stringify(request.body),
       projectId: request.projectId,
+      ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+      ...(request.signal ? { signal: request.signal } : {}),
     });
 
     return {
@@ -218,6 +224,7 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
       status: response.status,
       statusText: response.statusText,
       json: () => response.json(),
+      text: () => response.text(),
     };
   }
 }

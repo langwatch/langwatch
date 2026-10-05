@@ -142,6 +142,8 @@ export interface ScenarioPrefetchFixture {
   organizationId?: string;
   /** The run-key mint; unconfigured, every key is "run-key". */
   apiKeys?: Partial<Pick<ApiKeyApi, "mintRunKey">>;
+  /** Whether workflow reports per-project engines; absent, it does not. */
+  perProjectEngines?: boolean;
 }
 
 class TestScenarioSecretCipher implements ScenarioSecretCipher {
@@ -285,6 +287,7 @@ function agentService(deps: ScenarioPrefetchFixture): AgentApi {
 
 function workflowService(deps: ScenarioPrefetchFixture): WorkflowApi {
   return fakeService<WorkflowApi>({
+    hasPerProjectEngines: () => deps.perProjectEngines ?? false,
     getById: async (input) => {
       const value = await deps.workflowVersionFetcher.getLatestDsl({
         projectId: input.projectId,

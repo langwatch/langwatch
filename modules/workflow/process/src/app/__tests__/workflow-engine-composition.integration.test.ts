@@ -172,3 +172,13 @@ describe("a process that names no engine at all", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("when a scenario asks whether a deployment without a fleet has per-project engines", () => {
+  it("answers no for an engine address", async () => {
+    expect((await appAt({ nlpServiceUrl: "http://nlp.test" })).hasPerProjectEngines()).toBe(false);
+  });
+
+  it("answers no with no engine at all", async () => {
+    expect((await appAt({ nlpServiceUrl: void 0 })).hasPerProjectEngines()).toBe(false);
+  });
+});

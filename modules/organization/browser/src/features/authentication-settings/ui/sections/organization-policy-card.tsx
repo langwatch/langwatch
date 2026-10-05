@@ -38,9 +38,10 @@ export function OrganizationPolicyCard({
       data-testid="organization-policy"
     >
       <JoinPolicyCard
-        key={`${joinRequests.joining.domainJoin}:${joinRequests.joining.joinDomains.join(",")}`}
+        key={`${joinRequests.joining.domainJoin}:${joinRequests.joining.joinDomains.join(",")}:${joinRequests.joining.joinerRole}`}
         domainJoin={joinRequests.joining.domainJoin}
         joinDomains={joinRequests.joining.joinDomains}
+        joinerRole={joinRequests.joining.joinerRole}
         saving={joinRequests.savingJoining}
         planLocked={twoStep.planLocked}
         planLink={twoStep.planLink}

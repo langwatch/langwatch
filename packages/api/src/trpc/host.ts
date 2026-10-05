@@ -3,6 +3,7 @@
  * SAME router. tRPC is session-authenticated by definition, so the session reader is required.
  */
 import {
+  DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   MembershipDisabledError,
   type AuthzScopeLineageResult,
@@ -95,10 +96,11 @@ export type TrpcRequestContext = {
 /** Whatever this root made of one declared namespace. */
 export type TrpcNamespace = unknown;
 
-/** This transport's own refusal copy: the two answers the declared check gives. */
+/** This transport's own refusal copy: the answers the declared check gives. */
 const DENIALS: TrpcAuthorizationDenial = {
   membershipDisabled: () => new MembershipDisabledError(),
   liteMemberRestricted: (resource: string) => new LiteMemberRestrictedError(resource),
+  developerSeatRestricted: (resource: string) => new DeveloperSeatRestrictedError(resource),
 };
 
 export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {

@@ -1,6 +1,7 @@
 import type {
   DomainJoinSetting,
   JoinCandidateOrganization,
+  JoinerRole,
   JoinRequestAggregateState,
 } from "@langwatch/identity-contract";
 import {
@@ -82,7 +83,7 @@ function harness({
   /** Membership per organization; overrides `isMember`. */
   memberOf?: string[];
   dismissedDomains?: string[];
-  setting?: { domainJoin: DomainJoinSetting; joinDomains: string[] };
+  setting?: { domainJoin: DomainJoinSetting; joinDomains: string[]; joinerRole?: JoinerRole };
 } = {}) {
   const requests = {
     requestJoin: vi.fn(async (_command: Record<string, unknown>) => []),
@@ -1289,6 +1290,53 @@ describe("given the members area asking who walked in lately", () => {
     expect(reads.findAutomaticJoinsForOrganization).toHaveBeenCalledWith({
       organizationId: "org_acme",
       resolvedAfterMs: NOW - 14 * 24 * 60 * 60 * 1000,
+    });
+  });
+});
+
+describe("given the seat newcomers receive (ADR-171)", () => {
+  describe("when the administrator picks the Developer seat", () => {
+    /** @scenario The joiner seat setting lands email joiners as Developers */
+    it("saves it beside the door setting and reports both halves", async () => {
+      const { service, settings } = harness({
+        setting: { domainJoin: "request", joinDomains: [], joinerRole: "MEMBER" },
+      });
+
+      const change = await service.setJoining({
+        actorUserId: "user_admin",
+        organizationId: "org_acme",
+        domainJoin: "request",
+        domains: [],
+        joinerRole: "DEVELOPER",
+      });
+
+      expect(settings.write).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        domainJoin: "request",
+        joinDomains: [],
+        joinerRole: "DEVELOPER",
+      });
+      expect(change).toMatchObject({ previousJoinerRole: "MEMBER", nextJoinerRole: "DEVELOPER" });
+    });
+  });
+
+  describe("when a save names no seat", () => {
+    /** @scenario The joiner seat setting is Full by default */
+    it("keeps the seat already saved", async () => {
+      const { service, settings } = harness({
+        setting: { domainJoin: "request", joinDomains: [], joinerRole: "DEVELOPER" },
+      });
+
+      await service.setJoining({
+        actorUserId: "user_admin",
+        organizationId: "org_acme",
+        domainJoin: "off",
+        domains: [],
+      });
+
+      expect(settings.write).toHaveBeenCalledWith(
+        expect.objectContaining({ joinerRole: "DEVELOPER" }),
+      );
     });
   });
 });
