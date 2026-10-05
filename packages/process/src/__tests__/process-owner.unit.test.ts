@@ -1,4 +1,4 @@
-import { parseProcessConfig } from "@langwatch/config";
+import { parseProcessConfig, publicBaseUrl } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
 import { processOwner } from "../owner.ts";
@@ -14,6 +14,21 @@ describe("the process owner's own declaration", () => {
       );
       expect(read({ BASE_HOST: "   " }).baseHost).toBeUndefined();
       expect(read({}).baseHost).toBeUndefined();
+    });
+  });
+
+  describe("given a module holding the shared public origin leaf beside the process", () => {
+    /** @scenario "The process and a module both holding the public origin leaf parse it" */
+    it("parses BASE_HOST once for both, with no collision", () => {
+      const automation = { name: "automation", config: { publicBaseUrl } } as const;
+
+      const config = parseProcessConfig({
+        owners: [processOwner, automation],
+        environment: { BASE_HOST: " https://app.langwatch.test " },
+      });
+
+      expect(config.process.baseHost).toBe("https://app.langwatch.test");
+      expect(config.automation.publicBaseUrl).toBe("https://app.langwatch.test");
     });
   });
 

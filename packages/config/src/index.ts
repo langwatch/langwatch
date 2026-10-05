@@ -28,6 +28,7 @@ export {
   LOCAL_GATEWAY_URL,
   posthogHost,
   posthogKey,
+  publicBaseUrl,
   SAAS_GATEWAY_URL,
   signInProviders,
   signUpAllowedDomains,

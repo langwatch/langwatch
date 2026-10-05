@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { ConfigCollisionError, ConfigParseError } from "../config.errors.ts";
 import { Config, parseProcessConfig } from "../config.ts";
-import { langevalsStagingTtlSeconds } from "../deployment-facts.ts";
+import { langevalsStagingTtlSeconds, publicBaseUrl } from "../deployment-facts.ts";
 
 const github = {
   name: "github",
@@ -117,6 +117,22 @@ describe("parseProcessConfig", () => {
 
       expect(() => parseProcessConfig({ owners: [evaluation, rogue], environment: {} })).toThrow(
         expect.objectContaining({ code: "config_collision" }),
+      );
+    });
+  });
+
+  describe("given an owner holding the public origin leaf", () => {
+    const automation = { name: "automation", config: { publicBaseUrl } } as const;
+    const read = (environment: Record<string, string | undefined>) =>
+      parseProcessConfig({ owners: [automation], environment }).automation.publicBaseUrl;
+
+    /** @scenario "A blank public origin reads as absent" */
+    it("reads a blank or unset BASE_HOST as no public origin", () => {
+      expect(read({ BASE_HOST: "   " })).toBeUndefined();
+      expect(read({ BASE_HOST: "" })).toBeUndefined();
+      expect(read({})).toBeUndefined();
+      expect(read({ BASE_HOST: " https://app.langwatch.test " })).toBe(
+        "https://app.langwatch.test",
       );
     });
   });

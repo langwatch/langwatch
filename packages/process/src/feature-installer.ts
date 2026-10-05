@@ -153,16 +153,30 @@ export interface ModuleTaskSetup<
   Members,
   Repositories,
   App,
+  Config = unknown,
 > extends ModuleTransportFactSetup<Dependencies, Members, App> {
   readonly repositories: Repositories;
+  /** This module's slice of the one process parse (§6), as its App's `create` received it. */
+  readonly config: Config;
   /** The secrets this module's App declared, scoped to it; resolve with `secrets.into`. */
   readonly secrets: ScopedSecrets;
 }
 
 /** Builds a module's one-shot tasks over its booted App, once at install in the tasks role. */
-export type ModuleTaskBinder<Dependencies extends TokenMap, Members, Repositories, App> = (
-  setup: ModuleTaskSetup<Dependencies, Members, Repositories, App>,
+export type ModuleTaskBinder<
+  Dependencies extends TokenMap,
+  Members,
+  Repositories,
+  App,
+  Config = unknown,
+> = (
+  setup: ModuleTaskSetup<Dependencies, Members, Repositories, App, Config>,
 ) => readonly unknown[] | Promise<readonly unknown[]>;
+
+/** The parsed slice a declaration's phantom `configType` names; nothing where it declared none. */
+type DeclaredConfigOf<Declaration> = Declaration extends { readonly configType?: infer Config }
+  ? Exclude<Config, undefined>
+  : unknown;
 
 /** An inert API descriptor retained for the process root to mount later. */
 export type FeatureTransportDescriptor = Readonly<{
@@ -1722,7 +1736,13 @@ export type ModuleContributions<
       ...workers: readonly unknown[]
     ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
     withTasks(
-      bind: ModuleTaskBinder<Dependencies, Members, Repositories, Created>,
+      bind: ModuleTaskBinder<
+        Dependencies,
+        Members,
+        Repositories,
+        Created,
+        DeclaredConfigOf<Declaration>
+      >,
     ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
     withTasks(
       ...tasks: readonly unknown[]
@@ -1792,6 +1812,7 @@ function bindingTasks<Declaration extends object>(
           args.resolve,
         ) as ResolvedTokens<TokenMap>,
         members: args.members,
+        config: declaredConfig(args.config),
         secrets: args.secrets ?? undeclaredSecrets(installable.name),
       });
       return { ...state, tasks: [...(state.tasks ?? []), ...built] };

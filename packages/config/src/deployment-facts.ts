@@ -67,6 +67,20 @@ export const { telemetryExporterEndpoint } = Config.define((c) => ({
   ),
 }));
 
+/**
+ * This deployment's public origin (`BASE_HOST`): the process and every module that links back
+ * hold this one leaf. Absent and blank both mean "named none".
+ */
+export const { publicBaseUrl } = Config.define((c) => ({
+  publicBaseUrl: c.env(
+    "BASE_HOST",
+    z
+      .string()
+      .optional()
+      .transform((value) => value?.trim() || void 0),
+  ),
+}));
+
 /** The terminal fallback for a target that names no model; blank is not a model. */
 export const { langwatchDefaultModel } = Config.define((c) => ({
   langwatchDefaultModel: c.env(

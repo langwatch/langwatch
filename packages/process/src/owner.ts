@@ -2,7 +2,7 @@
  * The process-server's own declaration (§6): framework globals declare at
  * their framework owner, with the same primitive a module uses.
  */
-import { Config, isSaas } from "@langwatch/config";
+import { Config, isSaas, publicBaseUrl } from "@langwatch/config";
 import { Secret } from "@langwatch/secrets";
 import { z } from "zod";
 
@@ -61,17 +61,10 @@ export const processOwner = {
         .transform((value) => value?.trim() || void 0),
     ),
     /**
-     * This deployment's public origin: a process fact drilled to the modules
-     * that link back, never a config key each of them declares. Absent and
-     * blank both mean "named none", as the composition this replaced answered.
+     * This deployment's public origin: the shared leaf, so a module holding
+     * `publicBaseUrl` in its own slice reads the same fact without a collision.
      */
-    baseHost: c.env(
-      "BASE_HOST",
-      z
-        .string()
-        .optional()
-        .transform((value) => value?.trim() || void 0),
-    ),
+    baseHost: publicBaseUrl,
     /**
      * The standard proxy spellings, keyed by env name: a process fact handed to
      * every module whose outbound calls follow it, as the `outboundProxy` member.
