@@ -733,6 +733,13 @@ const registry = {
     ],
     docsPath: "/evaluations/evaluators/list",
   },
+  monitor_parameters_unused: {
+    tips: [
+      "Change the settings on the evaluator named in meta.evaluatorId: PUT /api/evaluators/{evaluatorId}",
+      "Or send parameters as {}; the evaluator's settings are what run, and a move to another evaluator re-checks the stored parameters",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
 
   // ---- default models ----
   model_not_configured: {

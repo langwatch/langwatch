@@ -951,6 +951,11 @@ const presentations = {
     describe: () =>
       "Pick an existing evaluator or create one first, then attach it to the evaluation.",
   },
+  monitor_parameters_unused: {
+    title: "These settings belong to the evaluator",
+    describe: () =>
+      "This evaluation runs with its evaluator's settings. Change them on the evaluator instead.",
+  },
   evaluator_not_found: { title: "Evaluator not found" },
   evaluator_config_error: {
     title: "This evaluator isn't configured correctly",
