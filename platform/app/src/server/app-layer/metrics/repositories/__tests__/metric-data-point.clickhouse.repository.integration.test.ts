@@ -591,6 +591,7 @@ describe("given points ensured for the tenant's organization", () => {
   describe("when one of an organization's points is accepted a second time", () => {
     const dedupTenantId = `${tag}-dedup-project`;
     const dedupOrganizationId = `${tag}-dedup-org`;
+    const DAY_MS = 24 * 60 * 60_000;
     const ledgerPoint = (timeUnixMs: number, accepted = acceptedAt) =>
       point({
         tenantId: dedupTenantId,
@@ -605,9 +606,10 @@ describe("given points ensured for the tenant's organization", () => {
       await repo.ensureDataPoints({
         points: [ledgerPoint(bucket0 + 1_000), ledgerPoint(bucket0 + 2_000)],
       });
-      // The same PointId again, accepted a second later: a second ledger row.
+      // The same PointId accepted again in a later monthly partition, where
+      // the engine cannot collapse the two rows: only the query dedups them.
       await repo.ensureDataPoints({
-        points: [ledgerPoint(bucket0 + 1_000, acceptedAt + 1_000)],
+        points: [ledgerPoint(bucket0 + 1_000, acceptedAt + 32 * DAY_MS)],
       });
     }, 30_000);
 
@@ -616,7 +618,7 @@ describe("given points ensured for the tenant's organization", () => {
         organizationId: dedupOrganizationId,
         tenantId: dedupTenantId,
         from: new Date(acceptedAt - 60 * 60_000),
-        to: new Date(acceptedAt + 60 * 60_000),
+        to: new Date(acceptedAt + 33 * DAY_MS),
         groupBy: "organization",
       });
 
@@ -624,6 +626,7 @@ describe("given points ensured for the tenant's organization", () => {
       expect(estimates[0]).toMatchObject({
         organizationId: dedupOrganizationId,
         acceptedPoints: 2,
+        canonicalRetainedBytes: 4,
         uniqueActiveSeries: 1,
       });
     });
