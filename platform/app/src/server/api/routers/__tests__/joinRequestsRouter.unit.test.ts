@@ -18,10 +18,15 @@ const auditLogMock = vi.fn(async () => undefined);
 const setJoiningMock = vi.fn();
 const verifiedEmailsOfMock = vi.fn();
 const findUserMock = vi.fn();
+const findUsersMock = vi.fn();
 const lookupMock = vi.fn();
+const requestMock = vi.fn();
+const admitMock = vi.fn();
+const pendingForOrganizationMock = vi.fn();
+const readJoiningMock = vi.fn();
 
 vi.mock("~/server/db", () => ({
-  prisma: { user: { findUnique: findUserMock } },
+  prisma: { user: { findUnique: findUserMock, findMany: findUsersMock } },
 }));
 
 vi.mock(
@@ -94,6 +99,10 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   joinRequestsService: () => ({
     setJoining: setJoiningMock,
     lookup: lookupMock,
+    request: requestMock,
+    joinAutomaticallyIfAdmitted: admitMock,
+    pendingForOrganization: pendingForOrganizationMock,
+    readJoining: readJoiningMock,
   }),
   // The second-factor gate runs after every permitted decision (D06). Nothing
   // here is about it, so it answers "satisfied" and gets out of the way.
@@ -129,7 +138,88 @@ beforeEach(() => {
   });
   verifiedEmailsOfMock.mockResolvedValue(null);
   findUserMock.mockResolvedValue(null);
+  findUsersMock.mockResolvedValue([]);
   lookupMock.mockResolvedValue({ outcome: "none" });
+  requestMock.mockResolvedValue({ joinRequestId: "jreq_1", state: "PENDING" });
+  admitMock.mockResolvedValue(null);
+  pendingForOrganizationMock.mockResolvedValue([]);
+  readJoiningMock.mockResolvedValue({
+    domainJoin: "request",
+    joinDomains: [],
+    joinerRole: "MEMBER",
+  });
+});
+
+describe("given a request made from the terminal", () => {
+  describe("when the welcome screen asks to join on the device page's behalf", () => {
+    /** @scenario A request made from the terminal lands as a Developer when approved */
+    it("hands the origin to the service", async () => {
+      verifiedEmailsOfMock.mockResolvedValue([{ value: "ana@acme.com" }]);
+
+      await caller().request({ organizationId: "org_acme", origin: "cli" });
+
+      expect(requestMock).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_acme", origin: "cli" }),
+      );
+    });
+
+    /** @scenario A request made on the web keeps the organisation's joiner seat */
+    it("reads an older client that names no origin as a web one", async () => {
+      verifiedEmailsOfMock.mockResolvedValue([{ value: "ana@acme.com" }]);
+
+      await caller().request({ organizationId: "org_acme" });
+
+      expect(requestMock).toHaveBeenCalledWith(
+        expect.objectContaining({ origin: "web" }),
+      );
+    });
+
+    /** @scenario The welcome screen honours an automatic door */
+    it("hands the origin to the automatic door too", async () => {
+      verifiedEmailsOfMock.mockResolvedValue([{ value: "ana@acme.com" }]);
+
+      await caller().admitAutomatically({ origin: "cli" });
+
+      expect(admitMock).toHaveBeenCalledWith(
+        expect.objectContaining({ origin: "cli" }),
+      );
+    });
+  });
+
+  describe("when an administrator opens the pending list", () => {
+    /** @scenario The pending list shows the seat each request will land as */
+    it("shows a Developer seat for the terminal's request and the joiner seat for the web's", async () => {
+      hasOrganizationPermission.mockResolvedValue(true);
+      const waiting = {
+        domain: "acme.com",
+        createdAtMs: 1_700_000_000_000,
+        expiresAtMs: null,
+      };
+      pendingForOrganizationMock.mockResolvedValue([
+        {
+          ...waiting,
+          joinRequestId: "jreq_cli",
+          userId: "user_sam",
+          origin: "cli",
+        },
+        {
+          ...waiting,
+          joinRequestId: "jreq_web",
+          userId: "user_dana",
+          origin: "web",
+        },
+      ]);
+
+      const pending = await caller().pending({ organizationId: "org_acme" });
+
+      expect(
+        pending.map(({ joinRequestId, seat }) => ({ joinRequestId, seat })),
+      ).toEqual([
+        { joinRequestId: "jreq_cli", seat: "DEVELOPER" },
+        { joinRequestId: "jreq_web", seat: "MEMBER" },
+      ]);
+    });
+  });
 });
 
 describe("given the caller's verified-address projection", () => {

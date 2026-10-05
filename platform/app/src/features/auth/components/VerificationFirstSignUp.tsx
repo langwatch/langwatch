@@ -273,7 +273,13 @@ export function VerificationFirstSignUp() {
     email: string,
   ): Promise<"link_sent" | "unconfirmed" | null> => {
     try {
-      const result = await requestVerification.mutateAsync({ email });
+      // The continuation rides on the emailed link, so a sign-up finished in
+      // a fresh tab still lands where this one was going; the server keeps
+      // only a path on this site.
+      const result = await requestVerification.mutateAsync({
+        email,
+        callbackUrl,
+      });
       if (!result.sent) {
         // No link can be mailed here, so the password step comes straight
         // away, over an unconfirmed proof.

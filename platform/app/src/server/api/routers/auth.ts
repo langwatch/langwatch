@@ -248,7 +248,15 @@ export const authRouter = createTRPCRouter({
    * what strands somebody on an account they half-created.
    */
   requestSignUpVerification: publicProcedure
-    .input(z.object({ email: z.string().email() }))
+    .input(
+      z.object({
+        email: z.string().email(),
+        // Where the screen goes once through. Carried onto the emailed link
+        // so a sign-up finished in a fresh tab still lands there; the link
+        // builder keeps only a path on this site.
+        callbackUrl: z.string().max(2048).optional(),
+      }),
+    )
     .noPermission({
       reason:
         "starts a signed-out visitor's own sign-up; no tenant scope exists before an account does",
@@ -319,7 +327,10 @@ export const authRouter = createTRPCRouter({
         };
       }
 
-      await verification.requestVerification({ email: input.email });
+      await verification.requestVerification({
+        email: input.email,
+        callbackUrl: input.callbackUrl,
+      });
       return { sent: true as const };
     }),
 

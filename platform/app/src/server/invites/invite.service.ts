@@ -1142,6 +1142,50 @@ export class InviteService {
    * one instead of wondering where it went. ACCEPTED rows are members, and
    * PAYMENT_PENDING rides the checkout surface; neither belongs here.
    */
+  /**
+   * The invitations waiting for an account, by the addresses it has PROVED
+   * (ADR-143 v6). What comes back includes the invitation code, which is the
+   * secret from the mail, so the caller hands in verified addresses only and
+   * this never falls back to anything softer. Lowercased the way an invite
+   * is stored. Nothing is asked when there is nothing to ask about.
+   */
+  async findPendingForAddresses({
+    addresses,
+  }: {
+    addresses: readonly string[];
+  }): Promise<
+    Array<{
+      inviteCode: string;
+      organizationName: string;
+      role: OrganizationUserRole;
+    }>
+  > {
+    const normalized = [
+      ...new Set(addresses.map((address) => address.trim().toLowerCase())),
+    ].filter(Boolean);
+    if (normalized.length === 0) return [];
+
+    const invites = await this.prisma.organizationInvite.findMany({
+      where: {
+        email: { in: normalized },
+        status: "PENDING",
+        OR: [{ expiration: null }, { expiration: { gt: new Date() } }],
+      },
+      select: {
+        inviteCode: true,
+        role: true,
+        organization: { select: { name: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return invites.map((invite) => ({
+      inviteCode: invite.inviteCode,
+      organizationName: invite.organization.name,
+      role: invite.role,
+    }));
+  }
+
   async listInvites({ organizationId }: { organizationId: string }): Promise<
     Array<
       OrganizationInvite & {

@@ -1384,7 +1384,8 @@ export function signUpVerification(): SignUpVerificationService {
       sendVerificationLink: ({ email, verificationUrl }) =>
         sendSignUpVerificationEmail({ email, verificationUrl }),
     },
-    buildVerificationUrl: ({ token }) => buildSignUpVerificationUrl(token),
+    buildVerificationUrl: ({ token, callbackUrl }) =>
+      buildSignUpVerificationUrl({ token, callbackUrl }),
   });
 }
 

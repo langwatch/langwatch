@@ -362,6 +362,32 @@ export const inviteRouter = createTRPCRouter({
    * one. Only addresses the account has proven count, the same ones
    * `acceptInvite` accepts.
    */
+  /**
+   * Every invitation waiting for the signed-in user, on any installation
+   * (ADR-143 v6). The welcome screen leads with one of these before it offers
+   * to ask to join, so an administrator who already invited somebody is not
+   * asked the question twice.
+   *
+   * VERIFIED addresses only, with no fall-back to the session address: the
+   * answer carries the invitation code, which is the secret from the mail,
+   * and it is handed over only to somebody who has proved they hold the
+   * address it was sent to. A user not yet on identifiers answers nothing.
+   */
+  pendingForMe: protectedProcedure
+    .input(z.object({}))
+    .noPermission({
+      reason:
+        "answers for the session user's own VERIFIED addresses; the caller belongs to no organization yet, and nothing about anybody else's invitations is reachable",
+    })
+    .query(async ({ ctx }) => {
+      const proven = await identityEmail().verifiedEmailsOf({
+        userId: ctx.session.user.id,
+      });
+      return InviteService.create(ctx.prisma).findPendingForAddresses({
+        addresses: (proven ?? []).map(({ value }) => value),
+      });
+    }),
+
   myPendingInvitation: protectedProcedure
     .input(z.object({}))
     .noPermission({

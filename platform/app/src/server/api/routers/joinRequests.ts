@@ -1,8 +1,10 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import {
   DOMAIN_JOIN_SETTINGS,
+  JOIN_REQUEST_ORIGINS,
   JOINER_ROLES,
   type JoinLookupDecision,
+  seatForJoiner,
 } from "@langwatch/identity";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -35,6 +37,13 @@ import {
  * the same permission that gates inviting, because approving a request and
  * sending an invitation are the same authority.
  */
+/**
+ * Where a request is made (ADR-143 v6), as the browser asserts it. Trusted
+ * because it can only LOWER the seat: `cli` lands a Developer, `web` the
+ * joiner seat, and an older client that names nothing is a web one.
+ */
+const joinOriginInput = z.enum(JOIN_REQUEST_ORIGINS).default("web");
+
 export const joinRequestsRouter = createTRPCRouter({
   /**
    * Which organizations are open to one of the caller's own verified
@@ -109,12 +118,12 @@ export const joinRequestsRouter = createTRPCRouter({
    * carries on to the offer or to workspace creation.
    */
   admitAutomatically: protectedProcedure
-    .input(z.object({}))
+    .input(z.object({ origin: joinOriginInput }))
     .noPermission({
       reason:
         "admits the caller to an organization that opted into admitting their own verified domain; the handler re-derives the match server-side and admits nothing else",
     })
-    .mutation(async ({ ctx }) => {
+    .mutation(async ({ ctx, input }) => {
       const verifiedEmail = await verifiedEmailFor({
         prisma: ctx.prisma,
         userId: ctx.session.user.id,
@@ -122,6 +131,7 @@ export const joinRequestsRouter = createTRPCRouter({
       const joined = await joinRequestsService().joinAutomaticallyIfAdmitted({
         userId: ctx.session.user.id,
         verifiedEmail,
+        origin: input.origin,
       });
       return { organization: joined?.organization ?? null };
     }),
@@ -147,7 +157,9 @@ export const joinRequestsRouter = createTRPCRouter({
 
   /** Ask one organization to let you in. */
   request: protectedProcedure
-    .input(z.object({ organizationId: z.string().min(1) }))
+    .input(
+      z.object({ organizationId: z.string().min(1), origin: joinOriginInput }),
+    )
     .noPermission({
       reason:
         "asking to join is the one action a non-member takes on an organization; the handler proves the organization was OFFERED to this caller's verified domain and refuses anything else as if it did not exist",
@@ -162,6 +174,7 @@ export const joinRequestsRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         verifiedEmail,
         organizationId: input.organizationId,
+        origin: input.origin,
       });
     }),
 
@@ -190,6 +203,11 @@ export const joinRequestsRouter = createTRPCRouter({
       const pending = await joinRequestsService().pendingForOrganization({
         organizationId: input.organizationId,
       });
+      // The seat each request lands in if approved (ADR-143 v6): read only,
+      // because approval carries no role choice and never will.
+      const { joinerRole } = await joinRequestsService().readJoining({
+        organizationId: input.organizationId,
+      });
       // Who is asking, by name. The requester's ADDRESS is deliberately not
       // returned: the domain is what was matched and what the admin is
       // deciding on, and the local part is not the organization's business
@@ -208,6 +226,7 @@ export const joinRequestsRouter = createTRPCRouter({
         requestedAt: new Date(request.createdAtMs),
         expiresAt:
           request.expiresAtMs === null ? null : new Date(request.expiresAtMs),
+        seat: seatForJoiner({ origin: request.origin, joinerRole }),
       }));
     }),
 
