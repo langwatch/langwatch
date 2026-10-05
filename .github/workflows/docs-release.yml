@@ -39,11 +39,15 @@ jobs:
         run: |
           CURRENT_TIME=$(date +%s)
           jq --arg current_time_val "$CURRENT_TIME" \
-            'if (.redirects[0].source | startswith("/ci/cache/busted/")) then
-              .redirects[0].source = ("/ci/cache/busted/" + $current_time_val)
-            else
-              error("Error: .redirects[0].source does not start with /ci/cache/busted/")
-            end' \
+            '([.redirects[] | select(.source | startswith("/ci/cache/busted/"))] | length) as $n
+            | if $n == 1 then
+                .redirects |= map(
+                  if (.source | startswith("/ci/cache/busted/"))
+                  then .source = ("/ci/cache/busted/" + $current_time_val)
+                  else . end)
+              else
+                error("Error: expected exactly one redirect with source /ci/cache/busted/*, found \($n)")
+              end' \
             docs.json > docs.json.tmp && \
           mv docs.json.tmp docs.json
 

@@ -80,12 +80,12 @@ describe("provider data boundaries", () => {
       );
       expect(
         screen.getAllByLabelText(
-          /Licence per month not measured.*Contract price required/,
+          /License per month not measured.*Contract price required/,
         ),
       ).toHaveLength(cards.length);
       expect(
         screen.getAllByLabelText(
-          /Unassigned licence cost not measured.*contract price required/,
+          /Unassigned license cost not measured.*contract price required/,
         ),
       ).toHaveLength(cards.length);
     });

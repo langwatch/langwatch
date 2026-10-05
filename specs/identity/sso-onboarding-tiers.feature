@@ -32,11 +32,21 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
   #
   #   TIER 2  self-hosted self-serve, licence-gated       SECOND, SIMPLEST
   #     an organization administrator, in Settings
-  #     register -> claim -> prove (DNS record or HTTPS file) ->
-  #     activate
-  #     the licence grants access to setup; it does not prove domain
-  #     ownership. The same customer-controlled evidence used by hosted
-  #     self-serve decides an uncontested claim.
+  #     register -> claim (verified at once) -> activate
+  #     the licence grants access to setup, and the installation's licence
+  #     is the proof: a claim is approved on the authority `license` and
+  #     verified with the method `license-token` in the same request, with
+  #     nothing to publish. The operator of the installation already controls
+  #     who has an account on it, so a DNS record would prove nothing new.
+  #     Two limits keep that from becoming a way to take a domain:
+  #       - a domain is held by one organization per installation, so a
+  #         domain another organization holds is refused at claim time;
+  #       - on an installation with more than one organization, only a
+  #         platform operator (ADMIN_EMAILS) claims without proof. An
+  #         organization administrator there publishes the DNS record or
+  #         the HTTPS file, exactly as on the hosted service.
+  #     A domain verified this way has no published evidence, so the
+  #     re-proof sweep never reads it and never un-verifies it.
   #
   #   TIER 3  hosted self-serve                           LAST, SEPARABLE
   #     an organization administrator, in Settings
@@ -166,21 +176,52 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     Then the confirmation names "acme" by name and says who would lose their way in
     And the removal is refused outright when the organization's name cannot be resolved
 
-  # ── Tier 2: self-hosted, licence-gated with ownership proof ─────────
+  # ── Tier 2: self-hosted, licence-gated ─────────────────────────────
+
+  @unit
+  Scenario: The installation decides whether a claimed domain needs published proof
+    Given the deployment, the licence, the number of organizations and who is asking
+    When the setup surface asks how a domain is proved
+    Then a licensed self-hosted installation with one organization proves with its licence
+    And a platform operator on a licensed installation with several organizations proves with the licence
+    And an organization administrator on an installation with several organizations publishes a record
+    And the hosted service always publishes a record
 
   @integration
   Scenario: A self-hosted administrator sets single sign-on up with nobody else involved
-    Given a self-hosted installation holding a genuine licence
+    Given a self-hosted installation holding a genuine licence and only the organization "acme"
     When "ana" registers the identity provider and claims "acme.com" in Settings
-    Then the licence permits setup but does not approve or prove the claim
-    And "ana" is given a domain-ownership record to publish
+    Then "acme.com" is verified at once, with the installation's licence recorded as the proof
+    And the claim is approved on the authority of the licence
+    And "ana" is given no record to publish
+
+  @integration
+  Scenario: A platform operator's claim on a multi-organization installation is verified at once
+    Given a self-hosted installation holding a genuine licence and several organizations
+    When the platform operator "olive" claims "acme.com" for "acme"
+    Then "acme.com" is verified at once, with the installation's licence recorded as the proof
 
   @integration
   Scenario: A licensed installation still needs domain-ownership evidence
-    Given a self-hosted installation holding a genuine licence
-    When "ana" asks to prove "acme.com"
+    Given a self-hosted installation holding a genuine licence and several organizations
+    When "ana", who is not a platform operator, claims and asks to prove "acme.com"
     Then she is given a record and file address carrying the same minted token
     And the domain remains unproved until one of those exact locations serves it
+
+  @integration
+  Scenario: A domain another organization on the installation holds is refused at claim time
+    Given a self-hosted installation holding a genuine licence
+    And another organization on it already holds "acme.com"
+    When "ana" claims "acme.com"
+    Then the claim is refused with the code "sso_connection_domain_taken"
+    And nothing is recorded on her connection
+
+  @unit
+  Scenario: A licence ceremony on a multi-organization installation takes a platform operator
+    Given a self-hosted installation holding a genuine licence and several organizations
+    When an organization administrator who is not a platform operator asks for the licence as proof
+    Then it is refused with the code "sso_connection_operator_act_required"
+    And a platform operator asking the same thing is verified
 
   @unit
   Scenario: The proof is recorded as a hash and the identity provider's secret is not recorded at all
@@ -196,11 +237,11 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     And the words name activating a licence, and name no environment variable, host or internal service
 
   @unit
-  Scenario: A licence activated while the installation is running takes effect at the next restart
-    Given a self-hosted installation that was unlicensed when it started
+  Scenario: A licence activated while the installation is running reaches setup within a minute
+    Given a self-hosted installation whose licence gate still denies
     When a genuine licence is activated and single sign-on setup is opened
-    Then setup stays unavailable until the installation restarts
-    And the page says a restart is needed and does not pretend otherwise
+    Then setup stays unavailable until the gate reads the licence
+    And the page says single sign-on turns on within a minute and does not say there is no licence
 
   @integration
   Scenario: The only connection on an installation still leaves a way in
@@ -212,8 +253,8 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
   @unit
   Scenario: A self-hosted administrator is not offered attestation either
     Given a self-hosted installation holding a genuine licence
-    When "ana" asks to prove "acme.com"
-    Then publishing the record or file is what proves it
+    When "ana" opens single sign-on setup
+    Then the installation's licence is what proves a domain she claims
     And attesting the domain is not something she can reach
 
   @unit

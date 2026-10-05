@@ -5,7 +5,8 @@ Feature: The suites REST family is a deprecated alias
   So that I can move to run plans and test suites on my own schedule
 
   # /api/suites predates the split between a RUN PLAN (what you run) and a
-  # TEST SUITE (a group of scenarios). It keeps answering exactly as it did.
+  # TEST SUITE (a group of scenarios). It keeps answering as it did, except
+  # that a create body carrying a field it does not have is refused.
   # Every response names its successor, and every operation is marked
   # deprecated in the published document.
 

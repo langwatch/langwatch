@@ -93,15 +93,7 @@ export function persistWebhookActionParams({
   incoming: WebhookActionParams;
   existing?: WebhookStoredActionParams | null;
 }): WebhookStoredActionParams {
-  const hasKept = Object.values(incoming.headers).includes(
-    WEBHOOK_HEADER_VALUE_KEPT,
-  );
-  if (hasKept && existing?.url !== incoming.url) {
-    throw new InvalidActionParamsError(
-      "Re-enter webhook header values after changing the destination URL.",
-      "url",
-    );
-  }
+  assertKeptSecretsStayWithTheirDestination({ incoming, existing });
   const saved = existing ? decryptWebhookHeaders(existing) : {};
   const resolved: Record<string, string> = {};
   for (const [name, value] of Object.entries(incoming.headers)) {
@@ -119,6 +111,30 @@ export function persistWebhookActionParams({
       : {}),
     ...persistSigningSecret({ incoming, existing }),
   };
+}
+
+/** A saved header value or signing secret authenticates against the URL it
+ *  was issued for, so a changed URL has to arrive with fresh values. */
+function assertKeptSecretsStayWithTheirDestination({
+  incoming,
+  existing,
+}: {
+  incoming: WebhookActionParams;
+  existing?: WebhookStoredActionParams | null;
+}): void {
+  if (existing?.url === incoming.url) return;
+  if (Object.values(incoming.headers).includes(WEBHOOK_HEADER_VALUE_KEPT)) {
+    throw new InvalidActionParamsError(
+      "Re-enter webhook header values after changing the destination URL.",
+      "url",
+    );
+  }
+  if (incoming.signingSecret === WEBHOOK_HEADER_VALUE_KEPT) {
+    throw new InvalidActionParamsError(
+      "Re-enter the signing secret after changing the destination URL.",
+      "signingSecret",
+    );
+  }
 }
 
 /** The stored rotation window, carried forward untouched. */

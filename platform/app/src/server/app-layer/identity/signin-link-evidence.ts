@@ -1,4 +1,5 @@
 import {
+  assertedEmailVerification,
   DEFAULT_SSO_ARRIVAL_POLICY,
   identifierProviderFor,
   type LinkProposalReason,
@@ -11,14 +12,17 @@ import { z } from "zod";
 const logger = createLogger("langwatch:identity:signin-link-evidence");
 
 /**
- * The claims a link is judged on. Both optional on purpose: an identity
- * provider that asserts neither has told us nothing, and silence is not
- * evidence of anything.
+ * The address a link is judged on. Optional on purpose: an identity provider
+ * that asserts none has told us nothing. Whether it verified the address is
+ * read by `assertedEmailVerification`, the reader the single sign-on user
+ * resolver uses too, so the two never weigh the same token differently.
  */
-const assertedClaimsSchema = z.object({
-  email: z.string().min(1).optional(),
-  email_verified: z.boolean().optional(),
-});
+const assertedClaimsSchema = z
+  .object({
+    email: z.string().min(1).optional(),
+    iss: z.string().optional(),
+  })
+  .passthrough();
 
 /**
  * The account a provider wants to attach to, as the rule needs it: whether
@@ -79,8 +83,9 @@ export interface SignInLinkEvidenceDeps {
  * time here would only add a way to lock a new signup out.
  *
  * Only when the identity provider actually asserted something. No ID token,
- * no `email` claim or no `email_verified` claim means no evidence, and the
- * link proceeds exactly as it did before this guard existed.
+ * no `email` claim, or no verification claim (`email_verified`, or
+ * `xms_edov` from Microsoft Entra ID) means no evidence, and the link
+ * proceeds exactly as it did before this guard existed.
  *
  * NOT the domain half of the rule. `linkRefusalFor` also refuses a candidate
  * holding identifiers on domains the connection cannot vouch for — and a
@@ -212,9 +217,16 @@ function assertedAddress(
   const parsed = assertedClaimsSchema.safeParse(claims);
   if (!parsed.success) return null;
 
-  const { email, email_verified: emailVerified } = parsed.data;
+  const { email, iss } = parsed.data;
+  const verification = assertedEmailVerification({
+    claimSources: [parsed.data],
+    issuer: iss,
+  });
   // Both halves, or nothing. An address with no verification claim beside it
   // is the silence this guard refuses to read as either answer.
-  if (!email || emailVerified === undefined) return null;
-  return { email: normalizeIdentifierValue(email), emailVerified };
+  if (!email || verification === "unasserted") return null;
+  return {
+    email: normalizeIdentifierValue(email),
+    emailVerified: verification === "verified",
+  };
 }

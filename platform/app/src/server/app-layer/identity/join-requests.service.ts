@@ -6,6 +6,7 @@ import {
   JoinAutoConnectionAdmitsError,
   JoinAutoDomainUnprovenError,
   JoinAutoNotLicensedError,
+  type JoinerRole,
   type JoinLookupDecision,
   JoinNotAvailableError,
   type JoinOffer,
@@ -102,21 +103,32 @@ export interface JoinOfferDismissalPort {
   dismiss(args: { userId: string; domain: string }): Promise<void>;
 }
 
-/** Whether this organization may change its joining setting, and to what. */
+/**
+ * Whether this organization may change its joining setting, and to what.
+ *
+ * `joinerRole` (ADR-143) is the seat a person admitted WITHOUT an invitation
+ * receives: a domain join here, or an SSO-admitted login. `MEMBER` (a Full
+ * seat) by default; `DEVELOPER` for an organization whose newcomers should
+ * land with a personal project and nothing shared. An invitation always
+ * names its own role and never reads this.
+ */
 export interface JoinSettingPort {
-  read(args: {
-    organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }>;
+  read(args: { organizationId: string }): Promise<{
+    domainJoin: DomainJoinSetting;
+    joinDomains: string[];
+    joinerRole: JoinerRole;
+  }>;
   write(args: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     joinDomains: string[];
+    joinerRole: JoinerRole;
   }): Promise<void>;
 }
 
 /**
  * What changed when an administrator saved the joining setting: both values,
- * and both domain lists.
+ * both domain lists, and both joiner seats.
  *
  * Both halves are returned rather than just the new one because the audit row
  * the caller writes has to say what it was as well as what it became — "ana
@@ -128,6 +140,8 @@ export interface JoinSettingChange {
   next: DomainJoinSetting;
   previousDomains: readonly string[];
   nextDomains: readonly string[];
+  previousJoinerRole: JoinerRole;
+  nextJoinerRole: JoinerRole;
 }
 
 export interface JoinRequestsServiceDeps {
@@ -611,13 +625,17 @@ export class JoinRequestsService {
     organizationId,
     domainJoin,
     domains,
+    joinerRole,
   }: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     domains: readonly string[];
+    /** The seat newcomers receive (ADR-143). Left out, the saved one stands. */
+    joinerRole?: JoinerRole;
   }): Promise<JoinSettingChange> {
     const current = await this.deps.settings.read({ organizationId });
     const normalized = domains.map(normalizeDomain).filter(Boolean);
+    const nextJoinerRole = joinerRole ?? current.joinerRole;
 
     if (
       opensTheDoorWider({
@@ -632,19 +650,10 @@ export class JoinRequestsService {
     }
 
     if (domainJoin === "auto") {
-      if (!(await this.deps.autoJoinLicensed())) {
-        throw new JoinAutoNotLicensedError(
-          `organization ${organizationId} cannot enable automatic joining without a genuine license`,
-        );
-      }
-      if (normalized.length === 0) {
-        throw new JoinAutoDomainUnprovenError(
-          "automatic joining needs a company domain to be named",
-        );
-      }
-      for (const domain of normalized) {
-        await this.assertDomainProven({ organizationId, domain });
-      }
+      await this.assertAutomaticJoinAllowed({
+        organizationId,
+        domains: normalized,
+      });
     }
 
     // Turning automatic joining off clears the domains it named: a setting
@@ -655,21 +664,50 @@ export class JoinRequestsService {
       organizationId,
       domainJoin,
       joinDomains: nextDomains,
+      joinerRole: nextJoinerRole,
     });
     return {
       previous: current.domainJoin,
       next: domainJoin,
       previousDomains: current.joinDomains,
       nextDomains,
+      previousJoinerRole: current.joinerRole,
+      nextJoinerRole,
     };
   }
 
-  /** How this organization has set joining, for the settings card. */
-  async readJoining({
+  /**
+   * What automatic joining needs before it may be switched on: a genuine
+   * licence, at least one domain, and every named domain proven.
+   */
+  private async assertAutomaticJoinAllowed({
     organizationId,
+    domains,
   }: {
     organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }> {
+    domains: readonly string[];
+  }): Promise<void> {
+    if (!(await this.deps.autoJoinLicensed())) {
+      throw new JoinAutoNotLicensedError(
+        `organization ${organizationId} cannot enable automatic joining without a genuine license`,
+      );
+    }
+    if (domains.length === 0) {
+      throw new JoinAutoDomainUnprovenError(
+        "automatic joining needs a company domain to be named",
+      );
+    }
+    for (const domain of domains) {
+      await this.assertDomainProven({ organizationId, domain });
+    }
+  }
+
+  /** How this organization has set joining, for the settings card. */
+  async readJoining({ organizationId }: { organizationId: string }): Promise<{
+    domainJoin: DomainJoinSetting;
+    joinDomains: string[];
+    joinerRole: JoinerRole;
+  }> {
     return this.deps.settings.read({ organizationId });
   }
 

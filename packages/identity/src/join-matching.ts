@@ -53,6 +53,28 @@ export type DomainJoinSetting = (typeof DOMAIN_JOIN_SETTINGS)[number];
 export const DEFAULT_DOMAIN_JOIN_SETTING: DomainJoinSetting = "request";
 
 /**
+ * The seat a person admitted WITHOUT an invitation receives (ADR-143): a
+ * domain join, or an SSO-admitted login. `MEMBER` is a Full seat and the
+ * default, so no existing organization changes behaviour; `DEVELOPER` lands
+ * newcomers with a personal project and nothing shared. Invitations always
+ * name their own role and never read this.
+ */
+export const JOINER_ROLES = ["MEMBER", "DEVELOPER"] as const;
+export type JoinerRole = (typeof JOINER_ROLES)[number];
+export const DEFAULT_JOINER_ROLE: JoinerRole = "MEMBER";
+
+/**
+ * The stored joiner seat, narrowed to the two values the setting allows. The
+ * column is the whole organisation role enum, but a joiner is only ever a
+ * Full member or a Developer (ADR-143); anything else reads as the default.
+ */
+export function readJoinerRole(stored: string | null | undefined): JoinerRole {
+  return (JOINER_ROLES as readonly string[]).includes(stored ?? "")
+    ? (stored as JoinerRole)
+    : DEFAULT_JOINER_ROLE;
+}
+
+/**
  * Asking to join needs ONE member holding a verified address on the domain:
  * the ask reveals nothing on its own and an admin gates the outcome.
  */

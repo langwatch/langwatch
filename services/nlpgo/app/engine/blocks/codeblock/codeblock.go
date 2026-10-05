@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,10 +37,13 @@ var fakeDspyPySource []byte
 type Options struct {
 	// Python is the interpreter binary. Default: "python3".
 	Python string
-	// RunnerPath, if set, points at an existing runner.py on disk
-	// (used in dev so we don't have to write the embedded copy each
-	// time). When unset, the executor materializes the embedded
-	// runner.py to a temp file on first use.
+	// RunnerPath, if set, points at an existing runner.py on disk, and
+	// its directory is where fake_dspy.py is looked for too (used in dev
+	// to run an edited runner without rebuilding the binary). The files
+	// are read once, when the executor is built; from then on the
+	// executor works from those bytes and never reads the path again, so
+	// a dev override is as immutable to user code as the embedded copy.
+	// When unset, the embedded runner.py and fake_dspy.py are used.
 	RunnerPath string
 	// DefaultTimeout caps execution when the request doesn't specify one.
 	DefaultTimeout time.Duration
@@ -100,13 +104,23 @@ var defaultEnvAllowlist = []string{
 }
 
 // Executor runs code blocks via a Python subprocess.
+//
+// The runner sources are held as bytes in the engine's own memory, not as a
+// path on disk the subprocess shares. Execute writes them out fresh for each
+// execution, into a directory belonging to that execution alone, and removes
+// the directory afterwards. That is what makes the runner one execution runs
+// independent of anything an earlier execution did: user code and the runner
+// run as the same user, so a file the subprocess can read is a file it can
+// also rewrite, and the only copy it cannot reach is the one it never sees.
 type Executor struct {
-	opts       Options
-	runnerPath string
+	opts           Options
+	runnerSource   []byte
+	fakeDspySource []byte
 }
 
-// New builds an Executor. If RunnerPath is empty the embedded runner.py
-// is materialized once into a temp dir.
+// New builds an Executor, resolving the runner sources it will write for
+// every execution: the embedded copies, or the files named by
+// Options.RunnerPath when a dev run overrides them.
 func New(opts Options) (*Executor, error) {
 	if opts.Python == "" {
 		opts.Python = "python3"
@@ -123,26 +137,85 @@ func New(opts Options) (*Executor, error) {
 	if opts.EnvAllowlist == nil {
 		opts.EnvAllowlist = defaultEnvAllowlist
 	}
-	runnerPath := opts.RunnerPath
-	if runnerPath == "" {
-		dir, err := os.MkdirTemp("", "nlpgo-codeblock-*")
+	runnerSource := runnerPySource
+	fakeDspySource := fakeDspyPySource
+	if opts.RunnerPath != "" {
+		loaded, err := os.ReadFile(opts.RunnerPath)
 		if err != nil {
-			return nil, fmt.Errorf("codeblock: tmp dir: %w", err)
+			return nil, fmt.Errorf("codeblock: read runner %q: %w", opts.RunnerPath, err)
 		}
-		runnerPath = filepath.Join(dir, "runner.py")
-		if err := os.WriteFile(runnerPath, runnerPySource, 0o600); err != nil {
-			return nil, fmt.Errorf("codeblock: write runner: %w", err)
-		}
-		// runner.py imports fake_dspy from its own directory — write
-		// it alongside so the import resolves whether the executor is
-		// running from the embedded copy (prod / tests) or a dev
-		// RunnerPath override.
-		fakeDspyPath := filepath.Join(dir, "fake_dspy.py")
-		if err := os.WriteFile(fakeDspyPath, fakeDspyPySource, 0o600); err != nil {
-			return nil, fmt.Errorf("codeblock: write fake_dspy: %w", err)
+		runnerSource = loaded
+		// runner.py imports fake_dspy from its own directory, so an
+		// override of one is an override of the pair. A dev checkout that
+		// carries only the runner keeps the embedded stand-in.
+		sibling := filepath.Join(filepath.Dir(opts.RunnerPath), "fake_dspy.py")
+		if loaded, err := os.ReadFile(sibling); err == nil {
+			fakeDspySource = loaded
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("codeblock: read fake_dspy %q: %w", sibling, err)
 		}
 	}
-	return &Executor{opts: opts, runnerPath: runnerPath}, nil
+	return &Executor{
+		opts:           opts,
+		runnerSource:   runnerSource,
+		fakeDspySource: fakeDspySource,
+	}, nil
+}
+
+// runnerFileMode is read-only even for the owner. User code runs as the same
+// user and can chmod it back, so this stops a careless write rather than a
+// deliberate one; the per-execution directory is what makes the rewrite
+// pointless either way.
+const runnerFileMode = 0o400
+
+// newRunDir creates the directory for one execution and materializes the
+// runner pair into it. The caller removes the directory when the execution
+// ends, which also disposes of whatever the user's code wrote inside it.
+func (e *Executor) newRunDir() (string, error) {
+	dir, err := os.MkdirTemp("", "nlpgo-codeblock-run-*")
+	if err != nil {
+		return "", fmt.Errorf("codeblock: run dir: %w", err)
+	}
+	for name, source := range map[string][]byte{
+		"runner.py":    e.runnerSource,
+		"fake_dspy.py": e.fakeDspySource,
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), source, runnerFileMode); err != nil {
+			_ = os.RemoveAll(dir)
+			return "", fmt.Errorf("codeblock: write %s: %w", name, err)
+		}
+	}
+	return dir, nil
+}
+
+// removeRunDir disposes of one execution's directory.
+//
+// A plain RemoveAll is not enough: unlinking a file needs write permission on
+// the directory holding it, so user code that chmods its own run directory (or
+// any directory it created inside) read-only makes the removal fail and leaves
+// the tree on disk. The next execution still gets a fresh directory, so the
+// isolation property holds either way, but a long-lived engine process would
+// accumulate them until the volume filled. Restoring owner write permission on
+// the way down costs one walk and removes the only failure mode user code can
+// arrange for itself.
+func removeRunDir(dir string) {
+	if err := os.RemoveAll(dir); err == nil {
+		return
+	}
+	_ = filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			// Keep walking: one unreadable entry must not abandon the rest.
+			return nil //nolint:nilerr // best-effort cleanup, see the doc comment
+		}
+		if entry.IsDir() {
+			// G302 does not distinguish a directory from a file: 0700 is already
+			// owner-only, and the execute bit is what makes a directory
+			// traversable at all.
+			_ = os.Chmod(path, 0o700) //nolint:gosec // directory mode, not a file mode
+		}
+		return nil
+	})
+	_ = os.RemoveAll(dir)
 }
 
 // Request is what the engine hands to the executor per node invocation.
@@ -275,13 +348,17 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	resultFile, err := os.CreateTemp("", "nlpgo-codeblock-result-*.json")
+	// One directory per execution, holding the runner pair and the result
+	// file, removed on the way out. Nothing the user's code writes here
+	// survives to be read, imported or executed by a later run.
+	runDir, err := e.newRunDir()
 	if err != nil {
-		return nil, fmt.Errorf("codeblock: tmp result: %w", err)
+		return nil, err
 	}
-	resultPath := resultFile.Name()
-	_ = resultFile.Close()
-	defer os.Remove(resultPath)
+	defer removeRunDir(runDir)
+
+	runnerPath := filepath.Join(runDir, "runner.py")
+	resultPath := filepath.Join(runDir, "result.json")
 
 	payload, err := json.Marshal(map[string]any{
 		"code":    req.Code,
@@ -294,17 +371,25 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 		return nil, fmt.Errorf("codeblock: marshal request: %w", err)
 	}
 
-	cmd := exec.CommandContext(runCtx, e.opts.Python, e.runnerPath, resultPath) //nolint:gosec // runnerPath is operator-controlled
+	cmd := exec.CommandContext(runCtx, e.opts.Python, runnerPath, resultPath) //nolint:gosec // runnerPath is this execution's own copy of the engine's embedded runner
 	// Withhold the pod environment from user code. cmd.Env is always set to
 	// a non-nil slice so exec never falls back to inheriting os.Environ();
 	// see childEnv. Project secrets travel via the request payload, not here.
 	// The run's own sandbox credential is the one exception, and it is added
 	// only when the run carries both halves of it.
-	cmd.Env = withSandboxCredential(
+	//
+	// TMPDIR is pointed at this execution's directory last, after the
+	// allowlist copy, so the deployment's own TMPDIR cannot send the
+	// subprocess's scratch files to a location shared with other executions.
+	cmd.Env = append(withSandboxCredential(
 		e.childEnv(),
 		req.SandboxAPIKey,
 		e.opts.SandboxEndpoint,
-	)
+	), "TMPDIR="+runDir)
+	// Relative paths in user code resolve inside the disposable directory
+	// rather than the engine's working directory. Python already puts the
+	// script's own directory on sys.path, so imports are unaffected.
+	cmd.Dir = runDir
 	cmd.Stdin = bytes.NewReader(payload)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	var stderrBuf bytes.Buffer
