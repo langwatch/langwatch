@@ -30,6 +30,7 @@ import {
   SelectMigrationRouteCommand,
   SetArrivalPolicyCommand,
   SuspendConnectionCommand,
+  UpdateConnectionIdpCommand,
   VerifyDomainCommand,
   WithdrawDomainCommand,
 } from "./commands/ssoConnectionCommands";
@@ -108,6 +109,7 @@ export const CONNECTION_COMMANDS = [
   ["completeTeardown", CompleteTeardownCommand],
   ["setArrivalPolicy", SetArrivalPolicyCommand],
   ["renameConnection", RenameConnectionCommand],
+  ["updateConnectionIdp", UpdateConnectionIdpCommand],
   ["recordDomainProofAbsent", RecordDomainProofAbsentCommand],
   ["recordDomainProofPresent", RecordDomainProofPresentCommand],
   ["grandfatherConnection", GrandfatherConnectionCommand],

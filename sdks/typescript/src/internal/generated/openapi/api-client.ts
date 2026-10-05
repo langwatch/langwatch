@@ -246,6 +246,19 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description No annotation with that ID exists in the project */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            error: "annotation_not_found";
+                            message: string;
+                        };
+                    };
+                };
             };
         };
         options?: never;
@@ -1415,7 +1428,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** @description List entries of a dataset (paginated). Same as GET /:slugOrId/records. */
+        get: operations["getApiDatasetBySlugEntries"];
         put?: never;
         /** @description Add entries to a dataset */
         post: operations["postApiDatasetBySlugEntries"];
@@ -1950,7 +1964,7 @@ export interface paths {
         put?: never;
         /**
          * Create a Slack alert trigger
-         * @description Create a trigger that posts to a Slack incoming webhook when traces match its filters. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.
+         * @description Create a trigger that posts to Slack when traces match its filters, through a Slack connection (`slack_connection_id`, plus `slack_channel_id` for a bot) or an incoming webhook URL (`slack_webhook`), which is stored as a connection. The trigger stores no secret of its own. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.
          */
         post: operations["postApiTriggerSlack"];
         delete?: never;
@@ -4294,10 +4308,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List all active triggers (automations) for the project */
+        /** @description List the project's automations, newest first. Paused automations are included. */
         get: operations["getApiTriggers"];
         put?: never;
-        /** @description Create a new trigger (automation) */
+        /** @description Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation. */
         post: operations["postApiTriggers"];
         delete?: never;
         options?: never;
@@ -4320,8 +4334,93 @@ export interface paths {
         delete: operations["deleteApiTriggersById"];
         options?: never;
         head?: never;
-        /** @description Update a trigger (name, active state, message, filters) */
+        /** @description Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an alert's graph cannot be changed. */
         patch: operations["patchApiTriggersById"];
+        trace?: never;
+    };
+    "/api/triggers/{id}/fires": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description What this automation has done: its fires, newest first. Metadata only — no trace ids and no trace content. Send `nextCursor` back as `cursor` to read the page after this one. */
+        get: operations["getApiTriggersByIdFires"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triggers/{id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Resume an automation. A report's schedule is put back on the calendar. */
+        post: operations["postApiTriggersByIdEnable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triggers/{id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Pause an automation. A report stops claiming its schedule. */
+        post: operations["postApiTriggersByIdDisable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triggers/{id}/test-fire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Send this automation's message to the destination it is configured with, so you can confirm it arrives. Nothing is recorded as a fire. */
+        post: operations["postApiTriggersByIdTestFire"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/slack-connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the Slack connections this project can deliver through: its own and its organization's, by name. Never returns a token or webhook URL. */
+        get: operations["getApiSlackConnections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/webhooks/v1/endpoints": {
@@ -10323,6 +10422,21 @@ export interface operations {
         };
         responses: never;
     };
+    getApiDatasetBySlugEntries: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
     postApiDatasetBySlugEntries: {
         parameters: {
             query?: never;
@@ -14012,9 +14126,13 @@ export interface operations {
                 "application/json": {
                     /**
                      * Format: uri
-                     * @description Incoming webhook URL the alert is posted to
+                     * @description Incoming webhook URL the alert is posted to. It is stored as a Slack connection this project can use (an existing one holding the same URL, else a new project connection). Send this or `slack_connection_id`, not both.
                      */
-                    slack_webhook: string;
+                    slack_webhook?: string;
+                    /** @description The Slack connection the alert posts through: an organization connection or one of this project's, as `GET /api/slack-connections` and `langwatch slack-connection list` list them. Send this or `slack_webhook`, not both. */
+                    slack_connection_id?: string;
+                    /** @description The channel a bot connection posts in; required with one. Invite the LangWatch app to it first. */
+                    slack_channel_id?: string;
                     /** @description How the trigger is listed in the app */
                     name: string;
                     /** @description Extra line included with each alert */
@@ -14267,6 +14385,25 @@ export interface operations {
             };
             /** @description The API key lacks triggers:manage */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description The connection is not one this project can use (`slack_integration_missing`), or a bot connection was named without `slack_channel_id` (`invalid_action_params`) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -23438,7 +23575,7 @@ export interface operations {
                         members: {
                             userId: string;
                             /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                             disabled: boolean;
                             disabledAt: string | null;
                             createdAt: string;
@@ -23475,7 +23612,7 @@ export interface operations {
                     "application/json": {
                         userId: string;
                         /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                         disabled: boolean;
                         disabledAt: string | null;
                         createdAt: string;
@@ -23536,7 +23673,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    role?: "ADMIN" | "MEMBER" | "EXTERNAL";
+                    role?: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                     disabled?: boolean;
                 };
             };
@@ -23551,7 +23688,7 @@ export interface operations {
                     "application/json": {
                         userId: string;
                         /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                         disabled: boolean;
                         disabledAt: string | null;
                         createdAt: string;
@@ -23646,7 +23783,7 @@ export interface operations {
                             id: string;
                             email: string;
                             /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                             status: string;
                             expiration: string | null;
                             inviteCode: string;
@@ -23677,7 +23814,7 @@ export interface operations {
                         /** Format: email */
                         email: string;
                         /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                         teams: {
                             teamId: string;
                             /** @enum {string} */
@@ -23700,7 +23837,7 @@ export interface operations {
                             id: string;
                             email: string;
                             /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                             status: string;
                             expiration: string | null;
                             inviteCode: string;
@@ -25729,6 +25866,7 @@ export interface operations {
                         reasoning?: string;
                         metCriteria: string[];
                         unmetCriteria: string[];
+                        inconclusiveCriteria?: string[];
                         error?: string;
                         evaluations?: {
                             evaluatorId: string;
@@ -32254,12 +32392,66 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE";
+                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
+                        /** @description The rule an alert fires by. Null for anything that is not one. */
+                        graphAlert: {
+                            threshold: number;
+                            /** @enum {string} */
+                            operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                            timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                            seriesName: string;
+                        } | null;
+                        /** @description What a report renders and when. Null for anything else. */
+                        report: {
+                            source: {
+                                /** @constant */
+                                kind: "dashboard";
+                                dashboardId: string;
+                            } | {
+                                /** @constant */
+                                kind: "customGraph";
+                                customGraphId: string;
+                            } | {
+                                /** @constant */
+                                kind: "traceQuery";
+                                /** @default {} */
+                                filters: {
+                                    [key: string]: unknown;
+                                };
+                                metric?: string;
+                                /** @default 5 */
+                                topN: number;
+                            };
+                            schedule: {
+                                cron: string;
+                                timezone: string;
+                            };
+                            /** @default false */
+                            compareToPrevious: boolean;
+                        } | null;
                         filters: {
                             [key: string]: unknown;
+                        };
+                        filterQuery: string | null;
+                        /**
+                         * @description What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+                         * @enum {string}
+                         */
+                        kind: "AUTOMATION" | "ALERT" | "REPORT";
+                        customGraphId: string | null;
+                        notificationCadence: string | null;
+                        traceDebounceMs: number | null;
+                        /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                        templates: {
+                            /** @enum {string|null} */
+                            slackTemplateType?: "string" | "block_kit" | null;
+                            slackTemplate?: string | null;
+                            emailSubjectTemplate?: string | null;
+                            emailBodyTemplate?: string | null;
                         };
                         active: boolean;
                         message: string | null;
@@ -32332,19 +32524,433 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @constant */
+                    action: "SEND_EMAIL";
+                    /** @description Email delivery. */
+                    actionParams: {
+                        /** @description Who receives the email. Any address, not only teammates. */
+                        members: string[];
+                    } & {
+                        [key: string]: unknown;
+                    };
                     name: string;
-                    /** @enum {string} */
-                    action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE";
-                    /** @default {} */
-                    actionParams?: {
-                        [key: string]: unknown;
-                    };
                     filters?: {
-                        [key: string]: unknown;
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
                     };
+                    /** @description The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`. */
+                    filterQuery?: string | null;
                     message?: string;
                     /** @enum {string} */
                     alertType?: "CRITICAL" | "WARNING" | "INFO";
+                    /** @description Set to make this an alert on that graph. `graphAlert` and `alertType` are then required. */
+                    customGraphId?: string;
+                    /** @description The rule an alert fires by: series, operator, threshold, window. */
+                    graphAlert?: {
+                        threshold: number;
+                        /** @enum {string} */
+                        operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                        timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                        seriesName: string;
+                    };
+                    /** @description What a scheduled report renders and when it sends. */
+                    report?: {
+                        source: {
+                            /** @constant */
+                            kind: "dashboard";
+                            dashboardId: string;
+                        } | {
+                            /** @constant */
+                            kind: "customGraph";
+                            customGraphId: string;
+                        } | {
+                            /** @constant */
+                            kind: "traceQuery";
+                            /** @default {} */
+                            filters?: {
+                                [key: string]: unknown;
+                            };
+                            metric?: string;
+                            /** @default 5 */
+                            topN?: number;
+                        };
+                        schedule: {
+                            cron: string;
+                            timezone: string;
+                        };
+                        /** @default false */
+                        compareToPrevious?: boolean;
+                    };
+                    /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                    templates?: {
+                        /** @enum {string|null} */
+                        slackTemplateType?: "string" | "block_kit" | null;
+                        slackTemplate?: string | null;
+                        emailSubjectTemplate?: string | null;
+                        emailBodyTemplate?: string | null;
+                    };
+                    /**
+                     * @description How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+                     * @enum {string}
+                     */
+                    notificationCadence?: "immediate" | "5min_digest" | "15min_digest" | "hourly_digest";
+                    /** @description How long to wait for a trace to settle before the conditions are read. */
+                    traceDebounceMs?: number;
+                } | {
+                    /** @constant */
+                    action: "SEND_SLACK_MESSAGE";
+                    /** @description Slack delivery through a Slack connection (`slackIntegrationId`), plus `slackChannelId` when the connection is a bot. */
+                    actionParams: {
+                        /** @description The Slack connection this automation posts through: an organization connection or one of this project's, listed under Settings, Integrations, Slack. A bot connection also needs `slackChannelId`; a webhook connection needs nothing else. Preferred over `slackWebhook` and `slackBotToken`, and what a read returns in their place. */
+                        slackIntegrationId?: string;
+                        /**
+                         * @description How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. With `slackIntegrationId` it follows the connection's kind. Absent without a connection means `webhook`.
+                         * @enum {string}
+                         */
+                        slackDelivery?: "webhook" | "bot";
+                        /** @description Legacy, accepted for one release: an incoming webhook URL, for `webhook` delivery. It is stored as a Slack connection (an existing one holding the same URL, else a new project connection) and the automation keeps only that connection's id. Send `slackIntegrationId` instead. */
+                        slackWebhook?: string;
+                        /** @description The channel the bot posts in, for a bot connection or `bot` delivery. Invite the LangWatch app to it first. */
+                        slackChannelId?: string;
+                        /** @description Legacy, accepted for one release: a bot token, for `bot` delivery. It is stored as a Slack connection (an existing one holding the same token, else a new project connection) and never reads back. Send `slackIntegrationId` instead. */
+                        slackBotToken?: string;
+                        /** @description Legacy and ignored: no read returns it. An update that retypes no secret moves an automation's own stored secret into a connection. */
+                        slackBotTokenSet?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                    name: string;
+                    filters?: {
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                    };
+                    /** @description The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`. */
+                    filterQuery?: string | null;
+                    message?: string;
+                    /** @enum {string} */
+                    alertType?: "CRITICAL" | "WARNING" | "INFO";
+                    /** @description Set to make this an alert on that graph. `graphAlert` and `alertType` are then required. */
+                    customGraphId?: string;
+                    /** @description The rule an alert fires by: series, operator, threshold, window. */
+                    graphAlert?: {
+                        threshold: number;
+                        /** @enum {string} */
+                        operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                        timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                        seriesName: string;
+                    };
+                    /** @description What a scheduled report renders and when it sends. */
+                    report?: {
+                        source: {
+                            /** @constant */
+                            kind: "dashboard";
+                            dashboardId: string;
+                        } | {
+                            /** @constant */
+                            kind: "customGraph";
+                            customGraphId: string;
+                        } | {
+                            /** @constant */
+                            kind: "traceQuery";
+                            /** @default {} */
+                            filters?: {
+                                [key: string]: unknown;
+                            };
+                            metric?: string;
+                            /** @default 5 */
+                            topN?: number;
+                        };
+                        schedule: {
+                            cron: string;
+                            timezone: string;
+                        };
+                        /** @default false */
+                        compareToPrevious?: boolean;
+                    };
+                    /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                    templates?: {
+                        /** @enum {string|null} */
+                        slackTemplateType?: "string" | "block_kit" | null;
+                        slackTemplate?: string | null;
+                        emailSubjectTemplate?: string | null;
+                        emailBodyTemplate?: string | null;
+                    };
+                    /**
+                     * @description How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+                     * @enum {string}
+                     */
+                    notificationCadence?: "immediate" | "5min_digest" | "15min_digest" | "hourly_digest";
+                    /** @description How long to wait for a trace to settle before the conditions are read. */
+                    traceDebounceMs?: number;
+                } | {
+                    /** @constant */
+                    action: "SEND_WEBHOOK";
+                    /** @description Delivery to a customer endpoint over HTTP, with a body in any media type. */
+                    actionParams: {
+                        /** @description Where the request goes. https only, and not a private host. */
+                        url: string;
+                        /**
+                         * @description The HTTP method. Absent means POST.
+                         * @enum {string}
+                         */
+                        method?: "POST" | "PUT" | "PATCH";
+                        /** @description Static headers sent with every delivery. The values are credentials: they read back as the placeholder, and sending the placeholder back keeps the stored ones. Changing `url` means sending the values again in the same request. */
+                        headers?: {
+                            [key: string]: string;
+                        };
+                        /** @description A Liquid template for the body. Absent sends the standard LangWatch envelope for a JSON content type, and an empty body for any other. */
+                        bodyTemplate?: string | null;
+                        /** @description The `Content-Type` the delivery announces, which also decides how the body is treated: `application/json` (and any `+json` type) is checked and re-serialised; any other media type sends the rendered template verbatim. Absent means `application/json`. */
+                        contentType?: string;
+                        /** @description Signs every delivery so the receiver can verify it came from LangWatch. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one. */
+                        signingSecret?: string | null;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                    name: string;
+                    filters?: {
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                    };
+                    /** @description The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`. */
+                    filterQuery?: string | null;
+                    message?: string;
+                    /** @enum {string} */
+                    alertType?: "CRITICAL" | "WARNING" | "INFO";
+                    /** @description Set to make this an alert on that graph. `graphAlert` and `alertType` are then required. */
+                    customGraphId?: string;
+                    /** @description The rule an alert fires by: series, operator, threshold, window. */
+                    graphAlert?: {
+                        threshold: number;
+                        /** @enum {string} */
+                        operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                        timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                        seriesName: string;
+                    };
+                    /** @description What a scheduled report renders and when it sends. */
+                    report?: {
+                        source: {
+                            /** @constant */
+                            kind: "dashboard";
+                            dashboardId: string;
+                        } | {
+                            /** @constant */
+                            kind: "customGraph";
+                            customGraphId: string;
+                        } | {
+                            /** @constant */
+                            kind: "traceQuery";
+                            /** @default {} */
+                            filters?: {
+                                [key: string]: unknown;
+                            };
+                            metric?: string;
+                            /** @default 5 */
+                            topN?: number;
+                        };
+                        schedule: {
+                            cron: string;
+                            timezone: string;
+                        };
+                        /** @default false */
+                        compareToPrevious?: boolean;
+                    };
+                    /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                    templates?: {
+                        /** @enum {string|null} */
+                        slackTemplateType?: "string" | "block_kit" | null;
+                        slackTemplate?: string | null;
+                        emailSubjectTemplate?: string | null;
+                        emailBodyTemplate?: string | null;
+                    };
+                    /**
+                     * @description How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+                     * @enum {string}
+                     */
+                    notificationCadence?: "immediate" | "5min_digest" | "15min_digest" | "hourly_digest";
+                    /** @description How long to wait for a trace to settle before the conditions are read. */
+                    traceDebounceMs?: number;
+                } | {
+                    /** @constant */
+                    action: "ADD_TO_DATASET";
+                    /** @description Append matched traces to a dataset. */
+                    actionParams: {
+                        /** @description The dataset matched traces are appended to. */
+                        datasetId: string;
+                        /** @description How a trace becomes a row in that dataset. */
+                        datasetMapping: {
+                            mapping: {
+                                [key: string]: unknown;
+                            };
+                            expansions?: string[];
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    };
+                    name: string;
+                    filters?: {
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                    };
+                    /** @description The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`. */
+                    filterQuery?: string | null;
+                    message?: string;
+                    /** @enum {string} */
+                    alertType?: "CRITICAL" | "WARNING" | "INFO";
+                    /** @description Set to make this an alert on that graph. `graphAlert` and `alertType` are then required. */
+                    customGraphId?: string;
+                    /** @description The rule an alert fires by: series, operator, threshold, window. */
+                    graphAlert?: {
+                        threshold: number;
+                        /** @enum {string} */
+                        operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                        timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                        seriesName: string;
+                    };
+                    /** @description What a scheduled report renders and when it sends. */
+                    report?: {
+                        source: {
+                            /** @constant */
+                            kind: "dashboard";
+                            dashboardId: string;
+                        } | {
+                            /** @constant */
+                            kind: "customGraph";
+                            customGraphId: string;
+                        } | {
+                            /** @constant */
+                            kind: "traceQuery";
+                            /** @default {} */
+                            filters?: {
+                                [key: string]: unknown;
+                            };
+                            metric?: string;
+                            /** @default 5 */
+                            topN?: number;
+                        };
+                        schedule: {
+                            cron: string;
+                            timezone: string;
+                        };
+                        /** @default false */
+                        compareToPrevious?: boolean;
+                    };
+                    /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                    templates?: {
+                        /** @enum {string|null} */
+                        slackTemplateType?: "string" | "block_kit" | null;
+                        slackTemplate?: string | null;
+                        emailSubjectTemplate?: string | null;
+                        emailBodyTemplate?: string | null;
+                    };
+                    /**
+                     * @description How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+                     * @enum {string}
+                     */
+                    notificationCadence?: "immediate" | "5min_digest" | "15min_digest" | "hourly_digest";
+                    /** @description How long to wait for a trace to settle before the conditions are read. */
+                    traceDebounceMs?: number;
+                } | {
+                    /** @constant */
+                    action: "ADD_TO_ANNOTATION_QUEUE";
+                    /** @description Queue matched traces for a person to label. */
+                    actionParams: {
+                        /** @description Who the queued items go to. */
+                        annotators: {
+                            id: string;
+                            name: string;
+                        }[];
+                    } & {
+                        [key: string]: unknown;
+                    };
+                    name: string;
+                    filters?: {
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                    };
+                    /** @description The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`. */
+                    filterQuery?: string | null;
+                    message?: string;
+                    /** @enum {string} */
+                    alertType?: "CRITICAL" | "WARNING" | "INFO";
+                    /** @description Set to make this an alert on that graph. `graphAlert` and `alertType` are then required. */
+                    customGraphId?: string;
+                    /** @description The rule an alert fires by: series, operator, threshold, window. */
+                    graphAlert?: {
+                        threshold: number;
+                        /** @enum {string} */
+                        operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                        timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                        seriesName: string;
+                    };
+                    /** @description What a scheduled report renders and when it sends. */
+                    report?: {
+                        source: {
+                            /** @constant */
+                            kind: "dashboard";
+                            dashboardId: string;
+                        } | {
+                            /** @constant */
+                            kind: "customGraph";
+                            customGraphId: string;
+                        } | {
+                            /** @constant */
+                            kind: "traceQuery";
+                            /** @default {} */
+                            filters?: {
+                                [key: string]: unknown;
+                            };
+                            metric?: string;
+                            /** @default 5 */
+                            topN?: number;
+                        };
+                        schedule: {
+                            cron: string;
+                            timezone: string;
+                        };
+                        /** @default false */
+                        compareToPrevious?: boolean;
+                    };
+                    /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                    templates?: {
+                        /** @enum {string|null} */
+                        slackTemplateType?: "string" | "block_kit" | null;
+                        slackTemplate?: string | null;
+                        emailSubjectTemplate?: string | null;
+                        emailBodyTemplate?: string | null;
+                    };
+                    /**
+                     * @description How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+                     * @enum {string}
+                     */
+                    notificationCadence?: "immediate" | "5min_digest" | "15min_digest" | "hourly_digest";
+                    /** @description How long to wait for a trace to settle before the conditions are read. */
+                    traceDebounceMs?: number;
                 };
             };
         };
@@ -32359,12 +32965,66 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE";
+                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
+                        /** @description The rule an alert fires by. Null for anything that is not one. */
+                        graphAlert: {
+                            threshold: number;
+                            /** @enum {string} */
+                            operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                            timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                            seriesName: string;
+                        } | null;
+                        /** @description What a report renders and when. Null for anything else. */
+                        report: {
+                            source: {
+                                /** @constant */
+                                kind: "dashboard";
+                                dashboardId: string;
+                            } | {
+                                /** @constant */
+                                kind: "customGraph";
+                                customGraphId: string;
+                            } | {
+                                /** @constant */
+                                kind: "traceQuery";
+                                /** @default {} */
+                                filters: {
+                                    [key: string]: unknown;
+                                };
+                                metric?: string;
+                                /** @default 5 */
+                                topN: number;
+                            };
+                            schedule: {
+                                cron: string;
+                                timezone: string;
+                            };
+                            /** @default false */
+                            compareToPrevious: boolean;
+                        } | null;
                         filters: {
                             [key: string]: unknown;
+                        };
+                        filterQuery: string | null;
+                        /**
+                         * @description What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+                         * @enum {string}
+                         */
+                        kind: "AUTOMATION" | "ALERT" | "REPORT";
+                        customGraphId: string | null;
+                        notificationCadence: string | null;
+                        traceDebounceMs: number | null;
+                        /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                        templates: {
+                            /** @enum {string|null} */
+                            slackTemplateType?: "string" | "block_kit" | null;
+                            slackTemplate?: string | null;
+                            emailSubjectTemplate?: string | null;
+                            emailBodyTemplate?: string | null;
                         };
                         active: boolean;
                         message: string | null;
@@ -32448,12 +33108,66 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE";
+                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
+                        /** @description The rule an alert fires by. Null for anything that is not one. */
+                        graphAlert: {
+                            threshold: number;
+                            /** @enum {string} */
+                            operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                            timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                            seriesName: string;
+                        } | null;
+                        /** @description What a report renders and when. Null for anything else. */
+                        report: {
+                            source: {
+                                /** @constant */
+                                kind: "dashboard";
+                                dashboardId: string;
+                            } | {
+                                /** @constant */
+                                kind: "customGraph";
+                                customGraphId: string;
+                            } | {
+                                /** @constant */
+                                kind: "traceQuery";
+                                /** @default {} */
+                                filters: {
+                                    [key: string]: unknown;
+                                };
+                                metric?: string;
+                                /** @default 5 */
+                                topN: number;
+                            };
+                            schedule: {
+                                cron: string;
+                                timezone: string;
+                            };
+                            /** @default false */
+                            compareToPrevious: boolean;
+                        } | null;
                         filters: {
                             [key: string]: unknown;
+                        };
+                        filterQuery: string | null;
+                        /**
+                         * @description What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+                         * @enum {string}
+                         */
+                        kind: "AUTOMATION" | "ALERT" | "REPORT";
+                        customGraphId: string | null;
+                        notificationCadence: string | null;
+                        traceDebounceMs: number | null;
+                        /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                        templates: {
+                            /** @enum {string|null} */
+                            slackTemplateType?: "string" | "block_kit" | null;
+                            slackTemplate?: string | null;
+                            emailSubjectTemplate?: string | null;
+                            emailBodyTemplate?: string | null;
                         };
                         active: boolean;
                         message: string | null;
@@ -32631,11 +33345,136 @@ export interface operations {
                     /** @enum {string|null} */
                     alertType?: "CRITICAL" | "WARNING" | "INFO" | null;
                     filters?: {
-                        [key: string]: unknown;
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
                     };
-                    actionParams?: {
+                    /** @description The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`. */
+                    filterQuery?: string | null;
+                    /** @enum {string} */
+                    action?: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                    /** @description The graph this alert watches, which an update cannot change. Accepted so that writing the read response back works; a different graph is refused. Create an alert on the other graph and delete this one. */
+                    customGraphId?: string | null;
+                    /** @description Replaces the delivery configuration as a whole rather than merging into it: send the fields this automation should have from now on, and anything left out is removed — omit `headers` and it delivers with none, omit `signingSecret` and its deliveries are no longer signed. The one exception is a credential the read hid: send back the `[redacted]` placeholder and the stored credential is kept (a Slack automation not yet on a connection has its stored secret moved into one), so reading an automation, changing one field and writing the whole object back is safe. Only this channel's fields are accepted; anything else is refused rather than dropped, and the rule this automation fires by belongs in `graphAlert` or `report`. */
+                    actionParams?: ({
+                        /** @description Who receives the email. Any address, not only teammates. */
+                        members: string[];
+                    } & {
                         [key: string]: unknown;
+                    }) | ({
+                        /** @description The Slack connection this automation posts through: an organization connection or one of this project's, listed under Settings, Integrations, Slack. A bot connection also needs `slackChannelId`; a webhook connection needs nothing else. Preferred over `slackWebhook` and `slackBotToken`, and what a read returns in their place. */
+                        slackIntegrationId?: string;
+                        /**
+                         * @description How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. With `slackIntegrationId` it follows the connection's kind. Absent without a connection means `webhook`.
+                         * @enum {string}
+                         */
+                        slackDelivery?: "webhook" | "bot";
+                        /** @description Legacy, accepted for one release: an incoming webhook URL, for `webhook` delivery. It is stored as a Slack connection (an existing one holding the same URL, else a new project connection) and the automation keeps only that connection's id. Send `slackIntegrationId` instead. */
+                        slackWebhook?: string;
+                        /** @description The channel the bot posts in, for a bot connection or `bot` delivery. Invite the LangWatch app to it first. */
+                        slackChannelId?: string;
+                        /** @description Legacy, accepted for one release: a bot token, for `bot` delivery. It is stored as a Slack connection (an existing one holding the same token, else a new project connection) and never reads back. Send `slackIntegrationId` instead. */
+                        slackBotToken?: string;
+                        /** @description Legacy and ignored: no read returns it. An update that retypes no secret moves an automation's own stored secret into a connection. */
+                        slackBotTokenSet?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    }) | ({
+                        /** @description Where the request goes. https only, and not a private host. */
+                        url: string;
+                        /**
+                         * @description The HTTP method. Absent means POST.
+                         * @enum {string}
+                         */
+                        method?: "POST" | "PUT" | "PATCH";
+                        /** @description Static headers sent with every delivery. The values are credentials: they read back as the placeholder, and sending the placeholder back keeps the stored ones. Changing `url` means sending the values again in the same request. */
+                        headers?: {
+                            [key: string]: string;
+                        };
+                        /** @description A Liquid template for the body. Absent sends the standard LangWatch envelope for a JSON content type, and an empty body for any other. */
+                        bodyTemplate?: string | null;
+                        /** @description The `Content-Type` the delivery announces, which also decides how the body is treated: `application/json` (and any `+json` type) is checked and re-serialised; any other media type sends the rendered template verbatim. Absent means `application/json`. */
+                        contentType?: string;
+                        /** @description Signs every delivery so the receiver can verify it came from LangWatch. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one. */
+                        signingSecret?: string | null;
+                    } & {
+                        [key: string]: unknown;
+                    }) | ({
+                        /** @description The dataset matched traces are appended to. */
+                        datasetId: string;
+                        /** @description How a trace becomes a row in that dataset. */
+                        datasetMapping: {
+                            mapping: {
+                                [key: string]: unknown;
+                            };
+                            expansions?: string[];
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    }) | ({
+                        /** @description Who the queued items go to. */
+                        annotators: {
+                            id: string;
+                            name: string;
+                        }[];
+                    } & {
+                        [key: string]: unknown;
+                    });
+                    /** @description The rule this alert fires by. Only for an automation that is one. */
+                    graphAlert?: {
+                        threshold: number;
+                        /** @enum {string} */
+                        operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                        timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                        seriesName: string;
                     };
+                    /** @description What this report renders and when. Only for one that is a report. */
+                    report?: {
+                        source: {
+                            /** @constant */
+                            kind: "dashboard";
+                            dashboardId: string;
+                        } | {
+                            /** @constant */
+                            kind: "customGraph";
+                            customGraphId: string;
+                        } | {
+                            /** @constant */
+                            kind: "traceQuery";
+                            /** @default {} */
+                            filters?: {
+                                [key: string]: unknown;
+                            };
+                            metric?: string;
+                            /** @default 5 */
+                            topN?: number;
+                        };
+                        schedule: {
+                            cron: string;
+                            timezone: string;
+                        };
+                        /** @default false */
+                        compareToPrevious?: boolean;
+                    };
+                    /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                    templates?: {
+                        /** @enum {string|null} */
+                        slackTemplateType?: "string" | "block_kit" | null;
+                        slackTemplate?: string | null;
+                        emailSubjectTemplate?: string | null;
+                        emailBodyTemplate?: string | null;
+                    };
+                    /**
+                     * @description How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+                     * @enum {string}
+                     */
+                    notificationCadence?: "immediate" | "5min_digest" | "15min_digest" | "hourly_digest";
+                    /** @description How long to wait for a trace to settle before the conditions are read. */
+                    traceDebounceMs?: number;
                 };
             };
         };
@@ -32650,12 +33489,66 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE";
+                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
+                        /** @description The rule an alert fires by. Null for anything that is not one. */
+                        graphAlert: {
+                            threshold: number;
+                            /** @enum {string} */
+                            operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                            timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                            seriesName: string;
+                        } | null;
+                        /** @description What a report renders and when. Null for anything else. */
+                        report: {
+                            source: {
+                                /** @constant */
+                                kind: "dashboard";
+                                dashboardId: string;
+                            } | {
+                                /** @constant */
+                                kind: "customGraph";
+                                customGraphId: string;
+                            } | {
+                                /** @constant */
+                                kind: "traceQuery";
+                                /** @default {} */
+                                filters: {
+                                    [key: string]: unknown;
+                                };
+                                metric?: string;
+                                /** @default 5 */
+                                topN: number;
+                            };
+                            schedule: {
+                                cron: string;
+                                timezone: string;
+                            };
+                            /** @default false */
+                            compareToPrevious: boolean;
+                        } | null;
                         filters: {
                             [key: string]: unknown;
+                        };
+                        filterQuery: string | null;
+                        /**
+                         * @description What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+                         * @enum {string}
+                         */
+                        kind: "AUTOMATION" | "ALERT" | "REPORT";
+                        customGraphId: string | null;
+                        notificationCadence: string | null;
+                        traceDebounceMs: number | null;
+                        /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                        templates: {
+                            /** @enum {string|null} */
+                            slackTemplateType?: "string" | "block_kit" | null;
+                            slackTemplate?: string | null;
+                            emailSubjectTemplate?: string | null;
+                            emailBodyTemplate?: string | null;
                         };
                         active: boolean;
                         message: string | null;
@@ -32694,6 +33587,589 @@ export interface operations {
             };
             /** @description Trigger not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiTriggersByIdFires: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description The `nextCursor` from the previous page. Omit for the newest fires. */
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description One page of fires, newest first. */
+                        fires: {
+                            id: string;
+                            triggerId: string;
+                            customGraphId: string | null;
+                            firedAt: string;
+                            resolvedAt: string | null;
+                        }[];
+                        /** @description Pass as `cursor` to read the page after this one. Null on the last page. */
+                        nextCursor: string | null;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Trigger not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiTriggersByIdEnable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trigger resumed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /** @enum {string} */
+                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
+                        actionParams: {
+                            [key: string]: unknown;
+                        };
+                        /** @description The rule an alert fires by. Null for anything that is not one. */
+                        graphAlert: {
+                            threshold: number;
+                            /** @enum {string} */
+                            operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                            timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                            seriesName: string;
+                        } | null;
+                        /** @description What a report renders and when. Null for anything else. */
+                        report: {
+                            source: {
+                                /** @constant */
+                                kind: "dashboard";
+                                dashboardId: string;
+                            } | {
+                                /** @constant */
+                                kind: "customGraph";
+                                customGraphId: string;
+                            } | {
+                                /** @constant */
+                                kind: "traceQuery";
+                                /** @default {} */
+                                filters: {
+                                    [key: string]: unknown;
+                                };
+                                metric?: string;
+                                /** @default 5 */
+                                topN: number;
+                            };
+                            schedule: {
+                                cron: string;
+                                timezone: string;
+                            };
+                            /** @default false */
+                            compareToPrevious: boolean;
+                        } | null;
+                        filters: {
+                            [key: string]: unknown;
+                        };
+                        filterQuery: string | null;
+                        /**
+                         * @description What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+                         * @enum {string}
+                         */
+                        kind: "AUTOMATION" | "ALERT" | "REPORT";
+                        customGraphId: string | null;
+                        notificationCadence: string | null;
+                        traceDebounceMs: number | null;
+                        /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                        templates: {
+                            /** @enum {string|null} */
+                            slackTemplateType?: "string" | "block_kit" | null;
+                            slackTemplate?: string | null;
+                            emailSubjectTemplate?: string | null;
+                            emailBodyTemplate?: string | null;
+                        };
+                        active: boolean;
+                        message: string | null;
+                        /** @enum {string|null} */
+                        alertType: "CRITICAL" | "WARNING" | "INFO" | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Trigger not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiTriggersByIdDisable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trigger paused */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /** @enum {string} */
+                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave; a Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
+                        actionParams: {
+                            [key: string]: unknown;
+                        };
+                        /** @description The rule an alert fires by. Null for anything that is not one. */
+                        graphAlert: {
+                            threshold: number;
+                            /** @enum {string} */
+                            operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                            timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                            seriesName: string;
+                        } | null;
+                        /** @description What a report renders and when. Null for anything else. */
+                        report: {
+                            source: {
+                                /** @constant */
+                                kind: "dashboard";
+                                dashboardId: string;
+                            } | {
+                                /** @constant */
+                                kind: "customGraph";
+                                customGraphId: string;
+                            } | {
+                                /** @constant */
+                                kind: "traceQuery";
+                                /** @default {} */
+                                filters: {
+                                    [key: string]: unknown;
+                                };
+                                metric?: string;
+                                /** @default 5 */
+                                topN: number;
+                            };
+                            schedule: {
+                                cron: string;
+                                timezone: string;
+                            };
+                            /** @default false */
+                            compareToPrevious: boolean;
+                        } | null;
+                        filters: {
+                            [key: string]: unknown;
+                        };
+                        filterQuery: string | null;
+                        /**
+                         * @description What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+                         * @enum {string}
+                         */
+                        kind: "AUTOMATION" | "ALERT" | "REPORT";
+                        customGraphId: string | null;
+                        notificationCadence: string | null;
+                        traceDebounceMs: number | null;
+                        /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                        templates: {
+                            /** @enum {string|null} */
+                            slackTemplateType?: "string" | "block_kit" | null;
+                            slackTemplate?: string | null;
+                            emailSubjectTemplate?: string | null;
+                            emailBodyTemplate?: string | null;
+                        };
+                        active: boolean;
+                        message: string | null;
+                        /** @enum {string|null} */
+                        alertType: "CRITICAL" | "WARNING" | "INFO" | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Trigger not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiTriggersByIdTestFire: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Test fire sent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        channel: "email" | "slack" | "webhook";
+                        recipientCount: number;
+                        /** @description Whether the LangWatch default message was rendered because this automation states no template of its own. */
+                        usedDefault: boolean;
+                        missingVariables: string[];
+                        errors: string[];
+                        /** @description Webhook only: what the endpoint answered with. */
+                        httpStatus?: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Trigger not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiSlackConnections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description What an automation's `slackIntegrationId` names to post through this connection. */
+                        id: string;
+                        name: string;
+                        /**
+                         * @description `bot` posts as the LangWatch Slack app and needs a `slackChannelId` on the automation; `webhook` posts to its incoming webhook's channel.
+                         * @enum {string}
+                         */
+                        kind: "bot" | "webhook";
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "PROJECT";
+                        scopeId: string;
+                        scopeName: string;
+                        /** @description The Slack workspace a bot connection posts into. */
+                        slackTeamName: string | null;
+                        createdAt: string;
+                    }[];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

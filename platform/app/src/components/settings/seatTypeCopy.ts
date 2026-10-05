@@ -44,4 +44,22 @@ export const LITE_MEMBER_NEEDS_TEAM_WARNING =
   "only the projects their teams give them, so one with no team can sign in " +
   "and do no more. You can add a team later from the members list.";
 
+/**
+ * What an admin is told when choosing the Developer seat (ADR-143).
+ *
+ * The seat is the answer to one question: a developer who needs a login,
+ * their own project and the ability to send traces and run evaluations
+ * there, and who must never see the shared projects. It is not a cheaper
+ * full seat and not a viewing seat; it is a separate place to work.
+ */
+export const DEVELOPER_SHORT_DESCRIPTION =
+  "Works in a project of their own, sees nothing shared";
+
+export const DEVELOPER_EXPLANATION =
+  "A developer gets a personal project and everything a member can do inside " +
+  "it: send traces from the CLI, run queries and evaluations, manage its keys. " +
+  "They cannot open or be added to any shared project or team, and they are " +
+  "never counted against your member seats. Move them to a Member seat if " +
+  "they need shared projects.";
+
 export const SEAT_TYPES_DOC_PATH = "/ai-governance/roles-and-permissions#seats";

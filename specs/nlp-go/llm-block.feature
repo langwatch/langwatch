@@ -92,6 +92,8 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
       | openai/o3          |
       | openai/o4-preview  |
       | openai/gpt-5-mini  |
+      | openai/gpt-5.6-terra |
+      | openai/gpt-6-luna  |
 
   @integration @v1 @unimplemented
   Scenario: reasoning fields are normalized to a single canonical key before the gateway call

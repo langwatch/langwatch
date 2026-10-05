@@ -409,10 +409,16 @@ export function useEvaluatorEditorController(
   // stale value before the toggle-flip flushes), so cost gets a resolved
   // default that stomps duration back to `[]`. Latch a ref to "already done
   // the initial reset" for this evaluator so late-resolving defaults never
-  // re-fire the reset once the form is live.
+  // re-fire the reset once the form is live. The latch only closes once both
+  // cascade queries have answered: resetting while they are in flight would
+  // fill the model with the platform fallback and never pick up the
+  // configured default.
+  const resolvedDefaultsLoading =
+    resolvedDefaultModel.isLoading || resolvedDefaultEmbeddings.isLoading;
   const didInitializeCreateFormRef = useRef<string | null>(null);
   useEffect(() => {
     if (!evaluatorDef || evaluatorId) return;
+    if (resolvedDefaultsLoading) return;
     const key = evaluatorType ?? evaluatorDef.name ?? "unknown";
     if (didInitializeCreateFormRef.current === key) return;
     form.reset({
@@ -427,6 +433,7 @@ export function useEvaluatorEditorController(
     defaultSettings,
     form,
     forceUserToDecideAName,
+    resolvedDefaultsLoading,
   ]);
 
   const savedFormValuesRef = useRef<EvaluatorFormValues | null>(null);
@@ -733,7 +740,10 @@ export function useEvaluatorEditorController(
     evaluatorType,
     evaluatorDef,
     effectiveEvaluatorDef,
-    isLoadingEvaluator: evaluatorQuery.isLoading,
+    // A new evaluator's form holds until its default models answer, so the
+    // reset that fills them in never lands on top of something typed.
+    isLoadingEvaluator:
+      evaluatorQuery.isLoading || (!evaluatorId && resolvedDefaultsLoading),
     workflowCard,
     isWorkflowEvaluator,
     hasSettings,
@@ -817,7 +827,6 @@ export function EvaluatorEditorBody({
 }) {
   const {
     form,
-    evaluatorId,
     evaluatorType,
     evaluatorDef,
     effectiveEvaluatorDef,
@@ -847,7 +856,7 @@ export function EvaluatorEditorBody({
   // decides which layout to draw.
   const isComparison = isComparisonEvaluatorType(evaluatorType);
 
-  if (evaluatorId && isLoadingEvaluator) {
+  if (isLoadingEvaluator) {
     return (
       <HStack justify="center" paddingY={8}>
         <Spinner size="md" />
@@ -1103,15 +1112,16 @@ export function EvaluatorEditorFooter({
     handleDiscard,
     handleApply,
     handleClose,
+    isLoadingEvaluator,
   } = controller;
 
   const isComparisonEditor = !!onComparisonChange;
-  const saveDisabled = isSaveDisabled({ isValid, isSaving });
-  const applyDisabled = isApplyDisabled({
-    isComparisonEditor,
-    isValid,
-    isSaving,
-  });
+  // Nothing is saved or applied while the form is still waiting on what it edits.
+  const saveDisabled =
+    isLoadingEvaluator || isSaveDisabled({ isValid, isSaving });
+  const applyDisabled =
+    isLoadingEvaluator ||
+    isApplyDisabled({ isComparisonEditor, isValid, isSaving });
 
   if (onLocalConfigChange) {
     return (

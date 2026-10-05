@@ -4,6 +4,7 @@ import {
   ssoConnectionSourceSchema,
   ssoConnectionTypeSchema,
   ssoDomainClaimAuthoritySchema,
+  ssoIdpDialingSchema,
   ssoIdpMetadataSchema,
   ssoMigrationRouteSchema,
   ssoAttestationEvidenceRefSchema,
@@ -97,6 +98,17 @@ export const SET_ARRIVAL_POLICY_COMMAND_TYPE =
 export const RENAME_CONNECTION_COMMAND_TYPE =
   "lw.identity.rename_connection" as const;
 /**
+ * Replacing what the engine dials on an existing connection: the issuer and
+ * the credential references, or the SAML configuration reference.
+ *
+ * Its own verb rather than a discard and a fresh registration, because the
+ * connection id is what the redirect address at the identity provider is
+ * keyed by. Keeping the id keeps that address, the domains and their proofs,
+ * the arrival policy and every account linked through the connection.
+ */
+export const UPDATE_CONNECTION_IDP_COMMAND_TYPE =
+  "lw.identity.update_connection_idp" as const;
+/**
  * The one command that STATES HISTORY rather than commanding a change: the
  * grandfather migration's, which records what an organization's `ssoDomain`
  * and `ssoProvider` strings have been doing all along as the history a
@@ -130,6 +142,7 @@ export const SSO_CONNECTION_COMMAND_TYPES = [
   COMPLETE_TEARDOWN_COMMAND_TYPE,
   SET_ARRIVAL_POLICY_COMMAND_TYPE,
   RENAME_CONNECTION_COMMAND_TYPE,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
 ] as const;
 export type SsoConnectionCommandType =
@@ -380,6 +393,14 @@ export const renameConnectionCommandDataSchema = commandDataSchema({
 export type RenameConnectionCommandData = z.infer<
   typeof renameConnectionCommandDataSchema
 >;
+/** The identity provider's dialing information, as references that are
+ *  already in the credential store. The name is not part of it. */
+export const updateConnectionIdpCommandDataSchema = commandDataSchema({
+  idp: ssoIdpDialingSchema,
+});
+export type UpdateConnectionIdpCommandData = z.infer<
+  typeof updateConnectionIdpCommandDataSchema
+>;
 export type SetArrivalPolicyCommandData = z.infer<
   typeof setArrivalPolicyCommandDataSchema
 >;
@@ -486,6 +507,10 @@ export type SsoConnectionCommand =
   | {
       type: typeof RENAME_CONNECTION_COMMAND_TYPE;
       data: RenameConnectionCommandData;
+    }
+  | {
+      type: typeof UPDATE_CONNECTION_IDP_COMMAND_TYPE;
+      data: UpdateConnectionIdpCommandData;
     }
   | {
       type: typeof GRANDFATHER_CONNECTION_COMMAND_TYPE;

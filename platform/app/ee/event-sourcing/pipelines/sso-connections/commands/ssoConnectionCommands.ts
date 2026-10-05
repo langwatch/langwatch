@@ -66,6 +66,9 @@ import {
   selectMigrationRouteCommandDataSchema,
   setArrivalPolicyCommandDataSchema,
   suspendConnectionCommandDataSchema,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
+  type UpdateConnectionIdpCommandData,
+  updateConnectionIdpCommandDataSchema,
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
@@ -300,6 +303,14 @@ export const RenameConnectionCommand = connectionCommand({
   verb: "renameConnection",
 });
 export type RenameConnectionPayload = RenameConnectionCommandData;
+
+export const UpdateConnectionIdpCommand = connectionCommand({
+  type: UPDATE_CONNECTION_IDP_COMMAND_TYPE,
+  schema: updateConnectionIdpCommandDataSchema,
+  description: "Replace the identity provider settings a connection dials",
+  verb: "updateConnectionIdp",
+});
+export type UpdateConnectionIdpPayload = UpdateConnectionIdpCommandData;
 
 export const RecordDomainProofAbsentCommand = connectionCommand({
   type: RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,

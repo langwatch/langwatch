@@ -205,6 +205,16 @@ func TestDecodeProviderErrorBody_ObservedProductionShapes(t *testing.T) {
 			wantKind:    "json",
 		},
 		{
+			// The gateway forwards a Bedrock refusal under Bedrock's status and
+			// exception name, with no handled-error marker.
+			name:        "Bedrock refusal forwarded by the gateway keeps the exception name",
+			body:        []byte(`{"error":{"type":"ValidationException","code":"ValidationException","message":"Expected toolResult blocks at messages.2.content for the following Ids: call_b2","meta":{"status":400,"provider":"bedrock"}}}`),
+			status:      http.StatusBadRequest,
+			contentType: "application/json",
+			wantCode:    "ValidationException",
+			wantKind:    "json",
+		},
+		{
 			name:        "plain proxy 502",
 			body:        []byte("error code: 502"),
 			status:      http.StatusBadGateway,

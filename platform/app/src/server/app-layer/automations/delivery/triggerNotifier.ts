@@ -1,15 +1,11 @@
-import {
-  IncomingWebhook,
-  type IncomingWebhookSendArguments,
-} from "@slack/webhook";
 import type { TriggerNotifier } from "~/server/app-layer/automations/trigger-template.service";
 import { sendEmail } from "~/server/mailer/emailSender";
 import {
   assertWebhookDelivered,
   sendWebhook,
 } from "~/server/webhooks/sendWebhook";
+import { sendRenderedSlackMessage } from "./sendSlackWebhook";
 import { postSlackChatMessage } from "./slackWebApi";
-import { isSlackWebhookUrl } from "./slackWebhookGuard";
 
 /**
  * Production delivery for trigger test fires: the email path reuses the shared
@@ -21,17 +17,13 @@ export const liveTriggerNotifier: TriggerNotifier = {
     await sendEmail({ to, bcc, subject, html });
   },
   async sendSlack({ webhook, payload }) {
-    // Defense-in-depth SSRF guard: even though the persisted webhook is
-    // validated at save time, the test-fire path can supply an arbitrary URL,
-    // so re-enforce the same Slack-host allow-list here before posting.
-    if (!isSlackWebhookUrl(webhook)) {
-      throw new Error(
-        "Slack webhook must be a valid https://hooks.slack.com/ URL.",
-      );
-    }
-    await new IncomingWebhook(webhook).send(
-      payload as IncomingWebhookSendArguments,
-    );
+    // The same host guard and refusal classification a real fire takes: the
+    // test-fire URL is author-supplied, and a refusal must reach them as prose.
+    await sendRenderedSlackMessage({
+      triggerWebhook: webhook,
+      triggerName: "test fire",
+      payload,
+    });
   },
   async sendWebhook({
     url,
@@ -39,17 +31,21 @@ export const liveTriggerNotifier: TriggerNotifier = {
     headers,
     signingSecrets,
     body,
+    contentType,
     triggerName,
   }) {
     // The full SSRF-fenced sender — same path a real fire takes — with the
     // non-suppressible test-fire marker header (ADR-040 §1). Non-2xx throws
     // the classified DispatchError so the author sees what the endpoint said.
+    // `contentType` travels with the body: a test fire that announced JSON for
+    // a plain-text automation would answer a question the author did not ask.
     const result = await sendWebhook({
       url,
       method,
       headers,
       signingSecrets,
       body,
+      contentType,
       triggerName,
       testFire: true,
     });

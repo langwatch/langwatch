@@ -322,10 +322,11 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// rejects the InvokeModel with a 403. Gated to RequestTypeChat here:
 	// /v1/messages took the translated lane above, which runs its own VPCE
 	// intercept (anthropic_bedrock_vpce.go); embeddings/responses/passthrough
-	// are handled above. A no-op for Bedrock credentials without a runtime
-	// endpoint.
+	// are handled above. OpenAI models on Bedrock take the same lane over the
+	// public runtime host (see bedrockConverseEndpoint); any other Bedrock
+	// request without a runtime endpoint stays on bifrost.
 	if req.Type == domain.RequestTypeChat {
-		if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
+		if endpoint, err := bedrockConverseEndpoint(cred, model); err != nil {
 			return nil, err
 		} else if endpoint != "" {
 			return r.dispatchBedrockVPCE(ctx, req, provider, model, cred, endpoint)
@@ -691,10 +692,10 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	// official Bedrock ConverseStream API over the customer's VPC endpoint —
 	// same rationale as the non-streaming Dispatch intercept above. Gated to
 	// RequestTypeChat because /v1/messages took its own lanes above, each
-	// with its own VPCE handling. A no-op for Bedrock credentials without a
-	// runtime endpoint.
+	// with its own VPCE handling. OpenAI models on Bedrock stream through the
+	// same lane over the public runtime host.
 	if req.Type == domain.RequestTypeChat {
-		if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
+		if endpoint, err := bedrockConverseEndpoint(cred, model); err != nil {
 			return nil, err
 		} else if endpoint != "" {
 			return r.dispatchBedrockVPCEStream(ctx, req, provider, model, cred, endpoint)
