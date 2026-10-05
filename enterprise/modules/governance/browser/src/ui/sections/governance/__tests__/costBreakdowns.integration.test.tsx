@@ -641,6 +641,22 @@ describe("the cost breakdown panels", () => {
     });
   });
 
+  describe("given one provider has no complete USD amount and another recorded a refund", () => {
+    /** @scenario "Missing provider prices are not displayed as zero" */
+    it("labels the first unavailable rather than zero and keeps the refund negative", () => {
+      harness.providers = [
+        { provider: "openai_admin", amountUsd: -12.5, cellsWithoutAmount: 0 },
+        { provider: "anthropic_admin", amountUsd: null, cellsWithoutAmount: 1 },
+      ];
+      renderScreen();
+
+      const billed = within(screen.getByTestId("cost-lane-billed"));
+      expect(billed.getByText("USD amount unavailable")).toBeInTheDocument();
+      expect(billed.getByText(/-\$12\.50|−\$12\.50|\(\$12\.50\)/)).toBeInTheDocument();
+      expect(billed.queryByText("$0.00")).toBeNull();
+    });
+  });
+
   describe("given the window holds a day we have no dollar figure for", () => {
     /** @scenario "A day with a withheld amount shows as withheld in cost over time, not as a smaller bar" */
     it("marks the cost-over-time chart as short and names the provider that withheld", () => {

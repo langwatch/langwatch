@@ -26,6 +26,7 @@ function composer(parserConfig: Record<string, string>): ComposerState {
 
 describe("given a Claude compliance source whose admin entered a workspace key", () => {
   describe("when the pull config is assembled for saving", () => {
+    /** @scenario "The Claude compliance workspace key reaches its adapter as the token it reads" */
     it("files the key under the credentials as the token, not under the old name", () => {
       const config = buildClaudeCompliancePullConfig(
         composer({ credentialsToken: "sk-ant-workspace" }),

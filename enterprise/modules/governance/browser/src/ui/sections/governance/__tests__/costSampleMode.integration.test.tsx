@@ -332,6 +332,14 @@ describe("given sample mode is on with nothing measured", () => {
     window.sessionStorage.setItem("governance.sample", "true");
   });
 
+  /** @scenario "A panel with nothing in it shows sample data instead of Not available" */
+  it("fills the empty panels with sample figures and never reads Not available", () => {
+    renderScreen();
+
+    expect(screen.getAllByText(A_SAMPLE_FIGURE).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/not available/i)).toBeNull();
+  });
+
   /** @scenario "The screen says figures are invented once, not once per panel" */
   it("says so in one banner and repeats it in no panel badge", () => {
     renderScreen();
@@ -359,6 +367,7 @@ describe("given the cost read failed", () => {
     beforeEach(() => window.sessionStorage.setItem("governance.sample", "true"));
 
     /** @scenario No error alert is rendered while sample mode is on */
+    /** @scenario "No error alerts are rendered while sample mode is on" */
     it("renders no error alert and shows invented figures under the sample banner", () => {
       renderScreen();
 

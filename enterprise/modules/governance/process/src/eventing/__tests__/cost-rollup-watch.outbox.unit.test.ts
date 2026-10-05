@@ -455,6 +455,7 @@ describe("a failing comparison against its process store", () => {
 describe("drift that outlives the ladder", () => {
   describe("given a day's summary no longer matches its recorded charges", () => {
     /** @scenario "Drift that outlives every look is counted and logged" */
+    /** @scenario "The comparator counts a summary that drifted from its events" */
     it("counts it once and logs both figures", async () => {
       const world = await driftingWorld();
       world.toNextSlot();

@@ -76,11 +76,15 @@ describe("given a chip whose choices cannot apply to the current view", () => {
 });
 
 describe("given a page with a department filter and a sort control", () => {
-  it("draws both chips as children of the same row", () => {
+  /** @scenario "Filters and sort share one row under the page header" */
+  it("draws both chips as children of the same row, which wraps rather than scrolls", () => {
     renderChip();
 
     const department = screen.getByRole("button", { name: /Department/ });
     const sort = screen.getByRole("button", { name: /Sort/ });
     expect(department.parentElement).toBe(sort.parentElement);
+    const row = getComputedStyle(department.parentElement as HTMLElement);
+    expect(row.flexWrap).toBe("wrap");
+    expect(["", "visible"]).toContain(row.overflowX);
   });
 });

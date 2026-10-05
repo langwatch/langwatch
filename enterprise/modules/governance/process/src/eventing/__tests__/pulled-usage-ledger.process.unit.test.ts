@@ -44,6 +44,7 @@ describe("resuming an instance persisted before the state carried a filed cell",
 describe("recognising a reissued charge", () => {
   describe("given a day's bill already pulled in one currency", () => {
     /** @scenario "A bill reissued in another currency is withdrawn by the pull that finds it" */
+    /** @scenario "A retraction is dated to the day it corrects" */
     it("withdraws the first currency's version when the next pull returns another currency", async () => {
       const { retraction, observe, drainOutbox } = ledgerRuntime();
 
