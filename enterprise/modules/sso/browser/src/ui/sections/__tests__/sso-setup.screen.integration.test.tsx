@@ -271,6 +271,31 @@ describe("the single sign-on setup page", () => {
       expect(screen.queryByText(/No identity provider is registered/)).toBeNull();
     });
 
+    /** @scenario "A step that cannot be read says so rather than looking finished" */
+    it("quotes the words registered for the failure's code and shows no step as done", () => {
+      state.isError = true;
+      state.error = {
+        data: {
+          error: {
+            code: "sso_issuer_unreachable",
+            kind: "sso_issuer_unreachable",
+            httpStatus: 422,
+            fault: "customer",
+            meta: {},
+            reasons: [{ code: "unknown", kind: "unknown" }],
+          },
+        },
+      };
+      state.view = null;
+
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.getByText("The identity provider could not be reached")).toBeInTheDocument();
+      expect(screen.getByText(/We could not load single sign-on setup\./)).toBeInTheDocument();
+      expect(screen.queryByTestId("step-done")).toBeNull();
+      expect(screen.queryByTestId("setup-step-1")).toBeNull();
+    });
+
     it("still says the setup is unavailable when the read answered nothing at all", () => {
       state.view = null;
 

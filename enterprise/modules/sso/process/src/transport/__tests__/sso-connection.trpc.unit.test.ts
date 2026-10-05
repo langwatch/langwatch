@@ -396,6 +396,35 @@ describe("the back-office single sign-on surface", () => {
       );
     });
 
+    /** @scenario "An operator reads a connection's history from the back office, gated like the rest of that surface" */
+    it("answers the history to the staff list and the same not-found to everybody else", async () => {
+      context.connections.findById.mockResolvedValue(legacyConnection("org_acme"));
+
+      await expect(
+        context.callerFor({ id: STAFF_ID }).getHistory({ connectionId: "ssoc_1" }),
+      ).resolves.toEqual([
+        { eventId: "evt_1", occurredAtMs: 1, summary: "Registered", carriedOver: false },
+      ]);
+      expect(context.getHistory).toHaveBeenCalledOnce();
+
+      const outsider = await context
+        .callerFor({ id: CUSTOMER_ID })
+        .getHistory({ connectionId: "ssoc_1" })
+        .then(() => {
+          throw new Error("the back office gate let a history read through");
+        }, domainErrorOf);
+      const probeOfAnotherSurface = await context
+        .callerFor({ id: CUSTOMER_ID })
+        .claimDomain({ ...TARGET, domain: "acme.com" })
+        .then(() => {
+          throw new Error("the back office gate let a claim through");
+        }, domainErrorOf);
+
+      expect(outsider).toMatchObject({ code: "not_found", message: "Not found" });
+      expect(outsider).toEqual(probeOfAnotherSurface);
+      expect(context.getHistory).toHaveBeenCalledOnce();
+    });
+
     it("pages a cutover with main's defaults, and answers null for a missing connection", async () => {
       const caller = context.callerFor({ id: STAFF_ID });
       await expect(

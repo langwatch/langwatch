@@ -192,6 +192,38 @@ describe("given a command the server accepted before the read caught up", () => 
     expect(state.checkDomainRecord.calls).toHaveLength(1);
   });
 
+  /** @scenario "Proving one domain leaves another domain available for verification" */
+  it("carries nothing of the first domain's proof onto the next domain's controls", () => {
+    state.proveDomain.answer = { proved: false, record: RECORD };
+    const second: DomainClaimView = { ...claimed, domain: "beta.com" };
+    const { withRead } = renderSection({ claims: [claimed, second] });
+    fireEvent.click(screen.getAllByRole("button", { name: "Prove this domain" })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: "Check for it now" }));
+    withRead({ evidence: [PROVED], claims: [second] });
+
+    expect(screen.queryByTestId("connection-domain-pending")).toBeNull();
+    expect(polls.at(-1)).toEqual({ enabled: false });
+    expect(screen.getByRole("button", { name: "Prove this domain" })).toBeEnabled();
+
+    state.proveDomain.answer = {
+      proved: false,
+      record: {
+        ...RECORD,
+        domain: "beta.com",
+        name: "_langwatch.beta.com",
+        value: "lw-proof-beta",
+      },
+    };
+    fireEvent.click(screen.getByRole("button", { name: "Prove this domain" }));
+
+    expect(screen.getByText("lw-proof-beta")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Check for it now" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Check the file instead" })).toBeEnabled();
+    expect(screen.queryByTestId("connection-domain-pending")).toBeNull();
+    expect(polls.at(-1)).toEqual({ enabled: false });
+    expect(state.checkDomainRecord.calls).toHaveLength(1);
+  });
+
   it("says a removal was accepted until the domain is gone from the rows", () => {
     const { withRead } = renderSection({ evidence: [PROVED], claims: [] });
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
