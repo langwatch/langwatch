@@ -100,6 +100,14 @@ Feature: Join before create - the choice happens before an organization is minte
     And asking to join is not offered beside it
 
   @integration
+  Scenario: A pending invitation leads even while a request to join is open
+    Given "sam" already asked to join "acme" and is waiting for an administrator
+    And "ana" invited "sam@acme.com" to "acme" as a Developer
+    When "sam" reaches the welcome screen
+    Then accepting the invitation to "acme" is the leading action
+    And the waiting screen does not stand in front of it
+
+  @integration
   Scenario: Accepting the invitation from the welcome screen lands the invited seat
     Given "ana" invited "sam@acme.com" to "acme" as a Developer
     When "sam" accepts it from the welcome screen

@@ -481,6 +481,24 @@ describe("given somebody an administrator already invited", () => {
       ).not.toBeInTheDocument();
     });
 
+    /** @scenario A pending invitation leads even while a request to join is open */
+    it("leads with the invitation over the request already waiting", () => {
+      invitationsRef.current = { ...INVITED };
+      mineRef.current = {
+        data: [{ joinRequestId: "jr_1", organizationId: "org_acme" }],
+        isPending: false,
+      };
+      renderTakeover();
+
+      // Waiting on the request would let an approval land the joiner seat;
+      // accepting the invitation lands the seat the administrator chose and
+      // withdraws the request.
+      expect(
+        screen.getByRole("button", { name: /Accept the invitation to Acme/ }),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("join-team-waiting")).not.toBeInTheDocument();
+    });
+
     /** @scenario Accepting the invitation from the welcome screen lands the invited seat */
     it("accepts through the invitation's own path and lets the welcome redirect carry on", async () => {
       invitationsRef.current = { ...INVITED };

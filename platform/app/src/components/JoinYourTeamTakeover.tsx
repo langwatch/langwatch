@@ -76,6 +76,16 @@ export function JoinYourTeamTakeover({
   // answered, so nothing here decides.
   if (currentOrganizationId === undefined) return fallback;
 
+  // An administrator already answered the question this screen would ask,
+  // by inviting them. Lead with that, and offer no ask beside it. It leads
+  // even over a request already waiting: accepting withdraws that request,
+  // while waiting on it would let an approval land the joiner seat instead
+  // of the seat the administrator chose. Only the welcome screen is handed
+  // an invitation (see the state hook), so a dashboard is unchanged.
+  if (invitation) {
+    return <InvitationTakeover invitation={invitation} />;
+  }
+
   const waiting = findWaitingRequest(mine, currentOrganizationId);
 
   if (waiting) {
@@ -85,13 +95,6 @@ export function JoinYourTeamTakeover({
         onCheckAgain={() => void utils.joinRequests.mine.invalidate()}
       />
     );
-  }
-
-  // An administrator already answered the question this screen would ask,
-  // by inviting them. Lead with that, and offer no ask beside it. Only the
-  // welcome screen is handed one (see the state hook).
-  if (invitation) {
-    return <InvitationTakeover invitation={invitation} />;
   }
 
   if (!decision || decision.outcome === "none") return fallback;
