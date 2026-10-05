@@ -15,6 +15,7 @@ import { GatewayModule } from "./app/gateway.app.ts";
 import { gatewayGovernanceEventsEventing } from "./eventing/gateway-governance-events.pipeline.ts";
 import { gatewayRealtimeSessionEventing } from "./eventing/gateway-realtime-session.pipeline.ts";
 import { gatewaySpendEventing } from "./eventing/gateway-spend.pipeline.ts";
+import { gatewayRepositories } from "./repositories/gateway-repositories.registry.ts";
 import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
 import {
   GatewayBudgetChangeDedupeService,
@@ -49,6 +50,7 @@ export function gatewaySpendPlanOrganizationId(context: { req: { raw: Request } 
 }
 
 export const gatewayProcessModule = defineProcessModule("gateway")
+  .withRepositories(gatewayRepositories)
   .withApi(GatewayModule)
   .withTransports(
     agentCacheRest,

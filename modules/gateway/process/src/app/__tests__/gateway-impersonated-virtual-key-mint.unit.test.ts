@@ -1,29 +1,21 @@
 import { PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  * @see modules/gateway/specs/gateway-virtual-key-impersonated-mint.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { GatewayModule } from "../gateway.app.ts";
 
 const ORGANIZATION_ID = "organization_1";
 const ACTOR = { type: "user", id: "member-1" };
 
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
-
-const reversible: Encryption = {
-  encrypt: (plaintext) => `sealed:${plaintext}`,
-  decrypt: (ciphertext) => ciphertext.replace(/^sealed:/, ""),
-};
 
 async function gatewayApp() {
   const hasPermission = vi.fn<AuthzApi["hasPermission"]>(async () => true);
@@ -42,17 +34,12 @@ async function gatewayApp() {
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
     },
-    members: {
-      prisma: createApiFixture<PrismaClient>({}),
-      clickhouse: createApiFixture<ClickHouseQueryClient>({}),
-      encryption: reversible,
-      redis: memoryRedisDouble(),
-      publicBaseUrl: "https://app.acme.example",
-    },
+    repositories: MemoryGatewayRepositories.create(),
     config: {
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,
+      publicBaseUrl: "https://app.acme.example",
       baseUrl: void 0,
       publicUrl: void 0,
       isSaas: false,

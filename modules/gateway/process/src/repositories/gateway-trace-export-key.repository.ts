@@ -1,11 +1,11 @@
 /**
- * The ownerless key one gateway trace project's spans are exported with; the token rests
- * encrypted.
+ * The ownerless key one gateway trace project's spans are exported with. The token is readable
+ * here; the live repository seals it at rest.
  */
 export type StoredGatewayTraceExportKey = Readonly<{
   projectId: string;
   apiKeyId: string;
-  encryptedToken: string;
+  token: string;
 }>;
 
 export abstract class GatewayTraceExportKeyRepository {

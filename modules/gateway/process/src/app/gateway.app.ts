@@ -137,7 +137,6 @@ import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type ProcessMembers } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
@@ -166,6 +165,7 @@ import {
   EventingGatewaySpendAdapter,
   GatewaySpendProducerAdapter,
 } from "../eventing/gateway-spend.pipeline.ts";
+import type { GatewayAgentCacheEntryRepository } from "../repositories/gateway-agent-cache.repository.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
 import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
 import type { GatewayBudgetRepository } from "../repositories/gateway-budget.repository.ts";
@@ -177,14 +177,9 @@ import type { GatewaySpendFoldCacheRepository } from "../repositories/gateway-sp
 import type { GatewaySpendScopeRepository } from "../repositories/gateway-spend-scope.repository.ts";
 import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
 import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
-import { LiveGatewayRepositories } from "../repositories/live/live.gateway.repositories.ts";
-import type { GatewayAgentCacheEntryStore } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
 import { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
 import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
-import {
-  GatewayAgentCacheService,
-  type GatewayAgentCacheEncryption,
-} from "../services/gateway-agent-cache.service.ts";
+import { GatewayAgentCacheService } from "../services/gateway-agent-cache.service.ts";
 import { GatewayApplicableBudgetsService } from "../services/gateway-applicable-budgets.service.ts";
 import { GatewayAuthzScopePermissionsService } from "../services/gateway-authz-scope-permissions.service.ts";
 import { GatewayBudgetChangeDedupeService } from "../services/gateway-budget-change-dedupe.service.ts";
@@ -446,13 +441,8 @@ export type GatewayApplicableBudgetTarget = Readonly<{
  * else lives in this package directly.
  */
 export type GatewayRestInfrastructure = Readonly<{
-  /** Absent only where this process has no encryption and mounts no agent-cache family. */
-  agentCache?:
-    | Readonly<{
-        store: GatewayAgentCacheEntryStore;
-        encryption: GatewayAgentCacheEncryption;
-      }>
-    | undefined;
+  /** Absent only where this process mounts no agent-cache family. */
+  agentCache?: GatewayAgentCacheEntryRepository | undefined;
 }>;
 
 export interface GatewayAppDependencies extends GatewayRestInfrastructure {
@@ -1089,12 +1079,9 @@ function extractSessionActor(value: object): { user: { id: string } } | null {
 
 type GatewaySetup = FeatureSetup<
   typeof GatewayModule.dependencies,
-  Pick<ProcessMembers, "prisma" | "clickhouse" | "encryption" | "redis"> &
-    Readonly<{
-      /** The expected control plane, where the gateway's own setting says nothing. */
-      publicBaseUrl?: string | undefined;
-    }>,
-  GatewayServerConfig
+  never,
+  GatewayServerConfig,
+  GatewayRepositories
 >;
 
 export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, GatewaySpendDoorApi {
@@ -1145,13 +1132,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     jwtSecret: Secret.load("LW_GATEWAY_JWT_SECRET", { optional: true }),
     virtualKeyPepper,
   } as const;
-  /**
-   * `prisma` is the one guarded connection every gateway row read runs on.
-   * `clickhouse` is the control plane's ONE routing client, resolved per tenant
-   * rather than a second pool — the spend ledger is a projection in that instance.
-   */
-  static readonly reads = ["prisma", "clickhouse", "encryption", "redis", "publicBaseUrl"] as const;
-
   static async create(setup: GatewaySetup): Promise<GatewayModule> {
     return setup.secrets.into(GatewayModule.secrets.internalSecret, (internalSecret) =>
       setup.secrets.into(GatewayModule.secrets.jwtSecret, (jwtSecret) =>
@@ -1173,11 +1153,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     const governanceEvents = GatewayGovernanceEventsService.create({
       projects: setup.dependencies.projects,
     });
-    const repositories = LiveGatewayRepositories.create({
-      prisma: setup.members.prisma,
-      clickhouse: setup.members.clickhouse,
-      redis: setup.members.redis,
-    });
+    const { repositories } = setup;
     const controlPlane = gatewayControlPlane({
       repositories,
       peers: {
@@ -1198,7 +1174,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     const graceMs = settlementGraceMs(setup.config?.spendSettlementGraceMs);
     const connectUpstream = GatewayConnectUpstreamService.create({
       repository: repositories.connectUpstream,
-      cipher: setup.members.encryption,
     });
     const spendCommands: Record<string, GatewaySpendCommandSender | undefined> = {};
     const spend = {
@@ -1231,7 +1206,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       connectUpstream,
       traceExportKeys: GatewayTraceExportKeyService.create({
         repository: repositories.traceExportKeys,
-        cipher: setup.members.encryption,
         apiKeys: setup.dependencies.apiKeys,
       }),
     });
@@ -1260,13 +1234,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     });
 
     return new GatewayModule({
-      members: {
-        ...controlPlane,
-        agentCache: {
-          store: repositories.agentCache,
-          encryption: setup.members.encryption,
-        },
-      },
+      infrastructure: { ...controlPlane, agentCache: repositories.agentCache },
       voice: {
         webhook: GatewayElevenLabsWebhookService.create({
           credentials: voiceCredentials,
@@ -1318,7 +1286,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       addresses: {
         baseUrl: setup.config?.internalUrl ?? setup.config?.baseUrl,
         publicUrl: setup.config?.publicUrl ?? setup.config?.baseUrl,
-        expectedControlPlaneUrl: setup.config?.controlPlaneUrl ?? setup.members.publicBaseUrl,
+        expectedControlPlaneUrl: setup.config?.controlPlaneUrl ?? setup.config?.publicBaseUrl,
       },
       connectUpstream,
       oneTimeReveals: setup.dependencies.oneTimeReveals,
@@ -1348,7 +1316,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   #governanceEvents: GatewayGovernanceEventsService | undefined;
 
   private constructor({
-    members,
+    infrastructure,
     voice,
     internalProtocol,
     internalDoor,
@@ -1364,7 +1332,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     oneTimeReveals,
     governanceEvents,
   }: {
-    members: GatewayInfrastructure;
+    infrastructure: GatewayInfrastructure;
     voice: GatewayVoiceServices;
     internalProtocol: GatewayInternalProtocolService;
     internalDoor: RestIdentity;
@@ -1390,9 +1358,9 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     // The union's second arm exists for the REST-only composition (agent cache
     // and the ElevenLabs callback), which carries no control plane. Every
     // installed process now takes the first.
-    this.#coreDependencies = "virtualKeys" in members ? members : void 0;
-    this.#agentCache = members.agentCache
-      ? GatewayAgentCacheService.create(members.agentCache)
+    this.#coreDependencies = "virtualKeys" in infrastructure ? infrastructure : void 0;
+    this.#agentCache = infrastructure.agentCache
+      ? GatewayAgentCacheService.create({ store: infrastructure.agentCache })
       : void 0;
     this.#voice = voice;
   }

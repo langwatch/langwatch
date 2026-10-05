@@ -3,18 +3,16 @@
  * `GatewayModule.listSpendEventsPage`: ledger read, filter/cursor passthrough,
  * virtual-key display-name resolution — moved here so REST and tRPC agree.
  */
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  memorySpendStateSeed,
+  memoryVirtualKeySeed,
+} from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
+import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { GatewayModule } from "../gateway.app.ts";
 
 /** A peer that answers nothing: the composition resolves it, no test call reaches it. */
@@ -36,60 +34,33 @@ function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
 
 const PROJECT_ID = "project_1";
 
-const SPEND_EVENT_ROW = {
-  TenantId: PROJECT_ID,
-  GatewayRequestId: "req_1",
-  OrganizationId: "org_1",
-  VirtualKeyId: "vk_1",
-  PrincipalUserId: "",
-  EndUserId: "enduser-9",
-  TraceId: "trace_1",
-  Model: "gpt-5",
-  ProviderKey: "prov_1",
-  RequestType: "chat",
-  TokensInput: 100,
-  TokensOutput: 50,
-  TokensCacheRead: 0,
-  TokensCacheWrite: 0,
-  TokensReasoning: 0,
-  CostNanoUSD: 4_200_000,
-  RateVersion: "catalog@2026-07-26",
-  Status: "confirmed",
-  ErrorClass: "",
-  HttpStatus: 200,
-  NeedsReconciliation: 0,
-  SettleReason: "",
-  Labels: [] as string[],
-  Metadata: "",
-  DurationMS: 900,
-  OccurredAtMs: Date.parse("2026-07-20T12:00:00Z"),
-};
-
-const clickHouseQuery = vi.fn();
 const findOrganizationId = vi.fn();
-const virtualKeyFindMany = vi.fn();
 
-/** A fake ClickHouse client answering the spend ledger page read. */
-function fakeClickHouse(): ClickHouseQueryClient {
-  return clickHouseQueryClientDouble({
-    query: clickHouseQuery,
-    insert: async () => {},
-  });
-}
-
-/** A fake Prisma client answering the one virtual-key display-name lookup. */
-function fakePrisma(): PrismaClient {
-  return prismaDouble({
-    virtualKey: { findMany: virtualKeyFindMany },
-  });
+/** One settled request on the ledger, naming the key it was spent through. */
+async function seededRepositories({ virtualKeyId }: { virtualKeyId: string }) {
+  const repositories = MemoryGatewayRepositories.create();
+  await repositories.virtualKeys.create(
+    memoryVirtualKeySeed({ id: "vk_1", name: "Customer A key", organizationId: "org_1" }),
+  );
+  await repositories.spendEvents.upsertFromFold([
+    {
+      tenantId: PROJECT_ID,
+      gatewayRequestId: "req_1",
+      state: memorySpendStateSeed({ virtualKeyId }),
+    },
+  ]);
+  return repositories;
 }
 
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
-/** The slice of the application this surface reaches, and nothing else. */
-async function gatewayAppStub(): Promise<GatewayModule> {
-  return GatewayModule.create({
+/** The gateway over seeded memory twins, with the ledger page and key-name reads watched. */
+async function gatewayAppStub({ virtualKeyId = "vk_1" }: { virtualKeyId?: string } = {}) {
+  const repositories = await seededRepositories({ virtualKeyId });
+  const pageReads = vi.spyOn(repositories.spendEvents, "readSpendEventsPage");
+  const nameReads = vi.spyOn(repositories.virtualKeys, "findMetaByIds");
+  const app = await GatewayModule.create({
     dependencies: {
       entitlement: peer("entitlement"),
       authz: peer("authz"),
@@ -104,16 +75,12 @@ async function gatewayAppStub(): Promise<GatewayModule> {
       oneTimeReveals: peer("oneTimeReveals"),
       apiKeys: peer("apiKeys"),
     },
-    members: {
-      prisma: fakePrisma(),
-      clickhouse: fakeClickHouse(),
-      encryption: createApiFixture<Encryption>(),
-      redis: redisDouble(),
-    },
+    repositories,
     config: {
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,
+      publicBaseUrl: void 0,
       baseUrl: undefined,
       publicUrl: undefined,
       isSaas: false,
@@ -122,6 +89,7 @@ async function gatewayAppStub(): Promise<GatewayModule> {
     resources: new ResourceScope(),
     secrets: noSecrets,
   });
+  return { app, pageReads, nameReads };
 }
 
 const BASE_INPUT = {
@@ -133,43 +101,37 @@ const BASE_INPUT = {
 describe("GatewayModule.listSpendEventsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clickHouseQuery.mockResolvedValue({ rows: [SPEND_EVENT_ROW] });
     findOrganizationId.mockResolvedValue("org_1");
-    virtualKeyFindMany.mockResolvedValue([
-      { id: "vk_1", name: "Customer A key", displayPrefix: "..." },
-    ]);
   });
 
   describe("given a page request carrying filters and a cursor", () => {
     /** @scenario Ledger filters and cursor pass through to the repository page read */
     it("passes filters and cursor through to the repository page read", async () => {
-      const app = await gatewayAppStub();
+      const { app, pageReads } = await gatewayAppStub();
+      const filters = {
+        virtualKeyIds: ["vk_1"],
+        endUserIds: ["enduser-9"],
+        models: ["gpt-5"],
+        providerKeys: ["pk-openai"],
+        labels: ["billable"],
+        metadata: [{ key: "customer_tier", values: ["gold"] }],
+        status: "error" as const,
+      };
       await app.listSpendEventsPage({
         ...BASE_INPUT,
-        filters: {
-          virtualKeyIds: ["vk_1"],
-          endUserIds: ["enduser-9"],
-          models: ["gpt-5"],
-          providerKeys: ["pk-openai"],
-          labels: ["billable"],
-          metadata: [{ key: "customer_tier", values: ["gold"] }],
-          status: "error",
-        },
+        filters,
         cursor: { occurredAtMs: 123, gatewayRequestId: "req_0" },
         limit: 25,
       });
 
-      expect(clickHouseQuery).toHaveBeenCalledWith(
+      expect(pageReads).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantId: PROJECT_ID,
-          params: expect.objectContaining({
-            tenantId: PROJECT_ID,
-            fromMs: BASE_INPUT.fromMs,
-            toMs: BASE_INPUT.toMs,
-            limit: 25,
-            cursorOccurredAtMs: 123,
-            cursorRequestId: "req_0",
-          }),
+          fromMs: BASE_INPUT.fromMs,
+          toMs: BASE_INPUT.toMs,
+          filters: expect.objectContaining(filters),
+          cursor: { occurredAtMs: 123, gatewayRequestId: "req_0" },
+          limit: 25,
         }),
       );
     });
@@ -179,30 +141,26 @@ describe("GatewayModule.listSpendEventsPage", () => {
     /** @scenario Ledger rows resolve virtual key display names */
     /** @scenario Virtual key rows are read only through the gateway feature */
     it("resolves virtual-key display names alongside the rows", async () => {
-      const app = await gatewayAppStub();
+      const { app, nameReads } = await gatewayAppStub();
       const result = await app.listSpendEventsPage(BASE_INPUT);
 
       expect(result?.rows).toHaveLength(1);
       expect(result?.virtualKeyNames).toEqual({ vk_1: "Customer A key" });
       expect(result?.clickHouseDisabled).toBe(false);
       expect(findOrganizationId).toHaveBeenCalledWith(PROJECT_ID);
-      expect(virtualKeyFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ organizationId: "org_1", id: { in: ["vk_1"] } }),
-        }),
-      );
+      expect(nameReads).toHaveBeenCalledWith({ organizationId: "org_1", ids: ["vk_1"] });
     });
   });
 
   describe("given a page naming no keys", () => {
     it("asks the virtual-key table nothing", async () => {
-      clickHouseQuery.mockResolvedValue({ rows: [{ ...SPEND_EVENT_ROW, VirtualKeyId: "" }] });
-      const app = await gatewayAppStub();
+      const { app, nameReads } = await gatewayAppStub({ virtualKeyId: "" });
 
       const result = await app.listSpendEventsPage(BASE_INPUT);
 
+      expect(result?.rows).toHaveLength(1);
       expect(result?.virtualKeyNames).toEqual({});
-      expect(virtualKeyFindMany).not.toHaveBeenCalled();
+      expect(nameReads).not.toHaveBeenCalled();
     });
   });
 
@@ -210,12 +168,12 @@ describe("GatewayModule.listSpendEventsPage", () => {
     /** @scenario Unknown project tenants do not resolve virtual-key names */
     it("keeps virtual-key names empty", async () => {
       findOrganizationId.mockResolvedValue(undefined);
-      const app = await gatewayAppStub();
+      const { app, nameReads } = await gatewayAppStub();
 
       const result = await app.listSpendEventsPage(BASE_INPUT);
 
       expect(result?.virtualKeyNames).toEqual({});
-      expect(virtualKeyFindMany).not.toHaveBeenCalled();
+      expect(nameReads).not.toHaveBeenCalled();
     });
   });
 });

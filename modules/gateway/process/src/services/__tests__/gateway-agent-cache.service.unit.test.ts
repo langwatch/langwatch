@@ -1,3 +1,4 @@
+import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { logger } = vi.hoisted(() => ({
@@ -8,15 +9,26 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => logger,
 }));
 
+import { GatewayAgentCacheEntryUnreadableError } from "../../repositories/gateway-agent-cache.repository.ts";
 import { MemoryGatewayAgentCacheEntryRepository } from "../../repositories/memory/memory.gateway-agent-cache.repository.ts";
+import { RedisGatewayAgentCacheEntryRepository } from "../../repositories/redis/redis.gateway-agent-cache.repository.ts";
 import { GatewayAgentCacheService } from "../gateway-agent-cache.service.ts";
 
-const encryption = {
-  encrypt: (value: string) => `sealed:${value}`,
-  decrypt: (value: string) => value.replace(/^sealed:/, ""),
-};
+/** A store holding an entry it can no longer open, as Redis does once the key changed. */
+function unreadableStore() {
+  const store = MemoryGatewayAgentCacheEntryRepository.create();
+  return {
+    find: () =>
+      Promise.reject(
+        new GatewayAgentCacheEntryUnreadableError({ cause: new Error("bad ciphertext") }),
+      ),
+    set: (key: string, value: string, ttlMs: number) => store.set(key, value, ttlMs),
+    claim: (key: string, value: string, ttlMs: number) => store.claim(key, value, ttlMs),
+    delete: (key: string) => store.delete(key),
+  };
+}
 
-describe("given an encrypted agent cache", () => {
+describe("given the agent cache", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -27,7 +39,6 @@ describe("given an encrypted agent cache", () => {
     it("reads the last value written under a name", async () => {
       const service = GatewayAgentCacheService.create({
         store: MemoryGatewayAgentCacheEntryRepository.create(),
-        encryption,
       });
 
       await service.put({ projectId: "project-1", name: "SESSION", value: "first" });
@@ -45,7 +56,6 @@ describe("given an encrypted agent cache", () => {
     it("lets exactly one concurrent claim take a name", async () => {
       const service = GatewayAgentCacheService.create({
         store: MemoryGatewayAgentCacheEntryRepository.create(),
-        encryption,
       });
 
       const claims = await Promise.all(
@@ -75,7 +85,6 @@ describe("given an encrypted agent cache", () => {
     it("stops answering the name with the cache miss code", async () => {
       const service = GatewayAgentCacheService.create({
         store: MemoryGatewayAgentCacheEntryRepository.create(),
-        encryption,
       });
       await service.put(shortLived);
       await expect(service.get(shortLived)).resolves.toMatchObject({ value: "state" });
@@ -91,7 +100,6 @@ describe("given an encrypted agent cache", () => {
     it("lets the next claim take the name", async () => {
       const service = GatewayAgentCacheService.create({
         store: MemoryGatewayAgentCacheEntryRepository.create(),
-        encryption,
       });
       await expect(service.claim(shortLived)).resolves.toMatchObject({ claimed: true });
       await expect(service.claim(shortLived)).resolves.toMatchObject({ claimed: false });
@@ -113,7 +121,6 @@ describe("given an encrypted agent cache", () => {
           delete: (key) => store.delete(key),
           claim: () => Promise.reject(new Error("redis unavailable")),
         },
-        encryption,
       });
 
       await expect(
@@ -122,20 +129,10 @@ describe("given an encrypted agent cache", () => {
     });
   });
 
-  describe("when an entry cannot be decrypted", () => {
+  describe("when the store can no longer open an entry", () => {
     /** @scenario "An entry the platform can no longer read answers as a miss" */
     it("raises the cache miss code", async () => {
-      const store = MemoryGatewayAgentCacheEntryRepository.create();
-      await store.set("ttlcache:agent-cache:project-1:SESSION", "unreadable", 60_000);
-      const service = GatewayAgentCacheService.create({
-        store,
-        encryption: {
-          encrypt: vi.fn(),
-          decrypt: () => {
-            throw new Error("bad ciphertext");
-          },
-        },
-      });
+      const service = GatewayAgentCacheService.create({ store: unreadableStore() });
 
       await expect(service.get({ projectId: "project-1", name: "SESSION" })).rejects.toMatchObject({
         code: "cache_entry_not_found",
@@ -144,16 +141,18 @@ describe("given an encrypted agent cache", () => {
 
     /** @scenario "An entry the platform can no longer read answers as a miss" */
     it("keeps the stored value out of its warning", async () => {
-      const store = MemoryGatewayAgentCacheEntryRepository.create();
-      await store.set("ttlcache:agent-cache:project-1:SESSION", "a-secret-nobody-may-log", 60_000);
+      const redis = memoryRedisDouble();
+      await redis.set("ttlcache:agent-cache:project-1:SESSION", "a-secret-nobody-may-log");
       const service = GatewayAgentCacheService.create({
-        store,
-        encryption: {
-          encrypt: vi.fn(),
-          decrypt: () => {
-            throw new Error("bad ciphertext");
+        store: RedisGatewayAgentCacheEntryRepository.create({
+          redis,
+          cipher: {
+            encrypt: (value) => value,
+            decrypt: () => {
+              throw new Error("bad ciphertext");
+            },
           },
-        },
+        }),
       });
 
       await expect(service.get({ projectId: "project-1", name: "SESSION" })).rejects.toMatchObject({
@@ -166,11 +165,22 @@ describe("given an encrypted agent cache", () => {
     });
   });
 
+  describe("when the store itself fails a read", () => {
+    it("raises the store's error rather than a miss", async () => {
+      const service = GatewayAgentCacheService.create({
+        store: { ...unreadableStore(), find: () => Promise.reject(new Error("redis unavailable")) },
+      });
+
+      await expect(service.get({ projectId: "project-1", name: "SESSION" })).rejects.toThrow(
+        "redis unavailable",
+      );
+    });
+  });
+
   describe("when a project does not hold the name", () => {
     it("raises the cache miss code", async () => {
       const service = GatewayAgentCacheService.create({
         store: MemoryGatewayAgentCacheEntryRepository.create(),
-        encryption,
       });
 
       await expect(service.get({ projectId: "project-1", name: "MISSING" })).rejects.toMatchObject({

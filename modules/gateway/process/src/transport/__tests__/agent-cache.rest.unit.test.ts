@@ -10,10 +10,6 @@ import { GatewayAgentCacheService } from "../../services/gateway-agent-cache.ser
 import { agentCacheRest } from "../agent-cache.rest.ts";
 
 const PROJECT_ID = "project-1";
-const encryption = {
-  encrypt: (value: string) => `sealed:${value}`,
-  decrypt: (value: string) => value.replace(/^sealed:/, ""),
-};
 
 const renderError: RestErrorHandler = (error, context) => {
   if (error instanceof Error && error.name === "RequestValidationError") {
@@ -31,7 +27,6 @@ const renderError: RestErrorHandler = (error, context) => {
 function mountedAgentCache() {
   const service = GatewayAgentCacheService.create({
     store: MemoryGatewayAgentCacheEntryRepository.create(),
-    encryption,
   });
   const app = createApiFixture<GatewayApi>({
     getAgentCacheEntry: (input) => service.get(input),

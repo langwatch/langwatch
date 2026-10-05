@@ -14,6 +14,7 @@ import {
 
 import type { GatewayModule } from "../app/gateway.app.ts";
 import { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
+import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
 import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_PIPELINE_NAME,
@@ -40,7 +41,7 @@ import { GatewaySpendFoldProjection, type GatewaySpendState } from "./gateway-sp
 /** gateway_spend, registered by the module that owns it, with its debit and settlement managers. */
 export const gatewaySpendEventing = defineEventingModule({
   pipeline: GATEWAY_SPEND_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<undefined, GatewayModule>) =>
+  build: ({ app, participation }: EventingSetup<GatewayRepositories, GatewayModule>) =>
     app.spendPipeline({ participation }),
   connect: ({ app, commands }) => app.connectSpend(commands),
 });

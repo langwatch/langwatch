@@ -5,21 +5,19 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
  * `GatewayModule.listSpendEventsPage`, pinning only the wiring and shape.
  */
 import type { AuthzPermission } from "@langwatch/authorization";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  memorySpendStateSeed,
+  memoryVirtualKeySeed,
+} from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
 import { GatewayModule } from "../../app/gateway.app.ts";
+import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { gatewaySpendEventTrpcTransport } from "../gateway-spend-event.trpc.ts";
 
 type GatewayTrpcTestContext = { actor: { id: string } };
@@ -41,60 +39,26 @@ function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
   return overrides as ProjectApi;
 }
 
-const SPEND_EVENT_ROW = {
-  TenantId: "project_1",
-  GatewayRequestId: "req_1",
-  OrganizationId: "org_1",
-  VirtualKeyId: "vk_1",
-  PrincipalUserId: "",
-  EndUserId: "enduser-9",
-  TraceId: "trace_1",
-  Model: "gpt-5",
-  ProviderKey: "prov_1",
-  RequestType: "chat",
-  TokensInput: 100,
-  TokensOutput: 50,
-  TokensCacheRead: 0,
-  TokensCacheWrite: 0,
-  TokensReasoning: 0,
-  CostNanoUSD: 4_200_000,
-  RateVersion: "catalog@2026-07-26",
-  Status: "confirmed",
-  ErrorClass: "",
-  HttpStatus: 200,
-  NeedsReconciliation: 0,
-  SettleReason: "",
-  Labels: [] as string[],
-  Metadata: "",
-  DurationMS: 900,
-  OccurredAtMs: Date.parse("2026-07-20T12:00:00Z"),
-};
-
-const clickHouseQuery = vi.fn();
-
-/** A fake ClickHouse client answering one row of the spend ledger. */
-function fakeClickHouse(): ClickHouseQueryClient {
-  return clickHouseQueryClientDouble({
-    query: clickHouseQuery,
-    insert: async () => {},
-  });
-}
-
-/** A fake Prisma client answering the one virtual-key display-name lookup. */
-function fakePrisma(): PrismaClient {
-  return prismaDouble({
-    virtualKey: {
-      findMany: async () => [{ id: "vk_1", name: "Customer A key", displayPrefix: "..." }],
-    },
-  });
+/** One settled request on the ledger, naming a key the organization holds. */
+async function seededRepositories() {
+  const repositories = MemoryGatewayRepositories.create();
+  await repositories.virtualKeys.create(
+    memoryVirtualKeySeed({ id: "vk_1", name: "Customer A key", organizationId: "org_1" }),
+  );
+  await repositories.spendEvents.upsertFromFold([
+    { tenantId: "project_1", gatewayRequestId: "req_1", state: memorySpendStateSeed() },
+  ]);
+  return repositories;
 }
 
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
-/** The slice of the application this surface reaches, and nothing else. */
-async function gatewayAppStub(): Promise<GatewayModule> {
-  return GatewayModule.create({
+/** The gateway over seeded memory twins, with its ledger page read watched. */
+async function gatewayAppStub() {
+  const repositories = await seededRepositories();
+  const pageReads = vi.spyOn(repositories.spendEvents, "readSpendEventsPage");
+  const app = await GatewayModule.create({
     dependencies: {
       entitlement: peer("entitlement"),
       authz: peer("authz"),
@@ -109,16 +73,12 @@ async function gatewayAppStub(): Promise<GatewayModule> {
       oneTimeReveals: peer("oneTimeReveals"),
       apiKeys: peer("apiKeys"),
     },
-    members: {
-      prisma: fakePrisma(),
-      clickhouse: fakeClickHouse(),
-      encryption: createApiFixture<Encryption>(),
-      redis: redisDouble(),
-    },
+    repositories,
     config: {
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,
+      publicBaseUrl: void 0,
       baseUrl: undefined,
       publicUrl: undefined,
       isSaas: false,
@@ -127,6 +87,7 @@ async function gatewayAppStub(): Promise<GatewayModule> {
     resources: new ResourceScope(),
     secrets: noSecrets,
   });
+  return { app, pageReads };
 }
 
 const BASE_INPUT = {
@@ -136,7 +97,7 @@ const BASE_INPUT = {
 };
 
 async function caller(permits?: (permission: AuthzPermission) => boolean) {
-  const app = await gatewayAppStub();
+  const { app, pageReads } = await gatewayAppStub();
   const trpc = initTRPC.context<GatewayTrpcTestContext>().create();
   const router = createTrpcRuntime<GatewayTrpcTestContext>({
     root: trpc,
@@ -144,12 +105,11 @@ async function caller(permits?: (permission: AuthzPermission) => boolean) {
     members: trpcTestMembers<GatewayTrpcTestContext>({ permits }),
   }).mount(gatewaySpendEventTrpcTransport, () => app);
 
-  return router.createCaller({ actor: { id: "usr_1" } });
+  return { procedures: router.createCaller({ actor: { id: "usr_1" } }), pageReads };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  clickHouseQuery.mockResolvedValue({ rows: [SPEND_EVENT_ROW] });
 });
 
 describe("gatewaySpendEvents.list", () => {
@@ -157,11 +117,13 @@ describe("gatewaySpendEvents.list", () => {
     /** @scenario Ledger rows resolve virtual key display names */
     /** @scenario "Spend history is served with no ClickHouse-absent degrade path" */
     it("answers the page the application resolved", async () => {
-      const result = await (await caller()).list(BASE_INPUT);
+      const { procedures, pageReads } = await caller();
+      const result = await procedures.list(BASE_INPUT);
 
+      expect(result.rows).toHaveLength(1);
       expect(result.virtualKeyNames).toEqual({ vk_1: "Customer A key" });
       expect(result.clickHouseDisabled).toBe(false);
-      expect(clickHouseQuery).toHaveBeenCalledWith(
+      expect(pageReads).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: BASE_INPUT.projectId }),
       );
     });
@@ -170,10 +132,10 @@ describe("gatewaySpendEvents.list", () => {
   describe("when the caller lacks gatewayUsage:view", () => {
     /** @scenario The ledger requires the gateway usage view scope */
     it("never reaches the application", async () => {
-      await expect((await caller(() => false)).list(BASE_INPUT)).rejects.toMatchObject({
-        code: "FORBIDDEN",
-      });
-      expect(clickHouseQuery).not.toHaveBeenCalled();
+      const { procedures, pageReads } = await caller(() => false);
+
+      await expect(procedures.list(BASE_INPUT)).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(pageReads).not.toHaveBeenCalled();
     });
   });
 });

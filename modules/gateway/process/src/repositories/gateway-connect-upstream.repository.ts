@@ -1,11 +1,12 @@
 /**
  * The LangWatch-hosted provider slot a connected install's gateway adds for one
- * organization (ADR-156 §8). Licensing writes and clears it; the gateway reads it.
+ * organization (ADR-156 §8). Licensing writes and clears it; the gateway reads it. The token is
+ * readable here; the live repository seals it at rest.
  */
 export type StoredGatewayConnectUpstream = Readonly<{
   organizationId: string;
   baseUrl: string;
-  encryptedToken: string;
+  token: string;
   instanceId: string;
 }>;
 

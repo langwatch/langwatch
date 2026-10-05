@@ -21,6 +21,7 @@ import { gatewaySpendEventing } from "../../eventing/gateway-spend.pipeline.ts";
 import { gatewayProcessModule } from "../../gateway.module.ts";
 import type { GatewayGuardrailCheckRow } from "../../repositories/gateway-guardrail.repository.ts";
 import type { OpenAdmission } from "../../repositories/gateway-open-admissions.repository.ts";
+import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import {
   buildGatewayCanonicalString,
@@ -42,9 +43,9 @@ type GatewayAppServesSpend = GatewayModule extends GatewaySpendApp ? true : neve
 const spendFamilyIsWhole: GatewayAppServesSpend = true;
 
 /**
- * The two members `GatewayModule` declares it reads. Boot touches no store —
- * the control plane only constructs repositories — so each must EXIST and
- * refuse on first use, naming "the test reached a datastore" as a failure.
+ * The stores the live repository tier reads. Boot touches no store — the
+ * control plane only constructs repositories — so each must EXIST and refuse
+ * on first use, naming "the test reached a datastore" as a failure.
  */
 function relationalWithoutStore(): PrismaClient {
   const client: Partial<PrismaClient> = {};
@@ -95,6 +96,9 @@ function peer(name: string): never {
 
 const PRIVATE_SERVER = "http://private-clickhouse.test";
 
+/** The gateway's pipelines build from the app alone; this argument is never read. */
+const unreadRepositories = MemoryGatewayRepositories.create();
+
 function openAdmission(gatewayRequestId: string): OpenAdmission {
   return {
     tenantId: `project-${gatewayRequestId}`,
@@ -140,7 +144,7 @@ async function sweepOnce(clickhouse: ClickHouseQueryClient) {
       throw new Error("Gateway installation did not provide GatewayModule");
     }
     const consumed = gatewaySpendEventing.build({
-      repositories: undefined,
+      repositories: unreadRepositories,
       app,
       processStore: createApiFixture<ProcessStore>(),
       participation: "consume",
@@ -193,11 +197,10 @@ async function installGateway({
     const state = await gatewayProcessModule.install({
       resources,
       config: { spendSettlementGraceMs: undefined },
-      members: {
-        prisma,
-        clickhouse,
-        encryption: createApiFixture<Encryption>(),
-        redis,
+      members: {},
+      repositorySelection: {
+        tier: "live",
+        members: { prisma, clickhouse, encryption: createApiFixture<Encryption>(), redis },
       },
       role: "api",
       secrets,
@@ -267,7 +270,7 @@ function isInternalCredential(binding: object): binding is RestCredentialBinding
 }
 
 describe("gateway app installation", () => {
-  describe("given a process that supplied the members and the peers", () => {
+  describe("given a process that supplied the stores and the peers", () => {
     it("serves the control plane instead of refusing by name", async () => {
       const { state, resources } = await installGateway();
 
@@ -312,7 +315,7 @@ describe("gateway app installation", () => {
           throw new Error("Gateway installation did not provide GatewayModule");
         }
         const setup = {
-          repositories: undefined,
+          repositories: unreadRepositories,
           app,
           processStore: createApiFixture<ProcessStore>(),
         };
@@ -339,7 +342,7 @@ describe("gateway app installation", () => {
           throw new Error("Gateway installation did not provide GatewayModule");
         }
         const setup = {
-          repositories: undefined,
+          repositories: unreadRepositories,
           app,
           processStore: createApiFixture<ProcessStore>(),
         };
@@ -366,7 +369,7 @@ describe("gateway app installation", () => {
           throw new Error("Gateway installation did not provide GatewayModule");
         }
         const setup = {
-          repositories: undefined,
+          repositories: unreadRepositories,
           app,
           processStore: createApiFixture<ProcessStore>(),
         };
@@ -397,7 +400,7 @@ describe("gateway app installation", () => {
           throw new Error("Gateway installation did not provide GatewayModule");
         }
         const setup = {
-          repositories: undefined,
+          repositories: unreadRepositories,
           app,
           processStore: createApiFixture<ProcessStore>(),
         };
@@ -468,7 +471,7 @@ describe("gateway app installation", () => {
           throw new Error("Gateway installation did not provide GatewayModule");
         }
         const consumed = gatewaySpendEventing.build({
-          repositories: undefined,
+          repositories: unreadRepositories,
           app,
           processStore: createApiFixture<ProcessStore>(),
           participation: "consume",
@@ -498,7 +501,7 @@ describe("gateway app installation", () => {
           throw new Error("Gateway installation did not provide GatewayModule");
         }
         const maintenance = gatewayRealtimeSessionEventing.build({
-          repositories: undefined,
+          repositories: unreadRepositories,
           app,
           processStore: createApiFixture<ProcessStore>(),
           participation: "consume",

@@ -1,29 +1,21 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  * @see specs/ai-gateway/public-rest-api.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
+import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { GatewayModule } from "../gateway.app.ts";
 
 const ORGANIZATION_ID = "organization_1";
 const PROJECT_ID = "project_caller";
 
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
-
-const reversible: Encryption = {
-  encrypt: (plaintext) => `sealed:${plaintext}`,
-  decrypt: (ciphertext) => ciphertext.replace(/^sealed:/, ""),
-};
 
 function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayModule> {
   return GatewayModule.create({
@@ -41,17 +33,12 @@ function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayModule> {
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
     },
-    members: {
-      prisma: createApiFixture<PrismaClient>({}),
-      clickhouse: createApiFixture<ClickHouseQueryClient>({}),
-      encryption: reversible,
-      redis: memoryRedisDouble(),
-      publicBaseUrl: "https://app.acme.example",
-    },
+    repositories: MemoryGatewayRepositories.create(),
     config: {
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,
+      publicBaseUrl: "https://app.acme.example",
       baseUrl: void 0,
       publicUrl: void 0,
       isSaas: false,

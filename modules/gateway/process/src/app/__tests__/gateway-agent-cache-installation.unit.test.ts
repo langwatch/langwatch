@@ -1,23 +1,15 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
+import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { GatewayModule } from "../gateway.app.ts";
 
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
-
-const reversible: Encryption = {
-  encrypt: (plaintext) => `sealed:${plaintext}`,
-  decrypt: (ciphertext) => ciphertext.replace(/^sealed:/, ""),
-};
 
 function gatewayApp(): Promise<GatewayModule> {
   return GatewayModule.create({
@@ -35,17 +27,12 @@ function gatewayApp(): Promise<GatewayModule> {
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
     },
-    members: {
-      prisma: createApiFixture<PrismaClient>({}),
-      clickhouse: createApiFixture<ClickHouseQueryClient>({}),
-      encryption: reversible,
-      redis: memoryRedisDouble(),
-      publicBaseUrl: "https://app.acme.example",
-    },
+    repositories: MemoryGatewayRepositories.create(),
     config: {
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,
+      publicBaseUrl: "https://app.acme.example",
       baseUrl: void 0,
       publicUrl: void 0,
       isSaas: false,
@@ -57,8 +44,8 @@ function gatewayApp(): Promise<GatewayModule> {
 }
 
 describe("the agent cache on an installed gateway", () => {
-  describe("given the process supplied its Redis connection and encryption", () => {
-    /** @scenario "The installed agent cache is served from the process's own members" */
+  describe("given the gateway installed over its own repositories", () => {
+    /** @scenario "The installed agent cache is served from the gateway's own repositories" */
     it("stores, claims, reads back and removes an entry", async () => {
       const app = await gatewayApp();
       const entry = { projectId: "project-1", name: "ACME_SESSION" };

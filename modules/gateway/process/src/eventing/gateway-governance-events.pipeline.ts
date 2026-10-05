@@ -9,6 +9,7 @@ import {
 } from "@langwatch/eventing";
 
 import type { GatewayModule } from "../app/gateway.app.ts";
+import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
 import {
   GATEWAY_GOVERNANCE_EVENTS_AGGREGATE_TYPE,
   GATEWAY_GOVERNANCE_EVENTS_PIPELINE_NAME,
@@ -43,6 +44,7 @@ export function buildGatewayGovernanceEventsPipeline(): GatewayGovernanceEventsD
 /** Declared before gateway_spend, so the debit writer's crossing sender is bound first. */
 export const gatewayGovernanceEventsEventing = defineEventingModule({
   pipeline: GATEWAY_GOVERNANCE_EVENTS_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<undefined, GatewayModule>) => app.governanceEventsPipeline(),
+  build: ({ app }: EventingSetup<GatewayRepositories, GatewayModule>) =>
+    app.governanceEventsPipeline(),
   connect: ({ app, commands }) => app.connectGovernanceEvents(commands),
 });

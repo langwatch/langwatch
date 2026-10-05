@@ -3,18 +3,14 @@
  * `GatewayModule.budgetOverviewForUser`: delegates to `BudgetOverviewService`
  * and proves it stays scoped to the caller's own organization.
  */
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { GatewayModule } from "../gateway.app.ts";
 
 /** No handle is ever resolved through it in these tests. */
@@ -40,9 +36,7 @@ const USER_ID = "user_1";
 const isMember = vi.fn();
 const getPersonalWorkspace = vi.fn();
 const isEnabled = vi.fn();
-const virtualKeyFindMany = vi.fn();
 const listGroupsForMember = vi.fn();
-const gatewayBudgetFindMany = vi.fn();
 
 function organizationsStub(overrides: Partial<OrganizationApi>): OrganizationApi {
   return overrides as OrganizationApi;
@@ -56,22 +50,12 @@ function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
   return overrides as ProjectApi;
 }
 
-/** Unreached whenever no budget resolves — the only path these tests take. */
-function fakeClickHouse(overrides: Partial<ClickHouseQueryClient>): ClickHouseQueryClient {
-  return overrides as ClickHouseQueryClient;
-}
-
-/** Answers the reads the budget-resolution repository makes, one delegate at a time. */
-function fakePrisma(overrides: {
-  virtualKey?: Partial<PrismaClient["virtualKey"]>;
-  gatewayBudget?: Partial<PrismaClient["gatewayBudget"]>;
-}): PrismaClient {
-  return overrides as PrismaClient;
-}
-
-/** The slice of the application this surface reaches, and nothing else. */
-async function gatewayAppStub(): Promise<GatewayModule> {
-  return GatewayModule.create({
+/** The gateway over memory twins, with the two reads the overview makes watched. */
+async function gatewayAppStub() {
+  const repositories = MemoryGatewayRepositories.create();
+  const virtualKeyReads = vi.spyOn(repositories.virtualKeys, "findAllInOrganization");
+  const budgetReads = vi.spyOn(repositories.budgets, "resolveApplicableBudgets");
+  const app = await GatewayModule.create({
     dependencies: {
       entitlement: peer("entitlement"),
       authz: peer("authz"),
@@ -86,19 +70,12 @@ async function gatewayAppStub(): Promise<GatewayModule> {
       oneTimeReveals: peer("oneTimeReveals"),
       apiKeys: peer("apiKeys"),
     },
-    members: {
-      prisma: fakePrisma({
-        virtualKey: { findMany: virtualKeyFindMany },
-        gatewayBudget: { findMany: gatewayBudgetFindMany },
-      }),
-      clickhouse: fakeClickHouse({ query: vi.fn(), insert: vi.fn() }),
-      encryption: createApiFixture<Encryption>(),
-      redis: redisDouble(),
-    },
+    repositories,
     config: {
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,
+      publicBaseUrl: void 0,
       baseUrl: undefined,
       publicUrl: undefined,
       isSaas: false,
@@ -107,6 +84,7 @@ async function gatewayAppStub(): Promise<GatewayModule> {
     resources: new ResourceScope(),
     secrets: noSecrets,
   });
+  return { app, virtualKeyReads, budgetReads };
 }
 
 describe("GatewayModule.budgetOverviewForUser", () => {
@@ -114,16 +92,14 @@ describe("GatewayModule.budgetOverviewForUser", () => {
     vi.clearAllMocks();
     getPersonalWorkspace.mockRejectedValue(new TeamNotFoundError());
     isEnabled.mockResolvedValue(true);
-    virtualKeyFindMany.mockResolvedValue([]);
     listGroupsForMember.mockResolvedValue([]);
-    gatewayBudgetFindMany.mockResolvedValue([]);
   });
 
   describe("given a caller who is not a member of the organization", () => {
     /** @scenario A per-member overview refuses a caller outside the organization */
     it("reports no gateway access and never reads the organization's keys or budgets", async () => {
       isMember.mockResolvedValue(false);
-      const app = await gatewayAppStub();
+      const { app, virtualKeyReads, budgetReads } = await gatewayAppStub();
 
       const overview = await app.budgetOverviewForUser({
         organizationId: OTHER_ORG_ID,
@@ -132,8 +108,8 @@ describe("GatewayModule.budgetOverviewForUser", () => {
 
       expect(overview).toEqual({ gatewayAccess: false, reason: "no_membership", budgets: [] });
       expect(isMember).toHaveBeenCalledWith({ organizationId: OTHER_ORG_ID, userId: USER_ID });
-      expect(virtualKeyFindMany).not.toHaveBeenCalled();
-      expect(gatewayBudgetFindMany).not.toHaveBeenCalled();
+      expect(virtualKeyReads).not.toHaveBeenCalled();
+      expect(budgetReads).not.toHaveBeenCalled();
     });
   });
 
@@ -141,7 +117,7 @@ describe("GatewayModule.budgetOverviewForUser", () => {
     /** @scenario A member's overview reads only their own organization's budgets */
     it("answers with access, and scopes the underlying budget read to that organization", async () => {
       isMember.mockResolvedValue(true);
-      const app = await gatewayAppStub();
+      const { app, budgetReads } = await gatewayAppStub();
 
       const overview = await app.budgetOverviewForUser({
         organizationId: ORG_ID,
@@ -150,11 +126,7 @@ describe("GatewayModule.budgetOverviewForUser", () => {
 
       expect(overview).toEqual({ gatewayAccess: true, budgets: [] });
       expect(isMember).toHaveBeenCalledWith({ organizationId: ORG_ID, userId: USER_ID });
-      expect(gatewayBudgetFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ organizationId: ORG_ID }),
-        }),
-      );
+      expect(budgetReads).toHaveBeenCalledWith(expect.objectContaining({ organizationId: ORG_ID }));
     });
   });
 });

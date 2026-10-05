@@ -137,6 +137,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
         spendSettlementGraceMs: undefined,
         internalUrl: undefined,
         controlPlaneUrl: undefined,
+        publicBaseUrl: "http://langwatch.test",
         baseUrl: undefined,
         publicUrl: undefined,
         isSaas: false,
@@ -148,7 +149,6 @@ async function mountWebhook(): Promise<MountableRestApp> {
     .withKeyvalue(memoryRedisDouble())
     .withSecrets(resolvedSecrets({}))
     .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
-    .withMember("publicBaseUrl", "http://langwatch.test")
     .provide({
       webhook: peer("webhook"),
       entitlement: peer("entitlement"),

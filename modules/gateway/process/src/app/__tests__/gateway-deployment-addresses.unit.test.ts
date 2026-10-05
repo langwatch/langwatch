@@ -2,15 +2,12 @@
  * @vitest-environment node
  * `GatewayModule.getDeploymentAddresses`: what the checkup's gateway rows read.
  */
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
+import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { GatewayModule } from "../gateway.app.ts";
 
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
@@ -41,17 +38,12 @@ function gatewayApp({
       oneTimeReveals: createApiFixture({}),
       apiKeys: createApiFixture({}),
     },
-    members: {
-      prisma: createApiFixture<PrismaClient>({}),
-      clickhouse: createApiFixture<ClickHouseQueryClient>({}),
-      encryption: createApiFixture<Encryption>(),
-      redis: redisDouble(),
-      publicBaseUrl: "https://app.acme.example",
-    },
+    repositories: MemoryGatewayRepositories.create(),
     config: {
       spendSettlementGraceMs: void 0,
       internalUrl,
       controlPlaneUrl,
+      publicBaseUrl: "https://app.acme.example",
       baseUrl,
       publicUrl,
       isSaas: false,

@@ -24,6 +24,12 @@ import type { VirtualKeyDirectBudgetRepository } from "./gateway-virtual-key-dir
 import type { GatewayVirtualKeyRepository } from "./gateway-virtual-key.repository.ts";
 import type { VirtualKeyAuthorizationRepository } from "./virtual-key-authorization.repository.ts";
 
+/** The process's cipher: the live tier seals tokens at rest; memory twins hold plaintext. */
+export type GatewayCipher = Readonly<{
+  encrypt(plaintext: string): string;
+  decrypt(ciphertext: string): string;
+}>;
+
 /**
  * The state the gateway owns, chosen once at boot. One tier spans three
  * coexisting stores: Postgres holds keys, budgets and rules, ClickHouse the

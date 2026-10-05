@@ -1,8 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 /**
@@ -14,11 +12,9 @@ import { ScopedSecrets } from "@langwatch/secrets";
  * @see specs/ai-gateway/public-rest-api.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { GatewayModule } from "../gateway.app.ts";
 
 function peer(name: string): never {
@@ -60,19 +56,12 @@ async function gatewayApp(): Promise<GatewayModule> {
       oneTimeReveals: peer("oneTimeReveals"),
       apiKeys: peer("apiKeys"),
     },
-    members: {
-      prisma: prismaDouble({}) as PrismaClient,
-      clickhouse: clickHouseQueryClientDouble({
-        query: async () => ({ rows: [] }),
-        insert: async () => {},
-      }),
-      encryption: createApiFixture<Encryption>(),
-      redis: memoryRedisDouble(),
-    },
+    repositories: MemoryGatewayRepositories.create(),
     config: {
       spendSettlementGraceMs: void 0,
       internalUrl: void 0,
       controlPlaneUrl: void 0,
+      publicBaseUrl: void 0,
       baseUrl: undefined,
       publicUrl: undefined,
       isSaas: false,

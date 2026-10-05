@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { GatewayBudgetSpendRepository } from "../gateway-budget-spend.repository.ts";
-import type { GatewayRepositories } from "../gateway.repositories.ts";
+import type { GatewayCipher, GatewayRepositories } from "../gateway.repositories.ts";
 import { PrismaGatewayAuditRepository } from "./prisma.gateway-audit.repository.ts";
 import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
 import { PrismaGatewayCacheRuleRepository } from "./prisma.gateway-cache-rule.repository.ts";
@@ -49,10 +49,13 @@ export class PostgresGatewayRepositories {
   static create({
     prisma,
     budgetSpend,
+    encryption,
   }: Readonly<{
     prisma: PrismaClient;
     /** The ledger a budget's health reads its spend from. */
     budgetSpend: GatewayBudgetSpendRepository;
+    /** Seals the connect upstream's and the trace export key's tokens at rest. */
+    encryption: GatewayCipher;
   }>): GatewayPostgresRepositories {
     const changeEvents = PrismaGatewayChangeEventsRepository.create(prisma);
     const audit = PrismaGatewayAuditRepository.create(prisma);
@@ -76,10 +79,13 @@ export class PostgresGatewayRepositories {
       providerLabels: PrismaGatewayProviderLabelRepository.create(prisma),
       directBudgets: PrismaVirtualKeyDirectBudgetRepository.create({ database: prisma }),
       spendScope: PrismaGatewaySpendScopeRepository.create({ database: prisma }),
-      connectUpstream: PrismaGatewayConnectUpstreamRepository.create(prisma),
+      connectUpstream: PrismaGatewayConnectUpstreamRepository.create({
+        prisma,
+        cipher: encryption,
+      }),
       realtimeSessions: PrismaGatewayRealtimeSessionRepository.create({ database: prisma }),
       internalStore: PrismaGatewayInternalStoreRepository.create({ database: prisma }),
-      traceExportKeys: PrismaGatewayTraceExportKeyRepository.create(prisma),
+      traceExportKeys: PrismaGatewayTraceExportKeyRepository.create({ prisma, cipher: encryption }),
     };
   }
 }
