@@ -290,20 +290,22 @@ describe("the worker process installation", () => {
   });
 
   /** @scenario "The worker hands gateway's governance facts to webhook delivery" */
-  it("hosts gateway's governance subscriber and webhook's governance delivery under main's names", async () => {
+  it("hosts webhook's subscribers on gateway's governance facts and its governance delivery", async () => {
     const { runtime, eventing } = await bootWorker();
 
     try {
-      const pipeline = (name: string) =>
-        eventing.definitions.find((definition) => definition.metadata.name === name);
-      expect(
-        pipeline("governance_events_processing")?.open((definition) =>
-          definition.eventSubscribers.has("webhookGovernanceDelivery"),
-        ),
-      ).toBe(true);
-      expect(pipeline("webhook_delivery")?.processManagers.has("governanceEventsDelivery")).toBe(
-        true,
+      const webhook = eventing.definitions.find(
+        (definition) => definition.metadata.name === "webhook_delivery",
       );
+      expect(
+        webhook?.open((definition) => (definition.globalProjections ?? []).map(({ name }) => name)),
+      ).toEqual(
+        expect.arrayContaining([
+          "webhook_delivery.gatewayBudgetCrossingDelivery",
+          "webhook_delivery.gatewayVkLifecycleDelivery",
+        ]),
+      );
+      expect(webhook?.processManagers.has("governanceEventsDelivery")).toBe(true);
     } finally {
       await runtime.stop();
     }
@@ -318,6 +320,32 @@ describe("the worker process installation", () => {
       expect(
         usage?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
       ).toEqual(["orgBillableEventsMeter"]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "the pipeline is composed from packages alone" */
+  it("hosts the trace processing pipeline and routes every command and projection it declares", async () => {
+    const { runtime, eventing } = await bootWorker({ live: true });
+
+    try {
+      const trace = eventing.definitions.find(
+        ({ metadata }) => metadata.name === "trace_processing",
+      );
+      if (trace === undefined) throw new Error("the worker hosts no trace_processing pipeline");
+      const routed = [
+        ...trace.open((definition) => definition.commands.map(({ definition }) => definition.name)),
+      ].map((name) => `trace_processing:command:${name}`);
+      const projected = trace
+        .open((definition) => [...definition.foldProjections.keys()])
+        .map((name) => `trace_processing:projection:${name}`);
+
+      expect(routed).not.toEqual([]);
+      expect(projected).not.toEqual([]);
+      for (const key of [...routed, ...projected]) {
+        expect(eventing.globalJobRegistry.has(key), key).toBe(true);
+      }
     } finally {
       await runtime.stop();
     }

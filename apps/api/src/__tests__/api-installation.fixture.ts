@@ -47,7 +47,11 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
 
 export async function bootApi({
   surface,
-}: { surface?: (peers: TransportPeers) => ExposedSurface<unknown, unknown> } = {}) {
+  eventing: runtimeEventing,
+}: {
+  surface?: (peers: TransportPeers) => ExposedSurface<unknown, unknown>;
+  eventing?: EventSourcing;
+} = {}) {
   const owners = processConfig(processModules, ROLE);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
@@ -60,11 +64,13 @@ export async function bootApi({
   await resolver.preflight(declared);
 
   const prisma = unreachable<ProcessMembers["prisma"]>("prisma");
-  const eventing = new EventSourcing({
-    enabled: false,
-    participation: "produce",
-    processManagerMode: "producer-only",
-  });
+  const eventing =
+    runtimeEventing ??
+    new EventSourcing({
+      enabled: false,
+      participation: "produce",
+      processManagerMode: "producer-only",
+    });
   const stores: Partial<ProcessMembers> = {
     logger: createTestLogger().logger,
     clock: systemClock(),
