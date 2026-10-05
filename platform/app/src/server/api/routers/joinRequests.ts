@@ -10,10 +10,8 @@ import {
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import {
-  identityEmail,
-  joinRequestsService,
-} from "~/server/app-layer/identity/runtime";
+import { provenAddressesOf } from "~/server/app-layer/identity/proven-addresses";
+import { joinRequestsService } from "~/server/app-layer/identity/runtime";
 
 /**
  * Where a request is made (ADR-143 v6), as the browser asserts it. Trusted
@@ -380,10 +378,10 @@ export const JOIN_SETTING_AUDIT_ACTION = "organization.joining.changed";
  * The caller's own verified address, and the reason every procedure above
  * starts here.
  *
- * `verifiedEmailsOf` answers `null` for a user who is not on identifiers yet,
- * which is the legacy fallback the rest of the identity surface uses: the
- * `User.email` column, but only where better-auth has marked it verified. An
- * unverified address answers null, and every caller treats that as the
+ * The first of the list `provenAddressesOf` reads, which is the one rule the
+ * invitation lookup applies to the same person: identifiers first, else the
+ * legacy `User.email` column only where better-auth has marked it verified.
+ * An unverified address answers null, and every caller treats that as the
  * universal nothing.
  */
 async function verifiedEmailFor({
@@ -393,12 +391,5 @@ async function verifiedEmailFor({
   prisma: PrismaClient;
   userId: string;
 }): Promise<string | null> {
-  const verified = await identityEmail().verifiedEmailsOf({ userId });
-  if (verified !== null) return verified[0]?.value ?? null;
-
-  const row = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { email: true, emailVerified: true },
-  });
-  return row?.emailVerified ? (row.email ?? null) : null;
+  return (await provenAddressesOf({ prisma, userId }))[0] ?? null;
 }

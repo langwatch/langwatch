@@ -11,6 +11,7 @@ import {
 } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { provenAddressesOf } from "~/server/app-layer/identity/proven-addresses";
 import {
   identityEmail,
   joinRequestsService,
@@ -140,31 +141,6 @@ function assertInvitePending(invite: InviteWithOrganization): void {
       message: INVITE_NOT_READY_MESSAGE,
     });
   }
-}
-
-/**
- * Every address the session user has PROVEN. Identifiers answer first; a user
- * not on identifiers yet keeps the legacy `User.email` column, counted only
- * where better-auth marked it verified. This is the rule the join door applies
- * to the same person (`verifiedEmailFor` in joinRequests.ts): reading the two
- * differently let the automatic door admit somebody whose invitation this
- * lookup could not see.
- */
-async function provenAddressesOf({
-  prisma,
-  userId,
-}: {
-  prisma: PrismaClient;
-  userId: string;
-}): Promise<string[]> {
-  const proven = await identityEmail().verifiedEmailsOf({ userId });
-  if (proven !== null) return proven.map(({ value }) => value);
-
-  const row = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { email: true, emailVerified: true },
-  });
-  return row?.emailVerified && row.email ? [row.email] : [];
 }
 
 async function matchInviteAcceptor({
