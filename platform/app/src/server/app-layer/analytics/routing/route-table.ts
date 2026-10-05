@@ -412,11 +412,14 @@ const SLIM_TRACE_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>(
   ],
 );
 
-/** Slim-eval filter fields — typed columns on the slim row. */
-const SLIM_EVAL_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>([
-  "metadata.key",
-  "metadata.value",
-]);
+/**
+ * Slim-eval filter fields (none). The slim eval row's Attributes carry only
+ * the evaluation events' own metadata, never the trace's custom metadata, so
+ * `metadata.key` / `metadata.value` must read `trace_summaries` on the
+ * legacy path. See https://github.com/langwatch/tasks/issues/919
+ */
+const SLIM_EVAL_FILTER_FIELDS: ReadonlySet<FilterField> =
+  new Set<FilterField>();
 
 /**
  * Aggregations the trace rollup can compute CORRECTLY from its columns. The
@@ -727,7 +730,10 @@ function filtersHitBlocklist(
   return false;
 }
 
-function isBlocklisted(key: string): boolean {
+function isBlocklisted(rawKey: string): boolean {
+  // Filter keys arrive with `·` standing in for `.`; the builders read the
+  // dotted key, so check that one.
+  const key = rawKey.replaceAll("·", ".");
   if (PAYLOAD_BLOCKLIST_EXACT.has(key)) return true;
   for (const prefix of PAYLOAD_BLOCKLIST_PREFIXES) {
     if (key.startsWith(prefix)) return true;

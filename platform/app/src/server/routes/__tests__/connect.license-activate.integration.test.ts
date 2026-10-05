@@ -13,9 +13,9 @@ import {
   activationCodeHash,
   activationCodeHint,
   mintActivationCode,
-  normaliseActivationCode,
 } from "@ee/licensing/activation/activationCode";
 import { PrismaActivationCodes } from "@ee/licensing/activation/activationCode.prisma";
+import { normaliseActivationCode } from "@ee/licensing/activation/activationCodeShape";
 import { validateLicense } from "@ee/licensing/validation";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

@@ -92,6 +92,9 @@ export function computeScheduledFor({
   if (PERSIST_TRIGGER_ACTIONS.has(action)) return now;
   if (cadence === "immediate") return now;
   const windowMs = CADENCE_WINDOW_MS[cadence];
+  // A stored cadence this build does not know degrades to immediate — the
+  // same reading `next-firing.ts` gives it — rather than scheduling for NaN.
+  if (!windowMs) return now;
   const nowMs = now.getTime();
   // Next wall-clock boundary: ceil(nowMs / window) * window.
   // If now is already exactly on a boundary, advance one full window so two

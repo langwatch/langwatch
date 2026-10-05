@@ -171,7 +171,7 @@ const registry = {
   custom_graph_writes_disabled_for_playground: {
     tips: [
       "The custom-chart-playground is enabled for this project, which turns off creating or editing dashboard graphs; retrying will not help",
-      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
+      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
     ],
   },
   saved_workbench_chart_already_exists: {
@@ -208,7 +208,7 @@ const registry = {
   saved_workbench_charts_disabled_for_playground: {
     tips: [
       "The custom-chart-playground is enabled for this project, which turns off saved workbench charts; retrying will not help",
-      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
+      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
     ],
   },
   lwql_unknown_identifier: {
@@ -251,14 +251,21 @@ const registry = {
   },
   instant_eval_not_enabled: {
     tips: [
-      "Instant Evals are behind a release flag; ask LangWatch to enable them for this project",
+      "Instant Evals are off for this organization; a self-serve organization on the hosted service is switched on by an organization admin from the search bar, and any other organization or install asks LangWatch to",
     ],
+    docsPath: "/features/instant-evals/limits-and-cost",
   },
   instant_eval_not_found: {
     tips: [
       "Read `meta.runId`; no run of the authenticated project carries that id",
       "List the project's runs to find the id you meant",
     ],
+  },
+  instant_eval_opt_in_not_offered: {
+    tips: [
+      "An enterprise organization, or a self-hosted install, is switched on by LangWatch rather than from the search bar; contact support@langwatch.ai",
+    ],
+    docsPath: "/features/instant-evals/limits-and-cost",
   },
   instant_eval_query_invalid: {
     tips: [
@@ -723,6 +730,13 @@ const registry = {
     tips: [
       "Create an evaluator first: langwatch evaluator create <name> --type <type>, then pass its id via evaluatorId",
       "Or pick an existing one: langwatch evaluator list",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
+  monitor_parameters_unused: {
+    tips: [
+      "Change the settings on the evaluator named in meta.evaluatorId: PUT /api/evaluators/{evaluatorId}",
+      "Or send parameters as {}; the evaluator's settings are what run, and a move to another evaluator re-checks the stored parameters",
     ],
     docsPath: "/evaluations/evaluators/list",
   },

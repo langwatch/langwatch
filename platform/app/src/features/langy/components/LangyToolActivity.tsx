@@ -87,8 +87,8 @@ import {
   LangyCapabilityRenderer,
   toolResultForCapability,
 } from "./capabilities/LangyCapabilityRenderer";
+import { isReaderDecision, LangyFailedStepCard } from "./LangyFailedStepCard";
 import { LangyInterruptedNote } from "./LangyInterruptedNote";
-import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
 import { LangyToolErrorCard } from "./LangyToolErrorCard";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
 
@@ -1481,22 +1481,15 @@ function FailedToolCallRow({
   recovered?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  // A plan limit is never folded: it is not a step that failed, it is a
-  // decision the reader can change, and its card is the way to change it.
-  if (recovered && !presentation.limit) {
+  // A decision the reader can make is never folded: its card is the way to
+  // make it (LangyFailedStepCard).
+  if (recovered && !isReaderDecision({ call, presentation })) {
     return <RecoveredToolFailureRow presentation={presentation} />;
   }
   return (
     <VStack align="stretch" gap={1}>
       <Box position="relative">
-        {/* A plan limit is not a broken step, it is a decision the reader can
-            change — so it gets the upgrade card, INSTEAD of the failure card,
-            never beside it. */}
-        {presentation.limit ? (
-          <LangyPlanLimitCard presentation={presentation} />
-        ) : (
-          <LangyToolErrorCard presentation={presentation} />
-        )}
+        <LangyFailedStepCard call={call} presentation={presentation} />
         {devMode ? (
           <Box position="absolute" top={2} right={2}>
             <RawDataToggle

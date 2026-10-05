@@ -169,6 +169,7 @@
               },
               "features/querying-your-data",
               "features/automations",
+              "features/topic-clustering",
               "features/embedded-analytics"
             ]
           },
@@ -982,6 +983,7 @@
             "group": "Overview",
             "pages": [
               "self-hosting/overview",
+              "self-hosting/first-run",
               "self-hosting/licensing",
               "self-hosting/connect",
               "self-hosting/data-and-telemetry",
@@ -1011,7 +1013,8 @@
               "self-hosting/deployment/docker-images",
               "self-hosting/deployment/kubernetes-helm",
               "self-hosting/deployment/kubernetes-local",
-              "self-hosting/deployment/argocd"
+              "self-hosting/deployment/argocd",
+              "self-hosting/deployment/routing"
             ]
           },
           {
@@ -1088,6 +1091,7 @@
               "api-reference/datasets/create-direct-upload",
               "api-reference/datasets/evaluate-a-dataset",
               "api-reference/datasets/create-upload",
+              "api-reference/datasets/get-entries",
               "api-reference/datasets/get-dataset",
               "api-reference/datasets/get-records",
               "api-reference/datasets/update-dataset",
@@ -1363,11 +1367,16 @@
             "group": "Triggers",
             "pages": [
               "api-reference/triggers/overview",
+              "api-reference/triggers/list-slack-connections",
               "api-reference/triggers/list-triggers",
               "api-reference/triggers/create-a-slack-alert-trigger",
               "api-reference/triggers/create-triggers",
               "api-reference/triggers/get-triggers",
+              "api-reference/triggers/get-fires",
               "api-reference/triggers/update-triggers",
+              "api-reference/triggers/action-disable",
+              "api-reference/triggers/action-enable",
+              "api-reference/triggers/action-test-fire",
               "api-reference/triggers/delete-triggers"
             ]
           },
@@ -1710,12 +1719,12 @@
   },
   "redirects": [
     {
-      "source": "/features/instant-evals/shorthand",
-      "destination": "/features/instant-evals/targets"
+      "source": "/ci/cache/busted/1791197095",
+      "destination": "/introduction"
     },
     {
-      "source": "/ci/cache/busted/1789807595",
-      "destination": "/introduction"
+      "source": "/features/instant-evals/shorthand",
+      "destination": "/features/instant-evals/targets"
     },
     {
       "source": "/integration/tools/integrations/claude-code",

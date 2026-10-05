@@ -9,6 +9,7 @@ import {
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
+import { activateConfiguredLicenseForInstall } from "../ee/licensing/activation/configuredActivation";
 import { flushConnectSpend } from "../ee/licensing/connect/connectSpend.runtime";
 import { resolveAppPackageRoot } from "./server/appPackageRoot";
 
@@ -272,6 +273,12 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
     );
     process.exit(1);
   }
+
+  // LANGWATCH_LICENSE_KEY may hold an activation code instead of a signed
+  // license key. It is redeemed here, before the server listens, so the first
+  // request already has SSO on.
+  // Never throws: a refusal is logged and the app boots without the license.
+  await activateConfiguredLicenseForInstall();
 
   // Partial-config assertion on LW_VIRTUAL_KEY_PEPPER /
   // LW_GATEWAY_INTERNAL_SECRET / LW_GATEWAY_JWT_SECRET now lives in

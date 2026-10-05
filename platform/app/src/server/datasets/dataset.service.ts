@@ -132,7 +132,7 @@ export type ValidateDatasetNameResult = {
 
 /**
  * Service layer for dataset business logic.
- * Single Responsibility: Dataset lifecycle management and slug synchronization.
+ * Single Responsibility: Dataset lifecycle management.
  *
  * Framework-agnostic - no tRPC dependencies.
  * Throws domain-specific errors that can be mapped by the router layer.
@@ -164,7 +164,7 @@ export class DatasetService {
    * Creates a new dataset or updates an existing one.
    *
    * Business rules:
-   * - For updates: Auto-syncs slug with name, handles column type migrations
+   * - For updates: keeps the slug on rename, handles column type migrations
    * - For creates: Generates unique slug, checks conflicts, configures S3
    * - If no name provided, generates from experiment name
    *
@@ -203,7 +203,7 @@ export class DatasetService {
   }
 
   /**
-   * Updates an existing dataset with new name, slug, and column types.
+   * Updates an existing dataset's name and column types; the slug never changes.
    * Handles column type migrations by remapping existing records.
    *
    * @throws {DatasetNotFoundError} if dataset doesn't exist
@@ -238,15 +238,11 @@ export class DatasetService {
     const columnsChanged =
       JSON.stringify(preexisting.columnTypes) !== JSON.stringify(columnTypes);
     if (columnsChanged && preexisting.contentLayout === "s3_jsonl") {
-      const slug = this.generateSlug(name);
-      const conflictingDataset = await this.repository.findBySlug({
-        slug,
+      await this.refuseRenameCollision({
         projectId,
-        excludeId: datasetId,
+        dataset: preexisting,
+        name,
       });
-      if (conflictingDataset) {
-        throw new DatasetConflictError();
-      }
       return await migrateS3JsonlColumns({
         prisma: this.prisma,
         dataset: preexisting,
@@ -254,7 +250,7 @@ export class DatasetService {
         oldColumnTypes: preexisting.columnTypes as DatasetColumns,
         newColumnTypes: columnTypes,
         name,
-        slug,
+        slug: preexisting.slug,
         repository: this.repository,
       });
     }
@@ -289,21 +285,12 @@ export class DatasetService {
           });
         }
 
-        const slug = this.generateSlug(name);
-
-        // Check for slug collision with other datasets (excluding current one)
-        const conflictingDataset = await this.repository.findBySlug(
-          {
-            slug,
-            projectId,
-            excludeId: datasetId,
-          },
-          { tx },
-        );
-
-        if (conflictingDataset) {
-          throw new DatasetConflictError();
-        }
+        await this.refuseRenameCollision({
+          projectId,
+          dataset: existingDataset,
+          name,
+          tx,
+        });
 
         const existingColumns = existingDataset.columnTypes as DatasetColumns;
         const columnsChanged =
@@ -351,7 +338,6 @@ export class DatasetService {
             projectId,
             data: {
               name,
-              slug,
               columnTypes,
             },
           },
@@ -370,6 +356,32 @@ export class DatasetService {
         maxWait: DATASET_MUTATION_TXN_MAX_WAIT_MS,
       },
     );
+  }
+
+  /**
+   * A rename keeps the slug (SDK and API callers address the dataset by it), but
+   * a new name whose slug another dataset already holds is still refused.
+   * See specs/datasets/dataset-slug-stability.feature.
+   */
+  private async refuseRenameCollision({
+    projectId,
+    dataset,
+    name,
+    tx,
+  }: {
+    projectId: string;
+    dataset: { id: string; name: string };
+    name: string;
+    tx?: Prisma.TransactionClient;
+  }): Promise<void> {
+    if (name === dataset.name) return;
+    const conflictingDataset = await this.repository.findBySlug(
+      { slug: this.generateSlug(name), projectId, excludeId: dataset.id },
+      { tx },
+    );
+    if (conflictingDataset) {
+      throw new DatasetConflictError();
+    }
   }
 
   /**
@@ -546,17 +558,24 @@ export class DatasetService {
   ): Promise<ValidateDatasetNameResult> {
     const { projectId, proposedName, excludeDatasetId } = params;
 
-    const slug = this.generateSlug(proposedName);
+    const derivedSlug = this.generateSlug(proposedName);
+    // Editing: the dataset keeps its slug on rename, so that is the one to show.
+    const editedDataset = excludeDatasetId
+      ? await this.repository.findOne({ id: excludeDatasetId, projectId })
+      : null;
+    if (editedDataset && editedDataset.name === proposedName) {
+      return { available: true, slug: editedDataset.slug };
+    }
 
     const existingDataset = await this.repository.findBySlug({
-      slug,
+      slug: derivedSlug,
       projectId,
       excludeId: excludeDatasetId,
     });
 
     return {
       available: !existingDataset,
-      slug,
+      slug: editedDataset?.slug ?? derivedSlug,
       conflictsWith: existingDataset?.name,
     };
   }
@@ -704,13 +723,12 @@ export class DatasetService {
    */
   async archiveDataset(params: { slugOrId: string; projectId: string }) {
     const dataset = await this.getBySlugOrId(params);
-    const slug = this.generateSlug(dataset.name);
 
     await this.repository.update({
       id: dataset.id,
       projectId: params.projectId,
       data: {
-        slug: `${slug}-archived-${nanoid()}`,
+        slug: `${dataset.slug}-archived-${nanoid()}`,
         archivedAt: new Date(),
       },
     });

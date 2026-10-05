@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
+  canonicalEntraIssuer,
+  entraMultiTenantSegment,
   SsoCertificateInvalidError,
   SsoCredentialsRequiredError,
+  SsoIssuerMismatchError,
+  SsoIssuerMultiTenantError,
   SsoIssuerUnreachableError,
   SsoSamlMetadataInvalidError,
 } from "@langwatch/identity";
@@ -50,6 +54,24 @@ export const ssoIdpRegistrationSchema = z.discriminatedUnion("protocol", [
   ssoSamlRegistrationSchema,
 ]);
 
+/**
+ * What an administrator hands over to change an existing connection's
+ * identity provider settings. The same fields as a registration, except that
+ * an OpenID Connect client secret left blank keeps the one already stored:
+ * a secret is never shown back, so asking for it again on every issuer fix
+ * would send the administrator to their provider's console for nothing.
+ */
+export const ssoOidcUpdateSchema = ssoOidcRegistrationSchema.extend({
+  clientSecret: z.string().max(4096).nullable().default(null),
+});
+
+export const ssoIdpUpdateSchema = z.discriminatedUnion("protocol", [
+  ssoOidcUpdateSchema,
+  ssoSamlRegistrationSchema,
+]);
+
+export type SsoIdpUpdate = z.infer<typeof ssoIdpUpdateSchema>;
+
 export type SsoOidcRegistration = z.infer<typeof ssoOidcRegistrationSchema>;
 export type SsoSamlRegistration = z.infer<typeof ssoSamlRegistrationSchema>;
 export type SsoIdpRegistration = z.infer<typeof ssoIdpRegistrationSchema>;
@@ -60,9 +82,12 @@ export type SsoIdpRegistration = z.infer<typeof ssoIdpRegistrationSchema>;
  * world to answer it.
  */
 export interface SsoIssuerDiscoveryPort {
-  discover(args: {
-    issuer: string;
-  }): Promise<{ reachable: true } | { reachable: false; reason: string }>;
+  discover(args: { issuer: string }): Promise<
+    /** `issuer` is the one the discovery document names, when it names one;
+     *  `endpoints` are the endpoint addresses it lists. */
+    | { reachable: true; issuer?: string; endpoints?: string[] }
+    | { reachable: false; reason: string }
+  >;
 }
 
 /**
@@ -140,9 +165,18 @@ export function validateSamlRegistration(
 
 /**
  * Check an OpenID Connect registration by asking the issuer whether it is
- * one. The client id and secret are checked for presence only — whether they
- * are the RIGHT ones is a question only a sign-in can answer, and pretending
- * otherwise would mean a test sign-in that proves nothing.
+ * one, and answer the issuer to store. The client id and secret are checked
+ * for presence only — whether they are the RIGHT ones is a question only a
+ * sign-in can answer, and pretending otherwise would mean a test sign-in that
+ * proves nothing.
+ *
+ * THE ISSUER STORED IS THE ONE THE PROVIDER NAMES. Every ID token's `iss` is
+ * compared to the stored issuer exactly, so an address typed with a slash the
+ * provider does not use (or without one it does) refuses every sign-in. The
+ * discovery document's own `issuer` is what the tokens carry, so when it
+ * names the typed address up to trailing slashes, it is stored instead. A
+ * document that names a different issuer, or the `{tenantid}` template of an
+ * Entra ID multi-tenant endpoint, is refused here rather than at sign-in.
  */
 export async function validateOidcRegistration({
   registration,
@@ -150,7 +184,14 @@ export async function validateOidcRegistration({
 }: {
   registration: SsoOidcRegistration;
   discovery: SsoIssuerDiscoveryPort;
-}): Promise<void> {
+}): Promise<{ issuer: string }> {
+  const multiTenant = entraMultiTenantSegment(registration.issuer);
+  if (multiTenant !== null) {
+    throw new SsoIssuerMultiTenantError({
+      issuer: registration.issuer,
+      segment: multiTenant,
+    });
+  }
   if (
     blankToNull(registration.clientId) === null ||
     blankToNull(registration.clientSecret) === null
@@ -165,6 +206,26 @@ export async function validateOidcRegistration({
       `discovery at ${registration.issuer} did not answer: ${answer.reason}`,
     );
   }
+  const named = answer.issuer;
+  if (named === undefined) {
+    return { issuer: canonicalEntraIssuer(registration.issuer) };
+  }
+  if (named.includes("{tenantid}")) {
+    throw new SsoIssuerMultiTenantError({
+      issuer: registration.issuer,
+      segment: null,
+    });
+  }
+  if (
+    withoutTrailingSlashes(named) !==
+    withoutTrailingSlashes(registration.issuer)
+  ) {
+    throw new SsoIssuerMismatchError({
+      expected: registration.issuer,
+      received: named,
+    });
+  }
+  return { issuer: canonicalEntraIssuer(named) };
 }
 
 /**

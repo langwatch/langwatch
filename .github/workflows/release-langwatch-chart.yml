@@ -60,6 +60,9 @@ jobs:
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo update
 
+      # No Chart.lock is committed, so this resolves the file:// subcharts at
+      # the versions in this checkout (the ones release-please just bumped)
+      # and prometheus at its exact pin in Chart.yaml.
       - name: Build dependencies
         run: helm dependency build charts/langwatch
 

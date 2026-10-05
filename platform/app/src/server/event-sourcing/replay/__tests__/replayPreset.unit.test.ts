@@ -4,6 +4,9 @@ import { createReplayRuntime } from "../replayPreset";
 
 vi.mock("ioredis", () => ({
   default: class {
+    on() {
+      return this;
+    }
     disconnect() {}
   },
 }));
