@@ -41,22 +41,29 @@ name: apidiff
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # `labeled` fires for every label; a run starts only for `ci:full`, which
+    # also lifts the draft gate. Any other label is skipped by the gates below.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
 
 permissions:
   contents: read
   pull-requests: write
 
 concurrency:
-  group: apidiff-${{ github.event.pull_request.number }}
+  # A label event for any label but `ci:full` gets its own group, so it neither
+  # cancels a running full run nor is cancelled by one.
+  group: apidiff-${{ (github.event.action == 'labeled' && github.event.label.name != 'ci:full') && format('label-{0}', github.run_id) || github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   changes:
+    # Skips the whole run for a label event other than `ci:full`.
+    if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
-      heavy: ${{ steps.detect.outputs.heavy }}
+      # A PR labelled `ci:full` runs the heavy job on a draft too.
+      heavy: ${{ steps.detect.outputs.heavy == 'true' || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
