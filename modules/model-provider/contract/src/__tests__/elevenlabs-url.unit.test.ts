@@ -26,8 +26,8 @@ const REFUSED_EVEN_WITH_THE_SWITCH = [
 ];
 
 describe("isAllowedElevenLabsUrl", () => {
-  /** @scenario The product reaches a loopback voice host only under the dev switch */
   describe("when the dev loopback switch is off", () => {
+    /** @scenario "The product reaches a loopback voice host only under the dev switch" */
     it.each(["https://api.elevenlabs.io", "https://api.eu.residency.elevenlabs.io/v1"])(
       "admits %s",
       (url) => {
@@ -35,6 +35,7 @@ describe("isAllowedElevenLabsUrl", () => {
       },
     );
 
+    /** @scenario "The product reaches a loopback voice host only under the dev switch" */
     it.each([
       "http://127.0.0.1:5591",
       "http://localhost:5591",
@@ -46,6 +47,7 @@ describe("isAllowedElevenLabsUrl", () => {
       expect(isAllowedElevenLabsUrl({ url, secure: "https:", allowLoopback: false })).toBe(false);
     });
 
+    /** @scenario "The product reaches a loopback voice host only under the dev switch" */
     it("refuses a loopback websocket", () => {
       expect(
         isAllowedElevenLabsUrl({

@@ -353,8 +353,8 @@ describe("ApiKeyGrantPolicyService", () => {
       });
     });
 
-    /** @scenario "Only a platform-minted key with no owner may be bound to a personal workspace it is not owned in" */
     describe("given a system-managed key with no owner", () => {
+      /** @scenario "Only a platform-minted key with no owner may be bound to a personal workspace it is not owned in" */
       it("allows a personal workspace without making the key the owner's", async () => {
         const { service } = policyWith({ personalOwner: "user-2" });
 

@@ -1,6 +1,5 @@
 /**
  * @vitest-environment node
- * @scenario "Cloud admin is on only when asked for and the licence key matches the release"
  * The capability decision: the switch AND a private key that pairs with the built-in public key.
  */
 import { generateKeyPairSync } from "node:crypto";
@@ -23,6 +22,7 @@ const stranger = pair();
 
 describe("decideCloudOps", () => {
   describe("given the deployment did not ask", () => {
+    /** @scenario "Cloud admin is on only when asked for and the licence key matches the release" */
     it("is off with no key, and off with the matching key", () => {
       const off = { asked: false, builtInPublicKey: release.publicKey };
 
@@ -34,28 +34,33 @@ describe("decideCloudOps", () => {
   describe("given the deployment asked", () => {
     const asked = { asked: true, builtInPublicKey: release.publicKey };
 
+    /** @scenario "Cloud admin is on only when asked for and the licence key matches the release" */
     it("is on with the key that pairs with the built-in public key", () => {
       expect(decideCloudOps({ ...asked, privateKey: release.privateKey })).toBe(true);
     });
 
+    /** @scenario "Cloud admin is on only when asked for and the licence key matches the release" */
     it("accepts a key whose newlines arrive escaped, as an env value carries them", () => {
       const escaped = release.privateKey.replace(/\n/g, "\\n");
 
       expect(decideCloudOps({ ...asked, privateKey: escaped })).toBe(true);
     });
 
+    /** @scenario "Cloud admin is on only when asked for and the licence key matches the release" */
     it("refuses boot with no key", () => {
       expect(() => decideCloudOps({ ...asked, privateKey: void 0 })).toThrow(
         CloudOpsKeyMismatchError,
       );
     });
 
+    /** @scenario "Cloud admin is on only when asked for and the licence key matches the release" */
     it("refuses boot with a key that pairs with a different public key", () => {
       expect(() => decideCloudOps({ ...asked, privateKey: stranger.privateKey })).toThrow(
         CloudOpsKeyMismatchError,
       );
     });
 
+    /** @scenario "Cloud admin is on only when asked for and the licence key matches the release" */
     it("refuses boot with a value that is not a key, without echoing it", () => {
       const attempt = () => decideCloudOps({ ...asked, privateKey: "not-a-key-secret-value" });
 

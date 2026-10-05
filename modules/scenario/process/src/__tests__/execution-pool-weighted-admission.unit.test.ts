@@ -48,8 +48,8 @@ function poolOf({
 }
 
 describe("ScenarioExecutionPool weighted admission", () => {
-  /** @scenario Admission weighs each run by its runtime class */
   describe("given a budget of slots", () => {
+    /** @scenario "Admission weighs each run by its runtime class" */
     it("weighs voice and light at one slot each, keeping today's run-count limit", () => {
       expect(VOICE).toBe(1);
       expect(LIGHT).toBe(1);
@@ -57,6 +57,7 @@ describe("ScenarioExecutionPool weighted admission", () => {
       expect(TARGET_RESOURCE_CLASS.http).toBe("light");
     });
 
+    /** @scenario "Admission weighs each run by its runtime class" */
     it("charges a light run one slot and holds back what does not fit", () => {
       const { pool, started } = poolOf({ concurrency: 3 });
 
@@ -66,6 +67,7 @@ describe("ScenarioExecutionPool weighted admission", () => {
       expect(pool.pendingCount).toBe(1);
     });
 
+    /** @scenario "Admission weighs each run by its runtime class" */
     it("charges a voice run its class weight, so it takes room from light runs", () => {
       const { pool, started } = poolOf({ concurrency: LIGHT * 2 + VOICE });
 
@@ -78,6 +80,7 @@ describe("ScenarioExecutionPool weighted admission", () => {
       expect(pool.pendingCount).toBe(1);
     });
 
+    /** @scenario "Admission weighs each run by its runtime class" */
     it("admits every waiting run that now fits when a heavier run frees its slots", () => {
       const { pool, started } = poolOf({ concurrency: VOICE });
       pool.submit(job({ n: 1, type: "voice" }));
@@ -90,6 +93,7 @@ describe("ScenarioExecutionPool weighted admission", () => {
       expect(pool.pendingCount).toBe(0);
     });
 
+    /** @scenario "Admission weighs each run by its runtime class" */
     it("lets a run heavier than the whole budget run alone", () => {
       const { pool, started } = poolOf({ concurrency: 0 });
 
@@ -104,6 +108,7 @@ describe("ScenarioExecutionPool weighted admission", () => {
       expect(started).toEqual(["run-1", "run-2"]);
     });
 
+    /** @scenario "Admission weighs each run by its runtime class" */
     it("holds back only the project over its class budget", () => {
       const { pool, started } = poolOf({ concurrency: 100, projectSlots: { voice: VOICE } });
 

@@ -391,11 +391,11 @@ describe("ModelProviderKeysService read masking", () => {
   });
 });
 
-/** @scenario Moving a provider to another endpoint does not carry its stored secret along */
 describe("ModelProviderKeysService merge when the endpoint changes", () => {
   const keys = ModelProviderKeysService.create();
   const stored = { OPENAI_API_KEY: "sk-stored", OPENAI_BASE_URL: "https://api.openai.com/v1" };
 
+  /** @scenario "Moving a provider to another endpoint does not carry its stored secret along" */
   it("drops the stored secret when the base URL moves and the key is left masked", () => {
     const merged = keys.merge({
       incoming: {
@@ -407,6 +407,7 @@ describe("ModelProviderKeysService merge when the endpoint changes", () => {
     expect(merged).toEqual({ OPENAI_BASE_URL: "https://elsewhere.example" });
   });
 
+  /** @scenario "Moving a provider to another endpoint does not carry its stored secret along" */
   it("keeps the stored secret when the base URL is unchanged", () => {
     const merged = keys.merge({
       incoming: {
@@ -418,6 +419,7 @@ describe("ModelProviderKeysService merge when the endpoint changes", () => {
     expect(merged.OPENAI_API_KEY).toBe("sk-stored");
   });
 
+  /** @scenario "Moving a provider to another endpoint does not carry its stored secret along" */
   it("saves a newly typed secret alongside the new base URL", () => {
     const merged = keys.merge({
       incoming: { OPENAI_API_KEY: "sk-new", OPENAI_BASE_URL: "https://elsewhere.example" },
@@ -429,6 +431,7 @@ describe("ModelProviderKeysService merge when the endpoint changes", () => {
     });
   });
 
+  /** @scenario "Moving a provider to another endpoint does not carry its stored secret along" */
   it.each([
     ["ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY"],
     ["CUSTOM_BASE_URL", "CUSTOM_API_KEY"],
@@ -444,6 +447,7 @@ describe("ModelProviderKeysService merge when the endpoint changes", () => {
     expect(merged).toEqual({ [endpointField]: "https://elsewhere.example" });
   });
 
+  /** @scenario "Moving a provider to another endpoint does not carry its stored secret along" */
   it("drops the stored secret when a base URL is added where none was stored", () => {
     const merged = keys.merge({
       incoming: {
@@ -455,6 +459,7 @@ describe("ModelProviderKeysService merge when the endpoint changes", () => {
     expect(merged).toEqual({ ANTHROPIC_BASE_URL: "https://elsewhere.example" });
   });
 
+  /** @scenario "Moving a provider to another endpoint does not carry its stored secret along" */
   it("does not count a masked endpoint echoed back as a move", () => {
     const merged = keys.merge({
       incoming: {
@@ -469,6 +474,7 @@ describe("ModelProviderKeysService merge when the endpoint changes", () => {
     expect(merged.ELEVENLABS_API_KEY).toBe("stored-secret");
   });
 
+  /** @scenario "Moving a provider to another endpoint does not carry its stored secret along" */
   it("drops masked extra headers once the endpoint has moved", () => {
     const endpointMoved = keys.endpointMoved({
       incoming: { OPENAI_BASE_URL: "https://elsewhere.example" },

@@ -141,8 +141,8 @@ describe("the key doors' actor", () => {
     });
   });
 
-  /** @scenario "A run nobody started acts as the system actor at the door" */
   describe("given the key of a run nobody started", () => {
+    /** @scenario "A run nobody started acts as the system actor at the door" */
     it("is the system acting for an unattended run on the project door", async () => {
       const headers = { authorization: "Bearer sk-lw-unattended-run", "x-project-id": "project-1" };
 

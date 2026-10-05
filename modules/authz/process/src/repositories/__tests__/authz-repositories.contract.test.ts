@@ -375,8 +375,8 @@ function memoryHolderFixture(): HolderFixture {
   };
 }
 
-/** The lane's Postgres; the Postgres row is skipped without one. */
-const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+/** The integration lane's Postgres; the unit lane never sets it, so the row is skipped there. */
+const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 let prisma: PrismaClient | undefined;
 
 async function postgresHolderFixture(): Promise<HolderFixture> {

@@ -79,11 +79,11 @@ describe("ScenarioExecutionPool with the voice-only admission filter", () => {
     });
   });
 
-  /** @scenario A worker only admits runtime classes it consumes */
   describe("given a worker that consumes only the light class", () => {
     const consumed = ["light"] as const;
     const accept = (j: ExecutionJobData) => consumesJobClass({ consumed, job: j });
 
+    /** @scenario "A worker only admits runtime classes it consumes" */
     it("refuses a voice job and starts a light one", () => {
       const pool = ScenarioExecutionPoolService.create({ concurrency: 10, acceptJob: accept });
       pool.connect({ execute: () => new Promise<void>(() => {}), skipCancelled: () => {} });
@@ -94,8 +94,8 @@ describe("ScenarioExecutionPool with the voice-only admission filter", () => {
     });
   });
 
-  /** @scenario A worker only admits runtime classes it consumes */
   describe("given a worker that consumes every class", () => {
+    /** @scenario "A worker only admits runtime classes it consumes" */
     it("admits each target type", () => {
       for (const type of ["prompt", "http", "code", "workflow", "connected", "voice"] as const) {
         expect(consumesJobClass({ consumed: ["light", "voice"], job: job({ n: 1, type }) })).toBe(
