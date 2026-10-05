@@ -1,7 +1,7 @@
 /**
  * The deprecated `/api/suites` family: one address for both nouns, from before
  * run plans and test suites were published separately. Every answer names its
- * successors, and the family is addressed exactly as it always was.
+ * successors; only a create body carrying a field the family lacks now fails.
  */
 import { randomUUID } from "node:crypto";
 

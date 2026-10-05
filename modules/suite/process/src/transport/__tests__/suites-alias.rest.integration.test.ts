@@ -117,6 +117,38 @@ describe("given the project holds one test suite", () => {
   });
 });
 
+describe("given a create body carrying fields the alias does not have", () => {
+  const createScheduled = (families: ReturnType<typeof mountSuiteFamilies>) =>
+    families.api.post(BASE, {
+      name: "Nightly Plan",
+      scenarioIds: [families.world.addScenario().id],
+      targets: [{ type: "http", referenceId: families.world.addAgent().id }],
+      schedule: "0 2 * * *",
+      cron: "0 2 * * *",
+    });
+
+  it("answers 422 naming the fields", async () => {
+    const response = await createScheduled(mountSuiteFamilies());
+
+    expect(response.status).toBe(422);
+    const body = (await response.json()) as { code: string };
+    expect(body.code).toBe("validation_error");
+    const refusal = JSON.stringify(body);
+    expect(refusal).toContain("schedule");
+    expect(refusal).toContain("cron");
+  });
+
+  it("stores no run plan", async () => {
+    const families = mountSuiteFamilies();
+
+    await createScheduled(families);
+
+    expect([...families.world.plans.values()].map((plan) => plan.name)).not.toContain(
+      "Nightly Plan",
+    );
+  });
+});
+
 describe("given the project holds one run plan to archive", () => {
   /** @scenario "Archiving a run plan through the alias archives it" */
   it("falls back from the test suite to the run plan", async () => {
