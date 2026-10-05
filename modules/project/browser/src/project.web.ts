@@ -4,6 +4,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { ProjectSwitcherToken } from "@langwatch/project-contract";
 
 export const projectWeb = defineBrowserModule("project")
   .withHosts({
@@ -37,6 +38,8 @@ export const projectWeb = defineBrowserModule("project")
         default: (await import("./ui/sections/home/components/hero-ask-field.tsx")).HeroAskField,
       }),
     },
-    /** Main's project selector, lent to pages outside the navigation shell (§10). */
+    /** Kept until secret, api-key and organization read `ProjectSwitcherToken` (§15). */
     projectSwitcher: { load: () => import("./ui/blocks/project-switcher.tsx") },
-  });
+  })
+  /** Main's project selector, lent to pages outside the navigation shell (§10). */
+  .lends(ProjectSwitcherToken, { load: () => import("./ui/blocks/project-switcher.tsx") });
