@@ -6,6 +6,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { LangyPanelAccessService } from "../langy-panel-access.service.ts";
 import {
   LangyPanelConversationService,
@@ -15,6 +16,7 @@ import {
   LangyPanelLocalService,
   type LangyPanelLocalMembers,
 } from "../langy-panel-local.service.ts";
+import { LangyUiActionPageService } from "../langy-ui-action-page.service.ts";
 
 type UiActions = NonNullable<LangyPanelConversationMembers["uiActions"]>;
 
@@ -32,15 +34,16 @@ function access({ enabled = true, demo = false } = {}): LangyPanelAccessService 
 function panel(
   overrides: Partial<LangyPanelConversationMembers> = {},
 ): LangyPanelConversationService {
+  const repositories = MemoryLangyRepositories.create();
   return LangyPanelConversationService.create({
     access: access(),
     langy: createApiFixture<LangyPanelConversationMembers["langy"]>(),
     turnBounds: createApiFixture<LangyPanelConversationMembers["turnBounds"]>(),
     rateLimits: { check: async () => ({ allowed: true }) },
     presence: createApiFixture<PresenceApi>(),
-    turnAccess: null,
-    openBuffer: null,
-    uiActions: null,
+    turnAccess: repositories.turnAccess,
+    openBuffer: () => repositories.tokenBuffer.openBlocking(),
+    uiActions: LangyUiActionPageService.create({ uiActions: repositories.uiActions }),
     ...overrides,
   });
 }

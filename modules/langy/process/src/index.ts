@@ -1,11 +1,6 @@
 export { langyProcessModule } from "./langy.module.ts";
 export type { LangyDatabase } from "./repositories/prisma/langy-database.mapper.ts";
 export type { LangyTurnTechnicalMembers } from "./services/langy-turn.service.ts";
-export type { PrismaLangySessionKeyReapDatabase } from "./repositories/prisma/prisma.langy-session-key-reap.repository.ts";
-// The seam for the two rows above: a composing worker calls this instead of naming either
-// class (private-runtime-export drive, dev/docs/plans/private-runtime-export-drive.md §3d).
-// The raw exports stay until every importer is rewired onto the seam.
-export { createLangySessionKeyReap } from "./langy.module.ts";
 export type { LangySessionKeyRevocation } from "./services/langy-session-key.service.ts";
 export type {
   LangyConversationCommands,
@@ -60,14 +55,6 @@ export {
   type EventingLangyConversationAdapterOptions,
   type RedisLangyConversationRuntimeRepository,
 } from "./eventing/langy-conversation-runtime.pipeline.ts";
-// The seam for the conversation-runtime's five process-graph rows above: a composing worker
-// calls these instead of naming the classes directly (private-runtime-export drive,
-// dev/docs/plans/private-runtime-export-drive.md §3d). The raw exports stay until every
-// importer is rewired onto the seam.
-export {
-  createLangyAnalyticsEventClickHouseSink,
-  createLangyTitleGenerator,
-} from "./langy.module.ts";
 export {
   LANGY_SESSION_KEY_REAP_INTERVAL_MS,
   LANGY_SESSION_KEY_REAP_PROCESS_NAME,

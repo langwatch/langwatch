@@ -55,6 +55,7 @@ import {
   assertLangyServerConfig,
   langyConfig,
   langySecrets,
+  renderLangyTurnContext,
   type LangyServerConfig,
   type LangyUsageCount,
   type LangyRelayConnection,
@@ -95,6 +96,7 @@ import type * as langyContractModule from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { NotificationService } from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
 import { OnboardingApi } from "@langwatch/onboarding-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -107,6 +109,7 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 import type { z } from "zod";
 
 import { HttpLangyWorkerChannel } from "../channels/http/http.langy-worker.channel.ts";
+import type { LangyWorker } from "../channels/langy-worker.channel.ts";
 import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-worker.channel.ts";
 import { RedisLangyConversationProducerRepository } from "../eventing/langy-conversation-producer.pipeline.ts";
 import { EventingLangyConversationAdapter } from "../eventing/langy-conversation-runtime.pipeline.ts";
@@ -116,9 +119,17 @@ import type { LangyConversationDefinition } from "../eventing/langy-conversation
 import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
+import { RedisLangyTurnRelayRepository } from "../repositories/redis/redis.langy-turn-relay.repository.ts";
 import { readSessionKeyCredential } from "../rules/langy-local-control-connect.rules.ts";
+import { langyWorkerRuntimeOf } from "../rules/langy-worker-runtime.rules.ts";
 import { LangyAnalyticsEventStorageService } from "../services/langy-analytics-event-storage.service.ts";
+import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
 import { LangyConversationUpdateService } from "../services/langy-conversation-update.service.ts";
+import { LangyGithubPrPermitService } from "../services/langy-github-pr-permit.service.ts";
+import {
+  LANGY_GITHUB_PRS_PER_DAY,
+  LangyGithubPrQuotaService,
+} from "../services/langy-github-pr-quota.service.ts";
 import { LangyGithubTurnTokenService } from "../services/langy-github-turn-token.service.ts";
 import { LangyGuidedOnboardingService } from "../services/langy-guided-onboarding.service.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
@@ -137,11 +148,15 @@ import { LangyPanelAccessService } from "../services/langy-panel-access.service.
 import { LangyPanelConversationService } from "../services/langy-panel-conversation.service.ts";
 import { LangyPanelEgressService } from "../services/langy-panel-egress.service.ts";
 import { LangyPanelLocalService } from "../services/langy-panel-local.service.ts";
-import { LangyPostgresService } from "../services/langy-postgres.service.ts";
+import {
+  LangyPostgresService,
+  type LangyServiceCompositionOptions,
+} from "../services/langy-postgres.service.ts";
 import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
 import { LangyRestMetricsPrometheusService } from "../services/langy-rest-metrics-prometheus.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
+import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
 import { LangySkillGatesService } from "../services/langy-skill-gates.service.ts";
 import { LangyTitleGeneratorService } from "../services/langy-title-generator.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
@@ -156,9 +171,10 @@ import { LangyUiActionService } from "../services/langy-ui-action.service.ts";
 import { LangyVirtualKeyGatewayService } from "../services/langy-virtual-key-gateway.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
 import { LangyWorkerMetricsOtelService } from "../services/langy-worker-metrics-otel.service.ts";
-import type { LangyService } from "../services/langy.service.ts";
+import type { LangyService, OpenLangyRelay } from "../services/langy.service.ts";
 import { SetupSkillsService } from "../services/setup-skills.service.ts";
-import { buildLangyInfrastructure } from "./langy-composition.build.ts";
+
+const relayLogger = createLogger("langwatch:langy:relay");
 
 /** What the process composes this feature's application from. */
 type LangyAppDependencies = {
@@ -282,36 +298,11 @@ export class LangyModule implements LangyApiContract {
       authz: setup.dependencies.authz,
       metrics: LangySessionKeyMetricsOtelService.create(),
     });
-    const built = buildLangyInfrastructure({
-      config: setup.config,
-      publicBaseUrl: setup.config.publicBaseUrl,
+    const built = LangyModule.#composeInfrastructure({
+      setup,
       // Main's preset: no agent, no turn worker, so a send refuses "Agent not configured".
       worker: configured ? channel : null,
-      repositories: setup.repositories,
-      models: LangyModelService.create({ modelProviders: setup.dependencies.modelProviders }),
       sessionKeys,
-      virtualKeys: LangyVirtualKeyGatewayService.create({
-        secrets: setup.dependencies.secrets,
-        gateway: setup.dependencies.gateway,
-      }),
-      uiActionSurface: LangyUiActionSurfaceService.create(setup.dependencies.featureFlags),
-      github: LangyGithubTurnTokenService.create(setup.dependencies.github),
-      skillGates: LangySkillGatesService.create(setup.dependencies.featureFlags),
-      navigateFallback: LangyNavigateFallbackService.create({
-        projects: setup.dependencies.projects,
-        resources: LangyNavigateResourceLocatorService.create({
-          experiments: setup.dependencies.experiments,
-          agents: setup.dependencies.agents,
-          prompts: setup.dependencies.prompts,
-          datasets: setup.dependencies.datasets,
-          workflows: setup.dependencies.workflows,
-          monitors: setup.dependencies.monitors,
-          evaluators: setup.dependencies.evaluators,
-          scenarios: setup.dependencies.scenarios,
-          publicBaseUrl: setup.config.publicBaseUrl,
-        }),
-        publicBaseUrl: setup.config.publicBaseUrl,
-      }),
     });
     const commands = LangyConversationCommandSenders.create();
     const langy = adapter.build({
@@ -494,6 +485,103 @@ export class LangyModule implements LangyApiContract {
     });
   }
 
+  /**
+   * Everything `LangyPostgresService.build` needs besides `commands`: the turn's technical
+   * collaborators, the worker credentials, block metrics, feedback prompts and the relay.
+   */
+  static #composeInfrastructure({
+    setup,
+    worker,
+    sessionKeys,
+  }: {
+    setup: LangySetup;
+    worker: LangyWorker | null;
+    sessionKeys: LangySessionKeyService;
+  }): Omit<LangyServiceCompositionOptions, "commands"> {
+    const { config, dependencies, repositories } = setup;
+    const { publicBaseUrl } = config;
+    const navigateFallback = LangyNavigateFallbackService.create({
+      projects: dependencies.projects,
+      resources: LangyNavigateResourceLocatorService.create({
+        experiments: dependencies.experiments,
+        agents: dependencies.agents,
+        prompts: dependencies.prompts,
+        datasets: dependencies.datasets,
+        workflows: dependencies.workflows,
+        monitors: dependencies.monitors,
+        evaluators: dependencies.evaluators,
+        scenarios: dependencies.scenarios,
+        publicBaseUrl,
+      }),
+      publicBaseUrl,
+    });
+    return {
+      turns: {
+        models: LangyModelService.create({ modelProviders: dependencies.modelProviders }),
+        worker,
+        tokenBuffer: repositories.tokenBuffer.open(),
+        permits: LangyGithubPrPermitService.create(
+          LangyGithubPrQuotaService.create({ counts: repositories.githubPrCounts }),
+        ),
+        perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
+        sessionKeys,
+        // Rendering the composer's context chips is pure, and the contract package owns it.
+        context: { render: renderLangyTurnContext },
+        uiActionSurface: LangyUiActionSurfaceService.create(dependencies.featureFlags),
+        skillGates: LangySkillGatesService.create(dependencies.featureFlags),
+        metrics: { count: () => undefined },
+        accessStore: repositories.turnAccess,
+        handoffStore: repositories.turnHandoff,
+      },
+      credentials: {
+        sessionKeys,
+        virtualKeys: LangyVirtualKeyGatewayService.create({
+          secrets: dependencies.secrets,
+          gateway: dependencies.gateway,
+        }),
+        github: LangyGithubTurnTokenService.create(dependencies.github),
+        runtime: langyWorkerRuntimeOf({ config, publicBaseUrl }),
+      },
+      blockMetrics: LangyBlockMetricsOtelService.create(),
+      feedbackPrompts: repositories.feedbackPrompts,
+      openRelay: LangyModule.#relayOpener({
+        repositories,
+        baseHost: publicBaseUrl ?? "",
+        navigateFallback,
+      }),
+    };
+  }
+
+  /**
+   * One relay per pushed connection, as main's relay route built it: frames are
+   * authenticated against the project-scoped handoff, deduplicated on the turn's
+   * nonce set, fanned to the live buffer; an unremembered navigate falls back.
+   */
+  static #relayOpener({
+    repositories,
+    baseHost,
+    navigateFallback,
+  }: {
+    repositories: LangyRepositories;
+    baseHost: string;
+    navigateFallback: LangyNavigateFallbackService;
+  }): OpenLangyRelay {
+    return (conversations) =>
+      RedisLangyTurnRelayRepository.create({
+        conversations,
+        buffer: repositories.tokenBuffer.open(),
+        frameDedup: repositories.frameDedup,
+        handoff: repositories.turnHandoff,
+        resourceLinks: repositories.resourceLinks,
+        resolveResourceUrl: async (navigate) => {
+          const resolution = await navigateFallback.resolveUrl(navigate);
+          return resolution.outcome === "resolved" ? resolution.url : null;
+        },
+        baseHost,
+        logger: relayLogger,
+      });
+  }
+
   /** langy_conversation_processing as this role registers it: the worker folds, the api sends. */
   conversationPipeline({
     participation,
@@ -549,7 +637,6 @@ export class LangyModule implements LangyApiContract {
     this.#internal = LangyInternalService.create(
       dependencies.langy,
       LangyRestMetricsPrometheusService.create(),
-      true,
     );
   }
 

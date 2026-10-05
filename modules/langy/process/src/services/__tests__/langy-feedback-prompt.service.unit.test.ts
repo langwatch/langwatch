@@ -24,8 +24,8 @@ function memoryRedis(): LangyFeedbackPromptRedis & { store: Map<string, string> 
   };
 }
 
-function service(redis: LangyFeedbackPromptRedis | null, now = NOW): LangyFeedbackPromptService {
-  const prompts = redis ? LangyFeedbackPromptRedisRepository.create({ redis }) : null;
+function service(redis: LangyFeedbackPromptRedis, now = NOW): LangyFeedbackPromptService {
+  const prompts = LangyFeedbackPromptRedisRepository.create({ redis });
   return LangyFeedbackPromptService.create({ prompts, now: () => now });
 }
 
@@ -115,20 +115,6 @@ describe("LangyFeedbackPromptService", () => {
     ).resolves.toBe(false);
     await expect(
       service(broken).markShown({ userId: "u1", conversationId: "c1" }),
-    ).resolves.toBeUndefined();
-  });
-
-  /** @scenario "feedback prompt is safe when Redis is unavailable" */
-  it("fails closed when Redis is not configured", async () => {
-    await expect(
-      service(null).shouldAsk({
-        userId: "u1",
-        conversationId: "c1",
-        assistantAnswerCount: 5,
-      }),
-    ).resolves.toBe(false);
-    await expect(
-      service(null).markShown({ userId: "u1", conversationId: "c1" }),
     ).resolves.toBeUndefined();
   });
 

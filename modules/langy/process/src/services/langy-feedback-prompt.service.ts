@@ -15,13 +15,13 @@ export const FEEDBACK_LONG_CONVERSATION_ANSWERS = 8;
 export class LangyFeedbackPromptService {
   private constructor(
     private readonly deps: {
-      prompts: LangyFeedbackPromptRepository | null;
+      prompts: LangyFeedbackPromptRepository;
       now?: () => number;
     },
   ) {}
 
   static create(options: {
-    prompts: LangyFeedbackPromptRepository | null;
+    prompts: LangyFeedbackPromptRepository;
     now?: () => number;
   }): LangyFeedbackPromptService {
     return new LangyFeedbackPromptService(options);
@@ -37,7 +37,6 @@ export class LangyFeedbackPromptService {
     assistantAnswerCount: number;
   }): Promise<boolean> {
     if (input.assistantAnswerCount < FEEDBACK_MIN_ANSWERS) return false;
-    if (!this.deps.prompts) return false;
     let lastAsks;
     try {
       lastAsks = await this.deps.prompts.findLastAsked(input.userId);
@@ -54,7 +53,6 @@ export class LangyFeedbackPromptService {
   }
 
   async markShown(input: { userId: string; conversationId: string }): Promise<void> {
-    if (!this.deps.prompts) return;
     try {
       await this.deps.prompts.recordAsked({
         userId: input.userId,

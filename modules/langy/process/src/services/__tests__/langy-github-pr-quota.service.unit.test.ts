@@ -9,10 +9,7 @@ import {
   type LangyGithubPrCountRedis,
   LangyGithubPrCountRedisRepository,
 } from "../../repositories/redis/redis.langy-github-pr-count.repository.ts";
-import {
-  LANGY_GITHUB_PRS_PER_DAY,
-  LangyGithubPrQuotaService,
-} from "../langy-github-pr-quota.service.ts";
+import { LangyGithubPrQuotaService } from "../langy-github-pr-quota.service.ts";
 
 const get = vi.fn<(key: string) => Promise<string | null>>();
 const incr = vi.fn<(key: string, amount: number) => Promise<number>>();
@@ -25,21 +22,12 @@ const redis: LangyGithubPrCountRedis = { get, incrby: incr, decr, expire, eval: 
 
 const counts = LangyGithubPrCountRedisRepository.create({ redis });
 const quota = LangyGithubPrQuotaService.create({ counts });
-const quotaWithoutCounter = LangyGithubPrQuotaService.create({ counts: null });
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("LangyGithubPrQuotaService.usage", () => {
-  describe("when Redis is unavailable", () => {
-    it("fails open — user is allowed and full quota remains", async () => {
-      const out = await quotaWithoutCounter.usage({ userId: "u1" });
-      expect(out.allowed).toBe(true);
-      expect(out.remaining).toBe(LANGY_GITHUB_PRS_PER_DAY);
-    });
-  });
-
   describe("when the counter is below the cap", () => {
     it("reports remaining as cap minus count and allowed=true", async () => {
       get.mockResolvedValue("5");
@@ -121,16 +109,6 @@ describe("LangyGithubPrQuotaService.reservePermit", () => {
     });
   });
 
-  describe("when Redis is unavailable", () => {
-    it("fails open — does not strip GitHub from every connected user", async () => {
-      const out = await quotaWithoutCounter.reservePermit({ userId: "u1" });
-      expect(out).toMatchObject({
-        allowed: true,
-        remaining: LANGY_GITHUB_PRS_PER_DAY,
-      });
-    });
-  });
-
   describe("when two requests race the same bucket", () => {
     it("only one is granted; the loser sees DECR and allowed=false", async () => {
       // Simulated atomic INCR across two callers at count=20 (one slot left):
@@ -158,12 +136,6 @@ describe("LangyGithubPrQuotaService.releasePermit", () => {
       await quota.releasePermit({ userId: "u1" });
       expect(floored).toHaveBeenCalledTimes(1);
       expect(floored.mock.calls[0]?.[2]).toMatch(/^langy:gh:prs:u1:/);
-    });
-  });
-
-  describe("when Redis is unavailable", () => {
-    it("is a no-op (best-effort fairness, not a correctness boundary)", async () => {
-      await expect(quotaWithoutCounter.releasePermit({ userId: "u1" })).resolves.toBeUndefined();
     });
   });
 });

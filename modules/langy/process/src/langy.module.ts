@@ -4,24 +4,7 @@ import { defineProcessModule } from "@langwatch/process";
 import { LangyModule } from "./app/langy.app.ts";
 import { langyConversationEventing } from "./eventing/langy-conversation.pipeline.ts";
 import { langyMaintenanceEventing } from "./eventing/langy-maintenance.pipeline.ts";
-import { LangyAnalyticsEventClickHouseRepository } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
-import type { LangyAnalyticsClickHouseClientResolver } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 import { langyRepositories } from "./repositories/langy-repositories.registry.ts";
-import type { LangyTokenBufferConnection } from "./repositories/langy-token-buffer.repository.ts";
-import { PrismaLangySessionKeyReapRepository } from "./repositories/prisma/prisma.langy-session-key-reap.repository.ts";
-import type { PrismaLangySessionKeyReapDatabase } from "./repositories/prisma/prisma.langy-session-key-reap.repository.ts";
-import { LangyTokenBufferRedisRepository } from "./repositories/redis/redis.langy-token-buffer.repository.ts";
-import {
-  LangyTurnHandoffRedisRepository,
-  type LangyHandoffRedis,
-} from "./repositories/redis/redis.langy-turn-handoff.repository.ts";
-import { LangySessionKeyReapService } from "./services/langy-session-key-reap.service.ts";
-import type { LangySessionKeyMetrics } from "./services/langy-session-key.service.ts";
-import {
-  type LangyTitleGenerator,
-  LangyTitleGeneratorService,
-  type LangyTitleGeneratorDeps,
-} from "./services/langy-title-generator.service.ts";
 import { langyInternalRest } from "./transport/langy-internal.rest.ts";
 import {
   langyLocalControlConnectDatedRests,
@@ -37,48 +20,6 @@ import { langyTurnsRest } from "./transport/langy-turns.rest.ts";
 import { langyUiActionsRest } from "./transport/langy-ui-actions.rest.ts";
 import { langyEgressTrpcTransport, langyTrpcTransport } from "./transport/langy.trpc.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
-
-// The seams below are process-graph factories: a composing worker calls one of these
-// instead of naming the feature's private repository/service classes directly (the
-// private-runtime-export drive, dev/docs/plans/private-runtime-export-drive.md §3d).
-
-/** The content-free analytics sink, over whichever ClickHouse client a project resolves to. */
-export function createLangyAnalyticsEventClickHouseSink(
-  resolveClient: LangyAnalyticsClickHouseClientResolver,
-): LangyAnalyticsEventClickHouseRepository {
-  return LangyAnalyticsEventClickHouseRepository.create(resolveClient);
-}
-
-/** The turn's live-edge token buffer, over the process's own Redis connection. */
-export function createLangyTokenBufferRedisRepository(
-  deps: LangyTokenBufferConnection,
-): LangyTokenBufferRedisRepository {
-  return LangyTokenBufferRedisRepository.create(deps);
-}
-
-/** Where a stopped turn's handoff parks until the next agent picks it up. */
-export function createLangyTurnHandoffRedisRepository(options: {
-  redis: LangyHandoffRedis;
-}): LangyTurnHandoffRedisRepository {
-  return LangyTurnHandoffRedisRepository.create(options);
-}
-
-/** The generator as the conversation runtime's effect ports take it, bound to one model gateway. */
-export function createLangyTitleGenerator(deps: LangyTitleGeneratorDeps): LangyTitleGenerator {
-  return LangyTitleGeneratorService.create(deps).generator();
-}
-
-/** The daily best-effort sweep for elapsed Langy session keys, over one project database and
- * one metrics sink. */
-export function createLangySessionKeyReap(options: {
-  database: PrismaLangySessionKeyReapDatabase;
-  metrics: LangySessionKeyMetrics;
-}): LangySessionKeyReapService {
-  return LangySessionKeyReapService.create({
-    repository: PrismaLangySessionKeyReapRepository.create(options.database),
-    metrics: options.metrics,
-  });
-}
 
 export const langyProcessModule = defineProcessModule("langy")
   .withRepositories(langyRepositories)

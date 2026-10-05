@@ -17,6 +17,7 @@ import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
+import type { LangyRelayConnection } from "@langwatch/langy-contract";
 import type {
   LangyConversationCommands,
   LangyTurnTechnicalMembers,
@@ -41,6 +42,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyModule } from "../app/langy.app.ts";
+import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 import { MemoryLangyRepositories } from "../repositories/memory/memory.langy.repositories.ts";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
 import { PrismaLangyRepositories } from "../repositories/prisma/prisma.langy.repositories.ts";
@@ -91,7 +93,9 @@ function composition(turns: LangyTurnTechnicalMembers) {
       },
     },
     turns,
-    feedbackPrompts: null,
+    feedbackPrompts: createApiFixture<LangyFeedbackPromptRepository>(),
+    blockMetrics: LangyBlockMetricsOtelService.create(),
+    openRelay: () => createApiFixture<LangyRelayConnection>(),
   };
 }
 

@@ -11,7 +11,7 @@ import type {
 import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
 import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 import type { LangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
-import { LangyBlockMetrics } from "./langy-block-metrics-otel.service.ts";
+import type { LangyBlockMetrics } from "./langy-block-metrics-otel.service.ts";
 import { LangyConversationService } from "./langy-conversation.service.ts";
 import {
   LangyCredentialService,
@@ -22,7 +22,7 @@ import {
   type LangyVirtualKeyService,
 } from "./langy-credential.service.ts";
 import { LangyFeedbackPromptService } from "./langy-feedback-prompt.service.ts";
-import { type LangyBlockCounter, LangyFinalPartsService } from "./langy-final-parts.service.ts";
+import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
 import { LangyMessageService } from "./langy-message.service.ts";
 import type { LangySessionKeyMetrics } from "./langy-session-key.service.ts";
 import { LangySessionKeyService } from "./langy-session-key.service.ts";
@@ -33,21 +33,6 @@ import {
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
 } from "./langy.service.ts";
-
-/** The default: a deployment composed no block-metrics collector publishes nothing. */
-class LangyBlockMetricsNullService extends LangyBlockMetrics {
-  private constructor() {
-    super();
-  }
-
-  static create(): LangyBlockMetricsNullService {
-    return new LangyBlockMetricsNullService();
-  }
-
-  blockCounter(): LangyBlockCounter {
-    return () => undefined;
-  }
-}
 
 export abstract class LangyTrustedMessage {
   abstract getRecordsByConversation(input: { conversationId: string; projectId: string }): Promise<
@@ -98,11 +83,9 @@ export type LangyServiceCompositionOptions = {
   commands: LangyConversationCommands;
   events?: LangyConversationEventsReader | null;
   runtime?: LangyConversationRuntime;
-  /** Opens the live relay; absent where this process serves none. */
-  openRelay?: OpenLangyRelay;
-  feedbackPrompts?: LangyFeedbackPromptRepository | null;
-  /** Block-salvage counter; absent composes LangyBlockMetricsNullService (nothing published). */
-  blockMetrics?: LangyBlockMetrics;
+  openRelay: OpenLangyRelay;
+  feedbackPrompts: LangyFeedbackPromptRepository;
+  blockMetrics: LangyBlockMetrics;
 };
 
 export interface LangyPostgresServiceOptions {
@@ -166,9 +149,7 @@ export class LangyPostgresService {
       repository: this.repositories.conversations,
       messages: this.repositories.messages,
       events: options.events,
-      finalParts: LangyFinalPartsService.create(
-        (options.blockMetrics ?? LangyBlockMetricsNullService.create()).blockCounter(),
-      ),
+      finalParts: LangyFinalPartsService.create(options.blockMetrics.blockCounter()),
       runtime: options.runtime,
     });
     const messages = LangyMessageService.create(
@@ -193,9 +174,9 @@ export class LangyPostgresService {
       messages,
       credentials,
       feedbackPrompt: LangyFeedbackPromptService.create({
-        prompts: options.feedbackPrompts ?? null,
+        prompts: options.feedbackPrompts,
       }),
-      ...(options.openRelay ? { openRelay: options.openRelay } : {}),
+      openRelay: options.openRelay,
     });
     return this.service;
   }

@@ -78,10 +78,9 @@ export type LangyPanelConversationMembers = Readonly<{
   turnBounds: Pick<LangyTurnsBoundsService, "assertTurnWithinBounds">;
   rateLimits: LangyRateLimitRepository;
   presence: Pick<PresenceApi, "getTenantEmitter" | "cleanupTenantEmitter">;
-  turnAccess: LangyTurnAccessRepository | null;
-  openBuffer: OpenLangyTurnBuffer | null;
-  /** Absent without Redis: no action is ever published, so no tab can claim or complete one. */
-  uiActions: Pick<LangyUiActionPageService, "claim" | "complete"> | null;
+  turnAccess: LangyTurnAccessRepository;
+  openBuffer: OpenLangyTurnBuffer;
+  uiActions: Pick<LangyUiActionPageService, "claim" | "complete">;
 }>;
 
 /**
@@ -133,7 +132,7 @@ export class LangyPanelConversationService {
       projectId: input.projectId,
       userId: input.caller.userId,
     });
-    if (!conversation || !uiActions) return { isClaimed: false };
+    if (!conversation) return { isClaimed: false };
     return uiActions.claim({
       projectId: input.projectId,
       userId: input.caller.userId,
@@ -147,7 +146,6 @@ export class LangyPanelConversationService {
     input: LangyPanelCall<typeof langyCompleteUiActionInputSchema>,
   ): Promise<{ isAccepted: boolean }> {
     await this.members.access.assertPanelAccess(input);
-    if (!this.members.uiActions) return { isAccepted: false };
     return this.members.uiActions.complete({
       projectId: input.projectId,
       userId: input.caller.userId,
@@ -413,10 +411,7 @@ export class LangyPanelConversationService {
       );
       throw new LangyConversationNotFoundError(conversationId);
     }
-    const watch = this.members.openBuffer?.() ?? null;
-    if (!watch) return;
-
-    const { buffer, release } = watch;
+    const { buffer, release } = this.members.openBuffer();
     yield* LangyTurnTailService.create().streamTurnEntries({
       conversationId,
       turnId,
@@ -485,7 +480,7 @@ export class LangyPanelConversationService {
     turnId: string;
     userId: string;
   }): Promise<boolean> {
-    if (this.members.turnAccess && (await this.members.turnAccess.isTurnActor(input))) {
+    if (await this.members.turnAccess.isTurnActor(input)) {
       return true;
     }
     const conversation = await this.members.langy.findByIdVisible({

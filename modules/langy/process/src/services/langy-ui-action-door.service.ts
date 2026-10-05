@@ -3,7 +3,6 @@ import type { AuthzPermission, RestResolvedProjectCredential } from "@langwatch/
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   LangyApiRequestInvalidError,
-  LangyUiNoBrowserError,
   langyUiActionDispatchBodySchema,
   type LangyKeyCaller,
   type LangyUiActionDispatched,
@@ -38,8 +37,7 @@ export class LangyUiActionDoorService {
     callers: Pick<LangyRestCallerService, "getCaller">;
     catalog: LangyUiActionCatalogService;
     authz: Pick<AuthzApi, "hasApiKeyPermission" | "can">;
-    /** The channel, where this process has the Redis it runs on. */
-    actions: LangyUiActionService | null;
+    actions: LangyUiActionService;
   }): LangyUiActionDoorService {
     return new LangyUiActionDoorService(deps);
   }
@@ -49,7 +47,7 @@ export class LangyUiActionDoorService {
       callers: Pick<LangyRestCallerService, "getCaller">;
       catalog: LangyUiActionCatalogService;
       authz: Pick<AuthzApi, "hasApiKeyPermission" | "can">;
-      actions: LangyUiActionService | null;
+      actions: LangyUiActionService;
     },
   ) {}
 
@@ -74,7 +72,6 @@ export class LangyUiActionDoorService {
       permission: definition.requiredPermission,
     });
     // Without Redis no page can claim anything, exactly as the panel's own claim answers.
-    if (!this.deps.actions) throw new LangyUiNoBrowserError(kind);
     const outcome = await this.deps.actions.dispatch({
       projectId: caller.projectId,
       userId: caller.userId,

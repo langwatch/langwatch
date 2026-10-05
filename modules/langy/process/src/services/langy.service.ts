@@ -62,7 +62,7 @@ export class LangyService {
   private readonly turns: LangyTurnService;
   private readonly messages: LangyMessageService;
   private readonly credentials: LangyCredentialService;
-  private readonly openRelay: OpenLangyRelay | null;
+  private readonly openRelay: OpenLangyRelay;
 
   private constructor({
     feedbackPrompt,
@@ -70,14 +70,14 @@ export class LangyService {
     turns,
     messages,
     credentials,
-    openRelay = null,
+    openRelay,
   }: {
     feedbackPrompt: LangyFeedbackPromptService;
     conversations: LangyConversationService;
     turns: LangyTurnService;
     messages: LangyMessageService;
     credentials: LangyCredentialService;
-    openRelay?: OpenLangyRelay | null;
+    openRelay: OpenLangyRelay;
   }) {
     this.feedbackPrompt = feedbackPrompt;
     this.conversations = conversations;
@@ -94,7 +94,7 @@ export class LangyService {
     messages: LangyMessageService;
     credentials: LangyCredentialService;
     feedbackPrompt: LangyFeedbackPromptService;
-    openRelay?: OpenLangyRelay;
+    openRelay: OpenLangyRelay;
   }): LangyService {
     return new LangyService({
       feedbackPrompt: options.feedbackPrompt,
@@ -102,15 +102,11 @@ export class LangyService {
       turns: options.turns,
       messages: options.messages,
       credentials: options.credentials,
-      openRelay: options.openRelay ?? null,
+      openRelay: options.openRelay,
     });
   }
 
   openRelayConnection(): LangyRelayConnection {
-    if (!this.openRelay) {
-      throw new Error("Langy relay is not configured");
-    }
-
     return this.openRelay(this);
   }
 

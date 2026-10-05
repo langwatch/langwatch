@@ -1,3 +1,4 @@
+import type { LangyRelayConnection } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * What is left of `LangyService`'s own behaviour once the composed services own the rest: the
@@ -40,6 +41,7 @@ function service(prompt: LangyFeedbackPromptService) {
     messages: createApiFixture<LangyMessageService>({}),
     credentials: createApiFixture<LangyCredentialService>({}),
     feedbackPrompt: prompt,
+    openRelay: () => createApiFixture<LangyRelayConnection>(),
   });
 }
 

@@ -1,40 +1,46 @@
 /**
- * The relay a process opens, composed the way LangyModule composes it.
+ * The relay a process opens, on a LangyModule composed over its memory registry.
  * @vitest-environment node
  * @see modules/langy/specs/langy-internal-relay.feature
  */
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import {
+  EventSourcing,
+  EventStoreProducerOnly,
+  type EventSourcedQueueProcessor,
+} from "@langwatch/eventing";
 import {
   EXPERIMENT_TYPES,
   type Experiment,
   type ExperimentApi,
 } from "@langwatch/experiment-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { GithubApi } from "@langwatch/github-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { NotificationService } from "@langwatch/notification-contract";
+import type { OnboardingApi } from "@langwatch/onboarding-contract";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { UnavailableLangyWorkerChannel } from "../../channels/unavailable.langy-worker.channel.ts";
-import type { LangySessionKeyRepository } from "../../repositories/langy-session-key.repository.ts";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { mintRunToken, signFrame } from "../../rules/langy-frame-auth.rules.ts";
-import { LangyModel } from "../../services/langy-model.service.ts";
-import { LangyNavigateFallbackService } from "../../services/langy-navigate-fallback.service.ts";
-import { LangyNavigateResourceLocatorService } from "../../services/langy-navigate-resource-locator.service.ts";
-import { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
-import { LangyVirtualKeyGatewayService } from "../../services/langy-virtual-key-gateway.service.ts";
-import { LangyWorkerMetricsNullService } from "../../services/langy-worker-metrics-null.service.ts";
-import type { LangyService } from "../../services/langy.service.ts";
-import { buildLangyInfrastructure } from "../langy-composition.build.ts";
+import { LangyModule } from "../langy.app.ts";
 
 const ORIGIN = "https://app.example.test";
 const RUN_TOKEN = mintRunToken();
@@ -59,27 +65,56 @@ const SUMMER_EVAL: Experiment = {
   workbenchVersion: 0,
 };
 
-class NoLangyModel extends LangyModel {
-  resolve(): Promise<{ modelId: string }> {
-    return Promise.reject(new Error("no model in this test"));
-  }
+/** A producer-only eventing over a queue that drops what it is sent: no Redis, no ClickHouse. */
+function producerEventing(): EventSourcing {
+  const queue: EventSourcedQueueProcessor<Record<string, unknown>> = {
+    send: async () => undefined,
+    sendBatch: async () => undefined,
+    waitUntilReady: async () => undefined,
+    close: async () => undefined,
+  };
+  return new EventSourcing({
+    enabled: true,
+    eventStore: EventStoreProducerOnly.create({ processName: "langwatch-test" }),
+    queueFactory: () => queue,
+    consumersEnabled: false,
+    executionTarget: "api",
+    processManagerMode: "producer-only",
+  });
 }
 
-/** The conversation the relay records into; only the relay's own reads and records answer. */
-const conversations = createApiFixture<LangyService>({
-  findRunToken: async () => RUN_TOKEN,
-  recordToolCallStarted: async () => undefined,
-  recordToolCallCompleted: async () => undefined,
-  ingestAgentTurnResult: async () => undefined,
-  recordTurnHandoff: async () => undefined,
-  recordPlanUpdated: async () => undefined,
-});
-
-/** The live buffer's stream commands, reading back what was written (the double has no streams). */
-/** A relay opened by the composition, over the memory registry its buffer is read back from. */
-function composedRelay() {
+/** A relay opened by LangyModule, over the memory registry its buffer is read back from. */
+async function composedRelay() {
   const repositories = MemoryLangyRepositories.create();
-  const built = buildLangyInfrastructure({
+  const app = await LangyModule.create({
+    dependencies: {
+      presence: createApiFixture<PresenceApi>(),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
+      users: createApiFixture<UserApi>(),
+      github: createApiFixture<GithubApi>(),
+      gateway: createApiFixture<GatewayApi>(),
+      secrets: createApiFixture<SecretApi>(),
+      experiments: createApiFixture<ExperimentApi>({
+        findById: async ({ id }) => (id === SUMMER_EVAL.id ? SUMMER_EVAL : null),
+      }),
+      agents: createApiFixture<AgentApi>(),
+      prompts: createApiFixture<PromptApi>(),
+      datasets: createApiFixture<DatasetApi>(),
+      workflows: createApiFixture<WorkflowApi>(),
+      monitors: createApiFixture<MonitorApi>(),
+      evaluators: createApiFixture<EvaluatorApi>(),
+      scenarios: createApiFixture<ScenarioApi>(),
+      modelProviders: createApiFixture<ModelProviderApi>(),
+      apiKeys: createApiFixture<ApiKeyApi>(),
+      authz: createApiFixture<AuthzApi>(),
+      projects: createApiFixture<ProjectApi>({
+        findSummaryById: async () => ({ name: "Acme", slug: "acme" }),
+      }),
+      plans: createApiFixture<EntitlementApi>(),
+      onboarding: createApiFixture<OnboardingApi>(),
+      notifications: createApiFixture<NotificationService>(),
+      retention: createApiFixture<DataRetentionApi>(),
+    },
     config: {
       agentUrl: undefined,
       workerCallbackUrl: undefined,
@@ -88,44 +123,34 @@ function composedRelay() {
       gatewayInternalUrl: undefined,
       gatewayPublicUrl: undefined,
       gatewayLegacyUrl: undefined,
-      publicBaseUrl: undefined,
-    },
-    publicBaseUrl: ORIGIN,
-    worker: UnavailableLangyWorkerChannel.create(LangyWorkerMetricsNullService.create()),
-    repositories,
-    models: new NoLangyModel(),
-    sessionKeys: LangySessionKeyService.create({
-      repository: createApiFixture<LangySessionKeyRepository>(),
-      apiKeys: createApiFixture<ApiKeyApi>(),
-      authz: createApiFixture<AuthzApi>(),
-      metrics: { record: () => undefined },
-    }),
-    virtualKeys: LangyVirtualKeyGatewayService.create({
-      secrets: createApiFixture<SecretApi>(),
-      gateway: createApiFixture<GatewayApi>(),
-    }),
-    navigateFallback: LangyNavigateFallbackService.create({
-      projects: createApiFixture<ProjectApi>({
-        findSummaryById: async () => ({ name: "Acme", slug: "acme" }),
-      }),
-      resources: LangyNavigateResourceLocatorService.create({
-        experiments: createApiFixture<ExperimentApi>({
-          findById: async ({ id }) => (id === SUMMER_EVAL.id ? SUMMER_EVAL : null),
-        }),
-        agents: createApiFixture<AgentApi>(),
-        prompts: createApiFixture<PromptApi>(),
-        datasets: createApiFixture<DatasetApi>(),
-        workflows: createApiFixture<WorkflowApi>(),
-        monitors: createApiFixture<MonitorApi>(),
-        evaluators: createApiFixture<EvaluatorApi>(),
-        scenarios: createApiFixture<ScenarioApi>(),
-        publicBaseUrl: ORIGIN,
-      }),
       publicBaseUrl: ORIGIN,
-    }),
+    },
+    resources: { own: () => void 0, ownService: () => void 0 },
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    repositories,
   });
-  if (!built.openRelay) throw new Error("the composition builds the relay");
-  const relay = built.openRelay(conversations);
+  const registered = producerEventing().register(
+    app.conversationPipeline({ participation: "produce" }),
+  );
+  app.connectConversationCommands(registered.commands);
+  // The turn's handoff carries the run token the worker signs its frames with.
+  await repositories.turnHandoff.stash({
+    projectId: TURN.projectId,
+    conversationId: TURN.conversationId,
+    turnId: TURN.turnId,
+    actorUserId: TURN.userId,
+    prompt: "",
+    system: "",
+    credentials: {
+      llmVirtualKey: "vk-test",
+      langwatchEndpoint: ORIGIN,
+      gatewayBaseUrl: "https://gateway.example.test/v1",
+      organizationId: "org_1",
+    },
+    runToken: RUN_TOKEN,
+    permitReserved: false,
+  });
+  const relay = app.openRelayConnection();
   const buffer = repositories.tokenBuffer.open();
 
   return {
@@ -150,7 +175,7 @@ describe("the relay LangyModule composes", () => {
   describe("when Langy opens a resource the conversation remembered no link for", () => {
     /** @scenario "A navigate with no remembered link opens the resource's page" */
     it("navigates to the resource's own page under the project slug", async () => {
-      const relay = composedRelay();
+      const relay = await composedRelay();
 
       await relay.push(
         bashCall({ id: "call_1", command: "langwatch navigate open experiment_1", output: "ok" }),
@@ -163,7 +188,7 @@ describe("the relay LangyModule composes", () => {
     });
 
     it("drops a navigate to an id the project cannot resolve", async () => {
-      const relay = composedRelay();
+      const relay = await composedRelay();
 
       await relay.push(
         bashCall({
@@ -180,7 +205,7 @@ describe("the relay LangyModule composes", () => {
   describe("when a LangWatch capability call runs", () => {
     /** @scenario "A running capability call shows its progress label" */
     it("shows the capability's present-tense label, and clears it when the call settles", async () => {
-      const relay = composedRelay();
+      const relay = await composedRelay();
 
       await relay.push(
         bashCall({ id: "call_1", command: "langwatch trace search --format json", output: "{}" }),
