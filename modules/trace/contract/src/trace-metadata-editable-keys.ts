@@ -60,3 +60,27 @@ export function traceAttributeKeyForMetadata(key: string): string {
   if (key === LABELS_METADATA_KEY) return LABELS_ATTRIBUTE;
   return `${METADATA_ATTRIBUTE_PREFIX}${key}`;
 }
+
+/** The three attribute keys a custom metadata key may be stored under. */
+export type CustomMetadataStorageKeys = {
+  /** `metadata.{key}`, as the SDKs send it. */
+  canonical: string;
+  /** `langwatch.metadata.{key}`, from the legacy REST collector. */
+  legacy: string;
+  /** `{key}`, a legacy bare OTEL resource attribute. */
+  bare: string;
+};
+
+/**
+ * Every reader of a custom metadata filter (trace search, analytics on
+ * trace_summaries and on the slim table) reads all three keys, so they match
+ * the same traces. Filter keys arrive with `·` standing in for `.`.
+ */
+export function customMetadataStorageKeys(filterKey: string): CustomMetadataStorageKeys {
+  const bare = filterKey.replaceAll("·", ".");
+  return {
+    canonical: `${METADATA_ATTRIBUTE_PREFIX}${bare}`,
+    legacy: `langwatch.${METADATA_ATTRIBUTE_PREFIX}${bare}`,
+    bare,
+  };
+}

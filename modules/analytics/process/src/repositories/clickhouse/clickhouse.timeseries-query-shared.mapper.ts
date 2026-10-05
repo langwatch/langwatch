@@ -1,4 +1,5 @@
 import type { AnalyticsFilterValue } from "@langwatch/analytics-contract";
+import { customMetadataStorageKeys } from "@langwatch/trace-contract";
 
 /**
  * Internal helpers shared by the slim + rollup timeseries SQL builders
@@ -124,27 +125,99 @@ export function isEvalMetricKey(metric: string): metric is EvalMetricKey {
   return (EVAL_METRIC_KEYS as readonly string[]).includes(metric);
 }
 
+/** A custom metadata condition's WHERE fragment and the parameters it binds. */
+export type CustomMetadataCondition = {
+  sql: string;
+  params: Record<string, unknown>;
+};
+
+/** Input of the custom metadata condition builders. */
+export type CustomMetadataConditionInput = {
+  values: string[];
+  paramId: string;
+  /** Alias of the row carrying `Attributes` in the caller's query. */
+  alias: string;
+};
+
+/**
+ * Matches traces carrying any of the custom metadata keys, under any of the
+ * three spellings trace search also reads. A key holding an empty value does
+ * not count as present.
+ */
+export function customMetadataKeyCondition({
+  values,
+  paramId,
+  alias,
+}: CustomMetadataConditionInput): CustomMetadataCondition {
+  if (values.length === 0) return { sql: "1=0", params: {} };
+  // mapContains lets ClickHouse skip granules through the bloom filter on
+  // mapKeys(Attributes); the != '' keeps empty values out.
+  const present = (param: string) =>
+    `(mapContains(${alias}.Attributes, {${param}:String}) AND ${alias}.Attributes[{${param}:String}] != '')`;
+  const params: Record<string, unknown> = {};
+  const conditions = values.map((value, i) => {
+    const keys = customMetadataStorageKeys(value);
+    params[`${paramId}_k${i}_canonical`] = keys.canonical;
+    params[`${paramId}_k${i}_lw`] = keys.legacy;
+    params[`${paramId}_k${i}_bare`] = keys.bare;
+    return `(${present(`${paramId}_k${i}_canonical`)} OR ${present(`${paramId}_k${i}_lw`)} OR ${present(`${paramId}_k${i}_bare`)})`;
+  });
+  return {
+    sql: conditions.length === 1 ? conditions[0]! : `(${conditions.join(" OR ")})`,
+    params,
+  };
+}
+
+/** {@link customMetadataKeyCondition}, matching the key's value; no key matches nothing. */
+export function customMetadataValueCondition({
+  values,
+  paramId,
+  key,
+  alias,
+}: CustomMetadataConditionInput & { key: string | undefined }): CustomMetadataCondition {
+  if (!key) return { sql: "1=0", params: {} };
+  const keys = customMetadataStorageKeys(key);
+  const valuesParam = `{${paramId}_values:Array(String)}`;
+  return {
+    sql: `(${alias}.Attributes[{${paramId}_canonical:String}] IN (${valuesParam}) OR ${alias}.Attributes[{${paramId}_lw:String}] IN (${valuesParam}) OR ${alias}.Attributes[{${paramId}_bare:String}] IN (${valuesParam}))`,
+    params: {
+      [`${paramId}_canonical`]: keys.canonical,
+      [`${paramId}_lw`]: keys.legacy,
+      [`${paramId}_bare`]: keys.bare,
+      [`${paramId}_values`]: values,
+    },
+  };
+}
+
+/** Appends a `Record<metaKey, string[]>` filter; values sent with no key match nothing. */
 export function appendMetadataValueFilterClauses({
-  attributes,
+  alias,
   rawValue,
   clauses,
   params,
   next,
 }: {
-  attributes: string;
+  alias: string;
   rawValue: AnalyticsFilterValue;
   clauses: string[];
   params: Record<string, unknown>;
   next: (prefix: string) => string;
 }): void {
-  if (typeof rawValue !== "object" || Array.isArray(rawValue)) return;
+  if (Array.isArray(rawValue)) {
+    clauses.push("1=0");
+    return;
+  }
+  if (typeof rawValue !== "object") return;
 
   for (const [metaKey, vals] of Object.entries(rawValue)) {
     if (!Array.isArray(vals) || vals.length === 0) continue;
-    const pKey = next("metaValueKey");
-    params[pKey] = metaKey;
-    const pVals = next("metaValueVals");
-    params[pVals] = vals;
-    clauses.push(`${attributes}[{${pKey}:String}] IN ({${pVals}:Array(String)})`);
+    const condition = customMetadataValueCondition({
+      values: vals,
+      paramId: next("metaValue"),
+      key: metaKey,
+      alias,
+    });
+    clauses.push(condition.sql);
+    Object.assign(params, condition.params);
   }
 }

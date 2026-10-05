@@ -7,6 +7,10 @@
 import type { FilterField } from "@langwatch/analytics-contract";
 
 import { type CHTable, tableAliases } from "./clickhouse.field-mappings.mapper.ts";
+import {
+  customMetadataKeyCondition,
+  customMetadataValueCondition,
+} from "./clickhouse.timeseries-query-shared.mapper.ts";
 
 /**
  * Result of translating an ES filter to CH WHERE clause
@@ -66,8 +70,9 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
   "metadata.thread_id": ({ values }) => translateMetadataFilter("gen_ai.conversation.id", values),
   "metadata.customer_id": ({ values }) => translateMetadataFilter("langwatch.customer_id", values),
   "metadata.labels": ({ values }) => translateLabelsFilter(values),
-  "metadata.key": ({ values }) => translateMetadataKeyFilter(values),
-  "metadata.value": ({ values, key }) => translateMetadataValueFilter(values, key),
+  "metadata.key": ({ values }) => translateCustomMetadataFilter({ field: "metadata.key", values }),
+  "metadata.value": ({ values, key }) =>
+    translateCustomMetadataFilter({ field: "metadata.value", values, key }),
   "metadata.prompt_ids": ({ values }) => translatePromptIdsFilter(values),
 
   // Trace Filters
@@ -208,37 +213,26 @@ function translateLabelsFilter(values: string[]): FilterTranslation {
 }
 
 /**
- * Translate metadata key exists filter
+ * Translate a custom metadata key or value filter with the same three storage
+ * formats trace search reads, so a graph and the trace list match the same
+ * traces. A value filter without a key matches nothing.
  */
-function translateMetadataKeyFilter(values: string[]): FilterTranslation {
+function translateCustomMetadataFilter({
+  field,
+  values,
+  key,
+}: {
+  field: "metadata.key" | "metadata.value";
+  values: string[];
+  key?: string;
+}): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const paramName = genParamName("metaKeys");
-  // Use arrayExists to check if any key exists
-  return {
-    whereClause: `arrayExists(k -> mapContains(${ts}.Attributes, k), {${paramName}:Array(String)})`,
-    requiredJoins: [],
-    params: { [paramName]: values },
-  };
-}
-
-/**
- * Translate metadata value filter (requires key)
- */
-function translateMetadataValueFilter(values: string[], key?: string): FilterTranslation {
-  const ts = tableAliases.trace_summaries;
-  if (!key) {
-    return { whereClause: "1=1", requiredJoins: [], params: {} };
-  }
-
-  // Key may have dots replaced with special char, restore them
-  const attributeKey = key.replace(/·/g, ".");
-  const paramName = genParamName("metaValue");
-
-  return {
-    whereClause: `${ts}.Attributes[{${paramName}_key:String}] IN ({${paramName}:Array(String)})`,
-    requiredJoins: [],
-    params: { [`${paramName}_key`]: attributeKey, [paramName]: values },
-  };
+  const paramId = genParamName("customMeta");
+  const { sql, params } =
+    field === "metadata.key"
+      ? customMetadataKeyCondition({ values, paramId, alias: ts })
+      : customMetadataValueCondition({ values, paramId, key, alias: ts });
+  return { whereClause: sql, requiredJoins: [], params };
 }
 
 /**

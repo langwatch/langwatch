@@ -89,6 +89,16 @@ describe("clickHouseFilterConditions", () => {
       expect(result.params).toHaveProperty("f0_k1_canonical", "metadata.environment");
     });
 
+    it("when a key is filtered, it probes the map with mapContains so the key bloom filter can skip granules", () => {
+      const builder = clickHouseFilterConditions["metadata.key"];
+      const result = builder!({ values: ["canary"], paramId: "f0" });
+
+      for (const param of ["f0_k0_canonical", "f0_k0_lw", "f0_k0_bare"]) {
+        expect(result.sql).toContain(`mapContains(ts.Attributes, {${param}:String})`);
+        expect(result.sql).toContain(`ts.Attributes[{${param}:String}] != ''`);
+      }
+    });
+
     it("when no keys are selected, it returns the no-match guard", () => {
       const builder = clickHouseFilterConditions["metadata.key"];
       const result = builder!({ values: [], paramId: "f0" });

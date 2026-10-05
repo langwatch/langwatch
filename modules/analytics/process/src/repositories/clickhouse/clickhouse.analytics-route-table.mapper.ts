@@ -275,11 +275,12 @@ const SLIM_TRACE_FILTER_FIELDS: ReadonlySet<string> = new Set<string>([
   "traces.name",
 ]);
 
-/** Slim-eval filter fields — typed columns on the slim row. */
-const SLIM_EVAL_FILTER_FIELDS: ReadonlySet<string> = new Set<string>([
-  "metadata.key",
-  "metadata.value",
-]);
+/**
+ * Slim-eval filter fields (none). The slim eval row's Attributes carry only
+ * the evaluation events' own metadata, never the trace's custom metadata, so
+ * `metadata.key` / `metadata.value` must read `evaluation_runs`.
+ */
+const SLIM_EVAL_FILTER_FIELDS: ReadonlySet<string> = new Set<string>();
 
 /**
  * Aggregations the trace rollup computes CORRECTLY: `sum`; `avg` only for
@@ -519,7 +520,10 @@ function filtersHitBlocklist(filters: PickAnalyticsTableInput["filters"]): boole
   return false;
 }
 
-function isBlocklisted(key: string): boolean {
+function isBlocklisted(rawKey: string): boolean {
+  // Filter keys arrive with `·` standing in for `.`; the builders read the
+  // dotted key, so check that one.
+  const key = rawKey.replaceAll("·", ".");
   if (PAYLOAD_BLOCKLIST_EXACT[key] === true) return true;
   for (const prefix of PAYLOAD_BLOCKLIST_PREFIXES) {
     if (key.startsWith(prefix)) return true;

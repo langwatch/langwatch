@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../../rules/trace-signal.rules.ts";
+import { buildEvalSlimTimeseriesQuery } from "../clickhouse.eval-slim-timeseries-query.mapper.ts";
 import { buildRollupTimeseriesQuery } from "../clickhouse.rollup-timeseries-query.mapper.ts";
 import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";
 
@@ -182,6 +183,42 @@ describe("buildSlimTimeseriesQuery", () => {
     });
   });
 
+  describe("when filtered by custom metadata", () => {
+    const build = (filters: Record<string, string[] | Record<string, string[]>>) =>
+      buildSlimTimeseriesQuery({
+        projectId: "tenant-slim",
+        ...baseDates,
+        series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+        timeScale: "full",
+        filters,
+      });
+
+    it("reads a metadata.key filter from all three storage formats", () => {
+      const { sql, params } = build({ "metadata.key": ["outcome"] });
+      expect(Object.values(params)).toEqual(
+        expect.arrayContaining(["metadata.outcome", "langwatch.metadata.outcome", "outcome"]),
+      );
+      expect(sql).toContain("mapContains(ta.Attributes");
+    });
+
+    it("reads a metadata.value filter from all three storage formats", () => {
+      const { params } = build({ "metadata.value": { outcome: ["ok"] } });
+      expect(Object.values(params)).toEqual(
+        expect.arrayContaining([
+          "metadata.outcome",
+          "langwatch.metadata.outcome",
+          "outcome",
+          ["ok"],
+        ]),
+      );
+    });
+
+    it("matches nothing for metadata.value values sent without a key", () => {
+      const { sql } = build({ "metadata.value": ["ok"] });
+      expect(sql).toContain("1=0");
+    });
+  });
+
   describe("when grouped by metadata.model", () => {
     // Model group-bys need per-SPAN attribution (the legacy builder's
     // span-model partition join) so buckets sum exactly to the ungrouped
@@ -222,5 +259,26 @@ describe("buildSlimTimeseriesQuery", () => {
         k.startsWith("slim_user_") && Array.isArray(v) && (v as string[]).includes("alice"),
     );
     expect(userParam).toBeDefined();
+  });
+});
+
+describe("buildEvalSlimTimeseriesQuery", () => {
+  describe("when a custom metadata filter reaches it", () => {
+    // The eval slim row carries only the evaluation events' metadata, never
+    // the trace's, so the router sends these to evaluation_runs.
+    it.each([{ "metadata.key": ["outcome"] }, { "metadata.value": { outcome: ["ok"] } }])(
+      "throws for %j: the router should have sent it to evaluation_runs",
+      (filters) => {
+        expect(() =>
+          buildEvalSlimTimeseriesQuery({
+            projectId: "tenant-eval-slim",
+            ...baseDates,
+            series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality" }],
+            timeScale: "full",
+            filters,
+          }),
+        ).toThrow(/cannot serve filter/);
+      },
+    );
   });
 });

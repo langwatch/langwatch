@@ -29,6 +29,34 @@ describe("Analytics timeseries route table", () => {
     ).toBe("trace_summaries");
   });
 
+  describe("given a metadata.key filter on a blocklisted key sent with · for .", () => {
+    it("falls back to trace_summaries (the builders read the dotted key)", () => {
+      expect(
+        pickAnalyticsTable({
+          series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+          filters: { "metadata.key": ["input·value"] },
+        }),
+      ).toBe("trace_summaries");
+    });
+  });
+
+  describe("given an evaluation metric filtered by custom metadata", () => {
+    // The eval slim row carries only the evaluation events' metadata, never
+    // the trace's, so it would count nothing.
+    it.each([{ "metadata.key": ["outcome"] }, { "metadata.value": { outcome: ["ok"] } }])(
+      "routes %j to evaluation_runs",
+      (filters) => {
+        // Grouped by label so the unfiltered series lands on the eval slim.
+        const query = {
+          series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality" as const }],
+          groupBy: "evaluations.evaluation_label",
+        };
+        expect(pickAnalyticsTable(query)).toBe("evaluation_analytics");
+        expect(pickAnalyticsTable({ ...query, filters })).toBe("evaluation_runs");
+      },
+    );
+  });
+
   describe("given a query carrying negateFilters", () => {
     // The fast-path builders do not implement filter negation — serving the
     // query from slim/rollup would silently return NON-negated results.

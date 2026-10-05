@@ -5,12 +5,23 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  customMetadataStorageKeys,
   isTraceMetadataKeyEditable,
   traceAttributeKeyForMetadata,
   mapAttributeToTraceMetadataKey,
 } from "../trace-metadata-editable-keys.ts";
 
 describe("trace metadata editable keys", () => {
+  describe("given a custom metadata filter key with · standing in for .", () => {
+    it("returns the canonical, legacy and bare spellings of the dotted key", () => {
+      expect(customMetadataStorageKeys("nested·key")).toEqual({
+        canonical: "metadata.nested.key",
+        legacy: "langwatch.metadata.nested.key",
+        bare: "nested.key",
+      });
+    });
+  });
+
   describe("given the metadata keys a trace can carry", () => {
     describe("when asking which ones a correction may replace", () => {
       /** @scenario "Which metadata keys a reviewer may correct is one rule" */

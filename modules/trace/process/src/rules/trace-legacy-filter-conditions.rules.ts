@@ -3,6 +3,7 @@ import {
   type AnalyticsFilterValue as FilterParam,
   type FilterField,
 } from "@langwatch/analytics-contract";
+import { customMetadataStorageKeys } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 /** One filter field's WHERE fragment and the parameters it binds. */
@@ -99,19 +100,19 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
   }),
   "metadata.key": ({ values, paramId }) => {
     if (values.length === 0) return { sql: "1=0", params: {} };
-    // Check all three legacy key formats for each metadata key:
-    // - metadata.{key} (canonical, from Python SDK canonicalization)
-    // - langwatch.metadata.{key} (legacy REST collector)
-    // - {key} (legacy bare OTEL resource attribute)
+    // mapContains lets ClickHouse skip granules through the bloom filter on
+    // mapKeys(Attributes); the != '' keeps empty values out.
+    const present = (param: string) =>
+      `(mapContains(ts.Attributes, {${param}:String}) AND ts.Attributes[{${param}:String}] != '')`;
     const conditions = values.map((_v, i) => {
-      return `(ts.Attributes[{${paramId}_k${i}_canonical:String}] != '' OR ts.Attributes[{${paramId}_k${i}_lw:String}] != '' OR ts.Attributes[{${paramId}_k${i}_bare:String}] != '')`;
+      return `(${present(`${paramId}_k${i}_canonical`)} OR ${present(`${paramId}_k${i}_lw`)} OR ${present(`${paramId}_k${i}_bare`)})`;
     });
     const params: Record<string, unknown> = {};
     values.forEach((v, i) => {
-      const rawKey = v.replaceAll("·", ".");
-      params[`${paramId}_k${i}_canonical`] = `metadata.${rawKey}`;
-      params[`${paramId}_k${i}_lw`] = `langwatch.metadata.${rawKey}`;
-      params[`${paramId}_k${i}_bare`] = rawKey;
+      const keys = customMetadataStorageKeys(v);
+      params[`${paramId}_k${i}_canonical`] = keys.canonical;
+      params[`${paramId}_k${i}_lw`] = keys.legacy;
+      params[`${paramId}_k${i}_bare`] = keys.bare;
     });
     return {
       sql: conditions.length === 1 ? conditions[0]! : `(${conditions.join(" OR ")})`,
@@ -120,17 +121,13 @@ export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuil
   },
   "metadata.value": ({ values, paramId, key }) => {
     if (!key) return { sql: "1=0", params: {} };
-    const rawKey = key.replaceAll("·", ".");
-    // Match all three legacy key formats for existing data:
-    // - metadata.{key} (canonical, from Python SDK canonicalization)
-    // - langwatch.metadata.{key} (legacy REST collector)
-    // - {key} (legacy bare OTEL resource attribute)
+    const keys = customMetadataStorageKeys(key);
     return {
       sql: `(ts.Attributes[{${paramId}_canonical:String}] IN ({${paramId}_values:Array(String)}) OR ts.Attributes[{${paramId}_lw:String}] IN ({${paramId}_values:Array(String)}) OR ts.Attributes[{${paramId}_bare:String}] IN ({${paramId}_values:Array(String)}))`,
       params: {
-        [`${paramId}_canonical`]: `metadata.${rawKey}`,
-        [`${paramId}_lw`]: `langwatch.metadata.${rawKey}`,
-        [`${paramId}_bare`]: rawKey,
+        [`${paramId}_canonical`]: keys.canonical,
+        [`${paramId}_lw`]: keys.legacy,
+        [`${paramId}_bare`]: keys.bare,
         [`${paramId}_values`]: values,
       },
     };

@@ -4,17 +4,11 @@
  * since their column sets differ too much to share one parameterised builder.
  */
 
-import type {
-  AnalyticsAggregation,
-  AnalyticsFilterValue,
-  BuiltAnalyticsQuery,
-} from "@langwatch/analytics-contract";
+import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import {
-  appendMetadataValueFilterClauses,
-  collectStringValues,
   dateTrunc,
   type EvalMetricKey,
   hasFilterValues,
@@ -143,70 +137,21 @@ function dedupedSlim(alias: string, dateClause: string): string {
 const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
 
 /**
- * Translate the small slice of filter fields the eval slim natively
- * serves into a WHERE fragment + params. Anything else MUST have been
- * rejected by `pickAnalyticsTable` already.
+ * The eval slim serves no filter fields: its Attributes carry only the
+ * evaluation events' own metadata, never the trace's, so `pickAnalyticsTable`
+ * routes every filtered query to `evaluation_runs`. A filter here is a routing bug.
  */
 function buildEvalSlimFilterClauses(filters: TimeseriesQueryInput["filters"]): {
   whereClause: string;
   params: Record<string, unknown>;
 } {
-  if (!filters) return { whereClause: "", params: {} };
-
-  const clauses: string[] = [];
-  const params: Record<string, unknown> = {};
-  let paramIdx = 0;
-  const next = (prefix: string) => `evalslim_${prefix}_${paramIdx++}`;
-
-  for (const [field, rawValue] of Object.entries(filters)) {
-    if (!hasFilterValues(rawValue)) continue;
-    appendEvalSlimFilterClause({ field, rawValue, clauses, params, next });
+  for (const [field, value] of Object.entries(filters ?? {})) {
+    if (!hasFilterValues(value)) continue;
+    throw new Error(
+      `Eval slim builder cannot serve filter "${field}". The router should have routed this to evaluation_runs.`,
+    );
   }
-
-  const whereClause = clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
-  return { whereClause, params };
-}
-
-function appendEvalSlimFilterClause({
-  field,
-  rawValue,
-  clauses,
-  params,
-  next,
-}: {
-  field: string;
-  rawValue: AnalyticsFilterValue;
-  clauses: string[];
-  params: Record<string, unknown>;
-  next: (prefix: string) => string;
-}): void {
-  switch (field) {
-    case "metadata.key": {
-      const keys = collectStringValues(rawValue);
-      if (keys.length === 0) break;
-      const exprs = keys.map((k, i) => {
-        const p = next(`metaKey${i}`);
-        params[p] = k;
-        return `mapContains(${ea}.Attributes, {${p}:String})`;
-      });
-      clauses.push(`(${exprs.join(" OR ")})`);
-      break;
-    }
-    case "metadata.value": {
-      appendMetadataValueFilterClauses({
-        attributes: `${ea}.Attributes`,
-        rawValue,
-        clauses,
-        params,
-        next,
-      });
-      break;
-    }
-    default:
-      throw new Error(
-        `Eval slim builder cannot serve filter "${field}". The router should have routed this to evaluation_runs.`,
-      );
-  }
+  return { whereClause: "", params: {} };
 }
 
 /**
