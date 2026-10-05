@@ -6817,6 +6817,9 @@ importers:
       '@langwatch/metric-process':
         specifier: workspace:*
         version: link:../../metric/process
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -9022,6 +9025,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       zod:
         specifier: 'catalog:'
         version: 4.6.5
