@@ -11,7 +11,6 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -37,6 +36,7 @@ import {
   TENANTS,
   USER_ID,
 } from "./support/budget-overview.fixture.ts";
+import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
 import { TestFeatureFlags } from "./support/test-feature-flag-service.ts";
 

@@ -11,7 +11,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
+import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";
 

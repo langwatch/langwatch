@@ -11,11 +11,11 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import type {
   BucketSpend,
   GatewayBudgetSpendRepository,
 } from "../repositories/gateway-budget-spend.repository.ts";
+import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 
 function stubTemplate(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
   return {

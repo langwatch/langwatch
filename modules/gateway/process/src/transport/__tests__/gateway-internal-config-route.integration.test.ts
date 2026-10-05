@@ -9,10 +9,10 @@ import { nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { PrismaGatewayAdapter } from "../../__tests__/support/postgres.gateway-service.ts";
 import { seededCustomKeys } from "../../__tests__/support/seeded-custom-keys.ts";
 import { PostgresVirtualKeyAdapter } from "../../__tests__/testing.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
-import { PrismaGatewayAdapter } from "../../app/gateway-composition.build.ts";
 import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service.ts";
 import type { VirtualKeyService } from "../../services/virtual-key.service.ts";

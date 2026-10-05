@@ -15,7 +15,6 @@ export { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trp
 export { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 export { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
 export { gatewaySessionFact, virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
-export type { GatewayPersistence } from "./app/gateway-composition.build.ts";
 export type {
   GatewayUsageProjects,
   GatewayUsageVirtualKeys,

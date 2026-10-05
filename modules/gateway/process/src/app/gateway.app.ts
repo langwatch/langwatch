@@ -19,6 +19,7 @@ import type {
 } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
+  virtualKeyBudgetInputSchema,
   type GatewayBudgetOverviewForUser,
   type GatewayAuthorizedKeyCaller,
   type GatewayAuthorizedVirtualKeyCaller,
@@ -167,35 +168,30 @@ import {
 } from "../eventing/gateway-spend.pipeline.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
 import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
+import type { GatewayBudgetRepository } from "../repositories/gateway-budget.repository.ts";
 import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 import type { GatewayOpenAdmissionsRepository } from "../repositories/gateway-open-admissions.repository.ts";
 import type { GatewayPrincipalSpendRepository } from "../repositories/gateway-principal-spend.repository.ts";
 import type { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
 import type { GatewaySpendFoldCacheRepository } from "../repositories/gateway-spend-fold-cache.repository.ts";
+import type { GatewaySpendScopeRepository } from "../repositories/gateway-spend-scope.repository.ts";
 import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
-import { PrismaGatewayConnectUpstreamRepository } from "../repositories/prisma/prisma.gateway-connect-upstream.repository.ts";
-import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
-import { PrismaGatewayInternalStoreRepository } from "../repositories/prisma/prisma.gateway-internal-store.repository.ts";
-import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
-import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
-import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
-import { PrismaGatewayTraceExportKeyRepository } from "../repositories/prisma/prisma.gateway-trace-export-key.repository.ts";
-import {
-  type GatewayAgentCacheEntryStore,
-  RedisGatewayAgentCacheEntryRepository,
-} from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
-import { RedisGatewayBudgetChangeDedupeRepository } from "../repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
-import { RedisGatewaySpendFoldCacheRepository } from "../repositories/redis/redis.gateway-spend-fold-cache.repository.ts";
+import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
+import { LiveGatewayRepositories } from "../repositories/live/live.gateway.repositories.ts";
+import type { GatewayAgentCacheEntryStore } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
 import { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
 import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
 import {
   GatewayAgentCacheService,
   type GatewayAgentCacheEncryption,
 } from "../services/gateway-agent-cache.service.ts";
+import { GatewayApplicableBudgetsService } from "../services/gateway-applicable-budgets.service.ts";
+import { GatewayAuthzScopePermissionsService } from "../services/gateway-authz-scope-permissions.service.ts";
 import { GatewayBudgetChangeDedupeService } from "../services/gateway-budget-change-dedupe.service.ts";
 import { GatewayBudgetCrossingService } from "../services/gateway-budget-crossing.service.ts";
 import { GatewayBudgetLedgerService } from "../services/gateway-budget-ledger.service.ts";
 import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
+import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
 import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import { GatewayConnectUpstreamService } from "../services/gateway-connect-upstream.service.ts";
@@ -206,40 +202,60 @@ import { GatewayElevenLabsWebhookService } from "../services/gateway-elevenlabs-
  * as {@link GatewayActor}, an argument rather than read from session/request, so one check
  * serves both a browser session and an API key.
  */
-import type { GatewayEndUserCap } from "../services/gateway-end-user-caps.service.ts";
-import { GatewayGovernanceEventsService } from "../services/gateway-governance-events.service.ts";
+import {
+  GatewayEndUserCapsService,
+  type GatewayEndUserCap,
+} from "../services/gateway-end-user-caps.service.ts";
+import {
+  GatewayGovernanceEventsService,
+  type GatewayGovernanceSignals,
+} from "../services/gateway-governance-events.service.ts";
 import { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
+import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
 import { GatewayInternalDoorService } from "../services/gateway-internal-door.service.ts";
 import { GatewayInternalIdentityService } from "../services/gateway-internal-identity.service.ts";
 import { GatewayInternalProtocolService } from "../services/gateway-internal-protocol.service.ts";
 import type { GatewaySpendCommandSender } from "../services/gateway-internal-protocol.service.ts";
 import { GatewayJwtService } from "../services/gateway-jwt.service.ts";
+import { GatewayOrganizationDirectoryService } from "../services/gateway-organization-directory.service.ts";
 import {
   GatewayRealtimeSessionReconciliationService,
   realtimeSessionReconciliationConfig,
 } from "../services/gateway-realtime-session-reconciliation.service.ts";
 import { GatewayRealtimeSessionSweepService } from "../services/gateway-realtime-session-sweep.service.ts";
 import type { GatewayRealtimeSessionCollaborators } from "../services/gateway-realtime-session.service.ts";
+import {
+  GatewayScopeResolutionService,
+  type GatewayPlatformProviders,
+} from "../services/gateway-scope-resolution.service.ts";
 import { GatewaySpendDebitService } from "../services/gateway-spend-debit.service.ts";
-import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
+import { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import {
   GatewaySpendReconciliationService,
   type GatewaySpendScope,
   type GatewaySpendScopeQuery,
 } from "../services/gateway-spend-reconciliation.service.ts";
 import { GatewaySpendScopeService } from "../services/gateway-spend-scope.service.ts";
-import type {
+import {
   GatewayUsageService,
-  UsageWindow,
+  type UsageWindow,
 } from "../services/gateway-spend-summary.service.ts";
 import { GatewayTraceExportKeyService } from "../services/gateway-trace-export-key.service.ts";
-import type {
-  VirtualKeyCamelDto,
-  VirtualKeySnakeDto,
+import {
+  GatewayVirtualKeyDtoService,
+  type VirtualKeyCamelDto,
+  type VirtualKeySnakeDto,
 } from "../services/gateway-virtual-key-dto.service.ts";
-import type { GatewayService } from "../services/gateway.service.ts";
+import { GatewayService } from "../services/gateway.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
 import { TwilioCredentialService } from "../services/twilio-credential.service.ts";
+import {
+  VirtualKeyAuthorizationService,
+  type VirtualKeyActor,
+} from "../services/virtual-key-authorization.service.ts";
+import { VirtualKeyCryptoService } from "../services/virtual-key-crypto.service.ts";
+import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service.ts";
+import { VirtualKeyService } from "../services/virtual-key.service.ts";
 import type {
   GatewayInternalBucketRequest,
   GatewayInternalChangesRequest,
@@ -251,10 +267,6 @@ import type {
   GatewayInternalSessionRequest,
 } from "../transport/gateway-internal.rest.ts";
 import type { GatewaySpendDoorApi } from "../transport/gateway-spend.rest.ts";
-import {
-  buildGatewayControlPlane,
-  GatewayEndUserCapsAdapter,
-} from "./gateway-composition.build.ts";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped
@@ -702,7 +714,8 @@ type GatewaySpendDefinition = StaticPipelineDefinition<
  * two resolutions run on, and how long after a request an outcome may still arrive.
  */
 export type GatewaySpendCollaborators = Readonly<{
-  prisma: ProcessMembers["prisma"];
+  spendScope: GatewaySpendScopeRepository;
+  budgets: GatewayBudgetRepository;
   settlementGraceMs: number;
 }>;
 
@@ -720,6 +733,359 @@ export type GatewayBudgetOverviewDeps = Readonly<{
 const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
   findBudget: async () => null,
 };
+
+const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
+
+/** The other features the gateway control plane reaches, one by one. */
+type GatewayControlPlanePeers = Readonly<{
+  /** The permission service every other surface on this process authorizes with. */
+  authz: AuthzApi;
+  /** The project directory the tenancy graph composed. */
+  projects: ProjectApi;
+  /** The organization directory: existence, membership, groups and their members. */
+  organizations: OrganizationApi;
+  /** The evaluators a guardrail rule runs, as the budget-decision store reads them. */
+  evaluators: EvaluatorApi;
+  /** The monitors a guardrail attachment names. */
+  monitors: MonitorApi;
+  /** The deployment's own providers, which a license's managed key dispatches on. */
+  platformProviders: GatewayPlatformProviders;
+  /** The per-virtual-key spend the usage surfaces read, one tenant at a time. */
+  traces: Pick<
+    TraceApi,
+    "findSpendByAttributeValue" | "findAttributeUsageBuckets" | "findAttributedTraces"
+  >;
+}>;
+
+type GatewayControlPlaneOptions = Readonly<{
+  repositories: GatewayRepositories;
+  peers: GatewayControlPlanePeers;
+  /** The HMAC key a virtual key's stored secret is hashed under. */
+  virtualKeyPepper: string | undefined;
+  /** Where a virtual key's lifecycle is announced, where the deployment composed a ledger. */
+  governanceSignals?: GatewayGovernanceSignals | undefined;
+}>;
+
+type GatewayControlPlane = GatewayAppDependencies &
+  Readonly<{
+    internalVirtualKeys: VirtualKeyService;
+    internalChanges: GatewayChangeEventsRepository;
+    internalScopeResolution: GatewayScopeResolutionService;
+    /** The spend ledger the gateway_spend fold writes. */
+    spendLedger: GatewaySpendEventsRepository;
+    /** The settlement sweeper's read of every server's open admissions. */
+    openAdmissions: GatewayOpenAdmissionsRepository;
+  }>;
+
+/**
+ * Composes the gateway control plane over the module's repositories: the
+ * whole of what {@link GatewayModule}'s core surface answers from.
+ */
+function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayControlPlane {
+  const { repositories, peers } = options;
+  const { projects, organizations } = peers;
+  const permissions = GatewayAuthzScopePermissionsService.create(peers.authz);
+  const organizationFacts = GatewayOrganizationDirectoryService.create({ organizations });
+  const virtualKeyAuthorization = VirtualKeyAuthorizationService.create({
+    directory: repositories.virtualKeyAuthorization,
+    organizations,
+    projects,
+  });
+  const scopeResolution = GatewayScopeResolutionService.create({
+    repository: repositories.scopeResolution,
+    platformProviders: peers.platformProviders,
+    projects,
+  });
+  const changes = repositories.changeEvents;
+  const virtualKeys = VirtualKeyService.create({
+    transactions: repositories.transactions,
+    keyBudgets: repositories.keyBudgets,
+    scopeResolution,
+    projects,
+    repository: repositories.virtualKeys,
+    changeEvents: changes,
+    auditLog: repositories.audit,
+    crypto: VirtualKeyCryptoService.create({ pepper: options.virtualKeyPepper }),
+    ...(options.governanceSignals ? { governanceSignals: options.governanceSignals } : {}),
+  });
+  const { budgetSpend, principalSpend, openAdmissions } = repositories;
+  const spendLedger = repositories.spendEvents;
+  const spendEvents = GatewaySpendEventsService.create(spendLedger);
+  // The cache-rule and guardrail catalogues live on the one budget service, so
+  // a rule written through one door is the rule every other door reads.
+  const budgetDecisions = GatewayService.create({
+    repository: repositories.budgets,
+    projects,
+    organizations,
+    cacheRules: GatewayCacheRuleService.create(repositories.cacheRules),
+    guardrails: GatewayGuardrailService.create({
+      repository: repositories.guardrails,
+      evaluators: peers.evaluators,
+      monitors: peers.monitors,
+      projects,
+      audit: repositories.audit,
+    }),
+  });
+  // The usage rollup labels each key the ledger reported spend against, which
+  // is a repository read; `virtualKeys` above is the operations service.
+  const usage = GatewayUsageService.create({
+    projects,
+    virtualKeys: repositories.virtualKeys,
+    chRepo: budgetSpend,
+    traces: peers.traces,
+  });
+
+  return {
+    virtualKeys,
+    budgetDecisions,
+    budgetSpend,
+    changeEvents: changes,
+    principalSpend,
+    spendEvents,
+    projects,
+    usage,
+    // The repositories hold a spend ledger in every tier, so the spend source
+    // is present whenever the control plane is.
+    spendSourceAvailable: true,
+    schemas: { virtualKeyBudgetInput: virtualKeyBudgetInputSchema },
+    internalVirtualKeys: virtualKeys,
+    internalChanges: changes,
+    internalScopeResolution: scopeResolution,
+    spendLedger,
+    openAdmissions,
+
+    organizationIdForProject: async (projectId) => {
+      const organizationId = await projects.findOrganizationId(projectId);
+      if (!organizationId) throw new Error(`project ${projectId} missing team`);
+
+      return organizationId;
+    },
+    // The refusal the deleted composition raised, unchanged: the anchor is
+    // read from both doors and a second taxonomy here would change what a
+    // tRPC caller already sees.
+    assertOrganizationExists: (organizationId) => organizationFacts.assertExists(organizationId),
+    resolveProviderLabels: (budgets) =>
+      repositories.providerLabels.resolveProviderLabels([...budgets]),
+    listGroupTargets: (organizationId) =>
+      repositories.organizationDirectory.findGroupTargets(organizationId),
+    groupMemberCounts: (budgets) => repositories.organizationDirectory.groupMemberCounts(budgets),
+    // The label per key a page of spend rows carries, read through this
+    // feature's OWN persistence rather than by a key-table `findMany`.
+    resolveVirtualKeyNames: (input) => virtualKeys.resolveNames(input),
+    isOrganizationMember: (input) => organizationFacts.isMember(input),
+    // A scoped API key acts as its owning user; a legacy project key carries
+    // none, so it acts as a stable machine principal for its project, which
+    // keeps an audit row traceable back to the credential that wrote it.
+    actorForCredential: ({ projectId, credential }) => {
+      if (credential.kind === "user") {
+        return {
+          actor: { kind: "cliAccessToken", userId: credential.userId, projectId },
+          actorUserId: credential.userId,
+        } satisfies { actor: VirtualKeyActor; actorUserId: string };
+      }
+      return credential.kind === "apiKey"
+        ? {
+            actor: {
+              kind: "apiKey",
+              apiKeyId: credential.apiKeyId,
+              userId: credential.userId,
+              organizationId: credential.organizationId,
+            } satisfies VirtualKeyActor,
+            actorUserId: credential.userId ?? `svc_${projectId}`,
+          }
+        : {
+            actor: { kind: "legacyProjectKey", projectId } satisfies VirtualKeyActor,
+            actorUserId: `svc_${projectId}`,
+          };
+    },
+
+    listVisibleVirtualKeys: async ({ organizationId, userId }) => {
+      const membership = await virtualKeyAuthorization.loadMembershipSet({
+        organizationId,
+        userId,
+      });
+
+      return (await virtualKeys.getAll(organizationId)).filter((virtualKey) =>
+        virtualKeyAuthorization.isVisibleToMembership(membership, virtualKey.scopes),
+      );
+    },
+    isVirtualKeyVisible: async ({ organizationId, userId, virtualKey }) =>
+      virtualKeyAuthorization.isVisibleToMembership(
+        await virtualKeyAuthorization.loadMembershipSet({ organizationId, userId }),
+        virtualKey.scopes,
+      ),
+    getVisibleVirtualKeyForUser: async ({ organizationId, id, userId }) =>
+      virtualKeyAuthorization.getVisibleVk(
+        virtualKeys,
+        await virtualKeyAuthorization.loadMembershipSet({ organizationId, userId }),
+        { id, organizationId },
+      ),
+    visibleInProject: async ({ projectId, virtualKeys: page }) => {
+      const membership = await virtualKeyAuthorization.membershipOfProject(projectId);
+
+      return page.filter((virtualKey) =>
+        virtualKeyAuthorization.isVisibleToMembership(membership, virtualKey.scopes),
+      );
+    },
+    heldOnAnyScope: ({ actor, virtualKeys: page, permission }) =>
+      virtualKeyAuthorization.heldByActor(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        page,
+        permission,
+      ),
+    getExistingVirtualKey: ({ organizationId, id }) =>
+      virtualKeyAuthorization.getExistingVk(virtualKeys, id, organizationId),
+
+    assertCanManageAllScopes: ({ actor, scopes }) =>
+      virtualKeyAuthorization.assertActorCanManageAllScopes(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        [...scopes],
+      ),
+    assertCanCreateScopes: ({ actor, scopes, callerProjectId }) =>
+      virtualKeyAuthorization.assertActorCanCreateScopes(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        { scopes: [...scopes], callerProjectId },
+      ),
+    assertCanOperateOnAnyScope: ({ actor, scopes, permission }) =>
+      virtualKeyAuthorization.assertActorCanOperateOnAnyScope(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        [...scopes],
+        permission,
+      ),
+    assertCanOperateAtOrganization: ({ actor, organizationId, permission }) =>
+      virtualKeyAuthorization.assertActorCanOperateAtOrganization(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        { organizationId, permission },
+      ),
+    assertScopesBelongToOrganization: ({ organizationId, scopes }) =>
+      virtualKeyAuthorization.assertScopesBelongToOrg({ organizationId, scopes: [...scopes] }),
+    assertTraceProjectBelongsToOrganization: ({ organizationId, traceProjectId }) =>
+      virtualKeyAuthorization.assertTraceProjectBelongsToOrg({ organizationId, traceProjectId }),
+    assertGuardrailAttachmentsAllowed: ({
+      actor,
+      organizationId,
+      virtualKeyId,
+      scopes,
+      traceProjectId,
+      attachments,
+    }) =>
+      virtualKeyAuthorization.assertGuardrailAttachmentsAllowed(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        {
+          organizationId,
+          vkId: virtualKeyId,
+          inputScopes: scopes ? [...scopes] : undefined,
+          traceProjectId,
+        },
+        attachments ? [...attachments] : undefined,
+      ),
+
+    // One read of the destinations for a whole page, in both casings: a
+    // listing must not cost a query per key to say where its traffic goes.
+    toVirtualKeyCamelDtos: async ({ virtualKeys: page }) => {
+      const facts = await virtualKeyDtos.loadTraceDestinationFacts({
+        projects,
+        virtualKeys: [...page],
+      });
+
+      return page.map((virtualKey) => virtualKeyDtos.toVirtualKeyCamelDto({ virtualKey, facts }));
+    },
+    toVirtualKeySnakeDtos: async ({ virtualKeys: page }) => {
+      const facts = await virtualKeyDtos.loadTraceDestinationFacts({
+        projects,
+        virtualKeys: [...page],
+      });
+
+      return page.map((virtualKey) => virtualKeyDtos.toVirtualKeySnakeDto({ virtualKey, facts }));
+    },
+    listApplicableBudgets: ({ target }) =>
+      GatewayApplicableBudgetsService.create({
+        budgetDecisions,
+        providerLabels: repositories.providerLabels,
+      }).resolveApplicableBudgetsForDraftKey(
+        projects,
+        { ...target, scopes: [...target.scopes] },
+        budgetSpend,
+      ),
+    loadDirectBudgetsForKeys: ({ organizationId, virtualKeyIds, now }) =>
+      VirtualKeyDirectBudgetService.create({
+        repository: repositories.directBudgets,
+        projects,
+      }).loadDirectBudgetsForKeys({
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        chRepo: budgetSpend,
+        now,
+      }),
+    spendByVirtualKey: ({ organizationId, virtualKeyIds, window }) =>
+      usage.spendByVirtualKey({
+        organizationId,
+        virtualKeyIds: [...virtualKeyIds],
+        window,
+      }),
+  };
+}
+
+/**
+ * The caller as the virtual-key authorization vocabulary names them,
+ * whichever door they arrived through.
+ */
+function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
+  if (typeof actor !== "object" || actor === null) {
+    return { kind: "session", session: null };
+  }
+  if (!("kind" in actor)) {
+    return { kind: "session", session: extractSessionActor(actor) };
+  }
+  if (isApiKeyActor(actor)) {
+    return {
+      kind: "apiKey",
+      apiKeyId: actor.apiKeyId,
+      userId: actor.userId,
+      organizationId: actor.organizationId,
+    };
+  }
+  if (actor.kind === "cliAccessToken") {
+    const userId = "userId" in actor ? actor.userId : null;
+    const projectId = "projectId" in actor ? actor.projectId : null;
+    if (typeof userId === "string" && typeof projectId === "string") {
+      return { kind: "cliAccessToken", userId, projectId };
+    }
+  }
+  if (
+    actor.kind === "legacyProjectKey" &&
+    "projectId" in actor &&
+    typeof actor.projectId === "string"
+  ) {
+    return { kind: "legacyProjectKey", projectId: actor.projectId };
+  }
+
+  return { kind: "session", session: null };
+}
+
+/** Whether the actor is an API key with every member the gateway reads, each well-typed. */
+function isApiKeyActor(actor: {
+  kind: unknown;
+}): actor is { kind: "apiKey"; apiKeyId: string; organizationId: string; userId: string | null } {
+  if (actor.kind !== "apiKey") return false;
+  if (!("apiKeyId" in actor) || typeof actor.apiKeyId !== "string") return false;
+  if (!("organizationId" in actor) || typeof actor.organizationId !== "string") return false;
+  if (!("userId" in actor)) return false;
+  return typeof actor.userId === "string" || actor.userId === null;
+}
+
+/**
+ * The one member the authorization vocabulary reads off a browser session: the
+ * signed-in person's id.
+ */
+function extractSessionActor(value: object): { user: { id: string } } | null {
+  if (!("user" in value)) return null;
+  const user = value.user;
+  if (typeof user !== "object" || user === null) return null;
+  if (!("id" in user) || typeof user.id !== "string") return null;
+
+  return { user: { id: user.id } };
+}
 
 type GatewaySetup = FeatureSetup<
   typeof GatewayModule.dependencies,
@@ -807,9 +1173,13 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     const governanceEvents = GatewayGovernanceEventsService.create({
       projects: setup.dependencies.projects,
     });
-    const controlPlane = buildGatewayControlPlane({
+    const repositories = LiveGatewayRepositories.create({
       prisma: setup.members.prisma,
       clickhouse: setup.members.clickhouse,
+      redis: setup.members.redis,
+    });
+    const controlPlane = gatewayControlPlane({
+      repositories,
       peers: {
         authz: setup.dependencies.authz,
         projects: setup.dependencies.projects,
@@ -827,7 +1197,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     // sweeper carry one answer. `setup.config` is undefined only in a test stub.
     const graceMs = settlementGraceMs(setup.config?.spendSettlementGraceMs);
     const connectUpstream = GatewayConnectUpstreamService.create({
-      repository: PrismaGatewayConnectUpstreamRepository.create(setup.members.prisma),
+      repository: repositories.connectUpstream,
       cipher: setup.members.encryption,
     });
     const spendCommands: Record<string, GatewaySpendCommandSender | undefined> = {};
@@ -836,7 +1206,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       rating: ModelCatalogGatewaySpendRatingService.create(),
     };
     const realtimeSessions: GatewayRealtimeSessionCollaborators = {
-      sessions: PrismaGatewayRealtimeSessionRepository.create({ database: setup.members.prisma }),
+      sessions: repositories.realtimeSessions,
       spendRating: spend.rating,
       // The senders `connectSpend` fills once the pipeline registers, read at call time.
       spendConfirmation: {
@@ -854,21 +1224,19 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       budgetDecisions: controlPlane.budgetDecisions,
       modelProviders: setup.dependencies.modelProviders,
       assembly: GatewayConfigAssemblyService.create({
-        repository: PrismaGatewayScopeResolutionRepository.create({
-          database: setup.members.prisma,
-        }),
+        repository: repositories.scopeResolution,
         platformProviders: setup.dependencies.modelProviders,
         projects: setup.dependencies.projects,
       }),
       connectUpstream,
       traceExportKeys: GatewayTraceExportKeyService.create({
-        repository: PrismaGatewayTraceExportKeyRepository.create(setup.members.prisma),
+        repository: repositories.traceExportKeys,
         cipher: setup.members.encryption,
         apiKeys: setup.dependencies.apiKeys,
       }),
     });
     const guardrails = GatewayGuardrailEvaluationService.create({
-      repository: PrismaGatewayGuardrailRepository.create(setup.members.prisma),
+      repository: repositories.guardrails,
       monitors: setup.dependencies.monitors,
       evaluations: setup.dependencies.evaluations,
     });
@@ -881,7 +1249,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       virtualKeys: controlPlane.internalVirtualKeys,
       projects: setup.dependencies.projects,
       jwt: secrets.jwtSecret ? GatewayJwtService.create({ secret: secrets.jwtSecret }) : void 0,
-      store: PrismaGatewayInternalStoreRepository.create({ database: setup.members.prisma }),
+      store: repositories.internalStore,
       changes: controlPlane.internalChanges,
       config,
       budgetSpend: controlPlane.budgetSpend,
@@ -895,7 +1263,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       members: {
         ...controlPlane,
         agentCache: {
-          store: RedisGatewayAgentCacheEntryRepository.create(setup.members.redis),
+          store: repositories.agentCache,
           encryption: setup.members.encryption,
         },
       },
@@ -922,14 +1290,12 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
         commands: spendCommands,
         openAdmissions: controlPlane.openAdmissions,
         settlementGraceMs: graceMs,
-        foldCache: RedisGatewaySpendFoldCacheRepository.create(setup.members.redis),
+        foldCache: repositories.spendFoldCache,
         debits: controlPlane.budgetSpend
           ? GatewaySpendDebitService.create({
               budgets: controlPlane.budgetDecisions,
               spend: controlPlane.budgetSpend,
-              dedupe: GatewayBudgetChangeDedupeService.create(
-                RedisGatewayBudgetChangeDedupeRepository.create(setup.members.redis),
-              ),
+              dedupe: GatewayBudgetChangeDedupeService.create(repositories.budgetChangeDedupe),
               changes: controlPlane.changeEvents,
               crossings: GatewayBudgetCrossingService.create({
                 budgets: controlPlane.budgetDecisions,
@@ -940,7 +1306,8 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
           : void 0,
       },
       spend: {
-        prisma: setup.members.prisma,
+        spendScope: repositories.spendScope,
+        budgets: repositories.budgets,
         settlementGraceMs: graceMs,
       },
       budgetOverviewDeps: {
@@ -1341,9 +1708,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     // a fresh one per request would resolve every filter from cold.
     this.#spendScope ??= GatewaySpendScopeService.create({
       projects: this.#dependencies.projects,
-      virtualKeys: PrismaGatewaySpendScopeRepository.create({
-        database: this.#spendCollaborators.prisma,
-      }),
+      virtualKeys: this.#spendCollaborators.spendScope,
     });
 
     return this.#spendScope.resolveSpendScope(input);
@@ -1359,8 +1724,8 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   }): Promise<GatewayEndUserCap[]> {
     const { budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId } = input;
 
-    return GatewayEndUserCapsAdapter.create({
-      database: this.#spendCollaborators.prisma,
+    return GatewayEndUserCapsService.create({
+      budgets: this.#spendCollaborators.budgets,
       spend: budgetRepository,
     }).forEndUser({
       organizationId,

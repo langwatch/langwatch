@@ -5,7 +5,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { MemoryGatewayAgentCacheEntryRepository } from "../../repositories/redis/redis.gateway-agent-cache.repository.ts";
+import { MemoryGatewayAgentCacheEntryRepository } from "../../repositories/memory/memory.gateway-agent-cache.repository.ts";
 import { GatewayAgentCacheService } from "../../services/gateway-agent-cache.service.ts";
 import { agentCacheRest } from "../agent-cache.rest.ts";
 

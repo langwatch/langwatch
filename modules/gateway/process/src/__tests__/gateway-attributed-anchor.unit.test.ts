@@ -4,8 +4,8 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import { GatewayScopeOrgMismatchError } from "../index.ts";
+import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 
 /**
  * The process's own composition, over the fake database.

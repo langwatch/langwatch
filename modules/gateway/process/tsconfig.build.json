@@ -12,6 +12,7 @@
     "./src/index.ts",
     "./src/__tests__/testing.ts",
     "./src/__tests__/support/postgres.virtual-key.ts",
+    "./src/__tests__/support/postgres.gateway-service.ts",
     "./src/services/gateway-realtime-session-reconciliation.service.ts",
     "./src/repositories/prisma/prisma.gateway-change-event.repository.ts",
     "./src/repositories/prisma/prisma.gateway-audit.repository.ts",

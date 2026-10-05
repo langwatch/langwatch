@@ -1,21 +1,26 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import {
+  GatewayOrganizationDirectoryRepository,
+  type GatewayGroupTarget,
+} from "../gateway-organization-directory.repository.ts";
+
 /** The client slice the organization/group tenancy reads below touch. */
 export type GatewayOrganizationDirectoryDatabase = Pick<PrismaClient, "group" | "groupMembership">;
 
-export class PrismaGatewayOrganizationDirectoryRepository {
+export class PrismaGatewayOrganizationDirectoryRepository extends GatewayOrganizationDirectoryRepository {
   static create(
     database: GatewayOrganizationDirectoryDatabase,
   ): PrismaGatewayOrganizationDirectoryRepository {
     return new PrismaGatewayOrganizationDirectoryRepository(database);
   }
 
-  private constructor(private readonly database: GatewayOrganizationDirectoryDatabase) {}
+  private constructor(private readonly database: GatewayOrganizationDirectoryDatabase) {
+    super();
+  }
 
   /** The groups a per-member budget can target, with their sizes. */
-  async findGroupTargets(
-    organizationId: string,
-  ): Promise<readonly { id: string; name: string; memberCount: number }[]> {
+  async findGroupTargets(organizationId: string): Promise<readonly GatewayGroupTarget[]> {
     const groups = await this.database.group.findMany({
       where: { organizationId },
       select: { id: true, name: true },
