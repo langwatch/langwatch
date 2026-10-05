@@ -221,3 +221,10 @@ Date: 2026-10-05. Branch: feat/strict-feature-layout-v0. Each row stays unbound 
 | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | studio-lambda-cache:46 A config-only rollout (timeout change, no new image) invalidates the cache and reconciles | the cache entry is only { arn, imageUri }: a timeout-only change is not invalidated and heals at the 600 s TTL (fingerprint the config, or reword) |
 | component-execution:14, :20, :26 (trace and span id format, uniqueness)                                          | the generators live in trace contract (trace-otel-ids.ts) with no test of their own; proposed trace-otel-ids.unit.test.ts                          |
+
+## Automation
+
+| Scenario                                                                                   | Product does                                                                                                                            |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| automation.feature:194 the ceiling notice from the background process offers the next tier | the worker builds the runaway service without `nextStep`; AutomationNextStepService is constructed only in its own test (likely defect) |
+| digest.feature (8 rows)                                                                    | the digest module has no implementation, only the spec and mail templates (land it, or @unimplemented)                                  |
