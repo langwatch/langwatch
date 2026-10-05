@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-26
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Builds on:** ADR-092 (the grants ledger and the resolver walk), ADR-110 (a
 grant is an aggregate), ADR-143 (the Developer seat, point 5: traces appear
@@ -299,3 +299,5 @@ rename of "project" to "workspace" is unaffected.
   for three callers; three rule shapes; ADR lives in the repo. Chosen by the
   author and open to overrule: materialised grants via a reconciler rather
   than read-time evaluation.
+- v2 (2026-09-26): locked by the captain ("lets go"); status Accepted. Spec
+  derived at `specs/governance/aggregate-project.feature`.
