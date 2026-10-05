@@ -33,7 +33,7 @@ See the [API Keys guide](/platform/api-keys#create-a-personal-key) for step-by-s
 <Tab title="Claude Desktop">
 1. Go to **Settings → Connectors**
 2. Click **Add custom connector**
-3. Enter the server URL: `https://app.langwatch.ai/sse`
+3. Enter the server URL: `https://app.langwatch.ai/mcp`
 4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
 The same steps work in Claude Cowork and in Claude chat on the web.
@@ -84,7 +84,7 @@ Under the `servers` object, add an entry named `langwatch` with these fields:
 <Tab title="ChatGPT">
 1. Go to **Settings → Connectors**
 2. Click **Add connector**
-3. Enter the server URL: `https://app.langwatch.ai/sse`
+3. Enter the server URL: `https://app.langwatch.ai/mcp`
 4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
 *Requires a Plus or Team plan.*
@@ -94,11 +94,11 @@ Under the `servers` object, add an entry named `langwatch` with these fields:
 For any MCP client that supports remote servers with OAuth:
 
 1. Add a new remote MCP server
-2. Enter the endpoint URL: `https://app.langwatch.ai/sse`
+2. Enter the endpoint URL: `https://app.langwatch.ai/mcp`
 3. Select **OAuth (browser)** authentication
 4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
-The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically. Clients that speak the Streamable HTTP transport can point at `https://app.langwatch.ai/mcp` instead.
+The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically. `https://app.langwatch.ai/mcp` is the Streamable HTTP transport. A client that only speaks the older SSE transport can use `https://app.langwatch.ai/sse` instead.
 </Tab>
 
 <Tab title="Other">
@@ -131,7 +131,7 @@ Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shif
 The MCP server runs in two modes:
 
 - **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
-- **Remote (HTTP/SSE)**: For chat assistants (Claude Desktop, ChatGPT, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE, click Connect and sign in via your browser to authorize access to your project. Supports both SSE (`/sse`) and Streamable HTTP (`/mcp`) transports.
+- **Remote (HTTP)**: For chat assistants (Claude Desktop, ChatGPT, BoltAI, etc.). Hosted at `https://app.langwatch.ai/mcp`, which serves the Streamable HTTP transport. Uses OAuth Authorization Code + PKCE, click Connect and sign in via your browser to authorize access to your project. `https://app.langwatch.ai/sse` serves the older SSE transport for clients that need it, and setups that already point at it don't need to change.
 
 ## Usage Examples
 
