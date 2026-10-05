@@ -25,6 +25,7 @@ const projectId = `test-confirm-settled-${nanoid()}`;
 const traceId = `trace-${nanoid()}`;
 const failingMonitor = "monitor-failing";
 const passingMonitor = "monitor-passing";
+const rewrittenMonitor = "monitor-rewritten";
 const now = Date.now() - 60 * 1000;
 
 let ch: ClickHouseClient;
@@ -157,6 +158,26 @@ beforeAll(async () => {
     evaluationRun({ evaluatorId: passingMonitor, passed: true, score: 1 }),
     projectId,
   );
+  // One evaluation rewritten in place: failed first, passed on the rerun.
+  const rewritten = `eval-${nanoid()}`;
+  await repository.upsert(
+    evaluationRun({
+      evaluationId: rewritten,
+      evaluatorId: rewrittenMonitor,
+      passed: false,
+    }),
+    projectId,
+  );
+  await repository.upsert(
+    evaluationRun({
+      evaluationId: rewritten,
+      evaluatorId: rewrittenMonitor,
+      passed: true,
+      score: 1,
+      updatedAt: now + 1000,
+    }),
+    projectId,
+  );
 }, 120_000);
 
 afterAll(async () => {
@@ -196,6 +217,30 @@ describe("confirmSettledMatch over stored evaluation runs (integration)", () => 
       it("does not confirm the match", async () => {
         const trigger = automation({
           filters: { "evaluations.passed": { [passingMonitor]: ["false"] } },
+        });
+
+        expect(await confirm(trigger)).toBe(false);
+      });
+    });
+  });
+
+  describe("given an evaluation that was rewritten with the opposite verdict", () => {
+    describe("when the filter asks for the later verdict", () => {
+      /** @scenario "An evaluation-filtered automation is confirmed at dispatch" */
+      it("confirms the match", async () => {
+        const trigger = automation({
+          filters: { "evaluations.passed": { [rewrittenMonitor]: ["true"] } },
+        });
+
+        expect(await confirm(trigger)).toBe(true);
+      });
+    });
+
+    describe("when the filter asks for the earlier verdict", () => {
+      /** @scenario "An evaluation-filtered automation is confirmed at dispatch" */
+      it("does not confirm the match", async () => {
+        const trigger = automation({
+          filters: { "evaluations.passed": { [rewrittenMonitor]: ["false"] } },
         });
 
         expect(await confirm(trigger)).toBe(false);

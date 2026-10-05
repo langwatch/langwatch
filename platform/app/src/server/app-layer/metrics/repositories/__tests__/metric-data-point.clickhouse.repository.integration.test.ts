@@ -602,6 +602,47 @@ describe("given points ensured for the tenant's organization", () => {
     });
   });
 
+  describe("when series totals are read by a point attribute one series carries", () => {
+    const labelledSeriesId = "9".repeat(64);
+    const labelled = [5, 12].map((value, index) =>
+      point({
+        tenantId,
+        organizationId,
+        seriesId: labelledSeriesId,
+        timeUnixMs: bucket0 + index * 1000,
+        metricKind: "sum",
+        aggregationTemporality: "cumulative",
+        isMonotonic: true,
+        valueDouble: value,
+        acceptedAt,
+        pointAttributesJson: JSON.stringify({ team: `alpha-${tag}` }),
+        pointAttributeKeys: ["team"],
+      }),
+    );
+
+    beforeAll(async () => {
+      await repo.upsertSeriesMany({ points: labelled });
+      await repo.recomputeAffectedRollupsMany({ points: labelled });
+    });
+
+    it("returns that series with its attributes and the sum of its rollups", async () => {
+      const totals = await repo.getSeriesTotalsByPointAttribute({
+        tenantId,
+        attributeKey: "team",
+        attributeValue: `alpha-${tag}`,
+        fromMs: bucket0 - 60 * 60_000,
+      });
+
+      expect(totals).toEqual([
+        {
+          metricName: labelled[0]!.metricName,
+          pointAttributes: { team: `alpha-${tag}` },
+          total: 12,
+        },
+      ]);
+    });
+  });
+
   describe("when series totals are read by a point attribute nothing carries", () => {
     it("runs against the real schema and finds no series", async () => {
       const totals = await repo.getSeriesTotalsByPointAttribute({
