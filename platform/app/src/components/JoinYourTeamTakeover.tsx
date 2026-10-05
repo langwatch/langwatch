@@ -58,14 +58,9 @@ export function JoinYourTeamTakeover({
    */
   origin?: JoinRequestOrigin;
 }) {
-  const { settled, decision, mine, invitation, admitting } =
+  const { settled, decision, mine, invitation, setInvitationAside, admitting } =
     useJoinTakeoverState({ currentOrganizationId, origin });
   const utils = api.useUtils();
-  // Setting the invitation aside is for this visit only: it still stands,
-  // and the mail still carries it. So it never opens the automatic door
-  // (the state hook keeps that shut while an invitation exists); the rest
-  // of the screen simply decides as if none had been shown.
-  const [invitationSetAside, setInvitationSetAside] = useState(false);
 
   // Nothing is decided until EVERY answer is in. Rendering the offer while
   // the pending query is still in flight would show "ask to join" to somebody
@@ -87,12 +82,12 @@ export function JoinYourTeamTakeover({
   // while waiting on it would let an approval land the joiner seat instead
   // of the seat the administrator chose. Only the welcome screen is handed
   // an invitation (see the state hook), so a dashboard is unchanged.
-  if (invitation && !invitationSetAside) {
+  if (invitation) {
     return (
       <InvitationTakeover
         invitation={invitation}
         dismissLabel={dismissLabel}
-        onSetAside={() => setInvitationSetAside(true)}
+        onSetAside={setInvitationAside}
       />
     );
   }
@@ -179,11 +174,19 @@ function useJoinTakeoverState({
     !mine.isPending &&
     !(onboarding && invitations.isPending);
 
+  // Setting the invitation aside is for this visit only: it still stands,
+  // and the mail still carries it. So it never opens the automatic door
+  // (`noInvitation` above reads the answer, not this); the screen simply
+  // decides as if none had been shown.
+  const [invitationSetAside, setInvitationSetAside] = useState(false);
+
   return {
     settled,
     decision: offer.data,
     mine: mine.data,
-    invitation: onboarding ? invitations.data?.[0] : undefined,
+    invitation:
+      onboarding && !invitationSetAside ? invitations.data?.[0] : undefined,
+    setInvitationAside: () => setInvitationSetAside(true),
     admitting,
   };
 }
