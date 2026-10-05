@@ -6,6 +6,7 @@ import type ts from "typescript";
 import type { ArchitectureViolation } from "../../types.ts";
 import { SOURCE_ROOTS, listFiles } from "../../workspace/layout.ts";
 import {
+  mentionMatcher,
   moduleImports,
   sourceFile,
   workspaceModuleResolver,
@@ -174,6 +175,22 @@ function readDynamicReferences({ file, resolveSpecifier, usage }: FileReadArgs):
   }
 }
 
+/**
+ * Whether `file` could name a module server source. Each resolution path is lexical, so a
+ * specifier landing under a `process` directory spells "process" itself, or names a `#`
+ * subpath or a package whose directory or manifest does; the file's own path may also.
+ */
+function serverSourceReach(resolver: WorkspaceModuleResolver): (file: string) => boolean {
+  const names = [...resolver.packages.values()]
+    .filter(({ directory, main, exports }) =>
+      `${directory}${JSON.stringify([main, exports])}`.includes("process"),
+    )
+    .map(({ name }) => name);
+  const mentions = mentionMatcher({ words: ["process", "#", ...names] });
+
+  return (file) => file.includes("process") || mentions(file);
+}
+
 /** Which names each file is read for, across the whole repository. */
 type UsageGraph = { usage: Usage; exported: ReadonlyMap<string, string[]> };
 
@@ -182,15 +199,19 @@ function usageGraph({
   files,
   declared,
   resolveSpecifier,
+  mayReach,
 }: {
   files: readonly string[];
   declared: ReadonlySet<string>;
   resolveSpecifier: ResolveSpecifier;
+  mayReach: (file: string) => boolean;
 }): UsageGraph {
   const usage: Usage = new Map();
   const exported = new Map<string, string[]>();
   for (const file of files) {
     if (!existsSync(file)) continue;
+
+    if (!declared.has(file) && !mayReach(file)) continue;
 
     const read = readFileReferences({ file, declared: declared.has(file) });
 
@@ -263,12 +284,13 @@ export function collectUnusedModuleExportFindings({
   const declared = moduleServerSources(root);
   if (declared.length === 0) return [];
 
-  const resolveSpecifier = (resolver ?? workspaceModuleResolver({ root })).resolve;
+  const moduleResolver = resolver ?? workspaceModuleResolver({ root });
 
   const { usage, exported } = usageGraph({
     files: repositorySources(root),
     declared: new Set(declared),
-    resolveSpecifier,
+    resolveSpecifier: moduleResolver.resolve,
+    mayReach: serverSourceReach(moduleResolver),
   });
 
   const findings = declared.flatMap((file) =>

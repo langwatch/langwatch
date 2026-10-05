@@ -6,7 +6,7 @@ import ts from "typescript";
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
 import { getAnchor } from "../../workspace/anchors.ts";
 import { listFiles } from "../../workspace/layout.ts";
-import { mayMention, sourceFile, sourceText } from "../../workspace/module-graph.ts";
+import { mentionMatcher, sourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 /**
@@ -181,16 +181,18 @@ function readFile({
   file,
   module,
   tables,
+  mentionsTable,
   found,
 }: {
   file: string;
   module: string;
   tables: ReadonlyMap<string, string>;
+  mentionsTable: (file: string) => boolean;
   found: Access[];
 }): void {
   if (!/from|join|into|table/i.test(sourceText({ file }))) return;
 
-  if (!mayMention({ file, words: tables.keys() })) return;
+  if (!mentionsTable(file)) return;
 
   const source = sourceFile({ file });
   const reader: Reader = { source, module, tables, constants: literalConstants(source), found };
@@ -218,6 +220,7 @@ function collectAccess(
   tables: ReadonlyMap<string, string>,
 ): Access[] {
   const found: Access[] = [];
+  const mentionsTable = mentionMatcher({ words: tables.keys() });
 
   for (const scan of scanRoots(root, catalogue)) {
     if (!existsSync(scan.directory)) continue;
@@ -228,7 +231,7 @@ function collectAccess(
     });
 
     for (const file of [...files].toSorted())
-      readFile({ file, module: scan.module, tables, found });
+      readFile({ file, module: scan.module, tables, mentionsTable, found });
   }
 
   return found.toSorted(

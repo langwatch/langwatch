@@ -4,7 +4,7 @@ import { FEATURE_PREFIX } from "@langwatch/oxlint-rules/grammar/feature-layout-p
 import ts from "typescript";
 
 import type { ArchitectureViolation } from "../../types.ts";
-import { mayMention, sourceFile } from "../../workspace/module-graph.ts";
+import { defineTreeFacts, mayMention } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 const PROJECTION_WRITE_TYPES = new Set(["FoldProjectionStore", "ProjectionStore"]);
@@ -14,10 +14,16 @@ const PROJECTION_WRITE_WORDS = [...PROJECTION_WRITE_TYPES, ...PROJECTION_WRITE_M
 
 type TypeDeclaration = ts.ClassDeclaration | ts.InterfaceDeclaration | ts.TypeAliasDeclaration;
 
-type PackageTypes = {
-  importsByFile: ReadonlyMap<ts.SourceFile, ReadonlyMap<string, string>>;
-  declarationsByName: ReadonlyMap<string, readonly TypeDeclaration[]>;
-  sourceByPath: ReadonlyMap<string, ts.SourceFile>;
+/** What a type node exposes itself, and the names it reaches through its file's imports. */
+type TypeFacts = { exposesWrite: boolean; references: readonly string[] };
+
+type DeclarationFacts = TypeFacts & { name: string };
+
+type DependencyFacts = TypeFacts & { text: string; line: number };
+
+type FileFacts = {
+  declarations: readonly DeclarationFacts[];
+  services: readonly { name: string; dependencies: readonly DependencyFacts[] }[];
 };
 
 const DOMAIN_SERVICE_FILE = new RegExp(`/process/src/${FEATURE_PREFIX}services/.+\\.service\\.ts$`);
@@ -62,33 +68,6 @@ function importedTypeNames(sourceFile: ts.SourceFile): ReadonlyMap<string, strin
   }
 
   return names;
-}
-
-function packageTypes(files: readonly string[]): PackageTypes {
-  const importsByFile = new Map<ts.SourceFile, ReadonlyMap<string, string>>();
-  const declarationsByName = new Map<string, TypeDeclaration[]>();
-  const sourceByPath = new Map<string, ts.SourceFile>();
-
-  for (const file of files) {
-    const parsed = sourceFile({ file, kind: ts.ScriptKind.TS });
-    sourceByPath.set(file, parsed);
-    importsByFile.set(parsed, importedTypeNames(parsed));
-
-    for (const statement of parsed.statements) {
-      const isTypeDeclaration =
-        ts.isClassDeclaration(statement) ||
-        ts.isInterfaceDeclaration(statement) ||
-        ts.isTypeAliasDeclaration(statement);
-
-      if (!isTypeDeclaration || !statement.name) continue;
-
-      const declarations = declarationsByName.get(statement.name.text) ?? [];
-      declarations.push(statement);
-      declarationsByName.set(statement.name.text, declarations);
-    }
-  }
-
-  return { importsByFile, declarationsByName, sourceByPath };
 }
 
 function memberExposesProjectionWrite(member: ts.TypeElement | ts.ClassElement): boolean {
@@ -149,36 +128,6 @@ function isPrivateClassMember(member: ts.ClassElement): boolean {
   );
 }
 
-function declarationExposesProjectionWrite(
-  declaration: TypeDeclaration,
-  types: PackageTypes,
-  seen: Set<TypeDeclaration>,
-): boolean {
-  if (seen.has(declaration)) return false;
-
-  seen.add(declaration);
-
-  if (ts.isTypeAliasDeclaration(declaration)) {
-    return typeExposesProjectionWrite(declaration.type, types, seen);
-  }
-
-  const exposedMembers = ts.isInterfaceDeclaration(declaration)
-    ? [...declaration.members]
-    : [...declaration.members].filter((member) => !isPrivateClassMember(member));
-
-  if (exposedMembers.some(memberExposesProjectionWrite)) return true;
-
-  const exposesNestedWrite = exposedMembers
-    .flatMap(memberTypeNodes)
-    .some((type) => typeExposesProjectionWrite(type, types, seen));
-
-  if (exposesNestedWrite) return true;
-
-  const heritageTypes = declaration.heritageClauses?.flatMap((clause) => clause.types) ?? [];
-
-  return heritageTypes.some((type) => typeExposesProjectionWrite(type, types, seen));
-}
-
 function memberNodeExposesProjectionWrite(node: ts.Node): boolean {
   const isMember =
     ts.isMethodSignature(node) ||
@@ -189,42 +138,44 @@ function memberNodeExposesProjectionWrite(node: ts.Node): boolean {
   return isMember && memberExposesProjectionWrite(node);
 }
 
-function typeExposesProjectionWrite(
-  node: ts.Node,
-  types: PackageTypes,
-  seen: Set<TypeDeclaration>,
-): boolean {
-  if (memberNodeExposesProjectionWrite(node)) return true;
-
-  let reference: string | null = null;
-
-  if (ts.isTypeReferenceNode(node)) {
-    reference = referencedTypeName(node.typeName);
-  } else if (ts.isExpressionWithTypeArguments(node)) {
-    reference = referencedTypeName(node.expression);
-  }
-
-  if (reference) {
-    const importedName = types.importsByFile.get(node.getSourceFile())?.get(reference);
-    const canonicalName = importedName ?? reference;
-    if (PROJECTION_WRITE_TYPES.has(canonicalName)) return true;
-
-    const declarations = types.declarationsByName.get(canonicalName) ?? [];
-
-    for (const declaration of declarations) {
-      if (declarationExposesProjectionWrite(declaration, types, seen)) return true;
-    }
-  }
-
+/** The facts of `nodes` and all beneath them: a write member, and every type name referenced. */
+function typeFacts(nodes: readonly ts.Node[], imports: ReadonlyMap<string, string>): TypeFacts {
   let exposesWrite = false;
+  const references: string[] = [];
 
-  ts.forEachChild(node, (child) => {
-    if (!exposesWrite && typeExposesProjectionWrite(child, types, seen)) {
-      exposesWrite = true;
-    }
-  });
+  const visit = (node: ts.Node): void => {
+    if (memberNodeExposesProjectionWrite(node)) exposesWrite = true;
 
-  return exposesWrite;
+    let reference: string | null = null;
+    if (ts.isTypeReferenceNode(node)) reference = referencedTypeName(node.typeName);
+    else if (ts.isExpressionWithTypeArguments(node))
+      reference = referencedTypeName(node.expression);
+    if (reference) references.push(imports.get(reference) ?? reference);
+
+    ts.forEachChild(node, visit);
+  };
+
+  for (const node of nodes) visit(node);
+
+  return { exposesWrite, references };
+}
+
+function declarationFacts(
+  declaration: TypeDeclaration,
+  imports: ReadonlyMap<string, string>,
+): TypeFacts {
+  if (ts.isTypeAliasDeclaration(declaration)) return typeFacts([declaration.type], imports);
+
+  const exposedMembers = ts.isInterfaceDeclaration(declaration)
+    ? [...declaration.members]
+    : [...declaration.members].filter((member) => !isPrivateClassMember(member));
+  const heritageTypes = declaration.heritageClauses?.flatMap((clause) => clause.types) ?? [];
+  const facts = typeFacts([...exposedMembers.flatMap(memberTypeNodes), ...heritageTypes], imports);
+
+  return {
+    ...facts,
+    exposesWrite: facts.exposesWrite || exposedMembers.some(memberExposesProjectionWrite),
+  };
 }
 
 function serviceDependencyTypes(service: ts.ClassDeclaration): ts.TypeNode[] {
@@ -251,37 +202,91 @@ function serviceDependencyTypes(service: ts.ClassDeclaration): ts.TypeNode[] {
   return dependencies;
 }
 
+function fileFacts({ file, source }: { file: string; source: ts.SourceFile }): FileFacts {
+  const imports = importedTypeNames(source);
+  const declarations: DeclarationFacts[] = [];
+  const services: FileFacts["services"][number][] = [];
+
+  for (const statement of source.statements) {
+    const isTypeDeclaration =
+      ts.isClassDeclaration(statement) ||
+      ts.isInterfaceDeclaration(statement) ||
+      ts.isTypeAliasDeclaration(statement);
+
+    if (!isTypeDeclaration || !statement.name) continue;
+
+    declarations.push({ name: statement.name.text, ...declarationFacts(statement, imports) });
+  }
+
+  if (!isDomainServiceFile(file)) return { declarations, services };
+
+  for (const statement of source.statements) {
+    if (!ts.isClassDeclaration(statement)) continue;
+
+    const name = statement.name?.text;
+    if (!name?.endsWith("Service")) continue;
+
+    const dependencies = serviceDependencyTypes(statement).map((dependency) => ({
+      text: dependency.getText(source),
+      line: source.getLineAndCharacterOfPosition(dependency.getStart(source)).line + 1,
+      ...typeFacts([dependency], imports),
+    }));
+    services.push({ name, dependencies });
+  }
+
+  return { declarations, services };
+}
+
+/** Derived wherever a process file is parsed, so this policy reads facts rather than trees. */
+const processFileFacts = defineTreeFacts({
+  accept: (file) => file.endsWith(".ts") && file.includes("/process/src/"),
+  derive: fileFacts,
+});
+
+/** Whether `facts` reaches a projection write via the package's declarations, each seen once. */
+function exposesProjectionWrite(
+  facts: TypeFacts,
+  declarationsByName: ReadonlyMap<string, readonly DeclarationFacts[]>,
+  seen: Set<DeclarationFacts>,
+): boolean {
+  if (facts.exposesWrite) return true;
+
+  for (const reference of facts.references) {
+    if (PROJECTION_WRITE_TYPES.has(reference)) return true;
+
+    for (const declaration of declarationsByName.get(reference) ?? []) {
+      if (seen.has(declaration)) continue;
+
+      seen.add(declaration);
+      if (exposesProjectionWrite(declaration, declarationsByName, seen)) return true;
+    }
+  }
+
+  return false;
+}
+
 function lintServiceFile(
   file: string,
-  sourceFile: ts.SourceFile,
-  types: PackageTypes,
+  facts: FileFacts,
+  declarationsByName: ReadonlyMap<string, readonly DeclarationFacts[]>,
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const seen = new Set<string>();
 
-  for (const statement of sourceFile.statements) {
-    if (!ts.isClassDeclaration(statement)) continue;
+  for (const service of facts.services) {
+    for (const dependency of service.dependencies) {
+      if (!exposesProjectionWrite(dependency, declarationsByName, new Set())) continue;
 
-    const serviceName = statement.name?.text;
-    if (!serviceName?.endsWith("Service")) continue;
-
-    for (const dependency of serviceDependencyTypes(statement)) {
-      if (!typeExposesProjectionWrite(dependency, types, new Set())) continue;
-
-      const dependencyText = dependency.getText(sourceFile);
-      const key = `${serviceName}:${dependencyText}`;
+      const key = `${service.name}:${dependency.text}`;
       if (seen.has(key)) continue;
 
       seen.add(key);
 
-      const line =
-        sourceFile.getLineAndCharacterOfPosition(dependency.getStart(sourceFile)).line + 1;
-
       violations.push({
         policy: "service-projection-write-boundary",
         file,
-        line,
-        message: `Service dependency ${JSON.stringify(dependencyText)} exposes projection writes.`,
+        line: dependency.line,
+        message: `Service dependency ${JSON.stringify(dependency.text)} exposes projection writes.`,
         allowed:
           "Inject an explicit read-only projection/read-model port. ProjectionStore, FoldProjectionStore, and storeProjection* capabilities belong to projection or eventing adapters and composition roots.",
       });
@@ -313,13 +318,17 @@ export function lintServiceProjectionBoundaries(
 
     if (!sourceFiles.some((file) => mayMention({ file, words: PROJECTION_WRITE_WORDS }))) continue;
 
-    const types = packageTypes(sourceFiles);
+    const declarationsByName = new Map<string, DeclarationFacts[]>();
+    for (const file of sourceFiles) {
+      for (const declaration of processFileFacts(file).declarations) {
+        const declarations = declarationsByName.get(declaration.name) ?? [];
+        declarations.push(declaration);
+        declarationsByName.set(declaration.name, declarations);
+      }
+    }
 
     for (const file of services) {
-      const sourceFile = types.sourceByPath.get(file);
-      if (!sourceFile) continue;
-
-      violations.push(...lintServiceFile(file, sourceFile, types));
+      violations.push(...lintServiceFile(file, processFileFacts(file), declarationsByName));
     }
   }
 

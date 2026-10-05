@@ -183,10 +183,19 @@ function parseTree({
   return ts.createSourceFile(file, sourceText({ file }), options, parents, kind);
 }
 
+/** A tree for one read, not retained: no caller sees it but its reader, and none reads JSDoc. */
+function transientTree(file: string): ts.SourceFile {
+  const kind = scriptKind(file);
+  const entry = syntaxTrees.get(`${file}\0${kind}`);
+  const known = entry !== void 0 && fresh(entry, file) ? entry.value.tree.deref() : void 0;
+
+  return known ?? parseTree({ file, kind, parents: false, jsDoc: ts.JSDocParsingMode.ParseNone });
+}
+
 /**
  * `read` over this file's tree without retaining it: a whole-tree pass keeps
- * only the import facts it derives. A `WeakRef` target lives until the job ends,
- * and a lint run is one synchronous job, so a cached tree is never released.
+ * only the import facts and the declared tree facts it derives. A `WeakRef`
+ * target lives until the job ends, and a lint run is one synchronous job.
  */
 export function readSourceOnce<T>({
   file,
@@ -195,18 +204,47 @@ export function readSourceOnce<T>({
   file: string;
   read: (source: ts.SourceFile) => T;
 }): T {
-  const kind = scriptKind(file);
-  const entry = syntaxTrees.get(`${file}\0${kind}`);
-  const known = entry !== void 0 && fresh(entry, file) ? entry.value.tree.deref() : void 0;
-  // No caller sees this tree but `read` and the import walk, and neither reads JSDoc.
-  const jsDoc = ts.JSDocParsingMode.ParseNone;
-  const source = known ?? parseTree({ file, kind, parents: false, jsDoc });
+  const source = transientTree(file);
 
   if (!fresh(parsedSources.get(file), file)) {
     parsedSources.set(file, stamp(file, collectParsedSource({ file, source })));
   }
 
+  for (const facts of declaredTreeFacts) facts.offer({ file, source });
+
   return read(source);
+}
+
+/** What a policy keeps of a file's tree: derived wherever the file is parsed, not only by it. */
+export type TreeFacts<T> = {
+  accept: (file: string) => boolean;
+  derive: (input: { file: string; source: ts.SourceFile }) => T;
+};
+
+const declaredTreeFacts: { offer: (input: { file: string; source: ts.SourceFile }) => void }[] = [];
+
+/** Declares `facts` once, at module load; the getter parses only a file no pass has read yet. */
+export function defineTreeFacts<T>({ accept, derive }: TreeFacts<T>): (file: string) => T {
+  const derived = new Map<string, Cached<T>>();
+
+  const offer = ({ file, source }: { file: string; source: ts.SourceFile }): T => {
+    const entry = derived.get(file);
+    if (entry && fresh(entry, file)) return entry.value;
+
+    const value = derive({ file, source });
+    derived.set(file, stamp(file, value));
+
+    return value;
+  };
+
+  declaredTreeFacts.push({ offer: (input) => void (accept(input.file) && offer(input)) });
+
+  return (file) => {
+    const entry = derived.get(file);
+    if (entry && fresh(entry, file)) return entry.value;
+
+    return offer({ file, source: transientTree(file) });
+  };
 }
 
 /** Escapes that can spell a word in a literal or identifier without its raw characters. */
@@ -218,6 +256,20 @@ export function mayMention({ file, words }: { file: string; words: Iterable<stri
 
   for (const word of words) if (text.includes(word)) return true;
 
+  return maySpellEscaped({ file });
+}
+
+/** `mayMention` for one word list read against many files: the list is compiled once. */
+export function mentionMatcher({ words }: { words: Iterable<string> }): (file: string) => boolean {
+  const alternatives = [...words].map((word) => word.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&"));
+  const pattern = alternatives.length > 0 ? new RegExp(alternatives.join("|")) : void 0;
+
+  return (file) => pattern?.test(sourceText({ file })) === true || maySpellEscaped({ file });
+}
+
+/** Whether this file holds an escape that could spell a word its raw text does not contain. */
+export function maySpellEscaped({ file }: { file: string }): boolean {
+  const text = sourceText({ file });
   const known = escapedTexts.get(file);
   if (known?.text === text) return known.escaped;
 
@@ -313,13 +365,39 @@ function importRecordFor(node: ts.Node): ImportRecordInput | undefined {
   return ts.isCallExpression(node) ? dynamicImportRecord(node) : undefined;
 }
 
+/** Every import record's text holds one of these words, unless a `\u` escape spells it. */
+const IMPORT_WORDS = /(?=import|export|require)/g;
+
+/**
+ * Whether a node's text holds an import word, so a subtree without one is walked past. A tree
+ * that may hold JSX, or an escaped keyword, is walked whole.
+ */
+function importWordFilter(source: ts.SourceFile): (node: ts.Node) => boolean {
+  const walksWhole =
+    source.languageVariant !== ts.LanguageVariant.Standard || source.text.includes("\\u");
+  if (walksWhole) return () => true;
+
+  const positions = Array.from(source.text.matchAll(IMPORT_WORDS), (match) => match.index);
+
+  return (node) => {
+    let low = 0;
+    let high = positions.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (positions[middle]! < node.pos) low = middle + 1;
+      else high = middle;
+    }
+
+    return low < positions.length && positions[low]! < node.end;
+  };
+}
+
 function parseSource(file: string): ParsedSource {
   const entry = parsedSources.get(file);
   if (entry && fresh(entry, file)) return entry.value;
 
-  // Import extraction never walks upward, and binding a parent onto every node
-  // of 14,000 files is the single most expensive thing the run would do.
-  const parsed = collectParsedSource({ file, source: sourceFile({ file, parents: false }) });
+  // Import extraction never walks upward and keeps only its facts: the tree goes.
+  const parsed = collectParsedSource({ file, source: transientTree(file) });
   parsedSources.set(file, stamp(file, parsed));
 
   return parsed;
@@ -351,13 +429,15 @@ function collectParsedSource({
     });
   };
 
+  const mayHoldRecord = importWordFilter(source);
+
   const visit = (node: ts.Node): void => {
     if (JSX_KINDS.has(node.kind)) rendersJsx = true;
 
     const importRecord = IMPORT_RECORD_KINDS.has(node.kind) ? importRecordFor(node) : void 0;
     if (importRecord) record(importRecord);
 
-    ts.forEachChild(node, visit);
+    if (mayHoldRecord(node)) ts.forEachChild(node, visit);
   };
 
   visit(source);

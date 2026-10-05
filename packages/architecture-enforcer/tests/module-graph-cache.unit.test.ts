@@ -7,7 +7,9 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  defineTreeFacts,
   mayMention,
+  mentionMatcher,
   moduleImports,
   readSourceOnce,
   rendersJsx,
@@ -93,5 +95,68 @@ describe("whether a file may mention a word", () => {
     });
 
     expect(mayMention({ file, words: ["ProjectionStore"] })).toBe(true);
+  });
+});
+
+describe("the import walk", () => {
+  it("records an import nested deep inside a subtree that names no other import", () => {
+    const file = fixture({
+      name: "nested.ts",
+      text: 'const a = 1;\nexport function load() {\n  return () => [a, import("./lazy.ts"), require("./old.cjs")];\n}\n',
+    });
+
+    expect(moduleImports({ file }).map(({ specifier, dynamic }) => [specifier, dynamic])).toEqual([
+      ["./lazy.ts", true],
+      ["./old.cjs", true],
+    ]);
+  });
+
+  it("walks a file whole when an escape could spell the import keyword", () => {
+    const file = fixture({
+      name: "escaped.ts",
+      text: 'const x = "\\u0041";\nexport function load() {\n  return \\u0069mport("./lazy.ts");\n}\n',
+    });
+
+    expect(moduleImports({ file }).map(({ specifier }) => specifier)).toEqual(["./lazy.ts"]);
+  });
+});
+
+describe("tree facts", () => {
+  it("derives a file's facts during a read of its tree, and parses only an unread file", () => {
+    let derivations = 0;
+    const statementCount = defineTreeFacts({
+      accept: (file) => file.endsWith(".facts.ts"),
+      derive: ({ source }) => {
+        derivations += 1;
+        return source.statements.length;
+      },
+    });
+    const read = fixture({ name: "read.facts.ts", text: "const a = 1;\nconst b = 2;\n" });
+    const unread = fixture({ name: "unread.facts.ts", text: "const c = 3;\n" });
+
+    readSourceOnce({ file: read, read: () => void 0 });
+    expect(derivations).toBe(1);
+    expect(statementCount(read)).toBe(2);
+    expect(derivations).toBe(1);
+    expect(statementCount(unread)).toBe(1);
+    expect(derivations).toBe(2);
+  });
+});
+
+describe("a word list matched against many files", () => {
+  it("answers as mayMention does, escapes included", () => {
+    const words = ["trace_summaries", "a.b(c)"];
+    const files = [
+      fixture({ name: "plain.ts", text: "SELECT * FROM trace_summaries" }),
+      fixture({ name: "meta.ts", text: "call a.b(c) here" }),
+      fixture({ name: "near.ts", text: "call aXb(c) here" }),
+      fixture({ name: "escaped.ts", text: 'const t = "trace\\x5fsummaries";' }),
+    ];
+    const matches = mentionMatcher({ words });
+
+    expect(files.map((file) => matches(file))).toEqual(
+      files.map((file) => mayMention({ file, words })),
+    );
+    expect(files.map((file) => matches(file))).toEqual([true, true, false, true]);
   });
 });
