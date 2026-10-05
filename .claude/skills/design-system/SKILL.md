@@ -91,10 +91,9 @@ no data) and each owning page renders it with the same entries (§10).
   skills tell you to import `@chakra-ui/react`.** In this repo that is wrong
   (rule 1); use them for Chakra v3 API knowledge only.
 - **A colour from a scale step or hex "just here".** Add a semantic token.
-- **Pattern docs lag the record.** `dev/docs/best_practices/react.md` still
-  says `web` packages and `screens/`; browser packages are `*-browser` (§16).
-  `best_practices/drawers.md` no longer exists: drawers are routed singletons,
-  see `browser-module`.
+- **Pattern docs lag the record.** Where one disagrees, the record wins:
+  browser packages are `*-browser` (§16), and `best_practices/drawers.md` no
+  longer exists: drawers are routed singletons, see `browser-module`.
 - **Fetching or reading `*HostApi` inside a shared component.** The owner lends
   it by token (§10.1) and the consumer renders what it is handed.
 - **Mail has its own expressive design system.** See the `mail-template` skill.

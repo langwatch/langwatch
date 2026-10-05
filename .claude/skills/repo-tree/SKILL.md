@@ -13,17 +13,17 @@ disagree, the linter wins (§17).
 
 ## The map
 
-| Folder | Holds | Rule |
-| --- | --- | --- |
-| `apps/` | `api`, `worker`, `tasks`, `ui`, `server` (npx CLI), `scenario-child`, plus the `*-web` internal consoles | An app is `src/main.ts` and `src/config.ts`. No product code (§1). |
-| `modules/<name>/` | One feature: `contract/ process/ browser/ client/`, plus `specs/` and `adrs/` | A module is an isolated microservice (§3). |
-| `enterprise/modules/<name>/` | The same shape, licence-gated at runtime | Always installed; refuses per organisation (§3, §11). |
-| `packages/` | Framework only | A package earns its place by being framework, not feature (§2). |
-| `services/` | Go (`aigateway`, `nlpgo`, `langyagent`, the `*sim`s), Python (`langevals`) | Not in the Node module system. |
-| `tools/` | Dev tooling: `thuishaven` (haven), `dev-runtime`, `apidiff`, `visualdiff` | Not shipped. |
-| `specs/` | Cross-cutting Gherkin feature files | Module specs live in `modules/<name>/specs/`. |
-| `sdks/`, `mcp/`, `docs/` | Published SDKs, the MCP server, the public docs site | Not the product. |
-| `dev/` | Architecture record, ADRs, best practices, dev scripts | `dev/docs/ARCHITECTURE.md` is the one record. |
+| Folder                       | Holds                                                                                                    | Rule                                                               |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `apps/`                      | `api`, `worker`, `tasks`, `ui`, `server` (npx CLI), `scenario-child`, plus the `*-web` internal consoles | An app is `src/main.ts` and `src/config.ts`. No product code (§1). |
+| `modules/<name>/`            | One feature: `contract/ process/ browser/ client/`, plus `specs/` and `adrs/`                            | A module is an isolated microservice (§3).                         |
+| `enterprise/modules/<name>/` | The same shape, licence-gated at runtime                                                                 | Always installed; refuses per organisation (§3, §11).              |
+| `packages/`                  | Framework only                                                                                           | A package earns its place by being framework, not feature (§2).    |
+| `services/`                  | Go (`aigateway`, `nlpgo`, `langyagent`, the `*sim`s), Python (`langevals`)                               | Not in the Node module system.                                     |
+| `tools/`                     | Dev tooling: `thuishaven` (haven), `dev-runtime`, `apidiff`, `visualdiff`                                | Not shipped.                                                       |
+| `specs/`                     | Cross-cutting Gherkin feature files                                                                      | Module specs live in `modules/<name>/specs/`.                      |
+| `sdks/`, `mcp/`, `docs/`     | Published SDKs, the MCP server, the public docs site                                                     | Not the product.                                                   |
+| `dev/`                       | Architecture record, ADRs, best practices, dev scripts                                                   | `dev/docs/ARCHITECTURE.md` is the one record.                      |
 
 ## Rules that matter
 
@@ -57,17 +57,17 @@ disagree, the linter wins (§17).
 
 Ask in order. Stop at the first yes.
 
-| Question | Goes to |
-| --- | --- |
-| Does it name a product subject? | The module the catalogue gives that subject. |
-| Does a screen render it? | `modules/<f>/browser/` (layers in the `browser-module` skill). |
-| Is it a component several modules share? | `packages/design-system` (§2). |
-| Is it data several browsers read? | The owner's `modules/<f>/client/`. |
-| Is it a schema, error or `*Api` another module calls? | The owner's `contract/`. |
-| Does it start a process, parse config or open stores? | A framework package (`process`, `process-stores`, `config`). |
-| Is it a one-shot migration or backfill? | The module's `process/src/migrations/` or `tasks/`, run by `apps/tasks`. |
-| Is it Go or Python? | `services/<name>`. |
-| Is it dev-only tooling? | `tools/<name>`. |
+| Question                                              | Goes to                                                                  |
+| ----------------------------------------------------- | ------------------------------------------------------------------------ |
+| Does it name a product subject?                       | The module the catalogue gives that subject.                             |
+| Does a screen render it?                              | `modules/<f>/browser/` (layers in the `browser-module` skill).           |
+| Is it a component several modules share?              | `packages/design-system` (§2).                                           |
+| Is it data several browsers read?                     | The owner's `modules/<f>/client/`.                                       |
+| Is it a schema, error or `*Api` another module calls? | The owner's `contract/`.                                                 |
+| Does it start a process, parse config or open stores? | A framework package (`process`, `process-stores`, `config`).             |
+| Is it a one-shot migration or backfill?               | The module's `process/src/migrations/` or `tasks/`, run by `apps/tasks`. |
+| Is it Go or Python?                                   | `services/<name>`.                                                       |
+| Is it dev-only tooling?                               | `tools/<name>`.                                                          |
 
 If no row fits, that is a design question. Do not invent a folder: ask.
 
@@ -118,5 +118,5 @@ module has that kind of thing.
 - The module skills: `module` for anatomy, `module-client` for clients,
   `browser-module` for the browser half.
 - Process composition and what a module may demand (peers, config, stores,
-  entitlements): the future `module-dependencies` and `process-composition`
-  skills. Not taught here.
+  entitlements): the `module-dependencies` and `process-composition` skills.
+  Not taught here.

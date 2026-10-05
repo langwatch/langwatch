@@ -38,12 +38,13 @@ cold-miss backoff poll that stops as soon as the payload settles. Read the
 interval from `data`, not from React state — the scheduler reads it outside the
 render cycle.
 
-## 2. Render a Chakra `Alert` banner for processing / failed
+## 2. Render an `Alert` banner for processing / failed
 
 One banner, driven by `status`. Processing gets a spinner; failed gets a
-message and a **Retry** affordance. Use Chakra `Alert.Root` /
-`Alert.Indicator` / `Alert.Content`, the same primitive the experiment views use
-(`src/components/experiments/DSPyExperiment.tsx`).
+message and a **Retry** affordance. Use `Alert.Root` / `Alert.Indicator` /
+`Alert.Content` from `@langwatch/design-system/primitives` (feature code never imports
+Chakra), as the experiment views do
+(`modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx`).
 
 ```tsx
 {
@@ -96,9 +97,9 @@ api.datasetRecord.getAll.useQuery(args, {
 ```
 
 Belt and suspenders on the server: the read procedure maps a not-ready resource
-to a precondition failure rather than serving partial data — tRPC
-`PRECONDITION_FAILED`, REST `425`
-(`src/server/api/routers/datasetRecord.ts`). A consumer that can still fire a
+to a precondition failure rather than serving partial data: the service throws
+`DatasetNotReadyError` (`dataset_not_ready`, HTTP 425,
+`modules/dataset/contract/src/dataset.errors.ts`). A consumer that can still fire a
 read before the gate flips should pass `retry: false` so it surfaces the
 precondition failure once instead of hammering the endpoint while it waits.
 
@@ -125,7 +126,7 @@ User-facing copy describes what the customer gets, never how the work is done
 - Poll + banner + retry + read-gate:
   `modules/dataset/browser/src/ui/sections/dataset-editor.screen.tsx`
 - Functional `refetchInterval` idiom: `modules/trace/browser/src/ui/sections/explorer/hooks/use-trace-facets.ts`
-- `Alert` banner primitive: `src/components/experiments/DSPyExperiment.tsx`
+- `Alert` banner in use: `modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx`
 - Gated dependent read: `modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx`
-- Server not-ready mapping: `src/server/api/routers/datasetRecord.ts`
+- Server not-ready refusal: `DatasetNotReadyError` in `modules/dataset/contract/src/dataset.errors.ts`
 - Architecture: ADR-032 (`dev/docs/adr/032-datasets-s3-jsonl.md`), Decision 6 / I-READY.

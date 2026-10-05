@@ -22,7 +22,8 @@ repositories, channels and the module class stay thin.
 process/src/
 ├── index.ts                    installer + transport declarations, nothing else
 ├── monitor.module.ts           the installer
-├── app/monitor.app.ts          the module class (`MonitorModule`)
+├── app/monitor.app.ts          the module class (`MonitorModule`); §3.2's target is
+│                               `monitor.module.ts`, beside the installer
 ├── services/*.service.ts       behaviour, one class per entity
 ├── repositories/
 │   ├── monitor.repository.ts           interface
@@ -113,7 +114,7 @@ function with its own unit test.
   into the module class's `create` (§5).
 - **A service that calls another module's repository, or reaches a peer
   directly.** Peers arrive as narrow `Pick<PeerApi, ...>` slices handed in by
-  the module class. How a peer is declared is the future `module-dependencies`
+  the module class. How a peer is declared is the `module-dependencies`
   skill; do not invent a path.
 - **A re-parse.** `monitor.service.ts` still parses its inputs after the
   transport has: the record says a service does not (§3.2). Do not copy it.
@@ -133,5 +134,5 @@ function with its own unit test.
 ## Where next
 
 REST and tRPC binding: `api-transports`. Pipelines, subscribers, schedules:
-`eventing-and-worker`. Tests: `testing`. Peers, config, supply, entitlements:
-the future `module-dependencies` skill.
+`eventing-and-worker`. Tests: `testing`. Peers, config, secrets, availability,
+entitlements, peer cycles: `module-dependencies`. Review: `architecture-review`.

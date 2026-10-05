@@ -1,6 +1,6 @@
 ---
 name: backend
-description: "Everything on the Node side of a LangWatch module: composing a process (apps/api, apps/worker, apps/tasks), Server/createApp/boot, a module's process-half shape, the four-way rule for what a module may demand, declaring REST endpoints and tRPC procedures, the worker role (drain order, eventing pipelines, jobs, subscribers, at-least-once/per-aggregate-ordering), building a new process module end to end, and backend testing (colocated __tests__, installation tests through the createApp chain, spec-scenario binding, asserting on error code). Use whenever someone is: composing or wiring a process; writing or extending a module's process/ package; hitting a boot() refusal; adding a REST route or tRPC procedure; adding a scheduled job, subscriber or projection; creating a brand-new module's process half; or writing/reviewing a unit or integration test for backend code."
+description: "Everything on the Node side of a LangWatch module: composing a process (apps/api, apps/worker, apps/tasks), Server/container/boot, a module's process-half shape, the four-way rule for what a module may demand, declaring REST endpoints and tRPC procedures, the worker role (drain order, eventing pipelines, process managers, subscribers, at-least-once/per-aggregate-ordering), building a new process module end to end, and backend testing (colocated __tests__, installation tests over the installed list, spec-scenario binding, asserting on error code). Use whenever someone is: composing or wiring a process; writing or extending a module's process/ package; hitting a boot() refusal; adding a REST route or tRPC procedure; adding a scheduled process manager, subscriber or projection; creating a brand-new module's process half; or writing/reviewing a unit or integration test for backend code."
 user-invocable: true
 argument-hint: "<question or backend task>"
 ---
@@ -9,46 +9,50 @@ argument-hint: "<question or backend task>"
 
 Read `dev/docs/ARCHITECTURE.md` first — this skill is a pointer into it, plus
 the procedure. `@langwatch/process` is the Node runtime **and** the
-process-half vocabulary: `Server`, `createApp`, `defineProcessModule`,
+process-half vocabulary: `Server`, the container, `defineProcessModule`,
 `defineRepositories`, `definePipeline`. An application (`apps/api`,
 `apps/worker`, `apps/tasks`) is only `main.ts` + `config.ts` — everything else
 lives in a module's `process/` package or in this framework. Full shape:
-record §2, §4.
+record §2, §4. In depth: `process-composition` (§4-§7) and
+`module-dependencies` (§3.3, §6, §11).
 
-## `Server`, `createApp`, `boot()`
-
-`Server.start` orders fatal handlers → secrets → config parse (under
-telemetry, so a parse failure logs with the service name) → signals →
-deadline. `/healthz` answers **during** boot.
+## `Server`, the container, `boot()` (record §4, §5)
 
 ```ts
-const server = await Server.start({ name: "langwatch-api", config: apiConfig });
-const stores = await openStores(server.config.stores, server.resources);
-await createApp({ role: "api", server })
-  .withModules(processModules)          // generated from modules/catalogue.json
-  .withConfig(server.config.modules)
-  .withStores(stores)                   // the one store call; never per-store with*
-  .withTransportAuth((a) => a.withStaticTokens({...}).withBrowserSession(session))
+// apps/api/src/main.ts (abridged; the worker differs only in role and run)
+const server = await Server.create("langwatch-api")
+  .withEnvironment(processEnvironment) // config.ts: the one process.env seam
+  .withConfig(processConfig(processModules)) // the installed list IS the schema
+  .withSecrets((config, secrets) => secrets.withEnv().withFile())
+  .withTelemetry(processTelemetry("langwatch-api"))
+  .start();
+const app = await server
+  .container("api")
+  .exposeTransports((transports) => transports.trpc().rest().browserBundle())
   .boot();
-await server.serve({ port: server.config.process.port, static: uiBundle() });
+await server.serve(app); // worker: server.container("worker").boot(), server.run(app)
 ```
 
-`boot()` (record §5): for each installed module — pick the repository tier
-from supplied stores, validate `requires` against what was supplied (refusal
-at boot, **by name**: `"webhook needs clickhouse; none supplied"`), build
-repositories, resolve peers by token, slice config, call
-`<Name>Module.create(...)`, then collect what the role wants (api → REST/tRPC/
-SSE/command senders; worker → jobs/subscriptions/projections). The container
+`boot()` (record §5): the container opens the stores, orders installers by
+peer tokens, and for each installed module picks the tier, checks each
+registry's `requires` against the opened stores (refusal at boot, **by name**:
+`"webhook needs clickhouse; none opened"`), builds repositories and channels
+from the module's registries, resolves peers by token, slices config, calls
+`<Name>Module.create({ repositories, channels, dependencies, config, secrets, role, resources })`,
+then collects what the role wants (api → REST/tRPC/SSE/command senders;
+worker → subscriptions, projections, process managers). The container
 answers only stores and peers; every other "is it here?" is the module's own
-answer (§3.3 rule 4), never a runtime fallback. The `processModules` list is
-generated (`pnpm generate:modules`) from `modules/catalogue.json`; installing
-a module edits the catalogue, never `main.ts`. **The root never grows** — a
-change that needs it to grow found a gap in the primitives; report the gap.
+answer (§3.3 rule 4), never a runtime fallback. There is no `withModules` in
+an app: the `processModules` list is generated (`pnpm generate:modules`) from
+`modules/catalogue.json`; installing a module edits the catalogue, never
+`main.ts`. **The root never grows** — a change that needs it to grow found a
+gap in the primitives; report the gap.
 
 Tasks (`apps/tasks`) takes the `Server` for telemetry/config, skips the
-listener; graceful degenerates to run-to-completion. A test passes no server:
-`createApp({ role: "api" })` registers nothing anywhere, and `boot()` returns
-the runtime for the test to drive directly (see Testing, below).
+listener; `server.container("tasks")` boots producer-only and runs the named
+tasks, a module's own declared with `.withTasks(...)` (§5). A test passes no
+server: `bootInstalledProcess({ role: "api", ... })` registers nothing
+anywhere and returns the runtime for the test to drive (see Testing, below).
 
 ## A module's process half (record §3.2)
 
@@ -56,6 +60,7 @@ the runtime for the test to drive directly (see Testing, below).
 // modules/<name>/process/src/<name>.module.ts — installer AND class, one file
 export const <name>ProcessModule = defineProcessModule("<name>")
   .withRepositories(<name>Repositories)   // registry: { live, memory }
+  .withChannels(<name>Channels)           // registry: { live, memory }; only if it has channels
   .withApi(<Name>Module)                  // the one class implementing <Name>Api
   .withTransports(<name>Rest, <name>Trpc) // inert declarations
   .withEventing(<name>Pipeline);          // only if the module owns events (§9)
@@ -78,20 +83,20 @@ pub/sub, vendor HTTP, queue, email, Slack, SSE — one interface, per-tier
 implementations, a memory twin, `{ live, memory }` registry), `eventing/`
 (the pipeline, §9), `transport/` (declarations only, §8), `rules/` (pure, no
 I/O). No `utils/`, `ports/`, `adapters/`, `composition/`, `lib/`, `helpers/`,
-`domain/`. A raw client crosses into a module in exactly one place — a
-registry or channel factory's `create()`, which arrives with its stores
-resolved (record §5). There are no members (§3.3).
+`domain/`. A raw client crosses into a module in exactly one place — the
+`create(stores)` of one of its repository or channel registries, which the
+container calls (record §3.2, §5). There are no members (§3.3).
 
 ## The four-way rule (record §3.3) — what a module may demand
 
 1. **Derivable from supplied stores alone** → a repository or channel inside
    the module. No demand.
 2. **Another module's capability** → a peer: the `*Api` token in
-   `static dependencies`. The process resolves tokens; a peer is never a
-   member import.
+   `static dependencies`. The container resolves tokens; modules receive
+   each other's implementations.
 3. **A deployment fact** (signing key, base URL, admin list) → the module's
-   own declared config schema (record §6); the process values the slice.
-   Module code never reads `process.env`.
+   declared config slice or secret handle (record §6); a process fact is a
+   leaf the slice picks. Module code never reads `process.env`.
 4. **An availability decision** (a capability this deployment may not have) →
    the module decides it from its own config and secrets, and its public
    config projects the answer to the browser. Off refuses by name with a
@@ -108,9 +113,8 @@ The **process mounts declarations; a module never mounts anything.** Listing
 a declaration on `.withTransports(...)` is the whole act of publishing it —
 no per-module mount file, no hand-assembled router. `boot()` opens the REST
 family, the tRPC namespace and the SSE lane for every installed module's
-role; auth is configured once, at the app level
-(`withTransportAuth`) — a declaration names a permission, never a credential
-source.
+role; auth binds the one API door from its own transport facts (record §4)
+— a declaration names a permission, never a credential source.
 
 ```ts
 // contract: declared once — name, kind, input, output
@@ -147,41 +151,48 @@ hand-written map for a namespace the module owns.
 
 ## The worker role (record §4, §9)
 
-The worker is **the same process file** with `role: "worker"` and
+The worker is **the same process file** with `server.container("worker")` and
 `server.run()` instead of `serve()`. The role decides what `boot()` hosts —
-jobs and subscriptions instead of HTTP doors — nothing more. Boot order is
+subscriptions, projections and process managers instead of HTTP doors —
+nothing more. Boot order is
 worker then api; **shutdown drains the worker before closing the api
-listener**, because worker jobs call back into the api's in-process graph.
+listener**, because worker consumers call back into the api's in-process graph.
 Every eventing consumer registers **drain-first** on `server.graceful` — a
 structural fact, not a convention someone could skip.
 
 A module declares its whole pipeline once:
 
 ```ts
-export const <name>Pipeline = definePipeline("<name>")
-  .withEvents(<name>Events)
-  .withCommands({ create: createCommand })
-  .withProjections({ <name>Summary })               // worker-only
-  .withSubscribers({ on<Thing>Created })             // worker-only
-  .withJobs({ retentionSweep: cron("0 3 * * *") });  // worker-only
+// record §9 (abridged); there is no .withJobs and no cron route
+definePipeline({ name: "<name>", aggregate: defineAggregate({ type: "<name>" }) })
+  .withEvents([<name>CreatedEventSchema]) // the contract's zod schemas
+  .withCommand("create", Create < Name > Command) // validate → append
+  .withPostgresProjection(<name>StateProjection) // worker-only
+  .withEventSubscriber("name", { events: [TYPE], handler }) // worker-only
+  .withProcessManager("retentionSweep", (pm) =>
+    // worker-only
+    pm.state(schema, initial).schedule({ everyMs }).onWake(wake).intent("pass", schema, run),
+  )
+  .build();
 ```
 
 `boot()` translates the **same** declaration per role: api is
-commands-only — projections, subscribers and jobs are **never constructed**,
+commands-only — projections, subscribers and process managers are
+described for ops introspection but **never started** (§4),
 and the role types the eventing requirement so a consumer cannot be
 hand-wired into an api-role chain (a compile error, not a runtime mistake).
 Worker semantics: delivery is at-least-once, so every subscriber must be
 idempotent; ordering is per aggregate via the group queue, so one poisoned
 aggregate retries with backoff without blocking its neighbours; projections
-fold from the same ordered stream. A reaction that needs another module still
-names it as a peer `*Api` token (four-way rule case 2) — a subscriber follows
+fold from the same ordered stream. A reaction to another module's event is a
+`withPeerSubscriber` in the reacting module that sends its own command (§9);
+its edge runs reactor → owner, so it closes no cycle. A subscriber follows
 the same rules as any other process code.
 
 ## Creating a new process module, end to end
 
-**Copy `modules/annotation`** — it is the shape reference and carries no
-`feature-shape-baseline.json` entry. Translate any "server"/"web" spelling
-you copy through record §16 as you go.
+**Copy `modules/annotation`** — it is the shape reference. A spelling you
+copy that record §15 lists is deleted: write its replacement, not the copy.
 
 1. **Catalogue entry.** `modules/catalogue.json` gets `{ "id": "<name>",
 "root": "modules/<name>", "classification": "core", "subjects": ["<name>"] }`.
@@ -197,8 +208,8 @@ you copy through record §16 as you go.
    `packages/handled-error/src/app-codes.ts` and its customer copy in
    `presentation.ts`, same change.
 4. **Process** (`@langwatch/<name>-process`): repositories first (interface,
-   `prisma/`, `memory/`, `defineRepositories({ live, memory })`), then
-   `services/`, then the one `<name>.module.ts` installer+class file above.
+   `prisma/`, `memory/`, `defineRepositories({ live, memory })`), channels
+   the same way if it talks to anything it does not own, then `services/`, then the one `<name>.module.ts` installer+class file above.
 5. **`pnpm generate:modules`** regenerates `processModules` from the
    catalogue — no process file changes, no hand-written module list.
 6. **The installation test** (below) proves the whole chain resolves over
@@ -215,16 +226,12 @@ from whether the file mentions one of those clients, declared in the
 package's own `vitest.config.ts`. Describe blocks nest `given`/`when`; `it`
 titles are action-based (`it("checks local first")`, never `it("should...")`).
 
-The installation test is the same chain production uses:
-
-```ts
-const runtime = await createApp({ role: "api" })          // no server: nothing to tear down
-  .withModules([<name>ProcessModule])
-  .withConfig({ <name>: {} })
-  .withStores(memoryStores())                              // branded → memory tier everywhere
-  .boot();
-const api = runtime.service(<Name>Api);
-```
+The installation test boots the installed list over memory twins, with no
+server (record §13): `bootInstalledProcess({ role, modules:
+processModules.map(overMemory), config, secrets, ... })` over `memoryStores()`,
+then `runtime.service(<Name>Api)`. Copy
+`apps/api/src/__tests__/api-installation.fixture.ts`; it still hands stores in
+as members until record §16's store-client row lands.
 
 Memory bundles need no datastore and no Docker, while peers still resolve
 each other for real through the same tokens production uses — no test-only
@@ -252,5 +259,5 @@ have crossed a process or serialisation boundary. See
 
 The record (`dev/docs/ARCHITECTURE.md`) is the authority; this skill only
 points into it. Where the tree and this skill disagree during the renames in
-flight, record §16 maps old spellings to the target ones — trust the table,
-not what is on disk.
+flight, record §16 maps each target name to today's spelling: code keeps
+today's spelling until its row lands, and §15 lists what is deleted.

@@ -13,7 +13,7 @@ not restate rulings. Deleted spellings are section 15; target names are section 
 A transport file **declares**. It never implements. The module's `*Api` operation holds the behaviour.
 
 Writing the contract itself (`*Api`, schemas, error classes) is the `contract` skill. Not here: how the module gets installed, how stores and peers reach it, how `boot()` opens the hosts.
-Those are the future `process-composition` and `module-dependencies` skills. A module never mounts
+Those are the `process-composition` and `module-dependencies` skills. A module never mounts
 anything; the process mounts every installed module's declarations.
 
 ## The rules that matter
@@ -49,6 +49,11 @@ anything; the process mounts every installed module's declarations.
    door (`modules/auth/process/src/services/api-door.service.ts`), with a spec scenario in
    `packages/api/specs/transport-declaration-split.feature`. A service keeps only the check that needs
    the loaded row.
+   **Middleware never does the framework's work** (record §8, 2026-10-05): middleware that
+   authenticates or parses a JSON body, and a route opened to any authenticated or unauthenticated
+   caller, are drift that lint rules catch; the guard list is
+   `dev/docs/plans/api-framework-bypass-2026-10-05.md`. The framework extensions E1 to E9 in that plan
+   are shapes first: Alex approves the signature and one example route before any is built.
 10. **A query never returns a credential.** Secrets come back only from a mutation.
 
 ## Worked example: one contract, one tRPC binding, one REST route
@@ -131,17 +136,17 @@ code slug. Register the code in `packages/handled-error/src/app-codes.ts` and it
 
 ## Traps
 
-| Trap                                     | Instead                                                |
-| ---------------------------------------- | ------------------------------------------------------ |
-| `c.json(...)`, `try/catch` into a status | return the value; throw a HandledError                 |
-| checking `typeof body.x` in a handler    | tighten the Zod schema in the contract                 |
-| `:id` on a new route                     | `:<thing>Id`                                           |
-| a docs object in `*-openapi.rules.ts`    | `.withDocs()` on the route                             |
-| a handler calling two `*Api` operations  | one operation that carries both                        |
-| a new procedure name chosen casually     | the wire name is the browser's cache key; choose once  |
-| a secret in a query output               | a mutation returns it once; forms read blank           |
-| a raw `/api/cron/*` route                | a scheduled process manager (`eventing-and-worker`)    |
-| REST route for the UI                    | the UI uses tRPC; REST is key-authenticated public API |
+| Trap                                                 | Instead                                                |
+| ---------------------------------------------------- | ------------------------------------------------------ |
+| `c.json(...)`, `try/catch` into a status             | return the value; throw a HandledError                 |
+| checking `typeof body.x` in a handler                | tighten the Zod schema in the contract                 |
+| `:id` on a new route                                 | `:<thing>Id`                                           |
+| a docs object in `*-openapi.rules.ts` (deleted, §15) | `.withDocs()` on the route                             |
+| a handler calling two `*Api` operations              | one operation that carries both                        |
+| a new procedure name chosen casually                 | the wire name is the browser's cache key; choose once  |
+| a secret in a query output                           | a mutation returns it once; forms read blank           |
+| a raw `/api/cron/*` route                            | a scheduled process manager (`eventing-and-worker`)    |
+| REST route for the UI                                | the UI uses tRPC; REST is key-authenticated public API |
 
 ## Tests
 

@@ -35,10 +35,12 @@ eventing); all of the below is lint-enforced.
   channel factory. Only `repositories/prisma/**` names Prisma. Uploads go to a
   signed URL and are attached by reference; no module buffers upload bytes
   (ADR-158).
-- **The four-way rule:** every dependency is one of: built inside the module
-  from supplied stores; a peer `*Api` token; a deployment fact from the
-  module's declared config schema (never `process.env`); or a declared supply
-  token the process answers. A module never defaults its own availability.
+- **The four-way rule (§3.3):** every dependency is one of: a repository or
+  channel built by the container from the module's own registry; a peer `*Api`
+  token in `static dependencies`; a deployment fact from the module's declared
+  config slice or secret handle (never `process.env`); or an availability the
+  module decides from its own config and secrets, refusing by name when off.
+  There are no members, no supply tokens and no `.provide` (§15).
 - **Transports declare, never implement.** Handlers receive
   `{ input, app, actor, scope, signal }`, call one API operation, and return a
   plain value or throw. No `c.json`, status branches, error envelopes or
@@ -57,15 +59,19 @@ eventing); all of the below is lint-enforced.
   other module records a fact event from its service and stops there; nurturing
   subscribes with `.withPeerSubscriber`. Adding an analytics channel, client or
   key to another module is a defect.
-- **Eventing follows the role:** the api process only sends commands;
-  projections, subscribers and jobs are constructed only in the worker,
+- **Eventing follows the role (§9):** the api process only sends commands;
+  projections, subscribers and process managers run in the worker only,
   at-least-once and per-aggregate ordered, so subscribers are idempotent.
-- **Config:** modules declare, apps compose, one Zod parse per process refuses
-  by name. Config is drilled as arguments (no DI container, no async context).
-  Secrets are never config fields: they resolve through `@langwatch/secrets`
-  (ADR-132) and are injected into the constructed collaborator.
-- **Verbs (ADR-146):** `find*` returns an array (empty, never null);
-  `get*`/`getBy*` returns one or throws. Don't write `T | null`; `try*` and
+  Background and calendar work is a scheduled process manager, never a job.
+- **Config (§6):** declared at its owner, in the contract's `<name>.config.ts`
+  (`Config.define` leaves, `Secret.load` handles); the module class attaches
+  them as `static readonly config`/`secrets`. The parse is generated from the
+  installed list and refuses by name; apps hold no module config. Secrets are
+  never config fields: `create()` and the registries resolve them through
+  `secrets.into(...)` (`@langwatch/secrets`, ADR-132). No async context.
+- **Verbs (ADR-146, §15):** `find*` returns an array (empty, never null);
+  `get*`/`getBy*` returns one or throws; `list*` returns a page. Don't write
+  `T | null`; `try*` and
   `require*` are banned. Don't satisfy the linter by renaming a parser `find*`.
 - **Installing a module** edits `modules/catalogue.json`, then
   `pnpm generate:modules`; never edit a composition root by hand.

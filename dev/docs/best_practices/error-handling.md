@@ -283,7 +283,7 @@ already used this invite", "That name is taken" — and replacing those with
 change. That is a worse failure than the slug it would be avoiding.
 
 **Whether a message is authored is decided at the boundary, not guessed at by
-the client.** `errorFormatter` in `src/server/api/trpc.ts` sets
+the client.** The tRPC runtime's error formatter (`packages/api/src/trpc/runtime.ts`) sets
 `data.authored`, and it is the only place that can: the test needs `cause`,
 which never crosses the wire. The rule it encodes: a message counts as authored
 only when the **procedure supplied it itself** — not when tRPC defaulted it to

@@ -10,8 +10,9 @@ Record: `dev/docs/ARCHITECTURE.md` section 13 (testing) and 14 D (the memory-tie
 tests (workers, scoping, never `npx vitest`) is `.claude/skills/core/testing-rules.md`; this skill is how to
 **write** them. Philosophy: `dev/docs/TESTING_PHILOSOPHY.md`.
 
-Not here: how the module is wired into a process for the installation test (the future
-`process-composition` and `module-dependencies` skills). Copy the nearest sibling test's setup for now.
+Not here: how the module is wired into a process for the installation test (the
+`process-composition` skill; record §13, `apps/api/src/__tests__/api-installation.fixture.ts`),
+and judging whether a bind proves its scenario (the `spec-binding-review` skill).
 
 ## The rules that matter
 
@@ -19,7 +20,8 @@ Not here: how the module is wired into a process for the installation test (the 
    covers your task, write it first, error paths included.
 2. **A scenario enforces nothing until bound.** It needs a level tag (`@unit`, `@integration`, `@e2e`,
    `@regression`) and the covering test carries `/** @scenario "<exact title>" */` directly above the
-   `it`. Untagged scenarios read `0/0 bound` and green. `@unimplemented` marks a known gap.
+   `it`. Untagged scenarios read `0/0 bound` and green. `@unimplemented` marks a known gap. The ruling
+   is that every scenario is bound and its tests written (record §13, 2026-10-05).
 3. **Tests live beside what they test**, in a colocated `__tests__/` folder. Never a root `tests/` next
    to `src/`.
 4. **Name the level honestly.** `*.unit.test.ts`: no rendering, no datastore. `*.integration.test.ts`:
@@ -38,27 +40,28 @@ Not here: how the module is wired into a process for the installation test (the 
 8. **A regression test executes the bug.** If it crashed at runtime, the test runs the path and observes
    the crash. A string assertion about generated output is supplementary and passes on reintroduction.
 9. **Descriptions.** `it("checks local first")`, never "should". Nest `describe("when the user clicks
-   submit")` for given/when instead of a flat test with comments.
+submit")` for given/when instead of a flat test with comments.
 10. **A green package test is not proof of wire compatibility.** For a route, procedure name, input,
     output or status, mount the real router (see below) and diff the served surface against `origin/main`.
 
 ## Backend: the shapes
 
-| Subject | Test | Exemplar |
-| --- | --- | --- |
-| a service or rule | unit, over memory repositories and `createApiFixture` peers | `modules/organization/process/src/repositories/__tests__/team.service.unit.test.ts` |
-| a contract schema | unit | `modules/automation/contract/src/__tests__/automation.contract.unit.test.ts` |
-| a tRPC declaration | unit: names, kinds, permissions | `modules/presence/process/src/transport/__tests__/presence.trpc.unit.test.ts` |
-| a REST family | integration: real router on a real runtime, assert status, body, `code` | `modules/automation/process/src/transport/__tests__/automation.rest.integration.test.ts` |
-| a subscriber | unit, delivered twice (at least once) | `modules/automation/process/src/eventing/__tests__/trace-alert-trigger-match.subscriber.redelivery.test.ts` |
-| a repository | a contract suite over the memory twin; the datastore twin has its own test in `prisma/__tests__/` | `modules/organization/process/src/repositories/__tests__/organization.repositories.contract.test.ts` |
-| the module installs | installation test (below) | `modules/organization/process/src/app/__tests__/organization-installation.unit.test.ts` |
+| Subject             | Test                                                                                              | Exemplar                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| a service or rule   | unit, over memory repositories and `createApiFixture` peers                                       | `modules/organization/process/src/repositories/__tests__/team.service.unit.test.ts`                         |
+| a contract schema   | unit                                                                                              | `modules/automation/contract/src/__tests__/automation.contract.unit.test.ts`                                |
+| a tRPC declaration  | unit: names, kinds, permissions                                                                   | `modules/presence/process/src/transport/__tests__/presence.trpc.unit.test.ts`                               |
+| a REST family       | integration: real router on a real runtime, assert status, body, `code`                           | `modules/automation/process/src/transport/__tests__/automation.rest.integration.test.ts`                    |
+| a subscriber        | unit, delivered twice (at least once)                                                             | `modules/automation/process/src/eventing/__tests__/trace-alert-trigger-match.subscriber.redelivery.test.ts` |
+| a repository        | a contract suite over the memory twin; the datastore twin has its own test in `prisma/__tests__/` | `modules/organization/process/src/repositories/__tests__/organization.repositories.contract.test.ts`        |
+| the module installs | installation test (below)                                                                         | `apps/api/src/__tests__/api-installation.fixture.ts` (record §13)                                           |
 
 **The installation test** boots the real module through the same chain production uses, over the memory
 tier, in each role it runs in, and calls its `*Api`. Memory bundles need no datastore and no Docker, while
 peers still resolve through the real tokens. Zero test-only spellings. Always `await runtime.stop()` in a
-`finally`. Role differences are tested here:
-`modules/automation/process/src/app/__tests__/automation-worker-installation.unit.test.ts`.
+`finally`. The per-module installation tests under `app/__tests__/` (organization's, automation's worker
+one) still use the deleted `createApp` chain and `withMemoryRepositories` (§15): read them for what they
+assert, not for how they boot.
 
 Worked example (`modules/automation/process/src/eventing/__tests__/automation-peer-subscribers.unit.test.ts`):
 
@@ -103,17 +106,19 @@ per-file tick: a `all bound` for one file can coexist with a failing run. A scen
 tests counts like one bound from a module's. Sabotage once per changed behaviour: break the path, watch the
 bound test fail for the stated reason, restore.
 
+Judging whether a bind proves its scenario (Then steps, level, library instances): the spec-binding-review skill.
+
 ## Traps
 
-| Trap | Instead |
-| --- | --- |
-| `{ getById: vi.fn() }` as a peer | `createApiFixture<XApi>({...})` |
-| `vi.spyOn(realService, ...)` | memory twin plus a fixture |
-| `as unknown as Prisma` in a test | the typed double in `@langwatch/test-harness` |
-| tagging a rendering test `.unit.test` | `.integration.test.tsx` |
-| a scenario with no tag or no `@scenario` | tag it and annotate the test |
-| asserting on error message text | assert on `code` |
-| a new contract type "for the test" | a fixture or builder in `__tests__/` |
-| `tests/` beside `src/` | `src/**/__tests__/` |
-| running `npx vitest` or the whole repo | `VITEST_MAX_WORKERS=2 pnpm --filter <pkg> test <paths>` |
-| `createLogger` in a logging test | `createTestLogger()`, read `lines` |
+| Trap                                     | Instead                                                 |
+| ---------------------------------------- | ------------------------------------------------------- |
+| `{ getById: vi.fn() }` as a peer         | `createApiFixture<XApi>({...})`                         |
+| `vi.spyOn(realService, ...)`             | memory twin plus a fixture                              |
+| `as unknown as Prisma` in a test         | the typed double in `@langwatch/test-harness`           |
+| tagging a rendering test `.unit.test`    | `.integration.test.tsx`                                 |
+| a scenario with no tag or no `@scenario` | tag it and annotate the test                            |
+| asserting on error message text          | assert on `code`                                        |
+| a new contract type "for the test"       | a fixture or builder in `__tests__/`                    |
+| `tests/` beside `src/`                   | `src/**/__tests__/`                                     |
+| running `npx vitest` or the whole repo   | `VITEST_MAX_WORKERS=2 pnpm --filter <pkg> test <paths>` |
+| `createLogger` in a logging test         | `createTestLogger()`, read `lines`                      |

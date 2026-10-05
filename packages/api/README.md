@@ -567,16 +567,18 @@ src/
 
 ## LLM instructions
 
-When creating a new API service using this framework:
+The rules are `dev/docs/ARCHITECTURE.md` §8 and the `api-transports` skill; this list only points.
 
-1. Create `modules/<feature>/server/src/transport/api-rest/<feature>.api.ts` exporting a factory that builds the app: `export function create<Feature>RestApp(options) { ...; return createService({ name })...build(); }`
-2. Mount the result in the owning application's composition, e.g. `apps/api/src/app/api-production.composition.ts`, with `rest.route("/", create<Feature>RestApp(...))` next to the other families (do not create a `route.ts`; `routeHandlers()` is only for legacy Next-style hosts)
-3. Use `createService({ name })` from `@langwatch/api/rest`, with the service name matching the URL path segment
-4. Pass auth and organization middleware through `createService({ auth, _legacy: { organizationMiddleware } })`; pass capability ports through `createService({ rateLimiter, cache })` when any endpoint declares them — declaring without the port fails the build
-5. Use `createRestService().get/post/put/patch/delete` for new public REST, compatibility `registerRoute` for existing HTTP, and a `defineRestRouter` route declaring `.withResponse("sse", {})` for streams
-6. Compose one application instance at process boot and expose it as `context.app`; expose the authenticated request principal as `context.actor()`. Feature handlers must not construct or resolve services per request. Handler signature is `(context, input)`; REST path, query and body fields are already merged into `input`
-7. Declare capabilities on the definition chain. Public REST has one `withInput` and one `withOutput`; compatibility HTTP retains `withParams`/`withQuery`
-8. Handlers return raw data when `withOutput` is declared; the framework validates and serializes
-9. Throw `NotFoundError` / `HandledError` for error responses, never a manual `c.json({ error }, 404)`
-10. Test the URL family you declared: `/api/{name}/{date|latest}/...` for `createService`, or `/api/v1/{name}/{optional date|latest}/...` for public REST
-11. Every mount reports through `onRouteMounted`, including withdrawn endpoints and both version-namespace guards
+1. A module's transports are declarations in `modules/<name>/process/src/transport/<name>.{rest,trpc}.ts`:
+   `defineRestRouter(<Name>Api)` and `defineTrpcRouter(<Name>Api, <name>Trpc)`, the tRPC names declared once
+   in the contract with `defineTrpcContract`.
+2. The installer lists them on `.withTransports(...)`; the process mounts every installed module's
+   declarations (§4). Never mount by hand, never write a per-module composition file under `apps/`.
+3. Every route declares `.withInput` (or `.withParams`/`.withQuery`), `.withOutput` or `.responds`,
+   `.withPermission(...)` and `.withDocs(...)`. Paths are `/api/<x>`; `/api/v1/<x>` also answers.
+4. A handler receives `{ input, app, actor, scope, signal }`, calls one `*Api` operation and returns a
+   plain value or throws a `HandledError`. No `c.json`, status branches or error envelopes.
+5. Middleware never does the framework's work (authentication, JSON body parsing), and a route opened to
+   any caller is drift (§8, 2026-10-05). A case the declaration cannot express is a gap here: extend this
+   package and the door.
+6. Test the declaration through the real router, asserting status, body and `code`.

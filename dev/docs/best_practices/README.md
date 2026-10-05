@@ -4,7 +4,7 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 
 ## Files
 
-- **repository-service.md** - Repository + Service layer pattern
+- Repository + service layering is the record's (ARCHITECTURE.md §3.2) and the `process-module` skill's
 - **scoped-resources.md** - Storage + read + UI pattern for org/team/project-scoped rows
 - **scope-selector-and-badges.md** - Shared scope picker + chips (org/team/project/department)
 - **row-actions-overflow-menu.md** - Vertical 3-dot overflow menu for per-row edit/delete/archive
@@ -14,7 +14,7 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 - **ops-dashboard.md** - Ops surfaces: space is proportional to trouble; identifiers, dual-axis charts, cross-tenant controls
 - **list-table.md** - Shared look for resource index tables
 - **alerts-toasts-and-field-errors.md** - When to use an alert, a toast or a field error; the alert variants
-- **drawers.md** - URL-routed drawers
+- URL-routed drawers are the record's (ARCHITECTURE.md §10, §10.1) and the `browser-module` skill's
 - **async-processing-ui.md** - Poll/banner/read-gate pattern for a processing→ready/failed resource
 - **soft-delete-vs-archive.md** - When to archive vs hard-delete
 - **error-handling.md** - When to throw a HandledError, what to put on it, how the client renders it
@@ -42,10 +42,10 @@ layout:
 
 | Was                                                          | Read as                                                                                       |
 | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `platform/app/src/server/<feature>/**`                       | `modules/<feature>/server/src/**`                                                             |
-| `platform/app/src/{components,hooks,features}/**`            | `modules/<feature>/web/src/**`, or `apps/ui/src/**` for the shell                             |
-| `platform/app/src/server/app-layer/**`, `src/runtime/app/**` | `apps/api/src/app/**` (the API's composition root)                                            |
-| `platform/app/src/workers.ts`, `src/runtime/worker/**`       | `apps/worker/src/app/**`                                                                      |
+| `platform/app/src/server/<feature>/**`                       | `modules/<feature>/process/src/**`                                                            |
+| `platform/app/src/{components,hooks,features}/**`            | `modules/<feature>/browser/src/**`, or `apps/ui/src/shell/**` for the shell                   |
+| `platform/app/src/server/app-layer/**`, `src/runtime/app/**` | `apps/api/src/main.ts` and the container (ARCHITECTURE.md §4)                                 |
+| `platform/app/src/workers.ts`, `src/runtime/worker/**`       | `apps/worker/src/main.ts`; the work itself in each module's `eventing/` pipeline (§9)         |
 | `platform/app/src/pages/**`                                  | `apps/ui/src/**` routes                                                                       |
 | `platform/app/vitest*.config.ts`                             | each package's and application's own `vitest.config.ts`                                       |
 | `platform/app/scripts/**`                                    | `dev/scripts/**` for the dev loop; a `task:*` script on `apps/api` or `apps/worker` otherwise |
