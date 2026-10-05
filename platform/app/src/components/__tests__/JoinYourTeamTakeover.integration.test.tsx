@@ -641,6 +641,32 @@ describe("given somebody an administrator already invited", () => {
     });
 
     /** @scenario The invitation can be set aside without accepting it */
+    it("keeps the organization's name on a request still waiting behind it", async () => {
+      invitationsRef.current = { ...INVITED };
+      mineRef.current = {
+        data: [{ joinRequestId: "jr_1", organizationId: "org_acme" }],
+        isPending: false,
+      };
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover
+            currentOrganizationId={null}
+            dismissLabel="Create a new organization instead"
+            fallback={<div data-testid="make-your-own" />}
+          />
+        </ChakraProvider>,
+      );
+
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: "Create a new organization instead",
+        }),
+      );
+
+      expect(screen.getByTestId("join-team-waiting")).toHaveTextContent("Acme");
+    });
+
+    /** @scenario The invitation can be set aside without accepting it */
     it("re-reads the invitations when accepting fails, so a withdrawn one drops off", async () => {
       invitationsRef.current = { ...INVITED };
       acceptInviteMock.mockImplementation(

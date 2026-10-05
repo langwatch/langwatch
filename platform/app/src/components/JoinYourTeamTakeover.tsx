@@ -58,8 +58,15 @@ export function JoinYourTeamTakeover({
    */
   origin?: JoinRequestOrigin;
 }) {
-  const { settled, decision, mine, invitation, setInvitationAside, admitting } =
-    useJoinTakeoverState({ currentOrganizationId, origin });
+  const {
+    settled,
+    decision,
+    mine,
+    invitation,
+    invitationSetAside,
+    setInvitationAside,
+    admitting,
+  } = useJoinTakeoverState({ currentOrganizationId, origin });
   const utils = api.useUtils();
 
   // Nothing is decided until EVERY answer is in. Rendering the offer while
@@ -116,7 +123,14 @@ export function JoinYourTeamTakeover({
     );
   }
 
-  if (offerIsNotForHere({ decision, currentOrganizationId })) return fallback;
+  if (
+    offerIsNotForHere({
+      decision,
+      currentOrganizationId,
+      invitationSetAside,
+    })
+  )
+    return fallback;
 
   return (
     <AskToJoinTakeover
@@ -174,21 +188,17 @@ function useJoinTakeoverState({
     !mine.isPending &&
     !(onboarding && invitations.isPending);
 
-  // Setting the invitation aside is for this visit only: it still stands,
-  // and the mail still carries it. So it never opens the automatic door
-  // (`noInvitation` above reads the answer, not this). Its button says
-  // "create a new organization instead", so the domain offer is not raised
-  // in its place either: one click reaches the screen beneath, and nothing
-  // lasting is recorded, unlike the ask screen's own refusal. A request
-  // already waiting still shows, as it always blocks creating one here.
+  // For this visit only: the invitation still stands, so it must not open
+  // the automatic door, and nothing lasting is recorded for it.
   const [invitationSetAside, setInvitationSetAside] = useState(false);
 
   return {
     settled,
-    decision: invitationSetAside ? undefined : offer.data,
+    decision: offer.data,
     mine: mine.data,
     invitation:
       onboarding && !invitationSetAside ? invitations.data?.[0] : undefined,
+    invitationSetAside,
     setInvitationAside: () => setInvitationSetAside(true),
     admitting,
   };
@@ -199,16 +209,21 @@ function useJoinTakeoverState({
  * domain offer for another organization; onboarding has no such context and
  * keeps the offer visible. `undefined` never reaches here (the caller returned
  * on it), so this is `null` (no context) versus a real organization id. An
- * offer naming no organization at all is nothing to show either.
+ * offer naming no organization at all is nothing to show either, and nor is
+ * one standing behind an invitation that was just set aside: that button
+ * said "create a new organization instead", so raising the ask in its place
+ * would make it take two clicks.
  */
 function offerIsNotForHere({
   decision,
   currentOrganizationId,
+  invitationSetAside,
 }: {
   decision: Extract<JoinLookupDecision, { outcome: "ask" }>;
   currentOrganizationId: string | null;
+  invitationSetAside: boolean;
 }): boolean {
-  if (decision.organizations.length === 0) return true;
+  if (invitationSetAside || decision.organizations.length === 0) return true;
   if (currentOrganizationId === null) return false;
   return !decision.organizations.some(
     (organization) => organization.organizationId === currentOrganizationId,
