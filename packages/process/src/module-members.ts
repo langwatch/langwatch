@@ -86,8 +86,10 @@ export class MissingMemberError extends Error {
     readonly member: string,
     options?: { cause?: unknown },
   ) {
+    // The store's own refusal names the setting that would configure it.
+    const remedy = options?.cause instanceof Error ? ` ${options.cause.message}` : "";
     super(
-      `Module "${module}" reads the "${member}" member, which this process cannot supply.`,
+      `Module "${module}" reads the "${member}" member, which this process cannot supply.${remedy}`,
       options,
     );
     this.name = "MissingMemberError";

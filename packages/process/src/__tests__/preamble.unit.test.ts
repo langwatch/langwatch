@@ -1,4 +1,4 @@
-import { Config } from "@langwatch/config";
+import { Config, ConfigParseError } from "@langwatch/config";
 import { Secret, SecretsPreflightError } from "@langwatch/secrets";
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
@@ -62,5 +62,31 @@ describe("the §4 preamble", () => {
     } finally {
       await server.close();
     }
+  });
+
+  describe("given a module whose settings carry a required field", () => {
+    const required = {
+      name: "billing",
+      config: Config.define((c) => ({ formId: c.env("PREAMBLE_FORM_ID", z.string()) })),
+    } as const;
+
+    /** @scenario "A misspelled required setting refuses the boot" */
+    it("refuses the boot when the field arrives under a misspelled name, naming the module and the field", async () => {
+      const failure = await Server.create("preamble-test")
+        .withEnvironment({ PREAMBLE_FROM_ID: "form-1" })
+        .withConfig([required])
+        .withProcessOwnership(false)
+        .withSecrets((_, secrets) => secrets.withEnv())
+        .start()
+        .then(
+          () => void 0,
+          (error: unknown) => error,
+        );
+
+      expect(failure).toBeInstanceOf(ConfigParseError);
+      expect((failure as ConfigParseError).refusals).toEqual([
+        expect.stringMatching(/^billing\.formId ← PREAMBLE_FORM_ID: /),
+      ]);
+    });
   });
 });
