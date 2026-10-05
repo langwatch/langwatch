@@ -247,8 +247,9 @@ export class VoicePublicBaseUrlInvalidError extends Error {
 /**
  * Thrown when a phone run is about to dial but there is no public media URL the
  * WORKER's own listener answers: `VOICE_PUBLIC_BASE_URL` is unset (the worker
- * minted no quick tunnel — most often because the `cloudflared` binary is
- * missing, so the mint failed with ENOENT at worker boot) and the only value
+ * minted no quick tunnel — either the tunnel is off, the self-hosted default,
+ * or the `cloudflared` binary is missing, so the mint failed with ENOENT at
+ * worker boot) and the only value
  * left is the app's own `BASE_HOST`, which runs no voice media listener.
  *
  * Dialling `BASE_HOST` is the exact production failure this guards: Twilio
@@ -277,8 +278,9 @@ export class VoicePublicBaseUrlMissingError extends Error {
         `unset, resolved source: ${source}). The app's BASE_HOST runs no voice ` +
         `media listener, so Twilio would dial a URL nothing answers and the ` +
         `call would fail with error 31920 after a 120s timeout. Set ` +
-        `VOICE_PUBLIC_BASE_URL, or ensure cloudflared is installed so the ` +
-        `worker can mint a tunnel at boot.${reasonSuffix}`,
+        `VOICE_PUBLIC_BASE_URL, or set VOICE_TUNNEL=true (off by default on ` +
+        `self-hosted installs) with cloudflared installed so the worker can ` +
+        `mint a tunnel at boot.${reasonSuffix}`,
     );
     this.name = "VoicePublicBaseUrlMissingError";
   }

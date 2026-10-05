@@ -59,7 +59,7 @@ export class HttpSsoIssuerDiscovery implements SsoIssuerDiscoveryPort {
     issuer,
   }: {
     issuer: string;
-  }): Promise<{ reachable: true } | { reachable: false; reason: string }> {
+  }): ReturnType<SsoIssuerDiscoveryPort["discover"]> {
     let url: URL;
     try {
       url = new URL(discoveryEndpointFor({ issuer }));
@@ -96,9 +96,21 @@ export class HttpSsoIssuerDiscovery implements SsoIssuerDiscoveryPort {
         return { reachable: false, reason: `answered ${response.status}` };
       }
       const document: unknown = await response.json();
-      return looksLikeDiscoveryDocument(document)
-        ? { reachable: true }
-        : { reachable: false, reason: "answered something else" };
+      if (!looksLikeDiscoveryDocument(document)) {
+        return { reachable: false, reason: "answered something else" };
+      }
+      const record = document as Record<string, unknown>;
+      const named = record.issuer;
+      return {
+        reachable: true,
+        ...(typeof named === "string" && named.length > 0
+          ? { issuer: named }
+          : {}),
+        endpoints: ENDPOINT_FIELDS.flatMap((field) => {
+          const value = record[field];
+          return typeof value === "string" ? [value] : [];
+        }),
+      };
     } catch (error) {
       return { reachable: false, reason: describeThrow(error) };
     }
@@ -127,6 +139,17 @@ function describeThrow(error: unknown): string {
   }
   return error.name;
 }
+
+/** The discovery fields the SSO engine reads an endpoint address from. */
+const ENDPOINT_FIELDS = [
+  "authorization_endpoint",
+  "token_endpoint",
+  "userinfo_endpoint",
+  "jwks_uri",
+  "end_session_endpoint",
+  "revocation_endpoint",
+  "introspection_endpoint",
+] as const;
 
 /** The two endpoints every OpenID Connect provider publishes and every
  *  authorization-code flow needs. Anything without them is not a provider we

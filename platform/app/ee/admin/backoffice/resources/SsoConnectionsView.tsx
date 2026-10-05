@@ -114,7 +114,7 @@ const STATE_TONE: Record<string, string> = {
 
 const METHOD_LABEL: Record<string, string> = {
   "dns-txt": "Published record",
-  "license-token": "Licence",
+  "license-token": "License",
   "operator-attested": "Attested by LangWatch",
   "legacy-configuration": "Earlier configuration",
 };

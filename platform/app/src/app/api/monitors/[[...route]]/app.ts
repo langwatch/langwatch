@@ -1,13 +1,19 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
+import isEqual from "lodash-es/isEqual";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import type { Prisma } from "~/generated/prisma/client";
+import type { Evaluator, Prisma } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { EvaluatorNotFoundError } from "~/server/app-layer/evaluations/errors";
-import { MonitorEvaluatorRequiredError } from "~/server/app-layer/monitors/errors";
+import { isEvaluatorSettingsRecoveryDisabled } from "~/server/app-layer/evaluations/settings-recovery-flag";
+import {
+  MonitorEvaluatorRequiredError,
+  MonitorParametersUnusedError,
+} from "~/server/app-layer/monitors/errors";
 import { prisma } from "~/server/db";
+import { resolveEvaluatorSettingsWithSource } from "~/server/event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { slugify } from "~/utils/slugify";
@@ -104,6 +110,46 @@ function toMonitorResponse(monitor: {
     createdAt: monitor.createdAt.toISOString(),
     updatedAt: monitor.updatedAt.toISOString(),
   };
+}
+
+/**
+ * Refuses `parameters` the run would never read. The runner hands the judge the
+ * evaluator's own settings whenever it has some, so parameters that disagree
+ * with them would be stored and read back as the monitor's configuration while
+ * never running. Resolved exactly as the runner resolves them, operator
+ * rollback flag included (an unreadable flag counts as not disabled, as in the
+ * runner), so the API refuses only parameters the runner would set aside.
+ */
+async function assertParametersWillRun({
+  evaluator,
+  parameters,
+}: {
+  evaluator: Evaluator;
+  parameters: Record<string, unknown> | undefined;
+}) {
+  if (!parameters || Object.keys(parameters).length === 0) return;
+
+  const { settings, source } = resolveEvaluatorSettingsWithSource({
+    config: evaluator.config as Record<string, unknown> | null,
+    parameters,
+    evaluatorRecordType: evaluator.type,
+    // Same fail-open default as the runner: an unreadable switch leaves
+    // recovery active.
+    recoveryDisabled: await isEvaluatorSettingsRecoveryDisabled().catch(
+      (error: unknown) => {
+        // Message only, as in the runner: a client error can carry connection
+        // detail on its other properties.
+        logger.warn(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Settings-recovery rollback flag could not be read — leaving recovery active",
+        );
+        return false;
+      },
+    ),
+  });
+  if (source === "monitor-parameters" || isEqual(settings, parameters)) return;
+
+  throw new MonitorParametersUnusedError(evaluator.id);
 }
 
 const secured = createProjectApp({ basePath: "/api/monitors" });
@@ -240,6 +286,7 @@ secured.access(requires("evaluations:create")).post(
     if (!evaluator) {
       throw new EvaluatorNotFoundError(body.evaluatorId);
     }
+    await assertParametersWillRun({ evaluator, parameters: body.parameters });
 
     const slug = `${slugify(body.name)}-${nanoid(5)}`;
 
@@ -319,8 +366,13 @@ secured.access(requires("evaluations:update")).patch(
       throw new MonitorEvaluatorRequiredError();
     }
 
+    // Parameters are checked against the evaluator the monitor will run with
+    // after this update: the one it moves to, or the one it already has. A move
+    // re-checks the stored parameters too, since the new evaluator's settings
+    // may override them.
+    let evaluator: Evaluator | null = null;
     if (body.evaluatorId) {
-      const evaluator = await prisma.evaluator.findFirst({
+      evaluator = await prisma.evaluator.findFirst({
         where: {
           id: body.evaluatorId,
           projectId: project.id,
@@ -330,6 +382,19 @@ secured.access(requires("evaluations:update")).patch(
       if (!evaluator) {
         throw new EvaluatorNotFoundError(body.evaluatorId);
       }
+    } else if (body.parameters !== undefined && existing.evaluatorId) {
+      evaluator = await prisma.evaluator.findFirst({
+        where: { id: existing.evaluatorId, projectId: project.id },
+      });
+    }
+    if (evaluator) {
+      await assertParametersWillRun({
+        evaluator,
+        parameters:
+          body.parameters ??
+          (existing.parameters as Record<string, unknown> | null) ??
+          undefined,
+      });
     }
 
     const data: Record<string, unknown> = {};

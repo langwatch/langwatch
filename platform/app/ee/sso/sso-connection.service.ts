@@ -66,6 +66,9 @@ import {
   selectMigrationRouteCommandDataSchema,
   setArrivalPolicyCommandDataSchema,
   suspendConnectionCommandDataSchema,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
+  type UpdateConnectionIdpCommandData,
+  updateConnectionIdpCommandDataSchema,
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
@@ -304,6 +307,17 @@ export class SsoConnectionService {
     return this.commit(
       { type: RENAME_CONNECTION_COMMAND_TYPE, data },
       await this.guards.renameConnection(data),
+    );
+  }
+
+  /** What the engine dials, replaced on the same connection id. */
+  async updateConnectionIdp(
+    input: UpdateConnectionIdpCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = updateConnectionIdpCommandDataSchema.parse(input);
+    return this.commit(
+      { type: UPDATE_CONNECTION_IDP_COMMAND_TYPE, data },
+      await this.guards.updateConnectionIdp(data),
     );
   }
 

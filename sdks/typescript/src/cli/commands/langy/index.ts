@@ -12,7 +12,6 @@
  */
 
 import chalk from "chalk";
-import { ProjectsApiService } from "../../../client-sdk/services/projects/projects-api.service";
 import { runDeviceFlowLogin } from "../../utils/governance/login-flow";
 import {
   chooseRequest,
@@ -25,6 +24,7 @@ import {
   platformTakesTheKey,
   waitForRequests,
 } from "./requests";
+import { platformProjectKeyReader } from "./project-key";
 import { startLangySession } from "./session";
 import { noticeRows } from "./ui";
 
@@ -148,13 +148,12 @@ async function shareControl(root: string): Promise<void> {
       id: choice.request.projectId,
       name: choice.request.projectName,
     },
-    // The developer's own login, never the session key: the platform gates
-    // the key on this person's permission on the project.
-    readProjectApiKey: (projectId) =>
-      new ProjectsApiService({
-        endpoint: credentials.endpoint,
-        apiKey: credentials.apiKey,
-      }).getApiKey(projectId),
+    // The developer's own device session, never the session key: the
+    // platform gates the key on this person's permission on the project.
+    readProjectApiKey: platformProjectKeyReader({
+      endpoint: credentials.endpoint,
+      apiKey: credentials.apiKey,
+    }),
   });
 
   const onSignal = () => session.requestShutdown();

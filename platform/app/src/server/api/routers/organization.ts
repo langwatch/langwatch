@@ -1,3 +1,4 @@
+import { activateConfiguredLicenseForInstall } from "@ee/licensing/activation/configuredActivation";
 import { declareAuthzMiddleware } from "@langwatch/authz";
 import { SsoTestArrivalCannotCreateOrganizationError } from "@langwatch/identity";
 import { TRPCError } from "@trpc/server";
@@ -18,10 +19,14 @@ import {
 } from "~/server/app-layer/authz/permission-adapters";
 import {
   memberProvenance,
+  signUpPolicy,
   ssoTestArrival,
 } from "~/server/app-layer/identity/runtime";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
-import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
+import {
+  MemberSeatLimitReachedError,
+  OrganizationCreationRestrictedError,
+} from "~/server/app-layer/organizations/errors";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
@@ -125,6 +130,16 @@ export const organizationRouter = createTRPCRouter({
         );
       }
 
+      // Invite-only installations (SIGN_UP_MODE=invite_only): members join
+      // the organizations that invited them, and founding a new one is for
+      // instance administrators and the first organization on the install.
+      const creation = await signUpPolicy().checkOrganizationCreation({
+        email: ctx.session.user.email,
+      });
+      if (!creation.allowed) {
+        throw new OrganizationCreationRestrictedError();
+      }
+
       const result = await getApp().organizations.createAndAssign({
         userId: ctx.session.user.id,
         orgName: input.orgName,
@@ -133,6 +148,11 @@ export const organizationRouter = createTRPCRouter({
         primaryIntent: input.primaryIntent,
         userDisplayName: ctx.session.user.name,
       });
+
+      // An activation code in LANGWATCH_LICENSE_KEY waits at boot for an
+      // organization to store its license on; this is where the first one
+      // appears. A no-op when the install already holds a license.
+      await activateConfiguredLicenseForInstall();
 
       return {
         success: true,

@@ -7,6 +7,7 @@
  * - Calls posthog.identify with userId and email
  * - Calls posthog.group with organization data
  * - Calls posthog.reset on logout (userId disappears)
+ * - Captures signed_in once per browser session with attribution
  * - Tracks upgrade_modal_shown via Zustand subscribe
  */
 
@@ -32,12 +33,36 @@ vi.mock("posthog-js", () => ({
 }));
 
 import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
-import { usePostHogIdentify } from "../usePostHogIdentify";
+import {
+  resetSignedInTracking,
+  usePostHogIdentify,
+} from "../usePostHogIdentify";
+
+function setUrl(search: string) {
+  window.history.replaceState({}, "", `/${search}`);
+}
+
+function signedInCalls() {
+  return mockCapture.mock.calls.filter(([event]) => event === "signed_in");
+}
+
+function renderIdentified(userId = "user-1") {
+  return renderHook(() =>
+    usePostHogIdentify({
+      session: { user: { id: userId, email: "test@example.com" } },
+      organization: undefined,
+      planType: undefined,
+    }),
+  );
+}
 
 describe("usePostHogIdentify", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useUpgradeModalStore.getState().close();
+    window.sessionStorage.clear();
+    resetSignedInTracking();
+    setUrl("");
   });
 
   afterEach(() => {
@@ -74,7 +99,146 @@ describe("usePostHogIdentify", () => {
     });
   });
 
+  describe("when an identified user loads the app", () => {
+    /** @scenario "An identified user loading the app tracks signed_in with stored attribution" */
+    it("captures signed_in with the stored first-touch attribution", () => {
+      window.sessionStorage.setItem("lw_attrib.utmSource", "newsletter");
+      window.sessionStorage.setItem("lw_attrib.utmCampaign", "weekly");
+      window.sessionStorage.setItem("lw_attrib.leadSource", "website");
+      window.sessionStorage.setItem("lw_attrib.referrer", "https://x.test/");
+
+      renderIdentified();
+
+      expect(signedInCalls()).toEqual([
+        [
+          "signed_in",
+          {
+            lead_source: "website",
+            utm_source: "newsletter",
+            utm_campaign: "weekly",
+            referrer: "https://x.test/",
+          },
+        ],
+      ]);
+    });
+
+    /** @scenario "UTM params on the current URL are reported on signed_in" */
+    it("reports only the campaign of the current URL when it has one", () => {
+      window.sessionStorage.setItem("lw_attrib.utmSource", "google");
+      window.sessionStorage.setItem("lw_attrib.utmMedium", "cpc");
+      setUrl("?utm_source=newsletter&utm_content=cta");
+
+      renderIdentified();
+
+      expect(signedInCalls()).toEqual([
+        ["signed_in", { utm_source: "newsletter", utm_content: "cta" }],
+      ]);
+    });
+
+    /** @scenario "signed_in without any attribution carries no attribution properties" */
+    it("captures signed_in with no properties when nothing is known", () => {
+      renderIdentified();
+
+      expect(signedInCalls()).toEqual([["signed_in", {}]]);
+    });
+
+    it("captures signed_in after identifying the user", () => {
+      renderIdentified();
+
+      expect(mockIdentify.mock.invocationCallOrder[0]!).toBeLessThan(
+        mockCapture.mock.invocationCallOrder[0]!,
+      );
+    });
+
+    /** @scenario "signed_in is captured once per browser session" */
+    it("captures signed_in once across remounts and page loads of a session", () => {
+      renderIdentified().unmount();
+      renderIdentified().unmount();
+      // A new page load loses module state and keeps sessionStorage.
+      resetSignedInTracking();
+      renderIdentified();
+
+      expect(signedInCalls()).toHaveLength(1);
+    });
+
+    it("captures signed_in again in a new browser session", () => {
+      renderIdentified().unmount();
+      window.sessionStorage.clear();
+      resetSignedInTracking();
+      renderIdentified();
+
+      expect(signedInCalls()).toHaveLength(2);
+    });
+
+    /** @scenario "A different user signing in on the same tab tracks signed_in again" */
+    it("captures signed_in for a second user on the same tab", () => {
+      const { rerender } = renderHook(
+        ({ userId }: { userId: string }) =>
+          usePostHogIdentify({
+            session: { user: { id: userId } },
+            organization: undefined,
+            planType: undefined,
+          }),
+        { initialProps: { userId: "user-1" } },
+      );
+
+      rerender({ userId: "user-2" });
+
+      expect(signedInCalls()).toHaveLength(2);
+    });
+
+    /** @scenario "A user who already signed in on the tab is not counted again after another user" */
+    it("does not capture signed_in again for the first user after a reload", () => {
+      renderIdentified("user-1").unmount();
+      renderIdentified("user-2").unmount();
+      resetSignedInTracking();
+      renderIdentified("user-1");
+
+      expect(signedInCalls()).toHaveLength(2);
+    });
+
+    describe("when sessionStorage is unavailable", () => {
+      it("captures signed_in once per page load", () => {
+        const getItem = vi
+          .spyOn(Storage.prototype, "getItem")
+          .mockImplementation(() => {
+            throw new Error("storage disabled");
+          });
+        const setItem = vi
+          .spyOn(Storage.prototype, "setItem")
+          .mockImplementation(() => {
+            throw new Error("storage disabled");
+          });
+
+        try {
+          renderIdentified().unmount();
+          renderIdentified();
+
+          expect(signedInCalls()).toHaveLength(1);
+        } finally {
+          getItem.mockRestore();
+          setItem.mockRestore();
+        }
+      });
+    });
+  });
+
   describe("when session is null", () => {
+    /** @scenario "Anonymous visitors track no signed_in event" */
+    it("does not capture signed_in", () => {
+      setUrl("?utm_source=newsletter");
+
+      renderHook(() =>
+        usePostHogIdentify({
+          session: null,
+          organization: undefined,
+          planType: undefined,
+        }),
+      );
+
+      expect(signedInCalls()).toHaveLength(0);
+    });
+
     it("does not call identify", () => {
       renderHook(() =>
         usePostHogIdentify({

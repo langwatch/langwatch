@@ -8,7 +8,6 @@ from attrs import field as _attrs_field
 
 from ..models.create_role_binding_response_201_role import CreateRoleBindingResponse201Role
 from ..models.create_role_binding_response_201_scope_type import CreateRoleBindingResponse201ScopeType
-from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.create_role_binding_response_201_principal import CreateRoleBindingResponse201Principal
@@ -30,7 +29,6 @@ class CreateRoleBindingResponse201:
         scope_id (str):
         scope_name (None | str):
         created_at (str):
-        has_legacy_access_notice (bool | Unset):
     """
 
     id: str
@@ -42,7 +40,6 @@ class CreateRoleBindingResponse201:
     scope_id: str
     scope_name: None | str
     created_at: str
-    has_legacy_access_notice: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -67,8 +64,6 @@ class CreateRoleBindingResponse201:
 
         created_at = self.created_at
 
-        has_legacy_access_notice = self.has_legacy_access_notice
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -84,8 +79,6 @@ class CreateRoleBindingResponse201:
                 "createdAt": created_at,
             }
         )
-        if has_legacy_access_notice is not UNSET:
-            field_dict["hasLegacyAccessNotice"] = has_legacy_access_notice
 
         return field_dict
 
@@ -127,8 +120,6 @@ class CreateRoleBindingResponse201:
 
         created_at = d.pop("createdAt")
 
-        has_legacy_access_notice = d.pop("hasLegacyAccessNotice", UNSET)
-
         create_role_binding_response_201 = cls(
             id=id,
             principal=principal,
@@ -139,7 +130,6 @@ class CreateRoleBindingResponse201:
             scope_id=scope_id,
             scope_name=scope_name,
             created_at=created_at,
-            has_legacy_access_notice=has_legacy_access_notice,
         )
 
         create_role_binding_response_201.additional_properties = d

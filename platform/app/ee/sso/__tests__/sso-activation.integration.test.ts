@@ -31,8 +31,10 @@ const DAY = 24 * 60 * 60 * 1000;
 const HOSTED_OPTED_IN: SsoSelfServeContext = {
   deployment: "hosted",
   licensed: false,
-  licenseActivatedSinceStart: false,
+  licenseActivationPending: false,
   optedIn: true,
+  singleOrganization: false,
+  actorIsPlatformOperator: false,
 };
 
 const HOSTED_NOT_OPTED_IN: SsoSelfServeContext = {

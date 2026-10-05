@@ -9,6 +9,7 @@ from ...models.post_api_trigger_slack_response_200 import PostApiTriggerSlackRes
 from ...models.post_api_trigger_slack_response_400 import PostApiTriggerSlackResponse400
 from ...models.post_api_trigger_slack_response_401 import PostApiTriggerSlackResponse401
 from ...models.post_api_trigger_slack_response_403 import PostApiTriggerSlackResponse403
+from ...models.post_api_trigger_slack_response_422 import PostApiTriggerSlackResponse422
 from ...types import Response, safe_http_status
 
 
@@ -38,6 +39,7 @@ def _parse_response(
     | PostApiTriggerSlackResponse400
     | PostApiTriggerSlackResponse401
     | PostApiTriggerSlackResponse403
+    | PostApiTriggerSlackResponse422
     | None
 ):
     if response.status_code == 200:
@@ -60,6 +62,11 @@ def _parse_response(
 
         return response_403
 
+    if response.status_code == 422:
+        response_422 = PostApiTriggerSlackResponse422.from_dict(response.json())
+
+        return response_422
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -73,6 +80,7 @@ def _build_response(
     | PostApiTriggerSlackResponse400
     | PostApiTriggerSlackResponse401
     | PostApiTriggerSlackResponse403
+    | PostApiTriggerSlackResponse422
 ]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
@@ -94,10 +102,13 @@ def sync_detailed(
     | PostApiTriggerSlackResponse400
     | PostApiTriggerSlackResponse401
     | PostApiTriggerSlackResponse403
+    | PostApiTriggerSlackResponse422
 ]:
     """Create a Slack alert trigger
 
-     Create a trigger that posts to a Slack incoming webhook when traces match its filters. The
+     Create a trigger that posts to Slack when traces match its filters, through a Slack connection
+    (`slack_connection_id`, plus `slack_channel_id` for a bot) or an incoming webhook URL
+    (`slack_webhook`), which is stored as a connection. The trigger stores no secret of its own. The
     `/api/triggers` family supersedes this narrower form, which stays for callers written against it.
 
     Args:
@@ -108,7 +119,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiTriggerSlackResponse200 | PostApiTriggerSlackResponse400 | PostApiTriggerSlackResponse401 | PostApiTriggerSlackResponse403]
+        Response[PostApiTriggerSlackResponse200 | PostApiTriggerSlackResponse400 | PostApiTriggerSlackResponse401 | PostApiTriggerSlackResponse403 | PostApiTriggerSlackResponse422]
     """
 
     kwargs = _get_kwargs(
@@ -131,11 +142,14 @@ def sync(
     | PostApiTriggerSlackResponse400
     | PostApiTriggerSlackResponse401
     | PostApiTriggerSlackResponse403
+    | PostApiTriggerSlackResponse422
     | None
 ):
     """Create a Slack alert trigger
 
-     Create a trigger that posts to a Slack incoming webhook when traces match its filters. The
+     Create a trigger that posts to Slack when traces match its filters, through a Slack connection
+    (`slack_connection_id`, plus `slack_channel_id` for a bot) or an incoming webhook URL
+    (`slack_webhook`), which is stored as a connection. The trigger stores no secret of its own. The
     `/api/triggers` family supersedes this narrower form, which stays for callers written against it.
 
     Args:
@@ -146,7 +160,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiTriggerSlackResponse200 | PostApiTriggerSlackResponse400 | PostApiTriggerSlackResponse401 | PostApiTriggerSlackResponse403
+        PostApiTriggerSlackResponse200 | PostApiTriggerSlackResponse400 | PostApiTriggerSlackResponse401 | PostApiTriggerSlackResponse403 | PostApiTriggerSlackResponse422
     """
 
     return sync_detailed(
@@ -164,10 +178,13 @@ async def asyncio_detailed(
     | PostApiTriggerSlackResponse400
     | PostApiTriggerSlackResponse401
     | PostApiTriggerSlackResponse403
+    | PostApiTriggerSlackResponse422
 ]:
     """Create a Slack alert trigger
 
-     Create a trigger that posts to a Slack incoming webhook when traces match its filters. The
+     Create a trigger that posts to Slack when traces match its filters, through a Slack connection
+    (`slack_connection_id`, plus `slack_channel_id` for a bot) or an incoming webhook URL
+    (`slack_webhook`), which is stored as a connection. The trigger stores no secret of its own. The
     `/api/triggers` family supersedes this narrower form, which stays for callers written against it.
 
     Args:
@@ -178,7 +195,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiTriggerSlackResponse200 | PostApiTriggerSlackResponse400 | PostApiTriggerSlackResponse401 | PostApiTriggerSlackResponse403]
+        Response[PostApiTriggerSlackResponse200 | PostApiTriggerSlackResponse400 | PostApiTriggerSlackResponse401 | PostApiTriggerSlackResponse403 | PostApiTriggerSlackResponse422]
     """
 
     kwargs = _get_kwargs(
@@ -199,11 +216,14 @@ async def asyncio(
     | PostApiTriggerSlackResponse400
     | PostApiTriggerSlackResponse401
     | PostApiTriggerSlackResponse403
+    | PostApiTriggerSlackResponse422
     | None
 ):
     """Create a Slack alert trigger
 
-     Create a trigger that posts to a Slack incoming webhook when traces match its filters. The
+     Create a trigger that posts to Slack when traces match its filters, through a Slack connection
+    (`slack_connection_id`, plus `slack_channel_id` for a bot) or an incoming webhook URL
+    (`slack_webhook`), which is stored as a connection. The trigger stores no secret of its own. The
     `/api/triggers` family supersedes this narrower form, which stays for callers written against it.
 
     Args:
@@ -214,7 +234,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiTriggerSlackResponse200 | PostApiTriggerSlackResponse400 | PostApiTriggerSlackResponse401 | PostApiTriggerSlackResponse403
+        PostApiTriggerSlackResponse200 | PostApiTriggerSlackResponse400 | PostApiTriggerSlackResponse401 | PostApiTriggerSlackResponse403 | PostApiTriggerSlackResponse422
     """
 
     return (

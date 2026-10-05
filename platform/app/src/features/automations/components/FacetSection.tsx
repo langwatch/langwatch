@@ -23,6 +23,12 @@ export interface FacetAccordionProps {
  * a collapsed one previews its `summary`. Opening one collapses the rest (the
  * main list holds the single-open state). Without it, the panel stays open —
  * the shape the facet component tests render against.
+ *
+ * The border is one neutral color regardless of completion — every section
+ * used to outline in green once `complete`, which read as a grouping (which
+ * sections belong together) rather than a per-section status, since several
+ * sections could be green or gray at once with no relation to each other.
+ * The check icon in the header is the only completion signal now.
  */
 export function FacetSection({
   title,
@@ -57,8 +63,14 @@ export function FacetSection({
         </Tooltip>
       ) : null}
       {complete ? (
-        <Box as="span" color="green.solid" display="inline-flex">
-          <Check size={14} />
+        <Box
+          as="span"
+          color="green.solid"
+          display="inline-flex"
+          role="img"
+          aria-label="Answered"
+        >
+          <Check size={14} aria-hidden="true" />
         </Box>
       ) : null}
     </HStack>
@@ -89,9 +101,9 @@ export function FacetSection({
     <Box
       borderRadius="md"
       border="1px solid"
-      colorPalette="green"
-      borderColor={complete ? "colorPalette.solid" : "border"}
+      borderColor="border"
       bg="bg"
+      _hover={{ borderColor: "border.emphasized" }}
     >
       <Box
         role="button"
@@ -108,9 +120,6 @@ export function FacetSection({
             e.preventDefault();
             onToggle();
           }
-        }}
-        _hover={{
-          borderColor: complete ? "colorPalette.emphasized" : "orange.400",
         }}
       >
         <HStack gap={2} align="center">

@@ -10,6 +10,12 @@ export type TeamRoleValue = TeamUserRole | `custom:${string}`;
  * divergence fails the typecheck instead of writing a wrong role. EXTERNAL
  * (a lite member) deliberately lands as VIEWER: a lite seat never confers
  * write access on a scope it is granted into.
+ *
+ * DEVELOPER (ADR-143) has an entry because the record is total over the enum,
+ * and it is VIEWER, never ADMIN: an ORGANIZATION-scoped ADMIN binding opens
+ * every project. Write paths must not reach this entry for a Developer at
+ * all, because a Developer holds no binding outside their personal team;
+ * `holdsSharedAccess` is the check they branch on first.
  */
 export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
   OrganizationUserRole,
@@ -18,19 +24,53 @@ export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
   [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
   [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
   [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
+  [OrganizationUserRole.DEVELOPER]: TeamUserRole.VIEWER,
 } as const;
+
+/**
+ * Whether a seat may hold access on anything the organisation shares: a
+ * shared team, a shared project, or the organisation itself. A Developer
+ * (ADR-143) may not; their personal team is the only scope they ever hold.
+ * Every write path that hands out shared access asks this before it reads
+ * `ORGANIZATION_TO_TEAM_ROLE_MAP`.
+ */
+export function holdsSharedAccess(role: OrganizationUserRole): boolean {
+  return role !== OrganizationUserRole.DEVELOPER;
+}
+
+/**
+ * Whether a seat carries the ORGANIZATION-scoped binding a Full member
+ * holds. A Lite Member does not (their access comes from their teams) and
+ * neither does a Developer (ADR-143), so the two writers of that binding ask
+ * this one question instead of naming each seat.
+ */
+export function holdsOrganizationBinding(role: OrganizationUserRole): boolean {
+  return (
+    role === OrganizationUserRole.ADMIN || role === OrganizationUserRole.MEMBER
+  );
+}
 
 export function getOrganizationRoleLabel(role: OrganizationUserRole): string {
   if (role === OrganizationUserRole.ADMIN) return "Organization Admin";
   if (role === OrganizationUserRole.MEMBER) return "Organization Member";
+  if (role === OrganizationUserRole.DEVELOPER) return "Developer";
   return "Lite Member";
 }
 
+/**
+ * Whether a member holding this organization role may hold this role on a
+ * SHARED team. A Developer (ADR-143) may hold none: their personal team is
+ * the only team they are ever on, and it is never offered here.
+ */
 export function isTeamRoleAllowedForOrganizationRole(params: {
   organizationRole: OrganizationUserRole;
   teamRole: TeamRoleValue;
 }): boolean {
   const { organizationRole, teamRole } = params;
+
+  if (organizationRole === OrganizationUserRole.DEVELOPER) {
+    return false;
+  }
 
   if (organizationRole === OrganizationUserRole.EXTERNAL) {
     return teamRole === TeamUserRole.VIEWER;
@@ -57,6 +97,8 @@ export function isBindingRoleAllowedForOrganizationRole(params: {
   role: TeamRoleValue;
 }): boolean {
   const { organizationRole, role } = params;
+  // A Developer holds no stored row on anything shared, whatever the role.
+  if (organizationRole === OrganizationUserRole.DEVELOPER) return false;
   if (organizationRole !== OrganizationUserRole.EXTERNAL) return true;
   return isTeamRoleAllowedForOrganizationRole({
     organizationRole,

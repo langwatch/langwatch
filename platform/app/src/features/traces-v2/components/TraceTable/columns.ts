@@ -143,8 +143,10 @@ const traceColumnDefs = {
   cost: traceCol.accessor("totalCost", {
     id: "cost",
     header: "Cost",
-    size: 90,
-    minSize: 80,
+    // Fits the longest cost a trace can show, an estimated sub-cent one
+    // such as `~$0.000036`, on one line.
+    size: 105,
+    minSize: 95,
     meta: num,
   }),
   contextSize: traceCol.accessor((row) => row.contextSizeTokens ?? 0, {
@@ -348,8 +350,8 @@ const conversationColumnDefs: Record<
   cost: convCol.accessor("totalCost", {
     id: "cost",
     header: "Cost",
-    size: 80,
-    minSize: 70,
+    size: 95,
+    minSize: 85,
     meta: num,
   }),
   tokens: convCol.accessor("totalTokens", {
