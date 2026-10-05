@@ -1,9 +1,19 @@
 Feature: The demo hotel bot fills a project with traces
 
-  `POST /api/demo/hotel_bot` runs a scripted hotel concierge on the platform's
-  own OpenAI key and posts each conversation to the collector with the caller's
-  project key, so the project shows real traces. About half the calls are
-  turned away on purpose, so the project shows failures too.
+  The hotel bot runs a scripted hotel concierge on the platform's own OpenAI
+  key and posts each conversation to the collector with the caller's project
+  key, so the project shows real traces. About half the calls are turned away
+  on purpose, so the project shows failures too.
+
+  It is for LangWatch staff only. Until the platform-operator door is in place,
+  `POST /api/demo/hotel_bot` is not served to any caller; the bot and its door
+  are kept so that door can mount them again.
+
+  @unit
+  Scenario: The hotel bot is served to no caller until platform operators are admitted
+    When the sample agents module is installed
+    Then it mounts no route for the hotel bot
+    And no caller can reach the bot or its OpenAI channel
 
   @unit
   Scenario: A call without a project key is refused before any model call
@@ -78,13 +88,13 @@ Feature: The demo hotel bot fills a project with traces
     Then it fails
 
   @unit
-  Scenario: The door hands the caller's key to the hotel bot
+  Scenario: The unmounted door hands the caller's key to the hotel bot
     When the hotel bot door is called with an X-Auth-Token
     Then the hotel bot runs with that key
     And the door answers the bot's reply
 
   @unit
-  Scenario: The door answers a declined run with its code
+  Scenario: The unmounted door answers a declined run with its code
     Given the hotel bot declines the run
     When the hotel bot door is called with an X-Auth-Token
     Then the door answers 401 with the code demo_bot_declined

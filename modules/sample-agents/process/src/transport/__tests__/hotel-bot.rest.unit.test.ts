@@ -32,7 +32,7 @@ function callHotelBot(headers: Record<string, string>) {
 }
 
 describe("the hotel bot's door", () => {
-  /** @scenario "The door hands the caller's key to the hotel bot" */
+  /** @scenario "The unmounted door hands the caller's key to the hotel bot" */
   it("runs the bot with the caller's X-Auth-Token and answers its reply", async () => {
     const runs: HotelBotRunInput[] = [];
     const hono = mount({
@@ -52,7 +52,7 @@ describe("the hotel bot's door", () => {
     expect(runs).toEqual([{ authToken: "sk-lw-project" }]);
   });
 
-  /** @scenario "The door answers a declined run with its code" */
+  /** @scenario "The unmounted door answers a declined run with its code" */
   it("answers a declined run as 401 with its code", async () => {
     const hono = mount({ runHotelBot: () => Promise.reject(new HotelBotDeclinedError()) });
 
