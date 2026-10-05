@@ -158,7 +158,9 @@ describe("defineRestRouter", () => {
       ).toThrow(/declares both a permission and public access/);
     });
 
-    it("refuses a route that declares neither", () => {
+    /** @scenario "A versioned endpoint without an access policy fails the build" */
+    /** @scenario "A service endpoint without an access declaration refuses to boot" */
+    it("refuses a route that declares neither, naming the route", () => {
       const api = moduleApi<{ ping(): Promise<void> }>("ops");
 
       expect(() => {
@@ -168,7 +170,7 @@ describe("defineRestRouter", () => {
           .get("/health", "readHealth");
 
         Reflect.apply(Reflect.get(route, "handle"), route, [() => {}]);
-      }).toThrow(/must declare withPermission\(\) or withAccess\(\)/);
+      }).toThrow(/REST readHealth must declare withPermission\(\) or withAccess\(\)/);
     });
   });
 

@@ -247,6 +247,39 @@ route().handle(() => ({ status: "healthy" }));
   }
 });
 
+/** @scenario "Handler arguments expose the application the composition root supplied" */
+it("types the handler's app as the supplied API and refuses an operation it does not expose", () => {
+  const directory = mkdtempSync(join(process.cwd(), ".tmp-transport-app-"));
+  const fixture = join(directory, "fixture.ts");
+
+  writeFileSync(
+    fixture,
+    `import { z } from "zod";
+import { moduleApi } from "@langwatch/module";
+import { defineRestRouter } from "../src/rest/declaration.ts";
+interface Supplied { getAnnotation(input: { id: string }): Promise<{ id: string }> }
+const api = moduleApi<Supplied>()("annotation");
+const route = () => defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
+  .get("/:id", "getAnnotation").withParams(z.object({ id: z.string() }))
+  .withPermission("annotations:view").withOutput(z.object({ id: z.string() }));
+route().handle(({ app, input }) => app.getAnnotation({ id: input.id }));
+route().handle(({ app }) => app.deleteAnnotation({ id: "one" }));
+`,
+  );
+
+  try {
+    const errors = compile(fixture)
+      .split("\n")
+      .filter((line) => line.includes("fixture.ts(") && line.includes("error TS"));
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("fixture.ts(10,");
+    expect(errors[0]).toContain("Property 'deleteAnnotation' does not exist");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 function compile(fixture: string): string {
   try {
     execFileSync(

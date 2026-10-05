@@ -445,6 +445,7 @@ describe("the security requirement an operation publishes", () => {
 
   describe("given a route behind an organization door", () => {
     /** @scenario "An operation publishes the scheme its own credential presents" */
+    /** @scenario "Every published operation states its own credential requirement" */
     it("publishes the organization scheme rather than inheriting the document default", () => {
       const published = restRouteDocumentation({ route: route(), credential: "organization" });
 
@@ -454,6 +455,7 @@ describe("the security requirement an operation publishes", () => {
 
   describe("given a route that raises its own credential inside another family", () => {
     /** @scenario "A route's own credential wins over its family's door" */
+    /** @scenario "Every published operation states its own credential requirement" */
     it("publishes the route's scheme, not the family's", () => {
       const published = restRouteDocumentation({
         route: route({ credential: "scim_token" }),

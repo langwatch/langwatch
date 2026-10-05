@@ -3052,3 +3052,45 @@ describe("two REST families behind different doors", () => {
     });
   });
 });
+
+describe("three families mounted on one host", () => {
+  const familyOver = (namespace: string) =>
+    defineRestRouter(AnnotationApi)
+      .withNamespace(namespace)
+      .withVersion(VERSION)
+      .get("/:id", "getById")
+      .withParams(z.object({ id: z.string() }))
+      .withAccess(publicRoute({ reason: "a request-log probe reads no tenant data" }))
+      .withOutput(z.object({ id: z.string() }))
+      .handle(async ({ app, input }) => app.getById({ id: input.id }))
+      .build();
+
+  /** @scenario "One request writes one request-log record" */
+  it("writes exactly one request-handled record for one request", async () => {
+    const runtime = createRestRuntime({
+      identity: { authenticate: () => ({ actor: null, scope: null }) },
+    });
+
+    const host = new Hono();
+
+    for (const namespace of ["prompts", "datasets", "monitors"]) {
+      host.route(
+        "/",
+        runtime.mount(familyOver(namespace).router(), {
+          app: () => ({ getById: async ({ id }) => ({ id }) }),
+          onError: createErrorHandler(),
+        }),
+      );
+    }
+
+    const response = await host.request("/api/datasets/dataset-1");
+
+    expect(response.status).toBe(200);
+
+    const handled = [...recordedLogs.values()]
+      .flat()
+      .filter((row) => row.message === "request handled");
+
+    expect(handled).toHaveLength(1);
+  });
+});

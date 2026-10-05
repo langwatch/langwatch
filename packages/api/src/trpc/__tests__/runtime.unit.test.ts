@@ -293,6 +293,7 @@ describe("a mounted contract procedure", () => {
 
   describe("given the handler throws", () => {
     /** @scenario "Handled failures cross the boundary as handled errors" */
+    /** @scenario "The transport owns the failure" */
     it("carries a handled code and status, and degrades a plain Error to unknown with a trace id", async () => {
       const { runtime } = harness();
       const app: ReviewApi = { read: async () => Promise.reject(new Error("boom")) };

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   anyAuthenticated,
   describeAccessPolicy,
+  handlerManagedAuth,
   internalSecret,
   publicEndpoint,
   requires,
@@ -41,6 +42,7 @@ describe("access policy helpers", () => {
   });
 
   describe("when declaring a public endpoint", () => {
+    /** @scenario "A public or internal route declares a documented reason" */
     it("carries the documented reason", () => {
       expect(publicEndpoint("health probe")).toEqual({
         kind: "public",
@@ -48,6 +50,7 @@ describe("access policy helpers", () => {
       });
     });
 
+    /** @scenario "A public or internal route declares a documented reason" */
     it("rejects an empty reason so public exposure is always justified", () => {
       expect(() => publicEndpoint("")).toThrow(/non-empty reason/);
       expect(() => publicEndpoint("   ")).toThrow(/non-empty reason/);
@@ -55,6 +58,7 @@ describe("access policy helpers", () => {
   });
 
   describe("when declaring an internal service endpoint", () => {
+    /** @scenario "A public or internal route declares a documented reason" */
     it("carries the documented reason", () => {
       expect(internalSecret("collector OTLP receiver")).toEqual({
         kind: "internal",
@@ -62,8 +66,29 @@ describe("access policy helpers", () => {
       });
     });
 
+    /** @scenario "A public or internal route declares a documented reason" */
     it("rejects an empty reason", () => {
       expect(() => internalSecret("")).toThrow(/non-empty reason/);
+    });
+  });
+
+  describe("when a handler manages its own authorization", () => {
+    /** @scenario "A public or internal route declares a documented reason" */
+    it("carries the documented reason and refuses a blank one", () => {
+      const policy = handlerManagedAuth({
+        reason: "the signature is the whole gate",
+        permissions: [],
+        credential: "apiKey",
+      });
+
+      expect(policy).toMatchObject({
+        kind: "handlerManaged",
+        reason: "the signature is the whole gate",
+      });
+
+      expect(() =>
+        handlerManagedAuth({ reason: "  ", permissions: [], credential: "apiKey" }),
+      ).toThrow(/non-empty reason/);
     });
   });
 

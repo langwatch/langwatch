@@ -379,6 +379,7 @@ describe("the size the request body cap is willing to trust", () => {
   describe("given a Content-Length that is not a non-negative integer", () => {
     describe("when the body exceeds the cap", () => {
       for (const [description, value] of Object.entries(UNUSABLE_LENGTHS)) {
+        /** @scenario "A body past the cap under a non-integer Content-Length is refused" */
         it(`refuses a body whose length arrived as ${description}`, async () => {
           const result = await capped({
             maxSize: 16,
