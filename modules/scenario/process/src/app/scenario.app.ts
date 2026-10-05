@@ -132,7 +132,7 @@ import {
   type ScenarioServerConfig,
 } from "@langwatch/scenario-contract";
 import { SecretApi } from "@langwatch/secret-contract";
-import { credentialsSecret, sessionSecret } from "@langwatch/secrets";
+import { credentialsSecret, nlpInternalSecret, sessionSecret } from "@langwatch/secrets";
 import { SuiteApi } from "@langwatch/suite-contract";
 /**
  * The scenario feature's application: what all of its doors call.
@@ -299,13 +299,9 @@ type ScenarioProcessMembers = Readonly<{
   }>;
   /** Cancel signals across the fleet; absent in a memory process. */
   redis: ScenarioRedis | null;
-  publicBaseUrl: string | undefined;
   /** The raw-socket door's port, which the worker's quick tunnel points at. */
   rawSocketPort: number;
-  nlpServiceUrl: string | undefined;
   nlpCodeBlockTimeoutSeconds: string | undefined;
-  /** The engine hop's shared credential, resolved by the process (ADR-132). */
-  nlpInternalSecret: string | undefined;
   isSaas: boolean;
   nodeEnvironment: string | undefined;
 }>;
@@ -330,11 +326,8 @@ export class ScenarioModule implements ScenarioApi {
     "encryption",
     "rateLimiter",
     "redis",
-    "publicBaseUrl",
     "rawSocketPort",
-    "nlpServiceUrl",
     "nlpCodeBlockTimeoutSeconds",
-    "nlpInternalSecret",
     "isSaas",
     "nodeEnvironment",
   ] as const;
@@ -343,6 +336,8 @@ export class ScenarioModule implements ScenarioApi {
   static readonly secrets = {
     voiceSessionSigning: credentialsSecret,
     voiceSessionSigningFallback: sessionSecret,
+    /** The engine hop's shared credential (ADR-132); the process holds the same handle. */
+    nlpInternal: nlpInternalSecret,
   } as const;
 
   static async create(
@@ -354,7 +349,8 @@ export class ScenarioModule implements ScenarioApi {
     >,
   ): Promise<ScenarioModule> {
     const { secrets } = setup;
-    const { redis, publicBaseUrl, nodeEnvironment } = setup.members;
+    const { redis, nodeEnvironment } = setup.members;
+    const { publicBaseUrl, nlpServiceUrl } = setup.config;
     const signingSecret = await secrets.into(
       ScenarioModule.secrets.voiceSessionSigning,
       (credentials) =>
@@ -363,6 +359,7 @@ export class ScenarioModule implements ScenarioApi {
           (session) => credentials ?? session,
         ),
     );
+    const nlpInternal = await secrets.into(ScenarioModule.secrets.nlpInternal, (secret) => secret);
     // Resolved here, in the worker only, before any child spawns (Alex, 2026-09-28).
     const voice = await VoicePublicUrlService.create().resolveForRole({
       role: setup.role,
@@ -413,7 +410,7 @@ export class ScenarioModule implements ScenarioApi {
     const { dependencies: peers, repositories, config } = setup;
     const prefetchConfig = {
       langwatchEndpoint: config.langwatchEndpoint ?? "",
-      nlpServiceUrl: setup.members.nlpServiceUrl ?? "",
+      nlpServiceUrl: nlpServiceUrl ?? "",
       legacyDefaultModel: config.defaultModel ?? DEFAULT_MODEL,
       publicBaseUrl,
     };
@@ -436,8 +433,8 @@ export class ScenarioModule implements ScenarioApi {
 
     const childHost = {
       voicePublicUrl: voice.publicUrl,
-      nlpServiceUrl: setup.members.nlpServiceUrl,
-      nlpInternalSecret: setup.members.nlpInternalSecret,
+      nlpServiceUrl,
+      nlpInternalSecret: nlpInternal,
       isSaas: setup.members.isSaas,
       nodeEnvironment,
       publicBaseUrl,

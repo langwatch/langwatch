@@ -5,6 +5,8 @@ import {
   Config,
   isSaas,
   langwatchDefaultModel,
+  nlpServiceUrl,
+  publicBaseUrl,
   type ConfigOf,
 } from "@langwatch/config";
 import { nlpFetchMaxTimeoutMs } from "@langwatch/workflow-contract";
@@ -97,6 +99,10 @@ export const scenarioConfig = Config.define((c) => ({
   blockLocalHttpCalls,
   allowedProxyHosts,
   defaultModel: langwatchDefaultModel,
+  /** The shared NLP engine's address; absent, no scenario executor is composed. */
+  nlpServiceUrl,
+  /** The deployment's public origin (the shared leaf); absent, platform links refuse by name. */
+  publicBaseUrl,
   /** The nlpgo deadlines an agent-test turn answers inside; unusable values clamp to defaults. */
   nlpTimeouts: {
     maxTimeoutMs: nlpFetchMaxTimeoutMs,

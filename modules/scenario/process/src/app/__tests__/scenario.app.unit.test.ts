@@ -64,7 +64,7 @@ async function harness() {
       ...scenarioVoicePeers(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
     },
-    config: scenarioTestConfig,
+    config: { ...scenarioTestConfig, publicBaseUrl: "https://langwatch.test" },
     resources: {} as ResourceOwnership,
     secrets: scenarioTestSecrets,
     // Nothing below is reached: assembling the envelope reads only its
@@ -73,7 +73,6 @@ async function harness() {
     members: {
       ...scenarioHostMembers,
       redis: null,
-      publicBaseUrl: "https://langwatch.test",
       clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
       simulations: simulations as SimulationService,
       encryption: createApiFixture<Encryption>(),
@@ -399,7 +398,6 @@ describe("ScenarioModule.getRunDataForAllSuites", () => {
         members: {
           ...scenarioHostMembers,
           redis: null,
-          publicBaseUrl: undefined,
           // No ClickHouse either: the refusal is what a deployment that
           // composed neither the member nor the store it derives from owes.
           clickhouse: undefined as never,
@@ -444,7 +442,6 @@ describe("given a process that supplies no simulations member but does read Clic
       members: {
         ...scenarioHostMembers,
         redis: null,
-        publicBaseUrl: undefined,
         clickhouse: {
           query: <Row>(input: { tenantId: string }) => {
             asked.push({ tenantId: input.tenantId });

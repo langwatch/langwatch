@@ -54,7 +54,7 @@ export type ScenarioExecutorPeers = Readonly<{
 const WORKSPACE_ROOT = path.join(import.meta.dirname, "..", "..", "..", "..", "..");
 const CHILD_PACKAGE_ROOT = path.join(WORKSPACE_ROOT, "apps", "scenario-child");
 
-/** The process facts a child is started with, read as members. */
+/** The process facts a child is started with, as the module resolved them. */
 export type ScenarioExecutorHost = Readonly<{
   voicePublicUrl: VoicePublicUrl;
   nlpServiceUrl: string | undefined;

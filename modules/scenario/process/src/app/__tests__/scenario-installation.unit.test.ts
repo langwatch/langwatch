@@ -57,7 +57,9 @@ const signatureAgent: AgentWithFields = {
 function process(role: "api" | "worker", emitter: EventEmitter) {
   return createApp({ role, secrets: scenarioInstallationSecrets() })
     .withModules([withMemoryRepositories(scenarioProcessModule)])
-    .withConfig({ scenario: scenarioTestConfig })
+    .withConfig({
+      scenario: { ...scenarioTestConfig, publicBaseUrl: "https://app.langwatch.test" },
+    })
     .withStores(memoryStores())
     .withAnalytical(createApiFixture<ScenarioReadOnlyClickHouse>())
     .withKeyvalue(memoryRedisDouble())
@@ -66,10 +68,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       decrypt: (value: string) => value,
     })
     .withMember("rateLimiter", { check: async () => ({ allowed: true }) })
-    .withMember("publicBaseUrl", "https://app.langwatch.test")
-    .withMember("nlpServiceUrl", undefined)
     .withMember("nlpCodeBlockTimeoutSeconds", undefined)
-    .withMember("nlpInternalSecret", undefined)
     .withMember("isSaas", false)
     .withMember("nodeEnvironment", "test")
     .withMember("rawSocketPort", 0)

@@ -106,10 +106,9 @@ export async function createScenarioRestTestApp(
       simulations,
       encryption: createApiFixture<Encryption>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
-      publicBaseUrl: "https://app.langwatch.test",
     },
     resources: createApiFixture<ResourceOwnership>(),
-    config: scenarioTestConfig,
+    config: { ...scenarioTestConfig, publicBaseUrl: "https://app.langwatch.test" },
     secrets: scenarioTestSecrets,
   });
 

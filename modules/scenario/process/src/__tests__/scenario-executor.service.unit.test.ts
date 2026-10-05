@@ -39,7 +39,12 @@ function harness({ langwatchEndpoint }: { langwatchEndpoint: string | undefined 
     cancellations: channel,
     cancellationSubscriptions: channel,
     config: { ...scenarioTestConfig, langwatchEndpoint },
-    host: { ...scenarioHostMembers, nlpServiceUrl: "http://nlp.test", publicBaseUrl: void 0 },
+    host: {
+      ...scenarioHostMembers,
+      nlpServiceUrl: "http://nlp.test",
+      nlpInternalSecret: void 0,
+      publicBaseUrl: void 0,
+    },
   });
   const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
   executor.connect({ pool, resources: { own: (name) => void owned.push(name) } });

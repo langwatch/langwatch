@@ -1,6 +1,6 @@
 /**
- * ScenarioModule reads `publicBaseUrl` off the process's own member, the same
- * way SuiteModule does - see specs/scenarios/scenario-api.feature.
+ * ScenarioModule reads `publicBaseUrl` from its config slice (the shared
+ * leaf) - see specs/scenarios/scenario-api.feature.
  * @vitest-environment node
  */
 import { EventEmitter } from "node:events";
@@ -55,13 +55,12 @@ async function buildProductionApp(publicBaseUrl: string | undefined, emitter = n
       ...scenarioVoicePeers(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
     },
-    config: scenarioTestConfig,
+    config: { ...scenarioTestConfig, publicBaseUrl },
     resources: createApiFixture<ResourceOwnership>(),
     secrets: scenarioTestSecrets,
     members: {
       ...scenarioHostMembers,
       redis: null,
-      publicBaseUrl,
       encryption: createApiFixture<Encryption>({
         encrypt: (value: string) => value,
         decrypt: (value: string) => value,
