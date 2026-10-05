@@ -11,6 +11,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import {
   ProjectOperationsService,
   type ProjectOperationsDirectory,
@@ -125,9 +126,14 @@ function characterizationProject(traceSharingEnabled: boolean): ProjectWithTeam 
   };
 }
 
+const MEMBER = { id: "user_1" };
+
+type PresenceSettingChange = Parameters<ProjectCreatedNoticeService["presenceSettingChanged"]>[0];
+
 function characterizationOperations(options: {
   projects: Partial<ProjectOperationsDirectory>;
   revokeAllTraceShares: ShareApi["revokeAllTraceShares"];
+  presenceChanges?: PresenceSettingChange[];
 }): ProjectOperationsService {
   return ProjectOperationsService.create({
     projects: new CharacterizationProjectDirectory(options.projects),
@@ -136,7 +142,12 @@ function characterizationOperations(options: {
     auditLog: createApiFixture<AuditLogApi>({
       record: async () => ({ id: "audit", occurredAt: 0 }),
     }),
-    lifecycle: { legacyKeyRevoked: async () => undefined },
+    lifecycle: {
+      legacyKeyRevoked: async () => undefined,
+      presenceSettingChanged: async (change) => {
+        options.presenceChanges?.push(change);
+      },
+    },
     logger: { error: () => undefined },
     now: () => 0,
   });
@@ -153,7 +164,10 @@ describe("ProjectOperationsService", () => {
         revokeAllTraceShares,
       });
 
-      await operations.updateSettings({ projectId: "project_123", traceSharingEnabled: false });
+      await operations.updateSettings(
+        { projectId: "project_123", traceSharingEnabled: false },
+        MEMBER,
+      );
 
       expect(update).toHaveBeenCalledWith(
         expect.objectContaining({ id: "project_123", organizationId: "org-1" }),
@@ -173,7 +187,10 @@ describe("ProjectOperationsService", () => {
         revokeAllTraceShares,
       });
 
-      await operations.updateSettings({ projectId: "project_123", traceSharingEnabled: false });
+      await operations.updateSettings(
+        { projectId: "project_123", traceSharingEnabled: false },
+        MEMBER,
+      );
 
       expect(revokeAllTraceShares).not.toHaveBeenCalled();
     });
@@ -194,7 +211,7 @@ describe("ProjectOperationsService", () => {
         revokeAllTraceShares: async () => {},
       });
 
-      await expect(operations.updateSettings(storage)).rejects.toMatchObject({
+      await expect(operations.updateSettings(storage, MEMBER)).rejects.toMatchObject({
         code: "validation_error",
         httpStatus: 400,
       });
@@ -210,9 +227,60 @@ describe("ProjectOperationsService", () => {
         revokeAllTraceShares: async () => {},
       });
 
-      await operations.updateSettings(storage);
+      await operations.updateSettings(storage, MEMBER);
 
       expect(update).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given a project whose presence setting is on", () => {
+    function presenceOperations() {
+      const presenceChanges: PresenceSettingChange[] = [];
+      const operations = characterizationOperations({
+        projects: {
+          findWithTeam: async () => characterizationProject(false),
+          update: async () => characterizationProject(false),
+        },
+        revokeAllTraceShares: async () => {},
+        presenceChanges,
+      });
+      return { operations, presenceChanges };
+    }
+
+    describe("when a member saves the settings with presence off", () => {
+      /** @scenario "A changed project presence setting is recorded as project's fact" */
+      it("records the change with the organization and the member who made it", async () => {
+        const { operations, presenceChanges } = presenceOperations();
+
+        await operations.updateSettings(
+          { projectId: "project_123", presenceEnabled: false },
+          MEMBER,
+        );
+
+        expect(presenceChanges).toEqual([
+          {
+            projectId: "project_123",
+            organizationId: "org-1",
+            presenceEnabled: false,
+            changedByUserId: "user_1",
+          },
+        ]);
+      });
+    });
+
+    describe("when a member saves the settings with presence unchanged or absent", () => {
+      /** @scenario "Saving project settings without changing presence records no presence fact" */
+      it("records no presence fact", async () => {
+        const { operations, presenceChanges } = presenceOperations();
+
+        await operations.updateSettings(
+          { projectId: "project_123", presenceEnabled: true },
+          MEMBER,
+        );
+        await operations.updateSettings({ projectId: "project_123", name: "Renamed" }, MEMBER);
+
+        expect(presenceChanges).toEqual([]);
+      });
     });
   });
 });

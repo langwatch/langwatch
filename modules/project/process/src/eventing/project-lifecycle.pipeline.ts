@@ -18,10 +18,12 @@ import type { ProjectRepositories } from "../repositories/project.repositories.t
 import {
   RecordProjectCreatedCommand,
   RecordProjectLegacyKeyRevokedCommand,
+  RecordProjectPresenceSettingChangedCommand,
 } from "./project-lifecycle.commands.ts";
 import {
   projectCreatedEventSchema,
   projectLegacyKeyRevokedEventSchema,
+  projectPresenceSettingChangedEventSchema,
 } from "./project-lifecycle.events.ts";
 
 function lifecycleCommands() {
@@ -29,9 +31,14 @@ function lifecycleCommands() {
     name: PROJECT_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: PROJECT_AGGREGATE_TYPE }),
   })
-    .withEvents([projectCreatedEventSchema, projectLegacyKeyRevokedEventSchema])
+    .withEvents([
+      projectCreatedEventSchema,
+      projectLegacyKeyRevokedEventSchema,
+      projectPresenceSettingChangedEventSchema,
+    ])
     .withCommand("recordProjectCreated", RecordProjectCreatedCommand)
-    .withCommand("recordProjectLegacyKeyRevoked", RecordProjectLegacyKeyRevokedCommand);
+    .withCommand("recordProjectLegacyKeyRevoked", RecordProjectLegacyKeyRevokedCommand)
+    .withCommand("recordPresenceSettingChanged", RecordProjectPresenceSettingChangedCommand);
 }
 
 export type ProjectLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;

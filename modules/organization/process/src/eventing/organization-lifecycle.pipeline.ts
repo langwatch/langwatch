@@ -12,6 +12,7 @@ import {
   RecordInviteAcceptedCommand,
   RecordMembersInvitedCommand,
   RecordPersonalWorkspaceProvisionedCommand,
+  RecordPresenceSettingChangedCommand,
   RecordSignedUpCommand,
 } from "./organization-lifecycle.commands.ts";
 import {
@@ -20,6 +21,7 @@ import {
   membersInvitedEventSchema,
   ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
+  organizationPresenceSettingChangedEventSchema,
   organizationSignedUpEventSchema,
   personalWorkspaceProvisionedEventSchema,
 } from "./organization-lifecycle.events.ts";
@@ -35,12 +37,14 @@ function lifecycleCommands() {
       inviteAcceptedEventSchema,
       integrationMethodChosenEventSchema,
       personalWorkspaceProvisionedEventSchema,
+      organizationPresenceSettingChangedEventSchema,
     ])
     .withCommand("recordSignedUp", RecordSignedUpCommand)
     .withCommand("recordMembersInvited", RecordMembersInvitedCommand)
     .withCommand("recordInviteAccepted", RecordInviteAcceptedCommand)
     .withCommand("recordIntegrationMethodChosen", RecordIntegrationMethodChosenCommand)
-    .withCommand("recordPersonalWorkspaceProvisioned", RecordPersonalWorkspaceProvisionedCommand);
+    .withCommand("recordPersonalWorkspaceProvisioned", RecordPersonalWorkspaceProvisionedCommand)
+    .withCommand("recordPresenceSettingChanged", RecordPresenceSettingChangedCommand);
 }
 
 export type OrganizationLifecycleDefinition = ReturnType<

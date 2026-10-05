@@ -140,21 +140,24 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("update")
   .withPermission("organization:manage")
-  .handle(async ({ app, input }) => {
+  .handle(async ({ app, input, actor }) => {
     // The stored secret is never sent to the form: a blank one beside an
     // endpoint leaves it unchanged, and blank everywhere clears it.
-    await app.updateSettings({
-      organizationId: input.organizationId,
-      name: input.name,
-      s3Endpoint: input.s3Endpoint ?? null,
-      s3AccessKeyId: input.s3AccessKeyId ?? null,
-      s3SecretAccessKey: input.s3SecretAccessKey || (input.s3Endpoint ? void 0 : null),
-      s3Bucket: input.s3Bucket,
-      presenceEnabled: input.presenceEnabled,
-      traceSharingEnabled: input.traceSharingEnabled,
-      supportContact: input.supportContact,
-      primaryIntent: input.primaryIntent,
-    });
+    await app.updateSettings(
+      {
+        organizationId: input.organizationId,
+        name: input.name,
+        s3Endpoint: input.s3Endpoint ?? null,
+        s3AccessKeyId: input.s3AccessKeyId ?? null,
+        s3SecretAccessKey: input.s3SecretAccessKey || (input.s3Endpoint ? void 0 : null),
+        s3Bucket: input.s3Bucket,
+        presenceEnabled: input.presenceEnabled,
+        traceSharingEnabled: input.traceSharingEnabled,
+        supportContact: input.supportContact,
+        primaryIntent: input.primaryIntent,
+      },
+      { id: actor.id },
+    );
 
     return { success: true as const };
   })

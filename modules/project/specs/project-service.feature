@@ -121,3 +121,24 @@ Feature: Shared project service
     When the backfill-project-created task runs twice
     Then each run records both projects as created, marked backfilled, with the organization's admin
     And the second run records the same facts as the first, keyed alike, so peers treat it as a repeat
+
+  @unit
+  Scenario: A changed project presence setting is recorded as project's fact
+    Given a project whose presence setting is on
+    When a member saves the project settings with presence off
+    Then project records a presence-setting-changed fact with presence off and the project's organization
+    And the fact carries the id of the member who changed it
+    And it is not marked as backfilled
+
+  @unit
+  Scenario: Saving project settings without changing presence records no presence fact
+    Given a project whose presence setting is on
+    When a member saves the project settings with presence on, or without the presence field
+    Then no presence-setting-changed fact is recorded
+
+  @unit
+  Scenario: Existing projects' presence settings are recorded by the backfill, idempotently
+    Given an organization with two projects whose presence settings were stored before project recorded them
+    When the backfill-project-presence-setting task runs twice
+    Then each run records each project's stored presence setting once, marked backfilled, with no changer
+    And each project's fact is keyed alike on both runs, so the second run records nothing new

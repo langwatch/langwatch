@@ -184,8 +184,8 @@ export const organizationManagementRest: Readonly<{
       "Update the organization profile. Partial: only the fields present are written, and the response is exactly what a subsequent GET returns.",
   })
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
-  .handle(async ({ app, input, scope }) => {
-    await app.updateSettings({ organizationId: scope.id, ...input });
+  .handle(async ({ app, input, scope, actor }) => {
+    await app.updateSettings({ organizationId: scope.id, ...input }, deriveCaller(actor));
 
     return app.getSettings({ organizationId: scope.id });
   })

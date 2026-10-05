@@ -21,6 +21,7 @@ import { ProjectCredentialsService } from "./services/project-credentials.servic
 import { ProjectMetadataService } from "./services/project-metadata.service.ts";
 import type { ProjectDiagnostics } from "./services/project.service.ts";
 import { ProjectCreatedBackfillTask } from "./tasks/project-created-backfill.task.ts";
+import { ProjectPresenceSettingBackfillTask } from "./tasks/project-presence-setting-backfill.task.ts";
 import { projectRest, projectRestCredential } from "./transport/project.rest.ts";
 import { projectTrpcTransport } from "./transport/project.trpc.ts";
 
@@ -38,6 +39,10 @@ export const projectProcessModule = defineProcessModule("project")
   .withEventing(projectLifecycleEventing)
   .withTasks(({ app, dependencies }) => [
     ProjectCreatedBackfillTask.create({ organizations: dependencies.organizations, projects: app }),
+    ProjectPresenceSettingBackfillTask.create({
+      organizations: dependencies.organizations,
+      projects: app,
+    }),
   ]);
 
 /**

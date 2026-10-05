@@ -247,6 +247,7 @@ describe("the projects REST family over the application the composition builds",
       app.connectLifecycle({
         recordProjectCreated: { send: recorded },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
+        recordPresenceSettingChanged: { send: async () => undefined },
       });
     });
 

@@ -231,6 +231,7 @@ describe("the project tRPC namespace", () => {
           s3SecretAccessKey: "encrypted(shh)",
           s3Bucket: "bucket",
         }),
+        expect.objectContaining({ id: ACTOR_ID }),
       );
     });
 

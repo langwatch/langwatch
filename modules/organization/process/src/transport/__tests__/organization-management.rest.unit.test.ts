@@ -124,6 +124,25 @@ describe("given the /api/organization family", () => {
     });
   });
 
+  describe("when a member updates the organization", () => {
+    /** @scenario "Both doors that save organization settings name who saved them" */
+    it("tells the organization service the member who saved it", async () => {
+      const updateSettings = vi.fn(async () => ({ traceShareRevocationRequired: false }));
+      const send = mount({ updateSettings, getSettings: async () => settings });
+
+      const response = await send("/api/organization", {
+        method: "PATCH",
+        body: { presenceEnabled: false },
+      });
+
+      expect(response.status).toBe(200);
+      expect(updateSettings).toHaveBeenCalledWith(
+        { organizationId: ORGANIZATION_ID, presenceEnabled: false },
+        { id: "user-owner" },
+      );
+    });
+  });
+
   describe("when the members are listed", () => {
     /** @scenario "Listing members returns roles and status" */
     it("answers each member's id, name, email, role and disabled flag, disabled ones only when asked", async () => {

@@ -293,7 +293,11 @@ export interface OrganizationApi {
     organizationId: string;
     record: GuidedOnboardingRecord;
   }): Promise<GuidedOnboardingRecord>;
-  updateSettings(input: UpdateOrganizationSettingsInput): Promise<UpdateOrganizationSettingsResult>;
+  /** `by` is the member saving it, or nothing for an organization key with no member. */
+  updateSettings(
+    input: UpdateOrganizationSettingsInput,
+    by: Readonly<{ id: string }> | null,
+  ): Promise<UpdateOrganizationSettingsResult>;
   getSettings(input: { organizationId: string }): Promise<organizationModule.OrganizationSettings>;
   listTeams(input: ListOrganizationTeamsInput): Promise<OrganizationTeamPage>;
   listMembers(input: {

@@ -182,6 +182,7 @@ function application(
   app.connectLifecycle({
     recordProjectCreated: { send: async () => undefined },
     recordProjectLegacyKeyRevoked: { send: options.revoked ?? (async () => undefined) },
+    recordPresenceSettingChanged: { send: async () => undefined },
   });
 
   return { app, database, asked, logged };

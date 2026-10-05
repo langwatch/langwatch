@@ -27,7 +27,10 @@ export type ProjectOperationsDirectory = Pick<
 type ProjectOperationsDependencies = Readonly<{
   readonly projects: ProjectOperationsDirectory;
   readonly auditLog: AuditLogApi;
-  readonly lifecycle: Pick<ProjectCreatedNoticeService, "legacyKeyRevoked">;
+  readonly lifecycle: Pick<
+    ProjectCreatedNoticeService,
+    "legacyKeyRevoked" | "presenceSettingChanged"
+  >;
   /** Where a best-effort failure is reported when nothing can be done about it. */
   readonly logger: Readonly<{
     error(payload: Readonly<Record<string, unknown>>, message: string): void;
@@ -72,6 +75,7 @@ export class ProjectOperationsService {
 
   async updateSettings(
     input: Readonly<UpdateProjectInput & { projectId: string }>,
+    by: ProjectCaller,
   ): Promise<Project> {
     const project = await this.dependencies.projects.findWithTeam(input.projectId);
     if (!project) {
@@ -104,6 +108,14 @@ export class ProjectOperationsService {
 
     if (input.traceSharingEnabled === false && project.traceSharingEnabled === true) {
       await this.dependencies.share.revokeAllTraceShares(input.projectId);
+    }
+    if (input.presenceEnabled !== undefined && input.presenceEnabled !== project.presenceEnabled) {
+      await this.dependencies.lifecycle.presenceSettingChanged({
+        projectId: input.projectId,
+        organizationId: project.team.organizationId,
+        presenceEnabled: input.presenceEnabled,
+        changedByUserId: by.id,
+      });
     }
 
     return updated;

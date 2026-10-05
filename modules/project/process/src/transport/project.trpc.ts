@@ -149,27 +149,30 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
     .handle(async ({ app, input, actor }) => {
       await traceSharingStanding({ app, input, actor });
 
-      const updatedProject = await app.projects().updateSettings({
-        projectId: input.projectId,
-        name: input.name,
-        language: input.language,
-        framework: input.framework,
-        teamId: input.teamId,
-        traceSharingEnabled: input.traceSharingEnabled,
-        presenceEnabled: input.presenceEnabled,
-        userLinkTemplate: input.userLinkTemplate,
-        s3Endpoint: input.s3Endpoint ? app.encryptProjectSecret(input.s3Endpoint) : null,
-        s3AccessKeyId: input.s3AccessKeyId ? app.encryptProjectSecret(input.s3AccessKeyId) : null,
-        // A blank secret beside an endpoint leaves the stored one unchanged.
-        ...(input.s3SecretAccessKey || !input.s3Endpoint
-          ? {
-              s3SecretAccessKey: input.s3SecretAccessKey
-                ? app.encryptProjectSecret(input.s3SecretAccessKey)
-                : null,
-            }
-          : {}),
-        s3Bucket: input.s3Bucket,
-      });
+      const updatedProject = await app.projects().updateSettings(
+        {
+          projectId: input.projectId,
+          name: input.name,
+          language: input.language,
+          framework: input.framework,
+          teamId: input.teamId,
+          traceSharingEnabled: input.traceSharingEnabled,
+          presenceEnabled: input.presenceEnabled,
+          userLinkTemplate: input.userLinkTemplate,
+          s3Endpoint: input.s3Endpoint ? app.encryptProjectSecret(input.s3Endpoint) : null,
+          s3AccessKeyId: input.s3AccessKeyId ? app.encryptProjectSecret(input.s3AccessKeyId) : null,
+          // A blank secret beside an endpoint leaves the stored one unchanged.
+          ...(input.s3SecretAccessKey || !input.s3Endpoint
+            ? {
+                s3SecretAccessKey: input.s3SecretAccessKey
+                  ? app.encryptProjectSecret(input.s3SecretAccessKey)
+                  : null,
+              }
+            : {}),
+          s3Bucket: input.s3Bucket,
+        },
+        actor,
+      );
 
       return { success: true, projectSlug: updatedProject.slug };
     })

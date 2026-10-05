@@ -240,6 +240,11 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#lifecycle.recordExisting(input);
   }
 
+  /** Records one organization's projects' stored presence settings, for the backfill task. */
+  recordExistingPresenceSettings(input: Readonly<{ organizationId: string }>): Promise<number> {
+    return this.#lifecycle.recordExistingPresenceSettings(input);
+  }
+
   /** The deployment's cipher, for the stored-object credentials on the form. */
   encryptProjectSecret(value: string): string {
     return this.#encryption.encrypt(value);
@@ -521,8 +526,11 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#operations.create(input, by);
   }
 
-  updateSettings(input: Readonly<UpdateProjectInput & { projectId: string }>): Promise<Project> {
-    return this.#operations.updateSettings(input);
+  updateSettings(
+    input: Readonly<UpdateProjectInput & { projectId: string }>,
+    by: Readonly<{ id: string }>,
+  ): Promise<Project> {
+    return this.#operations.updateSettings(input, by);
   }
 
   archive(input: Readonly<{ projectId: string }>): Promise<{ alreadyArchived: boolean }> {

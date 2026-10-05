@@ -6,12 +6,14 @@
  * @see specs/features/customer-io-nurturing-integration.feature
  */
 import { createTenantId } from "@langwatch/eventing";
+import { ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   RecordIntegrationMethodChosenCommand,
   RecordInviteAcceptedCommand,
   RecordMembersInvitedCommand,
+  RecordPresenceSettingChangedCommand,
   RecordSignedUpCommand,
 } from "../organization-lifecycle.commands.ts";
 import { buildOrganizationLifecyclePipeline } from "../organization-lifecycle.pipeline.ts";
@@ -90,5 +92,40 @@ describe("organization's lifecycle pipeline", () => {
 
   it("declares no subscriber of its own: its peers react from their side", () => {
     expect(buildOrganizationLifecyclePipeline().eventSubscribers.size).toBe(0);
+  });
+
+  describe("when the organization's presence setting is recorded", () => {
+    const presence = (data: { occurredAt: number; backfilled?: boolean }) =>
+      only(
+        new RecordPresenceSettingChangedCommand().handle(
+          command({
+            ...envelope,
+            presenceEnabled: false,
+            ...(data.backfilled ? { backfilled: true } : { changedByUserId: "user_admin" }),
+            occurredAt: data.occurredAt,
+          }),
+        ),
+      );
+
+    /** @scenario "A changed organization presence setting is recorded as organization's fact" */
+    it("records a change on the organization, carrying who changed it, keyed on its moment", () => {
+      const first = presence({ occurredAt: AT });
+      const second = presence({ occurredAt: AT + 1 });
+
+      expect(first.type).toBe(ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE);
+      expect(first.aggregateId).toBe("org_acme");
+      expect(first.data).toMatchObject({ presenceEnabled: false, changedByUserId: "user_admin" });
+      expect(first.data.backfilled).toBeUndefined();
+      expect(first.idempotencyKey).not.toBe(second.idempotencyKey);
+    });
+
+    /** @scenario "Existing organizations' presence settings are recorded by the backfill, idempotently" */
+    it("keys a backfilled setting once per organization, so a re-run collapses", () => {
+      const first = presence({ occurredAt: AT, backfilled: true });
+      const rerun = presence({ occurredAt: AT + 1, backfilled: true });
+
+      expect(first.idempotencyKey).toBe("org_acme:presence_setting:backfilled");
+      expect(rerun.idempotencyKey).toBe(first.idempotencyKey);
+    });
   });
 });

@@ -65,7 +65,11 @@ async function seeded() {
   return ProjectService.create({
     created: ProjectCreatedNoticeService.create({
       logger: { error: () => void 0 },
-      projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+      projects: {
+        findWithOrgAdmin: async () => null,
+        findIdsByOrganization: async () => [],
+        findWithTeam: async () => null,
+      },
     }),
     repository,
     credentials: ProjectCredentialsService.create(),

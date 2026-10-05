@@ -4,8 +4,11 @@ import {
   PROJECT_CREATED_EVENT_VERSION,
   PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE,
   PROJECT_LEGACY_KEY_REVOKED_EVENT_VERSION,
+  PROJECT_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
+  PROJECT_PRESENCE_SETTING_CHANGED_EVENT_VERSION,
   projectCreatedEventDataSchema,
   projectLegacyKeyRevokedEventDataSchema,
+  projectPresenceSettingChangedEventDataSchema,
 } from "@langwatch/project-contract";
 import { z } from "zod";
 
@@ -38,3 +41,22 @@ export const projectLegacyKeyRevokedEventSchema = z.object({
   data: projectLegacyKeyRevokedEventDataSchema,
 });
 export type ProjectLegacyKeyRevokedEvent = z.infer<typeof projectLegacyKeyRevokedEventSchema>;
+
+export const RECORD_PROJECT_PRESENCE_SETTING_CHANGED_COMMAND_TYPE =
+  "lw.project.record_presence_setting_changed" as const;
+
+export const recordProjectPresenceSettingChangedCommandDataSchema =
+  projectPresenceSettingChangedEventDataSchema;
+export type RecordProjectPresenceSettingChangedCommandData = z.infer<
+  typeof recordProjectPresenceSettingChangedCommandDataSchema
+>;
+
+export const projectPresenceSettingChangedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROJECT_PRESENCE_SETTING_CHANGED_EVENT_TYPE),
+  version: z.literal(PROJECT_PRESENCE_SETTING_CHANGED_EVENT_VERSION),
+  data: projectPresenceSettingChangedEventDataSchema,
+});
+export type ProjectPresenceSettingChangedEvent = z.infer<
+  typeof projectPresenceSettingChangedEventSchema
+>;

@@ -163,6 +163,7 @@ describe("the tasks process installation", () => {
         "grant-platform-operator",
         "system-migrations-pass",
         "backfill-project-created",
+        "backfill-project-presence-setting",
         "stalled-runs-backfill",
         "topic-clustering-run",
         "user-data-erase",

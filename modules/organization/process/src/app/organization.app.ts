@@ -366,6 +366,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       grants: setup.dependencies.permissions,
       diagnostics: infrastructure.diagnostics,
       notices: infrastructure.lifecycle,
+      settingsNotices: infrastructure.lifecycle,
     });
     const membershipRepository = setup.repositories.membership(setup.dependencies.permissions);
     const membership = OrganizationMembershipService.create({
@@ -709,8 +710,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   async updateSettings(
     input: UpdateOrganizationSettingsInput,
+    by: Readonly<{ id: string }> | null,
   ): Promise<UpdateOrganizationSettingsResult> {
-    const result = await this.#dependencies.organizations.updateSettings(input);
+    const result = await this.#dependencies.organizations.updateSettings(input, by);
     await this.#revokeTraceSharesIfRequired(input.organizationId, result);
 
     return result;
@@ -1566,6 +1568,11 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   /** organization_lifecycle: the same in every role, since its peers react from their side (§9). */
   lifecyclePipeline(): OrganizationLifecycleDefinition {
     return buildOrganizationLifecyclePipeline();
+  }
+
+  /** Records one organization's stored presence switch, for the backfill task. */
+  recordStoredPresenceSetting(input: { organizationId: string }): Promise<boolean> {
+    return this.#dependencies.organizations.recordStoredPresenceSetting(input);
   }
 
   connectLifecycle(senders: OrganizationLifecycleSenders): void {

@@ -6,6 +6,9 @@ import {
   inviteAcceptedEventDataSchema,
   MEMBERS_INVITED_EVENT_TYPE,
   membersInvitedEventDataSchema,
+  ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
+  ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_VERSION,
+  organizationPresenceSettingChangedEventDataSchema,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   organizationSignedUpEventDataSchema,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
@@ -27,6 +30,8 @@ export const RECORD_INTEGRATION_METHOD_CHOSEN_COMMAND_TYPE =
   "lw.organization.record_integration_method_chosen" as const;
 export const RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE =
   "lw.organization.record_personal_workspace_provisioned" as const;
+export const RECORD_PRESENCE_SETTING_CHANGED_COMMAND_TYPE =
+  "lw.organization.record_presence_setting_changed" as const;
 
 /** Somebody finished onboarding by creating this organization. */
 export const recordSignedUpCommandDataSchema = organizationSignedUpEventDataSchema;
@@ -95,3 +100,20 @@ export type OrganizationLifecycleEvent =
   | InviteAcceptedEvent
   | IntegrationMethodChosenEvent
   | PersonalWorkspaceProvisionedEvent;
+
+/** The organization's presence switch; versioned on its own, born after the lifecycle's facts. */
+export const recordPresenceSettingChangedCommandDataSchema =
+  organizationPresenceSettingChangedEventDataSchema;
+export type RecordPresenceSettingChangedCommandData = z.infer<
+  typeof recordPresenceSettingChangedCommandDataSchema
+>;
+
+export const organizationPresenceSettingChangedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE),
+  version: z.literal(ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_VERSION),
+  data: organizationPresenceSettingChangedEventDataSchema,
+});
+export type OrganizationPresenceSettingChangedEvent = z.infer<
+  typeof organizationPresenceSettingChangedEventSchema
+>;

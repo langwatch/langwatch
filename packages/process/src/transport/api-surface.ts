@@ -262,7 +262,11 @@ class ApiSurface {
       bindTrpcFact(callerEmailFact, (ctx: TrpcRequestContext) => ctx.session?.user.email ?? null),
       bindTrpcFact(organizationSessionPersonFact, (ctx: TrpcRequestContext) =>
         ctx.session?.user
-          ? { name: ctx.session.user.name ?? null, email: ctx.session.user.email ?? null }
+          ? {
+              name: ctx.session.user.name ?? null,
+              email: ctx.session.user.email ?? null,
+              image: ctx.session.user.image ?? null,
+            }
           : null,
       ),
       bindTrpcFact(opsOperatorFact, (ctx: TrpcRequestContext) =>

@@ -376,7 +376,11 @@ const createService = (
   organizations = new StubOrganizationService(),
   created = ProjectCreatedNoticeService.create({
     logger: { error: () => void 0 },
-    projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+    projects: {
+      findWithOrgAdmin: async () => null,
+      findIdsByOrganization: async () => [],
+      findWithTeam: async () => null,
+    },
   }),
 ): ProjectService =>
   ProjectService.create({
@@ -608,11 +612,16 @@ describe("ProjectService", () => {
       const send = vi.fn(() => Promise.resolve());
       const created = ProjectCreatedNoticeService.create({
         logger: { error: () => void 0 },
-        projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+        projects: {
+          findWithOrgAdmin: async () => null,
+          findIdsByOrganization: async () => [],
+          findWithTeam: async () => null,
+        },
       });
       created.connect({
         recordProjectCreated: { send },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
+        recordPresenceSettingChanged: { send: async () => undefined },
       });
 
       await createService(new StubRepository(), new StubOrganizationService(), created).create(
@@ -633,11 +642,16 @@ describe("ProjectService", () => {
       const error = vi.fn();
       const created = ProjectCreatedNoticeService.create({
         logger: { error },
-        projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+        projects: {
+          findWithOrgAdmin: async () => null,
+          findIdsByOrganization: async () => [],
+          findWithTeam: async () => null,
+        },
       });
       created.connect({
         recordProjectCreated: { send: () => Promise.reject(new Error("queue down")) },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
+        recordPresenceSettingChanged: { send: async () => undefined },
       });
 
       await expect(

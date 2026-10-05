@@ -519,10 +519,10 @@ describe("OrganizationService", () => {
       updatedAt: new Date(2),
     };
     await expect(
-      createService(repository).updateSettings({
-        organizationId: "org",
-        traceSharingEnabled: false,
-      }),
+      createService(repository).updateSettings(
+        { organizationId: "org", traceSharingEnabled: false },
+        { id: "admin" },
+      ),
     ).resolves.toEqual({ traceShareRevocationRequired: true });
     expect(repository.settingsUpdate).toEqual({
       organizationId: "org",
@@ -541,7 +541,9 @@ describe("OrganizationService", () => {
     it("refuses it when no secret is stored yet", async () => {
       const repository = new StubRepository("team");
 
-      await expect(createService(repository).updateSettings(storage)).rejects.toMatchObject({
+      await expect(
+        createService(repository).updateSettings(storage, { id: "admin" }),
+      ).rejects.toMatchObject({
         code: "validation_error",
         httpStatus: 400,
       });
@@ -553,7 +555,7 @@ describe("OrganizationService", () => {
       const repository = new StubRepository("team");
       repository.hasS3Secret = true;
 
-      await createService(repository).updateSettings(storage);
+      await createService(repository).updateSettings(storage, { id: "admin" });
 
       expect(repository.settingsUpdate).not.toHaveProperty("s3SecretAccessKey");
     });
@@ -563,7 +565,10 @@ describe("OrganizationService", () => {
     const repository = new StubRepository("team");
 
     await expect(
-      createService(repository).updateSettings({ organizationId: "org", name: "Renamed" }),
+      createService(repository).updateSettings(
+        { organizationId: "org", name: "Renamed" },
+        { id: "admin" },
+      ),
     ).resolves.toEqual({ traceShareRevocationRequired: false });
     expect(repository.settingsUpdate).toEqual({ organizationId: "org", name: "Renamed" });
   });

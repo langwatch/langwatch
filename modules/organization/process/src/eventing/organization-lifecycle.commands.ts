@@ -4,6 +4,8 @@ import {
   INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
   INVITE_ACCEPTED_EVENT_TYPE,
   MEMBERS_INVITED_EVENT_TYPE,
+  ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
+  ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_VERSION,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
 } from "@langwatch/organization-contract";
@@ -14,12 +16,14 @@ import {
   type MembersInvitedEvent,
   ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_EVENT_VERSION,
+  type OrganizationPresenceSettingChangedEvent,
   type OrganizationSignedUpEvent,
   type PersonalWorkspaceProvisionedEvent,
   RECORD_INTEGRATION_METHOD_CHOSEN_COMMAND_TYPE,
   RECORD_INVITE_ACCEPTED_COMMAND_TYPE,
   RECORD_MEMBERS_INVITED_COMMAND_TYPE,
   RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE,
+  RECORD_PRESENCE_SETTING_CHANGED_COMMAND_TYPE,
   RECORD_SIGNED_UP_COMMAND_TYPE,
   type RecordIntegrationMethodChosenCommandData,
   recordIntegrationMethodChosenCommandDataSchema,
@@ -29,6 +33,8 @@ import {
   recordMembersInvitedCommandDataSchema,
   type RecordPersonalWorkspaceProvisionedCommandData,
   recordPersonalWorkspaceProvisionedCommandDataSchema,
+  type RecordPresenceSettingChangedCommandData,
+  recordPresenceSettingChangedCommandDataSchema,
   type RecordSignedUpCommandData,
   recordSignedUpCommandDataSchema,
 } from "./organization-lifecycle.events.ts";
@@ -193,6 +199,45 @@ export class RecordPersonalWorkspaceProvisionedCommand implements CommandHandler
   }
 
   static getAggregateId(payload: RecordPersonalWorkspaceProvisionedCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/**
+ * Records the organization's presence switch. A change is keyed on its moment; a backfill once per
+ * organization, so a re-run collapses onto the first.
+ */
+export class RecordPresenceSettingChangedCommand implements CommandHandler<
+  Command<RecordPresenceSettingChangedCommandData>,
+  OrganizationPresenceSettingChangedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PRESENCE_SETTING_CHANGED_COMMAND_TYPE,
+    recordPresenceSettingChangedCommandDataSchema,
+    "Record that an organization's presence setting changed",
+  );
+
+  handle(
+    command: Command<RecordPresenceSettingChangedCommandData>,
+  ): OrganizationPresenceSettingChangedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<OrganizationPresenceSettingChangedEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
+        version: ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: data.backfilled
+          ? `${data.organizationId}:presence_setting:backfilled`
+          : `${data.organizationId}:presence_setting:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordPresenceSettingChangedCommandData): string {
     return payload.organizationId;
   }
 }

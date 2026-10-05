@@ -157,3 +157,35 @@ Feature: Shared organization service
     Given an organization holding its hidden governance project beside an application project
     When a member's organizations are listed with their projects
     Then the governance project is not among them
+
+  @unit
+  Scenario: A changed organization presence setting is recorded as organization's fact
+    Given an organization whose presence setting is on
+    When an administrator saves the organization settings with presence off
+    Then organization records a presence-setting-changed fact with presence off
+    And the fact carries the id of the administrator who changed it
+    And it is not marked as backfilled
+
+  @unit
+  Scenario: Saving organization settings without changing presence records no presence fact
+    Given an organization whose presence setting is on
+    When an administrator saves the organization settings with presence on, or without the presence field
+    Then no presence-setting-changed fact is recorded
+
+  @unit
+  Scenario: Both doors that save organization settings name who saved them
+    When an administrator saves the organization settings through the settings form or the management API
+    Then the organization service is told the member who saved them
+
+  @unit
+  Scenario: Existing organizations' presence settings are recorded by the backfill, idempotently
+    Given two organizations whose presence settings were stored before organization recorded them
+    When organization records every existing organization's stored presence setting twice
+    Then each run records each organization's stored presence setting once, marked backfilled, with no changer
+    And each organization's fact is keyed alike on both runs, so the second run records nothing new
+
+  @unit
+  Scenario: The signed-in person fact may carry an image organization does not read
+    Given the process binds the signed-in person with a name, an email and an image
+    When organization parses the person for a procedure
+    Then it reads the name and the email and leaves the image out
