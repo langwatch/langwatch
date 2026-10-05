@@ -254,8 +254,6 @@ export type TestLicensingAppOptions = Readonly<{
   role?: ServerRole;
 }>;
 
-const SILENT_LOGGER = { error: () => undefined };
-
 /**
  * The licensing app over its memory registry, every peer a fixture. One
  * organization, `org-456`, exists with no licence and no seats taken.
@@ -274,7 +272,6 @@ export function createTestLicensingApp(
       }),
       ...options.dependencies,
     },
-    members: { logger: SILENT_LOGGER, serviceVersion: "test" },
     repositories: {
       ...MemoryLicensingRepositories.create(),
       organizationLicenses: MemoryOrganizationLicenseRepository.create(

@@ -1,4 +1,5 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
+import { releaseVersionOf } from "@langwatch/config";
 import {
   LicenseGenerationService,
   NodeLicenseCryptographyService,
@@ -63,6 +64,7 @@ import {
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import { createLogger } from "@langwatch/observability";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -84,7 +86,6 @@ import { LICENSE_SYNCS_LIMIT } from "../rules/issued-license.rules.ts";
 import { ActivationCodeService } from "../services/activation-code.service.ts";
 import type { ActivationRateLimit } from "../services/activation-code.service.ts";
 import {
-  type ConfiguredActivationLogger,
   ConfiguredActivationService,
   type ConfiguredActivationOutcome,
 } from "../services/configured-activation.service.ts";
@@ -146,12 +147,11 @@ export type LicensingInfrastructure = Readonly<{
 
 export type LicensingRuntime = Readonly<Omit<LicensingInfrastructure, "repository">>;
 
-/** The two process facts with no shared home yet: see the members-licensing handoff. */
-type LicensingProcessMembers = Readonly<{ logger: LicenseLogger; serviceVersion: string }>;
+const logger = createLogger("langwatch:licensing");
 
 type LicensingSetup = FeatureSetup<
   typeof LicensingModule.dependencies,
-  LicensingProcessMembers,
+  never,
   LicensingServerConfig,
   LicensingRepositories
 >;
@@ -177,7 +177,6 @@ export class LicensingModule implements LicensingApiContract {
     instanceLicenseKey: licensingSecrets.instanceLicenseKey,
     licensePrivateKey: licensingSecrets.licensePrivateKey,
   } as const;
-  static readonly reads = ["logger", "serviceVersion"] as const;
 
   readonly #service: LicenseService;
   readonly #entitlements: LicensingEntitlementSourceService;
@@ -253,13 +252,12 @@ export class LicensingModule implements LicensingApiContract {
   }
 
   static #assemble(
-    { members, config, resources, dependencies, repositories, role }: LicensingSetup,
+    { config, resources, dependencies, repositories, role }: LicensingSetup,
     {
       instanceLicenseKey,
       licensePrivateKey,
     }: { instanceLicenseKey: string | undefined; licensePrivateKey: string | undefined },
   ): LicensingModule {
-    const { logger } = members;
     const cryptography = NodeLicenseCryptographyService.create({ publicKey: config.publicKey });
     // The variable takes a signed key or an activation code. A code is not a
     // license: it is redeemed at start and stored on an organization.
@@ -298,7 +296,7 @@ export class LicensingModule implements LicensingApiContract {
       gateway: dependencies.gateway,
       config,
       cryptography,
-      version: members.serviceVersion,
+      version: releaseVersionOf(config),
       instanceLicenseKey: signedInstanceKey,
     });
     const app = new LicensingModule({
@@ -345,7 +343,7 @@ export class LicensingModule implements LicensingApiContract {
           return { success: true };
         },
         isValidLicense: (licenseKey) => cryptography.validateLicense({ licenseKey }).valid,
-        logger: activationLoggerOf(logger),
+        logger,
       });
       // Before the server listens, so the first request already sees the license.
       resources.ownService({
@@ -751,15 +749,6 @@ export class LicensingModule implements LicensingApiContract {
 /** A redemption at start gives up well before the transport's own timeout. */
 const BOOT_REDEMPTION_TIMEOUT_MS = 15_000;
 
-/** The process logger; a test fabric's error-only logger stays silent here. */
-function activationLoggerOf(logger: unknown): ConfiguredActivationLogger {
-  const candidate = logger as Partial<ConfiguredActivationLogger> | undefined;
-  if (typeof candidate?.info === "function" && typeof candidate.warn === "function") {
-    return candidate as ConfiguredActivationLogger;
-  }
-  return { info: () => undefined, warn: () => undefined };
-}
-
 /** What the registry and the hosted routes resolve to together. */
 type LicenseRegistryParts = Readonly<{
   registry: LicenseRegistryService;
@@ -1135,7 +1124,7 @@ export type ConnectInstallInfrastructure = Readonly<{
   instanceLicenseKey: () => string | undefined;
   /** A fresh instance identity. Supplied, so a suite mints a predictable one. */
   newInstanceId: () => string;
-  /** The release this install runs: the process's `serviceVersion` member, drilled in. */
+  /** The release this install runs: `releaseVersionOf` over the shared release leaves. */
   version: () => string;
   /** The identity an operator named instead of the one this install minted. */
   instanceIdOverride?: string;

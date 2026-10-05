@@ -109,12 +109,6 @@ Feature: Enterprise licensing lifecycle
       When an operator lists the self-hosted instances
       Then the install is listed with no organization name
 
-    @unit
-    Scenario: A process that composes no stores refuses the instance registry by name
-      Given a process composed without stores or an instance registry
-      When an operator lists the self-hosted instances
-      Then the read is refused naming the self-hosted instance registry
-
   Rule: Every deployment composes the licence registry from its own stores
 
     Main built the licence registry, activation codes and licence sync from

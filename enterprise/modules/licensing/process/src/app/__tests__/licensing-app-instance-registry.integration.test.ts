@@ -5,7 +5,6 @@ import { ResourceScope } from "@langwatch/process";
 import type { RateLimiter } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { createTestLogger } from "@langwatch/test-harness";
 /**
  * @vitest-environment node
  * @see enterprise/modules/licensing/specs/licensing.feature
@@ -80,7 +79,6 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry in produc
                 : null,
           }),
         },
-        members: { logger: createTestLogger().logger, serviceVersion: "test" },
         repositories: LiveLicensingRepositories.create({
           prisma,
           encryption: createApiFixture<IssuedLicenseCipher>(),
