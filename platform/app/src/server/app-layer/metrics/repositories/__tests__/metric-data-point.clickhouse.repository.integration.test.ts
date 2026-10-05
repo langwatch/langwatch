@@ -144,10 +144,12 @@ afterAll(async () => {
       "metric_data_points",
       "metric_usage_estimates",
       "metric_time_rollups",
+      "metric_series",
     ]) {
+      // Every tenant this suite writes to is named after the run's tag.
       await ch.exec({
-        query: `ALTER TABLE ${table} DELETE WHERE TenantId = {tenantId:String}`,
-        query_params: { tenantId },
+        query: `ALTER TABLE ${table} DELETE WHERE startsWith(TenantId, {tag:String})`,
+        query_params: { tag },
       });
     }
   }
