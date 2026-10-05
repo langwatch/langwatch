@@ -1,5 +1,6 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import {
+  DEFAULT_JOIN_REQUEST_ORIGIN,
   DOMAIN_JOIN_SETTINGS,
   JOIN_REQUEST_ORIGINS,
   JOINER_ROLES,
@@ -19,7 +20,9 @@ import {
  * because it can only LOWER the seat: `cli` lands a Developer, `web` the
  * joiner seat, and an older client that names nothing is a web one.
  */
-const joinOriginInput = z.enum(JOIN_REQUEST_ORIGINS).default("web");
+const joinOriginInput = z
+  .enum(JOIN_REQUEST_ORIGINS)
+  .default(DEFAULT_JOIN_REQUEST_ORIGIN);
 
 /**
  * Joining an organization (D12, ADR-117): the lookup, the ask, the two admin
