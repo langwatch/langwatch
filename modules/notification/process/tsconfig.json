@@ -57,6 +57,9 @@
       "path": "../../user/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/process-stores/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {

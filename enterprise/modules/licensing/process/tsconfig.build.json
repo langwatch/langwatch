@@ -30,6 +30,9 @@
       "path": "../../../../packages/authorization/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/config/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/license-signing/tsconfig.build.json"
     },
     {
@@ -58,6 +61,9 @@
     },
     {
       "path": "../../../../packages/module/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/observability/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/ops/contract/tsconfig.build.json"

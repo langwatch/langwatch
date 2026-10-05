@@ -9135,6 +9135,9 @@ importers:
 
   modules/hosted-mcp/contract:
     dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -9209,6 +9212,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -10485,6 +10491,9 @@ importers:
 
   modules/monitor/contract:
     dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
@@ -10842,6 +10851,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -14726,6 +14738,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -14865,6 +14880,9 @@ importers:
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract
@@ -15447,6 +15465,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../packages/redis-client
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
