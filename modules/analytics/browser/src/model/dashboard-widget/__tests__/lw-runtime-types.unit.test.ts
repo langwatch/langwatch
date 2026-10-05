@@ -5,6 +5,7 @@
  */
 
 import { buildChartFrameDocument } from "@langwatch/analytics-contract/chart-frame-document";
+import { CHART_FRAME_GLOBAL_EXPORTS } from "@langwatch/analytics-contract/chart-frame-import-map";
 import { describe, expect, it } from "vitest";
 
 import { LW_GLOBAL_DTS } from "../lw-global-types.ts";
@@ -67,8 +68,7 @@ describe("the declarations Monaco reads for the widget runtime", () => {
   });
 
   it("declares every UMD global the frame loads", () => {
-    const importMap = scriptContaining({ marker: "var globals = {" });
-    const globals = [...importMap.matchAll(/": "(\w+)"/g)].map((match) => match[1] ?? "");
+    const globals = Object.keys(CHART_FRAME_GLOBAL_EXPORTS);
 
     expect(globals).toEqual(expect.arrayContaining(["React", "Recharts", "LWCharts"]));
     const undeclared = globals.filter(

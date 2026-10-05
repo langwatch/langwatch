@@ -4,7 +4,7 @@
  * @see specs/analytics/custom-chart-sandbox-imports.feature
  */
 
-import { buildJsxRuntimeModuleSource } from "@langwatch/analytics-contract/chart-frame-document";
+import { buildJsxRuntimeModuleSource } from "@langwatch/analytics-contract/chart-frame-import-map";
 import * as React from "react";
 import { describe, expect, it } from "vitest";
 

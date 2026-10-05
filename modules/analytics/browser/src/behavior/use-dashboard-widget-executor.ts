@@ -38,10 +38,12 @@ export interface QueryLastRun {
 function toChartQueryError(error: unknown): ChartQueryError {
   // ADR-045: registry copy only, with the lwql_* code riding along.
   const explained = explainAnyError(error);
+  const handled = readHandledError(error);
   return {
-    code: readHandledError(error)?.code ?? "unknown",
+    code: handled?.code ?? "unknown",
     title: explained.title,
     message: explained.description,
+    ...(handled?.retryable === true ? { retryable: true } : {}),
   };
 }
 
