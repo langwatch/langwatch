@@ -364,6 +364,10 @@ function InvitationTakeover({
               onSuccess: () => {
                 void utils.organization.getAll.invalidate();
                 void utils.invite.pendingForMe.invalidate();
+                // Accepting withdrew any request this person had open, so
+                // the cached one must not bring the waiting screen back.
+                void utils.joinRequests.mine.invalidate();
+                void utils.joinRequests.offer.invalidate();
               },
               onError: (error) =>
                 showErrorToast({

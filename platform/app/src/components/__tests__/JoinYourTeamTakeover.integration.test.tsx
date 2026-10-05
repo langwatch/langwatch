@@ -507,6 +507,29 @@ describe("given somebody an administrator already invited", () => {
       expect(screen.queryByTestId("join-team-waiting")).not.toBeInTheDocument();
     });
 
+    /** @scenario A pending invitation leads even while a request to join is open */
+    it("drops the withdrawn request from view once the invitation is accepted", async () => {
+      invitationsRef.current = { ...INVITED };
+      mineRef.current = {
+        data: [{ joinRequestId: "jr_1", organizationId: "org_acme" }],
+        isPending: false,
+      };
+      acceptInviteMock.mockImplementation(
+        (_input: unknown, options?: { onSuccess?: () => void }) =>
+          options?.onSuccess?.(),
+      );
+      renderTakeover();
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /Accept the invitation to Acme/ }),
+      );
+
+      // Accepting withdrew the request server-side; a stale cached copy
+      // would put the waiting screen back up for a request that is gone.
+      expect(invalidateMine).toHaveBeenCalledTimes(1);
+      expect(invalidateOffer).toHaveBeenCalledTimes(1);
+    });
+
     /** @scenario Accepting the invitation from the welcome screen lands the invited seat */
     it("accepts through the invitation's own path and lets the welcome redirect carry on", async () => {
       invitationsRef.current = { ...INVITED };
