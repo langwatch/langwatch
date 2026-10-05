@@ -6,7 +6,8 @@ import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contrac
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
@@ -65,7 +66,8 @@ function installation() {
   const projects = [project("project-shared"), project("project-other")];
 
   const process = createApp({ role: "api" })
-    .withModules([withMemoryRepositories(codingAgentProcessModule)])
+    .withModules([codingAgentProcessModule])
+    .withStores(memoryStores())
     .provide({
       project: createApiFixture<ProjectApi>({
         listByOrganization: async ({ page, limit }) => ({
