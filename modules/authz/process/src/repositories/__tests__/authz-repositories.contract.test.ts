@@ -20,6 +20,7 @@ import { MemoryAuthzAdmissionRepository } from "../memory/memory.authz-admission
 import { MemoryAuthzCutoverRepository } from "../memory/memory.authz-cutover.repository.ts";
 import { MemoryAuthzEpochRepository } from "../memory/memory.authz-epoch.repository.ts";
 import { MemoryAuthzManagedGrantRepository } from "../memory/memory.authz-managed-grant.repository.ts";
+import { MemoryAuthzSessionVersionRepository } from "../memory/memory.authz-session-version.repository.ts";
 import { MemoryAuthzUserStandingRepository } from "../memory/memory.authz-user-standing.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "../prisma/prisma.authz-managed-grant.repository.ts";
 
@@ -43,6 +44,8 @@ const backends: readonly Backend[] = [
         cutover: MemoryAuthzCutoverRepository.create({ memory }),
         admissions: MemoryAuthzAdmissionRepository.create({ memory }),
         userStandings: MemoryAuthzUserStandingRepository.create({ memory }),
+        epoch: MemoryAuthzEpochRepository.create({ memory }),
+        sessionVersions: MemoryAuthzSessionVersionRepository.create({ memory }),
       };
     },
   },

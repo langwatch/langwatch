@@ -63,8 +63,8 @@ export interface AuthzCompatibilityLedger {
 
 /**
  * The whole adapter surface, as a caller composing this graph BY HAND
- * supplies it. The installed module reads the two members it needs and
- * builds the rest itself (see {@link AuthzModule.create}); kept for hand composition.
+ * supplies it beside the selected repositories. The installed module reads the one member
+ * it needs and builds the rest itself (see {@link AuthzModule.create}).
  */
 export type AuthzInfrastructure = Omit<PostgresAuthzAdapterOptions, "repositories">;
 export type AuthzSetup = FeatureSetup<
@@ -80,12 +80,8 @@ export class AuthzModule implements AuthzApi {
   static readonly dependencies = {} as const;
   static readonly config = authzServerConfig;
   static readonly publicConfig = authzBrowserConfig.project;
-  /**
-   * `redis` is read rather than optional: the permission cache's epoch
-   * counter lives on it, and every process installing AuthZ opens Redis
-   * anyway - this states the dependency instead of hiding it behind a null.
-   */
-  static readonly reads = ["prisma", "redis"] as const;
+  /** The ledger's Postgres graph; Redis reaches authz through its live registry. */
+  static readonly reads = ["prisma"] as const;
 
   #permissions: AuthzService;
   #grantIdentity = AuthzGrantIdentityService.create();
@@ -167,7 +163,6 @@ export class AuthzModule implements AuthzApi {
     const config = authzRuntimeConfig(setup.config);
     const built = PostgresAuthzAdapter.create({
       database: setup.members.prisma,
-      redis: setup.members.redis,
       dispatcher,
       newBindingId: newAuthzGrantId,
       repositories: setup.repositories,

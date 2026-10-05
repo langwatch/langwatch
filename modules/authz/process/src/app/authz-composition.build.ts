@@ -26,19 +26,11 @@ import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.
 import { EventingAuthzListingRepository } from "../repositories/eventing/eventing.authz-listing.repository.ts";
 import { EventingAuthzPlatformGrantRepository } from "../repositories/eventing/eventing.authz-platform-grant.repository.ts";
 import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
-import { AuthzMemoryStore } from "../repositories/memory/authz-memory.store.ts";
-import { MemoryAuthzSessionVersionRepository } from "../repositories/memory/memory.authz-session-version.repository.ts";
 import type { AuthzAuditDatabase } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import { PrismaAuthzAuditRepository } from "../repositories/prisma/prisma.authz-audit.repository.ts";
-import {
-  type AuthzCutoverDatabase,
-  PrismaAuthzCutoverRepository,
-} from "../repositories/prisma/prisma.authz-cutover.repository.ts";
+import type { AuthzCutoverDatabase } from "../repositories/prisma/prisma.authz-cutover.repository.ts";
 import type { PrismaAuthzGrantDatabase } from "../repositories/prisma/prisma.authz-grant.repository.ts";
-import {
-  type AuthzManagedGrantDatabase,
-  PrismaAuthzManagedGrantRepository,
-} from "../repositories/prisma/prisma.authz-managed-grant.repository.ts";
+import type { AuthzManagedGrantDatabase } from "../repositories/prisma/prisma.authz-managed-grant.repository.ts";
 import {
   type AuthzMembershipStampDatabase,
   PrismaAuthzMembershipStampRepository,
@@ -50,13 +42,7 @@ import {
   PrismaAuthzProjectionRepository,
 } from "../repositories/prisma/prisma.authz-projection.repository.ts";
 import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
-import {
-  PrismaAuthzUserStandingRepository,
-  type PrismaAuthzUserStandingDatabase,
-} from "../repositories/prisma/prisma.authz-user-standing.repository.ts";
-import type { AuthzEpochRedis } from "../repositories/redis/redis.authz-epoch.repository.ts";
-import { RedisAuthzEpochRepository } from "../repositories/redis/redis.authz-epoch.repository.ts";
-import { RedisAuthzSessionVersionRepository } from "../repositories/redis/redis.authz-session-version.repository.ts";
+import type { PrismaAuthzUserStandingDatabase } from "../repositories/prisma/prisma.authz-user-standing.repository.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import type {
   AuthzGrantsCommandDispatcher,
@@ -86,13 +72,8 @@ export type PostgresAuthzDatabase = PrismaAuthzUserStandingDatabase &
 
 export type PostgresAuthzAdapterOptions = {
   database: PostgresAuthzDatabase;
-  /**
-   * The rows the process selected at boot. A caller that composes this graph
-   * by hand may omit them, and the two selectable rows are then built from the
-   * structural database above.
-   */
-  repositories?: AuthzRepositories;
-  redis: AuthzEpochRedis | null;
+  /** The rows the process selected at boot: Postgres facts and the Redis counters. */
+  repositories: AuthzRepositories;
   dispatcher: AuthzGrantsCommandDispatcher;
   newBindingId: () => string;
   newCommandId?: () => string;
@@ -205,12 +186,9 @@ export class PostgresAuthzAdapter {
   private constructor(private readonly options: PostgresAuthzAdapterOptions) {}
 
   build(): PostgresAuthzBuild {
-    const { database } = this.options;
-    const epoch = RedisAuthzEpochRepository.create({ redis: this.options.redis });
-    const cutover = AuthzCutoverGateService.create({
-      repository:
-        this.options.repositories?.cutover ?? PrismaAuthzCutoverRepository.create({ database }),
-    });
+    const { database, repositories } = this.options;
+    const { epoch } = repositories;
+    const cutover = AuthzCutoverGateService.create({ repository: repositories.cutover });
     // Migration completion still answers compatibility writes and legacy
     // API-key adoption; every decision and listing reads the grants head.
     const isOnEngine = (organizationId: string) => cutover.isOn({ organizationId });
@@ -232,12 +210,8 @@ export class PostgresAuthzAdapter {
     if (this.options.ledgerPoll) ledgerOptions.poll = this.options.ledgerPoll;
     const ledger = EventingAuthzLedgerAdapter.create(ledgerOptions);
     const grantRepository = EventingAuthzGrantRepository.create({ database, writer: ledger });
-    const bindingRepository =
-      this.options.repositories?.bindings ?? PrismaAuthzManagedGrantRepository.create({ database });
-
-    const standings =
-      this.options.repositories?.userStandings ??
-      PrismaAuthzUserStandingRepository.create({ database });
+    const bindingRepository = repositories.bindings;
+    const standings = repositories.userStandings;
     const platformOperators = AuthzPlatformOperatorsService.create({
       grants: EventingAuthzPlatformGrantRepository.create(database),
       standings,
@@ -274,11 +248,8 @@ export class PostgresAuthzAdapter {
       permissions: authz,
     });
 
-    const { redis } = this.options;
     const sessionVersions = AuthzSessionVersionService.create({
-      versions: redis
-        ? RedisAuthzSessionVersionRepository.create({ redis })
-        : MemoryAuthzSessionVersionRepository.create({ memory: AuthzMemoryStore.create() }),
+      versions: repositories.sessionVersions,
       bindings: bindingRepository,
     });
 

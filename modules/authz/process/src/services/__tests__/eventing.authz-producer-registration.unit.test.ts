@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PostgresAuthzAdapter } from "../../app/authz-composition.build.ts";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
+import { MemoryAuthzRepositories } from "../../repositories/memory/memory.authz.repositories.ts";
 import {
   AuthzGrantsCommandDispatcher,
   AuthzCommandDispatcherService,
@@ -113,7 +114,7 @@ function producerRuntime() {
 function buildAuthz() {
   return PostgresAuthzAdapter.create({
     database: prismaDouble({ auditLog: { createMany: vi.fn() } }),
-    redis: null,
+    repositories: MemoryAuthzRepositories.create(),
     dispatcher: new NullDispatcher(),
     newBindingId: () => "rolebinding_test",
   }).build();

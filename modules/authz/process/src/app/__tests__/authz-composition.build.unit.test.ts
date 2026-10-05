@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
+import { MemoryAuthzRepositories } from "../../repositories/memory/memory.authz.repositories.ts";
 import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
@@ -50,7 +51,7 @@ describe("PostgresAuthzAdapter", () => {
 
     const built = PostgresAuthzAdapter.create({
       database,
-      redis: null,
+      repositories: MemoryAuthzRepositories.create(),
       dispatcher,
       newBindingId: () => "binding_1",
       now: () => 1_755_000_000_000,
@@ -81,7 +82,7 @@ describe("PostgresAuthzAdapter", () => {
     it("renders both of its counters into the process registry", () => {
       PostgresAuthzAdapter.create({
         database: buildDatabase().database,
-        redis: null,
+        repositories: MemoryAuthzRepositories.create(),
         dispatcher: new RecordingDispatcher(),
         newBindingId: () => "binding_1",
       }).build();

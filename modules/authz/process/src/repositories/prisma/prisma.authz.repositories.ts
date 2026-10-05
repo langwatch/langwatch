@@ -6,22 +6,19 @@ import { PrismaAuthzCutoverRepository } from "./prisma.authz-cutover.repository.
 import { PrismaAuthzManagedGrantRepository } from "./prisma.authz-managed-grant.repository.ts";
 import { PrismaAuthzUserStandingRepository } from "./prisma.authz-user-standing.repository.ts";
 
+export type AuthzPostgresRepositories = Omit<AuthzRepositories, "epoch" | "sessionVersions">;
+
 /**
- * The live tier: binding facts and engine cutover state, both read from
- * the process's own client. The grant ledger, its projections and the
- * listing reads are built by the module's graph builder instead.
+ * The Postgres rows: binding facts, engine cutover, admissions and standings. The grant
+ * ledger, its projections and the listing reads are still built by the module's graph builder.
  */
 export class PostgresAuthzRepositories {
-  static readonly requires = ["prisma"] as const;
-
-  static create(members: Readonly<{ prisma: PrismaClient }>): AuthzRepositories {
-    const database = members.prisma;
-
+  static create({ prisma }: Readonly<{ prisma: PrismaClient }>): AuthzPostgresRepositories {
     return {
-      bindings: PrismaAuthzManagedGrantRepository.create({ database }),
-      cutover: PrismaAuthzCutoverRepository.create({ database }),
-      admissions: PrismaAuthzAdmissionRepository.create({ database }),
-      userStandings: PrismaAuthzUserStandingRepository.create({ database }),
+      bindings: PrismaAuthzManagedGrantRepository.create({ database: prisma }),
+      cutover: PrismaAuthzCutoverRepository.create({ database: prisma }),
+      admissions: PrismaAuthzAdmissionRepository.create({ database: prisma }),
+      userStandings: PrismaAuthzUserStandingRepository.create({ database: prisma }),
     };
   }
 }

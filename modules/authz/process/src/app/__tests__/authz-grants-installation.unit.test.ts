@@ -8,7 +8,6 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { EventSourcing, EventStoreProducerOnly, InMemoryProcessStore } from "@langwatch/eventing";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
-import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import { authzProcessModule } from "../../authz.module.ts";
@@ -37,7 +36,6 @@ function process() {
     .withModules([withMemoryRepositories(authzProcessModule)])
     .withConfig(AUTHZ_CONFIG)
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
-    .withKeyvalue(redisDouble())
     .withEventing(eventing())
     .provide({});
 }
@@ -87,7 +85,6 @@ describe("given a process with dispatch and no database", () => {
     const withoutDatabase = createApp({ role: "api" })
       .withModules([withMemoryRepositories(authzProcessModule)])
       .withConfig(AUTHZ_CONFIG)
-      .withKeyvalue(redisDouble())
       .withEventing(eventing());
     // wrong-typed input: the builder refuses a missing member at compile time, boot at run time
     const booting = (withoutDatabase as unknown as UnsuppliedProcess).provide({}).boot();
@@ -117,7 +114,6 @@ async function ledgerOf(role: "api" | "worker") {
     .withModules([withMemoryRepositories(authzProcessModule)])
     .withConfig(AUTHZ_CONFIG)
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
-    .withKeyvalue(redisDouble())
     .withEventing(eventSourcing)
     .provide({})
     .boot();
