@@ -1,5 +1,5 @@
 /**
- * `LANGY_UI_ACTIONS_FLAG` lives in `app/langy.members.ts`, beside
+ * `LANGY_UI_ACTIONS_FLAG` lives in `services/langy-ui-action-surface.service.ts`, beside
  * `LangyUiActionSurface` — its adapter may not import this transport file.
  */
 

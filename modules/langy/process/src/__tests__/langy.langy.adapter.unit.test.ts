@@ -303,7 +303,6 @@ async function createApp(): Promise<LangyModule> {
       publicBaseUrl: undefined,
       prisma: undefined!,
       redis: createApiFixture<RedisConnection>(),
-      rateLimiter: { check: async () => ({ allowed: true }) },
     },
     config: {
       agentUrl: undefined,

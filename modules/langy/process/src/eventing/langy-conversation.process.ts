@@ -4,12 +4,9 @@ import { LANGY_CONVERSATION_EVENT_TYPES, LANGY_TITLE_SOURCE } from "@langwatch/l
 import {
   type LangyConversationProcessState,
   langyConversationProcessStateSchema,
-  type LangyEffectMembers,
   type LangyGenerateTitleIntent,
   type LangyProcessEventView,
   type LangyWorkerDispatchIntent,
-} from "../app/langy.members.ts";
-import {
   LANGY_OUTBOX_LEASE_DURATION_MS,
   LANGY_PROCESS_INTENT_TYPES,
   langyGenerateTitleIntentSchema,
@@ -35,6 +32,7 @@ import {
   LangyToolCallFailedEventSchema,
   LangyPlanUpdatedEventSchema,
 } from "./langy-conversation-state.projection.ts";
+import type { LangyIntentEffects } from "./langy-conversation.intent.ts";
 import {
   createLangyGenerateTitleIntent,
   createLangyWorkerDispatchIntent,
@@ -202,7 +200,7 @@ export const handleNoDecision: LangyHandler = (state) => ({ state });
  * ADR-052).
  */
 export function langyConversationProcess(
-  ports: LangyEffectMembers,
+  ports: LangyIntentEffects,
 ): ProcessManagerApplier<LangyConversationProcessingEvent> {
   return (pm) =>
     pm

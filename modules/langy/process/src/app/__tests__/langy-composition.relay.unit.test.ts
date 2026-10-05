@@ -29,6 +29,7 @@ import type { LangySessionKeyRepository } from "../../repositories/langy-session
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { LangyTokenBufferRedisRepository } from "../../repositories/redis/redis.langy-token-buffer.repository.ts";
 import { mintRunToken, signFrame } from "../../rules/langy-frame-auth.rules.ts";
+import { LangyModel } from "../../services/langy-model.service.ts";
 import { LangyNavigateFallbackService } from "../../services/langy-navigate-fallback.service.ts";
 import { LangyNavigateResourceLocatorService } from "../../services/langy-navigate-resource-locator.service.ts";
 import { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
@@ -36,7 +37,6 @@ import { LangyVirtualKeyGatewayService } from "../../services/langy-virtual-key-
 import { LangyWorkerMetricsNullService } from "../../services/langy-worker-metrics-null.service.ts";
 import type { LangyService } from "../../services/langy.service.ts";
 import { buildLangyInfrastructure } from "../langy-composition.build.ts";
-import { LangyModel } from "../langy.members.ts";
 
 const ORIGIN = "https://app.example.test";
 const RUN_TOKEN = mintRunToken();

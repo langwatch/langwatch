@@ -29,7 +29,6 @@ import type { NotificationService } from "@langwatch/notification-contract";
 import type { OnboardingApi } from "@langwatch/onboarding-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { PresenceApi } from "@langwatch/presence-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -53,21 +52,6 @@ const TIER_PLAN_TYPE: Record<string, string> = {
 };
 
 /** A real fixed window: each key counts its own checks, refused past the allowance named. */
-function windowLimiter(): RateLimiter {
-  const used = new Map<string, number>();
-  return {
-    check: (key, limit) => {
-      const count = (used.get(key) ?? 0) + 1;
-      used.set(key, count);
-      const requests = limit?.requests ?? Number.POSITIVE_INFINITY;
-
-      return Promise.resolve(
-        count <= requests ? { allowed: true } : { allowed: false, retryAfterSeconds: 60 },
-      );
-    },
-  };
-}
-
 function recordingEventing(): EventSourcing {
   const factory = (
     _definition: EventSourcedQueueDefinition<Record<string, unknown>>,
@@ -141,7 +125,6 @@ async function harness() {
       // A throwing double rather than a Redis-less build: the turn paths this
       // suite exercises never reach the member, and a reach is a loud failure.
       redis: createApiFixture<RedisConnection>(),
-      rateLimiter: windowLimiter(),
     },
     config: {
       agentUrl: undefined,

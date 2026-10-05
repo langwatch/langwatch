@@ -5,14 +5,73 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import {
-  type LangyUiActionDefinition,
-  type LangyBackendActor,
-  type LangyUiActionBackend,
-} from "../app/langy.members.ts";
 import { extractTransformRefusalCode } from "../rules/langy-ui-action-refusal.rules.ts";
 import { LangyExplorerActionService } from "./langy-explorer-action.service.ts";
+import type { LangyUiActionDefinition } from "./langy-ui-action-catalog.service.ts";
 import type { UiActionBackendRunner } from "./langy-ui-action.service.ts";
+
+/** Who a backend edit is recorded as. */
+export type LangyBackendActor = Readonly<{ userId: string; label: string }>;
+
+/** The document a transform rewrites, at the version it was read at. */
+export type LangyBackendStateRead = Readonly<{
+  /** The row a save is addressed to, which a slug alone does not name. */
+  documentId: string;
+  version: number;
+  /** `null` when the target exists but holds no state yet. */
+  state: unknown;
+}>;
+
+/**
+ * A save either lands, or a concurrent writer moved the document on. The stale
+ * branch is a value rather than a thrown error so this package classifies none
+ * of another feature's failures.
+ */
+export type LangyBackendSaveResult =
+  | Readonly<{ saved: true; version: number }>
+  | Readonly<{ saved: false; reason: "stale" }>;
+
+/** A run either starts, or the saved document refuses it by name. */
+export type LangyBackendRunResult =
+  | Readonly<{ started: true; runId: string; total: number }>
+  | Readonly<{ started: false; refusal: string }>;
+
+export interface LangyUiActionBackend {
+  /**
+   * The board as an agent reads it, from the saved document, with the version
+   * that projection was taken at.
+   */
+  project(args: {
+    projectId: string;
+    target: string;
+    payload: unknown;
+  }): Promise<{ version: number; projection: Record<string, unknown> }>;
+
+  readState(args: { projectId: string; target: string }): Promise<LangyBackendStateRead>;
+
+  saveState(args: {
+    projectId: string;
+    documentId: string;
+    state: unknown;
+    expectedVersion: number;
+    actor: LangyBackendActor;
+    commitMessage: string;
+  }): Promise<LangyBackendSaveResult>;
+
+  /** Starts the run the open page would have started, over the saved document. */
+  startRun(args: {
+    projectId: string;
+    target: string;
+    payload: unknown;
+    actor: LangyBackendActor;
+  }): Promise<LangyBackendRunResult>;
+}
+
+/**
+ * How an away page is stood in for: the saved document is read, rewritten by
+ * the action's own transform, or run.
+ */
+export type LangyUiActionBackendMode = "read" | "transform" | "run";
 
 /**
  * The away-fallback half of the UI-action channel: the same action kinds the

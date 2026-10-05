@@ -20,6 +20,7 @@ import type {
 } from "./langy-live-turn.repository.ts";
 import type { LangyLocalPresenceRepository } from "./langy-local-presence.repository.ts";
 import type { LangyMessageRepository } from "./langy-message.repository.ts";
+import type { LangyRateLimitRepository } from "./langy-rate-limit.repository.ts";
 import type { LangySessionKeyRepository } from "./langy-session-key.repository.ts";
 import type {
   LangyTokenBufferConnection,
@@ -57,6 +58,8 @@ export interface LangyRepositories {
   };
   /** Where the content-free analytics grain the worker folds lands. */
   readonly analyticsEvents: LangyAnalyticsEventRepository;
+  /** The turn window's, the panel sends' and the worker warms' fixed windows. */
+  readonly rateLimits: LangyRateLimitRepository;
 }
 
 export const langyRepositories = defineRepositories({

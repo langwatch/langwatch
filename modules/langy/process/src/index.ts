@@ -84,8 +84,8 @@ export type {
   LangyAnalyticsClickHouseWriteClient,
 } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 export type { LangyAnalyticsEventRecord } from "./repositories/langy-analytics-event.repository.ts";
-export type { LangyEffectMembers } from "./app/langy.members.ts";
-export type { LangyTitleGenerator } from "./app/langy.members.ts";
+export type { LangyIntentEffects } from "./eventing/langy-conversation.intent.ts";
+export type { LangyTitleGenerator } from "./services/langy-title-generator.service.ts";
 export type { CreateLangyEffectRepositoryOptions } from "./repositories/redis/redis.langy-effect.repository.ts";
 export {
   createAgentTurnLivenessSubscriber,
@@ -103,7 +103,10 @@ export type {
   LangyConversationUpdateBroadcastSubscriberDeps,
   LangyFailTurnCommand,
 } from "./eventing/langy-conversation.subscriber.ts";
-export type { LangyGenerateTitleIntent, LangyWorkerDispatchIntent } from "./app/langy.members.ts";
+export type {
+  LangyGenerateTitleIntent,
+  LangyWorkerDispatchIntent,
+} from "./eventing/langy-conversation-process.schemas.ts";
 export type { LangyFrameDedupRedis } from "./repositories/redis/redis.langy-frame-dedup.repository.ts";
 export type { LangyLinkRedis } from "./repositories/redis/redis.langy-resource-links.repository.ts";
 export type { LangyTurnAccess } from "./repositories/langy-live-turn.repository.ts";
@@ -141,7 +144,7 @@ export type { GithubPrLimitResult } from "./services/langy-github-pr-quota.servi
 // ADR-129 local control: the developer's own folder, and the cards that wait
 // for the developer. One runtime per process, two transports over it, and the
 // worker's REST door onto both.
-export type { LocalControlRuntime } from "./app/langy.members.ts";
+export type { LocalControlRuntime } from "./services/langy-local-control-runtime.service.ts";
 export type {
   ControlRequestKeyMinter,
   ControlRequestProjects,

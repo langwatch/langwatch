@@ -9,7 +9,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
-import type { LangyUiActionCatalog, LangyUiActionDefinition } from "../../app/langy.members.ts";
+import type {
+  LangyUiActionCatalog,
+  LangyUiActionDefinition,
+} from "../langy-ui-action-catalog.service.ts";
 import { LangyUiActionPageService } from "../langy-ui-action-page.service.ts";
 import { LangyUiActionService, uiActionKeys } from "../langy-ui-action.service.ts";
 

@@ -1,10 +1,10 @@
 /** Test-only concrete capability access for feature characterization suites. */
 
 import type {
-  LangyEffectMembers,
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
-} from "../langy.members.ts";
+} from "../../eventing/langy-conversation-process.schemas.ts";
+import type { LangyIntentEffects } from "../../eventing/langy-conversation.intent.ts";
 
 export interface StubLangyEffectCalls {
   dispatchedTurns: (LangyWorkerDispatchIntent & { projectId: string })[];
@@ -12,7 +12,7 @@ export interface StubLangyEffectCalls {
 }
 
 export function createStubLangyEffectPorts(): {
-  ports: LangyEffectMembers;
+  ports: LangyIntentEffects;
   calls: StubLangyEffectCalls;
 } {
   const calls: StubLangyEffectCalls = {

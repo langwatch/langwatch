@@ -9,12 +9,15 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { Redis } from "ioredis";
 
-import type { LangyUiActionCatalog, LangyUiActionDefinition } from "../app/langy.members.ts";
 import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import type {
   LangyStreamRedis,
   LangyTokenBufferRepository,
 } from "../repositories/langy-token-buffer.repository.ts";
+import type {
+  LangyUiActionCatalog,
+  LangyUiActionDefinition,
+} from "./langy-ui-action-catalog.service.ts";
 
 /**
  * The agent-to-page action channel (specs/langy/langy-ui-actions.feature).

@@ -6,7 +6,6 @@
 
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
-import type { LocalControlRuntime } from "../app/langy.members.ts";
 import type { LangyLocalPresenceRepository } from "../repositories/langy-local-presence.repository.ts";
 import type { LocalCallBuffer } from "../rules/langy-local-call-record.rules.ts";
 import type {
@@ -20,6 +19,15 @@ import {
   type ControlRequestProjects,
 } from "./langy-local-control-request.service.ts";
 import { UserWaitService } from "./langy-local-user-wait.service.ts";
+
+/** One process's local-control composition around one session store (ADR-129). */
+export interface LocalControlRuntime {
+  store: SessionStateStore;
+  presence: LangyLocalPresenceRepository;
+  dispatcher: LocalCallDispatcherService;
+  waits: UserWaitService;
+  requests: ControlRequestService;
+}
 
 type Timing = { offlineWaitMs?: number; pollIntervalMs?: number; now?: () => number };
 

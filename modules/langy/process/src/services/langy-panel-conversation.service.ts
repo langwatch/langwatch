@@ -35,10 +35,10 @@ import {
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { z } from "zod";
 
 import type { LangyTurnAccessRepository } from "../repositories/langy-live-turn.repository.ts";
+import type { LangyRateLimitRepository } from "../repositories/langy-rate-limit.repository.ts";
 import { deriveSyntheticTerminal } from "../rules/langy-turn-settlement.rules.ts";
 import type { TurnHealth } from "../rules/langy-turn-settlement.rules.ts";
 import { LangyPanelAccessService } from "./langy-panel-access.service.ts";
@@ -76,7 +76,7 @@ export type LangyPanelConversationMembers = Readonly<{
     | "findModelsAllowedForProject"
   >;
   turnBounds: Pick<LangyTurnsBoundsService, "assertTurnWithinBounds">;
-  rateLimiter: RateLimiter;
+  rateLimits: LangyRateLimitRepository;
   presence: Pick<PresenceApi, "getTenantEmitter" | "cleanupTenantEmitter">;
   turnAccess: LangyTurnAccessRepository | null;
   openBuffer: OpenLangyTurnBuffer | null;
@@ -285,7 +285,7 @@ export class LangyPanelConversationService {
     await this.members.access.assertPanelAccess(input);
     const cold = { conversationId: input.conversationId ?? null, warmed: false };
     try {
-      const budget = await this.members.rateLimiter.check(
+      const budget = await this.members.rateLimits.check(
         `langy:rl:warm:${input.projectId}:${input.caller.userId}`,
         { requests: WARMS_PER_MINUTE, seconds: 60 },
       );
@@ -439,7 +439,7 @@ export class LangyPanelConversationService {
     adoptConversationId: boolean,
   ): Promise<{ conversationId: string; turnId: string }> {
     await this.members.access.assertPanelAccess(input);
-    const budget = await this.members.rateLimiter.check(
+    const budget = await this.members.rateLimits.check(
       `langy:rl:msg:${input.projectId}:${input.caller.userId}`,
       { requests: MESSAGES_PER_MINUTE, seconds: 60 },
     );

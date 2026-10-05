@@ -16,7 +16,7 @@ import {
   type LangyUsageCount,
 } from "@langwatch/langy-contract";
 
-import type { LangyConversationCommands } from "../app/langy.members.ts";
+import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
 import {
   ADOPTABLE_CONVERSATION_ID,
   type ConversationDetail,

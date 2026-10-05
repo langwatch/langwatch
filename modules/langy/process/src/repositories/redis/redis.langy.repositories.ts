@@ -1,3 +1,4 @@
+import type { RateLimiter } from "@langwatch/process-stores";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 
@@ -10,6 +11,7 @@ import { LangyFeedbackPromptRedisRepository } from "./redis.langy-feedback-promp
 import { LangyFrameDedupRedisRepository } from "./redis.langy-frame-dedup.repository.ts";
 import { LangyGithubPrCountRedisRepository } from "./redis.langy-github-pr-count.repository.ts";
 import { LangyLocalPresenceRedisRepository } from "./redis.langy-local-presence.repository.ts";
+import { RedisLangyRateLimitRepository } from "./redis.langy-rate-limit.repository.ts";
 import { LangyResourceLinksRedisRepository } from "./redis.langy-resource-links.repository.ts";
 import { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
 import { LangyTurnAccessRedisRepository } from "./redis.langy-turn-access.repository.ts";
@@ -21,10 +23,14 @@ import { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repo
  * the store: every row here lives in the process's Redis.
  */
 export class PostgresLangyRepositories {
-  static readonly requires = ["redis", "clickhouse"] as const;
+  static readonly requires = ["redis", "clickhouse", "rateLimiter"] as const;
 
   static create(
-    members: Readonly<{ redis: RedisConnection; clickhouse: LangyAnalyticsClickHouseMember }>,
+    members: Readonly<{
+      redis: RedisConnection;
+      clickhouse: LangyAnalyticsClickHouseMember;
+      rateLimiter: RateLimiter;
+    }>,
   ): LangyRepositories {
     const redis = members.redis;
     const sessionState = SessionStateStoreFactory.redis(redis);
@@ -43,6 +49,7 @@ export class PostgresLangyRepositories {
       // over whatever connection the caller borrowed for that stream.
       tokenBuffer: { open: (connection) => LangyTokenBufferRedisRepository.create(connection) },
       analyticsEvents: LangyAnalyticsEventClickHouseRepository.overMember(members.clickhouse),
+      rateLimits: RedisLangyRateLimitRepository.create(members.rateLimiter),
     };
   }
 }

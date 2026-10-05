@@ -36,18 +36,30 @@ import {
 import { z } from "zod";
 
 import type {
-  LangyEffectMembers,
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
-} from "../app/langy.members.ts";
+} from "./langy-conversation-process.schemas.ts";
 import {
   langyGenerateTitleIntentSchema,
   langyWorkerDispatchIntentSchema,
 } from "./langy-conversation-process.schemas.ts";
 import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
 
+export interface LangyWorkerDispatcher {
+  dispatchTurn(params: LangyWorkerDispatchIntent & { projectId: string }): Promise<void>;
+}
+
+export interface LangyTitleGeneration {
+  generateTitle(params: LangyGenerateTitleIntent & { projectId: string }): Promise<void>;
+}
+
+export interface LangyIntentEffects {
+  workerDispatch: LangyWorkerDispatcher;
+  titleGeneration: LangyTitleGeneration;
+}
+
 export const createLangyWorkerDispatchIntent =
-  (ports: LangyEffectMembers): IntentExecutor<LangyWorkerDispatchIntent> =>
+  (ports: LangyIntentEffects): IntentExecutor<LangyWorkerDispatchIntent> =>
   async (payload, context) => {
     await ports.workerDispatch.dispatchTurn({
       ...payload,
@@ -56,7 +68,7 @@ export const createLangyWorkerDispatchIntent =
   };
 
 export const createLangyGenerateTitleIntent =
-  (ports: LangyEffectMembers): IntentExecutor<LangyGenerateTitleIntent> =>
+  (ports: LangyIntentEffects): IntentExecutor<LangyGenerateTitleIntent> =>
   async (payload, context) => {
     await ports.titleGeneration.generateTitle({
       ...payload,

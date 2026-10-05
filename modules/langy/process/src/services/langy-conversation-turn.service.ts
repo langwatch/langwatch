@@ -8,7 +8,7 @@ import type {
 import { langyJsonValueSchema, LangyTurnErrors } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
-import type { LangyConversationCommands } from "../app/langy.members.ts";
+import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
 import { turnMessageId } from "../rules/langy-conversation-shape.rules.ts";
 import type { LangyConversationRuntime } from "./langy-conversation.service.ts";

@@ -27,10 +27,11 @@ import {
 } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { LangyConversationCommands, LocalControlRuntime } from "../app/langy.members.ts";
+import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
 import { conversationTitle, conversationUrl } from "../rules/langy-local-session-text.rules.ts";
 import { reconcileSkipPolicy } from "../rules/langy-local-skip-policy.rules.ts";
 import { ControlRequestService } from "./langy-local-control-request.service.ts";
+import type { LocalControlRuntime } from "./langy-local-control-runtime.service.ts";
 import type { LangyLocalWorkspaceService } from "./langy-local-workspace.service.ts";
 import type { LangyRestCallerService } from "./langy-rest-caller.service.ts";
 import type { LangyService } from "./langy.service.ts";

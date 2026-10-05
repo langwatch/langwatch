@@ -2,7 +2,6 @@ import { bindRestCredential } from "@langwatch/api/rest";
 import { defineProcessModule } from "@langwatch/process";
 
 import { LangyModule } from "./app/langy.app.ts";
-import type { LangyTitleGenerator, LangySessionKeyMetrics } from "./app/langy.members.ts";
 import { langyConversationEventing } from "./eventing/langy-conversation.pipeline.ts";
 import { langyMaintenanceEventing } from "./eventing/langy-maintenance.pipeline.ts";
 import { LangyAnalyticsEventClickHouseRepository } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
@@ -17,7 +16,9 @@ import {
   type LangyHandoffRedis,
 } from "./repositories/redis/redis.langy-turn-handoff.repository.ts";
 import { LangySessionKeyReapService } from "./services/langy-session-key-reap.service.ts";
+import type { LangySessionKeyMetrics } from "./services/langy-session-key.service.ts";
 import {
+  type LangyTitleGenerator,
   LangyTitleGeneratorService,
   type LangyTitleGeneratorDeps,
 } from "./services/langy-title-generator.service.ts";

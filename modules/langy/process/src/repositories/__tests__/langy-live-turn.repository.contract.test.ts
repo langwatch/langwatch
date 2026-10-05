@@ -221,6 +221,7 @@ describe("given the langy repository registry", () => {
         "frameDedup",
         "githubPrCounts",
         "localPresence",
+        "rateLimits",
         "resourceLinks",
         "sessionState",
         "tokenBuffer",
@@ -231,8 +232,12 @@ describe("given the langy repository registry", () => {
   });
 
   describe("when the live tier is selected", () => {
-    it("asks for the process's ClickHouse beside its Redis, for the analytics grain", () => {
-      expect(langyRepositories.definitions.live.requires).toEqual(["redis", "clickhouse"]);
+    it("asks for the process's ClickHouse and rate limiter beside its Redis", () => {
+      expect(langyRepositories.definitions.live.requires).toEqual([
+        "redis",
+        "clickhouse",
+        "rateLimiter",
+      ]);
     });
   });
 });

@@ -21,20 +21,18 @@ import {
   LangyGithubPrQuotaService,
   LANGY_GITHUB_PRS_PER_DAY,
 } from "../services/langy-github-pr-quota.service.ts";
+import type { LangyModel } from "../services/langy-model.service.ts";
 import type { LangyNavigateFallbackService } from "../services/langy-navigate-fallback.service.ts";
 import type {
   LangyCredentialComposition,
   LangyServiceCompositionOptions,
 } from "../services/langy-postgres.service.ts";
 import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
+import type { LangySkillGates } from "../services/langy-skill-gates.service.ts";
 import type { LangyTurnTechnicalMembers } from "../services/langy-turn-shared.service.ts";
+import { LangyGithubPermit } from "../services/langy-turn-shared.service.ts";
+import type { LangyUiActionSurface } from "../services/langy-ui-action-surface.service.ts";
 import type { OpenLangyRelay } from "../services/langy.service.ts";
-import {
-  LangyGithubPermit,
-  type LangyModel,
-  type LangySkillGates,
-  type LangyUiActionSurface,
-} from "./langy.members.ts";
 
 /** The turn's three permit calls, on the feature package's own quota service. */
 class LangyGithubPrPermitsAdapter extends LangyGithubPermit {

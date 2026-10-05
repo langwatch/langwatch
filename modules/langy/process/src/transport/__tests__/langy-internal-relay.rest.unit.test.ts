@@ -88,7 +88,6 @@ async function relayRoute() {
       publicBaseUrl: "https://app.example.test",
       prisma: undefined!,
       redis: memoryRedisDouble(),
-      rateLimiter: { check: () => Promise.resolve({ allowed: true }) },
     },
     config: {
       agentUrl: undefined,

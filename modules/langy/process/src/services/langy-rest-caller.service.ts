@@ -18,13 +18,13 @@ import {
   type ProjectIdentity,
 } from "@langwatch/project-contract";
 
-import { LANGY_UI_ACTIONS_FLAG } from "../app/langy.members.ts";
 import { LANGY_API_KEY_TURNS_FLAG } from "../rules/langy-rest-flags.rules.ts";
 import {
   LangyActorSessionService,
   type LangyActorUserReader,
 } from "./langy-actor-session.service.ts";
 import { LangyKeyIdentityService } from "./langy-key-identity.service.ts";
+import { LANGY_UI_ACTIONS_FLAG } from "./langy-ui-action-surface.service.ts";
 
 /** What this chain reads that Langy does not own. */
 export type LangyRestCallerMembers = Readonly<{

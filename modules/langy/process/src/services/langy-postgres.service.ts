@@ -8,13 +8,10 @@ import type {
   LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
 
-import {
-  type LangyConversationCommands,
-  LangyBlockMetrics,
-  type LangySessionKeyMetrics,
-} from "../app/langy.members.ts";
+import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
 import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 import type { LangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
+import { LangyBlockMetrics } from "./langy-block-metrics-otel.service.ts";
 import { LangyConversationService } from "./langy-conversation.service.ts";
 import {
   LangyCredentialService,
@@ -27,6 +24,7 @@ import {
 import { LangyFeedbackPromptService } from "./langy-feedback-prompt.service.ts";
 import { type LangyBlockCounter, LangyFinalPartsService } from "./langy-final-parts.service.ts";
 import { LangyMessageService } from "./langy-message.service.ts";
+import type { LangySessionKeyMetrics } from "./langy-session-key.service.ts";
 import { LangySessionKeyService } from "./langy-session-key.service.ts";
 import { LangyTurnService, type LangyTurnTechnicalMembers } from "./langy-turn.service.ts";
 import {

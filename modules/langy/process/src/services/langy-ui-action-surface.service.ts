@@ -1,7 +1,18 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 
-import { LANGY_UI_ACTIONS_FLAG, LangyUiActionSurface } from "../app/langy.members.ts";
+/** The rollout flag `LangyUiActionSurface.resolve` evaluates. */
+export const LANGY_UI_ACTIONS_FLAG = "release_langy_ui_actions" as const;
+
+/** Answers whether the live UI-action channel is open; fails closed to never stop turns.
+ * The turn block advertises the channel only while dispatch would answer it. */
+export abstract class LangyUiActionSurface {
+  abstract resolve(input: {
+    userId: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<boolean>;
+}
 
 const logger = createLogger("langwatch:langy:ui-action-surface");
 

@@ -1,8 +1,73 @@
+import type { CommandEnvelope } from "@langwatch/eventing";
+import type {
+  LangyAgentRespondedEventData,
+  LangyAgentResponseFailedEventData,
+  LangyAgentTurnAcceptedEventData,
+  LangyConversationArchivedEventData,
+  LangyConversationForkedEventData,
+  LangyConversationHandoffConsumedEventData,
+  LangyConversationHandoffPendingEventData,
+  LangyConversationMetadataUpdatedEventData,
+  LangyConversationStartedEventData,
+  LangyConversationTitleGeneratedEventData,
+  LangyLocalControlRequestedEventData,
+  LangyLocalPolicyChangedEventData,
+  LangyLocalWorkspaceConnectedEventData,
+  LangyLocalWorkspaceDisconnectedEventData,
+  LangyMessageImportedEventData,
+  LangyMessageRecordedEventData,
+  LangyPlanUpdatedEventData,
+  LangyToolCallFailedEventData,
+  LangyToolCallInitiatedEventData,
+  LangyToolCallSucceededEventData,
+  LangyUserWaitEndedEventData,
+  LangyUserWaitStartedEventData,
+} from "@langwatch/langy-contract";
+
+/** Command dispatchers injected from the event-sourcing pipeline registry. */
+type Dispatch<T> = (data: T & CommandEnvelope) => Promise<void>;
+
+/** All sixteen conversation writes from the agent-pipeline dispatcher. A dependency token
+ * (shared with scenario feature). Declared as abstract PROPERTIES not methods (like LangyHarness)
+ * to make contravariance catch shape mismatches at compile time. */
+export abstract class LangyConversationCommands {
+  abstract createConversation: Dispatch<LangyConversationStartedEventData>;
+  abstract forkConversation: Dispatch<LangyConversationForkedEventData>;
+  abstract recordMessage: Dispatch<LangyMessageRecordedEventData>;
+  abstract importMessage: Dispatch<LangyMessageImportedEventData>;
+  abstract acceptAgentTurn: Dispatch<
+    LangyAgentTurnAcceptedEventData & {
+      conversationStart?: Omit<LangyConversationStartedEventData, "conversationId">;
+      userMessage?: Omit<LangyMessageRecordedEventData, "conversationId">;
+      consumeHandoffTurnId?: string;
+    }
+  >;
+  abstract initiateToolCall: Dispatch<LangyToolCallInitiatedEventData>;
+  abstract succeedToolCall: Dispatch<LangyToolCallSucceededEventData>;
+  abstract failToolCall: Dispatch<LangyToolCallFailedEventData>;
+  abstract updatePlan: Dispatch<LangyPlanUpdatedEventData>;
+  abstract failAgentResponse: Dispatch<LangyAgentResponseFailedEventData>;
+  abstract recordAgentResponse: Dispatch<LangyAgentRespondedEventData>;
+  abstract archiveConversation: Dispatch<LangyConversationArchivedEventData>;
+  abstract updateConversationMetadata: Dispatch<LangyConversationMetadataUpdatedEventData>;
+  abstract recordTurnHandoff: Dispatch<LangyConversationHandoffPendingEventData>;
+  abstract consumeTurnHandoff: Dispatch<LangyConversationHandoffConsumedEventData>;
+  abstract generateConversationTitle: Dispatch<LangyConversationTitleGeneratedEventData>;
+  // ADR-129 local control: the shared folder and the cards that wait for the
+  // developer. Written by the local control services, folded by the spine and
+  // the turn document.
+  abstract requestLocalControl: Dispatch<LangyLocalControlRequestedEventData>;
+  abstract connectLocalWorkspace: Dispatch<LangyLocalWorkspaceConnectedEventData>;
+  abstract disconnectLocalWorkspace: Dispatch<LangyLocalWorkspaceDisconnectedEventData>;
+  abstract changeLocalPolicy: Dispatch<LangyLocalPolicyChangedEventData>;
+  abstract startUserWait: Dispatch<LangyUserWaitStartedEventData>;
+  abstract endUserWait: Dispatch<LangyUserWaitEndedEventData>;
+}
+
 /**
  * The langy_conversation_processing pipeline's own command senders. The process registers the
  * pipeline after the app is built (§9), so each write resolves its sender when it is sent.
  */
-import type { LangyConversationCommands } from "../app/langy.members.ts";
 
 const LANGY_CONVERSATION_PIPELINE_NAME = "langy_conversation_processing";
 

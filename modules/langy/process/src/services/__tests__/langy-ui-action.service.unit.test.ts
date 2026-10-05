@@ -10,7 +10,10 @@ import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import type { LangyUiActionCatalog, LangyUiActionDefinition } from "../../app/langy.members.ts";
+import type {
+  LangyUiActionCatalog,
+  LangyUiActionDefinition,
+} from "../langy-ui-action-catalog.service.ts";
 import { LangyUiActionPageService } from "../langy-ui-action-page.service.ts";
 import {
   LangyUiActionService,

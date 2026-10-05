@@ -1,6 +1,29 @@
+import { LANGY_TITLE_SOURCE } from "@langwatch/langy-contract";
 import { z } from "zod";
 
 import { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "../channels/langy-worker.channel.ts";
+
+export const langyConversationProcessStateSchema = z.object({
+  currentTurnId: z.string().nullable(),
+  turnStatus: z.enum(["idle", "running", "completed", "failed"]),
+  titleSource: z.enum(LANGY_TITLE_SOURCE),
+  /**
+   * One-shot latch: automatic title intent already recorded. Only generated
+   * at the first successful agent_responded boundary while the title is
+   * still derived, never again once set or titleSource leaves "derived".
+   */
+  autoTitleRequested: z.boolean(),
+  archived: z.boolean(),
+  /** ADR-048: id of the turn whose resume handoff is pending — identity only. */
+  pendingHandoffTurnId: z.string().nullable(),
+});
+export type LangyConversationProcessState = z.infer<typeof langyConversationProcessStateSchema>;
+
+export type LangyWorkerDispatchIntent = z.infer<typeof langyWorkerDispatchIntentSchema>;
+
+export type LangyGenerateTitleIntent = z.infer<typeof langyGenerateTitleIntentSchema>;
+
+export type LangyProcessEventView = z.infer<typeof langyProcessEventViewSchema>;
 
 /** Typed contracts for the Langy conversation process manager (ADR-049 §4). State holds
  * identities, statuses, and flags only; sensitive data stays in domain tables or Redis. */

@@ -1,7 +1,14 @@
 import { counter } from "@langwatch/observability/metrics";
 
-import { LangyBlockMetrics } from "../app/langy.members.ts";
 import type { LangyBlockCounter } from "./langy-final-parts.service.ts";
+
+/**
+ * Preserves the block-salvage series `LangyFinalPartsService.build` counts, without coupling the
+ * feature to app metrics. `blockCounter()` returns the per-reason counter callback.
+ */
+export abstract class LangyBlockMetrics {
+  abstract blockCounter(): (reason: string) => void;
+}
 
 export const LANGY_BLOCKS_METRIC_NAME = "langwatch_langy_blocks_total";
 

@@ -7,7 +7,7 @@ import {
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangyConversationCommands } from "../../app/langy.members.ts";
+import type { LangyConversationCommands } from "../../eventing/langy-conversation.commands.ts";
 import type { LangyConversationRepository } from "../../repositories/langy-conversation-projection.repository.ts";
 import { LangyConversationService } from "../langy-conversation.service.ts";
 

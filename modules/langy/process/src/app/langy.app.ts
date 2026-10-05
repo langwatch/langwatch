@@ -113,6 +113,7 @@ import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-wor
 import { RedisLangyConversationProducerRepository } from "../eventing/langy-conversation-producer.pipeline.ts";
 import { EventingLangyConversationAdapter } from "../eventing/langy-conversation-runtime.pipeline.ts";
 import { LangyConversationCommandSenders } from "../eventing/langy-conversation.commands.ts";
+import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
 import type { LangyConversationDefinition } from "../eventing/langy-conversation.pipeline.ts";
 import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
@@ -132,6 +133,7 @@ import { LangyInternalService } from "../services/langy-internal.service.ts";
 import { LocalControlConnectionService } from "../services/langy-local-control-connection.service.ts";
 import { LocalControlLongPollService } from "../services/langy-local-control-long-poll.service.ts";
 import { LangyLocalControlRuntimeService } from "../services/langy-local-control-runtime.service.ts";
+import type { LocalControlRuntime } from "../services/langy-local-control-runtime.service.ts";
 import { LangyLocalControlTerminalService } from "../services/langy-local-control-terminal.service.ts";
 import { LocalControlSessionCoreService } from "../services/langy-local-session.service.ts";
 import { LangyLocalWorkerService } from "../services/langy-local-worker.service.ts";
@@ -165,7 +167,6 @@ import { LangyWorkerMetricsOtelService } from "../services/langy-worker-metrics-
 import type { LangyService } from "../services/langy.service.ts";
 import { SetupSkillsService } from "../services/setup-skills.service.ts";
 import { buildLangyInfrastructure } from "./langy-composition.build.ts";
-import type { LangyConversationCommands, LocalControlRuntime } from "./langy.members.ts";
 
 /**
  * The Redis surface the live-turn edge needs: the turn-access record a
@@ -223,7 +224,7 @@ export interface LangyLocalControl {
   baseHost: string | undefined;
 }
 
-const langyStores = ["prisma", "redis", "rateLimiter"] as const;
+const langyStores = ["prisma", "redis"] as const;
 
 /** `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`. */
 type LangySetup = FeatureSetup<
@@ -275,7 +276,6 @@ export class LangyModule implements LangyApiContract {
   };
   static readonly config = langyConfig;
   static readonly secrets = langySecrets;
-  /** `rateLimiter` is the per-project counter every turn is checked against. */
   static readonly reads = [...langyStores, "publicBaseUrl"] as const;
 
   static async create(setup: LangySetup): Promise<LangyModule> {
@@ -435,7 +435,7 @@ export class LangyModule implements LangyApiContract {
     const turnBounds = LangyTurnsBoundsService.create({
       entitlement: setup.dependencies.plans,
       projects: setup.dependencies.projects,
-      rateLimiter: setup.members.rateLimiter,
+      rateLimits: setup.repositories.rateLimits,
     });
     const access = LangyPanelAccessService.create({
       featureFlags: setup.dependencies.featureFlags,
@@ -501,7 +501,7 @@ export class LangyModule implements LangyApiContract {
         access,
         langy,
         turnBounds,
-        rateLimiter: setup.members.rateLimiter,
+        rateLimits: setup.repositories.rateLimits,
         presence: setup.dependencies.presence,
         turnAccess: redis ? setup.repositories.turnAccess : null,
         openBuffer: redis

@@ -12,6 +12,7 @@ import {
   LangyTurnHandoffMemoryRepository,
 } from "./memory.langy-live-turn.repository.ts";
 import { LangyLocalPresenceMemoryRepository } from "./memory.langy-local-presence.repository.ts";
+import { MemoryLangyRateLimitRepository } from "./memory.langy-rate-limit.repository.ts";
 import { LangyTokenBufferMemoryRepository } from "./memory.langy-token-buffer.repository.ts";
 
 /** The "memory" tier: every langy row the app is tested without a datastore. */
@@ -37,6 +38,7 @@ export class MemoryLangyRepositories {
       // Redis connection serves every open() on the postgres tier.
       tokenBuffer: { open: () => LangyTokenBufferMemoryRepository.create(store) },
       analyticsEvents: LangyAnalyticsEventMemoryRepository.create(store),
+      rateLimits: MemoryLangyRateLimitRepository.create(),
     };
   }
 }

@@ -36,7 +36,7 @@ function panel(
     access: access(),
     langy: createApiFixture<LangyPanelConversationMembers["langy"]>(),
     turnBounds: createApiFixture<LangyPanelConversationMembers["turnBounds"]>(),
-    rateLimiter: { check: async () => ({ allowed: true }) },
+    rateLimits: { check: async () => ({ allowed: true }) },
     presence: createApiFixture<PresenceApi>(),
     turnAccess: null,
     openBuffer: null,
@@ -113,7 +113,7 @@ describe("LangyPanelConversationService", () => {
 
   /** @scenario "A person over the message budget is refused before a turn dispatches" */
   it("refuses a send over the message budget before any turn starts", async () => {
-    const service = panel({ rateLimiter: { check: async () => ({ allowed: false }) } });
+    const service = panel({ rateLimits: { check: async () => ({ allowed: false }) } });
 
     await expect(
       service.continueConversationTurn({
@@ -128,7 +128,7 @@ describe("LangyPanelConversationService", () => {
 
   /** @scenario "A panel-open warm over its budget is a cold start, never an error" */
   it("answers an over-budget warm as a cold start", async () => {
-    const service = panel({ rateLimiter: { check: async () => ({ allowed: false }) } });
+    const service = panel({ rateLimits: { check: async () => ({ allowed: false }) } });
 
     await expect(
       service.warmPanelWorker({ caller, projectId, conversationId: "conversation_1" }),

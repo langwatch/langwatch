@@ -22,7 +22,6 @@ import type {
 } from "@langwatch/langy-contract";
 
 import type { LangyModule } from "../app/langy.app.ts";
-import type { LangyEffectMembers } from "../app/langy.members.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import {
   LangyAnalyticsEventMapProjection,
@@ -56,6 +55,7 @@ import {
 } from "./langy-conversation-state.projection.ts";
 import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
 import { LangyConversationTurnFoldProjection } from "./langy-conversation-turn.projection.ts";
+import type { LangyIntentEffects } from "./langy-conversation.intent.ts";
 import {
   AcceptAgentTurnCommand,
   ArchiveConversationCommand,
@@ -102,7 +102,7 @@ export interface LangyConversationProcessingPipelineDeps {
    * Effect ports the conversation process manager dispatches into. Only the
    * effects are injected -- the process topology is declared on this pipeline.
    */
-  langyProcessPorts: LangyEffectMembers;
+  langyProcessPorts: LangyIntentEffects;
 }
 
 /** The langy_conversation_processing definition, whichever half of it a role registers. */

@@ -8,7 +8,7 @@ import type {
   LangyBackendSaveResult,
   LangyBackendStateRead,
   LangyUiActionBackend,
-} from "../app/langy.members.ts";
+} from "./langy-ui-action-backend.service.ts";
 
 type Experiments = Pick<
   ExperimentApi,

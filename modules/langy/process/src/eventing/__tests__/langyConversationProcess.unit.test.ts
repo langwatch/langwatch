@@ -9,7 +9,7 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
-import type { LangyConversationProcessState } from "../../app/langy.members.ts";
+import type { LangyConversationProcessState } from "../langy-conversation-process.schemas.ts";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_PROCESS_INTENT_TYPES,

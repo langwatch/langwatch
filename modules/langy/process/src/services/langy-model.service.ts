@@ -1,6 +1,9 @@
 import { LANGY_CHAT_FEATURE_KEY, type ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import { LangyModel } from "../app/langy.members.ts";
+/** Resolves the project-configured model for a Langy turn. */
+export abstract class LangyModel {
+  abstract resolve(input: { projectId: string }): Promise<{ modelId: string }>;
+}
 
 /** The project's Langy model, refused when the provider it names is absent or switched off. */
 export class LangyModelService extends LangyModel {

@@ -258,7 +258,6 @@ async function createApp({
       // A throwing double rather than a Redis-less build: the reads this
       // suite exercises never reach the member, and a reach is a loud failure.
       redis: createApiFixture<RedisConnection>(),
-      rateLimiter: { check: async () => ({ allowed: true }) },
     },
     config: {
       agentUrl: undefined,
