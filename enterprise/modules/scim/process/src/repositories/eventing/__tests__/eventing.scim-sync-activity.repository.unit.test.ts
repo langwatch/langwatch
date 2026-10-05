@@ -3,6 +3,7 @@ import {
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
   SCIM_SYNC_AGGREGATE_TYPE,
   SCIM_SYNC_EVENT_VERSION_LATEST,
+  SCIM_SYNC_PIPELINE_NAME,
   SCIM_USER_PUSHED_EVENT_TYPE,
 } from "@langwatch/enterprise-scim-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
@@ -11,10 +12,12 @@ import {
  * A connection's directory-sync log, read: newest first, tenant-scoped, ids only.
  * Corresponds to enterprise/modules/scim/specs/scim.feature.
  */
-import { type EventStore, createTenantId } from "@langwatch/eventing";
+import { type EventStore, PipelineEventStore, createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import type { ScimSyncEvent } from "../../../eventing/scim-sync-state.projection.ts";
+import { composeScimSyncPipeline } from "../../../eventing/scim-sync.pipeline.ts";
+import { MemoryScimSyncProjectionRepository } from "../../memory/memory.scim-sync-projection.repository.ts";
 import { EventingScimSyncActivityRepository } from "../eventing.scim-sync-activity.repository.ts";
 
 const ACME = "org_acme";
@@ -77,16 +80,24 @@ function repositoryOver(eventsByTenant: Record<string, ScimSyncEvent[]>): {
   requestedTenants: string[];
 } {
   const requestedTenants: string[] = [];
-  const getEvents: EventStore<ScimSyncEvent>["getEvents"] = async ({ aggregateId, context }) => {
+  const getEvents: EventStore["getEvents"] = async ({ aggregateId, context, aggregateType }) => {
     requestedTenants.push(context.tenantId);
     return (eventsByTenant[context.tenantId] ?? []).filter(
-      (event) => event.aggregateId === aggregateId,
+      (event) => event.aggregateId === aggregateId && event.aggregateType === aggregateType,
     );
   };
+  const storeEvents: EventStore["storeEvents"] = () =>
+    Promise.reject(new Error("reading the activity appends nothing"));
+  // The scim_sync pipeline's own store, bound to the aggregate its definition declares.
+  const eventStore = PipelineEventStore.create({
+    pipeline: SCIM_SYNC_PIPELINE_NAME,
+    log: () => ({ getEvents, storeEvents }),
+  });
+  eventStore.bindTo(
+    composeScimSyncPipeline({ scimSyncs: MemoryScimSyncProjectionRepository.create() }),
+  );
   return {
-    repository: EventingScimSyncActivityRepository.create({
-      eventStore: async () => ({ getEvents }),
-    }),
+    repository: EventingScimSyncActivityRepository.create({ eventStore }),
     requestedTenants,
   };
 }

@@ -117,9 +117,25 @@ export function composeScimSyncPipeline(
   });
 }
 
+/**
+ * The pipeline, handing its own store to the app where this process runs it. A build only
+ * to be listed keeps nothing: in a producer role that build runs second, after registration.
+ */
+export function buildScimSync({
+  participation,
+  repositories,
+  app,
+  eventStore,
+}: EventingSetup<
+  Pick<ScimRepositories, "scimSyncs">,
+  Pick<ScimModule, "readScimSyncFrom">
+>): ScimSyncPipeline {
+  if (participation !== "describe" && eventStore) app.readScimSyncFrom(eventStore);
+  return composeScimSyncPipeline(repositories);
+}
+
 export const scimSyncEventing = defineEventingModule({
   pipeline: SCIM_SYNC_PIPELINE_NAME,
-  build: ({ repositories }: EventingSetup<ScimRepositories, ScimModule>) =>
-    composeScimSyncPipeline(repositories),
+  build: (setup: EventingSetup<ScimRepositories, ScimModule>) => buildScimSync(setup),
   connect: ({ app, commands }) => app.connectScimSync(commands),
 });

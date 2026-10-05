@@ -463,6 +463,13 @@ Feature: Enterprise SCIM package boundary
       Then the read is refused as an unavailable capability rather than answered empty
 
     @unit
+    Scenario: Directory activity reads the sync log through the sync pipeline's own event store
+      Given the process runs SCIM's directory-sync pipeline
+      When a connection's activity is read
+      Then it is read through the store that pipeline was handed, for that connection's sync in the organization's tenant
+      And a pipeline built only to be listed hands its store to nobody
+
+    @unit
     Scenario: Recent directory activity is served in words under sso:view
       When a reader who may see single sign-on asks for "acme-okta"'s activity
       Then the lines are answered, and no other permission is asked

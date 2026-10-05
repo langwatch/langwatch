@@ -69,16 +69,11 @@ import {
   EntitlementApi,
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
-import type {
-  EventingCommandSender,
-  EventingParticipation,
-  EventSourcing,
-} from "@langwatch/eventing";
+import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 import type { ZodError, ZodType } from "zod";
@@ -88,7 +83,6 @@ import {
   buildScimDirectoryPipeline,
   type ScimDirectoryDefinition,
 } from "../eventing/scim-directory.pipeline.ts";
-import type { ScimSyncEvent } from "../eventing/scim-sync-state.projection.ts";
 import {
   EventingScimSyncActivityRepository,
   type ScimSyncEventReads,
@@ -116,7 +110,7 @@ import { ScimTokenMintService } from "../services/scim-token-mint.service.ts";
 
 type ScimSetup = FeatureSetup<
   typeof ScimModule.dependencies,
-  MembersRead<typeof ScimModule.reads>,
+  never,
   ScimServerConfig,
   ScimRepositories
 >;
@@ -221,17 +215,6 @@ function findBearer(authorization: string | null): string | null {
   return token.length > 0 ? token : null;
 }
 
-/** The directory-sync log's store, resolved per read so a stack not yet up at compose still answers. */
-function scimSyncEventStore(eventing: EventSourcing): () => Promise<ScimSyncEventReads> {
-  return async () => {
-    const store = eventing.getEventStore<ScimSyncEvent>();
-    if (!store) {
-      throw new Error("scim sync activity cannot read: the event-sourcing stack is unavailable");
-    }
-    return store;
-  };
-}
-
 type ScimDirectoryMoveSender = Pick<EventingCommandSender<RequestDirectoryMoveCommandData>, "send">;
 
 type ScimAppOptions = {
@@ -263,7 +246,6 @@ export class ScimModule implements ScimApiContract {
   };
   static readonly config = scimConfig;
   static readonly secrets = { ...scimSecrets, ...scimTokenPepperSecrets } as const;
-  static readonly reads = ["eventing"] as const;
   static readonly operatorReads = scimOperatorReads;
 
   readonly #scim: ScimService;
@@ -280,6 +262,7 @@ export class ScimModule implements ScimApiContract {
   #directoryMove: ScimDirectoryMoveService | undefined;
   #requestDirectoryMove: ScimDirectoryMoveSender | undefined;
   #scimSyncLedger: ScimSyncLedgerWriterService | undefined;
+  #syncReads: ScimSyncReadsService | undefined;
 
   private constructor(options: ScimAppOptions) {
     this.#scim = options.scim;
@@ -303,7 +286,7 @@ export class ScimModule implements ScimApiContract {
   }
 
   static async create(setup: ScimSetup): Promise<ScimModule> {
-    const { dependencies, members, config, secrets, repositories } = setup;
+    const { dependencies, config, secrets, repositories } = setup;
     const auth0WebhookSecret = await secrets.into(scimSecrets.auth0WebhookSecret, (value) => value);
     const tokenPepper = await secrets.into(ScimModule.secrets.tokenPepper, (credentials) =>
       secrets.into(ScimModule.secrets.tokenPepperFallback, (session) => credentials ?? session),
@@ -314,15 +297,8 @@ export class ScimModule implements ScimApiContract {
       ledger: scimSyncLedger,
       newCommandId: newScimSyncCommandId,
     });
-    const syncs = ScimSyncReadsService.create({
-      syncs: repositories.scimSyncs,
-      // Absent where no event stack was composed: an empty log would read as a quiet directory.
-      activity: members.eventing.isEnabled
-        ? EventingScimSyncActivityRepository.create({
-            eventStore: scimSyncEventStore(members.eventing),
-          })
-        : null,
-    });
+    // The activity log arrives when scim_sync is built over its own store; see readScimSyncFrom.
+    const syncs = ScimSyncReadsService.create({ syncs: repositories.scimSyncs, activity: null });
     const scim = PostgresScimService.create({
       repository: repositories.scim,
       writer: dependencies.authorization,
@@ -373,6 +349,7 @@ export class ScimModule implements ScimApiContract {
       lifecycle,
     });
     app.#scimSyncLedger = scimSyncLedger;
+    app.#syncReads = syncs;
     return app;
   }
 
@@ -393,6 +370,11 @@ export class ScimModule implements ScimApiContract {
   /** scim-sync's senders: the directory-sync history stages each fact through them. */
   connectScimSync(commands: ScimSyncSenders): void {
     this.#scimSyncLedger?.connect(commands);
+  }
+
+  /** scim_sync's own event store: a connection's directory activity is read from it. */
+  readScimSyncFrom(eventStore: ScimSyncEventReads): void {
+    this.#syncReads?.readActivityFrom(EventingScimSyncActivityRepository.create({ eventStore }));
   }
 
   moveToConnection: ScimApiContract["moveToConnection"] = async (input) => {
