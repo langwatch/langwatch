@@ -18,7 +18,11 @@ import {
   toProjectRoutePattern,
   type ProjectNavItem,
 } from "../model/project-nav-items.ts";
-import { resolveShellRoute, type ShellRoute } from "../model/resolve-shell-route.ts";
+import {
+  resolveShellRoute,
+  type SeatRefusal,
+  type ShellRoute,
+} from "../model/resolve-shell-route.ts";
 import {
   SHELL_SIDEBAR_WIDTH_COMPACT,
   SHELL_SIDEBAR_WIDTH_EXPANDED,
@@ -34,6 +38,8 @@ export interface NavigationShellReadyState {
   /** Null on the settings detour, which is not a product. */
   activeProductId: ProductId | null;
   isSettingsRoute: boolean;
+  /** The page's product is one the viewer's seat does not reach; null when it opens. */
+  seatRefusal: SeatRefusal | null;
   /** A development build, unless it asked to hide the badge. */
   showDevelopmentIndicator: boolean;
   isCompactSidebar: boolean;
@@ -80,6 +86,7 @@ export function useNavigationShellState({
     isPersonalScope,
     isOrgScope,
     isOnOwnPersonalProject: !!team?.isPersonal && team.ownerUserId === user?.id,
+    organizationRole: host.organizationRole(),
   });
 
   if (user && route.isResolverRoute && isOrgless(host)) {
@@ -99,6 +106,7 @@ export function useNavigationShellState({
     currentRoute: projectNavItemAt(toProjectRoutePattern({ pathname, projectSlug: project?.slug })),
     activeProductId: route.activeProductId,
     isSettingsRoute: route.isSettingsRoute,
+    seatRefusal: route.seatRefusal,
     showDevelopmentIndicator: showsDevelopmentIndicator(host.deployment()),
     isCompactSidebar,
     isMobile,

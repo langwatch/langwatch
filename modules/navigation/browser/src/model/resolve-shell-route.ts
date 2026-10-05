@@ -3,7 +3,9 @@ import {
   isPathUnder,
   isSettingsShellRoute,
   type ProductId,
+  productById,
   productFromPathname,
+  seatReachesProduct,
 } from "./products.ts";
 
 /**
@@ -31,6 +33,35 @@ export interface ShellRoute {
   isResolverRoute: boolean;
   /** Null on the settings detour, which is not a product. */
   activeProductId: ProductId | null;
+  /**
+   * The product the address names when the viewer's seat does not reach it,
+   * with the grant the standard permission alert names; null when the page opens.
+   */
+  seatRefusal: SeatRefusal | null;
+}
+
+export interface SeatRefusal {
+  productId: ProductId;
+  permission: string;
+}
+
+/**
+ * The seat gate every page in the shell sits behind (ARCHITECTURE.md §10): a
+ * page that belongs to no product is not seat-gated.
+ */
+function seatRefusalAt({
+  pathname,
+  organizationRole,
+}: {
+  pathname: string;
+  organizationRole: string | null | undefined;
+}): SeatRefusal | null {
+  const productId = productFromPathname(pathname);
+  if (!productId) return null;
+  const product = productById(productId);
+  if (seatReachesProduct({ product, organizationRole })) return null;
+  const permission = product.gates.find((gate) => gate.permission)?.permission ?? product.label;
+  return { productId, permission };
 }
 
 /** Product and scope resolver; settings detour is not a product; match on segment boundary */
@@ -39,11 +70,14 @@ export function resolveShellRoute({
   isPersonalScope,
   isOrgScope,
   isOnOwnPersonalProject,
+  organizationRole,
 }: {
   pathname: string;
   isPersonalScope: boolean;
   isOrgScope: boolean;
   isOnOwnPersonalProject: boolean;
+  /** The viewer's seat; the seat gate refuses a product it does not reach. */
+  organizationRole: string | null | undefined;
 }): ShellRoute {
   const isSettingsRoute = isSettingsShellRoute(pathname);
   // The product the ADDRESS names, before any sticky scope is applied.
@@ -66,5 +100,6 @@ export function resolveShellRoute({
     isOrgScopeRoute,
     isResolverRoute: isResolverAddress(pathname),
     activeProductId,
+    seatRefusal: seatRefusalAt({ pathname, organizationRole }),
   };
 }

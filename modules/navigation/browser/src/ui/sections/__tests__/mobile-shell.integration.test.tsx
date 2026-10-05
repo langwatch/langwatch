@@ -47,6 +47,7 @@ function readyState(overrides: Partial<NavigationShellReadyState> = {}): Navigat
     currentRoute: undefined,
     activeProductId: "llm-ops",
     isSettingsRoute: false,
+    seatRefusal: null,
     showDevelopmentIndicator: false,
     isCompactSidebar: false,
     isMobile: true,
