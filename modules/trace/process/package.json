@@ -33,6 +33,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",
     "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/analytics-filters": "workspace:*",
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",

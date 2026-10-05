@@ -46,6 +46,7 @@ import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.
  * literal /facets, before the bare :traceId.
  */
 import { formatTraceSummaryDigest } from "#rules/trace-formatting.rules";
+import { findUnkeyedLegacyFilters } from "#rules/trace-legacy-filter-keys.rules";
 import { tracePath } from "#rules/trace-platform-url.rules";
 import { compileProjection } from "#rules/trace-projection-compile.rules";
 
@@ -145,6 +146,16 @@ function coerceToEpochOrThrow(value: unknown, field: string): number {
   });
 }
 
+/** A keyed filter sent without its key would match no trace; refuse it, naming the field. */
+function refuseUnkeyedFilters(filters: unknown): void {
+  const unkeyed = findUnkeyedLegacyFilters({ filters, offersFilterString: true });
+  if (unkeyed.length === 0) return;
+  throw new RequestValidationError({
+    target: "json",
+    violations: unkeyed.map((violation) => ({ ...violation, type: "filter_key_required" })),
+  });
+}
+
 function compileRequestedProjection({
   from,
   select,
@@ -233,6 +244,7 @@ async function searchTraces({
     ...searchFields
   } = params;
   const format = resolveTraceFormat({ format: formatParam, llmMode });
+  refuseUnkeyedFilters(searchFields.filters);
 
   logger.info({ projectId: scope.id }, "Searching traces for project");
 

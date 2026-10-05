@@ -14450,6 +14450,9 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
+      '@langwatch/analytics-filters':
+        specifier: workspace:*
+        version: link:../../analytics/filters
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../../annotation/contract

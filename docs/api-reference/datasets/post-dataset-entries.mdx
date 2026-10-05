@@ -2,3 +2,6 @@
 title: "Add dataset entries programmatically using the LangWatch API to build evaluation sets for LLM testing and agent validation."
 openapi: "POST /api/v1/dataset/{datasetSlug}/entries"
 ---
+
+This endpoint only adds entries. To read them back, call
+[`GET /api/v1/dataset/{slugOrId}/records`](/api-reference/datasets/get-records).

@@ -27,6 +27,7 @@ import {
   generateAsciiTree,
   toLLMModeTrace,
 } from "#rules/trace-formatting.rules";
+import { findUnkeyedLegacyFilters } from "#rules/trace-legacy-filter-keys.rules";
 import { traceLegacySearchBodySchema } from "#rules/trace-legacy-search-body.rules";
 
 import { tracesRestCredential } from "./traces.rest.ts";
@@ -304,6 +305,10 @@ async function searchLegacyTraces({
     return answer({ error: app.describeValidationError(parsed.error) }, 400);
   }
   const params = parsed.data as TraceLegacySearchFields & Record<string, unknown>;
+  const unkeyed = findUnkeyedLegacyFilters({ filters: params.filters, offersFilterString: false });
+  if (unkeyed.length > 0) {
+    return answer({ error: unkeyed.map((filter) => filter.message).join(" ") }, 400);
+  }
 
   const format = params.format ?? (params.llmMode ? "digest" : "json");
 

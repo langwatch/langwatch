@@ -26,10 +26,10 @@ describe("AnnotationModule boundary", () => {
   });
 
   /** @scenario "annotation input is validated by the contract" */
-  it("refuses an incomplete anchor", () => {
+  it("refuses an incomplete anchor", async () => {
     const app = createAnnotationTestApp();
 
-    expect(() =>
+    await expect(
       app.create({
         id: "annotation-2",
         projectId: "project-1",
@@ -41,7 +41,7 @@ describe("AnnotationModule boundary", () => {
         expectedOutput: null,
         anchorKind: "field",
       }),
-    ).toThrow(ZodError);
+    ).rejects.toBeInstanceOf(ZodError);
   });
 
   /** @scenario "queue references use their owning services" */

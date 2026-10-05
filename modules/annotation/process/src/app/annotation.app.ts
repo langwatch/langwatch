@@ -150,20 +150,30 @@ export class AnnotationModule implements AnnotationApi {
     return new AnnotationModule(repositories, dependencies);
   }
 
-  create(input: CreateAnnotationInput): Promise<Annotation> {
-    return this.#annotations.create(input);
+  /**
+   * Every annotation write reaches the trace here, whichever API made it, so
+   * the annotation ids `has:annotation` reads never drift from Postgres.
+   */
+  async create(input: CreateAnnotationInput): Promise<Annotation> {
+    const created = await this.#annotations.create(input);
+    await this.#recordMarkerBestEffort(created);
+    return created;
   }
 
-  createUnattributed(input: CreateUnattributedAnnotationInput): Promise<Annotation> {
-    return this.#annotations.createUnattributed(input);
+  async createUnattributed(input: CreateUnattributedAnnotationInput): Promise<Annotation> {
+    const created = await this.#annotations.createUnattributed(input);
+    await this.#recordMarkerBestEffort(created);
+    return created;
   }
 
   update(input: UpdateAnnotationInput): Promise<Annotation> {
     return this.#annotations.update(input);
   }
 
-  delete(input: DeleteAnnotationInput): Promise<Annotation> {
-    return this.#annotations.delete(input);
+  async delete(input: DeleteAnnotationInput): Promise<Annotation> {
+    const deleted = await this.#annotations.delete(input);
+    await this.#removeMarkerBestEffort(deleted);
+    return deleted;
   }
 
   getById(input: AnnotationByIdInput): Promise<Annotation> {
@@ -421,7 +431,7 @@ export class AnnotationModule implements AnnotationApi {
   async createReview(input: AnnotationReviewCreateInput): Promise<Annotation> {
     await this.#syncTraceSuggestion(input);
 
-    const created = await this.create({
+    return this.create({
       userId: input.actorId,
       id: generate(ANNOTATION_KSUID_RESOURCE).toString(),
       projectId: input.projectId,
@@ -434,10 +444,6 @@ export class AnnotationModule implements AnnotationApi {
       anchorId: input.anchorId,
       anchorPath: input.anchorPath,
     });
-
-    await this.#recordMarkerBestEffort(created);
-
-    return created;
   }
 
   async updateReview(input: AnnotationReviewUpdateInput): Promise<Annotation> {
@@ -471,27 +477,8 @@ export class AnnotationModule implements AnnotationApi {
     });
   }
 
-  async deleteReview(input: AnnotationReviewDeleteInput): Promise<Annotation> {
-    const deleted = await this.delete({
-      id: input.annotationId,
-      projectId: input.projectId,
-    });
-
-    try {
-      await this.#traces.removeAnnotation({
-        tenantId: input.projectId,
-        traceId: deleted.traceId,
-        annotationId: deleted.id,
-        occurredAt: nowInstant().epochMilliseconds,
-      });
-    } catch (error) {
-      logger.error(
-        { error, traceId: deleted.traceId, projectId: input.projectId },
-        "Failed to sync annotation removal to ClickHouse",
-      );
-    }
-
-    return deleted;
+  deleteReview(input: AnnotationReviewDeleteInput): Promise<Annotation> {
+    return this.delete({ id: input.annotationId, projectId: input.projectId });
   }
 
   async #syncTraceSuggestion(
@@ -524,6 +511,11 @@ export class AnnotationModule implements AnnotationApi {
     });
   }
 
+  /**
+   * Best-effort: Postgres is the source of truth, so a failed sync is logged
+   * rather than failing a write that happened. Nothing retries it: an operator
+   * running the trace backfill task repairs a failed add, never a failed remove.
+   */
   async #recordMarkerBestEffort(annotation: Annotation): Promise<void> {
     try {
       await this.#traces.recordAnnotation({
@@ -539,6 +531,23 @@ export class AnnotationModule implements AnnotationApi {
       );
     }
   }
+
+  async #removeMarkerBestEffort(annotation: Annotation): Promise<void> {
+    try {
+      await this.#traces.removeAnnotation({
+        tenantId: annotation.projectId,
+        traceId: annotation.traceId,
+        annotationId: annotation.id,
+        occurredAt: nowInstant().epochMilliseconds,
+      });
+    } catch (error) {
+      logger.error(
+        { error, traceId: annotation.traceId, projectId: annotation.projectId },
+        "Failed to sync annotation removal to ClickHouse",
+      );
+    }
+  }
+
   async listReviewQueueItems(
     input: AnnotationQueueCaller,
   ): Promise<AnnotationQueueItemWithTrace[]> {

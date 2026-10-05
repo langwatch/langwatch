@@ -266,6 +266,13 @@ function translateTraceId(tag: TagToken, negated: boolean, ctx: TranslationConte
   return wrap(`TraceId = {${p}:String}`, negated);
 }
 
+/**
+ * The event name user feedback lands under. A `thumbs_up_down` tracked event,
+ * whether sent to `POST /api/events/track` or rebuilt from an SDK
+ * `langwatch.event` span event, is stored as an event of this name.
+ */
+const FEEDBACK_TRACKED_EVENT_TYPE = "thumbs_up_down";
+
 function translateExistence(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
   const value = extractStringValue(tag);
   validateValueLength(value);
@@ -293,7 +300,11 @@ function translateExistence(tag: TagToken, negated: boolean, ctx: TranslationCon
 
     case "feedback":
       return wrap(
-        boundedSubquery("stored_spans", "StartTime", "has(`Events.Name`, 'user_feedback')"),
+        boundedSubquery(
+          "stored_spans",
+          "StartTime",
+          `has(\`Events.Name\`, '${FEEDBACK_TRACKED_EVENT_TYPE}')`,
+        ),
         negated,
       );
 
@@ -355,7 +366,9 @@ const EXISTENCE_PROBES: ReadonlyMap<string, (trace: InMemoryTrace) => boolean | 
     [
       "feedback",
       (trace: InMemoryTrace) =>
-        trace.events == null ? UNSUPPORTED : trace.events.some((e) => e.name === "user_feedback"),
+        trace.events == null
+          ? UNSUPPORTED
+          : trace.events.some((e) => e.name === FEEDBACK_TRACKED_EVENT_TYPE),
     ],
     ["annotation", (trace: InMemoryTrace) => trace.summary.annotationIds.length > 0],
     [
