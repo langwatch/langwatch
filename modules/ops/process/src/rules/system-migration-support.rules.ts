@@ -112,7 +112,7 @@ export type SystemMigrationsServiceDependencies = {
     args?: RecordAuditLogCommand["args"];
   }) => Promise<void>;
   /** One full pass over both axes, where a worker executes it. */
-  runPass: () => Promise<MigrationPassSummary>;
+  runPass: (input: { signal?: AbortSignal }) => Promise<MigrationPassSummary>;
   /** Asks a worker for one pass, sent as the operator; resolves once the request is recorded. */
   requestPass: (args: { actorUserId: string }) => Promise<void>;
   /** Whether a pass on this installation could still move a tenant: the re-drive's gate. */

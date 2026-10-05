@@ -95,7 +95,8 @@ export type OpsProcessMembers = Readonly<{
   prisma: ProcessMembers["prisma"];
   redis: RedisConnection;
   clickhouse: ClickHouseQueryClient;
-  eventing: EventSourcing;
+  /** Cross-pipeline inspection and replay read the registered definitions, nothing more. */
+  eventing: Pick<EventSourcing, "definitions">;
   logger: Logger;
   /** The process's own fact (§6), for the EXPLAIN fail-closed rule. */
   nodeEnvironment: string | undefined;

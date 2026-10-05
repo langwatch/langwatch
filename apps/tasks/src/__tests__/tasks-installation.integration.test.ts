@@ -161,6 +161,7 @@ describe("the tasks process installation", () => {
         "model-provider-migrate-custom-models",
         "process-manager-purge",
         "grant-platform-operator",
+        "system-migrations-pass",
         "backfill-project-created",
         "stalled-runs-backfill",
         "topic-clustering-run",

@@ -4,11 +4,7 @@ import type { Encryption, RateLimiter } from "@langwatch/process-stores/members"
 
 import { newSsoAuthenticationActivityId } from "../../rules/sso-connection-id.rules.ts";
 import { EventingIdentityHistoryRepository } from "../eventing/eventing.identity-history.repository.ts";
-import type {
-  IdentityMigrationRepositories,
-  IdentityPipelineRepositories,
-  IdentityRepositories,
-} from "../identity.repositories.ts";
+import type { IdentityRepositories } from "../identity.repositories.ts";
 import { RedisIdentityRateLimitRepository } from "../redis/redis.identity-rate-limit.repository.ts";
 import { PrismaIdentityAccountRekeyRepository } from "./prisma.identity-account-rekey.repository.ts";
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
@@ -109,47 +105,4 @@ export class PostgresIdentityRepositories {
       rateLimits: RedisIdentityRateLimitRepository.create(members.rateLimiter),
     };
   }
-}
-
-/** The migration pass's rows over one client, sharing the one address lock (ADR-116 §6). */
-export function identityMigrationRepositoriesOverPrisma(
-  database: PrismaClient,
-): IdentityMigrationRepositories {
-  const reservations = PrismaIdentityReservationRepository.create(database);
-  return {
-    heads: PrismaIdentityHeadsRepository.create(database),
-    users: PrismaIdentityUsersRepository.create(database),
-    reservations,
-    mfaEnrollment: PrismaMfaEnrollmentRepository.create(database),
-    identityProjection: PrismaIdentityProjectionRepository.create({
-      prisma: database,
-      reservations,
-    }),
-    backfill: PrismaIdentityBackfillRepository.create(database),
-    secretCarry: PrismaIdentitySecretCarryRepository.create(database),
-    ssoDomainOwnership: PrismaSsoDomainOwnershipRepository.create(database),
-  };
-}
-
-/** The identity pipeline's rows over one client, for a process that sends its commands. */
-export function identityPipelineRepositoriesOverPrisma({
-  database,
-  eventing,
-}: {
-  database: PrismaClient;
-  eventing: Pick<EventSourcing, "getEventStore">;
-}): IdentityPipelineRepositories {
-  const reservations = PrismaIdentityReservationRepository.create(database);
-  return {
-    heads: PrismaIdentityHeadsRepository.create(database),
-    users: PrismaIdentityUsersRepository.create(database),
-    reservations,
-    mfaEnrollment: PrismaMfaEnrollmentRepository.create(database),
-    identityProjection: PrismaIdentityProjectionRepository.create({
-      prisma: database,
-      reservations,
-    }),
-    mfaProjection: PrismaMfaEnrollmentProjectionRepository.create(database),
-    identityHistory: EventingIdentityHistoryRepository.create({ eventing }),
-  };
 }

@@ -101,28 +101,3 @@ export interface IdentityRepositories {
   /** Identity's throttles: join requests, confirmation mails and the lookup's attempt budget. */
   readonly rateLimits: IdentityRateLimitRepository;
 }
-
-/** The rows a one-shot migration pass reads, none of which needs the deployment's encryption. */
-/** The rows the identity pipeline's guards and projections read, with no encryption needed. */
-export type IdentityPipelineRepositories = Pick<
-  IdentityRepositories,
-  | "heads"
-  | "users"
-  | "reservations"
-  | "mfaEnrollment"
-  | "identityProjection"
-  | "mfaProjection"
-  | "identityHistory"
->;
-
-export type IdentityMigrationRepositories = Pick<
-  IdentityRepositories,
-  | "heads"
-  | "users"
-  | "reservations"
-  | "mfaEnrollment"
-  | "identityProjection"
-  | "backfill"
-  | "secretCarry"
-  | "ssoDomainOwnership"
->;

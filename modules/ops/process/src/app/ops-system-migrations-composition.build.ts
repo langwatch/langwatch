@@ -522,7 +522,7 @@ export function buildSystemMigrations({
         ...(args === undefined ? {} : { args }),
       });
     },
-    runPass: () => passes.runPass({}),
+    runPass: (input) => passes.runPass(input),
     runTargetedPass: (target) => passes.runTargetedPass(target),
     requestPass: (request) => passRequests.request(request),
     hasTenantAwaitingRedrive: () => passes.hasTenantAwaitingRedrive(),

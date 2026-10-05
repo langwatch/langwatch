@@ -42,7 +42,6 @@ function input() {
         close: async () => void 0,
       },
       redis: null,
-      dataplane: { dataplaneFor: () => ({ kind: "shared" as const }) },
     },
     chain: SecretsChain.start({ environment: {} }),
     environment: {},

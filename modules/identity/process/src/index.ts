@@ -152,13 +152,6 @@ export type {
 export type { PerSubjectCachedFlag } from "./services/per-subject-cached-gate.service.ts";
 export type { ConnectionDirectoryRevocation } from "./services/sso-connection-teardown.service.ts";
 export type { IdentityRepositories } from "./repositories/identity.repositories.ts";
-export { IdentityProducerPipelines } from "./app/identity-producer-composition.build.ts";
-export {
-  IdentityNewbornSweep,
-  type IdentityMigrationsOptions,
-  IdentityOrganizationMigrations,
-  IdentityUserMigrations,
-} from "./app/identity-migrations-composition.build.ts";
 export {
   composeIdentityGuards,
   composeIdentityPipeline,

@@ -12,6 +12,7 @@ import { opsRepositories } from "#repositories/ops-repositories.registry";
 import { extractBearerSecret } from "#rules/ops-door.rules";
 import { GrantPlatformOperatorTask } from "#tasks/grant-platform-operator.task";
 import { ProcessManagerPurgeTask } from "#tasks/process-manager-purge.task";
+import { SystemMigrationsPassTask } from "#tasks/system-migrations-pass.task";
 import { adminRest } from "#transport/admin.rest";
 import { checkupRest } from "#transport/checkup.rest";
 import { checkupTrpcTransport } from "#transport/checkup.trpc";
@@ -55,6 +56,7 @@ export const opsProcessModule = defineProcessModule("ops")
   .withTasks(({ repositories, app }) => [
     ProcessManagerPurgeTask.create({ repository: () => repositories.processManagerPurge }),
     GrantPlatformOperatorTask.create({ operators: app }),
+    SystemMigrationsPassTask.create({ pass: () => app.systemMigrationPass() }),
   ]);
 
 /** One request's presented project credential, unverified, or none at all. */

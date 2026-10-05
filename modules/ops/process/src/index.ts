@@ -54,17 +54,10 @@ export type {
   MigrationEnrollmentRecord,
   SystemMigrationStateReader,
 } from "./services/system-migrations.service.ts";
-export {
-  OpsSystemMigrations,
-  UserStartupMigrationsUnsupportedError,
-  type OpsSystemMigrationsOptions,
-} from "./app/ops-system-migrations-composition.build.ts";
 // The state rows on their own, for a reader that is not the runner: the
 // identity write gate decides a user's fork from the backfill's record.
-export { RoutingTableOrganizationDataplaneService } from "./services/organization-dataplane.service.ts";
-export type { OrganizationDataplane, OrganizationDataplaneResolver } from "./app/ops.app.ts";
+export type { OrganizationDataplane } from "./app/ops.app.ts";
 export type { OrganizationCohortAdmission } from "./services/system-migration-cohort.service.ts";
-export { SystemMigrationsPassTask } from "./tasks/system-migrations-pass.task.ts";
 export {
   ProcessManagerPurgeTask,
   purgeProcessManagerTables,

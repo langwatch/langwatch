@@ -236,6 +236,7 @@ import {
 import { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import type { MigrationPassSummary, SystemMigrationPass } from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
@@ -532,6 +533,8 @@ export interface OpsSystemMigrationRunner {
   startPass(input: { actorUserId: string }): Promise<void>;
   /** One pass on this worker: the hourly re-drive only when a tenant could still move. */
   executePass(input: { redrive: boolean }): Promise<void>;
+  /** One pass of the tasks process's startup convergence, stopping at `signal`. */
+  runConvergencePass(input: { signal: AbortSignal }): Promise<MigrationPassSummary>;
   assertLegacyWritersDrained(input: {
     migrationName: string;
     tenantId: string;
@@ -1634,6 +1637,11 @@ export class OpsModule implements OpsApi {
   /** One pass of `ops_system_migrations`, on the worker hosting it; not on {@link OpsApi}. */
   executeSystemMigrationPass(input: { redrive: boolean }): Promise<void> {
     return this.#dependencies.systemMigrations.executePass(input);
+  }
+
+  /** The startup convergence's pass, for the tasks process's own task; not on {@link OpsApi}. */
+  systemMigrationPass(): SystemMigrationPass {
+    return ({ signal }) => this.#dependencies.systemMigrations.runConvergencePass({ signal });
   }
 
   /** One requested run of `ops_projection_replay`, on its worker; not on {@link OpsApi}. */
