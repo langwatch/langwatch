@@ -1,13 +1,12 @@
-import { Config, posthogHost, posthogKey, type ConfigOf } from "@langwatch/config";
+import { Config, type ConfigOf } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { Secret } from "@langwatch/secrets/secret";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets/shared-secrets";
 import { z } from "zod";
 
 /**
- * None is a credential: a payment-link id, the bank details an invoice paid
- * outside the payment provider prints, and the PostHog target, which is shared
- * deployment config: the same leaves ops reads.
+ * None is a credential: a payment-link id and the bank details an invoice paid
+ * outside the payment provider prints.
  */
 export const billingConfig = Config.define((c) => ({
   licensePaymentLinkId: c.env("STRIPE_LICENSE_PAYMENT_LINK_ID", z.string().optional()),
@@ -24,8 +23,6 @@ export const billingConfig = Config.define((c) => ({
   hubspotFormId: c.env("HUBSPOT_FORM_ID", z.string().optional()),
   hubspotReachedLimitFormId: c.env("HUBSPOT_REACHED_LIMIT_FORM_ID", z.string().optional()),
   bankDetails: c.env("LANGWATCH_BILLING_BANK_DETAILS", z.string().optional()),
-  posthogKey,
-  posthogHost,
 }));
 
 export type BillingServerConfig = ConfigOf<typeof billingConfig>;

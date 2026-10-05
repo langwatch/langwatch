@@ -474,6 +474,82 @@ describe("NurturingDeliveryService", () => {
     });
   });
 
+  describe("when a started subscription is delivered", () => {
+    const started: NurturingSignalOf<"subscription_started"> = {
+      kind: "subscription_started",
+      sourceEventId: "event-22",
+      ...source,
+      organizationId: "org-123",
+      memberUserIds: ["user-1", "user-2"],
+      plan: "GROWTH_SEAT_EUR_MONTHLY",
+    };
+    const key = "subscription_started:event-22";
+
+    /** @scenario A started subscription tracks subscription_started for every organization member */
+    it("tracks subscription_started in PostHog for each member and tells Customer.io nothing", async () => {
+      const { posthog, cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({ key, signal: started });
+      await settle();
+
+      const properties = {
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+        organization_id: "org-123",
+        $groups: { organization: "org-123" },
+      };
+      expect(posthog.tracked).toEqual([
+        { userId: "user-1", event: "subscription_started", properties },
+        { userId: "user-2", event: "subscription_started", properties },
+      ]);
+      expect(cio.sent).toEqual([]);
+    });
+
+    /** @scenario A redelivered started subscription tracks subscription_started once */
+    it("tracks each member once when the same signal is delivered twice", async () => {
+      const { posthog, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({ key, signal: started });
+      await delivery.deliver({ key, signal: started });
+      await settle();
+
+      expect(posthog.tracked.map((call) => call.userId)).toEqual(["user-1", "user-2"]);
+    });
+
+    /** @scenario subscription_started is skipped when PostHog is not configured */
+    it("tracks nothing and does not throw when PostHog is not configured", async () => {
+      const cio = customerIo();
+      const delivery = NurturingDeliveryService.create({
+        claims: claims(),
+        users: users(),
+        customerIo: cio.service,
+        posthog: undefined,
+      });
+
+      await expect(delivery.deliver({ key, signal: started })).resolves.toBeUndefined();
+      await settle();
+
+      expect(cio.sent).toEqual([]);
+    });
+
+    /** @scenario A PostHog client that cannot be built does not fail the delivery */
+    it("does not throw when tracking the event throws", async () => {
+      class ThrowingPostHogChannel extends PostHogChannel {
+        track(): void {
+          throw new Error("bad PostHog configuration");
+        }
+        groupIdentify(): void {}
+      }
+      const delivery = NurturingDeliveryService.create({
+        claims: claims(),
+        users: users(),
+        customerIo: undefined,
+        posthog: new ThrowingPostHogChannel(),
+      });
+
+      await expect(delivery.deliver({ key, signal: started })).resolves.toBeUndefined();
+    });
+  });
+
   describe("when a member's session is delivered", () => {
     const sessionStarted = {
       kind: "session_started",

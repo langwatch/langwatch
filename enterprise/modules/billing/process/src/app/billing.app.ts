@@ -51,7 +51,6 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { fromDate, Temporal, type Instant } from "@langwatch/time";
 import Stripe from "stripe";
 
-import { billingProductAnalyticsChannels } from "../channels/billing-product-analytics-channels.registry.ts";
 import { billingSubscriptionNotifierChannels } from "../channels/billing-subscription-notifier-channels.registry.ts";
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
 import { billingWebhookHostChannels } from "../channels/billing-webhook-host-channels.registry.ts";
@@ -78,7 +77,6 @@ import {
   type LicensePurchaseHandler,
 } from "../services/billing-stripe-webhook.service.ts";
 import type { SeatRetentionRules } from "../services/billing-subscription-lifecycle.service.ts";
-import { BillingSubscriptionStartedAnalyticsService } from "../services/billing-subscription-started-analytics.service.ts";
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { ConnectedBillingOverviewService } from "../services/connected-billing-overview.service.ts";
 import { ConnectedBillingTickService } from "../services/connected-billing-tick.service.ts";
@@ -161,8 +159,6 @@ type StripeWebhookComposition = Readonly<{
   licensePurchase?: LicensePurchaseHandler;
   /** Opens the invitations a seat checkout paid for; organization owns them. */
   invites?: Pick<OrganizationApi, "approvePaymentPendingInvites">;
-  /** Tracks subscription_started in product analytics for a subscription that became active. */
-  startedAnalytics?: Pick<BillingSubscriptionStartedAnalyticsService, "fire">;
 }>;
 
 type SubscriptionComposition = Readonly<{
@@ -263,7 +259,6 @@ export class BillingModule
           retention: setup.dependencies.dataRetention,
           invites: setup.dependencies.organizations,
           licensePurchase,
-          startedAnalytics: BillingModule.#composeStartedAnalytics(setup),
         },
         subscription: {
           notifier: billingSubscriptionNotifierChannels.slack.create({ notices }),
@@ -271,23 +266,6 @@ export class BillingModule
         },
       }),
     );
-  }
-
-  /** subscription_started for every member, sent where the deployment names a PostHog key. */
-  static #composeStartedAnalytics(setup: BillingSetup): BillingSubscriptionStartedAnalyticsService {
-    const { posthogKey: key, posthogHost: host } = setup.config;
-    const analytics = key
-      ? billingProductAnalyticsChannels.live.create({
-          targets: () => [{ key, ...(host ? { host } : {}) }],
-        })
-      : void 0;
-    if (analytics) setup.resources.own("Billing PostHog client", () => analytics.close());
-
-    return BillingSubscriptionStartedAnalyticsService.create({
-      analytics,
-      organizations: setup.dependencies.organizations,
-      errors: BillingErrorReporterService.create(),
-    });
   }
 
   /** Main's Slack, HubSpot and usage-limit mail notices; each Slack webhook is a secret. */
@@ -691,7 +669,6 @@ export class BillingModule
       retention: webhook.retention,
       connectedBilling,
       ...(announcer ? { announcer } : {}),
-      ...(webhook.startedAnalytics ? { startedAnalytics: webhook.startedAnalytics } : {}),
     });
     return StripeWebhookReceiptService.create({
       dispatchesEvents: () => isSaas,

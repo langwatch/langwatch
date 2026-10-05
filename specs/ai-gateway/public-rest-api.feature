@@ -81,6 +81,42 @@ Feature: Public REST API — /api/gateway/v1/*
     When it creates a virtual key naming neither scopes nor a project
     Then the response status is 422 and the violation names `scopes`
 
+  # Every virtual key and budget route declares its permission, and the key door asks it before
+  # the handler runs. The application then asks only what depends on the row: the scopes a
+  # virtual key lives in.
+
+  @unit @rest @pat
+  Scenario: A key acting in one project is asked the route's permission at that project
+    Given an API key that names a project, or a project-bound access token
+    When it calls a virtual key route or reads a budget
+    Then the key door asks the route's permission at that project
+    And a key without it is refused with the code `permission_denied`
+
+  @unit @rest @pat
+  Scenario: A key that names no project passes a virtual key route on any scope it is granted at
+    Given an API key granted on one team of the organization only
+    When it calls a virtual key route with no X-Project-Id
+    Then the key door asks the route's permission at each scope the key is granted at
+    And one scope that holds it is enough
+
+  @integration @rest @pat
+  Scenario: A key that holds a virtual key permission on none of its grants is refused
+    Given an API key whose grants give no `virtualKeys:view` at any scope
+    When it sends `GET /api/gateway/v1/virtual-keys` with no X-Project-Id
+    Then the response status is 403 with the code `permission_denied`
+
+  @unit @rest @pat
+  Scenario: A budget write is asked at the organization whatever project the key names
+    Given an API key that names a project
+    When it writes a budget
+    Then the key door asks the route's permission at the organization
+    And a project-bound access token is refused
+
+  @unit @rest @pat
+  Scenario: A legacy project key passes the key door by its class
+    When a legacy project key calls a virtual key or budget route
+    Then the key door admits it without asking a grant
+
   @integration @rest @pat @unimplemented
   Scenario: A scoped API key fails closed when a linked custom-role row has malformed permissions (583f27ff6)
     Given an API key "lwp_broken" linked to a custom role whose `permissions` column is NOT a JSON array

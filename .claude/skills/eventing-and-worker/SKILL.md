@@ -124,6 +124,7 @@ Run by the `tasks` app. Recurring work is a scheduled process manager instead.
 | renaming an event, aggregate or pipeline string born before this drive | leave it; new ones may change             |
 | a projection touching another module's table                           | the owner exposes an event or `*Api` read |
 | polling a run's status from the UI on a timer                          | read hints plus the fold                  |
+| a PostHog or Customer.io call, channel or key outside nurturing        | record a fact; nurturing subscribes       |
 
 ## Tests
 

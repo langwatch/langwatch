@@ -34,7 +34,10 @@ import {
   fireOrganizationCreated,
   fireSignup,
 } from "../rules/nurturing-signup-identification-service.rules.ts";
-import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
+import {
+  fireSubscriptionStarted,
+  fireSubscriptionSync,
+} from "../rules/nurturing-subscription-sync-service.rules.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
 const nurturingLogger = createLogger("langwatch:nurturing");
@@ -190,10 +193,7 @@ export class NurturingDeliveryService {
         return this.sendCustomerIoCalls(fireSubscriptionSync(signal));
       case "self_hosted_crm":
         return this.selfHostedCrm(signal);
-      case "scenario_run_succeeded":
-      case "evaluation_ran":
-      case "checkout_completed":
-      case "project_active_day":
+      default:
         return;
     }
   }
@@ -258,6 +258,8 @@ export class NurturingDeliveryService {
           event: "team_member_invited",
           properties: { inviteCount: signal.roles.length },
         });
+      case "subscription_started":
+        return fireSubscriptionStarted(signal).forEach((event) => posthog.track(event));
       case "checkout_completed":
         return this.checkoutCompleted({ posthog, signal });
       case "project_active_day":

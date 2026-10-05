@@ -43,6 +43,20 @@ eventing); all of the below is lint-enforced.
   `{ input, app, actor, scope, signal }`, call one API operation, and return a
   plain value or throw. No `c.json`, status branches, error envelopes or
   hand-rolled refusals; a thrown `HandledError` is the refusal.
+- **Authorization is declared on the route.** `.withPermission(permission)`,
+  with a target when it is asked somewhere other than the credential's scope
+  (`{ at: "route", param }`, and on the key door `{ at: "grants" }` or
+  `{ at: "organization" }`). `anyAuthenticated`, `deferredScope` and
+  `publicRoute` are for routes that ask no permission at all; none of them may
+  be followed by a permission check in a middleware fact, a handler or an
+  `*Api` operation. A case the declaration cannot express is a gap in
+  `packages/api` and the door auth binds: extend those. What stays in a service
+  is the part that needs the loaded row (the scopes a resource lives in).
+- **Analytics is nurturing's.** PostHog, Customer.io and every product
+  analytics or lifecycle event are sent by `enterprise/modules/nurturing`. Any
+  other module records a fact event from its service and stops there; nurturing
+  subscribes with `.withPeerSubscriber`. Adding an analytics channel, client or
+  key to another module is a defect.
 - **Eventing follows the role:** the api process only sends commands;
   projections, subscribers and jobs are constructed only in the worker,
   at-least-once and per-aggregate ordered, so subscribers are idempotent.

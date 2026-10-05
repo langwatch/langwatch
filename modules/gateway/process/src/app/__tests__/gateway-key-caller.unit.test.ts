@@ -7,9 +7,9 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
- * `GatewayModule.authorizeKeyCaller`: any API key, including an organization key
- * that names no project, is authorized for organization-owned budget rows.
- * `GatewayModule.authorizeVirtualKeyCaller`: the same keys on the virtual key routes.
+ * `GatewayModule.getKeyCaller`: any API key the key door admitted, including an organization
+ * key that names no project, as the organization it acts in and who a write is recorded as.
+ * `GatewayModule.getVirtualKeyCaller`: the same on the virtual key routes, with its project.
  * @see specs/ai-gateway/per-team-budget-reorganization.feature
  * @see specs/ai-gateway/public-rest-api.feature
  */
@@ -97,7 +97,12 @@ const projectKey = {
   resolvedProject: { id: PROJECT_ID, teamId: TEAM_ID },
 };
 
-describe("GatewayModule.authorizeKeyCaller", () => {
+function expectNoPermissionAsked(): void {
+  expect(hasApiKeyPermission).not.toHaveBeenCalled();
+  expect(hasPermission).not.toHaveBeenCalled();
+}
+
+describe("GatewayModule.getKeyCaller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hasApiKeyPermission.mockResolvedValue(true);
@@ -114,134 +119,85 @@ describe("GatewayModule.authorizeKeyCaller", () => {
   });
 
   describe("given an organization key that names no project", () => {
-    /** @scenario An organization key with no project lists the organization's budgets */
-    it("checks the read at the organization and answers with the key's organization", async () => {
+    it("answers with the key's organization and its owning user, asking no permission", async () => {
       const app = await gatewayApp();
 
-      const authorized = await app.authorizeKeyCaller({
-        caller: organizationKey,
-        permission: "gatewayBudgets:view",
-        reach: "caller",
-      });
+      const authorized = await app.getKeyCaller({ caller: organizationKey });
 
-      expect(authorized.organizationId).toBe(ORGANIZATION_ID);
-      expect(authorized.actorUserId).toBe("user_1");
-      expect(hasApiKeyPermission).toHaveBeenCalledWith(
-        expect.objectContaining({
+      expect(authorized).toEqual({
+        organizationId: ORGANIZATION_ID,
+        actor: {
+          kind: "apiKey",
           apiKeyId: "key_org",
-          permission: "gatewayBudgets:view",
-          scope: { type: "org", id: ORGANIZATION_ID },
-        }),
-      );
-      expect(findOrganizationId).not.toHaveBeenCalled();
-    });
-
-    describe("when the key does not hold the permission", () => {
-      /** @scenario A key without the budget permission is refused by permission, not as a bad key */
-      it("refuses with permission_denied naming the permission", async () => {
-        hasApiKeyPermission.mockResolvedValue(false);
-        const app = await gatewayApp();
-
-        const refusal = await app
-          .authorizeKeyCaller({
-            caller: organizationKey,
-            permission: "gatewayBudgets:view",
-            reach: "caller",
-          })
-          .catch((error: unknown) => error);
-
-        expect(refusal).toMatchObject({
-          code: "permission_denied",
-          httpStatus: 403,
-          meta: expect.objectContaining({ permission: "gatewayBudgets:view" }),
-        });
+          userId: "user_1",
+          organizationId: ORGANIZATION_ID,
+        },
+        actorUserId: "user_1",
       });
+      expect(findOrganizationId).not.toHaveBeenCalled();
+      expectNoPermissionAsked();
     });
 
-    describe("when the service key acts as nobody", () => {
+    describe("when the service key has no owning user", () => {
       it("records writes under a stable machine principal named after the key", async () => {
         const app = await gatewayApp();
 
-        const authorized = await app.authorizeKeyCaller({
+        const authorized = await app.getKeyCaller({
           caller: { ...organizationKey, userId: null },
-          permission: "gatewayBudgets:create",
-          reach: "organization",
         });
 
+        expect(authorized.actor).toMatchObject({ kind: "apiKey", userId: null });
         expect(authorized.actorUserId).toBe("svc_key_org");
+        expectNoPermissionAsked();
       });
     });
   });
 
   describe("given a key that resolved one project", () => {
-    /** @scenario A project key keeps reading budgets at its own project */
-    it("checks a read at that project", async () => {
+    it("answers with the key's organization and its owning user, asking no permission", async () => {
       const app = await gatewayApp();
 
-      await app.authorizeKeyCaller({
-        caller: projectKey,
-        permission: "gatewayBudgets:view",
-        reach: "caller",
-      });
+      const authorized = await app.getKeyCaller({ caller: projectKey });
 
-      expect(hasApiKeyPermission).toHaveBeenCalledWith(
-        expect.objectContaining({
-          scope: { type: "project", id: PROJECT_ID, teamId: TEAM_ID },
-        }),
-      );
+      expect(authorized).toEqual({
+        organizationId: ORGANIZATION_ID,
+        actor: {
+          kind: "apiKey",
+          apiKeyId: "key_project",
+          userId: "user_1",
+          organizationId: ORGANIZATION_ID,
+        },
+        actorUserId: "user_1",
+      });
+      expectNoPermissionAsked();
     });
 
-    /** @scenario A budget write is checked at the organization whatever key calls it */
-    it("checks a write at the organization", async () => {
-      const app = await gatewayApp();
+    describe("when the service key has no owning user", () => {
+      it("records writes under a machine principal named after its project", async () => {
+        const app = await gatewayApp();
 
-      await app.authorizeKeyCaller({
-        caller: projectKey,
-        permission: "gatewayBudgets:update",
-        reach: "organization",
+        const authorized = await app.getKeyCaller({ caller: { ...projectKey, userId: null } });
+
+        expect(authorized.actorUserId).toBe(`svc_${PROJECT_ID}`);
       });
-
-      expect(hasApiKeyPermission).toHaveBeenCalledWith(
-        expect.objectContaining({
-          permission: "gatewayBudgets:update",
-          scope: { type: "org", id: ORGANIZATION_ID },
-        }),
-      );
     });
   });
 
   describe("given a legacy project key", () => {
-    it("reads at its own project with no permission lookup", async () => {
-      const app = await gatewayApp();
-
-      const authorized = await app.authorizeKeyCaller({
-        caller: { kind: "project", projectId: PROJECT_ID },
-        permission: "gatewayBudgets:view",
-        reach: "caller",
-      });
-
-      expect(authorized).toMatchObject({
-        organizationId: ORGANIZATION_ID,
-        actorUserId: `svc_${PROJECT_ID}`,
-      });
-      expect(hasApiKeyPermission).not.toHaveBeenCalled();
-    });
-
     /** @scenario A legacy project key writes organization-wide budgets and cache rules */
-    it("is admitted to an organization-wide write as its machine principal, asking no grant", async () => {
+    it("is its project's organization and machine principal, asking no grant", async () => {
       const app = await gatewayApp();
 
-      const authorized = await app.authorizeKeyCaller({
+      const authorized = await app.getKeyCaller({
         caller: { kind: "project", projectId: PROJECT_ID },
-        permission: "gatewayBudgets:create",
-        reach: "organization",
       });
 
-      expect(authorized).toMatchObject({
+      expect(authorized).toEqual({
         organizationId: ORGANIZATION_ID,
+        actor: { kind: "legacyProjectKey", projectId: PROJECT_ID },
         actorUserId: `svc_${PROJECT_ID}`,
       });
-      expect(hasApiKeyPermission).not.toHaveBeenCalled();
+      expectNoPermissionAsked();
     });
   });
 });
@@ -251,7 +207,7 @@ function keyScopedTo(id: string, ...scopes: VirtualKeyWithScopes["scopes"]): Vir
   return { id, scopes } as VirtualKeyWithScopes;
 }
 
-describe("GatewayModule.authorizeVirtualKeyCaller", () => {
+describe("GatewayModule.getVirtualKeyCaller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hasApiKeyPermission.mockResolvedValue(true);
@@ -269,29 +225,29 @@ describe("GatewayModule.authorizeVirtualKeyCaller", () => {
   });
 
   describe("given an organization key that names no project", () => {
-    it("reaches its organization and asks no permission before a key is named", async () => {
+    it("reaches its organization with no project, asking no permission", async () => {
       const app = await gatewayApp();
 
-      const authorized = await app.authorizeVirtualKeyCaller({
-        caller: organizationKey,
-        permission: "virtualKeys:view",
-      });
+      const authorized = await app.getVirtualKeyCaller({ caller: organizationKey });
 
-      expect(authorized).toMatchObject({
+      expect(authorized).toEqual({
         organizationId: ORGANIZATION_ID,
-        actorUserId: "user_1",
         projectId: null,
+        actor: {
+          kind: "apiKey",
+          apiKeyId: "key_org",
+          userId: "user_1",
+          organizationId: ORGANIZATION_ID,
+        },
+        actorUserId: "user_1",
       });
-      expect(hasApiKeyPermission).not.toHaveBeenCalled();
+      expectNoPermissionAsked();
     });
 
     it("sees the keys it holds the view permission on, asking each scope once", async () => {
       hasApiKeyPermission.mockImplementation(async ({ scope }) => scope.id !== "team_other");
       const app = await gatewayApp();
-      const authorized = await app.authorizeVirtualKeyCaller({
-        caller: organizationKey,
-        permission: "virtualKeys:view",
-      });
+      const authorized = await app.getVirtualKeyCaller({ caller: organizationKey });
 
       const visible = await app.visibleToVirtualKeyCaller({
         caller: authorized,
@@ -313,40 +269,29 @@ describe("GatewayModule.authorizeVirtualKeyCaller", () => {
 
   describe("given an API key that names a project", () => {
     /** @scenario Writes from a scoped API key are attributed to its user */
-    it("is asked the permission at that project and acts as its owning user", async () => {
+    it("acts in that project as its owning user, asking no permission", async () => {
       const app = await gatewayApp();
 
-      const authorized = await app.authorizeVirtualKeyCaller({
-        caller: projectKey,
-        permission: "virtualKeys:create",
-      });
+      const authorized = await app.getVirtualKeyCaller({ caller: projectKey });
 
-      expect(authorized).toMatchObject({ actorUserId: "user_1", projectId: PROJECT_ID });
-      expect(hasApiKeyPermission).toHaveBeenCalledWith(
-        expect.objectContaining({
+      expect(authorized).toEqual({
+        organizationId: ORGANIZATION_ID,
+        projectId: PROJECT_ID,
+        actor: {
+          kind: "apiKey",
           apiKeyId: "key_project",
-          permission: "virtualKeys:create",
-          scope: { type: "project", id: PROJECT_ID, teamId: TEAM_ID },
-        }),
-      );
-    });
-
-    it("is refused by code when it does not hold the permission there", async () => {
-      hasApiKeyPermission.mockResolvedValue(false);
-      const app = await gatewayApp();
-
-      await expect(
-        app.authorizeVirtualKeyCaller({ caller: projectKey, permission: "virtualKeys:create" }),
-      ).rejects.toMatchObject({ code: "permission_denied" });
+          userId: "user_1",
+          organizationId: ORGANIZATION_ID,
+        },
+        actorUserId: "user_1",
+      });
+      expectNoPermissionAsked();
     });
 
     /** @scenario A sibling team's keys are invisible to the project credential */
     it("sees organization keys, its team's and its own, never a sibling team's", async () => {
       const app = await gatewayApp();
-      const authorized = await app.authorizeVirtualKeyCaller({
-        caller: projectKey,
-        permission: "virtualKeys:view",
-      });
+      const authorized = await app.getVirtualKeyCaller({ caller: projectKey });
 
       const visible = await app.visibleToVirtualKeyCaller({
         caller: authorized,
@@ -368,25 +313,25 @@ describe("GatewayModule.authorizeVirtualKeyCaller", () => {
     it("acts in its own project as the machine principal, asking no grant", async () => {
       const app = await gatewayApp();
 
-      const authorized = await app.authorizeVirtualKeyCaller({
+      const authorized = await app.getVirtualKeyCaller({
         caller: { kind: "project", projectId: PROJECT_ID },
-        permission: "virtualKeys:create",
       });
 
-      expect(authorized).toMatchObject({
+      expect(authorized).toEqual({
         organizationId: ORGANIZATION_ID,
-        actorUserId: `svc_${PROJECT_ID}`,
         projectId: PROJECT_ID,
+        actor: { kind: "legacyProjectKey", projectId: PROJECT_ID },
+        actorUserId: `svc_${PROJECT_ID}`,
       });
-      expect(hasApiKeyPermission).not.toHaveBeenCalled();
+      expectNoPermissionAsked();
     });
   });
 
   describe("given a project-bound access token", () => {
-    it("is asked the permission as its person, at the project it is bound to", async () => {
+    it("acts as its person in the project it is bound to, asking no permission", async () => {
       const app = await gatewayApp();
 
-      const authorized = await app.authorizeVirtualKeyCaller({
+      const authorized = await app.getVirtualKeyCaller({
         caller: {
           kind: "cliAccessToken",
           userId: "user_9",
@@ -394,14 +339,16 @@ describe("GatewayModule.authorizeVirtualKeyCaller", () => {
           projectId: PROJECT_ID,
           teamId: TEAM_ID,
         },
-        permission: "virtualKeys:view",
       });
 
-      expect(authorized).toMatchObject({ actorUserId: "user_9", projectId: PROJECT_ID });
-      expect(hasPermission).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: "user_9", permission: "virtualKeys:view" }),
-      );
-      expect(hasApiKeyPermission).not.toHaveBeenCalled();
+      expect(authorized).toEqual({
+        organizationId: ORGANIZATION_ID,
+        projectId: PROJECT_ID,
+        actor: { kind: "cliAccessToken", userId: "user_9", projectId: PROJECT_ID },
+        actorUserId: "user_9",
+      });
+      expect(findOrganizationId).not.toHaveBeenCalled();
+      expectNoPermissionAsked();
     });
   });
 });

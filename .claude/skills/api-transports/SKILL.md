@@ -41,6 +41,14 @@ anything; the process mounts every installed module's declarations.
 9. **Auth is the process's.** REST authenticates with API keys, tRPC with the session. A route names a
    permission (`.withPermission("triggers:view")`), never a credential source. The caller arrives as
    `actor`/`scope`; no handler reads headers or looks the key's owner up.
+   The door asks the permission before the handler runs. Never declare
+   `.withAccess(anyAuthenticated(...))` and then ask a permission in a middleware fact, the handler or
+   the `*Api`: that is a bypass. `{ at: "route", param }` asks at the scope the path names; on the
+   `api_key` door `{ at: "grants" }` passes a key naming no project on any scope it is granted at, and
+   `{ at: "organization" }` asks at the organization. If none fits, extend `packages/api` and the
+   door (`modules/auth/process/src/services/api-door.service.ts`), with a spec scenario in
+   `packages/api/specs/transport-declaration-split.feature`. A service keeps only the check that needs
+   the loaded row.
 10. **A query never returns a credential.** Secrets come back only from a mutation.
 
 ## Worked example: one contract, one tRPC binding, one REST route
@@ -55,7 +63,7 @@ export const automationTrpc = defineTrpcContract("automation")
 
   .query("getTriggers")
   .withInput(automationApiProjectScopeSchema)
-  .withOutput(automationListRowSchema.array())
+  .withOutput(automationListRowSchema.array());
 ```
 
 Process (`modules/automation/process/src/transport/automation.trpc.ts`): permission plus one call.
@@ -64,7 +72,7 @@ Process (`modules/automation/process/src/transport/automation.trpc.ts`): permiss
 defineTrpcRouter(AutomationApi, automationTrpc)
   .procedure("getTriggers")
   .withPermission("triggers:view")
-  .handle(({ app, input }) => app.listAutomations({ projectId: input.projectId }))
+  .handle(({ app, input }) => app.listAutomations({ projectId: input.projectId }));
 ```
 
 REST (`.../transport/automation.rest.ts`): a namespace, a version, then complete routes.
@@ -78,7 +86,10 @@ defineRestRouter(AutomationApi)
   .withPermission("triggers:view")
   .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
   .withDocs({ tags: ["Triggers"], description: "Get a trigger by its ID" })
-  .handle(async ({ app, input, scope }) => ({ status: 200 as const, body: wire(await app.getPublicTrigger({ triggerId: input.triggerId, projectId: scope.id })) }))
+  .handle(async ({ app, input, scope }) => ({
+    status: 200 as const,
+    body: wire(await app.getPublicTrigger({ triggerId: input.triggerId, projectId: scope.id })),
+  }));
 ```
 
 A POST that creates declares `.withInput(...)`, `.withStatus(201)` and `.withOutput(...)` in the same
@@ -120,17 +131,17 @@ code slug. Register the code in `packages/handled-error/src/app-codes.ts` and it
 
 ## Traps
 
-| Trap | Instead |
-| --- | --- |
-| `c.json(...)`, `try/catch` into a status | return the value; throw a HandledError |
-| checking `typeof body.x` in a handler | tighten the Zod schema in the contract |
-| `:id` on a new route | `:<thing>Id` |
-| a docs object in `*-openapi.rules.ts` | `.withDocs()` on the route |
-| a handler calling two `*Api` operations | one operation that carries both |
-| a new procedure name chosen casually | the wire name is the browser's cache key; choose once |
-| a secret in a query output | a mutation returns it once; forms read blank |
-| a raw `/api/cron/*` route | a scheduled process manager (`eventing-and-worker`) |
-| REST route for the UI | the UI uses tRPC; REST is key-authenticated public API |
+| Trap                                     | Instead                                                |
+| ---------------------------------------- | ------------------------------------------------------ |
+| `c.json(...)`, `try/catch` into a status | return the value; throw a HandledError                 |
+| checking `typeof body.x` in a handler    | tighten the Zod schema in the contract                 |
+| `:id` on a new route                     | `:<thing>Id`                                           |
+| a docs object in `*-openapi.rules.ts`    | `.withDocs()` on the route                             |
+| a handler calling two `*Api` operations  | one operation that carries both                        |
+| a new procedure name chosen casually     | the wire name is the browser's cache key; choose once  |
+| a secret in a query output               | a mutation returns it once; forms read blank           |
+| a raw `/api/cron/*` route                | a scheduled process manager (`eventing-and-worker`)    |
+| REST route for the UI                    | the UI uses tRPC; REST is key-authenticated public API |
 
 ## Tests
 

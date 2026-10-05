@@ -30,7 +30,6 @@ import type {
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
-import type { BillingSubscriptionStartedAnalyticsService } from "./billing-subscription-started-analytics.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");
@@ -56,8 +55,6 @@ type BillingSubscriptionLifecycleOptions = {
     BillingLifecycleAnnouncerService,
     "subscriptionActivated" | "subscriptionCancelled"
   >;
-  /** Tracks subscription_started in product analytics; absent where none is composed. */
-  startedAnalytics?: Pick<BillingSubscriptionStartedAnalyticsService, "fire">;
 };
 
 /** The two data-retention operations seat provisioning reads and writes. */
@@ -75,7 +72,6 @@ export class BillingSubscriptionLifecycleService {
   private readonly host: BillingWebhookHost;
   private readonly retention: SeatRetentionRules;
   private readonly announcer: BillingSubscriptionLifecycleOptions["announcer"];
-  private readonly startedAnalytics: BillingSubscriptionLifecycleOptions["startedAnalytics"];
   private readonly bestEffort = BestEffortService.create();
 
   private constructor(options: BillingSubscriptionLifecycleOptions) {
@@ -86,7 +82,6 @@ export class BillingSubscriptionLifecycleService {
     this.host = options.host;
     this.retention = options.retention;
     this.announcer = options.announcer;
-    this.startedAnalytics = options.startedAnalytics;
   }
 
   async handleSubscriptionDeleted({
@@ -213,9 +208,9 @@ export class BillingSubscriptionLifecycleService {
   }
 
   /**
-   * Reports a subscription that just became active: the Slack confirmation, the lifecycle
-   * record for peers, and the subscription_started analytics event. Callers gate this on the
-   * transition to active, so a renewal reports nothing.
+   * Reports a subscription that just became active: the Slack confirmation and the lifecycle
+   * records peers react to. Callers gate this on the transition to active, so a renewal
+   * reports nothing.
    */
   private async announceSubscriptionStarted(subscription: SubscriptionWithOrg): Promise<void> {
     await this.bestEffort.run({
@@ -232,9 +227,9 @@ export class BillingSubscriptionLifecycleService {
           ...planQuantitiesOf(subscription),
         }),
     });
-    await this.announcer?.subscriptionActivated({ organizationId: subscription.organizationId });
-    this.startedAnalytics?.fire({
+    await this.announcer?.subscriptionActivated({
       organizationId: subscription.organizationId,
+      subscriptionId: subscription.id,
       plan: subscription.plan,
     });
   }

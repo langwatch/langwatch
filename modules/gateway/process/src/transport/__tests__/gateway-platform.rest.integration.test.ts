@@ -10,6 +10,7 @@ import {
   createRestRuntime,
   type IdempotentRunner,
   type RestErrorHandler,
+  type RestPermissionReach,
 } from "@langwatch/api/rest";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import {
@@ -50,12 +51,12 @@ const scopedKey: GatewayRequestCredential = {
 };
 
 /** The fixture's caller: the credential stands as the actor, attributed as the composition does. */
-const callerOf: Pick<GatewayApi, "actorForCredential" | "authorizeVirtualKeyCaller"> = {
+const callerOf: Pick<GatewayApi, "actorForCredential" | "getVirtualKeyCaller"> = {
   actorForCredential: ({ projectId, credential }) => ({
     actor: credential,
     actorUserId: (credential.kind === "apiKey" ? credential.userId : null) ?? `svc_${projectId}`,
   }),
-  authorizeVirtualKeyCaller: async ({ caller }) => ({
+  getVirtualKeyCaller: async ({ caller }) => ({
     organizationId: ORGANIZATION_ID,
     actor: caller,
     actorUserId: caller.kind === "project" ? `svc_${caller.projectId}` : (caller.userId ?? "svc"),
@@ -124,6 +125,41 @@ const PROJECT_KEY_CALLER: GatewayVirtualKeyCaller = {
   resolvedProject: { id: PROJECT_ID, teamId: "team_1" },
 };
 
+/** What the key door was asked for one request: the route's permission and its declared reach. */
+type KeyDoorQuestion = Readonly<{
+  permission: string;
+  reach: RestPermissionReach["at"] | undefined;
+}>;
+
+type KeyDoorInput = { request: Request; permission: string; reach?: RestPermissionReach["at"] };
+
+/** A key door that records each question and refuses a permission the test says the key lacks. */
+function fakeKeyDoor({
+  asked,
+  keyHolds,
+}: {
+  asked: KeyDoorQuestion[];
+  keyHolds: (permission: string) => boolean;
+}) {
+  const caller = () => ({
+    actor: { type: "user" as const, id: "user_1" },
+    scope: { tier: "organization" as const, id: ORGANIZATION_ID },
+  });
+
+  return {
+    authenticate: ({ permission, reach }: KeyDoorInput) => {
+      asked.push({ permission, reach });
+      if (keyHolds(permission)) return caller();
+      throw new PermissionDeniedError({
+        permission,
+        scope: { type: "organization", id: ORGANIZATION_ID },
+        denialReason: "no-binding",
+      });
+    },
+    identify: caller,
+  };
+}
+
 /**
  * The family behind both of its doors: project-door routes see the caller's
  * project, key-door routes (virtual keys and the organization-owned rows) the
@@ -135,24 +171,24 @@ function mountFamily({
   keyCaller = ORGANIZATION_KEY_CALLER,
   virtualKeyCaller = PROJECT_KEY_CALLER,
   credential = scopedKey,
+  asked = [],
+  keyHolds = () => true,
 }: {
   app: GatewayApi;
   idempotency: IdempotentRunner;
   keyCaller?: GatewayKeyCaller;
   virtualKeyCaller?: GatewayVirtualKeyCaller;
   credential?: GatewayRequestCredential;
+  asked?: KeyDoorQuestion[];
+  keyHolds?: (permission: string) => boolean;
 }) {
   const projectDoor = () => ({
     actor: { type: "api_key" as const, id: "gateway-key" },
     scope: { tier: "project" as const, id: PROJECT_ID },
   });
-  const keyDoor = () => ({
-    actor: { type: "user" as const, id: "user_1" },
-    scope: { tier: "organization" as const, id: ORGANIZATION_ID },
-  });
   const runtime = createRestRuntime({
     identity: { authenticate: projectDoor, identify: projectDoor },
-    doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
+    doors: { api_key: fakeKeyDoor({ asked, keyHolds }) },
     idempotency,
   });
 
@@ -169,6 +205,7 @@ function mountFamily({
 
 function mountGatewayPlatform(options: { allowedAtOrganization: readonly string[] }) {
   const probed: string[] = [];
+  const asked: KeyDoorQuestion[] = [];
   const archiveBudget = vi.fn(async (): Promise<GatewayBudgetResource> => {
     throw new Error("the write must not run for a refused caller");
   });
@@ -191,19 +228,26 @@ function mountGatewayPlatform(options: { allowedAtOrganization: readonly string[
     actorForCredential: () => ({ actor: { kind: "legacyProjectKey" }, actorUserId: "svc" }),
     authorizeOrganizationWideOperation: async (input) =>
       refuseUnlessAllowed(input.permission, input.organizationId),
-    authorizeKeyCaller: async (input) => {
-      refuseUnlessAllowed(input.permission, ORGANIZATION_ID);
-      return { organizationId: ORGANIZATION_ID, actor: null, actorUserId: "user_1" };
-    },
+    getKeyCaller: async () => ({
+      organizationId: ORGANIZATION_ID,
+      actor: null,
+      actorUserId: "user_1",
+    }),
     archiveBudget,
     updateCacheRule,
     groupMemberCounts: async () => new Map<string, number>(),
   });
 
-  const hono = mountFamily({ app, idempotency: passthroughIdempotency });
+  const hono = mountFamily({
+    app,
+    idempotency: passthroughIdempotency,
+    asked,
+    keyHolds: (permission) => options.allowedAtOrganization.includes(permission),
+  });
 
   return {
     probed,
+    asked,
     archiveBudget,
     updateCacheRule,
     archiveBudgetRequest: (id: string) =>
@@ -226,7 +270,7 @@ describe("the gateway platform family's organization-wide writes", () => {
       const response = await world.archiveBudgetRequest("budget_of_sibling_project");
 
       expect(response.status).toBe(403);
-      expect(world.probed).toEqual([`gatewayBudgets:delete@${ORGANIZATION_ID}`]);
+      expect(world.asked).toEqual([{ permission: "gatewayBudgets:delete", reach: "organization" }]);
       expect(world.archiveBudget).not.toHaveBeenCalled();
     });
 
@@ -403,7 +447,7 @@ describe("the gateway platform family's idempotent creates", () => {
     const row = budgetRow();
     const createBudget = vi.fn(async () => row);
     const app = createApiFixture<GatewayApi>({
-      authorizeKeyCaller: async () => ({
+      getKeyCaller: async () => ({
         organizationId: ORGANIZATION_ID,
         actor: null,
         actorUserId: "user_1",
@@ -470,11 +514,15 @@ function mountAs({
   credential,
   keyCaller,
   virtualKeyCaller,
+  asked,
+  keyHolds,
 }: {
   app: GatewayApi;
   credential?: GatewayRequestCredential;
   keyCaller?: GatewayKeyCaller;
   virtualKeyCaller?: GatewayVirtualKeyCaller;
+  asked?: KeyDoorQuestion[];
+  keyHolds?: (permission: string) => boolean;
 }) {
   const hono = mountFamily({
     app,
@@ -482,6 +530,8 @@ function mountAs({
     credential,
     keyCaller,
     virtualKeyCaller,
+    asked,
+    keyHolds,
   });
 
   return (path: string, body: unknown) =>
@@ -523,7 +573,8 @@ describe("the gateway platform family's caller", () => {
   describe("given a scoped API key with the budget grant at the organization", () => {
     /** @scenario "A scoped API key with the budget grant at the organization creates a budget" */
     it("creates the budget as the key's owning user, 201", async () => {
-      const authorizeKeyCaller = vi.fn(async () => ({
+      const asked: KeyDoorQuestion[] = [];
+      const getKeyCaller = vi.fn<GatewayApi["getKeyCaller"]>(async () => ({
         organizationId: ORGANIZATION_ID,
         actor: scopedKey,
         actorUserId: "user_1",
@@ -532,8 +583,9 @@ describe("the gateway platform family's caller", () => {
       const post = mountAs({
         credential: scopedKey,
         keyCaller: ORGANIZATION_KEY_CALLER,
+        asked,
         app: createApiFixture<GatewayApi>({
-          authorizeKeyCaller,
+          getKeyCaller,
           createBudget,
           groupMemberCounts: async () => new Map<string, number>(),
           budgetScopeReach: async () => ({
@@ -547,11 +599,8 @@ describe("the gateway platform family's caller", () => {
       const response = await post("/budgets", budgetBody);
 
       expect(response.status).toBe(201);
-      expect(authorizeKeyCaller).toHaveBeenCalledWith({
-        caller: ORGANIZATION_KEY_CALLER,
-        permission: "gatewayBudgets:create",
-        reach: "organization",
-      });
+      expect(asked).toEqual([{ permission: "gatewayBudgets:create", reach: "organization" }]);
+      expect(getKeyCaller).toHaveBeenCalledWith({ caller: ORGANIZATION_KEY_CALLER });
       expect(createBudget).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: "user_1" }));
     });
   });
@@ -562,16 +611,8 @@ describe("the gateway platform family's caller", () => {
       const createBudget = vi.fn(async () => budgetRow());
       const post = mountAs({
         credential: scopedKey,
-        app: createApiFixture<GatewayApi>({
-          authorizeKeyCaller: async ({ permission }) => {
-            throw new PermissionDeniedError({
-              permission,
-              scope: { type: "organization", id: ORGANIZATION_ID },
-              denialReason: "no-binding",
-            });
-          },
-          createBudget,
-        }),
+        keyHolds: () => false,
+        app: createApiFixture<GatewayApi>({ createBudget }),
       });
 
       const response = await post("/budgets", budgetBody);
@@ -634,13 +675,114 @@ describe("the gateway platform family's caller", () => {
   });
 });
 
+describe("the reach each key-door route declares", () => {
+  /** Every request is refused at the door, so only the declaration is exercised. */
+  async function askedBy(
+    requests: readonly (readonly [method: string, path: string, body?: unknown])[],
+    keyCaller: GatewayKeyCaller = ORGANIZATION_KEY_CALLER,
+  ) {
+    const asked: KeyDoorQuestion[] = [];
+    const hono = mountFamily({
+      app: createApiFixture<GatewayApi>({}),
+      idempotency: passthroughIdempotency,
+      keyCaller,
+      asked,
+      keyHolds: () => false,
+    });
+    const statuses: number[] = [];
+    for (const [method, path, body] of requests) {
+      const response = await hono.request(`/api/gateway/v1${path}`, {
+        method,
+        ...(body === undefined
+          ? {}
+          : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+      });
+      statuses.push(response.status);
+    }
+
+    return { asked, statuses };
+  }
+
+  describe("given the virtual key routes", () => {
+    it("asks the door each route's permission at the reach of the key's grants", async () => {
+      const { asked, statuses } = await askedBy([
+        ["GET", "/virtual-keys"],
+        ["POST", "/virtual-keys", { name: "ci-key" }],
+        ["GET", "/virtual-keys/vk_1"],
+        ["GET", "/virtual-keys/vk_1/spend"],
+        ["PATCH", "/virtual-keys/vk_1", { name: "renamed" }],
+        ["POST", "/virtual-keys/vk_1/rotate", {}],
+        ["POST", "/virtual-keys/vk_1/disable", {}],
+        ["POST", "/virtual-keys/vk_1/enable", {}],
+        ["POST", "/virtual-keys/vk_1/revoke", {}],
+      ]);
+
+      expect(asked).toEqual(
+        [
+          "virtualKeys:view",
+          "virtualKeys:create",
+          "virtualKeys:view",
+          "gatewayUsage:view",
+          "virtualKeys:update",
+          "virtualKeys:rotate",
+          "virtualKeys:update",
+          "virtualKeys:update",
+          "virtualKeys:delete",
+        ].map((permission) => ({ permission, reach: "grants" })),
+      );
+      expect(new Set(statuses)).toEqual(new Set([403]));
+    });
+  });
+
+  describe("given the budget writes, called by a key that resolved one project", () => {
+    /** @scenario A budget write is checked at the organization whatever key calls it */
+    it("asks the door each write's permission at the organization", async () => {
+      const { asked, statuses } = await askedBy(
+        [
+          ["POST", "/budgets", budgetBody],
+          ["PATCH", "/budgets/bgt_1", { limit_usd: "300" }],
+          ["DELETE", "/budgets/bgt_1"],
+          ["POST", "/budgets/bgt_1/reset", {}],
+        ],
+        PROJECT_KEY_CALLER,
+      );
+
+      expect(asked).toEqual(
+        [
+          "gatewayBudgets:create",
+          "gatewayBudgets:update",
+          "gatewayBudgets:delete",
+          "gatewayBudgets:update",
+        ].map((permission) => ({ permission, reach: "organization" })),
+      );
+      expect(new Set(statuses)).toEqual(new Set([403]));
+    });
+  });
+
+  describe("given the budget reads", () => {
+    it("asks the door the view permission with no reach, leaving it at the key's own", async () => {
+      const { asked, statuses } = await askedBy([
+        ["GET", "/budgets"],
+        ["GET", "/budgets/bgt_1"],
+      ]);
+
+      expect(asked).toStrictEqual([
+        { permission: "gatewayBudgets:view", reach: undefined },
+        { permission: "gatewayBudgets:view", reach: undefined },
+      ]);
+      expect(new Set(statuses)).toEqual(new Set([403]));
+    });
+  });
+});
+
 describe("the gateway budget routes behind the key door", () => {
   const readAt = Temporal.Instant.from("2026-08-02T00:00:00.000Z");
 
   describe("given an organization key that names no project", () => {
     /** @scenario The budget routes take an organization key and hand its caller to the application */
     it("lists the organization's budgets for the caller the key door resolved", async () => {
-      const authorizeKeyCaller = vi.fn(async () => ({
+      const asked: KeyDoorQuestion[] = [];
+      const getKeyCaller = vi.fn<GatewayApi["getKeyCaller"]>(async () => ({
         organizationId: ORGANIZATION_ID,
         actor: null,
         actorUserId: "user_1",
@@ -653,20 +795,17 @@ describe("the gateway budget routes behind the key door", () => {
         total: 1,
       }));
       const app = createApiFixture<GatewayApi>({
-        authorizeKeyCaller,
+        getKeyCaller,
         listBudgetPageWithHealth,
         groupMemberCounts: async () => new Map<string, number>(),
       });
-      const hono = mountFamily({ app, idempotency: passthroughIdempotency });
+      const hono = mountFamily({ app, idempotency: passthroughIdempotency, asked });
 
       const response = await hono.request("/api/gateway/v1/budgets");
 
       expect(response.status).toBe(200);
-      expect(authorizeKeyCaller).toHaveBeenCalledWith({
-        caller: ORGANIZATION_KEY_CALLER,
-        permission: "gatewayBudgets:view",
-        reach: "caller",
-      });
+      expect(asked).toStrictEqual([{ permission: "gatewayBudgets:view", reach: undefined }]);
+      expect(getKeyCaller).toHaveBeenCalledWith({ caller: ORGANIZATION_KEY_CALLER });
       expect(listBudgetPageWithHealth).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: ORGANIZATION_ID }),
       );
@@ -677,7 +816,7 @@ describe("the gateway budget routes behind the key door", () => {
     /** @scenario A budget listing carries each row's scope reach */
     it("carries scope_reach from the application's per-row reach read", async () => {
       const app = createApiFixture<GatewayApi>({
-        authorizeKeyCaller: async () => ({
+        getKeyCaller: async () => ({
           organizationId: ORGANIZATION_ID,
           actor: null,
           actorUserId: "user_1",
@@ -702,15 +841,16 @@ describe("the gateway budget routes behind the key door", () => {
     });
 
     /** @scenario The budget routes take an organization key and hand its caller to the application */
-    it("creates a budget after authorizing the key at the organization", async () => {
-      const authorizeKeyCaller = vi.fn(async () => ({
+    it("creates a budget once the door admitted the key at the organization", async () => {
+      const asked: KeyDoorQuestion[] = [];
+      const getKeyCaller = vi.fn<GatewayApi["getKeyCaller"]>(async () => ({
         organizationId: ORGANIZATION_ID,
         actor: null,
         actorUserId: "user_1",
       }));
       const createBudget = vi.fn(async () => budgetRow({ scopeType: "TEAM", scopeId: "team_1" }));
       const app = createApiFixture<GatewayApi>({
-        authorizeKeyCaller,
+        getKeyCaller,
         createBudget,
         groupMemberCounts: async () => new Map<string, number>(),
         budgetScopeReach: async () => ({
@@ -719,7 +859,7 @@ describe("the gateway budget routes behind the key door", () => {
           activeKeyCount: 1,
         }),
       });
-      const hono = mountFamily({ app, idempotency: passthroughIdempotency });
+      const hono = mountFamily({ app, idempotency: passthroughIdempotency, asked });
 
       const response = await hono.request("/api/gateway/v1/budgets", {
         method: "POST",
@@ -733,9 +873,8 @@ describe("the gateway budget routes behind the key door", () => {
       });
 
       expect(response.status).toBe(201);
-      expect(authorizeKeyCaller).toHaveBeenCalledWith(
-        expect.objectContaining({ permission: "gatewayBudgets:create", reach: "organization" }),
-      );
+      expect(asked).toEqual([{ permission: "gatewayBudgets:create", reach: "organization" }]);
+      expect(getKeyCaller).toHaveBeenCalledWith({ caller: ORGANIZATION_KEY_CALLER });
       expect(createBudget).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: ORGANIZATION_ID, actorUserId: "user_1" }),
       );
@@ -765,7 +904,7 @@ describe("the gateway budget routes behind the key door", () => {
         spentUsd: new Prisma.Decimal("100.14"),
       });
       const app = createApiFixture<GatewayApi>({
-        authorizeKeyCaller: async () => ({
+        getKeyCaller: async () => ({
           organizationId: ORGANIZATION_ID,
           actor: null,
           actorUserId: "user_1",
@@ -797,7 +936,7 @@ describe("the gateway budget routes behind the key door", () => {
     /** @scenario A budget reset answers with the row it moved, carrying no reach read */
     it("does not carry scope_reach", async () => {
       const app = createApiFixture<GatewayApi>({
-        authorizeKeyCaller: async () => ({
+        getKeyCaller: async () => ({
           organizationId: ORGANIZATION_ID,
           actor: null,
           actorUserId: "user_1",

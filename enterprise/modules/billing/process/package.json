@@ -60,7 +60,6 @@
     "hono": "catalog:",
     "ioredis": "catalog:",
     "nanoid": "catalog:",
-    "posthog-node": "catalog:",
     "stripe": "^15.12.0",
     "zod": "catalog:"
   },

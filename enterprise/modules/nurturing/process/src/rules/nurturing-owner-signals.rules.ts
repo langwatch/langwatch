@@ -3,6 +3,7 @@ import type { SessionStartedEventData, SsoAutoAddedEventData } from "@langwatch/
 import type {
   CheckoutCompletedEventData,
   SubscriptionChangedEventData,
+  SubscriptionStartedEventData,
 } from "@langwatch/enterprise-billing-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import type {
@@ -151,6 +152,22 @@ export function subscriptionChangedSignal({
     organizationId: data.organizationId,
     memberUserIds: data.memberUserIds,
     hasSubscription: data.hasSubscription,
+  };
+}
+
+/** A subscription that became active, once per transition: keyed by it and its instant. */
+export function subscriptionStartedSignal({
+  data,
+  aggregateId,
+}: OwnerEvent<SubscriptionStartedEventData>): NurturingSignal {
+  return {
+    kind: "subscription_started",
+    sourceEventId: `${aggregateId}:${data.subscriptionId}:${data.occurredAt}`,
+    tenantId: data.tenantId,
+    occurredAt: data.occurredAt,
+    organizationId: data.organizationId,
+    memberUserIds: data.memberUserIds,
+    plan: data.plan,
   };
 }
 

@@ -433,6 +433,13 @@ export type RestPermissionTarget =
   | Readonly<{ at: "route"; param: ScopeTierField; field?: string }>
   | Readonly<{ at: "header"; param: ScopeTierField; header: string }>;
 
+/**
+ * How far a key that names no project is asked the route's permission. `grants` passes when it
+ * holds the permission at any scope it is granted at, for a resource that names its own scopes;
+ * `organization` asks at the whole organization, whatever project the key named.
+ */
+export type RestPermissionReach = Readonly<{ at: "grants" | "organization" }>;
+
 export type RestTransportRoute<Api> = Readonly<{
   readonly method: HttpMethod;
   readonly path: string;
@@ -445,6 +452,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly permission?: AuthzPermission;
   /** Where that permission is asked; absent means at the credential's scope. */
   readonly permissionTarget?: RestPermissionTarget;
+  /** How far the key door asks it; absent means the key's project, else its organization. */
+  readonly permissionReach?: RestPermissionReach["at"];
   /** Present exactly when the route named an access kind instead. */
   readonly access?: RouteAccess;
   readonly permissionScope?: string;
@@ -530,6 +539,7 @@ type RouteState = Readonly<{
   anyMethod?: boolean;
   permission?: AuthzPermission;
   permissionTarget?: RestPermissionTarget;
+  permissionReach?: RestPermissionReach["at"];
   access?: RouteAccess;
   version?: DateVersion;
   docs?: RestTransportDocs;
@@ -888,14 +898,17 @@ class RouteBuilder<Api, S extends RouteShape> {
   }
 
   /**
-   * The permission this route demands, and where it is asked. `{ at: "route",
-   * param }` asks it at the scope the route's own path names, for a family
-   * whose credential is one tier wider than the resource it addresses.
+   * The permission this route demands, and where it is asked. `{ at: "route", param }` asks at
+   * the scope the route's own path names, for a credential one tier wider than the resource.
+   * `{ at: "grants" }` and `{ at: "organization" }` are the key door's (RestPermissionReach).
    */
   withPermission(
     permission: AuthzPermission,
-    target?: RestPermissionTarget,
+    target?: RestPermissionTarget | RestPermissionReach,
   ): RouteBuilder<Api, With<S, { permission: true }>> {
+    const reach = target?.at === "grants" || target?.at === "organization" ? target.at : void 0;
+    const scoped = target && "param" in target ? target : void 0;
+
     return new RouteBuilder<Api, With<S, { permission: true }>>({
       router: this.router,
       method: this.method,
@@ -904,7 +917,8 @@ class RouteBuilder<Api, S extends RouteShape> {
       state: {
         ...this.state,
         permission,
-        ...(target ? { permissionTarget: target } : {}),
+        ...(scoped ? { permissionTarget: scoped } : {}),
+        ...(reach ? { permissionReach: reach } : {}),
       },
     });
   }
@@ -1169,14 +1183,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       ...(this.state.params ? { params: this.state.params } : {}),
       ...(this.state.input ? { input: this.state.input } : {}),
       ...(this.state.query ? { query: this.state.query } : {}),
-      ...(this.state.access
-        ? { access: this.state.access }
-        : {
-            permission: permissionOf(this.state.permission),
-            ...(this.state.permissionTarget
-              ? { permissionTarget: this.state.permissionTarget }
-              : {}),
-          }),
+      ...accessParts(this.state),
       output: this.state.output ?? successAnswerOf(this.state.answers) ?? z.void(),
       ...declaredParts(this.state),
       methods: this.state.methods ?? [this.method],
@@ -1315,6 +1322,22 @@ function assertAuditAction(action: string): void {
  * What the route declared about its body, its answer and its two capabilities,
  * as the fields a declared route carries: present exactly when declared.
  */
+/** The access kind a route named, or its permission with where and how far it is asked. */
+function accessParts(
+  state: RouteState,
+): Pick<
+  RestTransportRoute<unknown>,
+  "access" | "permission" | "permissionTarget" | "permissionReach"
+> {
+  if (state.access) return { access: state.access };
+
+  return {
+    permission: permissionOf(state.permission),
+    ...(state.permissionTarget ? { permissionTarget: state.permissionTarget } : {}),
+    ...(state.permissionReach ? { permissionReach: state.permissionReach } : {}),
+  };
+}
+
 function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
   return {
     ...(state.answers ? { answers: state.answers } : {}),
