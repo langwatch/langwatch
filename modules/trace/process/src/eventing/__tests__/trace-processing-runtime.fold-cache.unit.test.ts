@@ -1,9 +1,9 @@
 import { createTenantId } from "@langwatch/eventing";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 /**
  * @vitest-environment node
  * Spec: modules/trace/specs/trace-projections.feature
  */
+import type { RedisConnection } from "@langwatch/redis-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
@@ -19,9 +19,9 @@ import {
 function compose() {
   const set = vi.fn(async (): Promise<"OK"> => "OK");
   const get = vi.fn(async () => null);
-  const redis = createApiFixture<ProcessMembers["redis"]>({ get, set }, "redis");
+  const redis = createApiFixture<RedisConnection>({ get, set }, "redis");
   const pipeline = TraceProcessingRuntimeAdapter.create({
-    processName: "langwatch-test",
+    role: "worker",
     tokenizer: createApiFixture<TraceProcessingPipelineInput["tokenizer"]>(),
     peers: createApiFixture<TraceProcessingPipelineInput["peers"]>({
       dataRetention: createApiFixture<TraceProcessingPipelineInput["peers"]["dataRetention"]>({

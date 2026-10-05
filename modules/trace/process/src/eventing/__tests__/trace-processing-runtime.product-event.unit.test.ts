@@ -65,7 +65,7 @@ function project(): Project {
 function compose() {
   const updateMetadata = vi.fn<Peers["projects"]["updateMetadata"]>(async () => undefined);
   const pipeline = TraceProcessingRuntimeAdapter.create({
-    processName: "langwatch-test",
+    role: "worker",
     tokenizer: createApiFixture<TraceProcessingPipelineInput["tokenizer"]>(),
     peers: createApiFixture<Peers>({
       dataRetention: createApiFixture<Peers["dataRetention"]>({

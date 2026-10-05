@@ -119,6 +119,9 @@
       "path": "../../../packages/redaction/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/redis-client/tsconfig.build.json"
+    },
+    {
       "path": "../../share/contract/tsconfig.build.json"
     },
     {

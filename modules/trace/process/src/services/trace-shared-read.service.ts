@@ -4,7 +4,6 @@
  */
 import { createHash } from "node:crypto";
 
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { Project } from "@langwatch/project-contract";
 import {
   ShareLinkNotFoundError,
@@ -25,6 +24,7 @@ import {
   type TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
 
+import type { TraceRateLimitRepository } from "../repositories/trace-rate-limit.repository.ts";
 import {
   deriveTraceDropPrivacy,
   mapLegacySpanSummaryToTreeNode,
@@ -70,7 +70,7 @@ type TraceSharedReadDependencies = Readonly<{
     ): Promise<Pick<Project, "name" | "slug" | "language" | "framework" | "archivedAt"> | null>;
   }>;
   protections: Pick<TraceViewerProtectionService, "resolve">;
-  rateLimiter: RateLimiter;
+  rateLimiter: TraceRateLimitRepository;
   mappers: TraceReadMapperMembers;
 }>;
 

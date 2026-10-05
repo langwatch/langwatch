@@ -247,11 +247,11 @@ export class TraceAiQueryUnavailableError extends HandledError {
 export class TraceCapabilityUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
 
-  constructor(processName: string, capability: string) {
+  constructor(role: string, capability: string) {
     super("service_unavailable", "This part of the product is not available on this deployment", {
       httpStatus: 503,
       fault: "platform",
-      meta: { process: processName, capability },
+      meta: { process: role, capability },
     });
     this.name = "TraceCapabilityUnavailableError";
   }

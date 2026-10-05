@@ -22,7 +22,6 @@ export type TraceViewerProtectionOptions = Readonly<{
   plans: PlanProvider;
   dataPrivacy: DataPrivacyApi;
   fallbackVisibilityDays: number;
-  processName: string;
   now?: () => number;
   logger?: Logger;
 }>;
@@ -38,7 +37,7 @@ export class TraceViewerProtectionService {
 
   private constructor(private readonly options: TraceViewerProtectionOptions) {
     this.window = VisibilityWindowService.create(options.plans);
-    this.logger = options.logger ?? createLogger(`${options.processName}:trace-protections`);
+    this.logger = options.logger ?? createLogger("langwatch:trace:protections");
     this.now = options.now ?? Date.now;
   }
 

@@ -150,7 +150,6 @@ function compose({
       plans: peers.plans,
       dataPrivacy: peers.dataPrivacy,
       fallbackVisibilityDays: 14,
-      processName: "langwatch-api",
     },
     ...peers,
     requestBounds: peers.plans,

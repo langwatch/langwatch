@@ -457,7 +457,6 @@ export type TraceInfrastructure = Readonly<{
     commands: TraceProcessingCommands;
     broadcast: TracesTrpcEmitters;
     fallbackVisibilityDays: number;
-    processName: string;
     /** The deployment's public origin, for `platformUrl`. Optional: not every
      * install serves REST. */
     publicBaseUrl?: string;

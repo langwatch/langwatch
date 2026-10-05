@@ -31,38 +31,38 @@ import type { TraceAnalyticsData } from "./trace-derived.projection.ts";
 import { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
 import type { TraceAnalyticsRollupRow } from "./trace-rollup.projection.ts";
 
-/** Why every stand-in below refuses, in the process's own words. */
-function producerOnly(processName: string, capability: string): Error {
+/** Why every stand-in below refuses, naming the module and the role. */
+function producerOnly(role: string, capability: string): Error {
   return new Error(
-    `${processName} registered the trace_processing pipeline as a producer only, so it cannot ${capability}. This work belongs to the worker that drains the pipeline.`,
+    `trace (${role}) registered the trace_processing pipeline as a producer only, so it cannot ${capability}. This work belongs to the worker that drains the pipeline.`,
   );
 }
 
 /** A fold store that cannot fold, because this process consumes nothing. */
 class ProducerOnlyFoldStore<TState> implements FoldProjectionStore<TState> {
   constructor(
-    private readonly processName: string,
+    private readonly role: string,
     private readonly name: string,
   ) {}
 
   store(): Promise<void> {
-    return Promise.reject(producerOnly(this.processName, `write the ${this.name} projection`));
+    return Promise.reject(producerOnly(this.role, `write the ${this.name} projection`));
   }
 
   get(): Promise<never> {
-    return Promise.reject(producerOnly(this.processName, `read the ${this.name} projection`));
+    return Promise.reject(producerOnly(this.role, `read the ${this.name} projection`));
   }
 }
 
 /** An append store that cannot append, for the same reason. */
 class ProducerOnlyAppendStore<TRow> implements AppendStore<TRow> {
   constructor(
-    private readonly processName: string,
+    private readonly role: string,
     private readonly name: string,
   ) {}
 
   append(): Promise<void> {
-    return Promise.reject(producerOnly(this.processName, `append to the ${this.name} projection`));
+    return Promise.reject(producerOnly(this.role, `append to the ${this.name} projection`));
   }
 }
 
@@ -71,12 +71,12 @@ class ProducerOnlyAppendStore<TRow> implements AppendStore<TRow> {
  * empty answer — a stand-in answering "nothing" would be read as a span that carried nothing.
  */
 class ProducerOnlyCanonicalisation extends TraceCanonicalisationService {
-  constructor(private readonly processName: string) {
+  constructor(private readonly role: string) {
     super();
   }
 
   private refuse(): never {
-    throw producerOnly(this.processName, "canonicalise span content");
+    throw producerOnly(this.role, "canonicalise span content");
   }
 
   canonicalizeSpanAttributes(): never {
@@ -105,22 +105,22 @@ class ProducerOnlyCanonicalisation extends TraceCanonicalisationService {
 }
 
 class ProducerOnlyIoExtraction implements TraceIoExtraction {
-  constructor(private readonly processName: string) {}
+  constructor(private readonly role: string) {}
 
   extractRichIOFromSpan(): never {
-    throw producerOnly(this.processName, "extract a span's captured input or output");
+    throw producerOnly(this.role, "extract a span's captured input or output");
   }
 
   extractFallbackIOFromSpan(): never {
-    throw producerOnly(this.processName, "extract a span's captured input or output");
+    throw producerOnly(this.role, "extract a span's captured input or output");
   }
 }
 
 class ProducerOnlyMediaReferences implements TraceMediaReferenceResolver {
-  constructor(private readonly processName: string) {}
+  constructor(private readonly role: string) {}
 
   private refuse(): never {
-    throw producerOnly(this.processName, "resolve a span's media references");
+    throw producerOnly(this.role, "resolve a span's media references");
   }
 
   collect(): never {
@@ -141,86 +141,86 @@ class ProducerOnlyMediaReferences implements TraceMediaReferenceResolver {
 }
 
 class ProducerOnlyModelCosts implements TraceModelCost {
-  constructor(private readonly processName: string) {}
+  constructor(private readonly role: string) {}
 
   estimate(): number {
-    throw producerOnly(this.processName, "price a span against the model catalogue");
+    throw producerOnly(this.role, "price a span against the model catalogue");
   }
 }
 
 class ProducerOnlySpanNormalization implements TraceSpanNormalization {
-  constructor(private readonly processName: string) {}
+  constructor(private readonly role: string) {}
 
   normalizeSpanReceived(): NormalizedSpan {
-    throw producerOnly(this.processName, "normalise a received span");
+    throw producerOnly(this.role, "normalise a received span");
   }
 
   enrichRagContextIds(): void {
-    throw producerOnly(this.processName, "enrich a span's RAG context ids");
+    throw producerOnly(this.role, "enrich a span's RAG context ids");
   }
 }
 
 class ProducerOnlyPiiRedaction implements TraceSpanPiiRedaction {
-  constructor(private readonly processName: string) {}
+  constructor(private readonly role: string) {}
 
   redact(_input: { tenantId: TenantId }): Promise<void> {
-    return Promise.reject(producerOnly(this.processName, "redact a span"));
+    return Promise.reject(producerOnly(this.role, "redact a span"));
   }
 }
 
 class ProducerOnlyCostEnrichment implements TraceSpanCostEnrichment {
-  constructor(private readonly processName: string) {}
+  constructor(private readonly role: string) {}
 
   enrich(): Promise<void> {
-    return Promise.reject(producerOnly(this.processName, "enrich a span with its cost"));
+    return Promise.reject(producerOnly(this.role, "enrich a span with its cost"));
   }
 }
 
 class ProducerOnlyTokenEstimation implements TraceSpanTokenEstimation {
-  constructor(private readonly processName: string) {}
+  constructor(private readonly role: string) {}
 
   estimate(): Promise<void> {
-    return Promise.reject(producerOnly(this.processName, "estimate a span's tokens"));
+    return Promise.reject(producerOnly(this.role, "estimate a span's tokens"));
   }
 }
 
 class ProducerOnlyContentDrop implements TraceSpanContentDrop {
-  constructor(private readonly processName: string) {}
+  constructor(private readonly role: string) {}
 
   drop(): Promise<never> {
-    return Promise.reject(producerOnly(this.processName, "drop a span's captured content"));
+    return Promise.reject(producerOnly(this.role, "drop a span's captured content"));
   }
 }
 
 /**
  * Builds the trace-processing definition for a process that only sends commands on it.
- * `processName` names the refusal, so a stand-in reached by accident names which process.
+ * `role` names the refusal, so a stand-in reached by accident names which role it ran in.
  */
 export function createTraceProcessingProducerPipeline(input: {
-  processName: string;
+  role: string;
 }): ReturnType<ReturnType<EventingTracePipelineAdapter["build"]>["build"]> {
-  const { processName } = input;
+  const { role } = input;
   return EventingTracePipelineAdapter.create({
-    spanStore: new ProducerOnlyAppendStore<NormalizedSpan>(processName, "span"),
-    summaryStore: new ProducerOnlyFoldStore<TraceSummaryData>(processName, "trace summary"),
-    derivedStore: new ProducerOnlyFoldStore<TraceAnalyticsData>(processName, "trace analytics"),
+    spanStore: new ProducerOnlyAppendStore<NormalizedSpan>(role, "span"),
+    summaryStore: new ProducerOnlyFoldStore<TraceSummaryData>(role, "trace summary"),
+    derivedStore: new ProducerOnlyFoldStore<TraceAnalyticsData>(role, "trace analytics"),
     rollupStore: new ProducerOnlyAppendStore<TraceAnalyticsRollupRow>(
-      processName,
+      role,
       "trace analytics rollup",
     ),
-    canonicalisation: new ProducerOnlyCanonicalisation(processName),
-    ioExtraction: new ProducerOnlyIoExtraction(processName),
-    mediaReferences: new ProducerOnlyMediaReferences(processName),
-    modelCosts: new ProducerOnlyModelCosts(processName),
-    spanNormalization: new ProducerOnlySpanNormalization(processName),
+    canonicalisation: new ProducerOnlyCanonicalisation(role),
+    ioExtraction: new ProducerOnlyIoExtraction(role),
+    mediaReferences: new ProducerOnlyMediaReferences(role),
+    modelCosts: new ProducerOnlyModelCosts(role),
+    spanNormalization: new ProducerOnlySpanNormalization(role),
     // The identity, and it is never reached: preparation only runs on the fold
     // path, and this registration folds nothing.
     prepareEventForProjection: (event: TraceProcessingEvent) => event,
     recordSpanCommand: EventingRecordSpanAdapter.create({
-      piiRedaction: new ProducerOnlyPiiRedaction(processName),
-      costEnrichment: new ProducerOnlyCostEnrichment(processName),
-      tokenEstimation: new ProducerOnlyTokenEstimation(processName),
-      contentDrop: new ProducerOnlyContentDrop(processName),
+      piiRedaction: new ProducerOnlyPiiRedaction(role),
+      costEnrichment: new ProducerOnlyCostEnrichment(role),
+      tokenEstimation: new ProducerOnlyTokenEstimation(role),
+      contentDrop: new ProducerOnlyContentDrop(role),
     }),
     // No subscribers: they are consumer-side, and this registration drains
     // nothing. The command routing triple is derived from the pipeline and

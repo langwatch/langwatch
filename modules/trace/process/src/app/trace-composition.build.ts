@@ -1,7 +1,6 @@
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { type FoldProjectionStore, createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -28,7 +27,6 @@ import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
 import { CLICKHOUSE_FACET_CATALOG } from "../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import {
-  MemberTraceClickHouseClientRepository,
   TraceClickHouse,
   type TraceClickHouseClient,
   type TraceClickHouseResolver,
@@ -97,7 +95,7 @@ import type {
 } from "./trace.members.ts";
 
 /**
- * Trace's own collaborators, built from process members; pipeline-owned features
+ * Trace's own collaborators, built from its registry and config; pipeline-owned features
  * (folds, rename, spool) refuse by name when absent.
  */
 
@@ -113,37 +111,28 @@ type TraceCollaborators = Readonly<{
   summaryStore?: FoldProjectionStore<TraceSummaryData>;
   commands: TraceProcessingCommands;
   fallbackVisibilityDays: number;
-  processName: string;
   publicBaseUrl?: string;
   /** The ingestion doors' duplicate claim, so an SDK's retry is not a second span. */
   dedup: TraceSpanDedupRepository;
 }>;
 
-/** Exactly the process members {@link buildTraceCollaborators} reads. */
-type TraceBuildMembers = Readonly<{
-  clickhouse: ClickHouseQueryClient;
-}>;
-
-/** The config slice the deployment states for this module. */
+/** The config slice the deployment states for this module, and the role it runs in. */
 type TraceBuildConfig = Readonly<{
-  processName: string;
+  role: string;
   fallbackVisibilityDays: number;
   publicBaseUrl?: string | undefined;
 }>;
 
-/** Builds this process's Trace collaborators from its members and config. */
+/** Builds this process's Trace collaborators from its registry's clients and its config. */
 export function buildTraceCollaborators(input: {
-  members: TraceBuildMembers;
+  resolveClickHouseClient: TraceClickHouseResolver;
   config: TraceBuildConfig;
   dedup: TraceSpanDedupRepository;
   /** trace_processing's senders, bound when the process connects the pipeline. */
   commands: TraceProcessingCommands;
 }): TraceCollaborators {
-  const { members, config } = input;
-  const refuse = refusalFactory(config.processName);
-  const resolveClickHouseClient = MemberTraceClickHouseClientRepository.resolverFor(
-    members.clickhouse,
-  );
+  const { resolveClickHouseClient, config } = input;
+  const refuse = refusalFactory(config.role);
 
   return {
     resolveClickHouseClient,
@@ -163,15 +152,12 @@ export function buildTraceCollaborators(input: {
     commands: input.commands,
     dedup: input.dedup,
     fallbackVisibilityDays: config.fallbackVisibilityDays,
-    processName: config.processName,
     ...(config.publicBaseUrl === undefined ? {} : { publicBaseUrl: config.publicBaseUrl }),
   };
 }
 
-function refusalFactory(
-  processName: string,
-): (capability: string) => TraceCapabilityUnavailableError {
-  return (capability: string) => new TraceCapabilityUnavailableError(processName, capability);
+function refusalFactory(role: string): (capability: string) => TraceCapabilityUnavailableError {
+  return (capability: string) => new TraceCapabilityUnavailableError(role, capability);
 }
 
 type TraceReaderCompositionOptions = {
@@ -237,7 +223,7 @@ type TraceReaderCompositionOptions = {
    * only carry the registry's enterprise ceiling.
    */
   requestBounds: TraceAppDependencies["requestBounds"];
-  /** The export door's rate window and in-flight slots, built by the app from process members. */
+  /** The export door's rate window and in-flight slots, built by the app from its registry. */
   exportBounds: TraceAppDependencies["exportBounds"];
   shareReadLimiter?: TraceAppDependencies["shareReadLimiter"];
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */

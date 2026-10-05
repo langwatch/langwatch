@@ -145,7 +145,6 @@ function compose({
       plans: countingPlans,
       dataPrivacy,
       fallbackVisibilityDays: 14,
-      processName: "langwatch-worker",
     },
     annotations: apis.reference(AnnotationApi),
     codingAgents: apis.reference(CodingAgentApi),

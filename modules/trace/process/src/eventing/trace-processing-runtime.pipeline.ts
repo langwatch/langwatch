@@ -72,7 +72,7 @@ interface TraceProcessingPeers {
 }
 
 export interface TraceProcessingPipelineInput {
-  processName: string;
+  role: string;
   tokenizer: TraceTokenCounter;
   peers: TraceProcessingPeers;
   repositories: Pick<
@@ -105,7 +105,7 @@ export class TraceProcessingRuntimeAdapter {
   build(setup: { participation: EventingParticipation }): TraceProcessingPipelineDefinition {
     if (setup.participation === "produce") {
       return createTraceProcessingProducerPipeline({
-        processName: this.input.processName,
+        role: this.input.role,
       });
     }
     return buildTraceProcessingConsumer(this.#projections(), this.#reactions());

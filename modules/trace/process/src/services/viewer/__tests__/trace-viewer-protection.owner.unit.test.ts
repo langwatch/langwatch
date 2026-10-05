@@ -86,7 +86,6 @@ function protectionsFor(userId: string) {
       getResolvedForProject: async () => ownerOnlyInput,
     }),
     fallbackVisibilityDays: 30,
-    processName: "test",
     logger: createTestLogger().logger,
   }).resolve({ projectId: project.id, userId, publiclyShared: false });
 }

@@ -41,7 +41,6 @@ function serviceWith(can: AuthzApi["can"]) {
     plans: {} as PlanProvider,
     dataPrivacy: {} as DataPrivacyApi,
     fallbackVisibilityDays: 30,
-    processName: "test",
   });
   const resolve = vi.fn<() => Promise<Protections>>(async () => anonymous);
   Object.defineProperty(service, "resolve", { value: resolve });

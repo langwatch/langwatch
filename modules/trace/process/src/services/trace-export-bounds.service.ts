@@ -1,9 +1,9 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { TraceExportRateLimitedError } from "@langwatch/trace-contract";
 
 import type { TraceExportSlotRepository } from "../repositories/trace-export-slot.repository.ts";
+import type { TraceRateLimitRepository } from "../repositories/trace-rate-limit.repository.ts";
 
 /**
  * A held slot outlives its export for ten minutes at most: the TTL is the
@@ -34,7 +34,7 @@ export class TraceExportBoundsService implements TraceExportBounds {
   static create(deps: {
     entitlement: Pick<EntitlementApi, "requestBound">;
     projects: Pick<ProjectApi, "getOrganizationId">;
-    rateLimiter: RateLimiter;
+    rateLimiter: TraceRateLimitRepository;
     slots: TraceExportSlotRepository;
   }): TraceExportBoundsService {
     return new TraceExportBoundsService(deps);
@@ -44,7 +44,7 @@ export class TraceExportBoundsService implements TraceExportBounds {
     private readonly deps: Readonly<{
       entitlement: Pick<EntitlementApi, "requestBound">;
       projects: Pick<ProjectApi, "getOrganizationId">;
-      rateLimiter: RateLimiter;
+      rateLimiter: TraceRateLimitRepository;
       slots: TraceExportSlotRepository;
     }>,
   ) {}

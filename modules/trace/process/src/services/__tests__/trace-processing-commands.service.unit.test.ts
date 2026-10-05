@@ -34,14 +34,14 @@ describe("TraceProcessingCommandsService", () => {
   describe("given trace_processing has not connected its senders", () => {
     /** @scenario "A command sent before the pipeline is connected names the missing command" */
     it("refuses by name, naming the command", async () => {
-      const commands = TraceProcessingCommandsService.create({ processName: "langwatch-api" });
+      const commands = TraceProcessingCommandsService.create({ role: "api" });
 
       await expect(
         commands.addAnnotation({ ...base, annotationId: "annotation-1" }),
       ).rejects.toMatchObject({
         code: "service_unavailable",
         meta: {
-          process: "langwatch-api",
+          process: "api",
           capability: 'the trace_processing "addAnnotation" command',
         },
       });
@@ -52,7 +52,7 @@ describe("TraceProcessingCommandsService", () => {
     /** @scenario "Trace's commands reach the senders the process connected" */
     it("sends each command through the connected sender of the same name", async () => {
       const log: Sent[] = [];
-      const commands = TraceProcessingCommandsService.create({ processName: "langwatch-worker" });
+      const commands = TraceProcessingCommandsService.create({ role: "worker" });
       commands.connect(connectedSenders(log));
 
       await commands.addAnnotation({ ...base, annotationId: "annotation-1" });

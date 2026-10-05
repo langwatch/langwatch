@@ -77,7 +77,6 @@ function compose({
         dropsAnyContent: async () => dropsContent,
       }),
       fallbackVisibilityDays: 14,
-      processName: "langwatch-api",
     },
     annotations: createApiFixture<AnnotationApi>(),
     codingAgents: createApiFixture<CodingAgentApi>({ shouldFilterSpan: () => false }),

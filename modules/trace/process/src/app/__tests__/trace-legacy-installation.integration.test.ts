@@ -63,7 +63,6 @@ function bootTraceApp(options: {
     plans: createApiFixture<PlanProvider>({}, "plans"),
     dataPrivacy: createApiFixture<DataPrivacyApi>({}, "data privacy"),
     fallbackVisibilityDays: 30,
-    processName: "test",
   });
   vi.spyOn(protections, "resolveForApiKey").mockResolvedValue({ canSeeCosts: true });
   const unread = () => Promise.reject(new Error("this suite reads a trace only by id"));

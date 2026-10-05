@@ -192,7 +192,6 @@ function deployment(access: CollectorAccess = {}) {
         plans: peers.plans,
         dataPrivacy: peers.dataPrivacy,
         fallbackVisibilityDays: 14,
-        processName: "langwatch-api",
       },
       projects: peers.projects,
       topics: peers.topics,

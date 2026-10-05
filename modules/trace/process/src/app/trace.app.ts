@@ -26,7 +26,6 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareViewer, ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
@@ -186,11 +185,10 @@ import {
   buildTraceProjectMilestonesPipeline,
   type TraceProjectMilestonesDefinition,
 } from "../eventing/trace-project-milestones.pipeline.ts";
-import { RedisTraceExportSlotRepository } from "../repositories/redis/redis.trace-export-slot.repository.ts";
-import { RedisTraceSpanDedupRepository } from "../repositories/redis/redis.trace-span-dedup.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
+import type { TraceRateLimitRepository } from "../repositories/trace-rate-limit.repository.ts";
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import {
@@ -619,7 +617,7 @@ export interface TraceAppDependencies {
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
   /** Counts the anonymous share read per token and per IP; absent, the share read refuses. */
-  shareReadLimiter?: RateLimiter | undefined;
+  shareReadLimiter?: TraceRateLimitRepository | undefined;
   /** Per-role scenario cost and latency over stored spans; absent, the derivation refuses. */
   scenarioRoleMetrics?: ScenarioRoleMetricsDerivationService | undefined;
   /** Topic clustering's reads of trace summaries; absent, both reads refuse. */
@@ -646,15 +644,8 @@ function occurredAtHint(occurredAtMs?: number): { occurredAtMs: number } | Recor
  */
 const TRACE_FALLBACK_VISIBILITY_DAYS = 14;
 
-/**
- * The store members this process opens, plus the two facts the process itself
- * knows: its public origin and its own name. Neither is a deployment fact.
- */
-type TraceMembers = MembersRead<readonly ["clickhouse", "redis", "rateLimiter"]> &
-  Readonly<{
-    publicBaseUrl: string | undefined;
-    processName: string;
-  }>;
+/** The one fact still read off the process: its public origin, until it is a config leaf. */
+type TraceMembers = Readonly<{ publicBaseUrl: string | undefined }>;
 
 type TraceSetup = FeatureSetup<
   typeof traceDependencies,
@@ -668,36 +659,25 @@ export class TraceModule implements TraceApi, CollectorApp {
   static readonly contract = TraceApiToken;
   static readonly dependencies = traceDependencies;
   static readonly config = traceConfig;
-  /**
-   * Every name is from the process's vocabulary; boot refuses by name. ClickHouse holds every span
-   * and Redis the ingest dedup claims and export slots. The logger is the module's own.
-   */
-  static readonly reads = [
-    "clickhouse",
-    "redis",
-    "rateLimiter",
-    "publicBaseUrl",
-    "processName",
-  ] as const;
+  /** Store clients reach trace through its registry; the public origin is the one read left. */
+  static readonly reads = ["publicBaseUrl"] as const;
 
   static create(input: TraceAppDependencies | TraceSetup): TraceModule {
     if (!("members" in input)) return new TraceModule(input);
 
-    const commands = TraceProcessingCommandsService.create({
-      processName: input.members.processName,
-    });
+    // Refusals name the module and the role; a test that builds by hand names none.
+    const role = input.role ?? "this process";
+    const { repositories } = input;
+    const commands = TraceProcessingCommandsService.create({ role });
     const collaborators = buildTraceCollaborators({
-      members: input.members,
+      resolveClickHouseClient: (tenantId) => repositories.clickhouseClients.resolve(tenantId),
       config: {
-        processName: input.members.processName,
+        role,
         fallbackVisibilityDays: TRACE_FALLBACK_VISIBILITY_DAYS,
         publicBaseUrl: input.members.publicBaseUrl,
       },
       commands,
-      dedup: RedisTraceSpanDedupRepository.create({
-        connection: input.members.redis,
-        logger: createLogger("langwatch:trace:span-dedup"),
-      }),
+      dedup: repositories.spanDedup,
     });
     const app = new TraceModule({
       ...composeTraceAppDependencies({
@@ -708,20 +688,19 @@ export class TraceModule implements TraceApi, CollectorApp {
         exportBounds: TraceExportBoundsService.create({
           entitlement: input.dependencies.plans,
           projects: input.dependencies.projects,
-          rateLimiter: input.members.rateLimiter,
-          slots: RedisTraceExportSlotRepository.create({ connection: input.members.redis }),
+          rateLimiter: repositories.rateLimits,
+          slots: repositories.exportSlots,
         }),
         presence: input.dependencies.presence,
         broadcast: input.dependencies.presence,
         tenantBroadcast: input.dependencies.presence,
-        shareReadLimiter: input.members.rateLimiter,
+        shareReadLimiter: repositories.rateLimits,
         protections: {
           authz: input.dependencies.authz,
           projects: input.dependencies.projects,
           plans: input.dependencies.plans,
           dataPrivacy: input.dependencies.dataPrivacy,
           fallbackVisibilityDays: collaborators.fallbackVisibilityDays,
-          processName: collaborators.processName,
         },
       }),
     });
@@ -739,12 +718,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
     const tokenizer = tokenCounterChannels.live.create(input.config.tokenizer);
     input.resources.own("Trace tokenizer", () => tokenizer.close());
-    const milestones = TraceProjectMilestonesService.create({
-      processName: input.members.processName,
-    });
+    const milestones = TraceProjectMilestonesService.create({ role });
     app.#milestones = milestones;
     app.#processing = TraceProcessingRuntimeAdapter.create({
-      processName: input.members.processName,
+      role,
       tokenizer,
       peers: input.dependencies,
       repositories: input.repositories,

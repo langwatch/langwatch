@@ -8,11 +8,15 @@ import { MemoryTraceAnalyticsFoldCacheRepository } from "./memory.trace-analytic
 import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics-projection.repository.ts";
 import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
 import { MemoryTraceAttributeSpendRepository } from "./memory.trace-attribute-spend.repository.ts";
+import { MemoryTraceClickHouseClientsRepository } from "./memory.trace-clickhouse-clients.repository.ts";
 import { MemoryTraceDerivationSpanRepository } from "./memory.trace-derivation-span.repository.ts";
 import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.repository.ts";
 import { MemoryTraceExistenceRepository } from "./memory.trace-existence.repository.ts";
+import { MemoryTraceExportSlotRepository } from "./memory.trace-export-slot.repository.ts";
 import { MemoryTraceModelSpendRepository } from "./memory.trace-model-spend.repository.ts";
 import { MemoryTracePayloadReaderRepository } from "./memory.trace-payload-reader.repository.ts";
+import { MemoryTraceRateLimitRepository } from "./memory.trace-rate-limit.repository.ts";
+import { MemoryTraceSpanDedupRepository } from "./memory.trace-span-dedup.repository.ts";
 import { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
 import { MemoryTraceSummaryFoldCacheRepository } from "./memory.trace-summary-fold-cache.repository.ts";
 import { MemoryTraceSummaryProjectionRepository } from "./memory.trace-summary-projection.repository.ts";
@@ -54,6 +58,10 @@ export class MemoryTraceRepositories {
       usageCount: MemoryTraceUsageCountRepository.create(),
       modelSpend: MemoryTraceModelSpendRepository.create(),
       attributeSpend: MemoryTraceAttributeSpendRepository.create(),
+      spanDedup: MemoryTraceSpanDedupRepository.create(),
+      exportSlots: MemoryTraceExportSlotRepository.create(),
+      rateLimits: MemoryTraceRateLimitRepository.create(),
+      clickhouseClients: MemoryTraceClickHouseClientsRepository.create(),
     };
   }
 }

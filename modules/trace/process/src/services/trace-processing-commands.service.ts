@@ -27,13 +27,13 @@ type TraceProcessingSenders = Readonly<{
 
 /** trace_processing's senders, bound on connect; unbound, each refuses by name. */
 export class TraceProcessingCommandsService implements TraceProcessingCommands {
-  static create(input: { processName: string }): TraceProcessingCommandsService {
-    return new TraceProcessingCommandsService(input.processName);
+  static create(input: { role: string }): TraceProcessingCommandsService {
+    return new TraceProcessingCommandsService(input.role);
   }
 
   #senders: TraceProcessingSenders | undefined;
 
-  private constructor(private readonly processName: string) {}
+  private constructor(private readonly role: string) {}
 
   connect(senders: TraceProcessingSenders): void {
     this.#senders = senders;
@@ -74,7 +74,7 @@ export class TraceProcessingCommandsService implements TraceProcessingCommands {
   #connected(command: string): TraceProcessingSenders {
     if (!this.#senders) {
       throw new TraceCapabilityUnavailableError(
-        this.processName,
+        this.role,
         `the trace_processing "${command}" command`,
       );
     }

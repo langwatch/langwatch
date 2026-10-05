@@ -34,7 +34,15 @@ export class PostgresTraceRepositories {
       prisma: PrismaClient;
       clickhouse: ClickHouseQueryClient;
     }>,
-  ): Omit<TraceRepositories, "summaryFoldCache" | "analyticsFoldCache"> {
+  ): Omit<
+    TraceRepositories,
+    | "summaryFoldCache"
+    | "analyticsFoldCache"
+    | "spanDedup"
+    | "exportSlots"
+    | "rateLimits"
+    | "clickhouseClients"
+  > {
     const traceClickHouse = MemberTraceClickHouseClientRepository.resolverFor(members.clickhouse);
     const storage = { resolveClient: traceClickHouse };
 

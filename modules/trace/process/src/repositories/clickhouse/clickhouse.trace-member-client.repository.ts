@@ -86,3 +86,20 @@ export class MemberTraceClickHouseClientRepository implements TraceClickHouseWri
     });
   }
 }
+
+/** The routed ClickHouse client as the registry hands it: one tenant-keyed resolution per call. */
+export class ClickHouseTraceClientsRepository extends TraceClickHouse {
+  static create(clickhouse: ClickHouseQueryClient): ClickHouseTraceClientsRepository {
+    return new ClickHouseTraceClientsRepository(clickhouse);
+  }
+
+  private constructor(private readonly clickhouse: ClickHouseQueryClient) {
+    super();
+  }
+
+  resolve(tenantId: string): Promise<TraceClickHouseClient> {
+    return Promise.resolve(
+      MemberTraceClickHouseClientRepository.create({ clickhouse: this.clickhouse, tenantId }),
+    );
+  }
+}

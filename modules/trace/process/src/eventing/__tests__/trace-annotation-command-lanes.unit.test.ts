@@ -11,7 +11,7 @@ import { EventingTraceProcessingAdapter } from "../trace-processing.commands.ts"
 const ANNOTATION_COMMANDS = ["addAnnotation", "removeAnnotation", "bulkSyncAnnotations"] as const;
 
 function commandNamed(name: string) {
-  const entry = createTraceProcessingProducerPipeline({ processName: "lane-test" }).commands.find(
+  const entry = createTraceProcessingProducerPipeline({ role: "api" }).commands.find(
     (command) => command.definition.name === name,
   );
   if (!entry) throw new Error(`no command registered as "${name}"`);

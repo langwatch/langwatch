@@ -115,7 +115,7 @@ function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
     async () => undefined,
   );
   const pipeline = TraceProcessingRuntimeAdapter.create({
-    processName: "langwatch-test",
+    role: "worker",
     tokenizer: createApiFixture<TraceProcessingPipelineInput["tokenizer"]>({
       computeTokenCount: async () => 0,
     }),
