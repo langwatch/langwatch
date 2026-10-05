@@ -353,7 +353,8 @@ export class SsoSetupCommandsService {
    */
   async activate({ organizationId, connectionId, actor }: SsoSetupCommand): Promise<void> {
     const state = await this.requireOrganizationConnection({ organizationId, connectionId });
-    if (state.state !== "ACTIVE") await this.requirePreconditionsInScreenOrder(state);
+    if (state.state === "ACTIVE") return;
+    await this.requirePreconditionsInScreenOrder(state);
     await this.deps.connections().activateConnection({
       ...this.command({ organizationId, connectionId, actor }),
       testLoginAccountId: await this.testSignInAccountOf(state),

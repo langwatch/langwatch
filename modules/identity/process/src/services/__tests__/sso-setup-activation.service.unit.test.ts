@@ -125,6 +125,26 @@ describe("taking a connection live", () => {
     expect(activateConnection).not.toHaveBeenCalled();
   });
 
+  it("goes live again silently on an ACTIVE connection with no test sign-in", async () => {
+    const { service, activateConnection } = serviceOver({
+      row: connection({ state: "ACTIVE", testLoginAccountId: null }),
+    });
+
+    await expect(activate(service)).resolves.toBeUndefined();
+    expect(activateConnection).not.toHaveBeenCalled();
+  });
+
+  it("still refuses a VERIFIED connection with no test sign-in", async () => {
+    const { service, activateConnection } = serviceOver({
+      row: connection({ state: "VERIFIED", testLoginAccountId: null }),
+    });
+
+    await expect(activate(service)).rejects.toMatchObject({
+      code: "sso_activation_test_sign_in_missing",
+    });
+    expect(activateConnection).not.toHaveBeenCalled();
+  });
+
   it("refuses when every recorded sign-in named no subject", async () => {
     const { service } = serviceOver({
       signIns: [{ userId: "user_ana", providerAccountId: null, atMs: 1_699_000_000_000 }],
@@ -189,15 +209,13 @@ describe("taking a connection live", () => {
     },
   );
 
-  it("keeps the account a completed activation already recorded", async () => {
+  it("leaves the account a completed activation already recorded untouched", async () => {
     const { service, activateConnection } = serviceOver({
       row: connection({ state: "ACTIVE", testLoginAccountId: "okta|ana" }),
     });
 
     await activate(service);
 
-    expect(activateConnection).toHaveBeenCalledWith(
-      expect.objectContaining({ testLoginAccountId: "okta|ana" }),
-    );
+    expect(activateConnection).not.toHaveBeenCalled();
   });
 });
