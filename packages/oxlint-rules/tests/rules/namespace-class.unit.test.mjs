@@ -34,7 +34,8 @@ describe("given a strict feature server module", () => {
       expect(found[0].messageId).toBe("namespaceClass");
       expect(found[0].message).toBe(
         "`AgentPresenceService` has only static members (2), so it is a module wearing a class." +
-          " Export the functions to `rules/agent-presence-service.rules.ts` and delete the class.",
+          " Export the functions to `rules/agent-presence-service.rules.ts` and delete the class." +
+          " Read the `backend` skill.",
       );
     });
 

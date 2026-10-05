@@ -323,7 +323,7 @@ export const boundaryRule = defineRule({
   messages: {
     compositionRoot: {
       what: "`{{specifier}}` is `{{module}}`'s process package, and an application composes modules without naming one.",
-      fix: "Take `{{module}}` from the app's generated `process-modules.generated.ts` list (catalogue-driven, `pnpm generate:modules`), and move whatever this root builds from `{{specifier}}` behind the module's own declaration so the module constructs it.",
+      fix: "Take `{{module}}` from the app's generated `process-modules.generated.ts` list (catalogue-driven, `pnpm generate:modules`), and move whatever this root builds from `{{specifier}}` behind the module's own declaration so the module constructs it. Read the `module` skill.",
     },
     processOutsideModule: {
       what: "`{{specifier}}` is `{{module}}`'s process package, and only `{{module}}` itself may import it.",

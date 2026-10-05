@@ -105,7 +105,7 @@ export const storeContainmentRule = defineRule({
     storeClientValue: {
       what: "`{{specifier}}` is the {{store}} client, value-imported outside `repositories/{{folder}}/`.",
       why: "A service holding its own client has a second, unswappable path to the module's data.",
-      fix: "Move the query into `repositories/{{folder}}/{{folder}}.<subject>.repository.ts` behind the `repositories/<subject>.repository.ts` interface and call that from the service; a file that only needs a type writes `import type`.",
+      fix: "Move the query into `repositories/{{folder}}/{{folder}}.<subject>.repository.ts` behind the `repositories/<subject>.repository.ts` interface and call that from the service; a file that only needs a type writes `import type`. Read the `process-module` skill.",
     },
     storeNamed: {
       what: "`{{specifier}}` names {{store}} outside `repositories/{{folder}}/`.",

@@ -195,7 +195,7 @@ export const commentBlockSizeRule = defineRule({
     },
     commentColumns: {
       what: "Comment line is {{width}} columns; wrap at {{max}}.",
-      why: `The rule's second check: a comment line is at most ${MAX_COMMENT_COLUMNS} columns wide.`,
+      why: `The rule's second check: a comment line is at most ${MAX_COMMENT_COLUMNS} columns wide. Read the linting skill.`,
       fix:
         "Wrap it at {{max}} columns, keeping the sentence whole across the break. If it only" +
         " restates the code beside it, delete it instead of wrapping it.",

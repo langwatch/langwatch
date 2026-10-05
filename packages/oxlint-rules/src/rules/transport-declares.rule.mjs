@@ -490,7 +490,7 @@ export const transportDeclaresRule = defineRule({
     },
     handlerBindingCall: {
       what: "This source calls `createTrpcHandlerBinding`.",
-      fix: "Delete the call and export the `defineTrpcRouter` declaration; the process binds handlers when it mounts the router.",
+      fix: "Delete the call and export the `defineTrpcRouter` declaration; the process binds handlers when it mounts the router. Read the `api-transports` skill.",
     },
     trpcRoot: {
       what: "This source creates a tRPC root with `{{call}}`.",

@@ -32,7 +32,7 @@ export const noAliasReexportRule = defineRule({
   messages: {
     aliasReexport: {
       what: "`{{local}}` is re-exported here as `{{exported}}`.",
-      fix: "Rename `{{local}}` to `{{exported}}` with tslsp-cli and export it under one name.",
+      fix: "Rename `{{local}}` to `{{exported}}` with tslsp-cli and export it under one name. Read the `linting` skill.",
     },
   },
   create(context, file) {

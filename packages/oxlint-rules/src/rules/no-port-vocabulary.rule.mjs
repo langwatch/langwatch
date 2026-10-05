@@ -42,7 +42,7 @@ export const noPortVocabularyRule = defineRule({
       fix:
         "Name the role instead. Owned state is a repository, messages to something the module " +
         "does not own are a channel, a client the process supplies is a member of the module's " +
-        "Infrastructure, behaviour is a service.",
+        "Infrastructure, behaviour is a service. Read the `process-module` skill.",
     },
     portFile: {
       what: "`{{name}}` is a port file.",

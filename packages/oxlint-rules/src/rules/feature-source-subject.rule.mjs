@@ -53,7 +53,7 @@ export const featureSourceSubjectRule = defineRule({
   messages: {
     foreignSubject: {
       what: "Source module {{path}} claims {{subject}}, which the catalogue gives to the {{owner}} module.",
-      fix: "Move the file to `{{ownerRoot}}/{{role}}/src/{{path}}`, or rename the subject if it is genuinely different.",
+      fix: "Move the file to `{{ownerRoot}}/{{role}}/src/{{path}}`, or rename the subject if it is genuinely different. Read the `module` skill.",
     },
   },
   create(context, file) {

@@ -27,7 +27,8 @@ describe("given a core module process package", () => {
       expect(found[0].message).toBe(
         "`AgentBusyError` is a `HandledError` subclass (it extends `HandledError`) declared in" +
           " `modules/agent/process/src/services/agent.service.ts`." +
-          " Move it to `modules/agent/contract/src/agent.errors.ts`.",
+          " Move it to `modules/agent/contract/src/agent.errors.ts`." +
+          " Read the `contract` skill.",
       );
     });
   });

@@ -149,7 +149,7 @@ export const zodSchemaPerCallRule = defineRule({
     perIteration: {
       what: "`{{call}}` builds a Zod schema on every iteration.",
       why: "Zod compiles a schema's parser on its first parse and caches it on that instance, so a schema built per row recompiles per row.",
-      fix: "Move it to a module-level `const` beside the other schemas and parse with that constant here.",
+      fix: "Move it to a module-level `const` beside the other schemas and parse with that constant here. Read the `contract` skill.",
     },
     perCall: {
       what: "`{{call}}` builds a Zod schema on every call to `{{method}}()`.",

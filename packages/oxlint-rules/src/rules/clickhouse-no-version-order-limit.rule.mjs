@@ -18,7 +18,7 @@ export const clickhouseNoVersionOrderLimitRule = defineRule({
     versionOrderLimit: {
       what: "This ClickHouse query reads heavy columns and picks the latest version with `ORDER BY {{column}} DESC LIMIT 1`, which loads every unmerged version before discarding them.",
       why: "The sort runs over full rows, not over the key columns.",
-      fix: "Select the latest version with an IN-tuple dedup: key columns and `max({{column}})` in an inner GROUP BY, heavy columns only in the outer SELECT.",
+      fix: "Select the latest version with an IN-tuple dedup: key columns and `max({{column}})` in an inner GROUP BY, heavy columns only in the outer SELECT. Read the `clickhouse-migration` skill.",
     },
   },
   create(context) {

@@ -78,6 +78,7 @@ export const featureSourceFilenameRule = defineRule({
   messages: {
     filename: {
       what: "`{{name}}` is not `<subject>.<artifact>.ts` in lower kebab case.",
+      why: "The filename grammar is fixed. Read the `process-module` skill.",
       fix: "{{instruction}}",
     },
   },

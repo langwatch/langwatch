@@ -54,7 +54,7 @@ export const testDescriptionIsAnActionRule = defineRule({
     nestedDescribeMissingGivenWhen: {
       what: 'This nested `describe` title does not start with "given ", "when " or "and ", and does not name the unit under test.',
       why: "Nested `describe` blocks read as BDD structure: an outer `given <precondition>`, an inner `when <action>`.",
-      fix: 'Rename it to a condition: "given <precondition>" if it sets up state, "when <action>" if it performs the behaviour under test.',
+      fix: 'Rename it to a condition: "given <precondition>" if it sets up state, "when <action>" if it performs the behaviour under test. Read the `testing` skill.',
     },
   },
   create(context, file) {

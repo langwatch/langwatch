@@ -131,7 +131,7 @@ export const eventingRolePurityRule = defineRule({
     projectionImpure: {
       what: "Projection {{detail}}.",
       why: "The worker refolds projections from the ordered stream; side effects or awaits make the read model depend on when it was folded.",
-      fix: "Keep the fold synchronous and deterministic: return the next read-model state and let the projection store persist it; side effects belong in a subscriber.",
+      fix: "Keep the fold synchronous and deterministic: return the next read-model state and let the projection store persist it; side effects belong in a subscriber. Read the `eventing-and-worker` skill.",
     },
     processImpure: {
       what: "Process manager {{detail}}.",

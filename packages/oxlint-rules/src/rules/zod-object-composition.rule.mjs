@@ -30,7 +30,7 @@ export const zodObjectCompositionRule = defineRule({
     keepRefinements: {
       what: "`.{{method}}()` is called on a Zod object that carries refinements.",
       why: "Spreading its shape alone would discard those checks.",
-      fix: "Write `.safeExtend({ ...fields })` here — a `z.object({ ...base.shape })` spread would drop those refinements without a type error.",
+      fix: "Write `.safeExtend({ ...fields })` here — a `z.object({ ...base.shape })` spread would drop those refinements without a type error. Read the `contract` skill.",
     },
   },
   create(context, file) {

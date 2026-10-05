@@ -15,7 +15,7 @@ export const noReduxRule = defineRule({
     reduxImported: {
       what: "`{{specifier}}` brings Redux into browser code.",
       why: "A global store couples every feature to one shape; the record gives each kind of state its own home.",
-      fix: "Server data goes in React Query, address-bar state in the router, shared client state in the feature's own zustand store under `behavior/`.",
+      fix: "Server data goes in React Query, address-bar state in the router, shared client state in the feature's own zustand store under `behavior/`. Read the `browser-module` skill.",
     },
   },
   create(context) {

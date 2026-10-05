@@ -34,7 +34,8 @@ describe("given a ClickHouse repository in a module's process half", () => {
       ]);
       expect(found[0].message).toBe(
         "This ClickHouse query reads heavy columns and picks the latest version with `ORDER BY UpdatedAt DESC LIMIT 1`, which loads every unmerged version before discarding them." +
-          " Select the latest version with an IN-tuple dedup: key columns and `max(UpdatedAt)` in an inner GROUP BY, heavy columns only in the outer SELECT.",
+          " Select the latest version with an IN-tuple dedup: key columns and `max(UpdatedAt)` in an inner GROUP BY, heavy columns only in the outer SELECT." +
+          " Read the `clickhouse-migration` skill.",
       );
     });
   });

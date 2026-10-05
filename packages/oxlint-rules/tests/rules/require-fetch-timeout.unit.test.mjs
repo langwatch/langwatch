@@ -32,7 +32,8 @@ describe("given a channel in a module's process half", () => {
       ]);
       expect(found[0].message).toBe(
         "This `fetch` has no abort signal, so a peer that never answers hangs the caller." +
-          " Pass `signal: AbortSignal.timeout(ms)` (or a controller's signal) in the init object.",
+          " Pass `signal: AbortSignal.timeout(ms)` (or a controller's signal) in the init object." +
+          " Read the `backend` skill.",
       );
     });
   });

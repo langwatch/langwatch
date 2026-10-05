@@ -54,7 +54,7 @@ export const environmentBoundariesRule = defineRule({
   messages: {
     environment: {
       what: "Do not read `process.env` here.",
-      fix: "Declare the key in the module's config schema and take the parsed value as an argument; only an app's `src/main.ts` or `src/config.ts`, or the test process's `packages/vitest-config`, reads the environment.",
+      fix: "Declare the key in the module's config schema and take the parsed value as an argument; only an app's `src/main.ts` or `src/config.ts`, or the test process's `packages/vitest-config`, reads the environment. Read the `process-composition` skill.",
     },
   },
   applies: (file) => !readsEnvironmentLegitimately(file),

@@ -157,7 +157,7 @@ export const moduleClassesRule = defineRule({
   messages: {
     missingDeclared: {
       what: "`{{path}}` declares a {{suffix}} and exports no interface or abstract class named `*{{suffix}}`.",
-      fix: "Export `interface <Name>{{suffix}}` here; the concrete class that implements it lives in its own file.",
+      fix: "Export `interface <Name>{{suffix}}` here; the concrete class that implements it lives in its own file. Read the `process-module` skill.",
     },
     missingConcrete: {
       what: "`{{path}}` exports no concrete class named `*{{suffix}}`.",

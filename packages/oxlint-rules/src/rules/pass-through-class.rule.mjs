@@ -13,7 +13,7 @@ export const passThroughClassRule = defineRule({
   messages: {
     passThrough: {
       what: "{{message}}",
-      why: "A pass-through class costs every reader a hop and every caller an indirection, and hides nothing.",
+      why: "A pass-through class costs every reader a hop and every caller an indirection, and hides nothing. Read the `process-module` skill.",
       fix: "{{allowed}}",
     },
   },

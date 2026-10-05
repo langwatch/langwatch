@@ -31,7 +31,7 @@ export const noTautologicalAssertionRule = defineRule({
   messages: {
     assertsItself: {
       what: "`expect({{actual}}).{{matcher}}({{actual}})` compares a value with itself and cannot fail.",
-      fix: "Assert the value the code produced against one derived independently of it.",
+      fix: "Assert the value the code produced against one derived independently of it. Read the `testing` skill.",
     },
   },
   create(context) {

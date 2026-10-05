@@ -72,7 +72,7 @@ export function suppressionStatesWhyRuleFor({ houseRules }) {
     messages: {
       houseRuleDisabled: {
         what: "`{{directive}}` turns off `{{rule}}`, a house rule that cannot be disabled.",
-        why: "The langwatch rules state the architecture; a disable would let the code drift.",
+        why: "The langwatch rules state the architecture; a disable would let the code drift. Read the `linting` skill.",
         fix:
           "Delete the directive and change the code the way `{{rule}}`'s own message says;" +
           ` ${ASK_THE_HUMAN} instead of disabling it.`,

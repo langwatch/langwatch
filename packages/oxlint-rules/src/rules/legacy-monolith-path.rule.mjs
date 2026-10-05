@@ -1,6 +1,6 @@
 import { defineRule } from "../define-rule.mjs";
 
-// `platform/app` was the monolith `apps/*` and `modules/*` replaced; `~/` and
+// `platform/app` was the monolith `apps/` and `modules/` replaced; `~/` and
 // `@app/` were aliases that only resolved inside it. Nothing maps them now, so a
 // stale path compiles until the first import of it. Spec: lint-legacy-monolith-path.
 
@@ -17,7 +17,7 @@ export const legacyMonolithPathRule = defineRule({
   kind: "problem",
   messages: {
     legacyMonolithPath: {
-      what: "`{{name}}` names the deleted monolith.",
+      what: "`{{name}}` names the deleted monolith; read the `repo-tree` skill.",
       why: "Nothing maps `~/*` or `@app/*` and `platform/` is gone, so the path resolves to nothing until something reaches the file.",
       fix: "Find where the code lives now by searching its basename under `modules/*/*/src`, `enterprise/modules/*/*/src`, `packages/*/src` and `apps/*/src`, then import it by that package's name.",
     },

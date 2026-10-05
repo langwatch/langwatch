@@ -96,7 +96,7 @@ export const schemaOutsideContractRule = defineRule({
     schema: {
       what: "`{{name}}` is a Zod schema declared in `{{path}}`.",
       why: "A transport file declares routes and imports its shapes; the vocabulary belongs to every side of the wire.",
-      fix: "Move it to `{{contractPath}}` and import it here.",
+      fix: "Move it to `{{contractPath}}` and import it here. Read the `contract` skill.",
     },
   },
   create(context, file) {

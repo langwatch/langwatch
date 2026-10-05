@@ -28,7 +28,8 @@ describe("given a module's process package", () => {
           " `modules/role/process/src/app/role.app.ts`, in the app or transport layer." +
           ' Declare `.withEntitlement("enterprise", { feature, when })` on the route or' +
           " procedure and delete this refusal; a gate that needs loaded data belongs in a" +
-          " service method.",
+          " service method." +
+          " Read the `module-dependencies` skill.",
       );
     });
   });

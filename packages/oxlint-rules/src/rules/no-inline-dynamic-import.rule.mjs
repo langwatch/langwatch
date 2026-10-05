@@ -72,7 +72,7 @@ export const noInlineDynamicImportRule = defineRule({
     inlineDynamicImport: {
       what: "`import(...)` is used inline here.",
       why: "A dynamic import hides a dependency the reader expects to find as a top-level import.",
-      fix: "Use a top-level `import` / `import type` statement instead; a code-split component loads through `lazy(() => import(...))`.",
+      fix: "Use a top-level `import` / `import type` statement instead; a code-split component loads through `lazy(() => import(...))`. Read the `linting` skill.",
     },
   },
   create(context, file) {

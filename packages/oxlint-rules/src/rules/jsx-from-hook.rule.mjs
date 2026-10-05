@@ -47,7 +47,7 @@ export const jsxFromHookRule = defineRule({
     hookReturnsJsx: {
       what: "Hook `{{name}}` returns JSX.",
       why: "Hooks return state and callbacks; a hook that renders is a component wearing the wrong name.",
-      fix: "Return the state and callbacks, and move the JSX into the component that calls this hook.",
+      fix: "Return the state and callbacks, and move the JSX into the component that calls this hook. Read the `frontend` skill.",
     },
   },
   create(context) {

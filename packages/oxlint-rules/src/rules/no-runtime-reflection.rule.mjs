@@ -48,7 +48,7 @@ export const noRuntimeReflectionRule = defineRule({
   messages: {
     proxy: {
       what: "`new Proxy(...)` stands in for a class here.",
-      fix: "Write the class or app the module already declares instead of intercepting it at runtime.",
+      fix: "Write the class or app the module already declares instead of intercepting it at runtime. Read the `process-module` skill.",
     },
     reflect: {
       what: "`Reflect.{{member}}` reaches around a method call.",

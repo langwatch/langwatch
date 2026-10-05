@@ -95,7 +95,7 @@ export const zodInternalsRule = defineRule({
   messages: {
     defAccess: {
       what: "`{{object}}._def` reads a Zod schema's internals, which differ between the two installed Zod majors.",
-      fix: "Export the un-refined schema object from the contract and build from it instead of unwrapping this one.",
+      fix: "Export the un-refined schema object from the contract and build from it instead of unwrapping this one. Read the `contract` skill.",
     },
     zodErrorInstanceOf: {
       what: "`instanceof {{right}}` tests an error against one Zod major's class, and the other major's errors fail it.",

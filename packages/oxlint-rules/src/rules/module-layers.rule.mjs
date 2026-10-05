@@ -53,7 +53,7 @@ export const moduleLayersRule = defineRule({
     repositoryCrossing: {
       what: "A repository names {{crossed}} (`{{specifier}}`).",
       why: "A repository takes the store it reads; behaviour lives in the services above it.",
-      fix: "Move the decision into the service that calls this repository and keep the repository over its store alone.",
+      fix: "Move the decision into the service that calls this repository and keep the repository over its store alone. Read the `process-module` skill.",
     },
     channelCrossing: {
       what: "A channel names {{crossed}} (`{{specifier}}`).",

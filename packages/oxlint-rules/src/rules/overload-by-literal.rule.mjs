@@ -12,7 +12,7 @@ export const overloadByLiteralRule = defineRule({
   messages: {
     splitTheOverloads: {
       what: "{{message}}",
-      why: "An overload set that only flips a flag makes the reader diff two signatures to learn one thing.",
+      why: "An overload set that only flips a flag makes the reader diff two signatures to learn one thing. Read the `contract` skill.",
       fix: "{{allowed}}",
     },
   },

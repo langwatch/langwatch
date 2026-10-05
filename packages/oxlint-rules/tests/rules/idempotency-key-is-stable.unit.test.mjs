@@ -33,7 +33,8 @@ describe("given a production source", () => {
           " different key and nothing is deduplicated." +
           " Derive it from the request's own content, or bind it once for the operation it" +
           " identifies — `useState(() => crypto.randomUUID())` for a form, a key threaded from" +
-          " the caller for a mutation — and pass that binding here.",
+          " the caller for a mutation — and pass that binding here." +
+          " Read the `eventing-and-worker` skill.",
       );
     });
 

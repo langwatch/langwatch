@@ -65,7 +65,7 @@ export const noLoggerSpyRule = defineRule({
   messages: {
     spyOnLogger: {
       what: "`vi.spyOn` patches a real logger here.",
-      fix: "Inject the `logger` from `createTestLogger()` (`@langwatch/test-harness`) and assert with `lines.findLine(level, text)` instead.",
+      fix: "Inject the `logger` from `createTestLogger()` (`@langwatch/test-harness`) and assert with `lines.findLine(level, text)` instead. Read the `testing` skill.",
     },
   },
   create(context, file) {

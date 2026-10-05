@@ -210,7 +210,7 @@ export const cognitiveComplexityRule = defineRule({
   messages: {
     tooComplex: {
       what: "`{{name}}` has cognitive complexity {{complexity}} (max {{max}}); the {{construct}} at line {{atLine}} carries {{share}} of it.",
-      fix: "Extract that {{construct}} into a module-level function (a nested closure still counts toward `{{name}}`) so the rest of `{{name}}` stays flat.",
+      fix: "Extract that {{construct}} into a module-level function (a nested closure still counts toward `{{name}}`) so the rest of `{{name}}` stays flat. Read the `linting` skill.",
     },
     // The score is nesting spread thin rather than one heavy block. Naming a
     // block here would prescribe an extraction that removes a few points and

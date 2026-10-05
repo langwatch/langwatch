@@ -88,7 +88,7 @@ Messages:
 
 - `bannedModelName`
   - what: This literal names the retired or overpriced model `{{name}}`.
-  - fix: Use `gpt-5-mini` instead.
+  - fix: Use `gpt-5-mini` instead. Read the `testing` skill.
   - why: gpt-5-mini is the cheapest and most capable model, and the whole suite should default to it.
 
 ## `langwatch/banned-verb-prefix`
@@ -117,7 +117,7 @@ Messages:
   - fix: Delete the catch that answers null or undefined so the failure reaches the caller, then drop `try` and name it for what it answers. It answers one value, so name it `get<Noun>` — or `getBy<Key>` when the key is what distinguishes it — and throw the domain error instead of answering null. If absence means something other than not-found, return an explicit result union naming that outcome instead. Do not rename it `find*`: `find` answers an array.
 - `tryPrefix`
   - what: `{{name}}` is named for how it behaves on failure, not for what it answers.
-  - fix: Drop `try` and name it for what it answers. A lookup of one thing becomes `get<Noun>` — or `getBy<Key>` when the key is what distinguishes it — and throws the domain error instead of answering null. None or many becomes `find<Noun>` returning an array, whose empty case is the absence. A derivation (`parse`, `extract`, `derive` and the other ADR-146 derivation verbs) may answer undefined when its input carried none. Never rename it to a `find*` that still answers null — `find` promises a list.
+  - fix: Drop `try` and name it for what it answers. A lookup of one thing becomes `get<Noun>` — or `getBy<Key>` when the key is what distinguishes it — and throws the domain error instead of answering null. None or many becomes `find<Noun>` returning an array, whose empty case is the absence. A derivation (`parse`, `extract`, `derive` and the other ADR-146 derivation verbs) may answer undefined when its input carried none. Never rename it to a `find*` that still answers null — `find` promises a list.. Read the contract skill.
   - why: A caller reading the call site cannot tell a lookup from a hedge, and the two need different handling.
 - `tryPrefixOneValue`
   - what: `{{name}}` is named for how it behaves on failure, not for the one value it answers.
@@ -142,7 +142,7 @@ Messages:
   - why: A store is module-private; another module reading it couples to its shape and bypasses its contract.
 - `storeOutsideBehavior`
   - what: `{{name}}` from zustand creates a store outside `behavior/`.
-  - fix: Move the store to `behavior/<feature>.store.ts` and call it from there, with each action a named function.
+  - fix: Move the store to `behavior/<feature>.store.ts` and call it from there, with each action a named function. Read the `browser-module` skill.
   - why: Shared client state has one named home per feature; a store anywhere else is invisible to the reader.
 
 ## `langwatch/clickhouse-no-version-order-limit`
@@ -159,7 +159,7 @@ Messages:
 
 - `versionOrderLimit`
   - what: This ClickHouse query reads heavy columns and picks the latest version with `ORDER BY {{column}} DESC LIMIT 1`, which loads every unmerged version before discarding them.
-  - fix: Select the latest version with an IN-tuple dedup: key columns and `max({{column}})` in an inner GROUP BY, heavy columns only in the outer SELECT.
+  - fix: Select the latest version with an IN-tuple dedup: key columns and `max({{column}})` in an inner GROUP BY, heavy columns only in the outer SELECT. Read the `clickhouse-migration` skill.
   - why: The sort runs over full rows, not over the key columns.
 
 ## `langwatch/clickhouse-tenant-id`
@@ -176,7 +176,7 @@ Messages:
 
 - `missingTenantPredicate`
   - what: This ClickHouse query reads `{{table}}` without a `TenantId` predicate in that table's own WHERE, so it can return another tenant's rows.
-  - fix: Add `TenantId = {tenantId:String}` (or `TenantId IN {tenantIds:Array(String)}`) to the WHERE that filters `{{table}}`.
+  - fix: Add `TenantId = {tenantId:String}` (or `TenantId IN {tenantIds:Array(String)}`) to the WHERE that filters `{{table}}`. Read the `process-module` skill.
   - why: No id but TenantId is unique across tenants.
 
 ## `langwatch/cognitive-complexity`
@@ -195,7 +195,7 @@ Messages:
 
 - `tooComplex`
   - what: `{{name}}` has cognitive complexity {{complexity}} (max {{max}}); the {{construct}} at line {{atLine}} carries {{share}} of it.
-  - fix: Extract that {{construct}} into a module-level function (a nested closure still counts toward `{{name}}`) so the rest of `{{name}}` stays flat.
+  - fix: Extract that {{construct}} into a module-level function (a nested closure still counts toward `{{name}}`) so the rest of `{{name}}` stays flat. Read the `linting` skill.
 - `tooComplexSpread`
   - what: `{{name}}` has cognitive complexity {{complexity}} (max {{max}}), spread across {{blocks}} nested blocks with no single one carrying a third of it -- the depth is the cost, not any one branch.
   - fix: Flatten it: take the nesting down with early returns, or lift a whole stage of the work -- the {{construct}} at line {{atLine}} is the largest single block at {{share}} -- into a module-level function; a nested closure still counts toward `{{name}}`.
@@ -219,7 +219,7 @@ Messages:
 - `commentColumns`
   - what: Comment line is {{width}} columns; wrap at {{max}}.
   - fix: Wrap it at {{max}} columns, keeping the sentence whole across the break. If it only restates the code beside it, delete it instead of wrapping it.
-  - why: The rule's second check: a comment line is at most 100 columns wide.
+  - why: The rule's second check: a comment line is at most 100 columns wide. Read the linting skill.
 
 ## `langwatch/condition-shape`
 
@@ -243,7 +243,7 @@ Messages:
   - why: A test nobody can read at a glance is where the wrong branch hides.
 - `ternaryInTest`
   - what: This test has a ternary inside it.
-  - fix: Move the ternary out of the test: decide it in the branch it belongs to, not inside this condition.
+  - fix: Move the ternary out of the test: decide it in the branch it belongs to, not inside this condition. Read the `testing` skill.
   - why: A test nobody can read at a glance is where the wrong branch hides.
 - `tooManyCalls`
   - what: This test makes {{calls}} calls; `maxCalls` is {{maxCalls}}.
@@ -269,7 +269,7 @@ Messages:
 - `stateTheShape`
   - what: {{message}}
   - fix: {{allowed}}
-  - why: A type this deep re-computes what a plain interface or discriminated union already says.
+  - why: A type this deep re-computes what a plain interface or discriminated union already says. Read the `contract` skill.
 
 ## `langwatch/effect-derives-state`
 
@@ -285,7 +285,7 @@ Messages:
 
 - `effectDerivesState`
   - what: This effect only copies a value derived from its dependencies into `{{setter}}`.
-  - fix: Delete the effect and the state, and compute the value during render (`useMemo` only if it is measurably slow).
+  - fix: Delete the effect and the state, and compute the value during render (`useMemo` only if it is measurably slow). Read the `browser-module` skill.
   - why: The component renders stale, then renders again; state that follows props or state is not state.
 
 ## `langwatch/em-dash-in-copy`
@@ -302,7 +302,7 @@ Messages:
 
 - `emDashInCopy`
   - what: This user-facing text contains an em dash: "{{excerpt}}".
-  - fix: Replace the em dash with a comma, a colon, or parentheses.
+  - fix: Replace the em dash with a comma, a colon, or parentheses. Read the `linting` skill.
   - why: The copy guidelines ban em dashes in customer-facing prose.
 
 ## `langwatch/enterprise-license-header`
@@ -319,7 +319,7 @@ Messages:
 
 - `enterpriseLicenseOutsideEnterprise`
   - what: This file carries the Enterprise SPDX directive but lives outside `enterprise/`.
-  - fix: Move the implementation into its Enterprise module under `enterprise/modules/<name>/` and expose only its contract to the open tree; never delete the directive to pass.
+  - fix: Move the implementation into its Enterprise module under `enterprise/modules/<name>/` and expose only its contract to the open tree; never delete the directive to pass. Read the `module-dependencies` skill.
   - why: Enterprise-licensed source belongs to an Enterprise module; the directive is how misplaced proprietary code is found.
 
 ## `langwatch/environment-boundaries`
@@ -336,7 +336,7 @@ Messages:
 
 - `environment`
   - what: Do not read `process.env` here.
-  - fix: Declare the key in the module's config schema and take the parsed value as an argument; only an app's `src/main.ts` or `src/config.ts`, or the test process's `packages/vitest-config`, reads the environment.
+  - fix: Declare the key in the module's config schema and take the parsed value as an argument; only an app's `src/main.ts` or `src/config.ts`, or the test process's `packages/vitest-config`, reads the environment. Read the `process-composition` skill.
 
 ## `langwatch/eventing-role-purity`
 
@@ -363,7 +363,7 @@ Messages:
   - why: A process manager's evolution replays from the stream, so it must decide the same way every time.
 - `projectionImpure`
   - what: Projection {{detail}}.
-  - fix: Keep the fold synchronous and deterministic: return the next read-model state and let the projection store persist it; side effects belong in a subscriber.
+  - fix: Keep the fold synchronous and deterministic: return the next read-model state and let the projection store persist it; side effects belong in a subscriber. Read the `eventing-and-worker` skill.
   - why: The worker refolds projections from the ordered stream; side effects or awaits make the read model depend on when it was folded.
 
 ## `langwatch/fallible-result-naming`
@@ -396,7 +396,7 @@ Messages:
   - why: `find` answers an array, so renaming a one-value read to `find*` misstates its cardinality.
 - `repositoryServiceVocabulary`
   - what: Repository method `{{name}}` uses service vocabulary; repositories answer `find*`, services answer `get*`.
-  - fix: Rename it `find{{rest}}` here and in the repository interface this class implements.
+  - fix: Rename it `find{{rest}}` here and in the repository interface this class implements. Read the `contract` skill.
 
 ## `langwatch/feature-source-filename`
 
@@ -413,6 +413,7 @@ Messages:
 - `filename`
   - what: `{{name}}` is not `<subject>.<artifact>.ts` in lower kebab case.
   - fix: {{instruction}}
+  - why: The filename grammar is fixed. Read the `process-module` skill.
 
 ## `langwatch/feature-source-layout`
 
@@ -431,7 +432,7 @@ Messages:
   - fix: Take the artifact from `app`, `commands`, `errors`, `events`, `queries` or `service`, and write the subject and the artifact in lower kebab case with a single dot between them.
 - `contractMissingSubject`
   - what: Rename `{{name}}` to `<subject>.{{artifact}}.ts`, e.g. `agent.commands.ts`.
-  - fix: Add the subject to the filename.
+  - fix: Add the subject to the filename. Read the `process-module` skill.
 - `contractProcessArtifact`
   - what: `{{name}}` is a process artifact: contract source holds none of `.api`, `.channel`, `.composition`, `.intent`, `.mapper`, `.migration`, `.process`, `.projection`, `.repository`, `.rules`, `.store`, `.subscriber`, `.task`.
   - fix: Move it into `modules/{{feature}}/process/src/`: `.repository`, `.store` and `.mapper` under `repositories/`, `.channel` under `channels/`, `.projection`, `.subscriber`, `.process` and `.intent` under `eventing/`, `.rules` under `rules/`, `.task` under `tasks/`, `.migration` under `migrations/`, and any `.api` other than `{{feature}}.api.ts` as `transport/{{feature}}.<rest|trpc|ws>.ts`.
@@ -459,7 +460,7 @@ Messages:
 
 - `foreignSubject`
   - what: Source module {{path}} claims {{subject}}, which the catalogue gives to the {{owner}} module.
-  - fix: Move the file to `{{ownerRoot}}/{{role}}/src/{{path}}`, or rename the subject if it is genuinely different.
+  - fix: Move the file to `{{ownerRoot}}/{{role}}/src/{{path}}`, or rename the subject if it is genuinely different. Read the `module` skill.
 
 ## `langwatch/handled-error-outside-contract`
 
@@ -475,7 +476,7 @@ Messages:
 
 - `handledError`
   - what: `{{name}}` is a `HandledError` subclass (it extends `{{parent}}`) declared in `{{path}}`.
-  - fix: Move it to `{{errorsFile}}`.
+  - fix: Move it to `{{errorsFile}}`. Read the `contract` skill.
   - why: A service throws it and a client reads its code, so both sides need the class and neither may import a process package.
 
 ## `langwatch/id-generation-origin`
@@ -492,7 +493,7 @@ Messages:
 
 - `foreignIdModule`
   - what: `{{name}}` mints ids outside the house scheme.
-  - fix: Import `generate` from `@langwatch/ksuid` and mint it with its kind: `generate("{{kindPrefix}}").toString()`.
+  - fix: Import `generate` from `@langwatch/ksuid` and mint it with its kind: `generate("{{kindPrefix}}").toString()`. Read the `backend` skill.
   - why: A second id scheme neither sorts by time nor names its kind, and two schemes in one table are a migration.
 - `randomUuid`
   - what: `randomUUID()` mints an id outside the house scheme.
@@ -513,7 +514,7 @@ Messages:
 
 - `mintedAtCallSite`
   - what: `{{name}}` is minted here by `{{source}}`, so every retry sends a different key and nothing is deduplicated.
-  - fix: Derive it from the request's own content, or bind it once for the operation it identifies — `useState(() => crypto.randomUUID())` for a form, a key threaded from the caller for a mutation — and pass that binding here.
+  - fix: Derive it from the request's own content, or bind it once for the operation it identifies — `useState(() => crypto.randomUUID())` for a form, a key threaded from the caller for a mutation — and pass that binding here. Read the `eventing-and-worker` skill.
   - why: A key that changes per attempt is a field on the wire, not a guarantee: the server sees each retry as a new operation.
 
 ## `langwatch/jsx-from-hook`
@@ -530,7 +531,7 @@ Messages:
 
 - `hookReturnsJsx`
   - what: Hook `{{name}}` returns JSX.
-  - fix: Return the state and callbacks, and move the JSX into the component that calls this hook.
+  - fix: Return the state and callbacks, and move the JSX into the component that calls this hook. Read the `frontend` skill.
   - why: Hooks return state and callbacks; a hook that renders is a component wearing the wrong name.
 
 ## `langwatch/legacy-monolith-path`
@@ -546,7 +547,7 @@ Options: none.
 Messages:
 
 - `legacyMonolithPath`
-  - what: `{{name}}` names the deleted monolith.
+  - what: `{{name}}` names the deleted monolith; read the `repo-tree` skill.
   - fix: Find where the code lives now by searching its basename under `modules/*/*/src`, `enterprise/modules/*/*/src`, `packages/*/src` and `apps/*/src`, then import it by that package's name.
   - why: Nothing maps `~/*` or `@app/*` and `platform/` is gone, so the path resolves to nothing until something reaches the file.
 
@@ -570,7 +571,7 @@ Messages:
   - fix: Export one `class <Name>{{suffix}}` here; an interface for it belongs in the interface file beside it.
 - `missingDeclared`
   - what: `{{path}}` declares a {{suffix}} and exports no interface or abstract class named `*{{suffix}}`.
-  - fix: Export `interface <Name>{{suffix}}` here; the concrete class that implements it lives in its own file.
+  - fix: Export `interface <Name>{{suffix}}` here; the concrete class that implements it lives in its own file. Read the `process-module` skill.
 - `publicConstructor`
   - what: `{{name}}` has `static create`, but its constructor is public, so a caller can bypass create with `new {{name}}(...)`.
   - fix: Declare the constructor `private` — write `private constructor() {}` when the class has none.
@@ -596,7 +597,7 @@ Messages:
   - why: A channel takes the client it speaks to; state is the repository's and behaviour the service's.
 - `repositoryCrossing`
   - what: A repository names {{crossed}} (`{{specifier}}`).
-  - fix: Move the decision into the service that calls this repository and keep the repository over its store alone.
+  - fix: Move the decision into the service that calls this repository and keep the repository over its store alone. Read the `process-module` skill.
   - why: A repository takes the store it reads; behaviour lives in the services above it.
 - `serviceNamesABackend`
   - what: A service names {{crossed}} (`{{specifier}}`).
@@ -625,7 +626,7 @@ Messages:
 
 - `namespaceClass`
   - what: `{{name}}` has only static members ({{count}}), so it is a module wearing a class.
-  - fix: Export the functions to `{{target}}` and delete the class.
+  - fix: Export the functions to `{{target}}` and delete the class. Read the `backend` skill.
   - why: A class earns its name by holding state; a bag of statics hides plain functions behind a namespace and a `create` nobody calls.
 
 ## `langwatch/no-alias-reexport`
@@ -642,7 +643,7 @@ Messages:
 
 - `aliasReexport`
   - what: `{{local}}` is re-exported here as `{{exported}}`.
-  - fix: Rename `{{local}}` to `{{exported}}` with tslsp-cli and export it under one name.
+  - fix: Rename `{{local}}` to `{{exported}}` with tslsp-cli and export it under one name. Read the `linting` skill.
 
 ## `langwatch/no-boot-hook-outside-guard`
 
@@ -658,7 +659,7 @@ Messages:
 
 - `bootHookOutsideGuard`
   - what: `process.{{method}}("{{event}}", ...)` is registered outside the boot guard.
-  - fix: Delete this listener and boot through the guard: a long-running process through the `Server` from `@langwatch/process`, a one-shot executable through `bootNodeExecutable` from `@langwatch/observability`.
+  - fix: Delete this listener and boot through the guard: a long-running process through the `Server` from `@langwatch/process`, a one-shot executable through `bootNodeExecutable` from `@langwatch/observability`. Read the `process-composition` skill.
 
 ## `langwatch/no-form-watch-in-child`
 
@@ -674,7 +675,7 @@ Messages:
 
 - `watchOnReceivedForm`
   - what: `{{form}}.watch()` runs on a form this component received as a prop, so the whole form tree re-renders on every keystroke.
-  - fix: Read the value with `useWatch({ control: {{form}}.control, name })` instead.
+  - fix: Read the value with `useWatch({ control: {{form}}.control, name })` instead. Read the `frontend` skill.
 
 ## `langwatch/no-hand-rolled-plan-gate`
 
@@ -690,7 +691,7 @@ Messages:
 
 - `handRolledPlanGate`
   - what: `{{refusal}}` refuses a plan in `{{path}}`, in the app or transport layer.
-  - fix: Declare `.withEntitlement("enterprise", { feature, when })` on the route or procedure and delete this refusal; a gate that needs loaded data belongs in a service method.
+  - fix: Declare `.withEntitlement("enterprise", { feature, when })` on the route or procedure and delete this refusal; a gate that needs loaded data belongs in a service method. Read the `module-dependencies` skill.
   - why: The framework asks a declared plan gate after access, so a caller refused on permission is never told what the plan lacks.
 
 ## `langwatch/no-inline-dynamic-import`
@@ -707,7 +708,7 @@ Messages:
 
 - `inlineDynamicImport`
   - what: `import(...)` is used inline here.
-  - fix: Use a top-level `import` / `import type` statement instead; a code-split component loads through `lazy(() => import(...))`.
+  - fix: Use a top-level `import` / `import type` statement instead; a code-split component loads through `lazy(() => import(...))`. Read the `linting` skill.
   - why: A dynamic import hides a dependency the reader expects to find as a top-level import.
 
 ## `langwatch/no-logger-spy`
@@ -724,7 +725,7 @@ Messages:
 
 - `spyOnLogger`
   - what: `vi.spyOn` patches a real logger here.
-  - fix: Inject the `logger` from `createTestLogger()` (`@langwatch/test-harness`) and assert with `lines.findLine(level, text)` instead.
+  - fix: Inject the `logger` from `createTestLogger()` (`@langwatch/test-harness`) and assert with `lines.findLine(level, text)` instead. Read the `testing` skill.
 
 ## `langwatch/no-port-vocabulary`
 
@@ -743,7 +744,7 @@ Messages:
   - fix: Move it to `repositories/` if it owns state, `channels/` if it exchanges messages with something the module does not own, `services/` if it's behaviour, or the module's Infrastructure if it's a client the process supplies — then rename the file for that role, dropping `port`.
 - `portVocabulary`
   - what: `{{name}}` names a port.
-  - fix: Name the role instead. Owned state is a repository, messages to something the module does not own are a channel, a client the process supplies is a member of the module's Infrastructure, behaviour is a service.
+  - fix: Name the role instead. Owned state is a repository, messages to something the module does not own are a channel, a client the process supplies is a member of the module's Infrastructure, behaviour is a service. Read the `process-module` skill.
 
 ## `langwatch/no-prototype-stub`
 
@@ -759,7 +760,7 @@ Messages:
 
 - `prototypeStub`
   - what: `Object.create({{name}}.prototype)` builds a test double from a class prototype.
-  - fix: Write it as an object literal typed `satisfies {{name}}`, or import the module's exported fixture if one already exists for this double.
+  - fix: Write it as an object literal typed `satisfies {{name}}`, or import the module's exported fixture if one already exists for this double. Read the `testing` skill.
 
 ## `langwatch/no-redux`
 
@@ -775,7 +776,7 @@ Messages:
 
 - `reduxImported`
   - what: `{{specifier}}` brings Redux into browser code.
-  - fix: Server data goes in React Query, address-bar state in the router, shared client state in the feature's own zustand store under `behavior/`.
+  - fix: Server data goes in React Query, address-bar state in the router, shared client state in the feature's own zustand store under `behavior/`. Read the `browser-module` skill.
   - why: A global store couples every feature to one shape; the record gives each kind of state its own home.
 
 ## `langwatch/no-runtime-reflection`
@@ -795,7 +796,7 @@ Messages:
   - fix: Declare the property directly where `{{target}}` is defined — in its class body or its object literal — instead of patching it in afterward.
 - `proxy`
   - what: `new Proxy(...)` stands in for a class here.
-  - fix: Write the class or app the module already declares instead of intercepting it at runtime.
+  - fix: Write the class or app the module already declares instead of intercepting it at runtime. Read the `process-module` skill.
 - `reflect`
   - what: `Reflect.{{member}}` reaches around a method call.
   - fix: Call the method directly; add it to the interface if it is missing.
@@ -817,7 +818,7 @@ Messages:
 
 - `assertsItself`
   - what: `expect({{actual}}).{{matcher}}({{actual}})` compares a value with itself and cannot fail.
-  - fix: Assert the value the code produced against one derived independently of it.
+  - fix: Assert the value the code produced against one derived independently of it. Read the `testing` skill.
 
 ## `langwatch/overload-by-literal`
 
@@ -834,7 +835,7 @@ Messages:
 - `splitTheOverloads`
   - what: {{message}}
   - fix: {{allowed}}
-  - why: An overload set that only flips a flag makes the reader diff two signatures to learn one thing.
+  - why: An overload set that only flips a flag makes the reader diff two signatures to learn one thing. Read the `contract` skill.
 
 ## `langwatch/package-boundaries`
 
@@ -856,7 +857,7 @@ Messages:
   - fix: Import `@langwatch/{{module}}-browser/declaration` and read the capability from its `withCapabilities` slot, or move a shared component into `@langwatch/design-system`.
 - `compositionRoot`
   - what: `{{specifier}}` is `{{module}}`'s process package, and an application composes modules without naming one.
-  - fix: Take `{{module}}` from the app's generated `process-modules.generated.ts` list (catalogue-driven, `pnpm generate:modules`), and move whatever this root builds from `{{specifier}}` behind the module's own declaration so the module constructs it.
+  - fix: Take `{{module}}` from the app's generated `process-modules.generated.ts` list (catalogue-driven, `pnpm generate:modules`), and move whatever this root builds from `{{specifier}}` behind the module's own declaration so the module constructs it. Read the `module` skill.
 - `contractRuntime`
   - what: A contract package is runtime-neutral: `{{specifier}}` is a node, browser or process runtime.
   - fix: Keep only schemas, types, errors and the `*Api` token here; move the code that needs `{{specifier}}` into this module's process package, or into its browser package when it is a browser import.
@@ -912,7 +913,7 @@ Messages:
 - `passThrough`
   - what: {{message}}
   - fix: {{allowed}}
-  - why: A pass-through class costs every reader a hop and every caller an indirection, and hides nothing.
+  - why: A pass-through class costs every reader a hop and every caller an indirection, and hides nothing. Read the `process-module` skill.
 
 ## `langwatch/plan-literals`
 
@@ -928,7 +929,7 @@ Messages:
 
 - `statesPlanFacts`
   - what: {{name}} states {{fields}} itself.
-  - fix: Read them from the catalogue: `planCatalogue.plan("<TYPE>").limits` from @langwatch/plans. If this is a fixture, build it from `planCatalogue.plan(...)` and override the one field the test is about.
+  - fix: Read them from the catalogue: `planCatalogue.plan("<TYPE>").limits` from @langwatch/plans. If this is a fixture, build it from `planCatalogue.plan(...)` and override the one field the test is about. Read the `module-dependencies` skill.
   - why: An object giving two or more limit fields literal values is a plan definition, and there is one catalogue of those.
 
 ## `langwatch/prisma-count-in-list-query`
@@ -945,7 +946,7 @@ Messages:
 
 - `countInsideFindMany`
   - what: `_count` rides this `findMany`, and the planner can re-run its aggregate once per listed row.
-  - fix: Drop `_count` from the query and run a second `groupBy` count restricted to the listed row ids.
+  - fix: Drop `_count` from the query and run a second `groupBy` count restricted to the listed row ids. Read the `process-module` skill.
   - why: Prisma builds `_count` as an uncorrelated join over the whole related table.
 
 ## `langwatch/query-data-in-state`
@@ -962,7 +963,7 @@ Messages:
 
 - `queryCopiedToState`
   - what: Query data is copied into state by `{{origin}}`.
-  - fix: Read the query result directly in render; keep only the user's own edits in state and overlay them on the query data.
+  - fix: Read the query result directly in render; keep only the user's own edits in state and overlay them on the query data. Read the `browser-module` skill.
   - why: A second copy of server state goes stale and fights the cache's refetch, invalidation and optimistic updates.
 
 ## `langwatch/refusal-is-a-handled-error`
@@ -979,7 +980,7 @@ Messages:
 
 - `handWrittenRefusal`
   - what: A refusal is written as a status and a body ({{shape}}).
-  - fix: Throw a `HandledError` with a stable `code` — set `fault: "platform"` or `"provider"` explicitly if the status is 5xx — and let the boundary render it; register the code in `packages/handled-error/src/app-codes.ts` (sorted) and give it a customer-safe entry in `packages/handled-error/src/presentation.ts`.
+  - fix: Throw a `HandledError` with a stable `code` — set `fault: "platform"` or `"provider"` explicitly if the status is 5xx — and let the boundary render it; register the code in `packages/handled-error/src/app-codes.ts` (sorted) and give it a customer-safe entry in `packages/handled-error/src/presentation.ts`. Read the `contract` skill.
   - why: Nothing hand-rendered reaches the error boundary, so the answer carries no code: the client presentation registry has nothing to key the customer's words on, and a test can only assert prose that will change.
 
 ## `langwatch/require-fetch-timeout`
@@ -996,7 +997,7 @@ Messages:
 
 - `fetchWithoutSignal`
   - what: This `fetch` has no abort signal, so a peer that never answers hangs the caller.
-  - fix: Pass `signal: AbortSignal.timeout(ms)` (or a controller's signal) in the init object.
+  - fix: Pass `signal: AbortSignal.timeout(ms)` (or a controller's signal) in the init object. Read the `backend` skill.
 
 ## `langwatch/rest-route`
 
@@ -1024,7 +1025,7 @@ Messages:
   - why: input is mandatory on every route, and the framework parses and validates only what the route declares (ARCHITECTURE.md §8).
 - `missingOutput`
   - what: REST route `{{operation}}` declares no answer.
-  - fix: Add `.withOutput(<schema>)` from the module's own contract (`z.void()` for a route that answers with nothing), `.responds({...})` for several statuses, or `.withResponse(<kind>)` for a non-JSON answer.
+  - fix: Add `.withOutput(<schema>)` from the module's own contract (`z.void()` for a route that answers with nothing), `.responds({...})` for several statuses, or `.withResponse(<kind>)` for a non-JSON answer. Read the `api-transports` skill.
   - why: the framework serialises and documents only what the route declares (ARCHITECTURE.md §8).
 - `pathParam`
   - what: REST route `{{operation}}` takes a path parameter named `{{name}}`.
@@ -1049,7 +1050,7 @@ Messages:
 
 - `schema`
   - what: `{{name}}` is a Zod schema declared in `{{path}}`.
-  - fix: Move it to `{{contractPath}}` and import it here.
+  - fix: Move it to `{{contractPath}}` and import it here. Read the `contract` skill.
   - why: A transport file declares routes and imports its shapes; the vocabulary belongs to every side of the wire.
 
 ## `langwatch/service-does-not-open-a-channel`
@@ -1066,7 +1067,7 @@ Messages:
 
 - `serviceOpensAChannel`
   - what: A service opens {{conduit}} directly (`{{specifier}}`).
-  - fix: Move the conduit to `channels/{{tier}}/{{tier}}.<subject>.channel.ts` and inject the channel interface.
+  - fix: Move the conduit to `channels/{{tier}}/{{tier}}.<subject>.channel.ts` and inject the channel interface. Read the `process-module` skill.
   - why: Messages to or from something the module does not own are a channel: an interface the module names, a live implementation per tier and a memory twin a test asserts against.
 
 ## `langwatch/service-loads-its-own-config`
@@ -1083,7 +1084,7 @@ Messages:
 
 - `configFunction`
   - what: `{{name}}` in `{{path}}` resolves its own configuration.
-  - fix: Delete it; add a named `config` member to the argument object `create` takes and resolve it once at the composition root.
+  - fix: Delete it; add a named `config` member to the argument object `create` takes and resolve it once at the composition root. Read the `process-composition` skill.
   - why: A caller that already validated its config forces every callee to re-validate what it was handed.
 
 ## `langwatch/shared-setup-is-a-hook`
@@ -1101,7 +1102,7 @@ Messages:
 - `siblingTestsRepeatSetup`
   - what: These {{count}} sibling tests each open with the same {{shared}} statements.
   - fix: Move the repeated statements into a `beforeEach(() => { ... })` at the top of this `describe` and delete them from each test.
-  - why: Setup pasted into every sibling drifts one body at a time.
+  - why: Setup pasted into every sibling drifts one body at a time. Read the `testing` skill.
 
 ## `langwatch/signature-mirror`
 
@@ -1117,7 +1118,7 @@ Messages:
 
 - `mirroredSignature`
   - what: This boundary type mirrors another signature through `{{name}}<…>`.
-  - fix: Declare the input and output as named contract types (Zod schema plus `z.infer`) and type the `*Api` operation with them explicitly.
+  - fix: Declare the input and output as named contract types (Zod schema plus `z.infer`) and type the `*Api` operation with them explicitly. Read the `contract` skill.
   - why: A mirrored type changes whenever the mirrored function does, so the contract no longer states what the boundary accepts or returns.
 
 ## `langwatch/stand-in-cast`
@@ -1134,7 +1135,7 @@ Messages:
 
 - `doubleCast`
   - what: `as {{through}} as {{target}}` casts through {{through}} to reach {{target}}.
-  - fix: If this value crossed a trust boundary (network, database row, user input), parse it with the contract's Zod schema (`Schema.parse(value)`) instead of casting; otherwise fix the type of whatever produced it so the cast is unnecessary.
+  - fix: If this value crossed a trust boundary (network, database row, user input), parse it with the contract's Zod schema (`Schema.parse(value)`) instead of casting; otherwise fix the type of whatever produced it so the cast is unnecessary. Read the `contract` skill.
   - why: A cast through `unknown` or `any` removes the only check that stood between the two types.
 - `doubleCastInTest`
   - what: `as {{through}} as {{target}}` forces this test value to {{target}} without checking it.
@@ -1155,7 +1156,7 @@ Messages:
 
 - `storeClientValue`
   - what: `{{specifier}}` is the {{store}} client, value-imported outside `repositories/{{folder}}/`.
-  - fix: Move the query into `repositories/{{folder}}/{{folder}}.<subject>.repository.ts` behind the `repositories/<subject>.repository.ts` interface and call that from the service; a file that only needs a type writes `import type`.
+  - fix: Move the query into `repositories/{{folder}}/{{folder}}.<subject>.repository.ts` behind the `repositories/<subject>.repository.ts` interface and call that from the service; a file that only needs a type writes `import type`. Read the `process-module` skill.
   - why: A service holding its own client has a second, unswappable path to the module's data.
 - `storeInApplication`
   - what: `{{specifier}}` is a {{store}} client named in an application.
@@ -1179,7 +1180,7 @@ Messages:
 - `houseRuleDisabled`
   - what: `{{directive}}` turns off `{{rule}}`, a house rule that cannot be disabled.
   - fix: Delete the directive and change the code the way `{{rule}}`'s own message says; if the case is confusing, stop and ask the human instead of disabling it.
-  - why: The langwatch rules state the architecture; a disable would let the code drift.
+  - why: The langwatch rules state the architecture; a disable would let the code drift. Read the `linting` skill.
 - `reasonMissing`
   - what: `{{directive}} {{rule}}` gives no reason.
   - fix: Append `-- <why the framework cannot express this case>` as a sentence of at least 5 words; if you cannot say why, delete the directive and use the shape `{{rule}}` names, and if the case is confusing, stop and ask the human.
@@ -1210,7 +1211,7 @@ Messages:
   - why: A Date on a declared type invites one to be minted to satisfy it.
 - `mintNow`
   - what: {{name}} mints a Date for the current moment.
-  - fix: Call `nowInstant()` from @langwatch/time.
+  - fix: Call `nowInstant()` from @langwatch/time. Read the `backend` skill.
   - why: One clock: every moment in the product is a Temporal.Instant.
 - `mintNowMilliseconds`
   - what: {{name}} reads the current moment as Date epoch milliseconds.
@@ -1236,7 +1237,7 @@ Messages:
 
 - `nestedDescribeMissingGivenWhen`
   - what: This nested `describe` title does not start with "given ", "when " or "and ", and does not name the unit under test.
-  - fix: Rename it to a condition: "given <precondition>" if it sets up state, "when <action>" if it performs the behaviour under test.
+  - fix: Rename it to a condition: "given <precondition>" if it sets up state, "when <action>" if it performs the behaviour under test. Read the `testing` skill.
   - why: Nested `describe` blocks read as BDD structure: an outer `given <precondition>`, an inner `when <action>`.
 
 ## `langwatch/transport-declares`
@@ -1262,7 +1263,7 @@ Messages:
   - fix: Read the caller from the handler's `actor` and `scope`; the framework resolves the credential, class and all, before the handler runs.
 - `handlerBindingCall`
   - what: This source calls `createTrpcHandlerBinding`.
-  - fix: Delete the call and export the `defineTrpcRouter` declaration; the process binds handlers when it mounts the router.
+  - fix: Delete the call and export the `defineTrpcRouter` declaration; the process binds handlers when it mounts the router. Read the `api-transports` skill.
 - `handlerChecksInput`
   - what: The handler throws when its input fails `{{test}}`.
   - fix: Delete the check and require the field in the route's `.withInput(...)` schema (no `.optional()`, and `.min(1)` for a string or array); the framework refuses the request before the handler runs.
@@ -1366,7 +1367,7 @@ Messages:
 
 - `unboundedLoop`
   - what: This `{{form}}` loop states no exit condition in its header.
-  - fix: State whichever bound this loop already tracks directly in its header — a deadline (`while (now() < deadline)`) or an attempt counter (`for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++)`) — or, if it tracks no such bound yet, move it into a function whose signature takes one as a parameter.
+  - fix: State whichever bound this loop already tracks directly in its header — a deadline (`while (now() < deadline)`) or an attempt counter (`for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++)`) — or, if it tracks no such bound yet, move it into a function whose signature takes one as a parameter. Read the `backend` skill.
   - why: When the exit lives in the body the reader has to find every return, break and throw to know when the loop ends.
 
 ## `langwatch/unit-test-does-not-render`
@@ -1383,7 +1384,7 @@ Messages:
 
 - `unitTestImportsRenderer`
   - what: `{{specifier}}` renders components, and `{{name}}` is not named as an integration test.
-  - fix: Rename the file to `{{target}}` and leave the content unchanged.
+  - fix: Rename the file to `{{target}}` and leave the content unchanged. Read the `testing` skill.
   - why: A test that renders a component and mocks its boundaries is an integration test.
 
 ## `langwatch/unresolved-relative-import`
@@ -1401,7 +1402,7 @@ Messages:
 - `unresolved`
   - what: `{{specifier}}` names no file on disk.
   - fix: Point it at the file's new path, or delete the line if the file is gone; a move leaves these in batches, so resolve the whole file in one pass.
-  - why: A stale `dist/*.d.ts` keeps diagnostics green, so only a test run finds it.
+  - why: A stale `dist/*.d.ts` keeps diagnostics green, so only a test run finds it. Read the `repo-tree` skill.
 
 ## `langwatch/web-imports-server-shaped-value`
 
@@ -1417,7 +1418,7 @@ Messages:
 
 - `serverShaped`
   - what: A browser module value-imports `{{name}}`, whose declarations are the server's and pull a database graph into the browser program.
-  - fix: Import it as a type when only the type is needed; otherwise read the data through the owning module's tRPC client, derived from its contract.
+  - fix: Import it as a type when only the type is needed; otherwise read the data through the owning module's tRPC client, derived from its contract. Read the `module-client` skill.
   - why: Loading declaration files is the largest bucket in a type-check, and this class of import is invisible in the bundle.
 
 ## `langwatch/zod-internals`
@@ -1434,7 +1435,7 @@ Messages:
 
 - `defAccess`
   - what: `{{object}}._def` reads a Zod schema's internals, which differ between the two installed Zod majors.
-  - fix: Export the un-refined schema object from the contract and build from it instead of unwrapping this one.
+  - fix: Export the un-refined schema object from the contract and build from it instead of unwrapping this one. Read the `contract` skill.
 - `zodErrorInstanceOf`
   - what: `instanceof {{right}}` tests an error against one Zod major's class, and the other major's errors fail it.
   - fix: Test the error structurally instead: check `Array.isArray(error.issues)`.
@@ -1453,7 +1454,7 @@ Messages:
 
 - `keepRefinements`
   - what: `.{{method}}()` is called on a Zod object that carries refinements.
-  - fix: Write `.safeExtend({ ...fields })` here — a `z.object({ ...base.shape })` spread would drop those refinements without a type error.
+  - fix: Write `.safeExtend({ ...fields })` here — a `z.object({ ...base.shape })` spread would drop those refinements without a type error. Read the `contract` skill.
   - why: Spreading its shape alone would discard those checks.
 - `spreadShape`
   - what: `.{{method}}()` builds this schema's type through Zod's mapped `Extend` generic.
@@ -1474,7 +1475,7 @@ Messages:
 
 - `keepRefinements`
   - what: `{{call}}` intersects a refined Zod object with a plain one.
-  - fix: Write `left.safeExtend(right.shape)`, which keeps the left side's refinements and parses once.
+  - fix: Write `left.safeExtend(right.shape)`, which keeps the left side's refinements and parses once. Read the `contract` skill.
 - `spreadShapes`
   - what: `{{call}}` intersects two Zod objects, which parses the input twice and merges the results.
   - fix: Write `z.object({ ...left.shape, ...right.shape })`; when either side is `.strict()`, `z.strictObject()` or has a `.catchall()`, write `left.safeExtend(right.shape)` so that behaviour survives.
@@ -1498,7 +1499,7 @@ Messages:
   - why: Zod compiles a schema's parser on its first parse and caches it on that instance, so a schema built per call recompiles per call.
 - `perIteration`
   - what: `{{call}}` builds a Zod schema on every iteration.
-  - fix: Move it to a module-level `const` beside the other schemas and parse with that constant here.
+  - fix: Move it to a module-level `const` beside the other schemas and parse with that constant here. Read the `contract` skill.
   - why: Zod compiles a schema's parser on its first parse and caches it on that instance, so a schema built per row recompiles per row.
 
 ## `langwatch/zod-validate-for-boolean`
@@ -1515,5 +1516,5 @@ Messages:
 
 - `useValidate`
   - what: `.{{method}}(…).success` builds a full parse result only to read its flag.
-  - fix: Write `.{{validator}}(…)` with the same argument in place of `.{{method}}(…).success`.
+  - fix: Write `.{{validator}}(…)` with the same argument in place of `.{{method}}(…).success`. Read the `contract` skill.
   - why: `.validate()` answers the same boolean without building the output or the error, up to 35x faster on a compiled schema.

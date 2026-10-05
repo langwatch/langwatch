@@ -52,7 +52,7 @@ export const prismaCountInListQueryRule = defineRule({
     countInsideFindMany: {
       what: "`_count` rides this `findMany`, and the planner can re-run its aggregate once per listed row.",
       why: "Prisma builds `_count` as an uncorrelated join over the whole related table.",
-      fix: "Drop `_count` from the query and run a second `groupBy` count restricted to the listed row ids.",
+      fix: "Drop `_count` from the query and run a second `groupBy` count restricted to the listed row ids. Read the `process-module` skill.",
     },
   },
   create(context, _file) {

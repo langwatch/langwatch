@@ -27,7 +27,8 @@ describe("given a transport file", () => {
       expect(found[0].message).toBe(
         "`CreateAgentSchema` is a Zod schema declared in" +
           " `modules/agent/process/src/transport/agent.rest.ts`." +
-          " Move it to `modules/agent/contract/src` and import it here.",
+          " Move it to `modules/agent/contract/src` and import it here." +
+          " Read the `contract` skill.",
       );
     });
   });

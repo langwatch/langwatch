@@ -35,7 +35,8 @@ describe("given a strict feature server module", () => {
           " State whichever bound this loop already tracks directly in its header — a deadline" +
           " (`while (now() < deadline)`) or an attempt counter" +
           " (`for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++)`) — or, if it tracks no such" +
-          " bound yet, move it into a function whose signature takes one as a parameter.",
+          " bound yet, move it into a function whose signature takes one as a parameter." +
+          " Read the `backend` skill.",
       );
     });
 

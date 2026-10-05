@@ -39,7 +39,8 @@ describe("given a ClickHouse repository in a module's process half", () => {
       expect(tablesOf(found)).toEqual([[3, "agent_runs"]]);
       expect(found[0].message).toBe(
         "This ClickHouse query reads `agent_runs` without a `TenantId` predicate in that table's own WHERE, so it can return another tenant's rows." +
-          " Add `TenantId = {tenantId:String}` (or `TenantId IN {tenantIds:Array(String)}`) to the WHERE that filters `agent_runs`.",
+          " Add `TenantId = {tenantId:String}` (or `TenantId IN {tenantIds:Array(String)}`) to the WHERE that filters `agent_runs`." +
+          " Read the `process-module` skill.",
       );
     });
   });

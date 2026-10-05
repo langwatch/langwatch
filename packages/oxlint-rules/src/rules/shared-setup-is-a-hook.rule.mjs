@@ -131,7 +131,7 @@ export const sharedSetupIsAHookRule = defineRule({
   messages: {
     siblingTestsRepeatSetup: {
       what: "These {{count}} sibling tests each open with the same {{shared}} statements.",
-      why: "Setup pasted into every sibling drifts one body at a time.",
+      why: "Setup pasted into every sibling drifts one body at a time. Read the `testing` skill.",
       fix:
         "Move the repeated statements into a `beforeEach(() => { ... })` at the top of this" +
         " `describe` and delete them from each test.",

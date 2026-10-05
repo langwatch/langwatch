@@ -32,7 +32,7 @@ export const browserStoreContainmentRule = defineRule({
     storeOutsideBehavior: {
       what: "`{{name}}` from zustand creates a store outside `behavior/`.",
       why: "Shared client state has one named home per feature; a store anywhere else is invisible to the reader.",
-      fix: "Move the store to `behavior/<feature>.store.ts` and call it from there, with each action a named function.",
+      fix: "Move the store to `behavior/<feature>.store.ts` and call it from there, with each action a named function. Read the `browser-module` skill.",
     },
     storeExported: {
       what: "The package's declaration file exports a store.",

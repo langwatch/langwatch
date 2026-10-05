@@ -70,7 +70,7 @@ export const featureSourceLayoutRule = defineRule({
   messages: {
     contractMissingSubject: {
       what: "Rename `{{name}}` to `<subject>.{{artifact}}.ts`, e.g. `agent.commands.ts`.",
-      fix: "Add the subject to the filename.",
+      fix: "Add the subject to the filename. Read the `process-module` skill.",
     },
     contractProcessArtifact: {
       what: `\`{{name}}\` is a process artifact: contract source holds none of ${PROCESS_ONLY_ARTIFACT_LIST}.`,

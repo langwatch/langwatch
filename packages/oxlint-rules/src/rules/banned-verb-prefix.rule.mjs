@@ -157,7 +157,7 @@ export const bannedVerbPrefixRule = defineRule({
     tryPrefix: {
       what: "`{{name}}` is named for how it behaves on failure, not for what it answers.",
       why: "A caller reading the call site cannot tell a lookup from a hedge, and the two need different handling.",
-      fix: `Drop \`try\` and name it for what it answers. ${RENAME}`,
+      fix: `Drop \`try\` and name it for what it answers. ${RENAME}. Read the contract skill.`,
     },
     tryPrefixOneValue: {
       what: "`{{name}}` is named for how it behaves on failure, not for the one value it answers.",

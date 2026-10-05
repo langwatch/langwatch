@@ -84,7 +84,7 @@ export const bannedTestModelNamesRule = defineRule({
     bannedModelName: {
       what: "This literal names the retired or overpriced model `{{name}}`.",
       why: "gpt-5-mini is the cheapest and most capable model, and the whole suite should default to it.",
-      fix: "Use `gpt-5-mini` instead.",
+      fix: "Use `gpt-5-mini` instead. Read the `testing` skill.",
     },
   },
   create(context, file) {

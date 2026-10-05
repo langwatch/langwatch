@@ -34,7 +34,8 @@ describe("given a test file", () => {
       ]);
       expect(found[0].message).toBe(
         "`expect(true).toBe(true)` compares a value with itself and cannot fail." +
-          " Assert the value the code produced against one derived independently of it.",
+          " Assert the value the code produced against one derived independently of it." +
+          " Read the `testing` skill.",
       );
     });
   });

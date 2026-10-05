@@ -20,7 +20,7 @@ export const noHandRolledPlanGateRule = defineRule({
     handRolledPlanGate: {
       what: "`{{refusal}}` refuses a plan in `{{path}}`, in the app or transport layer.",
       why: "The framework asks a declared plan gate after access, so a caller refused on permission is never told what the plan lacks.",
-      fix: 'Declare `.withEntitlement("enterprise", { feature, when })` on the route or procedure and delete this refusal; a gate that needs loaded data belongs in a service method.',
+      fix: 'Declare `.withEntitlement("enterprise", { feature, when })` on the route or procedure and delete this refusal; a gate that needs loaded data belongs in a service method. Read the `module-dependencies` skill.',
     },
   },
   create(context, file) {

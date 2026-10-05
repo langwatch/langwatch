@@ -12,7 +12,7 @@ export const conditionalTypeDepthRule = defineRule({
   messages: {
     stateTheShape: {
       what: "{{message}}",
-      why: "A type this deep re-computes what a plain interface or discriminated union already says.",
+      why: "A type this deep re-computes what a plain interface or discriminated union already says. Read the `contract` skill.",
       fix: "{{allowed}}",
     },
   },

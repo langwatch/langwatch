@@ -293,7 +293,7 @@ export const restRouteRule = defineRule({
     missingOutput: {
       what: "REST route `{{operation}}` declares no answer.",
       why: "the framework serialises and documents only what the route declares (ARCHITECTURE.md §8).",
-      fix: "Add `.withOutput(<schema>)` from the module's own contract (`z.void()` for a route that answers with nothing), `.responds({...})` for several statuses, or `.withResponse(<kind>)` for a non-JSON answer.",
+      fix: "Add `.withOutput(<schema>)` from the module's own contract (`z.void()` for a route that answers with nothing), `.responds({...})` for several statuses, or `.withResponse(<kind>)` for a non-JSON answer. Read the `api-transports` skill.",
     },
     missingInput: {
       what: "REST route `{{operation}}` is a body-carrying method but declares no input.",

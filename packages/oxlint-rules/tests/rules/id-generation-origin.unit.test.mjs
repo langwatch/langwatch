@@ -32,7 +32,8 @@ describe("given a strict feature or process source", () => {
       expect(found[0].messageId).toBe("foreignIdModule");
       expect(found[0].message).toBe(
         "`nanoid` mints ids outside the house scheme." +
-          ' Import `generate` from `@langwatch/ksuid` and mint it with its kind: `generate("agent").toString()`.',
+          ' Import `generate` from `@langwatch/ksuid` and mint it with its kind: `generate("agent").toString()`.' +
+          " Read the `backend` skill.",
       );
     });
 

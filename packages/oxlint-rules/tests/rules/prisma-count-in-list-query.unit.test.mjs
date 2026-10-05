@@ -33,7 +33,8 @@ describe("given a Prisma repository seam file", () => {
       expect(found[0].messageId).toBe("countInsideFindMany");
       expect(found[0].message).toBe(
         "`_count` rides this `findMany`, and the planner can re-run its aggregate once per listed row." +
-          " Drop `_count` from the query and run a second `groupBy` count restricted to the listed row ids.",
+          " Drop `_count` from the query and run a second `groupBy` count restricted to the listed row ids." +
+          " Read the `process-module` skill.",
       );
     });
   });

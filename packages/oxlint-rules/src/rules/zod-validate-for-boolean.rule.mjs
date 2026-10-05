@@ -18,7 +18,7 @@ export const zodValidateForBooleanRule = defineRule({
     useValidate: {
       what: "`.{{method}}(…).success` builds a full parse result only to read its flag.",
       why: "`.validate()` answers the same boolean without building the output or the error, up to 35x faster on a compiled schema.",
-      fix: "Write `.{{validator}}(…)` with the same argument in place of `.{{method}}(…).success`.",
+      fix: "Write `.{{validator}}(…)` with the same argument in place of `.{{method}}(…).success`. Read the `contract` skill.",
     },
   },
   create(context) {

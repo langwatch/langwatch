@@ -34,7 +34,8 @@ describe("given a .unit.test.tsx file", () => {
       expect(found[0].message).toBe(
         "`@testing-library/react` renders components, and `agent-card.unit.test.tsx` is not named" +
           " as an integration test. Rename the file to `agent-card.integration.test.tsx` and leave" +
-          " the content unchanged.",
+          " the content unchanged." +
+          " Read the `testing` skill.",
       );
     });
   });
