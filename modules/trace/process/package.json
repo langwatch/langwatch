@@ -67,6 +67,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/redaction": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/share-contract": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
