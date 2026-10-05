@@ -9,6 +9,16 @@ import {
 // a new parse is a new node, and a freed one takes its entry with it.
 
 const findingsByProgram = new WeakMap();
+const NO_FINDINGS = Object.freeze([]);
+
+/** A finding needs a `class`, a conditional `extends`, or both `true` and `false` literal types. */
+function mayHoldAFinding(text) {
+  return (
+    text.includes("class") ||
+    text.includes("extends") ||
+    (text.includes("true") && text.includes("false"))
+  );
+}
 
 /** Only the over-abstraction sources: no declarations, tests or generated code. */
 export function isOverengineeringFile(file) {
@@ -26,6 +36,7 @@ export function isOverengineeringFile(file) {
  */
 export function reportsFor({ context, file, policy, program }) {
   let findings = findingsByProgram.get(program);
+  if (!findings && !mayHoldAFinding(context.sourceCode.text)) return NO_FINDINGS;
   if (!findings) {
     findings = overengineeringFindings({
       path: file.filename,

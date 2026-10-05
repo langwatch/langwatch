@@ -67,6 +67,17 @@ function packageRootForFile(filename, cwd) {
   }
 }
 
+// Every import in a file asks for the same root; the last answer saves a path resolve per import.
+let lastRoot = { filename: undefined, cwd: undefined, root: undefined };
+
+function packageRootOfLintedFile(filename, cwd) {
+  if (lastRoot.filename !== filename || lastRoot.cwd !== cwd) {
+    lastRoot = { filename, cwd, root: packageRootForFile(filename, cwd) };
+  }
+
+  return lastRoot.root;
+}
+
 function retiredReplacement(specifier) {
   for (const [retired, replacement] of RETIRED_PACKAGE_ENTRYPOINTS) {
     if (specifier === retired || specifier.startsWith(`${retired}/`)) return replacement;
@@ -80,7 +91,7 @@ function workspaceRelative(cwd, path) {
 }
 
 function escapeFinding(file, specifier, cwd) {
-  const packageRoot = packageRootForFile(file.filename, cwd);
+  const packageRoot = packageRootOfLintedFile(file.filename, cwd);
   if (!packageRoot) return undefined;
   const targetPath = resolve(dirname(file.filename), specifier);
   if (!relative(packageRoot, targetPath).startsWith("..")) return undefined;
@@ -111,7 +122,7 @@ function declaredNamesOf(packageRoot) {
 /** An `@langwatch/*` import its package.json does not declare: no graph edge, so a stale cache. */
 function undeclaredFinding(file, specifier, cwd) {
   if (!specifier.startsWith(WORKSPACE_SCOPE)) return undefined;
-  const packageRoot = packageRootForFile(file.filename, cwd);
+  const packageRoot = packageRootOfLintedFile(file.filename, cwd);
   if (!packageRoot) return undefined;
   const dependency = specifier.split("/").slice(0, 2).join("/");
   if (declaredNamesOf(packageRoot).has(dependency)) return undefined;

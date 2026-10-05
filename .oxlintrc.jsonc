@@ -9,13 +9,15 @@
   // A suppression that suppresses nothing is a lie about the code.
   "options": { "reportUnusedDisableDirectives": "error" },
 
-  // Generated files are fixed in their generator; `session-context.mjs` and
-  // `session-guidance.mjs` are vendored minified bundles the plugin ships and
-  // builds elsewhere.
+  // Generated files are fixed in their generator (the SDK's openapi client is
+  // written by sdks/typescript/scripts/generate-openapi-types.mjs);
+  // `session-context.mjs` and `session-guidance.mjs` are vendored minified
+  // bundles the plugin ships and builds elsewhere.
   "ignorePatterns": [
     "**/*.generated.ts",
     "**/*.generated.tsx",
     "**/*.generated.js",
+    "sdks/typescript/src/internal/generated/openapi/api-client.ts",
     "plugins/langwatch/scripts/session-context.mjs",
     "plugins/langwatch/scripts/session-guidance.mjs",
     "tools/apidiff/inventory/**",
