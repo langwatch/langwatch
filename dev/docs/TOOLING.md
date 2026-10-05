@@ -53,26 +53,36 @@ Each layer is slower and sees more than the one before, so the cheap ones run
 first.
 
 ```
-  pnpm lint                 per project, no type info,     the fast rules, cached
-     |                      + files outside projects     per project
-  pnpm lint:changed         only what you changed and      seconds after the first
-     |                      its dependents
-
-  nx affected -t lint:types type-aware, per project,       cached per project
-     |                      only what the change reached
-  pnpm lint:architecture    the enforcer's whole-tree      CI blocks on it; run it
-                            policies                       on demand
+  pnpm lint                 native rules and the langwatch   whole tree, uncached,
+     |                      plugin, two parallel processes   about 35 s
+  pnpm lint:changed         the same, over the projects you  seconds
+     |                      changed and their dependents
+  pnpm lint:types           adds the type-aware rules as a   minutes; CI's gate
+     |                      third process, TS projects only
+  pnpm lint:architecture    the enforcer's whole-tree        CI blocks on it; run it
+                            policies                         on demand
 ```
 
-`lint` and `lint:types` aren't written in any `package.json`. A small plugin,
-`dev/nx/lint-plugin.mjs`, adds them to every workspace package, so the targets
-can't drift or go missing on a new package. `pnpm lint` (`dev/nx/lint.mjs`) runs
-`lint` for every project, then oxlint once over the files no project owns.
-`pnpm lint:changed` runs both for the uncommitted working copy plus the branch
-since its merge base, with dependents of every changed project. It can miss a
-finding that appears in an untouched file when the cause is something no Nx input
-names, and it never runs the enforcer, so `pnpm lint:architecture` stays the
-check before push. `pnpm lint:oxlint` is the plain whole-tree run, uncached.
+oxlint runs its native rules and the JavaScript plugin one after the other in a
+single process, so `dev/nx/lint.mjs` splits the rules into three configs and runs
+them side by side: `.oxlintrc.native.jsonc`, `.oxlintrc.plugin.jsonc` and
+`.oxlintrc.types.jsonc` (with `--type-aware`). `.oxlintrc.jsonc` extends all three
+and stays the one config the editor, `pnpm lint:fix` and the Nx targets read; it
+also holds the `ignorePatterns`, which the runner passes to every process.
+
+Each process reports every disable directive its own rules did not use, so the
+runner keeps an unused-directive report only when every process made it
+(`packages/oxlint-rules/src/unused-directives.mjs`). Plain `pnpm lint` has no
+type-aware process, so a directive naming only a type-aware rule reads as unused
+there, as it always has.
+
+`--changed` and `--base <sha>` narrow every process to the projects
+`nx show projects --affected` names, plus the files no project owns. The Nx
+`lint` and `lint:types` targets (`dev/nx/lint-plugin.mjs`) stay for cached
+per-project runs (`nx affected -t lint:types`); `pnpm lint` no longer goes
+through them. `pnpm lint:changed` can miss a finding in an untouched file when
+the cause is something no Nx input names, and it never runs the enforcer, so
+`pnpm lint:architecture` stays the check before push.
 
 ## How the Nx cache knows it's stale
 

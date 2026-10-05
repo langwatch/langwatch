@@ -38,7 +38,7 @@ function sourcesUnder(directory: string): string[] {
 }
 
 function lintOverrides(): Override[] {
-  const text = readFileSync(join(repoRoot, ".oxlintrc.jsonc"), "utf8")
+  const text = readFileSync(join(repoRoot, ".oxlintrc.native.jsonc"), "utf8")
     .replace(COMMENT_OR_STRING, (token) => (token.startsWith('"') ? token : ""))
     .replace(TRAILING_COMMA, "$1");
   const config: { overrides?: Override[] } = JSON.parse(text);

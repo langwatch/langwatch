@@ -54,7 +54,7 @@ export const reads = {
     "go.work",
     "go.work.sum",
   ],
-  "@langwatch/internal-slack": ["modules/automation/**/*", ".oxlintrc.jsonc"],
+  "@langwatch/internal-slack": ["modules/automation/**/*", ".oxlintrc.native.jsonc"],
   "@langwatch/identity-process": ["modules/auth/**/*"],
   "@langwatch/clickhouse-client": ["packages/clickhouse-migrations/**/*"],
   "@langwatch/evaluator-contract": [
@@ -95,6 +95,9 @@ export const reads = {
   "@langwatch/langy-process": ["specs/langy/langy-frame-auth.vectors.json"],
   "@langwatch/oxlint-rules": [
     ".oxlintrc.jsonc",
+    ".oxlintrc.native.jsonc",
+    ".oxlintrc.plugin.jsonc",
+    ".oxlintrc.types.jsonc",
     "packages/architecture-enforcer/oxlint.architecture.jsonc",
   ],
   "@langwatch/usage-process": ["docs/pricing.mdx", "docs/pricing/billable-events.mdx"],
@@ -135,6 +138,9 @@ export const reads = {
     ".github/release-please-config.json",
     ".github/.release-please-manifest.json",
     ".oxlintrc.jsonc",
+    ".oxlintrc.native.jsonc",
+    ".oxlintrc.plugin.jsonc",
+    ".oxlintrc.types.jsonc",
     ".oxfmtrc.json",
     ".gitignore",
     ".npmrc",

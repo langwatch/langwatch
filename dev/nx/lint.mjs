@@ -1,24 +1,21 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { mergeDiagnostics } from "../../packages/oxlint-rules/src/unused-directives.mjs";
 import { memberRoots, ownLintMembers } from "./workspace-members.mjs";
 
-// `pnpm lint`: the fast oxlint layer as one cached Nx target per project, plus the
-// files outside every project. `--changed` lints what the working copy and branch
-// changed; `--base <sha>` what a PR changed. ADR-150 and dev/docs/TOOLING.md say why.
-// `--types` runs the lint:types projects in one type-aware process, which parses each
-// shared dependency once instead of once per project.
+// `pnpm lint`: oxlint's native rules and the langwatch plugin as two parallel
+// processes over the tree; `--types` adds the type-aware rules as a third, over the
+// TypeScript projects. One unused-directive check spans the processes. `--changed`
+// and `--base <sha>` narrow to the projects a change reached. ADR-150, TOOLING.md.
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const OXLINT = join(root, "node_modules/.bin/oxlint");
 const LINTABLE = /\.(?:[cm]?[jt]sx?)$/;
 const UPSTREAM_FALLBACK = "origin/feat/strict-feature-layout-v0";
-
-function run(command, args) {
-  const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
-
-  return result.status ?? 1;
-}
+const PLAIN = [".oxlintrc.native.jsonc", ".oxlintrc.plugin.jsonc"];
+const TYPES = [...PLAIN, ".oxlintrc.types.jsonc"];
 
 function git(args) {
   const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
@@ -38,78 +35,127 @@ function changedFiles(base) {
   const tracked = git(["diff", "--name-only", "--diff-filter=ACMRD", base]);
   const untracked = git(["ls-files", "--others", "--exclude-standard"]);
 
-  return [...new Set([...tracked, ...untracked])].toSorted();
+  return [...new Set([...tracked, ...untracked])].toSorted((a, b) => a.localeCompare(b));
 }
 
-function residualArgs({ files }) {
-  const own = new Set(ownLintMembers(root).map((member) => member.root));
-  const ignored = memberRoots(root).filter((member) => !own.has(member));
-  const outside = (file) => !ignored.some((member) => file.startsWith(`${member}/`));
-  const targets = files === undefined ? ["."] : files.filter(outside);
-  if (targets.length === 0) return undefined;
-
-  return [
-    "exec",
-    "oxlint",
-    "--quiet",
-    "--config",
-    ".oxlintrc.jsonc",
-    ...ignored.flatMap((member) => ["--ignore-pattern", `${member}/**`]),
-    ...targets,
-  ];
-}
-
-function nxArgs({ scope }) {
-  const exclude = ownLintMembers(root)
-    .map((member) => member.name)
-    .join(",");
-
-  return ["exec", "nx", ...scope, "--exclude", exclude];
-}
-
-/** The lint:types projects (a tsconfig.json at the root) the scope names; all when unscoped. */
-function typedRoots({ files, base }) {
-  const typed = memberRoots(root).filter((member) =>
-    existsSync(join(root, member, "tsconfig.json")),
-  );
-  if (files === undefined && base === undefined) return typed;
-  const affected = base === undefined ? `--files=${files.join(",")}` : `--base=${base}`;
-  const show = ["exec", "nx", "show", "projects", "--affected", affected, "--json"];
-  const listed = spawnSync("pnpm", show, {
+/** The union config's ignorePatterns: `extends` does not carry them to the parts. */
+function ignoreArgs() {
+  const printed = spawnSync(OXLINT, ["--print-config", "-c", ".oxlintrc.jsonc"], {
     cwd: root,
     encoding: "utf8",
   });
+  if (printed.status !== 0) throw new Error(`oxlint --print-config failed:\n${printed.stdout}`);
+
+  return JSON.parse(printed.stdout).ignorePatterns.flatMap((p) => ["--ignore-pattern", p]);
+}
+
+/** Workspace roots a change reached, dependents included; every root when unscoped. */
+function affectedRoots({ roots, files, base }) {
+  if (files === undefined && base === undefined) return roots;
+  const affected = base === undefined ? `--files=${files.join(",")}` : `--base=${base}`;
+  const show = ["exec", "nx", "show", "projects", "--affected", affected, "--json"];
+  const listed = spawnSync("pnpm", show, { cwd: root, encoding: "utf8" });
   if (listed.status !== 0) process.exit(listed.status ?? 1);
   const names = new Set(JSON.parse(listed.stdout));
   const nameOf = (member) =>
     JSON.parse(readFileSync(join(root, member, "package.json"), "utf8")).name;
 
-  return typed.filter((member) => names.has(nameOf(member)));
+  return roots.filter((member) => names.has(nameOf(member)));
 }
 
-function typesArgs({ roots }) {
-  return ["exec", "oxlint", "--quiet", "--type-aware", "--config", ".oxlintrc.jsonc", ...roots];
+/** What each process lints: projects, plus the files no Nx `lint` target owns. */
+function scopes({ types, files, base }) {
+  const own = new Set(ownLintMembers(root).map((member) => member.root));
+  const members = memberRoots(root).filter((member) => !own.has(member));
+  if (types) {
+    const typed = memberRoots(root).filter((m) => existsSync(join(root, m, "tsconfig.json")));
+    return [{ paths: affectedRoots({ roots: typed, files, base }), ignores: [] }];
+  }
+  if (files === undefined && base === undefined) return [{ paths: ["."], ignores: [] }];
+  const outside = (file) => !members.some((member) => file.startsWith(`${member}/`));
+  const lintable = files?.filter((file) => LINTABLE.test(file) && existsSync(join(root, file)));
+  const residual = lintable === undefined ? ["."] : lintable.filter(outside);
+  const ignores = members.flatMap((member) => ["--ignore-pattern", `${member}/**`]);
+
+  return [
+    { paths: affectedRoots({ roots: members, files, base }), ignores: [] },
+    { paths: residual, ignores },
+  ];
+}
+
+/** The diagnostics of a `-f json` run; undefined when oxlint printed an error instead. */
+function parseReport(out) {
+  try {
+    return JSON.parse(out).diagnostics;
+  } catch {
+    return undefined;
+  }
+}
+
+/** One oxlint process; resolves to its diagnostics, or undefined when it failed to run. */
+function oxlint({ config, args }) {
+  const typeAware = config === ".oxlintrc.types.jsonc" ? ["--type-aware"] : [];
+  const child = spawn(OXLINT, ["--quiet", "-f", "json", "-c", config, ...typeAware, ...args], {
+    cwd: root,
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  let out = "";
+  child.stdout.on("data", (chunk) => (out += chunk));
+
+  return new Promise((resolve) => {
+    child.on("close", (status) => {
+      const report = status === 0 || status === 1 ? parseReport(out) : undefined;
+      if (report === undefined)
+        process.stderr.write(`oxlint -c ${config} exited ${status}:\n${out}\n`);
+      resolve(report);
+    });
+  });
+}
+
+function print(diagnostic) {
+  const { line, column } = diagnostic.labels?.[0]?.span ?? { line: 0, column: 0 };
+  const rule = diagnostic.code === undefined ? "" : ` [${diagnostic.code}]`;
+  const help = diagnostic.help === undefined ? "" : `\n  help: ${diagnostic.help}`;
+
+  return `${diagnostic.filename}:${line}:${column}: ${diagnostic.message}${rule}${help}`;
 }
 
 const flags = process.argv.slice(2);
 const baseFlag = flags.indexOf("--base");
-const changed = flags.includes("--changed");
+const types = flags.includes("--types");
 const base = baseFlag === -1 ? undefined : flags[baseFlag + 1];
-const files = changed ? changedFiles(mergeBase()) : undefined;
-const lintable = files?.filter((file) => LINTABLE.test(file) && existsSync(join(root, file)));
+const files = flags.includes("--changed") ? changedFiles(mergeBase()) : undefined;
+if (files?.length === 0) process.exit(0);
 
-let scope = ["run-many", "-t", "lint"];
-if (changed) scope = ["affected", "-t", "lint", `--files=${files.join(",")}`];
-if (base !== undefined) scope = ["affected", "-t", "lint", `--base=${base}`];
+const ignored = ignoreArgs();
+const configs = types ? TYPES : PLAIN;
+const runs = scopes({ types, files, base })
+  .filter((scope) => scope.paths.length > 0)
+  .map(async ({ paths, ignores }) => {
+    const args = [...ignored, ...ignores, ...paths];
+    const reports = await Promise.all(configs.map((config) => oxlint({ config, args })));
 
-if (flags.includes("--types")) {
-  const roots = changed && files.length === 0 ? [] : typedRoots({ files, base });
-  process.exit(roots.length === 0 ? 0 : run("pnpm", typesArgs({ roots })));
-}
+    return reports.includes(undefined) ? undefined : mergeDiagnostics({ reports });
+  });
+const results = await Promise.all(runs);
+const diagnostics = results.flatMap((result) => result ?? []);
+const position = (d) => [
+  d.filename,
+  d.labels?.[0]?.span.line ?? 0,
+  d.labels?.[0]?.span.column ?? 0,
+];
+const byPosition = (a, b) => {
+  const [fa, la, ca] = position(a);
+  const [fb, lb, cb] = position(b);
 
-const skip = changed && files.length === 0;
-const projects = skip ? 0 : run("pnpm", nxArgs({ scope }));
-const residual = residualArgs({ files: lintable });
-const outside = residual === undefined ? 0 : run("pnpm", residual);
+  return fa.localeCompare(fb) || la - lb || ca - cb;
+};
+process.stdout.write(
+  diagnostics
+    .toSorted(byPosition)
+    .map((d) => `${print(d)}\n`)
+    .join(""),
+);
+process.stdout.write(`\n${diagnostics.length} problem(s)\n`);
 
-process.exit(projects === 0 && outside === 0 ? 0 : 1);
+process.exit(diagnostics.length === 0 && !results.includes(undefined) ? 0 : 1);

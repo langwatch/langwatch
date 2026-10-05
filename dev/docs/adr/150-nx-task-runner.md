@@ -316,3 +316,52 @@ CI keeps the table true: `package-suites` loads `dev/nx/test-reads-hook.cjs` int
 change reaches, and `.github/scripts/check-test-reads.ts` fails the leg with the row to add.
 `@langwatch/test-harness` runs `git ls-files` over every tracked file, so its
 `test` is `cache: false`.
+
+## Amendment, 2026-10-05: lint as parallel processes, and one type-aware gate
+
+**Lint split (Alex).** oxlint runs its native rules and a JavaScript plugin one
+after the other in one process and holds each file's buffers while the plugin's
+single thread catches up. The rules now sit in three disjoint configs:
+`.oxlintrc.native.jsonc`, `.oxlintrc.plugin.jsonc` (the langwatch plugin) and
+`.oxlintrc.types.jsonc` (the type-aware rules only, named one by one, the
+correctness tier off). `.oxlintrc.jsonc` extends all three for the editor,
+`pnpm lint:fix` and the Nx targets; the native config is extended last because
+the last `categories` wins, and the root keeps `ignorePatterns` because `extends`
+does not carry them. `pnpm lint` (`dev/nx/lint.mjs`) runs native and plugin as two
+parallel processes over the tree; `--changed` and `--base` narrow both to the
+projects `nx show projects --affected` names plus the files no project owns. It no
+longer runs the per-project `lint` target: cold, that was 213 to 280 s against
+about 35 s whole-tree; the `lint` and `lint:types` targets stay for cached
+per-project runs.
+
+**CI type-aware gate (Alex).** CI runs `pnpm lint:types` (`dev/nx/lint.mjs
+--types`; `--base` on a PR, everything on a push or a global lint input change)
+in place of `nx affected -t lint:types`: one type-aware process over the projects
+parses each shared dependency once, where one process per project re-parsed it
+237 times. CI restores no Nx cache, so per-project caching bought it nothing, and
+its prepare-generated-files step covers the target's `^build` and
+`^prisma:generate`. The native and plugin processes run beside it over the same
+projects.
+
+**One unused-directive check.** Every config keeps
+`reportUnusedDisableDirectives`, so each process reports each directive its own
+rules did not use. The runner keeps a report only when every process made it; a
+per-rule report ("from `<rule>`") also stands where another process found the
+whole directive unused (`packages/oxlint-rules/src/unused-directives.mjs`). Plain
+`pnpm lint` has no type-aware process, so a directive naming only type-aware
+rules reads as unused there, as it did before the split.
+
+Measured on a frozen `git archive` copy, 4 shared cores; findings byte-identical
+(52 plain, 740 type-aware, unused directives included):
+
+| run                                           | wall          | user          | sys         | peak RSS      |
+| --------------------------------------------- | ------------- | ------------- | ----------- | ------------- |
+| plain, one process, full config (median of 3) | 34.2 s        | 49.7 s        | 20.6 s      | 3.4 GB        |
+| plain, native + plugin (median of 3)          | 36.0 s        | 54.1 s        | 6.3 s       | 1.1 GB        |
+| native alone / plugin alone                   | 17.1 / 34.0 s | 19.0 / 29.2 s | 5.9 / 2.3 s | 0.8 / 0.25 GB |
+| per-project `pnpm lint`, no Nx overhead       | 280 s         | 314 s         | 141 s       | 1.9 GB        |
+| `--types`, one process, full config           | 357 s         | 399 s         | 44 s        | 11.9 GB       |
+| `--types`, native + plugin + types            | 330 s         | 397 s         | 31 s        | 8.2 GB        |
+
+The plain run's wall is the plugin process's: its one JavaScript thread is the
+bottleneck, so the split buys memory and system time there, not wall.

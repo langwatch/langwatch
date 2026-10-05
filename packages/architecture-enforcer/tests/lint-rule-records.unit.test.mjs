@@ -19,6 +19,8 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OXLINT_CONFIGS = [
   join(packageRoot, "oxlint.architecture.jsonc"),
   join(root, ".oxlintrc.jsonc"),
+  join(root, ".oxlintrc.native.jsonc"),
+  join(root, ".oxlintrc.plugin.jsonc"),
 ];
 
 /** The decision-table shape ADR-135 fixes: this header row and no other table. */

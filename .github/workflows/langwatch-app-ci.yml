@@ -1100,9 +1100,9 @@ jobs:
       # What IS lost: inline annotations on the diff. Findings now arrive as
       # job output rather than as review comments.
       #
-      # `pnpm lint` is one cached Nx target per project plus the files outside
-      # every project. A PR lints what it affected (dependents included, since the
-      # cross-file rules can fail in a file the PR did not touch); a push runs all.
+      # `pnpm lint` runs oxlint's native rules and the langwatch plugin as two
+      # parallel processes. A PR lints what it affected (dependents included, since
+      # the cross-file rules can fail in a file the PR did not touch); a push runs all.
       # The Prisma client, the generated SDK types and the built SDK dist are
       # imports the type-aware rules resolve; without them they read as `any`.
       - uses: ./.github/actions/prepare-generated-files
@@ -1112,12 +1112,13 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null; then
-            node dev/nx/lint.mjs --base "$BASE"
+            pnpm lint --base "$BASE"
           else
-            node dev/nx/lint.mjs
+            pnpm lint
           fi
 
-      # Type-aware rules per project, only where a change reached (ADR-150).
+      # Type-aware rules over the affected projects in one process (shared parse;
+      # ADR-150), beside the native and plugin processes its directive check needs.
       # A global lint input changing, or a push, lints every project. Nx diffs
       # the lockfile per package, but oxlint is a root tool no project reaches,
       # so a lockfile change that moves it still lints everything.
@@ -1126,11 +1127,11 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null && ! git diff --name-only "$BASE" HEAD \
-            | grep -qE '^(\.oxlintrc\.jsonc|packages/oxlint-rules/|pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|dev/nx/)' \
+            | grep -qE '^(\.oxlintrc(\.[a-z]+)?\.jsonc|packages/oxlint-rules/|pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|dev/nx/)' \
             && ! git diff "$BASE" HEAD -- pnpm-lock.yaml | grep -qE '^[-+].*oxlint'; then
-            pnpm exec nx affected -t lint:types --base="$BASE" --head=HEAD
+            pnpm lint:types --base "$BASE"
           else
-            pnpm exec nx run-many -t lint:types
+            pnpm lint:types
           fi
 
       - name: Notify Slack on failure
