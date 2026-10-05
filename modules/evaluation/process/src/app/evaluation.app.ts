@@ -93,8 +93,10 @@ import { EvaluationSavedEvaluatorService } from "../services/evaluation-saved-ev
 import { EvaluationSettingsRecoverySwitchService } from "../services/evaluation-settings-recovery-switch.service.ts";
 import { EvaluationSpanDigestService } from "../services/evaluation-span-digest.service.ts";
 import { EvaluationService } from "../services/evaluation.service.ts";
+import { EvaluatorEffectiveSettingsService } from "../services/evaluator-effective-settings.service.ts";
 import { EvaluatorEnvironmentService } from "../services/evaluator-environment.service.ts";
 import { EvaluatorModelEnvService } from "../services/evaluator-model-env.service.ts";
+import { EvaluatorSettingsService } from "../services/evaluator-settings.service.ts";
 import { LangevalsClusteringService } from "../services/langevals-clustering.service.ts";
 import { LangevalsEvaluatorService } from "../services/langevals-evaluator.service.ts";
 import { LangevalsPiiDetectionService } from "../services/langevals-pii-detection.service.ts";
@@ -311,6 +313,7 @@ export class EvaluationModule implements EvaluationApiContract {
   readonly #commands: EvaluationCommandDispatcherService | undefined;
   readonly #clustering: LangevalsClusteringService;
   readonly #piiDetection: LangevalsPiiDetectionService;
+  readonly #effectiveSettings: EvaluatorEffectiveSettingsService;
   readonly #executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
   readonly #eventing: EvaluationProcessingStoresAdapter;
   readonly #lifecycle: EvaluationLifecycleService | undefined;
@@ -361,6 +364,10 @@ export class EvaluationModule implements EvaluationApiContract {
     });
     this.#commands = commands;
     this.#autoslug = EvaluationNameAutoslugService.create();
+    this.#effectiveSettings = EvaluatorEffectiveSettingsService.create({
+      settings: EvaluatorSettingsService.create(),
+      recovery: EvaluationSettingsRecoverySwitchService.create(dependencies.featureFlags),
+    });
     this.#filterMatching = EvaluationFilterMatchingService.create();
     this.#batchLog = EvaluationBatchLogService.create({
       experiments: members.experiments,
@@ -632,6 +639,8 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#slugs.findDatasetBySlug(input);
   findExperimentBySlug: EvaluationApiContract["findExperimentBySlug"] = (input) =>
     this.#experiments.findBySlug(input);
+  getEvaluatorEffectiveSettings: EvaluationApiContract["getEvaluatorEffectiveSettings"] = (input) =>
+    this.#effectiveSettings.get(input);
   findModelForFeature: EvaluationApiContract["findModelForFeature"] = (input) =>
     this.#models.findModelForFeature(input);
   recordEvaluationCost: EvaluationApiContract["recordEvaluationCost"] = (input) =>

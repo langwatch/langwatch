@@ -9,6 +9,7 @@ import type {
   AnalyticsFilterValue,
   BuiltAnalyticsQuery,
 } from "@langwatch/analytics-contract";
+import { customMetadataKeyCondition } from "@langwatch/trace-contract";
 
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../rules/trace-signal.rules.ts";
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
@@ -312,19 +313,18 @@ function appendSlimFilterClause({
     case "metadata.key": {
       const keys = collectStringValues(rawValue);
       if (keys.length === 0) break;
-      // Filter: trace has AT LEAST ONE of these keys in its (trimmed)
-      // Attributes map. mapContains() works on Map(String, String).
-      const exprs = keys.map((k, i) => {
-        const p = next(`metaKey${i}`);
-        params[p] = k;
-        return `mapContains(${ta}.Attributes, {${p}:String})`;
+      const condition = customMetadataKeyCondition({
+        values: keys,
+        paramId: next("metaKey"),
+        alias: ta,
       });
-      clauses.push(`(${exprs.join(" OR ")})`);
+      clauses.push(condition.sql);
+      Object.assign(params, condition.params);
       break;
     }
     case "metadata.value": {
       appendMetadataValueFilterClauses({
-        attributes: `${ta}.Attributes`,
+        alias: ta,
         rawValue,
         clauses,
         params,

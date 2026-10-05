@@ -1,6 +1,7 @@
 /**
  * The server half of `traces.instantEval.*`. Permissions match the REST family:
- * `analytics:manage` to spend, `analytics:view` to read a run back.
+ * `analytics:manage` to spend, `analytics:view` to read; the opt-in switch is the
+ * organization's consent, so it takes `organization:manage` via the project.
  * @see specs/traces-v2/instant-eval-search.feature
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
@@ -34,5 +35,17 @@ export const tracesInstantEvalTrpcTransport: TrpcRouterDeclaration<
   .withPermission("analytics:view")
   .handle(({ app, input }) =>
     app.getExplorerEvalRun({ projectId: input.projectId, runId: input.runId }),
+  )
+
+  .procedure("access")
+  .withPermission("analytics:view")
+  .handle(({ app, input, actor }) =>
+    app.getExplorerEvalAccess({ projectId: input.projectId, userId: actor.id }),
+  )
+
+  .procedure("enable")
+  .withPermission({ kind: "permission", permission: "organization:manage", via: "projectId" })
+  .handle(({ app, input, actor }) =>
+    app.enableExplorerEvals({ projectId: input.projectId, userId: actor.id }),
   )
   .build();

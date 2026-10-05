@@ -7,6 +7,8 @@ import { z } from "zod";
  * `DOMAIN_JOIN_SETTINGS` in `modules/identity/contract/src/join-matching.ts`.
  */
 const domainJoinSettingSchema = z.enum(["off", "request", "auto"]);
+/** The seat a joiner without an invitation lands on (ADR-171). */
+export const joinerRoleSchema = z.enum(["MEMBER", "DEVELOPER"]);
 
 /** One request this caller, or this organization's admins, are waiting on. */
 const waitingSinceSchema = z
@@ -77,7 +79,11 @@ export type JoinRequestPending = z.infer<typeof joinRequestPendingSchema>;
 
 /** How colleagues on a matching domain currently get into this organization. */
 export const joinRequestJoiningSchema = z
-  .object({ domainJoin: domainJoinSettingSchema, joinDomains: z.array(z.string()) })
+  .object({
+    domainJoin: domainJoinSettingSchema,
+    joinDomains: z.array(z.string()),
+    joinerRole: joinerRoleSchema,
+  })
   .strict();
 export type JoinRequestJoining = z.infer<typeof joinRequestJoiningSchema>;
 
@@ -88,6 +94,8 @@ export const joinRequestJoiningChangedSchema = z
     next: domainJoinSettingSchema,
     previousDomains: z.array(z.string()),
     nextDomains: z.array(z.string()),
+    previousJoinerRole: joinerRoleSchema,
+    nextJoinerRole: joinerRoleSchema,
   })
   .strict();
 export type JoinRequestJoiningChanged = z.infer<typeof joinRequestJoiningChangedSchema>;

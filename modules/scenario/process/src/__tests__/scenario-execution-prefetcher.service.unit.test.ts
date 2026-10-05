@@ -2768,3 +2768,62 @@ describe("prefetchWithFixture, when the target is a voice agent", () => {
     });
   });
 });
+
+describe("prefetchWithFixture, when choosing where the child posts a turn", () => {
+  const routeConfig = {
+    langwatchEndpoint: "http://app:5560",
+    nlpServiceUrl: "http://langwatch_nlp:5561",
+    legacyDefaultModel: DEFAULT_MODEL,
+    publicBaseUrl: "https://app.example.com",
+  };
+
+  async function routeFor({
+    perProjectEngines,
+    langwatchEndpoint = routeConfig.langwatchEndpoint,
+  }: {
+    perProjectEngines: boolean;
+    langwatchEndpoint?: string;
+  }) {
+    const deps = createMockDeps({
+      perProjectEngines,
+      promptFetcher: {
+        findByIdOrHandle: vi.fn().mockResolvedValue({
+          id: "prompt_123",
+          prompt: "You are helpful",
+          messages: [],
+          model: "openai/gpt-4",
+        }),
+      },
+    });
+    const result = await createTestScenarioExecutionPrefetcherService(deps, {
+      ...routeConfig,
+      langwatchEndpoint,
+    }).prefetch({ context: defaultContext, target: { type: "prompt", referenceId: "prompt_123" } });
+    if (!result.success) throw new Error(`expected a prepared run, got ${result.error}`);
+    return result.data.executeSyncRoute;
+  }
+
+  /** @scenario "A deployment with per-project engines relays" */
+  it("relays through the endpoint the platform hands out as itself", async () => {
+    expect(await routeFor({ perProjectEngines: true })).toEqual({
+      mode: "relay",
+      relayBaseUrl: "http://app:5560",
+    });
+  });
+
+  /** @scenario "A deployment with per-project engines relays" */
+  it("relays through the public origin when no endpoint is configured", async () => {
+    expect(await routeFor({ perProjectEngines: true, langwatchEndpoint: "" })).toEqual({
+      mode: "relay",
+      relayBaseUrl: "https://app.example.com",
+    });
+  });
+
+  /** @scenario "A deployment with one engine posts to it directly" */
+  it("posts straight to the engine the deployment configured", async () => {
+    expect(await routeFor({ perProjectEngines: false })).toEqual({
+      mode: "direct",
+      nlpServiceUrl: "http://langwatch_nlp:5561",
+    });
+  });
+});

@@ -184,3 +184,17 @@ describe("a deployment that names a fleet it does not describe", () => {
     expect(lambda.sent).toEqual([]);
   });
 });
+
+describe("when a scenario asks whether this deployment has per-project engines", () => {
+  it("answers yes once a fleet is described", async () => {
+    const app = await appWith({ fleetSecret: JSON.stringify(fleet) });
+
+    expect(app.hasPerProjectEngines()).toBe(true);
+  });
+
+  it("answers yes for a named but unusable fleet, so the turn relays and refuses by name", async () => {
+    const app = await appWith({ fleetSecret: "{" });
+
+    expect(app.hasPerProjectEngines()).toBe(true);
+  });
+});

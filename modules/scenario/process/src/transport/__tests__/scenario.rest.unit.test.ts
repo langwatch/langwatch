@@ -1,4 +1,4 @@
-import { bindRestHeader } from "@langwatch/api/rest";
+import { bindRestHeader, canonicalErrorResponse } from "@langwatch/api/rest";
 import { scenarioRestResponseWithPlatformUrlSchema } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
@@ -12,12 +12,13 @@ import {
 
 async function buildScenarioFamily(
   runtimeOptions?: Parameters<typeof createScenarioRestTestRuntime>[0],
+  onError: typeof scenarioRestTestErrors = scenarioRestTestErrors,
 ) {
   const { app } = await createScenarioRestTestApp();
   const { runtime, projectFacts } = createScenarioRestTestRuntime(runtimeOptions);
   const mounted = runtime.mount(createScenarioRest().router(), {
     app: () => app,
-    onError: scenarioRestTestErrors,
+    onError,
     facts: [projectFacts, bindRestHeader(scenarioRestSurface, "x-langwatch-surface")],
   });
 
@@ -174,6 +175,36 @@ describe("the scenarios REST declaration", () => {
         situation: "Original situation",
       });
     });
+  });
+
+  describe("when the body carries a field the endpoint does not have", () => {
+    it.each(["PUT", "PATCH"])(
+      "%s answers 422 naming the field and changes nothing",
+      async (method) => {
+        const family = await buildScenarioFamily(undefined, canonicalErrorResponse);
+        const createdResponse = await createScenario(family, {
+          name: "Strict Update",
+          situation: "Original situation",
+          labels: ["original"],
+        });
+        const created = scenarioRestResponseWithPlatformUrlSchema.parse(
+          await createdResponse.json(),
+        );
+
+        const response = await family.request(`/api/scenarios/${created.id}`, {
+          method,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ labels: ["relabelled"], status: "active" }),
+        });
+
+        expect(response.status).toBe(422);
+        const body = await response.text();
+        expect(JSON.parse(body)).toMatchObject({ code: "validation_error" });
+        expect(body).toContain("status");
+        const row = await family.app.getById({ id: created.id, projectId: PROJECT_ID });
+        expect(row.labels).toEqual(["original"]);
+      },
+    );
   });
 });
 

@@ -119,9 +119,7 @@ Ensure `app.http.baseHost` and `app.http.publicUrl` match the Ingress host.
 
 ### Istio, Service Mesh
 
-CronJob pods may hang after completion because the Istio sidecar keeps the pod alive.
-
-Fix: disable sidecar injection for CronJobs:
+Job pods may hang after completion because the Istio sidecar keeps the pod alive. The chart ships no CronJobs of its own; if you add jobs under `cronjobs.jobs`, disable sidecar injection for them:
 
 ```yaml
 cronjobs:
@@ -129,6 +127,8 @@ cronjobs:
     annotations:
       sidecar.istio.io/inject: "false"
 ```
+
+The chart-managed ClickHouse backup CronJobs (when `clickhouse.backup.enabled` is on) and the chart's own setup Jobs (the LangWatchQL render and the stored-objects upgrade hooks) take no pod annotations, so the setting above does not reach them. For those, enable native sidecars (Kubernetes 1.29 or later, Istio `ENABLE_NATIVE_SIDECARS=true`), which stop when the Job's container exits, or exclude the pods in your mesh's injection configuration.
 
 ## ClickHouse Issues
 
@@ -231,7 +231,7 @@ Verify the connection string:
 
 ```bash
 # For chart-managed PostgreSQL
-kubectl -n langwatch exec deploy/langwatch-postgresql -- \
+kubectl -n langwatch exec statefulset/langwatch-postgresql -- \
   pg_isready -U postgres
 
 # For external PostgreSQL, test from the app pod
@@ -293,13 +293,13 @@ See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm#production-depl
 
 ### Can I run without LangEvals or NLP?
 
-Yes. These services are optional. If you don't need built-in evaluators or NLP features, you can scale them to zero:
+Yes. These services are optional. If you don't need built-in evaluators or NLP features, you can leave them out. `enabled: false` removes the Deployment, Service and PodDisruptionBudget:
 
 ```yaml
 langwatch_nlp:
-  replicaCount: 0
+  enabled: false
 langevals:
-  replicaCount: 0
+  enabled: false
 ```
 
 ### How do I disable telemetry?

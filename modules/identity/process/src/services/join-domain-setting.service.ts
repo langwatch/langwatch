@@ -9,6 +9,7 @@ import {
   JoinPolicyNotLicensedError,
   normalizeDomain,
   type DomainJoinSetting,
+  type JoinerRole,
   type JoinSettingChange,
 } from "@langwatch/identity-contract";
 
@@ -37,14 +38,17 @@ export class JoinDomainSettingService {
     organizationId,
     domainJoin,
     domains,
+    joinerRole,
     actorUserId,
   }: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     domains: readonly string[];
+    joinerRole?: JoinerRole;
     actorUserId: string;
   }): Promise<JoinSettingChange> {
     const current = await this.deps.settings.read({ organizationId });
+    const nextJoinerRole = joinerRole ?? current.joinerRole;
     const normalized = domains.map(normalizeDomain).filter(Boolean);
 
     if (
@@ -80,13 +84,20 @@ export class JoinDomainSettingService {
     // Turning automatic joining off clears the domains it named: a setting
     // flipped back on later must name them again, deliberately.
     const nextDomains = domainJoin === "auto" ? normalized : [];
-    await this.deps.settings.write({ organizationId, domainJoin, joinDomains: nextDomains });
+    await this.deps.settings.write({
+      organizationId,
+      domainJoin,
+      joinDomains: nextDomains,
+      joinerRole: nextJoinerRole,
+    });
 
     const change: JoinSettingChange = {
       previous: current.domainJoin,
       next: domainJoin,
       previousDomains: current.joinDomains,
       nextDomains,
+      previousJoinerRole: current.joinerRole,
+      nextJoinerRole,
     };
     // Awaited: a setting that decides who may walk in unapproved is the change
     // a customer comes to the audit page for, so the row lands before "saved".

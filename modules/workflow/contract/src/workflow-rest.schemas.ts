@@ -153,3 +153,11 @@ export const workflowStudioRestEventSchema = z.object({
   projectId: z.string(),
   event: studioClientEventSchema,
 });
+
+/**
+ * The engine's own event a scenario child relays to `POST /api/scenario/execute-sync`. Forwarded
+ * unread: keys pass through untouched, and nothing in it names the project the turn runs on.
+ */
+export const executeSyncRelayEventSchema = z.looseObject({});
+
+export type ExecuteSyncRelayEvent = z.infer<typeof executeSyncRelayEventSchema>;

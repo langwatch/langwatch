@@ -197,7 +197,9 @@ export class GraphTriggerEvaluationPlanService {
       endDate: endDate.epochMilliseconds,
       filters: (filters ?? {}) as TimeseriesInputType["filters"],
       series: [{ ...series, name: void 0 }],
-      groupBy: graph.groupBy,
+      // Not the graph's `groupBy`: the threshold is one number, and only the
+      // database can compute it across every group (summing per-group values
+      // adds averages and counts an array grouping once per group).
       timeScale: graph.timeScale ?? 60,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     };

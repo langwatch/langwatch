@@ -1,14 +1,13 @@
 import {
+  findEvaluationFilterReferences,
+  findUnkeyedFilterFields,
+} from "@langwatch/analytics-filters";
+import {
   TriggerFilterKeyRequiredError,
   TriggerFilterMonitorRequiredError,
 } from "@langwatch/automation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-
-import {
-  findEvaluationFilterReferences,
-  findUnkeyedFilterFields,
-} from "../rules/trigger-filter-shape.rules.ts";
 
 /**
  * The write-time check on an automation's structured conditions: refuse the

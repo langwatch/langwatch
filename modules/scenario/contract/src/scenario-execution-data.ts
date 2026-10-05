@@ -330,6 +330,16 @@ export const ExecutionContextSchema = z.object({
 });
 export type ExecutionContext = z.infer<typeof ExecutionContextSchema>;
 
+/**
+ * Where a child posts a code or workflow turn: straight to the one engine (self-hosted), or to
+ * the control plane's relay with the project key (per-project engines). The parent chooses.
+ */
+export const ExecuteSyncRouteSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("direct"), nlpServiceUrl: z.string() }),
+  z.object({ mode: z.literal("relay"), relayBaseUrl: z.string() }),
+]);
+export type ExecuteSyncRoute = z.infer<typeof ExecuteSyncRouteSchema>;
+
 /** Model configuration - LLM settings */
 export const ModelConfigSchema = z.object({
   defaultModel: z.string(),
@@ -427,6 +437,8 @@ export const ChildProcessJobDataSchema = z
      *  fallback as the simulator, from the scenarios.judge default. */
     judgeModelParams: LiteLLMParamsSchema.optional(),
     nlpServiceUrl: z.string(),
+    /** Absent on a job queued before the route existed: the child posts to `nlpServiceUrl`. */
+    executeSyncRoute: ExecuteSyncRouteSchema.optional(),
     target: TargetConfigSchema,
     /**
      * Total time (ms) the judge waits at verdict for an http target's remote traces to

@@ -65,6 +65,20 @@ describe("Feature: Upgrade modal when a call is refused by the licence", () => {
     expect(isHandledByGlobalHandler(error)).toBe(true);
   });
 
+  it("leaves a Developer seat denial to the generic error path, with no upgrade modal", () => {
+    const error = failedCall({
+      data: {
+        code: "UNAUTHORIZED",
+        error: { code: "developer_seat_restricted", meta: { resource: "project" } },
+      },
+    });
+
+    expect(reportLicenseFailure(error)).toBe(false);
+
+    expect(useUpgradeModalStore.getState().variant).toBeNull();
+    expect(isHandledByGlobalHandler(error)).toBe(false);
+  });
+
   /** @scenario A refusal the licence does not explain is left to the screen */
   it("A refusal the licence does not explain is left to the screen", () => {
     const error = failedCall({

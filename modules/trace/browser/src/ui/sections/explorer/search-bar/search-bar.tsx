@@ -1,4 +1,3 @@
-import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { Kbd } from "@langwatch/design-system/kbd";
 import {
   Box,
@@ -37,6 +36,7 @@ import { explainAnyError } from "../../errors/index.ts";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
 import { useModelProvidersSettings } from "../../use-model-providers-settings.ts";
 import { AskAiButton } from "../ai/ask-ai-button.tsx";
+import { useInstantEvalAccess } from "../hooks/use-instant-eval-access.ts";
 import { useInstantEvalRuns } from "../hooks/use-instant-eval-runs.ts";
 import { useTraceFacets } from "../hooks/use-trace-facets.ts";
 import { InstantEvalConfirmDialog } from "../instant-eval-confirm-dialog.tsx";
@@ -257,16 +257,16 @@ export const SearchBar: React.FC = () => {
   // and a judgement goes to the cost rule (specs/traces-v2/instant-eval-search.feature). While the
   // flag read is in flight the submit counts as available: a server refusal then says why, so a
   // slow flag read never hides a feature the project actually has.
-  const { enabled: instantEvalsReleased, isLoading: instantEvalsFlagLoading } = useFeatureFlag(
-    "release_instant_evals",
-    {
-      projectId: project?.id,
-      organizationId: organization?.id,
-      enabled: !!project?.id && !!organization?.id,
-    },
-  );
-  const isInstantEvalAvailable = instantEvalsReleased || instantEvalsFlagLoading;
-  const instantEval = useInstantEvalRoute({ isInstantEvalAvailable });
+  // The organization's own switch is read beside the flag; it names a refused reader's offer.
+  const instantEvalAccess = useInstantEvalAccess({
+    projectId: project?.id,
+    organizationId: organization?.id,
+  });
+  const isInstantEvalAvailable = instantEvalAccess.isAvailable;
+  const instantEval = useInstantEvalRoute({
+    isInstantEvalAvailable,
+    optInOffer: instantEvalAccess.optInOffer,
+  });
   const { submitSearch, isRouting } = useSubmitSearch({
     isLangyAvailable: langyRoutesAsk,
     isInstantEvalAvailable,
@@ -339,7 +339,12 @@ export const SearchBar: React.FC = () => {
       <SyntaxHelpDrawerHost />
       {/* Anchored to a point at the bar's bottom-left: an anchor around the editor would remount
           the popover on every keystroke. */}
-      <InstantEvalRefusalPopover refusal={instantEval.refusal} onClose={instantEval.dismissRefusal}>
+      <InstantEvalRefusalPopover
+        refusal={instantEval.refusal}
+        onClose={instantEval.dismissRefusal}
+        onEnable={instantEval.enableInstantEvals}
+        isEnabling={instantEval.isEnabling}
+      >
         <Box position="absolute" left={3} bottom={0} width="1px" height="1px" aria-hidden="true" />
       </InstantEvalRefusalPopover>
       <InstantEvalConfirmDialog

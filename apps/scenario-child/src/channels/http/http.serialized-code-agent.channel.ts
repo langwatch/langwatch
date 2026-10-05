@@ -6,7 +6,6 @@
 import { randomBytes } from "crypto";
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
-import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import type { CodeAgentData, RunParameterValues } from "@langwatch/scenario-contract";
@@ -14,7 +13,6 @@ import { resolveFieldMappings, extractSourceField } from "@langwatch/scenario-co
 import { LATEST_SPEC_VERSION } from "@langwatch/workflow-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
 
 import type { NlpEngineResult } from "../../rules/execution-error.rules.ts";
 import {
@@ -24,12 +22,10 @@ import {
   formatMalformedBodyError,
   scrubKnownSecrets,
 } from "../../rules/execution-error.rules.ts";
-import {
-  type FetchInitWithDispatcher,
-  NLP_FETCH_HEADROOM_MS,
-  type NlpFetchTimeouts,
-} from "../nlp-fetch.channel.ts";
+import { type ExecuteSyncResponse, type ExecuteSyncTransport } from "../execute-sync.channel.ts";
+import { NLP_FETCH_HEADROOM_MS, type NlpFetchTimeouts } from "../nlp-fetch.channel.ts";
 import { SerializedAgentChannel } from "../serialized-agent.channel.ts";
+import { directExecuteSyncTransport } from "./http.execute-sync.channel.ts";
 import { HttpNlpFetchChannel } from "./http.nlp-fetch.channel.ts";
 
 /**
@@ -94,6 +90,8 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
     timeouts?: NlpFetchTimeouts;
     /** The engine hop's shared credential, as the parent stated it for this child. */
     nlpInternalSecret?: string | undefined;
+    /** How the turn reaches the project's engine; absent posts to `nlpServiceUrl` directly. */
+    transport?: ExecuteSyncTransport;
   }): HttpSerializedCodeAgentChannel {
     return new HttpSerializedCodeAgentChannel(options);
   }
@@ -122,6 +120,8 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
   private readonly timeouts: NlpFetchTimeouts;
   /** The engine hop's shared credential, as the parent stated it for this child. */
   private readonly nlpInternalSecret: string | undefined;
+  /** How the turn reaches the project's engine. */
+  private readonly transport: ExecuteSyncTransport;
 
   constructor({
     config,
@@ -130,6 +130,7 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
     parameters,
     timeouts,
     nlpInternalSecret,
+    transport,
   }: {
     config: CodeAgentData;
     nlpServiceUrl: string;
@@ -137,6 +138,7 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
     parameters?: RunParameterValues;
     timeouts?: NlpFetchTimeouts;
     nlpInternalSecret?: string | undefined;
+    transport?: ExecuteSyncTransport;
   }) {
     super();
     this.config = config;
@@ -145,6 +147,7 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
     this.parameters = parameters ?? {};
     this.timeouts = timeouts ?? {};
     this.nlpInternalSecret = nlpInternalSecret;
+    this.transport = transport ?? directExecuteSyncTransport({ nlpServiceUrl, nlpInternalSecret });
     this.name = "SerializedCodeAgentAdapter";
   }
 
@@ -389,7 +392,7 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
       },
     };
 
-    const endpoint = `${this.nlpServiceUrl}/go/studio/execute_sync`;
+    const endpoint = this.transport.endpoint;
     const fetchTimeoutMs = this.fetchTimeoutMs();
 
     return tracer.withActiveSpan(
@@ -414,25 +417,13 @@ export class HttpSerializedCodeAgentChannel extends SerializedAgentChannel {
         }, fetchTimeoutMs);
 
         try {
-          let response: UndiciResponse;
+          let response: ExecuteSyncResponse;
           try {
-            const fetchInit: FetchInitWithDispatcher = {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                ...nlpInternalSecretHeaders({ secret: this.nlpInternalSecret }),
-              },
-              body: JSON.stringify(event),
+            response = await this.transport.post({
+              event,
               signal: controller.signal,
-              dispatcher: HttpNlpFetchChannel.create().dispatcher({
-                timeoutMs: fetchTimeoutMs,
-              }),
-            };
-            // undici's own fetch, not the global one: Node's global fetch is
-            // bound to the undici bundled with Node, which rejects a
-            // dispatcher built by this package with "invalid onRequestStart
-            // method" (see mailer/providers/resend.ts for the same fix).
-            response = await undiciFetch(endpoint, fetchInit);
+              timeoutMs: fetchTimeoutMs,
+            });
           } catch (fetchError) {
             // An abort is classified once, by the outer handler, so a timeout
             // fired mid-body-read lands in the same place as one fired

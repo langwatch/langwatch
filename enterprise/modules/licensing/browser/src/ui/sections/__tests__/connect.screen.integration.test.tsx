@@ -75,6 +75,7 @@ function connected(overrides: Partial<Extract<ConnectStatus, { deployment: "on" 
     entitledServices: ["instant_evals"],
     usage: null,
     refusal: null,
+    isUsageUnavailable: false,
     sync: { lastSyncAt: null, lastError: null },
     ...overrides,
   } satisfies ConnectStatus;
@@ -204,6 +205,19 @@ describe("ConnectScreen", () => {
       expect(screen.getByText("120.00 USD")).toBeDefined();
       expect(screen.getByText("500.00 USD")).toBeDefined();
       expect(screen.getByText("380.00 USD")).toBeDefined();
+    });
+  });
+
+  describe("given the usage read could not reach LangWatch", () => {
+    /** @scenario "The page shows usage as unavailable when LangWatch cannot be reached" */
+    it("says usage is unavailable, keeps the services, and raises no error", () => {
+      renderScreen({
+        status: connected({ entitledServices: null, usage: null, isUsageUnavailable: true }),
+      });
+      expect(screen.getByTestId("connect-usage-unavailable")).toBeDefined();
+      expect(screen.getByText(/Usage unavailable/)).toBeDefined();
+      expect(screen.getByTestId("connect-services")).toBeDefined();
+      expect(screen.queryByRole("alert")).toBeNull();
     });
   });
 

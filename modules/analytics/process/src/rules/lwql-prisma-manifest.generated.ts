@@ -354,6 +354,7 @@ export interface LwqlPrismaRows {
     readonly ssoDomain: "String?";
     readonly ssoProvider: "String?";
     readonly domainJoin: "String";
+    readonly joinerRole: "OrganizationUserRole";
     readonly joinDomains: "String[]";
     readonly presenceEnabled: "Boolean";
     readonly traceSharingEnabled: "Boolean";
@@ -368,6 +369,8 @@ export interface LwqlPrismaRows {
     readonly licenseLastValidatedAt: "DateTime?";
     readonly selfHostedCustomer: "Boolean";
     readonly connectServicesDisabled: "String[]";
+    readonly instantEvalsEnabledAt: "DateTime?";
+    readonly instantEvalsEnabledByUserId: "String?";
     readonly connectLastSyncAt: "DateTime?";
     readonly connectLastSyncError: "String?";
   };

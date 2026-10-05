@@ -1016,6 +1016,10 @@ enum OrganizationUserRole {
   ADMIN
   MEMBER
   EXTERNAL
+  /// A Developer seat (ADR-171): owns a personal project and holds access
+  /// nowhere else. Never a member of a shared team, never given the
+  /// organisation-scoped binding a MEMBER holds, counted but never capped.
+  DEVELOPER
 }
 
 model TeamUser {
@@ -1181,6 +1185,12 @@ model Organization {
   /// domain in `joinDomains` while doing it, and the licence gate holds that
   /// value while letting `request` through.
   domainJoin                 String               @default("request")
+  /// The organisation role handed to a person admitted without an invitation:
+  /// a self-service domain join (`domainJoin`) or an SSO-admitted login.
+  /// `MEMBER` (default, a Full seat) or `DEVELOPER` (ADR-171). Set on the
+  /// organisation settings page only; the join flow never asks, and an
+  /// invitation always names its own role.
+  joinerRole                 OrganizationUserRole @default(MEMBER)
   /// The domains an administrator NAMED when turning automatic joining on.
   /// Empty means automatic joining admits nobody whatever `domainJoin` says -
   /// which is what keeps a setting left on from admitting a domain nobody
@@ -1234,6 +1244,15 @@ model Organization {
   /// (ADR-139, section 2). A license that names no service reaches nothing,
   /// whatever this column holds.
   connectServicesDisabled String[]                       @default([])
+  /// When a member of this organization switched Instant Evals on from the
+  /// search bar, which is the organization's consent to have judged text sent
+  /// to the judge's provider. Null until then: a self-serve organization is
+  /// never opted in on its behalf, and an enterprise one is switched on by an
+  /// operator through the release flag after asking, never here.
+  instantEvalsEnabledAt   DateTime?
+  /// The member who switched them on, so the audit trail names a person and
+  /// not just a moment.
+  instantEvalsEnabledByUserId String?
   /// When the last license sync succeeded.
   connectLastSyncAt       DateTime?
   /// The code of the failure the last sync ended on, cleared on the next

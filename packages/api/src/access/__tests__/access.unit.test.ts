@@ -25,6 +25,7 @@ const reviewer: Caller = { actor: { type: "user", id: "reviewer-1" } };
 const denials: AccessDenial = {
   membershipDisabled: () => new Error("membership disabled"),
   liteMemberRestricted: (resource) => new Error(`lite member: ${resource}`),
+  developerSeatRestricted: (resource) => new Error(`developer seat: ${resource}`),
 };
 
 function authorize(
@@ -85,6 +86,23 @@ describe("deciding access for one call", () => {
           denials,
         }),
       ).rejects.toBeInstanceOf(AuthenticationRequiredError);
+    });
+
+    /** @scenario A Developer never sees a shared project */
+    it("answers a Developer seat's refusal with the seat's own denial", async () => {
+      const refusing = authorize({
+        getDecision: async () => ({ permitted: false, organizationRole: "DEVELOPER" }),
+      });
+
+      await expect(
+        decide({
+          declaration: { kind: "permission", permission: "annotations:view" },
+          caller: reviewer,
+          input: { projectId: "project-1" },
+          authorize: refusing,
+          denials,
+        }),
+      ).rejects.toThrow("developer seat: annotations");
     });
 
     it("answers a refusal as a permission denial naming the scope", async () => {

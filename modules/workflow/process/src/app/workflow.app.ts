@@ -41,6 +41,7 @@ import {
   type PublishWorkflowCommand,
   type RunWorkflowCommand,
   type StudioClientEvent,
+  type ExecuteSyncRelayEvent,
   type StudioServerEvent,
   type StudioWorkflow,
   type UpdateWorkflowCommand,
@@ -112,6 +113,7 @@ import {
   type WorkflowRepositories,
 } from "../repositories/workflow-repositories.registry.ts";
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
+import { relayTurnCeilingMs } from "../rules/execute-sync-relay.rules.ts";
 import { buildStudioLambdaConfig } from "../rules/nlp-lambda-config.rules.ts";
 import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
 import { dispatchKeyFloorMs } from "../rules/workflow-run-key.rules.ts";
@@ -128,6 +130,7 @@ import { WorkflowCodeCompletionService } from "../services/workflow-code-complet
 import { WorkflowCommitMessageService } from "../services/workflow-commit-message.service.ts";
 import { WorkflowCopyLineageService } from "../services/workflow-copy-lineage.service.ts";
 import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
+import { WorkflowExecuteSyncRelayService } from "../services/workflow-execute-sync-relay.service.ts";
 import { WorkflowHttpSecretsService } from "../services/workflow-http-secrets.service.ts";
 import { WorkflowLinkedRowsService } from "../services/workflow-linked-rows.service.ts";
 import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
@@ -297,6 +300,8 @@ export interface NlpLambdaArnCache {
 export interface WorkflowInfrastructure {
   /** Where a studio component executes; absent means nothing executes. */
   studioDispatch?: WorkflowStudioDispatchService;
+  /** Relays a scenario child's turn to its project's own engine. */
+  executeSyncRelay: WorkflowExecuteSyncRelayService;
   /** The ONE workflow graph service on this process. */
   workflows: WorkflowService;
   /** The evaluators a workflow is published as. */
@@ -339,6 +344,8 @@ export interface WorkflowInfrastructure {
    * and the sweep then reads nothing.
    */
   nlpLambdaFleet?: NlpLambdaFleet;
+  /** Whether a scenario turn relays to the project's own engine; absent means it does not. */
+  perProjectEngines?: boolean;
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
 }
@@ -395,6 +402,8 @@ type WorkflowEngine = Readonly<{
   stream: WorkflowStudioStream;
   runtime: WorkflowNlpRuntime;
   fleet?: NlpLambdaFleet;
+  /** A fleet is named, usable or not: main's `LANGWATCH_NLP_LAMBDA_CONFIG` presence test. */
+  perProjectEngines: boolean;
 }>;
 
 /**
@@ -414,6 +423,7 @@ async function composeEngine(setup: WorkflowSetup): Promise<WorkflowEngine> {
     return {
       stream: UnconfiguredWorkflowStudioStreamAdapter.create({ reason }),
       runtime: UnconfiguredWorkflowNlpRuntimeAdapter.create({ reason }),
+      perProjectEngines: true,
     };
   }
 
@@ -424,6 +434,7 @@ async function composeEngine(setup: WorkflowSetup): Promise<WorkflowEngine> {
     return {
       stream: UnconfiguredWorkflowStudioStreamAdapter.create(),
       runtime: UnconfiguredWorkflowNlpRuntimeAdapter.create(),
+      perProjectEngines: false,
     };
   }
 
@@ -432,6 +443,7 @@ async function composeEngine(setup: WorkflowSetup): Promise<WorkflowEngine> {
   return {
     stream: HttpWorkflowStudioStreamAdapter.create({ serviceUrl, internalSecret }),
     runtime: HttpWorkflowNlpRuntimeAdapter.create({ serviceUrl, internalSecret }),
+    perProjectEngines: false,
   };
 }
 
@@ -465,9 +477,12 @@ function lambdaEngine({
     credentials,
     maxAttempts: NLP_LAMBDA_CLIENT_MAX_ATTEMPTS,
   });
+  // One SDK attempt: its retry re-invokes a function that may already run customer code.
+  const invokeLambda = new LambdaClient({ region: config.region, credentials, maxAttempts: 1 });
   const logs = new CloudWatchLogsClient({ region: config.region, credentials });
   setup.resources.own("Workflow NLP Lambda clients", () => {
     lambda.destroy();
+    invokeLambda.destroy();
     logs.destroy();
   });
 
@@ -495,12 +510,13 @@ function lambdaEngine({
     }),
     runtime: HttpWorkflowNlpRuntimeAdapter.onProjectFunctions({
       functions,
-      lambda: AwsNlpLambdaInvokeChannel.create({ lambda }),
+      lambda: AwsNlpLambdaInvokeChannel.create({ lambda: invokeLambda }),
       staging,
       stagingConfig: { stagingThresholdBytes, stagingTtlSeconds },
       internalSecret,
     }),
     fleet: AwsNlpLambdaFleetChannel.create({ lambda, logs, logger }),
+    perProjectEngines: true,
   };
 }
 
@@ -679,6 +695,7 @@ export class WorkflowModule implements WorkflowApi {
     return new WorkflowModule({
       ...setup.members,
       ...(engine.fleet ? { nlpLambdaFleet: engine.fleet } : {}),
+      perProjectEngines: engine.perProjectEngines,
       permissions: WorkflowPermissionService.create({ authz: setup.dependencies.authz }),
       commitMessages: WorkflowCommitMessageService.create({ modelProviders }),
       codeCompletions: WorkflowCodeCompletionService.create({ modelProviders }),
@@ -710,6 +727,10 @@ export class WorkflowModule implements WorkflowApi {
       }),
       publications: publicationsOf(setup.repositories.lineage),
       signals: WorkflowSignalsService.create(),
+      executeSyncRelay: WorkflowExecuteSyncRelayService.create({
+        runtime: nlpRuntime,
+        turnCeilingMs: relayTurnCeilingMs({ configured: setup.config.relayTurnCeilingMs }),
+      }),
       lifecycle: buildWorkflowLifecyclePipeline(),
     });
   }
@@ -1068,6 +1089,18 @@ export class WorkflowModule implements WorkflowApi {
     origin?: WorkflowRunOrigin;
   }): Promise<void> {
     return this.#members.studioRuns.postEvent(input);
+  }
+
+  relayExecuteSync(input: {
+    projectId: string;
+    event: ExecuteSyncRelayEvent;
+    signal: AbortSignal;
+  }): Promise<Response> {
+    return this.#members.executeSyncRelay.relay(input);
+  }
+
+  hasPerProjectEngines(): boolean {
+    return this.#members.perProjectEngines === true;
   }
 
   reportStudioFailure(error: unknown, context: { projectId: string }): void {
@@ -1501,10 +1534,15 @@ export interface WorkflowExecution {
 
 export type WorkflowNlpDispatchInput = {
   projectId: string;
-  body: StudioClientEvent;
+  /** A studio event, or a scenario child's relayed event forwarded unread. */
+  body: StudioClientEvent | ExecuteSyncRelayEvent;
   origin: WorkflowRunOrigin;
   causalityDepth?: number;
   parentTrace?: { traceId: string; parentSpanId: string };
+  /** A deadline for the whole call; absent imposes none. */
+  timeoutMs?: number;
+  /** The caller's cancellation, which stops the engine call. */
+  signal?: AbortSignal;
 };
 
 export type WorkflowNlpDispatchResponse = {
@@ -1512,6 +1550,8 @@ export type WorkflowNlpDispatchResponse = {
   status: number;
   statusText: string;
   json(): Promise<unknown>;
+  /** The engine's body unread; read once, instead of `json`. */
+  text(): Promise<string>;
 };
 
 export interface WorkflowNlpRuntime {

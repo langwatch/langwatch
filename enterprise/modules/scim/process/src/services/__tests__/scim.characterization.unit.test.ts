@@ -327,6 +327,99 @@ describe("SCIM characterization: provisioning invariants", () => {
     expect(writer.attachBindings).toHaveBeenCalledOnce();
   });
 
+  /** @scenario Directory sync leaves a Developer alone */
+  it("asserts no organization-wide grant for a Developer seat and leaves its role alone", async () => {
+    const writer = new GrantsFake();
+    const repo = repository({
+      addMembership: vi.fn(async () => undefined),
+      findMembership: vi.fn(async () => ({
+        userId: "user_1",
+        organizationId: "org_1",
+        role: "DEVELOPER",
+        user: {
+          id: "user_1",
+          email: "developer@example.com",
+          name: "Developer",
+          deactivatedAt: null,
+          createdAt: now,
+          updatedAt: now,
+          emailVerified: true,
+          image: null,
+          pendingSsoSetup: false,
+          lastLoginAt: null,
+        },
+      })),
+      // A directory that deleted the person once and now pushes them again: the re-admission path.
+      findUserResource: vi.fn(async () => ({
+        userId: "user_1",
+        organizationId: "org_1",
+        userName: "developer@example.com",
+        name: null,
+        active: false,
+        deletedAt: fromDate(new Date(0)),
+        createdAt: fromDate(new Date(0)),
+        updatedAt: fromDate(new Date(0)),
+      })),
+    });
+    const users = {
+      findByEmail: vi.fn(async () => ({
+        id: "user_1",
+        email: "member@example.com",
+        name: "Member",
+        deactivatedAt: null,
+        createdAt: now,
+        updatedAt: now,
+        emailVerified: true,
+        image: null,
+        pendingSsoSetup: false,
+        lastLoginAt: null,
+      })),
+      findById: vi.fn(async () => ({
+        id: "user_1",
+        email: "member@example.com",
+        name: "Member",
+        deactivatedAt: null,
+        createdAt: now,
+        updatedAt: now,
+        emailVerified: true,
+        image: null,
+        pendingSsoSetup: false,
+        lastLoginAt: null,
+      })),
+      create: vi.fn(),
+    } satisfies ScimUserProvisioning;
+    const scim = ScimService.create({
+      prisma: repo,
+      users,
+      writer,
+      governance: {
+        departmentResolveByNameOrCreate: vi.fn(async () => ({
+          id: "department_1",
+          organizationId: "org_1",
+          name: "Engineering",
+          // A Department carries its timestamps; the stub used to omit them and a
+          // cast onto the whole service hid it.
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
+        })),
+        departmentAssignUser: vi.fn(async () => undefined),
+      },
+      organization: new OrganizationAdministrationFake(),
+      entitlements: new FixedEntitlementService(true),
+      lifecycle: new QuietScimSyncLifecycle(),
+      provenOffboarding: false,
+      tokenPepper: "scim-test-pepper",
+    });
+    await scim.createUser({
+      organizationId: "org_1",
+      request: {
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        userName: "member@example.com",
+      },
+    });
+    expect(writer.attachBindings).not.toHaveBeenCalled();
+  });
+
   describe("given a directory push carries a connection", () => {
     describe("when a user is pushed", () => {
       /** @scenario "The fact records which connection pushed it, and one directory actor" */

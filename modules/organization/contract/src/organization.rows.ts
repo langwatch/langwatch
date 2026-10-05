@@ -22,6 +22,8 @@ export const OrganizationUserRole = {
   ADMIN: "ADMIN",
   MEMBER: "MEMBER",
   EXTERNAL: "EXTERNAL",
+  /** A personal project and nothing shared (ADR-171). */
+  DEVELOPER: "DEVELOPER",
 } as const;
 export type OrganizationUserRole = (typeof OrganizationUserRole)[keyof typeof OrganizationUserRole];
 

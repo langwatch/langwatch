@@ -3,7 +3,10 @@
  * reads back. It sends the search bar's vocabulary and the shorthand writes
  * the statement, so this is the run a CLI caller starts with `--target`.
  */
-import type { instantEvalEstimateSchema } from "@langwatch/instant-eval-contract";
+import type {
+  instantEvalEstimateSchema,
+  instantEvalOptInAccessSchema,
+} from "@langwatch/instant-eval-contract";
 import {
   INSTANT_EVAL_TARGETS,
   instantEvalRunSchema,
@@ -38,6 +41,9 @@ export const explorerInstantEvalRunSchema = z.object({
 export type ExplorerInstantEvalRunInput = z.infer<typeof explorerInstantEvalRunSchema>;
 
 /** One run of this project, named. */
+/** The project the opt-in popover was opened in; its organization is resolved, never taken. */
+export const explorerInstantEvalProjectSchema = z.object({ projectId: z.string() });
+
 export const explorerInstantEvalRunIdSchema = z.object({
   projectId: z.string(),
   runId: z.string().min(1).max(200),
@@ -91,6 +97,8 @@ export type ExplorerInstantEvalRuns = z.infer<typeof explorerInstantEvalRunsSche
 
 /** What an estimate tells the Explorer before a run starts. */
 export type ExplorerInstantEvalEstimate = z.infer<typeof instantEvalEstimateSchema>;
+/** What `traces.instantEval.access` answers; the browser reads the offer from it. */
+export type ExplorerInstantEvalOptInAccess = z.infer<typeof instantEvalOptInAccessSchema>;
 
 /**
  * Whether a run the Explorer is watching is still judging. Re-exported here so

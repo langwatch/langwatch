@@ -1729,12 +1729,12 @@
   },
   "redirects": [
     {
-      "source": "/features/instant-evals/shorthand",
-      "destination": "/features/instant-evals/targets"
+      "source": "/ci/cache/busted/1791197095",
+      "destination": "/introduction"
     },
     {
-      "source": "/ci/cache/busted/1789807595",
-      "destination": "/introduction"
+      "source": "/features/instant-evals/shorthand",
+      "destination": "/features/instant-evals/targets"
     },
     {
       "source": "/integration/tools/integrations/claude-code",

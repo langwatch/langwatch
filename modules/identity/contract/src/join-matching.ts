@@ -15,6 +15,21 @@ export type DomainJoinSetting = (typeof DOMAIN_JOIN_SETTINGS)[number];
 export const DEFAULT_DOMAIN_JOIN_SETTING: DomainJoinSetting = "request";
 
 /**
+ * The seat a person admitted without an invitation receives (ADR-171): a
+ * domain join or an SSO-admitted login. Invitations name their own role.
+ */
+export const JOINER_ROLES = ["MEMBER", "DEVELOPER"] as const;
+export type JoinerRole = (typeof JOINER_ROLES)[number];
+export const DEFAULT_JOINER_ROLE: JoinerRole = "MEMBER";
+
+/** The stored joiner seat narrowed to the two the setting allows; anything else is the default. */
+export function readJoinerRole(stored: string | null | undefined): JoinerRole {
+  return (JOINER_ROLES as readonly string[]).includes(stored ?? "")
+    ? (stored as JoinerRole)
+    : DEFAULT_JOINER_ROLE;
+}
+
+/**
  * Asking to join needs ONE member holding a verified address on the domain:
  * the ask reveals nothing on its own and an admin gates the outcome.
  */

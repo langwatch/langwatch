@@ -72,6 +72,10 @@ vi.mock("../../hooks/use-facet-search.ts", () => ({
 // The cost rule's estimate and start are tRPC mutations; these smoke tests
 // mount no provider, and the rule itself is covered by
 // use-instant-eval-route.integration.test.tsx.
+vi.mock("../../hooks/use-instant-eval-access.ts", () => ({
+  useInstantEvalAccess: () => ({ isAvailable: true, optInOffer: undefined }),
+}));
+
 vi.mock("../use-instant-eval-route.ts", () => ({
   useInstantEvalRoute: () => ({
     onInstantEvalRoute: vi.fn(),
@@ -81,6 +85,8 @@ vi.mock("../use-instant-eval-route.ts", () => ({
     searchWordsInstead: vi.fn(),
     refusal: null,
     dismissRefusal: vi.fn(),
+    enableInstantEvals: vi.fn(),
+    isEnabling: false,
     isEstimating: false,
     isStarting: false,
   }),

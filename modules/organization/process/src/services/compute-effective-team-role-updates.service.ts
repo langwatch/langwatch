@@ -61,6 +61,10 @@ export class EffectiveTeamRoleUpdatesService {
         origin: "seat-correction",
       }));
 
+    // A Developer holds no shared team, so there is no role to correct TO: the
+    // repository deletes the rows, and refuses a requested one by name (ADR-171).
+    if (newOrganizationRole === OrganizationUserRole.DEVELOPER) return requested;
+
     if (requested.length > 0) {
       if (newOrganizationRole !== OrganizationUserRole.EXTERNAL) {
         return requested;

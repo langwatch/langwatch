@@ -222,6 +222,7 @@ jobs:
             langwatch-langevals:
               - 'infra/docker/Dockerfile.langevals'
               - 'services/langevals/**'
+              - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-gateway:
               - 'infra/docker/Dockerfile.go_service'

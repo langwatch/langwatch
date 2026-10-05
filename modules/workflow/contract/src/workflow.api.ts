@@ -6,6 +6,7 @@ import type { StudioClientEvent, StudioServerEvent } from "./studio-events.ts";
 import type { ExecutionState, Field, StudioWorkflow } from "./studio-workflow.ts";
 import type { ExecuteWorkflowComponentInput } from "./workflow-component.commands.ts";
 import type {
+  ExecuteSyncRelayEvent,
   WorkflowCodeCompletionResponse,
   WorkflowRestEnvelope,
 } from "./workflow-rest.schemas.ts";
@@ -287,6 +288,17 @@ export interface WorkflowApi {
     /** Who started the run, as the engine attributes it; `workflow` when absent. */
     origin?: WorkflowRunOrigin;
   }): Promise<void>;
+  /**
+   * One scenario turn relayed to the project's own engine: its status and body verbatim, a 504
+   * past the turn ceiling, a 408 once `signal` aborts. `projectId` is the caller's key's project.
+   */
+  relayExecuteSync(input: {
+    projectId: string;
+    event: ExecuteSyncRelayEvent;
+    signal: AbortSignal;
+  }): Promise<Response>;
+  /** True when this deployment names a per-project engine fleet, so a scenario turn must relay. */
+  hasPerProjectEngines(): boolean;
   /** Where an unexpected studio failure is reported. Best effort. */
   reportStudioFailure(error: unknown, context: { projectId: string }): void;
   /** A short commit message for the change between two graphs. */

@@ -273,10 +273,10 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
   }): Promise<AuthzBindingForSynthesis[]> => {
     if (orgIds.length === 0) return [];
 
-    const { groupIdsByOrg, allGroupIds } = await this.groupMembershipsFor({
-      userId,
-      orgIds,
-    });
+    const [{ groupIdsByOrg, allGroupIds }, developerOrgIds] = await Promise.all([
+      this.groupMembershipsFor({ userId, orgIds }),
+      this.developerSeatOrgIds({ userId, orgIds }),
+    ]);
 
     const rows = (
       (await liveGrants(this.database).findMany({
@@ -293,12 +293,20 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
         orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
       })) as StoredHeadRow<GrantListRow>[]
     ).map(headRow<GrantListRow>);
-    const grants = this.listableGrants(rows).filter(
-      ({ row }) =>
-        row.principalType !== "GROUP" ||
-        (row.principalId != null &&
-          groupIdsByOrg.get(row.organizationId)?.has(row.principalId) === true),
-    );
+    const grants = this.listableGrants(rows)
+      .filter(
+        ({ row }) =>
+          row.principalType !== "GROUP" ||
+          (row.principalId != null &&
+            groupIdsByOrg.get(row.organizationId)?.has(row.principalId) === true),
+      )
+      // The engine grants a Developer (ADR-171) nothing through an organization-scoped or group
+      // binding, so the workspace listing synthesizes neither a shared team nor an admin role.
+      .filter(
+        ({ row, scopeType }) =>
+          !developerOrgIds.has(row.organizationId) ||
+          (row.principalType !== "GROUP" && scopeType !== "ORGANIZATION"),
+      );
 
     const rolesByOrg = await this.rolesByOrganizationFor(grants);
 
@@ -326,6 +334,21 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       };
     });
   };
+
+  /** The organizations among `orgIds` where this user holds a Developer seat. */
+  private async developerSeatOrgIds({
+    userId,
+    orgIds,
+  }: {
+    userId: string;
+    orgIds: readonly string[];
+  }): Promise<Set<string>> {
+    const memberships = (await this.database.organizationUser.findMany({
+      where: { userId, organizationId: { in: [...orgIds] }, role: "DEVELOPER" },
+      select: { organizationId: true },
+    })) as { organizationId: string }[];
+    return new Set(memberships.map((membership) => membership.organizationId));
+  }
 
   /** The user's group memberships, resolved per organization so a grant
    *  naming a group can be tied back to "a group this user is in, in the

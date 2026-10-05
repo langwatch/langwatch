@@ -34,6 +34,11 @@ export function classifyMemberType(
     return "FullMember";
   }
 
+  // A Developer (ADR-171) is its own seat; permissions never move it
+  if (role === OrganizationUserRole.DEVELOPER) {
+    return "Developer";
+  }
+
   // EXTERNAL role with non-view custom permissions is elevated to FullMember
   if (role === OrganizationUserRole.EXTERNAL && permissions && !isViewOnlyCustomRole(permissions)) {
     return "FullMember";

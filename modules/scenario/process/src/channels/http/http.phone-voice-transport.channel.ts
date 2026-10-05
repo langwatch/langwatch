@@ -156,8 +156,9 @@ export class VoicePublicBaseUrlMissingError extends Error {
         `unset, resolved source: ${source}). The app's BASE_HOST runs no voice ` +
         `media listener, so Twilio would dial a URL nothing answers and the ` +
         `call would fail with error 31920 after a 120s timeout. Set ` +
-        `VOICE_PUBLIC_BASE_URL, or ensure cloudflared is installed so the ` +
-        `worker can mint a tunnel at boot.${reasonSuffix}`,
+        `VOICE_PUBLIC_BASE_URL, or set VOICE_TUNNEL=true (off by default on ` +
+        `self-hosted installs) with cloudflared installed so the worker can ` +
+        `mint a tunnel at boot.${reasonSuffix}`,
     );
     this.name = "VoicePublicBaseUrlMissingError";
   }

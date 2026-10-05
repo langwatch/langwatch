@@ -74,8 +74,8 @@ def sync_detailed(
     body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> Response[PatchApiTriggersByIdResponse200 | PatchApiTriggersByIdResponse404]:
     """Update an automation. Every field is optional and what is left out is left alone, except
-    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be
-    changed.
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an
+    alert's graph cannot be changed.
 
     Args:
         trigger_id (str):
@@ -108,8 +108,8 @@ def sync(
     body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> PatchApiTriggersByIdResponse200 | PatchApiTriggersByIdResponse404 | None:
     """Update an automation. Every field is optional and what is left out is left alone, except
-    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be
-    changed.
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an
+    alert's graph cannot be changed.
 
     Args:
         trigger_id (str):
@@ -137,8 +137,8 @@ async def asyncio_detailed(
     body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> Response[PatchApiTriggersByIdResponse200 | PatchApiTriggersByIdResponse404]:
     """Update an automation. Every field is optional and what is left out is left alone, except
-    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be
-    changed.
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an
+    alert's graph cannot be changed.
 
     Args:
         trigger_id (str):
@@ -169,8 +169,8 @@ async def asyncio(
     body: PatchApiTriggersByIdBody | Unset = UNSET,
 ) -> PatchApiTriggersByIdResponse200 | PatchApiTriggersByIdResponse404 | None:
     """Update an automation. Every field is optional and what is left out is left alone, except
-    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be
-    changed.
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an
+    alert's graph cannot be changed.
 
     Args:
         trigger_id (str):

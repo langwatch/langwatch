@@ -60,7 +60,7 @@ import {
   type OrganizationUsageCount,
   OrganizationNotFoundForTeamError,
 } from "@langwatch/organization-contract";
-import type { Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 import type {
   GroupIdentity,
@@ -257,6 +257,15 @@ export class OrganizationService extends OrganizationServiceContract {
     maxSessionDurationDays: number;
   }): Promise<void> {
     return this.repository.saveSessionPolicy(input);
+  }
+
+  isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean> {
+    return this.repository.isInstantEvalsOptedIn(input);
+  }
+
+  /** The moment that counts is the one the agreement was given, so it is taken here. */
+  recordInstantEvalsOptIn(input: { organizationId: string; userId: string }): Promise<void> {
+    return this.repository.recordInstantEvalsOptIn({ ...input, at: nowInstant() });
   }
 
   /** The guided-onboarding record, where the organization keeps it. */

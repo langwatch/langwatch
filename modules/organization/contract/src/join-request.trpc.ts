@@ -8,6 +8,7 @@ import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  joinerRoleSchema,
   joinRequestAdmittedSchema,
   joinRequestAutomaticJoinsSchema,
   joinRequestFiledSchema,
@@ -36,6 +37,7 @@ export const joinRequestApiSetJoiningInputSchema = z.object({
   organizationId: z.string().min(1),
   domainJoin: joinRequestApiDomainJoinSchema,
   domains: z.array(z.string().min(1)).default([]),
+  joinerRole: joinerRoleSchema.optional(),
 });
 export type JoinRequestApiSetJoiningInput = z.infer<typeof joinRequestApiSetJoiningInputSchema>;
 

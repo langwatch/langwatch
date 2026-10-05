@@ -13,7 +13,10 @@ import {
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
-import { FakeMonitorEvaluators } from "../../app/__tests__/monitor.fixture.ts";
+import {
+  FakeEvaluatorSettings,
+  FakeMonitorEvaluators,
+} from "../../app/__tests__/monitor.fixture.ts";
 import { MonitorService } from "../../services/monitor.service.ts";
 import { MemoryMonitorRepository } from "../memory/memory.monitor.repository.ts";
 
@@ -52,6 +55,7 @@ function harness(
     service: MonitorService.create({
       repository,
       evaluators,
+      evaluation: new FakeEvaluatorSettings(),
       generateId: () => options.id ?? "monitor_test",
     }),
   };

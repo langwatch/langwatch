@@ -1,5 +1,6 @@
 import { GrantScopeTier } from "@langwatch/authz-contract";
 import { NotFoundError } from "@langwatch/handled-error";
+import { readJoinerRole } from "@langwatch/identity-contract";
 import {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
@@ -18,6 +19,7 @@ import {
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
+import type { DeveloperAdmissionVia } from "../../rules/admission-audit.rules.ts";
 import { isCustomRole } from "../../rules/custom-role-naming.rules.ts";
 import {
   isActiveAdmin,
@@ -567,21 +569,27 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
-  }): Promise<"created" | "already-present"> {
+    via: DeveloperAdmissionVia;
+  }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
     const { organizationId, userId, pendingAdmissionId } = input;
-    if (this.membershipRow({ organizationId, userId })) return "already-present";
+    const existing = this.membershipRow({ organizationId, userId });
+    if (existing) {
+      const seat = existing.role === OrganizationUserRole.DEVELOPER ? "DEVELOPER" : "MEMBER";
+      return { outcome: "already-present", seat };
+    }
 
+    const seat = readJoinerRole(this.memory.organizations.get(organizationId)?.joinerRole);
     const now = nowInstant();
     this.memory.organizationUsers.push({
       userId,
       organizationId,
-      role: OrganizationUserRole.MEMBER,
+      role: seat,
       disabledAt: null,
       createdAt: now,
       updatedAt: now,
-      pendingSsoGrantId: pendingAdmissionId,
+      pendingSsoGrantId: seat === "MEMBER" ? pendingAdmissionId : null,
     });
-    return "created";
+    return { outcome: "created", seat };
   }
 
   async deleteMember(input: DeleteMemberInput): Promise<void> {
@@ -702,6 +710,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     }
     row.role = role;
     row.updatedAt = nowInstant();
+    this.applyDeveloperSeat({ organizationId, userId, role });
 
     const teamsLeftWithoutAdmin: { id: string; name: string }[] = [];
     for (const update of effectiveTeamRoleUpdates) {
@@ -719,6 +728,25 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     }
 
     return { teamsLeftWithoutAdmin };
+  }
+
+  /** A move onto the Developer seat (ADR-171) keeps the personal team, leaves every shared one. */
+  private applyDeveloperSeat({
+    organizationId,
+    userId,
+    role,
+  }: {
+    organizationId: string;
+    userId: string;
+    role: OrganizationUserRole;
+  }): void {
+    if (role !== "DEVELOPER") return;
+    for (let index = this.memory.teamUsers.length - 1; index >= 0; index -= 1) {
+      const teamUser = this.memory.teamUsers[index];
+      const team = teamUser ? this.memory.teams.get(teamUser.teamId) : undefined;
+      if (teamUser?.userId !== userId || team?.organizationId !== organizationId) continue;
+      if (!team.isPersonal) this.memory.teamUsers.splice(index, 1);
+    }
   }
 
   async updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void> {

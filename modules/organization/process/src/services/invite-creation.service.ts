@@ -9,6 +9,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   AlreadyOrganizationMemberError,
   DuplicateInviteError,
+  DeveloperSeatNoSharedAccessError,
   LiteMemberViewerOnlyError,
   MemberSeatLimitReachedError,
   OrganizationUserRole,
@@ -142,7 +143,12 @@ export class InviteCreationService {
       });
 
     if (!subscriptionLimits.overrideAddingLimitations) {
-      if (currentFullMembers + newFullMembers > subscriptionLimits.maxMembers) {
+      // A pool this batch adds nobody to is not checked: a Developer-only batch
+      // enters neither, so a plan at its cap still admits it (ADR-171).
+      if (
+        newFullMembers > 0 &&
+        currentFullMembers + newFullMembers > subscriptionLimits.maxMembers
+      ) {
         throw new MemberSeatLimitReachedError({
           meta: {
             limitType: "members",
@@ -152,7 +158,10 @@ export class InviteCreationService {
         });
       }
 
-      if (currentMembersLite + newLiteMembers > subscriptionLimits.maxMembersLite) {
+      if (
+        newLiteMembers > 0 &&
+        currentMembersLite + newLiteMembers > subscriptionLimits.maxMembersLite
+      ) {
         throw new MemberSeatLimitReachedError({
           meta: {
             limitType: "membersLite",
@@ -175,6 +184,10 @@ export class InviteCreationService {
     role: OrganizationUserRole;
     teamAssignments?: TeamAssignmentInput[];
   }): void {
+    if (role === OrganizationUserRole.DEVELOPER) {
+      if ((teamAssignments ?? []).length > 0) throw new DeveloperSeatNoSharedAccessError();
+      return;
+    }
     if (role !== OrganizationUserRole.EXTERNAL) {
       return;
     }

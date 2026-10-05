@@ -180,6 +180,8 @@ export interface TrpcAuthorizationDenial {
   membershipDisabled(): Error;
   /** The organization role does not reach this feature at all. */
   liteMemberRestricted(resource: string): Error;
+  /** A Developer seat (ADR-171) reached outside its personal project. */
+  developerSeatRestricted?(resource: string): Error;
 }
 
 /**
@@ -610,6 +612,14 @@ function deniedError({
       code: "UNAUTHORIZED",
       message: "This feature is not available for your account",
       cause: denials.liteMemberRestricted(permission.split(":")[0] ?? "unknown"),
+    });
+  }
+
+  if (organizationRole === "DEVELOPER" && denials.developerSeatRestricted) {
+    return new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "This is outside your Developer seat",
+      cause: denials.developerSeatRestricted(permission.split(":")[0] ?? "unknown"),
     });
   }
 

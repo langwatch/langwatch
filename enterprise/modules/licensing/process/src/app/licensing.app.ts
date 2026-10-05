@@ -1210,6 +1210,7 @@ function connectInstallParts({
     instanceLicenseKey: infrastructure.instanceLicenseKey,
     ...(config.publicKey ? { publicKey: config.publicKey } : {}),
     ...(infrastructure.upstream ? { upstream: infrastructure.upstream } : {}),
+    ...(logger ? { logger } : {}),
   });
   return {
     identity,

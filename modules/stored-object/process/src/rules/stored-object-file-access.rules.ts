@@ -4,6 +4,7 @@ import { HandledError } from "@langwatch/handled-error";
 const DENIAL_CODES: ReadonlySet<string> = new Set([
   "project_permission_denied",
   "lite_member_restricted",
+  "developer_seat_restricted",
   // The ADR-092 engine's denial: without it here the engine's 403 would surface as a 500.
   "permission_denied",
 ]);

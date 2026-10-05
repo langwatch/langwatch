@@ -104,7 +104,7 @@ export function createEntitlementTestApp(
       organizations:
         input.dependencies?.organizations ??
         createApiFixture<OrganizationApi>({
-          countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0 }),
+          countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
         }),
     },
     config: input.config,

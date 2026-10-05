@@ -57,6 +57,8 @@ jobs:
           filters: |
             relevant:
               - 'services/langevals/**'
+              - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
+              - 'infra/docker/Dockerfile.langevals'
               - '.github/workflows/langevals-ci.yml'
 
   lint:

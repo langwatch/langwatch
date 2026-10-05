@@ -127,6 +127,7 @@ import {
   type AgentTestTurnJob,
   type ScenarioLogContext,
   type TakenPendingNavigate,
+  isVoiceTunnelEnabled,
   scenarioConfig,
   type ScenarioServerConfig,
 } from "@langwatch/scenario-contract";
@@ -353,6 +354,7 @@ export class ScenarioModule implements ScenarioApi {
     >,
   ): Promise<ScenarioModule> {
     const { secrets } = setup;
+    const { redis, publicBaseUrl, nodeEnvironment } = setup.members;
     const signingSecret = await secrets.into(
       ScenarioModule.secrets.voiceSessionSigning,
       (credentials) =>
@@ -365,7 +367,7 @@ export class ScenarioModule implements ScenarioApi {
     const voice = await VoicePublicUrlService.create().resolveForRole({
       role: setup.role,
       configuredUrl: setup.config.voicePublicBaseUrl,
-      tunnelEnabled: setup.config.voiceTunnel,
+      tunnelEnabled: isVoiceTunnelEnabled({ ...setup.config, nodeEnvironment }),
       workerOnly: setup.config.voiceWorkerOnly,
       port: setup.members.rawSocketPort,
     });
@@ -413,8 +415,8 @@ export class ScenarioModule implements ScenarioApi {
       langwatchEndpoint: config.langwatchEndpoint ?? "",
       nlpServiceUrl: setup.members.nlpServiceUrl ?? "",
       legacyDefaultModel: config.defaultModel ?? DEFAULT_MODEL,
+      publicBaseUrl,
     };
-    const { redis } = setup.members;
     const broadcast = setup.dependencies.presence;
     const voiceNonces = VoiceNonceRegistryService.create({ nonces: repositories.voiceNonces });
     const memoryCancellations = MemoryScenarioCancellationChannel.create();
@@ -429,7 +431,7 @@ export class ScenarioModule implements ScenarioApi {
     const platformLinks = ScenarioPlatformLinkService.create({
       featureFlags: setup.dependencies.featureFlags,
       projects: setup.dependencies.projects,
-      publicBaseUrl: setup.members.publicBaseUrl,
+      publicBaseUrl,
     });
 
     const childHost = {
@@ -437,8 +439,8 @@ export class ScenarioModule implements ScenarioApi {
       nlpServiceUrl: setup.members.nlpServiceUrl,
       nlpInternalSecret: setup.members.nlpInternalSecret,
       isSaas: setup.members.isSaas,
-      nodeEnvironment: setup.members.nodeEnvironment,
-      publicBaseUrl: setup.members.publicBaseUrl,
+      nodeEnvironment,
+      publicBaseUrl,
     };
 
     return new ScenarioModule({

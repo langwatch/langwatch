@@ -13,6 +13,7 @@ import { workflowRepositories } from "#repositories/workflow-repositories.regist
 import { WorkflowHttpSecretsService } from "#services/workflow-http-secrets.service";
 import { WorkflowPermissionService } from "#services/workflow-permission.service";
 import { WorkflowHttpCredentialsBackfillTask } from "#tasks/workflow-http-credentials-backfill.task";
+import { workflowExecuteSyncRest } from "#transport/workflow-execute-sync.rest";
 import { workflowOptimizationTrpcTransport } from "#transport/workflow-optimization.trpc";
 import { workflowRunCallerKey, workflowRunRest } from "#transport/workflow-run.rest";
 import { workflowStudioRest, workflowStudioSession } from "#transport/workflow-studio.rest";
@@ -28,6 +29,7 @@ export const workflowProcessModule = defineProcessModule("workflow")
     workflowOptimizationTrpcTransport,
     workflowRunRest,
     workflowStudioRest,
+    workflowExecuteSyncRest,
   )
   .withEventing(workflowNlpLambdaCleanupEventing)
   .withEventing(workflowLifecycleEventing)

@@ -35,6 +35,11 @@ function ctxWith(envBody: string) {
 
 const bus = { emit: () => {} } as never;
 
+// The uv calls that build the environment, leaving out the tokenizer cache fill.
+function syncCalls() {
+  return execCalls.filter((call) => call.args[0] === "sync");
+}
+
 function extrasFrom(args: string[]): string[] {
   return args.filter((a, i) => args[i - 1] === "--extra");
 }
@@ -102,14 +107,14 @@ describe("evaluator environment", () => {
   describe("when the toggle changes between runs", () => {
     it("re-syncs rather than reusing the environment it already built", async () => {
       await syncVenvs(ctxWith("ENVIRONMENT=local\n"), bus);
-      expect(execCalls).toHaveLength(1);
+      expect(syncCalls()).toHaveLength(1);
 
       // Same lockfile, different answer: the recorded hash covers the extras
       // list too, so asking for the PII model actually installs it instead of
       // silently keeping the lean environment.
       await syncVenvs(ctxWith("LANGWATCH_ENABLE_PRESIDIO=true\n"), bus);
-      expect(execCalls).toHaveLength(2);
-      expect(extrasFrom(execCalls[1]!.args)).toContain("presidio");
+      expect(syncCalls()).toHaveLength(2);
+      expect(extrasFrom(syncCalls()[1]!.args)).toContain("presidio");
     });
   });
 });

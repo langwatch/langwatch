@@ -44,6 +44,8 @@ export interface ScenarioExecutionPrefetchConfig {
   langwatchEndpoint: string;
   nlpServiceUrl: string;
   legacyDefaultModel: string;
+  /** The deployment's public origin: the relay address when no endpoint is configured. */
+  publicBaseUrl?: string;
 }
 
 type ScenarioExecutionPrefetcherServiceOptions = {
@@ -96,6 +98,7 @@ export class ScenarioExecutionPrefetcherService {
       modelParameters,
       traces: options.traces,
       runKeys,
+      workflows: options.workflows,
     });
     const runSecrets = ScenarioRunSecretsService.create(options.secretCipher);
 

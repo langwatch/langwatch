@@ -4,6 +4,7 @@ import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 import type { EventBus } from "./event-bus.ts";
 import { locateTasksDir, resolvePnpm } from "./node-deps.ts";
+import { appOfflineEnv, FORCED_ENV } from "./offline-defaults.ts";
 
 // Run Prisma and ClickHouse goose migrations through apps/tasks launcher.
 export async function runMigrations(
@@ -22,8 +23,11 @@ export async function runMigrations(
   const start = nowInstant().epochMilliseconds;
 
   const env: NodeJS.ProcessEnv = {
+    // Defaults first so the user's shell and .env override them.
+    ...appOfflineEnv(ctx.paths),
     ...process.env,
     ...envFromFile,
+    ...FORCED_ENV,
     // Prepend ~/.langwatch/bin so the clickhouse-migrate task (which
     // shells out to `which goose`) finds the predep-installed goose binary.
     // Postgres + redis don't need this — they're spawned by absolute path

@@ -436,6 +436,11 @@ function MemberListRow({
               Lite Member
             </Badge>
           )}
+          {member.role === "DEVELOPER" && (
+            <Badge colorPalette="teal" size="sm">
+              Developer
+            </Badge>
+          )}
           <MemberStatusChip member={member} />
         </>
       }

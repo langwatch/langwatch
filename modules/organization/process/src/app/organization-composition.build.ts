@@ -123,7 +123,13 @@ class EntitlementOrganizationSeatLicense {
     organizationId: string;
     plan: Plan;
   }): Promise<void> {
-    if (input.change === "no-change" || input.plan.overrideAddingLimitations) return;
+    // A move onto a Developer seat enters a pool no plan meters (ADR-171).
+    if (
+      input.change === "no-change" ||
+      input.change === "to-developer" ||
+      input.plan.overrideAddingLimitations
+    )
+      return;
 
     const resource = input.change === "lite-to-full" ? "members" : "membersLite";
     const max = this.allowance(input.plan, resource);

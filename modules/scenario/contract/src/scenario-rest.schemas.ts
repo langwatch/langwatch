@@ -169,23 +169,30 @@ export const scenarioRestCreateSchema = z.object({
     ),
 });
 
-export const scenarioRestUpdateSchema = z.object({
-  name: z.string().min(1).optional(),
-  situation: z.string().optional(),
-  criteria: z.array(z.string()).optional(),
-  labels: z.array(z.string()).optional(),
-  parameters: scenarioParameterDefinitionsSchema.optional().describe(parametersDescription),
-  simulatorModel: modelOverrideSchema.nullish().describe(simulatorModelDescription),
-  judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
-  maxTurns: z.number().int().min(1).max(100).nullish().describe(maxTurnsDescription),
-  minTurns: z.number().int().min(0).max(100).nullish().describe(minTurnsDescription),
-  testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
-  fields: scenarioFieldValuesSchema
-    .optional()
-    .describe(
-      "The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value.",
-    ),
-});
+/**
+ * Strict, so a field this endpoint does not have (`status`) is refused by name
+ * instead of dropped behind a 200: the caller must learn the write did not do
+ * what it asked.
+ */
+export const scenarioRestUpdateSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    situation: z.string().optional(),
+    criteria: z.array(z.string()).optional(),
+    labels: z.array(z.string()).optional(),
+    parameters: scenarioParameterDefinitionsSchema.optional().describe(parametersDescription),
+    simulatorModel: modelOverrideSchema.nullish().describe(simulatorModelDescription),
+    judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
+    maxTurns: z.number().int().min(1).max(100).nullish().describe(maxTurnsDescription),
+    minTurns: z.number().int().min(0).max(100).nullish().describe(minTurnsDescription),
+    testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
+    fields: scenarioFieldValuesSchema
+      .optional()
+      .describe(
+        "The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value.",
+      ),
+  })
+  .strict();
 
 export const scenarioRestIdParamsSchema = z.object({ id: z.string().min(1) });
 export const scenarioRestIdVersionParamsSchema = z.object({

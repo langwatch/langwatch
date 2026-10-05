@@ -4,6 +4,7 @@ import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { locateWorkerDir, resolvePnpm } from "./node-deps.ts";
+import { appOfflineEnv, FORCED_ENV } from "./offline-defaults.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
@@ -33,8 +34,11 @@ export async function startLangwatchWorkers(
       args: [...pnpm.args, "run", "start"],
       cwd: workerDir,
       env: {
+        // Defaults first so the user's shell and .env override them.
+        ...appOfflineEnv(ctx.paths),
         ...process.env,
         ...envFromFile,
+        ...FORCED_ENV,
         // ctx.paths.bin first so the bundled pnpm is reachable to nested
         // invocations; matches startLangwatch.
         PATH: `${ctx.paths.bin}:${process.env.PATH ?? ""}`,

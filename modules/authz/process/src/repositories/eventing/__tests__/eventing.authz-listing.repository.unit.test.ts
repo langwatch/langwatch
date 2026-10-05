@@ -42,6 +42,7 @@ const prismaWith = (data: {
   apiKeys?: Record<string, unknown>[];
   roles?: Record<string, unknown>[];
   groupMemberships?: Record<string, unknown>[];
+  developerMemberships?: Record<string, unknown>[];
 }) => {
   const prisma = {
     grant: { findMany: vi.fn().mockResolvedValue(data.grants ?? []) },
@@ -51,6 +52,9 @@ const prismaWith = (data: {
     role: { findMany: vi.fn().mockResolvedValue(data.roles ?? []) },
     groupMembership: {
       findMany: vi.fn().mockResolvedValue(data.groupMemberships ?? []),
+    },
+    organizationUser: {
+      findMany: vi.fn().mockResolvedValue(data.developerMemberships ?? []),
     },
   };
   return {
@@ -466,6 +470,38 @@ describe("EventingAuthzListingRepository", () => {
       expect(rows.map((row) => `${row.organizationId}:${row.scopeId}:${row.role}`)).toEqual([
         `${ORG}:team-1:MEMBER`,
         `${ORG}:team-1:VIEWER`,
+      ]);
+    });
+  });
+
+  describe("when the user holds a Developer seat in the organization", () => {
+    it("keeps the direct team row and drops the group and organization-scoped ones", async () => {
+      const { repository } = prismaWith({
+        groupMemberships: [{ groupId: "group-mine", group: { organizationId: ORG } }],
+        developerMemberships: [{ organizationId: ORG }],
+        grants: [
+          grantRow({ id: "g-own", principalType: "USER", principalId: "dev", roleKey: "admin" }),
+          grantRow({
+            id: "g-via-group",
+            principalType: "GROUP",
+            principalId: "group-mine",
+            roleKey: "member",
+          }),
+          grantRow({
+            id: "g-org",
+            principalType: "USER",
+            principalId: "dev",
+            roleKey: "admin",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
+        ],
+      });
+
+      const rows = await repository.findBindingsForSynthesis({ orgIds: [ORG], userId: "dev" });
+
+      expect(rows.map((row) => `${row.scopeType}:${row.scopeId}:${row.role}`)).toEqual([
+        "TEAM:team-1:ADMIN",
       ]);
     });
   });

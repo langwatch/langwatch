@@ -110,7 +110,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Instant Evals questions](https://langwatch.ai/docs/features/instant-evals/questions.md): The three kinds of question a run can ask, how to sharpen a yes or no with criteria and a threshold, and how to ask up to ten questions of the same text in one run.
 - [Instant Evals targets and statements](https://langwatch.ai/docs/features/instant-evals/targets.md): What one judged row is, how the time window and the trace filter narrow the rows, the LangWatchQL statement each target writes for you, and how to write your own.
 - [Reading Instant Eval results](https://langwatch.ai/docs/features/instant-evals/results.md): Page through a run's verdicts, read the text the judge saw beside each one, and query the judgments dataset with LangWatchQL to join verdicts to your traces.
-- [Instant Evals limits, cost and billing](https://langwatch.ai/docs/features/instant-evals/limits-and-cost.md): How many rows and questions a run takes, how long it runs, what a run costs, how to read the cost before you start, the free budget, and where the spend shows up.
+- [Instant Evals limits, cost and billing](https://langwatch.ai/docs/features/instant-evals/limits-and-cost.md): How many rows and questions a run takes, how long it runs, what a run costs, how to read the cost before you start, the free budget, where the spend shows up, and where the judged text goes.
 - [Instant Evals CLI reference](https://langwatch.ai/docs/features/instant-evals/cli.md): Every langwatch instant-eval subcommand and flag, what each prints, and the exit codes a script can read.
 
 ### Guardrails
@@ -663,7 +663,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Security & Control
 
-- [How Langy is Isolated](https://langwatch.ai/docs/langy/security/sandbox.md): Langy runs each conversation as an isolated worker under a gVisor sandbox, with per-worker file and control-port walls and an L7 egress adapter. This page states what each layer blocks and where the boundary is cooperative rather than mandatory today.
+- [How Langy is Isolated](https://langwatch.ai/docs/langy/security/sandbox.md): Langy runs each conversation as an isolated worker with per-worker file and control-port walls and an L7 egress adapter, under gVisor on LangWatch Cloud and optionally when self-hosted. This page states what each layer blocks and where the boundary is cooperative rather than mandatory today.
 - [Langy Data Flow and Privacy](https://langwatch.ai/docs/langy/security/data-flow-and-privacy.md): Exactly what data leaves a Langy conversation and where it goes: every turn is traced into your own LangWatch project, external traffic is limited to the egress path, and an optional operator mirror lane is off unless you configure it.
 - [What Langy Can Do in Your GitHub](https://langwatch.ai/docs/langy/security/github-access.md): Langy touches your code only through a GitHub App that opens bot-authored pull requests; the app private key is the only stored credential, tokens are minted per turn with two write scopes, and the install is the access boundary.
 
@@ -681,7 +681,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [First run](https://langwatch.ai/docs/self-hosting/first-run.md): From a fresh install to single sign-on: the first account, the license and the identity provider connection.
 - [Editions and licensing](https://langwatch.ai/docs/self-hosting/licensing.md): What self-hosted LangWatch gives you for free, what an Enterprise license adds, and how to activate one
 - [Connect: hosted services for a self-hosted install](https://langwatch.ai/docs/self-hosting/connect.md): Let a licensed install call LangWatch-hosted services over two outbound hosts, metered against your contract and capped from Settings
-- [Data and telemetry: what a self-hosted install sends to LangWatch](https://langwatch.ai/docs/self-hosting/data-and-telemetry.md): The two channels a self-hosted install can open to LangWatch, what each one carries, where to read your own copy of the report, and the three switches that stop parts of it or all of it
+- [Data and telemetry: every outbound connection of a self-hosted install](https://langwatch.ai/docs/self-hosting/data-and-telemetry.md): Every connection a self-hosted install can open to LangWatch and to third parties, what each one carries, and the switch that stops it
 - [Usage report dictionary: every field a self-hosted install sends](https://langwatch.ai/docs/self-hosting/usage-report-dictionary.md): The fields of the daily usage report, their category, their window, why each is collected, and what is never collected. Generated from the dictionary the install reports from.
 - [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane, keep full data ownership while using LangWatch's managed control plane.
 - [Checkup](https://langwatch.ai/docs/self-hosting/checkup.md): Check that a self-hosted install is wired correctly, and see what it sends to LangWatch
@@ -717,7 +717,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Self-hosting compliance](https://langwatch.ai/docs/self-hosting/compliance.md): What works in self-hosted LangWatch under the Apache 2.0 license vs what requires an Enterprise license. Persona-aware coverage map across SOC 2, ISO 27001, GDPR, HIPAA, EU AI Act, plus the substrate primitives behind each.
 - [Upgrade Guide](https://langwatch.ai/docs/self-hosting/upgrade.md): How to upgrade LangWatch to the latest version
 - [Migrate to v3](https://langwatch.ai/docs/self-hosting/upgrade-v3.md): Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0
-- [Dataset Storage Migration](https://langwatch.ai/docs/self-hosting/upgrade-dataset-storage.md): Upgrade guide for Helm deployments: datasets move to object storage, with a one-time automatic migration
+- [Dataset Storage Migration](https://langwatch.ai/docs/self-hosting/upgrade-dataset-storage.md): Upgrade guide for Helm deployments: datasets move to object storage, with a one-time migration you run once
 
 ## Ops Console
 

@@ -24,6 +24,12 @@ export abstract class AuthDirectory {
     organizationId: string;
   }): Promise<boolean>;
 
+  /** The seat an enabled member holds here; null for a stranger or a disabled seat. */
+  abstract findActiveMemberRole(params: {
+    userId: string;
+    organizationId: string;
+  }): Promise<string | null>;
+
   /** An unarchived project of the organization; throws `ProjectNotFoundError`. */
   abstract getLiveProject(params: {
     projectId: string;

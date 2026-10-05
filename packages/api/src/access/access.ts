@@ -114,6 +114,8 @@ export interface AccessDenial {
   membershipDisabled(): Error;
   /** The organization role does not reach this feature at all. */
   liteMemberRestricted(resource: string): Error;
+  /** A Developer seat (ADR-171) reached outside its personal project. */
+  developerSeatRestricted?(resource: string): Error;
 }
 
 /** What the handler is handed beside its input. */
@@ -650,6 +652,10 @@ function denied({
   // constant.
   if (denials && decision.organizationRole === "EXTERNAL") {
     return denials.liteMemberRestricted(permission.split(":")[0] ?? "unknown");
+  }
+
+  if (denials?.developerSeatRestricted && decision.organizationRole === "DEVELOPER") {
+    return denials.developerSeatRestricted(permission.split(":")[0] ?? "unknown");
   }
 
   return new PermissionDeniedError({

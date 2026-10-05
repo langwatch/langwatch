@@ -1,6 +1,7 @@
 import { type OrganizationRole } from "@langwatch/authorization";
 import {
   ApiKeyNotInOrganizationError,
+  AuthzDeveloperSeatNoSharedAccessError,
   AuthzLiteMemberViewerOnlyError,
   AuthzPersonalWorkspaceNotManagedHereError,
   bindingScopeCanGrantPermission,
@@ -135,7 +136,7 @@ export class AuthzGrantWriterService {
       organizationId: input.organizationId,
       bindings: [input],
     });
-    this.assertLiteMemberCeiling({
+    this.assertSeatCeiling({
       organizationRole,
       bindings: [input],
       scopeRows,
@@ -215,7 +216,7 @@ export class AuthzGrantWriterService {
         userId: binding.userId,
       });
       if (organizationRole) {
-        this.assertLiteMemberCeiling({
+        this.assertSeatCeiling({
           organizationRole,
           bindings: [{ ...binding, role: input.role }],
           scopeRows,
@@ -275,7 +276,7 @@ export class AuthzGrantWriterService {
       organizationId: input.organizationId,
       bindings: input.bindingsToCreate,
     });
-    this.assertLiteMemberCeiling({
+    this.assertSeatCeiling({
       organizationRole,
       bindings: input.bindingsToCreate,
       scopeRows: createScopeRows,
@@ -611,7 +612,8 @@ export class AuthzGrantWriterService {
     }
   }
 
-  private assertLiteMemberCeiling({
+  /** Lite: Viewer rows only, never the organization. Developer: no shared row at all (ADR-171). */
+  private assertSeatCeiling({
     organizationRole,
     bindings,
     scopeRows,
@@ -620,6 +622,12 @@ export class AuthzGrantWriterService {
     bindings: readonly Pick<AuthzBindingWrite, "role" | "scopeType" | "scopeId">[];
     scopeRows: readonly AuthzBindingScopeRow[];
   }): void {
+    if (organizationRole === "DEVELOPER") {
+      const [first] = bindings;
+      if (!first) return;
+      const scopeName = scopeRows.find((row) => row.id === first.scopeId)?.name;
+      throw new AuthzDeveloperSeatNoSharedAccessError(scopeName ?? null);
+    }
     if (organizationRole !== "EXTERNAL") {
       return;
     }

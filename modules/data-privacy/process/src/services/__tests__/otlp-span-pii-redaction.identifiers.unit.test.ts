@@ -46,8 +46,11 @@ function makeService(level: "essential" | "strict") {
     dataPrivacy: new DataPrivacyResolutionFake(policyAt(level)),
   });
   const submitted = (): string[] => batchSpy.mock.calls.flatMap(([texts]) => texts);
+  /** From here on the detector reads every value it receives as a person's name. */
+  const namesEverything = () =>
+    batchSpy.mockImplementation(async (texts: string[]) => texts.map(() => "[PERSON]"));
 
-  return { service, submitted };
+  return { service, submitted, namesEverything };
 }
 
 function spanWith(attributes: Record<string, string>): OtlpSpan {
@@ -381,5 +384,40 @@ describe("given a strict tenant and OTLP records rather than spans", () => {
 
     expect(harness.submitted().filter((text) => text === DECIMAL_TRACE_ADDRESS)).toHaveLength(1);
     expect(harness.submitted()).toContain(BODY);
+  });
+});
+
+// The name detector reads some span kinds as first names, so under strict mode
+// top-level spans stored `[PERSON]` as their kind. A known kind is a fixed word,
+// so it is never submitted and is stored unchanged.
+describe("given a strict tenant and the span kind attribute", () => {
+  const PROSE = "Customer said the refund went to the wrong card last week.";
+
+  /** @scenario "A known span kind is never sent for analysis" */
+  it.each(["agent", "workflow", "llm"])(
+    "keeps the known kind %s and never submits it",
+    async (value) => {
+      const harness = makeService("strict");
+      harness.namesEverything();
+      const span = spanWith({ "langwatch.span.type": value, "app.support_note": PROSE });
+
+      await ingest(harness, span, "STRICT");
+
+      expect(harness.submitted()).toContain(PROSE);
+      expect(harness.submitted()).not.toContain(value);
+      expect(attr(span, "langwatch.span.type")).toBe(value);
+      expect(attr(span, "app.support_note")).toBe("[PERSON]");
+    },
+  );
+
+  /** @scenario "A name written under the span kind attribute is still redacted" */
+  it("still redacts a name written under the kind attribute", async () => {
+    const harness = makeService("strict");
+    harness.namesEverything();
+    const span = spanWith({ "langwatch.span.type": "Jane Doe" });
+
+    await ingest(harness, span, "STRICT");
+
+    expect(attr(span, "langwatch.span.type")).toBe("[PERSON]");
   });
 });

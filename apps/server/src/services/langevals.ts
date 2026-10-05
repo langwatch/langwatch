@@ -7,6 +7,7 @@ import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
+import { langevalsOfflineEnv } from "./offline-defaults.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
@@ -32,6 +33,8 @@ export async function startLangevals(
       command: uvBin,
       args: ["run", "--project", projectDir, "--no-sync", "python", join("langevals", "server.py")],
       env: {
+        // Defaults first so the user's shell and .env override them.
+        ...langevalsOfflineEnv({ paths: ctx.paths, appRootDir: appRoot() }),
         ...process.env,
         ...envFromFile,
         UV_PROJECT_ENVIRONMENT: venvDir,

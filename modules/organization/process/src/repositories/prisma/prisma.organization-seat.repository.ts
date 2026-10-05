@@ -1,4 +1,4 @@
-import { isFullMember, isLiteMember } from "@langwatch/entitlement-contract";
+import { isDeveloper, isFullMember, isLiteMember } from "@langwatch/entitlement-contract";
 import {
   INVITE_STATUS,
   OrganizationUserRole,
@@ -66,6 +66,15 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   async getMembersLiteCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
     return this.countMembersByType(context, isLiteMember);
+  }
+
+  /**
+   * Counts Developer seats (ADR-171): DEVELOPER users plus live PENDING
+   * DEVELOPER invites. Shown on the plan page, never compared to a limit.
+   */
+  async getMembersDeveloperCount(organizationId: string): Promise<number> {
+    const context = await this.getMemberClassificationContext(organizationId);
+    return this.countMembersByType(context, isDeveloper);
   }
 
   /**

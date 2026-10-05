@@ -213,7 +213,7 @@ export function createAutomationRest(): Readonly<{
         description:
           "Update an automation. Every field is optional and what is left out is left alone, " +
           "except `actionParams`, which replaces the delivery configuration as a whole. The " +
-          "delivery channel cannot be changed.",
+          "delivery channel and an alert's graph cannot be changed.",
       })
       .withMiddleware(projectRestFacts)
       .handle(async ({ app, input, scope, actor }, project) => {

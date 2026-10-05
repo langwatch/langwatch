@@ -23860,7 +23860,7 @@
             }
           }
         },
-        "description": "Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be changed.",
+        "description": "Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an alert's graph cannot be changed.",
         "tags": [
           "Triggers"
         ],
@@ -23960,6 +23960,13 @@
                       "ADD_TO_ANNOTATION_QUEUE",
                       "SEND_SLACK_MESSAGE",
                       "SEND_WEBHOOK"
+                    ]
+                  },
+                  "customGraphId": {
+                    "description": "The graph this alert watches, which an update cannot change. Accepted so that writing the read response back works; a different graph is refused. Create an alert on the other graph and delete this one.",
+                    "type": [
+                      "string",
+                      "null"
                     ]
                   },
                   "actionParams": {
@@ -72681,7 +72688,8 @@
                             "enum": [
                               "ADMIN",
                               "MEMBER",
-                              "EXTERNAL"
+                              "EXTERNAL",
+                              "DEVELOPER"
                             ]
                           },
                           "disabled": {
@@ -72829,7 +72837,8 @@
                       "enum": [
                         "ADMIN",
                         "MEMBER",
-                        "EXTERNAL"
+                        "EXTERNAL",
+                        "DEVELOPER"
                       ]
                     },
                     "disabled": {
@@ -72988,7 +72997,8 @@
                       "enum": [
                         "ADMIN",
                         "MEMBER",
-                        "EXTERNAL"
+                        "EXTERNAL",
+                        "DEVELOPER"
                       ]
                     },
                     "disabled": {
@@ -73115,7 +73125,8 @@
                     "enum": [
                       "ADMIN",
                       "MEMBER",
-                      "EXTERNAL"
+                      "EXTERNAL",
+                      "DEVELOPER"
                     ]
                   },
                   "disabled": {
@@ -73437,7 +73448,8 @@
                             "enum": [
                               "ADMIN",
                               "MEMBER",
-                              "EXTERNAL"
+                              "EXTERNAL",
+                              "DEVELOPER"
                             ]
                           },
                           "status": {
@@ -73560,7 +73572,8 @@
                             "enum": [
                               "ADMIN",
                               "MEMBER",
-                              "EXTERNAL"
+                              "EXTERNAL",
+                              "DEVELOPER"
                             ]
                           },
                           "status": {
@@ -73685,11 +73698,11 @@
                           "enum": [
                             "ADMIN",
                             "MEMBER",
-                            "EXTERNAL"
+                            "EXTERNAL",
+                            "DEVELOPER"
                           ]
                         },
                         "teams": {
-                          "minItems": 1,
                           "type": "array",
                           "items": {
                             "type": "object",
@@ -73721,8 +73734,7 @@
                       },
                       "required": [
                         "email",
-                        "role",
-                        "teams"
+                        "role"
                       ]
                     }
                   }
@@ -84816,7 +84828,8 @@
                       ]
                     }
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -85231,7 +85244,8 @@
                       ]
                     }
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -98635,7 +98649,8 @@
                 },
                 "required": [
                   "name"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           }

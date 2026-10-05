@@ -171,8 +171,12 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
  */
 export type OrganizationInviteValidation = "strict" | "lenient";
 
-/** An organization's seats: full and lite members, live invitations included. */
-export type OrganizationMemberSeats = Readonly<{ fullMembers: number; liteMembers: number }>;
+/** An organization's seats: full, lite and Developer (ADR-171), live invitations included. */
+export type OrganizationMemberSeats = Readonly<{
+  fullMembers: number;
+  liteMembers: number;
+  developers: number;
+}>;
 
 /** One invitation batch as a transport asks for it, with the mode it chose. */
 export type OrganizationApiCreateInvitationsInput = OrganizationApiCreateInvitesInput &
@@ -280,6 +284,10 @@ export interface OrganizationApi {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<void>;
+  /** Whether the organization switched Instant Evals on itself; instant-eval's gate reads it. */
+  isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean>;
+  /** The organization's own Instant Evals consent; a second call keeps the first record. */
+  recordInstantEvalsOptIn(input: { organizationId: string; userId: string }): Promise<void>;
   /** Replaces the record, leaving every other sign-up answer where it is. */
   writeGuidedOnboardingState(input: {
     organizationId: string;
@@ -360,9 +368,9 @@ export interface OrganizationApi {
     }>,
   ): Promise<AuthzAccessBreakdownOutput>;
   /**
-   * Makes somebody a MEMBER (ADR-129). With `admittedBy` the grant lands now,
-   * audited to that actor; without it an SSO arrival resumes the admission.
-   * `"already-present"` when a concurrent callback or a retry made the row.
+   * Admits somebody on the joiner seat (ADR-129, ADR-171): a MEMBER's grant lands now with
+   * `admittedBy` or an SSO arrival resumes it; a DEVELOPER's row is the whole admission.
+   * `seat` is the row's role; `"already-present"` is a concurrent callback or a retry.
    */
   createMembership(
     input: Readonly<{
@@ -370,7 +378,7 @@ export interface OrganizationApi {
       userId: string;
       admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
     }>,
-  ): Promise<"created" | "already-present">;
+  ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,
@@ -772,6 +780,7 @@ export interface OrganizationApi {
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      joinerRole?: JoinRequestJoining["joinerRole"];
       actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged>;

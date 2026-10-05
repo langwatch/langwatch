@@ -28,8 +28,13 @@ export interface MemoryOrganizationRow {
   /** How colleagues on a matching domain get in; absent reads as asking. */
   domainJoin?: JoinRequestJoining["domainJoin"];
   joinDomains?: string[];
+  /** The seat a joiner without an invitation lands on (ADR-171); absent reads as MEMBER. */
+  joinerRole?: "MEMBER" | "DEVELOPER";
   /** The CLI/device session ceiling in days; absent reads as unbounded. */
   maxSessionDurationDays?: number;
+  /** The organization's own Instant Evals consent; absent reads as not given. */
+  instantEvalsEnabledAt?: Instant | null;
+  instantEvalsEnabledByUserId?: string | null;
   createdAt: Instant;
   updatedAt: Instant;
 }

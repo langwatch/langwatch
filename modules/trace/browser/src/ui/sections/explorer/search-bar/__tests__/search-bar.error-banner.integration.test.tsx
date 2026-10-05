@@ -18,6 +18,10 @@ vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 
+vi.mock("../../hooks/use-instant-eval-access.ts", () => ({
+  useInstantEvalAccess: () => ({ isAvailable: true, optInOffer: undefined }),
+}));
+
 vi.mock("../use-instant-eval-route.ts", () => ({
   useInstantEvalRoute: () => ({
     onInstantEvalRoute: vi.fn(),
@@ -27,6 +31,8 @@ vi.mock("../use-instant-eval-route.ts", () => ({
     searchWordsInstead: vi.fn(),
     refusal: null,
     dismissRefusal: vi.fn(),
+    enableInstantEvals: vi.fn(),
+    isEnabling: false,
     isEstimating: false,
     isStarting: false,
   }),

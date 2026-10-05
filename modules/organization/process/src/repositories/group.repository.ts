@@ -18,6 +18,7 @@ export abstract class GroupRepository {
     groupId: string;
     organizationId: string;
   }): Promise<OrganizationGroupMember[]>;
+  /** The people each group's bindings reach: a Developer seat is in none of them (ADR-171). */
   abstract findMembersForGroups(input: {
     groupIds: string[];
     organizationId: string;

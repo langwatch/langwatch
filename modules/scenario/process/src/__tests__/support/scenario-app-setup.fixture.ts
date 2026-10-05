@@ -13,6 +13,8 @@ export const scenarioTestConfig: ScenarioServerConfig = {
   langwatchEndpoint: void 0,
   voicePublicBaseUrl: void 0,
   voiceTunnel: false,
+  isSaas: false,
+  nodeEnvironment: "test",
   voiceWorkerOnly: false,
   consumedResourceClasses: ["light", "voice"],
   slotBudget: 3,

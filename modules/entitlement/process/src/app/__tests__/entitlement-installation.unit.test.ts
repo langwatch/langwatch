@@ -114,7 +114,7 @@ describe("entitlement app installation", () => {
               projectIds.map((projectId) => ({ projectId, count: 7 })),
           }),
           organization: createApiFixture<OrganizationApi>({
-            countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0 }),
+            countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
           }),
           project: createApiFixture<ProjectApi>({
             listIdsByOrganization: async () => ["project-1"],
@@ -183,7 +183,7 @@ describe("entitlement app installation", () => {
           billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
           trace: createApiFixture<TraceApi>({}),
           organization: createApiFixture<OrganizationApi>({
-            countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0 }),
+            countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
           }),
           project: createApiFixture<ProjectApi>({}),
           licensing: createApiFixture<LicensingApi>({

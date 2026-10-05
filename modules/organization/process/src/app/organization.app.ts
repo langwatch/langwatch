@@ -725,6 +725,14 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.organizations.saveSessionPolicy(input);
   }
 
+  isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean> {
+    return this.#dependencies.organizations.isInstantEvalsOptedIn(input);
+  }
+
+  recordInstantEvalsOptIn(input: { organizationId: string; userId: string }): Promise<void> {
+    return this.#dependencies.organizations.recordInstantEvalsOptIn(input);
+  }
+
   readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord> {
     return this.#dependencies.organizations.readGuidedOnboardingState(input);
   }
@@ -1579,11 +1587,12 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   async countMemberSeats(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationMemberSeats> {
-    const [fullMembers, liteMembers] = await Promise.all([
+    const [fullMembers, liteMembers, developers] = await Promise.all([
       this.#members.seatCounts.getMemberCount(input.organizationId),
       this.#members.seatCounts.getMembersLiteCount(input.organizationId),
+      this.#members.seatCounts.getMembersDeveloperCount(input.organizationId),
     ]);
-    return { fullMembers, liteMembers };
+    return { fullMembers, liteMembers, developers };
   }
 
   /** organization_seat_limit: organization records the fact, billing subscribes (§9). */
@@ -1938,6 +1947,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      joinerRole?: JoinRequestJoining["joinerRole"];
       actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged> {

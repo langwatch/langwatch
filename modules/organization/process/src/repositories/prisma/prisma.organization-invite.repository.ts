@@ -1,14 +1,21 @@
 import type { GrantScopeTier } from "@langwatch/authz-contract";
-import { InviteNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
+import {
+  InviteNotFoundError,
+  OrganizationNotFoundError,
+  OrganizationUserRole,
+} from "@langwatch/organization-contract";
 import type {
   Organization,
   OrganizationInvite,
   OrganizationUser,
-  OrganizationUserRole,
 } from "@langwatch/organization-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
 
+import {
+  DEVELOPER_ADMISSION_AUDIT_ACTION,
+  type DeveloperAdmissionVia,
+} from "../../rules/admission-audit.rules.ts";
 import {
   OrganizationInviteRepository,
   type InviteWithOrganization,
@@ -389,14 +396,28 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     userId,
     organizationId,
     role,
+    admission,
   }: {
     userId: string;
     organizationId: string;
     role: OrganizationUserRole;
+    admission?: { inviteId: string; actorUserId: string | null };
   }): Promise<void> {
-    await this.prisma.organizationUser.createMany({
+    const { count } = await this.prisma.organizationUser.createMany({
       data: [{ userId, organizationId, role }],
       skipDuplicates: true,
+    });
+    // A Developer gets no grant to audit, so its admission is recorded here (ADR-171).
+    if (count === 0 || role !== OrganizationUserRole.DEVELOPER || !admission) return;
+    const via: DeveloperAdmissionVia = "invite";
+    await this.prisma.auditLog.create({
+      data: {
+        action: DEVELOPER_ADMISSION_AUDIT_ACTION,
+        userId,
+        actorUserId: admission.actorUserId,
+        organizationId,
+        metadata: { seat: role, inviteId: admission.inviteId, via },
+      },
     });
   }
 

@@ -17,6 +17,7 @@ import type {
   User,
 } from "@langwatch/organization-contract";
 
+import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
 
 export type TeamWithProjects = Team & {
@@ -422,15 +423,16 @@ export abstract class OrganizationMembershipRepository {
   }) => Promise<MemberTeamBinding[]>;
 
   /**
-   * Makes somebody a MEMBER, carrying the grant intent an unfinished
-   * admission is resumed from (ADR-129). A row that is already there is
-   * `"already-present"` — a concurrent callback or a retry, not a failure.
+   * Admits somebody on the joiner seat (ADR-171): a MEMBER carries the grant
+   * intent an unfinished admission resumes from (ADR-129), a DEVELOPER none.
+   * A row already there is `"already-present"`: a retry, not a failure.
    */
   abstract createMembership: (input: {
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
-  }) => Promise<"created" | "already-present">;
+    via: DeveloperAdmissionVia;
+  }) => Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
 
   abstract deleteMember: (input: DeleteMemberInput) => Promise<void>;
 

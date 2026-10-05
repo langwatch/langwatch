@@ -407,6 +407,7 @@ describe("phoneTransport", () => {
         expect(thrown).toBeInstanceOf(VoicePublicBaseUrlMissingError);
         expect((thrown as Error).message).toContain("VOICE_PUBLIC_BASE_URL");
         expect((thrown as Error).message).toContain("cloudflared");
+        expect((thrown as Error).message).toContain("VOICE_TUNNEL=true");
         // The adapter was never built, so the SDK factory never ran and no dial
         // could have gone out against the app's own host.
         expect(factoryOptions).toHaveLength(0);
