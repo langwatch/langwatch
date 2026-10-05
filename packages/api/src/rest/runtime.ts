@@ -1,4 +1,9 @@
-import { actorSchema, type Actor, type AuthzDeclaredScopeId } from "@langwatch/authorization";
+import {
+  actorSchema,
+  type Actor,
+  type AuthzDeclaredScopeId,
+  type AuthzPermission,
+} from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, validationMeta } from "@langwatch/observability";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
@@ -20,6 +25,7 @@ import {
 } from "../access-policy.ts";
 import {
   assertRouteScopePermission,
+  chosenPermission,
   decide,
   decideEntitlement,
   refuseImpersonatedMint,
@@ -51,6 +57,7 @@ import {
 import {
   DOOR_SCOPE_TIER,
   permissionOf,
+  routePermissions,
   type RestDeprecation,
   type RestDoorCredential,
   type RestRouteAnswers,
@@ -75,6 +82,7 @@ import {
   bodyLimit,
   cachedRestAnswer,
   isBodyAbsent,
+  MalformedRequestError,
   loggerMiddleware,
   multipartMiddleware,
   refusingMalformedBody,
@@ -345,20 +353,16 @@ function assertPortsBound<Api>({
 
     assertReachDoor({ address, route, credential: route.credential ?? declaration.credential });
 
-    if (route.permissionTarget && !door.authorize) {
-      throw new Error(
-        `REST ${address} checks "${route.permission}" at the scope its path names, and this ` +
-          "runtime supplied no identity.authorize",
-      );
-    }
+    assertAfterBodyPorts({
+      address,
+      route,
+      door,
+      credential: route.credential ?? declaration.credential,
+    });
 
-    const identified =
-      route.access?.kind === "authenticated" ||
-      route.access?.kind === "deferred" ||
-      ((route.credential ?? declaration.credential) === "browser" &&
-        Boolean(route.permissionTarget));
+    const credential = route.credential ?? declaration.credential;
 
-    if (identified && !door.identify) {
+    if (identifiedFirst({ route, credential }) && !door.identify) {
       throw new Error(
         `REST ${address} answers behind the family's door with no permission, and this runtime ` +
           "supplied no identity.identify",
@@ -374,6 +378,55 @@ function assertPortsBound<Api>({
       );
     }
   }
+}
+
+/** Whether the door only identifies the caller, leaving the permission to be asked later. */
+function identifiedFirst({
+  route,
+  credential,
+}: {
+  route: RestTransportRoute<unknown>;
+  credential: RestDoorCredential;
+}): boolean {
+  if (route.access?.kind === "authenticated" || route.access?.kind === "deferred") return true;
+
+  return (
+    Boolean(route.permissionBy) || (credential === "browser" && Boolean(route.permissionTarget))
+  );
+}
+
+/**
+ * A permission asked once the body is read needs the door's `authorize`; and a browser session
+ * names no scope, so a choice asked at the credential's own scope would have none.
+ */
+function assertAfterBodyPorts({
+  address,
+  route,
+  door,
+  credential,
+}: {
+  address: string;
+  route: RestTransportRoute<unknown>;
+  door: RestIdentity;
+  credential: RestDoorCredential;
+}): void {
+  if ((route.permissionTarget || route.permissionBy) && !door.authorize) {
+    throw new Error(
+      `REST ${address} checks "${routePermissions(route).join(", ")}" after its door, at a ` +
+        "scope its input names, and this runtime supplied no identity.authorize",
+    );
+  }
+
+  if (!route.permissionBy || route.permissionTarget || credential !== "browser") return;
+
+  const bare = Object.values(route.permissionBy.map).some((entry) => typeof entry === "string");
+
+  if (!bare) return;
+
+  throw new Error(
+    `REST ${address} asks a permission its input chooses at the credential's own scope, and ` +
+      "the browser door resolves none: name the scope on the entry or the route",
+  );
 }
 
 /** A permission reach is the key door's question; behind any other door it has no answer. */
@@ -834,7 +887,7 @@ function validators({
   }
 
   add("query", route.query);
-  add("json", route.input);
+  add("json", route.arrayBody?.schema ?? route.input);
 
   return stack;
 }
@@ -852,6 +905,8 @@ function readingAbsentBody({
   validate: MiddlewareHandler;
 }): MiddlewareHandler {
   if (target !== "json" || route.multipart || route.rawBody) return validate;
+
+  if (route.arrayBody) return absentBodyRefused({ validate });
 
   return absentBodyAsEmptyObject({ schema, validate });
 }
@@ -888,6 +943,17 @@ function absentBodyAsEmptyObject({
   return Object.assign(middleware, validate);
 }
 
+/** An array route is never a bodiless action, so an absent body is the 400 a broken one is. */
+function absentBodyRefused({ validate }: { validate: MiddlewareHandler }): MiddlewareHandler {
+  const middleware: MiddlewareHandler = async (context, next) => {
+    if (!(await isBodyAbsent(context.req))) return validate(context, next);
+
+    throw new MalformedRequestError({ target: "json", detail: "No body was sent" });
+  };
+
+  return Object.assign(middleware, validate);
+}
+
 /** The one validated handler input: path, query and body fields, flattened. */
 function inputMiddleware({
   route,
@@ -904,7 +970,8 @@ function inputMiddleware({
 
     const query = route.query ? context.req.valid("query" as never) : undefined;
     const json = route.input ? context.req.valid("json" as never) : undefined;
-    const body = route.multipart ? context.get(ROUTE_FORM_FIELDS) : json;
+    const sent = route.arrayBody ? { [route.arrayBody.as]: json } : json;
+    const body = route.multipart ? context.get(ROUTE_FORM_FIELDS) : sent;
 
     context.set(ROUTE_INPUT, mergeInput({ params, query, body }));
     await next();
@@ -963,13 +1030,11 @@ function decideRouteCaller<Api>({
   caller: RestCaller;
   input: unknown;
 }) {
-  const permission = route.access ? void 0 : permissionOf(route.permission);
-
   return decide({
     declaration: {
       kind: "service-authorized",
       reason: route.access?.reason ?? options.reason ?? HOST_ENFORCED,
-      permissions: permission === void 0 ? [] : [permission],
+      permissions: routePermissions(route),
     },
     caller: { actor: normalizedActor(caller.actor), scope: caller.scope },
     input,
@@ -1563,27 +1628,67 @@ async function checkRouteScope({
   input: unknown;
   context: Context;
 }): Promise<AuthzDeclaredScopeId | null> {
-  if (!route.permissionTarget) return null;
+  const asked = askedAfterBody({ route, caller, input, context });
 
-  const permission = permissionOf(route.permission);
+  if (!asked) return null;
 
-  const scopeInput =
-    route.permissionTarget.at === "header"
-      ? headerScopeInput(route, context, route.permissionTarget)
-      : pathScopeInput(route.permissionTarget, input);
+  for (const permission of asked.permissions) {
+    const decision = await requireAuthorize(door)({ caller, permission, target: asked.target });
 
-  const target = routeScopeOf({ param: route.permissionTarget.param, input: scopeInput });
+    assertRouteScopePermission({
+      permission,
+      target: asked.target,
+      decision,
+      ...(ports.denials ? { denials: ports.denials } : {}),
+    });
+  }
 
-  const decision = await requireAuthorize(door)({ caller, permission, target });
+  return asked.named ? asked.target : null;
+}
 
-  assertRouteScopePermission({
-    permission,
-    target,
-    decision,
-    ...(ports.denials ? { denials: ports.denials } : {}),
-  });
+/**
+ * What is asked once the body is read, in order, and where: the permissions a route asks at
+ * the scope its own path names, or the one its input chose. `named` is false when that scope
+ * is the credential's own, which the handler is handed as its scope rather than its target.
+ */
+function askedAfterBody({
+  route,
+  caller,
+  input,
+  context,
+}: {
+  route: RestTransportRoute<unknown>;
+  caller: RestCaller;
+  input: unknown;
+  context: Context;
+}): Readonly<{
+  permissions: readonly AuthzPermission[];
+  target: AuthzDeclaredScopeId;
+  named: boolean;
+}> | null {
+  const chosen = route.permissionBy
+    ? chosenPermission({ declared: route.permissionBy, input })
+    : null;
 
-  return target;
+  if (chosen?.scope) return { permissions: [chosen.permission], target: chosen.scope, named: true };
+
+  const permissions = chosen ? [chosen.permission] : routePermissions(route);
+
+  if (route.permissionTarget) {
+    const scopeInput =
+      route.permissionTarget.at === "header"
+        ? headerScopeInput(route, context, route.permissionTarget)
+        : pathScopeInput(route.permissionTarget, input);
+    const target = routeScopeOf({ param: route.permissionTarget.param, input: scopeInput });
+
+    return { permissions, target, named: true };
+  }
+
+  if (!chosen) return null;
+
+  if (!caller.scope) throw new Error(`REST ${route.operation} chose a permission with no scope`);
+
+  return { permissions, target: caller.scope, named: false };
 }
 
 /**
@@ -1608,6 +1713,11 @@ async function callerOf({
 
   if (credential === "browser" && route.permissionTarget) return requireIdentify(door)({ request });
 
+  // Chosen from the input, so asked once the body is read; the door only says who is calling.
+  if (route.permissionBy) {
+    return requireIdentify(door)({ request, ...(rawBody === void 0 ? {} : { rawBody }) });
+  }
+
   if (kind === "optional") return requireIdentifyOptional(door)({ request });
 
   if (kind === "authenticated" || kind === "deferred")
@@ -1616,6 +1726,7 @@ async function callerOf({
   return door.authenticate({
     request,
     permission: permissionOf(route.permission),
+    permissions: routePermissions(route),
     ...(route.permissionReach ? { reach: route.permissionReach } : {}),
   });
 }
@@ -2520,7 +2631,7 @@ function registryPolicy<Api>({
   return handlerManagedAuth({
     reason: route.access?.reason ?? reason,
     credential: HANDLER_CREDENTIAL[credential],
-    permissions: route.access ? [] : [permissionOf(route.permission)],
+    permissions: routePermissions(route),
   });
 }
 

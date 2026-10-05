@@ -189,3 +189,19 @@ Feature: tRPC framework boundary
     Then the row its audit trail writes names the organization that holds the project as its organization and its target, beside the project
     And a declaration naming a field its input does not carry, made on a query, or made twice, is refused where it is written
     And a process that cannot say which organization holds a project is refused at the mount, naming the procedure
+
+  @unit
+  Scenario: A procedure chooses its permission from its parsed input
+    Given a procedure whose permission depends on a value its input carries, such as the tier a scope names
+    When it declares a map from each value of that field to the permission it asks, and the tier and input field of the scope it is asked at (Alex, 2026-10-05, E3)
+    Then the permission the value chose is asked before the handler, at the scope its entry names, else at the procedure's own scope field
+    And a caller lacking it is refused with permission_denied naming that permission, and the handler never runs
+    And a blank scope id is the caller's validation error
+    And a map whose keys are not exactly the values the field parses as, or an entry naming a tier that cannot grant its permission, is refused where it is written, and by the compiler where the input is known
+
+  @unit
+  Scenario: A procedure asks whether its tenant holds a named plan capability
+    Given a procedure declares that its tenant must hold the webhook endpoints capability (Alex, 2026-10-05, E6)
+    When a caller the access check admitted reaches it
+    Then the plan is asked about that capability by name, at the scope access resolved
+    And a tenant without it is refused with the refusal the process gives for that capability, before the handler

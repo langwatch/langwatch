@@ -51,8 +51,8 @@ import {
   decideEntitlement,
   declareAccessMiddleware,
   SCOPE_INPUT_FIELDS,
+  permissionsTogether,
   refuseImpersonatedMint,
-  sharedGrantTiers,
   type AccessDeclaration,
   type AccessDenial,
   type ApiEntitlement,
@@ -64,6 +64,11 @@ import {
   type PublicRouteAccess,
 } from "../access/access.ts";
 import type { AuthzDeclaration, EnforcedScopeFields } from "../access/declared-middleware.ts";
+import {
+  assertInputPermission,
+  type ExactInputPermission,
+  type InputPermission,
+} from "../access/input-permission.ts";
 import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
 import {
@@ -470,6 +475,14 @@ export interface TrpcRouterAccess<
    * does not carry, and on a procedure that runs with no caller.
    */
   withAudit(target: TrpcAuditTarget): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  /**
+   * The permission the parsed input chooses (`permissionBy`): its map names every value the
+   * field holds. A bare entry is asked at `via`'s scope, an entry with a tier at its own field.
+   */
+  withPermission<const Choice extends InputPermission>(
+    choice: Choice & ExactInputPermission<z.output<Contract["members"][Name]["input"]>, Choice>,
+    options?: { via: ScopeTierField },
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
   withPermission(
     access: AuthzPermission | AuthzDeclaration,
   ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
@@ -575,7 +588,11 @@ function mountRouter<Api, Contract extends TrpcContract>(
   };
 }
 
-type PermissionArgument = AuthzPermission | AuthzDeclaration | readonly AuthzPermission[];
+type PermissionArgument =
+  | AuthzPermission
+  | AuthzDeclaration
+  | InputPermission
+  | readonly AuthzPermission[];
 
 /** What a selected procedure has declared beside its facts, before its access. */
 type ProcedureMarks = Readonly<{
@@ -747,6 +764,23 @@ function permissionDeclarationOf({
     return permissionAllOf({ contract, name, permissions: access, via });
   }
 
+  if (access.kind === "permission-by-input") {
+    const input = contract.members[name]?.input;
+
+    assertInputPermission({
+      address: `tRPC ${contract.namespace}.${name}`,
+      declared: access,
+      schemas: input ? [input] : [],
+    });
+
+    return {
+      kind: "permission-by-input",
+      field: access.field,
+      map: access.map,
+      ...(via ? { via } : {}),
+    };
+  }
+
   if (access.kind === "custom") {
     throw new Error("a tRPC router cannot declare a custom access check");
   }
@@ -787,29 +821,12 @@ function permissionAllOf({
   permissions: readonly AuthzPermission[];
   via?: ScopeTierField;
 }): AccessDeclaration {
-  const address = `tRPC ${contract.namespace}.${name}`;
+  const together = permissionsTogether({
+    address: `tRPC ${contract.namespace}.${name}`,
+    permissions,
+  });
 
-  if (permissions.length < 2) {
-    throw new Error(`${address} names ${permissions.length} permissions to check together`);
-  }
-
-  if (new Set(permissions).size !== permissions.length) {
-    throw new Error(`${address} names one permission twice among the ones it checks together`);
-  }
-
-  if (sharedGrantTiers(permissions).length === 0) {
-    throw new Error(
-      `${address} checks ${permissions.join(" and ")} together, and no one scope grants them all`,
-    );
-  }
-
-  const [first, second, ...rest] = permissions as [
-    AuthzPermission,
-    AuthzPermission,
-    ...AuthzPermission[],
-  ];
-
-  return { kind: "permission-all", permissions: [first, second, ...rest], ...(via ? { via } : {}) };
+  return { kind: "permission-all", permissions: together, ...(via ? { via } : {}) };
 }
 
 /**

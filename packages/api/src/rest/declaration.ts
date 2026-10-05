@@ -16,6 +16,7 @@ import type * as httpStatusModule from "hono/utils/http-status";
 import { z } from "zod";
 
 import {
+  permissionsTogether,
   SCOPE_INPUT_FIELDS,
   type ApiEntitlement,
   type Credential,
@@ -23,6 +24,13 @@ import {
   type EntitlementOptions,
   type RouteAccess,
 } from "../access/access.ts";
+import {
+  assertInputPermission,
+  isInputPermission,
+  permissionsOfChoice,
+  type ExactInputPermission,
+  type InputPermission,
+} from "../access/input-permission.ts";
 import { PayloadTooLargeError } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
 import {
@@ -102,6 +110,10 @@ type DistinctSchema<
     ? Schema
     : never
   : Schema;
+/** An array body as the handler is handed it: the array, under the name the route gave it. */
+type RestArrayBody<Field extends string, Item extends z.ZodType> = z.ZodObject<{
+  [Key in Field]: z.ZodArray<Item>;
+}>;
 type SourceInput<Schema extends RouteSource> = Schema extends SourceSchema
   ? z.output<Schema>
   : unknown;
@@ -449,8 +461,14 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly docs?: RestTransportDocs;
   readonly params?: z.ZodObject;
   readonly input?: SourceSchema;
-  /** Absent exactly when the route declared an access kind instead. */
+  /** Present exactly when the body is a JSON array: `input` is then `{ [as]: schema }`. */
+  readonly arrayBody?: RestArrayBodyDeclared;
+  /** The one permission, or the first of several; absent with an access kind or `permissionBy`. */
   readonly permission?: AuthzPermission;
+  /** Present exactly when the route asks several permissions together, in this order. */
+  readonly permissions?: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]];
+  /** Present exactly when the permission is chosen from the parsed input. */
+  readonly permissionBy?: InputPermission;
   /** Where that permission is asked; absent means at the credential's scope. */
   readonly permissionTarget?: RestPermissionTarget;
   /** How far the key door asks it; absent means the key's project, else its organization. */
@@ -519,10 +537,14 @@ export type RestTransportDeclaration<Api> = Readonly<{
   readonly routes: readonly RestTransportRoute<Api>[];
 }>;
 
+/** The array a body is validated as, and the input field it is handed under. */
+export type RestArrayBodyDeclared = Readonly<{ as: string; schema: z.ZodArray }>;
+
 /** Everything a route has declared so far, before `handle` freezes it. */
 type RouteState = Readonly<{
   params?: z.ZodObject;
   input?: SourceSchema;
+  arrayBody?: RestArrayBodyDeclared;
   query?: z.ZodObject;
   output?: OutputSchema;
   answers?: RestRouteAnswers;
@@ -539,6 +561,8 @@ type RouteState = Readonly<{
   methods?: readonly HttpMethod[];
   anyMethod?: boolean;
   permission?: AuthzPermission;
+  permissions?: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]];
+  permissionBy?: InputPermission;
   permissionTarget?: RestPermissionTarget;
   permissionReach?: RestPermissionReach["at"];
   access?: RouteAccess;
@@ -673,19 +697,42 @@ class RouteBuilder<Api, S extends RouteShape> {
     });
   }
 
+  /**
+   * A JSON array body (E1): validated as sent, and handed as `input[as]` beside the path and
+   * query fields. An absent body is refused 400, as an array route is never bodiless.
+   */
+  withInput<Item extends z.ZodType, const Field extends string>(
+    this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
+    schema: z.ZodArray<Item>,
+    options: Readonly<{ as: Field }> &
+      (Field extends UnionKeys<SourceInput<S["params"]>> | UnionKeys<SourceInput<S["query"]>>
+        ? never
+        : unknown),
+  ): RouteBuilder<
+    Api,
+    With<S, { method: Exclude<HttpMethod, "get" | "head">; body: RestArrayBody<Field, Item> }>
+  >;
   withInput<Schema extends SourceSchema>(
     this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
     schema: Schema & DistinctSchema<Schema, S["params"]> & DistinctSchema<Schema, S["query"]>,
-  ): RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head">; body: Schema }>> {
+  ): RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head">; body: Schema }>>;
+  withInput(
+    this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
+    declared: SourceSchema | z.ZodArray,
+    options?: Readonly<{ as: string }>,
+  ): unknown {
     assertBodyMethod(this.method, this.path);
     assertSourceUnset("input", this.state.input);
     assertParsedBodyFree({ operation: this.operation, state: this.state });
+
+    const { schema, arrayBody } = bodySourceOf({ operation: this.operation, declared, options });
+
     assertDistinctSources(this.state.params, schema);
     assertDistinctSources(this.state.query, schema);
 
     return new RouteBuilder<
       Api,
-      With<S, { method: Exclude<HttpMethod, "get" | "head">; body: Schema }>
+      With<S, { method: Exclude<HttpMethod, "get" | "head">; body: SourceSchema }>
     >({
       router: this.router,
       method: this.method,
@@ -694,6 +741,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       state: {
         ...this.state,
         input: schema,
+        ...(arrayBody ? { arrayBody } : {}),
       },
     });
   }
@@ -906,6 +954,23 @@ class RouteBuilder<Api, S extends RouteShape> {
   withPermission(
     permission: AuthzPermission,
     target?: RestPermissionTarget | RestPermissionReach,
+  ): RouteBuilder<Api, With<S, { permission: true }>>;
+  /** Every one of them, asked in this order before the handler; naming an array says AND (E2). */
+  withPermission(
+    permissions: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]],
+    target?: RestPermissionTarget | RestPermissionReach,
+  ): RouteBuilder<Api, With<S, { permission: true }>>;
+  /**
+   * The permission the parsed input chooses (`permissionBy`, E3): the door only identifies, and
+   * the choice is asked after the body, at the entry's own scope, `target`'s, or the credential's.
+   */
+  withPermission<const Choice extends InputPermission>(
+    choice: Choice & ExactInputPermission<RouteInput<S["params"], S["query"], S["body"]>, Choice>,
+    target?: RestPermissionTarget,
+  ): RouteBuilder<Api, With<S, { permission: true }>>;
+  withPermission(
+    declared: AuthzPermission | readonly AuthzPermission[] | InputPermission,
+    target?: RestPermissionTarget | RestPermissionReach,
   ): RouteBuilder<Api, With<S, { permission: true }>> {
     const reach = target?.at === "grants" || target?.at === "organization" ? target.at : void 0;
     const scoped = target && "param" in target ? target : void 0;
@@ -917,7 +982,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       operation: this.operation,
       state: {
         ...this.state,
-        permission,
+        ...permissionParts({ operation: this.operation, declared, reach }),
         ...(scoped ? { permissionTarget: scoped } : {}),
         ...(reach ? { permissionReach: reach } : {}),
       },
@@ -1183,6 +1248,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       ...(this.state.docs ? { docs: this.state.docs } : {}),
       ...(this.state.params ? { params: this.state.params } : {}),
       ...(this.state.input ? { input: this.state.input } : {}),
+      ...(this.state.arrayBody ? { arrayBody: this.state.arrayBody } : {}),
       ...(this.state.query ? { query: this.state.query } : {}),
       ...accessParts(this.state),
       output: this.state.output ?? successAnswerOf(this.state.answers) ?? z.void(),
@@ -1328,12 +1394,20 @@ function accessParts(
   state: RouteState,
 ): Pick<
   RestTransportRoute<unknown>,
-  "access" | "permission" | "permissionTarget" | "permissionReach"
+  "access" | "permission" | "permissions" | "permissionBy" | "permissionTarget" | "permissionReach"
 > {
   if (state.access) return { access: state.access };
 
+  if (state.permissionBy) {
+    return {
+      permissionBy: state.permissionBy,
+      ...(state.permissionTarget ? { permissionTarget: state.permissionTarget } : {}),
+    };
+  }
+
   return {
     permission: permissionOf(state.permission),
+    ...(state.permissions ? { permissions: state.permissions } : {}),
     ...(state.permissionTarget ? { permissionTarget: state.permissionTarget } : {}),
     ...(state.permissionReach ? { permissionReach: state.permissionReach } : {}),
   };
@@ -1790,11 +1864,13 @@ function assertRouteReady({
   operation: string;
   state: RouteState;
 }): void {
-  if (!state.permission && !state.access) {
+  const permitted = state.permission ?? state.permissionBy;
+
+  if (!permitted && !state.access) {
     throw new Error(`REST ${operation} must declare withPermission() or withAccess()`);
   }
 
-  if (state.permission && state.access) {
+  if (permitted && state.access) {
     throw new Error(`REST ${operation} declares both a permission and ${state.access.kind} access`);
   }
 
@@ -1805,6 +1881,16 @@ function assertRouteReady({
   }
 
   if (state.permissionTarget) assertPermissionTarget({ operation, state });
+
+  if (state.permissionBy) {
+    assertInputPermission({
+      address: `REST ${operation}`,
+      declared: state.permissionBy,
+      schemas: [state.params, state.query, state.input].filter(
+        (schema): schema is SourceSchema => schema !== void 0,
+      ),
+    });
+  }
 
   assertAnyMethodAnswer({ operation, state });
 
@@ -2168,6 +2254,62 @@ function assertNoScopeInput({
       `REST ${operation} answers without a credential, so it cannot take "${named}" as input`,
     );
   }
+}
+
+/** Every permission a route can ask, in declared order; none for a route with an access kind. */
+export function routePermissions(route: RestTransportRoute<unknown>): readonly AuthzPermission[] {
+  if (route.access) return [];
+  if (route.permissionBy) return permissionsOfChoice(route.permissionBy);
+
+  return route.permissions ?? [permissionOf(route.permission)];
+}
+
+/** One permission, several together, or a choice from the input, as the route state holds them. */
+function permissionParts({
+  operation,
+  declared,
+  reach,
+}: {
+  operation: string;
+  declared: AuthzPermission | readonly AuthzPermission[] | InputPermission;
+  reach: RestPermissionReach["at"] | undefined;
+}): Pick<RouteState, "permission" | "permissions" | "permissionBy"> {
+  if (typeof declared === "string") return { permission: declared };
+
+  if (isInputPermission(declared)) {
+    // The key door asks a reach while it authenticates; a choice is asked after the body.
+    if (reach) {
+      throw new Error(`REST ${operation} chooses its permission from its input, so takes no reach`);
+    }
+
+    return { permissionBy: declared };
+  }
+
+  const permissions = permissionsTogether({ address: `REST ${operation}`, permissions: declared });
+
+  return { permission: permissions[0], permissions };
+}
+
+/** The input a body contributes; an array is handed under the field it names, `{ [as]: array }`. */
+function bodySourceOf({
+  operation,
+  declared,
+  options,
+}: {
+  operation: string;
+  declared: SourceSchema | z.ZodArray;
+  options: Readonly<{ as: string }> | undefined;
+}): Readonly<{ schema: SourceSchema; arrayBody?: RestArrayBodyDeclared }> {
+  if (!(declared instanceof z.ZodArray)) return { schema: declared };
+
+  if (!options?.as) {
+    throw new Error(`REST ${operation} declares an array body and names no field to hand it under`);
+  }
+
+  return {
+    schema: z.object({ [options.as]: declared }),
+    arrayBody: { as: options.as, schema: declared },
+  };
 }
 
 export function permissionOf(permission: AuthzPermission | undefined): AuthzPermission {

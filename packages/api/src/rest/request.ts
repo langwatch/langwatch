@@ -151,7 +151,7 @@ function violationOf(issue: ZodIssue, input: unknown): FieldViolation {
  * Hono raises this as an `HTTPException` before any schema runs; this only
  * gives it a code.
  */
-class MalformedRequestError extends HandledError {
+export class MalformedRequestError extends HandledError {
   constructor(args: { target: keyof ValidationTargets; detail: string }) {
     super("malformed_request", `The ${TARGET_NOUN[args.target]} could not be parsed.`, {
       httpStatus: 400,

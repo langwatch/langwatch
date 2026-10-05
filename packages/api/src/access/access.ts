@@ -32,6 +32,7 @@ import {
   declareAuthzMiddleware,
   type AuthzDeclaration,
 } from "./declared-middleware.ts";
+import { permissionsOfChoice, valueAtPath, type InputPermission } from "./input-permission.ts";
 
 const logger = createLogger("langwatch:authz");
 
@@ -46,15 +47,23 @@ export type PermissionAllDeclaration = Readonly<
   }
 >;
 
+/** A permission chosen from the parsed input; `via` is where a bare entry is asked. */
+export type InputPermissionDeclaration = InputPermission & Readonly<{ via?: ScopeTierField }>;
+
 export type AccessDeclaration =
   | Exclude<AuthzDeclaration, { kind: "custom" | "public" | "permission-all" }>
-  | PermissionAllDeclaration;
+  | PermissionAllDeclaration
+  | InputPermissionDeclaration;
 
 export function declareAccessMiddleware<M extends (params: never) => Promise<unknown>>(
   declaration: AccessDeclaration | PublicRouteAccess,
   middleware: M,
 ): M {
-  if (declaration.kind !== "permission-all" && declaration.kind !== "public") {
+  if (
+    declaration.kind !== "permission-all" &&
+    declaration.kind !== "public" &&
+    declaration.kind !== "permission-by-input"
+  ) {
     return declareAuthzMiddleware(declaration, middleware);
   }
 
@@ -75,6 +84,34 @@ export function sharedGrantTiers(
       shared.filter((tier) => permissionGrantTiers(permission).includes(tier)),
     permissions[0] ? permissionGrantTiers(permissions[0]) : [],
   );
+}
+
+/**
+ * Several permissions asked together, at one scope. A set that names fewer than two, repeats
+ * one, or shares no tier it could all be asked at is refused where it is written.
+ */
+export function permissionsTogether({
+  address,
+  permissions,
+}: {
+  address: string;
+  permissions: readonly AuthzPermission[];
+}): readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]] {
+  if (permissions.length < 2) {
+    throw new Error(`${address} names ${permissions.length} permissions to check together`);
+  }
+
+  if (new Set(permissions).size !== permissions.length) {
+    throw new Error(`${address} names one permission twice among the ones it checks together`);
+  }
+
+  if (sharedGrantTiers(permissions).length === 0) {
+    throw new Error(
+      `${address} checks ${permissions.join(" and ")} together, and no one scope grants them all`,
+    );
+  }
+
+  return permissions as readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]];
 }
 
 /** Which credential reaches a REST route, as the document names it. */
@@ -303,6 +340,8 @@ export async function decide({
       return decidePermissionAny({ declaration, caller, input, authorize, denials });
     case "permission-all":
       return decidePermissionAll({ declaration, caller, input, authorize, denials });
+    case "permission-by-input":
+      return decidePermissionByInput({ declaration, caller, input, authorize, denials });
     case "no-permission":
       assertNoSensitiveScope({ declaration, input });
       return { actor: caller.actor, scope: credentialScope };
@@ -450,12 +489,83 @@ async function decidePermissionAll({
   return { actor, scope };
 }
 
+async function decidePermissionByInput({
+  declaration,
+  caller,
+  input,
+  authorize,
+  denials,
+}: {
+  declaration: InputPermissionDeclaration;
+  caller: Caller;
+  input: unknown;
+  authorize?: Authorize;
+  denials?: AccessDenial;
+}): Promise<AccessDecision> {
+  const { actor } = requireCaller(caller);
+  const decisions = requireAuthorize({ authorize, kind: declaration.kind });
+  const { permission, scope: named } = chosenPermission({ declared: declaration, input });
+
+  const scope =
+    named ??
+    requireDeclaredScope({
+      permission,
+      input,
+      ...(declaration.via ? { via: declaration.via } : {}),
+    });
+
+  const decision = await decisions.getDecision({ userId: actor.id, permission, scope });
+
+  if (!decision.permitted) throw denied({ permission, scope, decision, denials });
+
+  return { actor, scope };
+}
+
 /**
- * What a declaration may ask the process to confirm the tenant behind the
- * request holds. One name today; the union is the runtime's own so a route
- * cannot invent one no process answers for.
+ * The permission the parsed input chose, and the scope its entry names; `null` when the entry
+ * is the permission alone and is asked where the declaration's own target says.
  */
-export type ApiEntitlement = "enterprise";
+export function chosenPermission({
+  declared,
+  input,
+}: {
+  declared: InputPermission;
+  input: unknown;
+}): Readonly<{ permission: AuthzPermission; scope: AuthzDeclaredScopeId | null }> {
+  const value = valueAtPath(input, declared.field);
+  const entry =
+    typeof value === "string" && Object.hasOwn(declared.map, value)
+      ? declared.map[value]
+      : undefined;
+
+  // The schema refused every value the map does not name, so this is a declaration and a
+  // schema that disagree: ours, never the caller's.
+  if (entry === undefined) {
+    logger.error({ field: declared.field }, "an input-chosen permission read an unmapped value");
+    throw new AccessWiringError();
+  }
+
+  if (typeof entry === "string") return { permission: entry, scope: null };
+
+  const id = valueAtPath(input, entry.field);
+
+  if (typeof id === "string" && id.trim() !== "") {
+    return { permission: entry.permission, scope: { tier: entry.tier, id } };
+  }
+
+  if (typeof id === "string") throw new BlankScopeIdError({ field: entry.field });
+
+  logger.error({ field: entry.field }, "an input-chosen permission's scope field was not parsed");
+
+  throw new AccessWiringError();
+}
+
+/**
+ * What a declaration may ask the process to confirm the tenant behind the request holds. The
+ * union is the runtime's own so a route cannot invent one no process answers for; each name
+ * is a capability, never a field of billing's plan.
+ */
+export type ApiEntitlement = "enterprise" | "webhook_endpoints";
 
 /** One declared plan question: the entitlement, the capability a refusal names, and when to ask. */
 export type EntitlementGate = Readonly<{
@@ -472,7 +582,7 @@ export type EntitlementOptions = Omit<EntitlementGate, "entitlement">;
 export interface Entitlements {
   holds(input: { entitlement: ApiEntitlement; scope: AuthzDeclaredScopeId }): Promise<boolean>;
   /** The process's own refusal for the capability; the framework's when absent. */
-  refusal?(input: { feature: string | undefined }): Error;
+  refusal?(input: { entitlement: ApiEntitlement; feature: string | undefined }): Error;
 }
 
 export async function decideEntitlement({
@@ -500,7 +610,9 @@ export async function decideEntitlement({
 
   if (await entitlements.holds({ entitlement, scope })) return;
 
-  throw entitlements.refusal?.({ feature }) ?? new EnterprisePlanRequiredError(feature);
+  throw (
+    entitlements.refusal?.({ entitlement, feature }) ?? new EnterprisePlanRequiredError(feature)
+  );
 }
 
 /**
@@ -677,6 +789,8 @@ function declaredPermissionOf(declaration: AccessDeclaration): string {
     case "permission-all":
     case "service-authorized":
       return declaration.permissions[0] ?? "";
+    case "permission-by-input":
+      return permissionsOfChoice(declaration)[0] ?? "";
     case "no-permission":
       return "";
   }

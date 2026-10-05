@@ -104,7 +104,10 @@ export type RestCaller = Readonly<{
 export type RestIdentity = Readonly<{
   authenticate(input: {
     request: Request;
+    /** The first of `permissions`, kept while a door asks one; a door asks every one. */
     permission: AuthzPermission;
+    /** Every permission the route asks, in declared order; the first one missing refuses. */
+    permissions: readonly AuthzPermission[];
     /** How far a key door asks the permission; only a route that declared one carries it. */
     reach?: "grants" | "organization";
   }): Promise<RestCaller> | RestCaller;

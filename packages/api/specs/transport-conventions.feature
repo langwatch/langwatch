@@ -246,3 +246,20 @@ Feature: The REST runtime renders what a transport may not hand-roll
       When it is called with a body under any media type
       Then the handler is handed the body as sent
       And a route that declares a refusal for a media type it never named, or names a media type with parameters or a wildcard, refuses to build
+
+  Rule: A JSON body may be an array, handed under the field its route names (Alex, 2026-10-05, E1)
+
+    @integration
+    Scenario: An array body is validated as sent and handed under the field its route names
+      Given a route whose JSON input is an array of objects, declared to be handed under one field
+      When it is called with an array whose items match
+      Then the handler is handed the array under that field, beside the route's path and query fields
+      And malformed JSON and an absent body are refused with 400 malformed_request, before the handler
+      And an item the schema refuses is refused with 422 validation_error, before the handler
+      And the document publishes the array itself as the required request body
+
+    @unit
+    Scenario: An array body's field is checked against the route's other fields where it is written
+      Given a route that declares an array body
+      When it names no field, or a field its path or query already declares
+      Then the declaration is refused where it is written, naming the route or the field

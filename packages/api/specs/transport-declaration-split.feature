@@ -338,3 +338,23 @@ Feature: Transport declaration split
     Given two routers under one namespace that both declare "getById"
     When they are composed
     Then the composition is refused, naming the procedure
+
+  @unit
+  Scenario: A route may require several permissions together
+    Given a family behind a key door
+    When a route names two permissions in one declaration (Alex, 2026-10-05, E2)
+    Then the door is asked every one of them, in the order declared, before the body is read
+    And a route asking them at the scope its own path names asks each one there, and the first the caller lacks is the refusal, before the handler
+    And the registry and the document record every permission the route asks
+    And a set naming fewer than two, repeating one, or sharing no scope that grants them all is refused where it is written
+
+  @unit
+  Scenario: A route chooses its permission from its parsed input
+    Given a route whose permission depends on a value its input carries
+    When it declares a map from each value of that field to the permission it asks, and optionally the scope it is asked at (Alex, 2026-10-05, E3)
+    Then the door only identifies the caller before the body is read
+    And once the body is validated, the permission the value chose is asked at the scope its entry names, else at the route's own target, else at the credential's scope
+    And a caller lacking it is refused 403 permission_denied naming that permission, and the handler never runs
+    And the registry records every permission the map can ask
+    And a map whose keys are not exactly the values the field parses as, an entry naming a tier that cannot grant its permission, or a choice asked at a key's reach is refused where it is written
+    And a mount whose door cannot identify or authorize, or a browser route asking a bare entry at the credential's scope, is refused, naming the route

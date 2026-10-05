@@ -7,11 +7,13 @@ export {
   AuthenticationRequiredError,
   anyAuthenticated,
   assertRouteScopePermission,
+  chosenPermission,
   declareAccessMiddleware,
   decide,
   decideEntitlement,
   deferredScope,
   optionalCredential,
+  permissionsTogether,
   publicRoute,
   routeScopeOf,
   SCOPE_INPUT_FIELDS,
@@ -30,12 +32,23 @@ export {
   type EntitlementGate,
   type EntitlementOptions,
   type Entitlements,
+  type InputPermissionDeclaration,
   type OptionalCredentialAccess,
   type PermissionAllDeclaration,
   type PublicRouteAccess,
   type RouteAccess,
 } from "./access.ts";
 export { resolveDeclaredScope } from "./declaration.ts";
+export {
+  assertInputPermission,
+  isInputPermission,
+  permissionBy,
+  permissionsOfChoice,
+  type ExactInputPermission,
+  type InputPermission,
+  type PermissionChoice,
+  type PermissionMap,
+} from "./input-permission.ts";
 export {
   AUTHZ_DECLARATION,
   declareAuthzMiddleware,
