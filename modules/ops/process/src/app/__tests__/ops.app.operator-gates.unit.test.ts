@@ -54,6 +54,8 @@ describe("given the platform-operator grant answers through authz", () => {
   });
 
   /** @scenario "Operator gates ask the platform-operator grant" */
+  /** @scenario "resolveOpsScope returns kind=platform for admin users" */
+  /** @scenario "resolveOpsScope returns kind=none for non-ops users instead of null" */
   it("answers the operator scope as an answer, never a refusal", async () => {
     expect(await app.operatorScope(VIEWER)).toEqual({ kind: "platform" });
     expect(await app.operatorScope(OUTSIDER)).toEqual({ kind: "none" });

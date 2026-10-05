@@ -150,6 +150,17 @@ describe("ImpersonationService", () => {
     ).rejects.toBeInstanceOf(CannotImpersonateAdminError);
   });
 
+  /** @scenario "An admin cannot impersonate another admin" */
+  it("reports cannot_impersonate_admin and leaves the session as it was", async () => {
+    const repository = new InMemoryImpersonationRepository(target({ id: PLATFORM_OPERATOR_ID }));
+    const { audit, service } = serviceFor(repository);
+
+    await expect(service.start(input)).rejects.toMatchObject({ code: "cannot_impersonate_admin" });
+
+    expect(repository.window).toBeNull();
+    expect(audit.entries).toEqual([]);
+  });
+
   describe("when the target belongs to an organization that requires a second factor", () => {
     /** @scenario "Impersonating into an organization that requires it takes the operator's own" */
     it("refuses an operator without one, and opens no window", async () => {

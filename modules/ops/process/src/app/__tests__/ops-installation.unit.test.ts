@@ -49,7 +49,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { opsProcessModule } from "../../ops.module.ts";
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
-import { SNAPSHOT_LEASE_KEY } from "../../repositories/redis/redis.ops-snapshot.repository.ts";
+import {
+  SNAPSHOT_EPOCH_KEY,
+  SNAPSHOT_LEASE_KEY,
+} from "../../repositories/redis/redis.ops-snapshot.repository.ts";
 import { OPS_STAFF_ADDRESS, platformOperatorAuthz } from "./ops.fixture.ts";
 
 /** A store that holds nothing: every command is written down, a lease `SET` is granted. */
@@ -149,6 +152,9 @@ function process(
 
 describe("ops app installation", () => {
   describe("given a process that boots the feature over memory", () => {
+    /** @scenario "The deployment's operator list reaches the back office" */
+    /** @scenario "resolveOpsScope returns kind=platform for admin users" */
+    /** @scenario "resolveOpsScope returns kind=none for non-ops users instead of null" */
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
       const runtime = await process(role).boot();
 
@@ -227,6 +233,27 @@ describe("ops app installation", () => {
         expect(leaseCommands().at(-1)?.[0]).toBe("eval");
       },
     );
+  });
+
+  describe("given a worker holding the queue's Redis", () => {
+    /** @scenario "The worker publishes the operations snapshot the dashboard reads" */
+    it("claims the writer lease and takes an epoch from the same store", async () => {
+      const redisCommands: unknown[][] = [];
+      const runtime = await process("worker", redisCommands).boot();
+
+      try {
+        await runtime.start();
+
+        await vi.waitFor(() => {
+          expect(redisCommands).toContainEqual(expect.arrayContaining(["set", SNAPSHOT_LEASE_KEY]));
+          expect(redisCommands).toContainEqual(
+            expect.arrayContaining(["incr", SNAPSHOT_EPOCH_KEY]),
+          );
+        });
+      } finally {
+        await runtime.stop();
+      }
+    });
   });
 
   describe("given the api role and a peer that registers migrations", () => {
