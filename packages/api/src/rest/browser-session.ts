@@ -1,6 +1,7 @@
+import type { PlatformTierPermission } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 
-import type { Authorize } from "../access/access.ts";
+import { platformPrincipalOf, type Authorize, type PlatformDecision } from "../access/access.ts";
 import { SurfaceUnverifiedError } from "../errors.ts";
 import type { RestCaller, RestIdentity } from "../hosting/api-door.ts";
 import type { SessionReader } from "../hosting/session-reader.ts";
@@ -17,7 +18,7 @@ export class BrowserOriginRefusedError extends HandledError {
 
 export class BrowserSessionIdentity implements RestIdentity {
   readonly #sessions: SessionReader;
-  readonly #authz: Pick<Authorize, "getDecision">;
+  readonly #authz: Pick<Authorize, "getDecision" | "getPlatformDecision">;
   readonly #publicOrigin: string | null;
 
   private constructor({
@@ -26,7 +27,7 @@ export class BrowserSessionIdentity implements RestIdentity {
     publicOrigin,
   }: {
     sessions: SessionReader;
-    authz: Pick<Authorize, "getDecision">;
+    authz: Pick<Authorize, "getDecision" | "getPlatformDecision">;
     publicOrigin: string | null;
   }) {
     this.#sessions = sessions;
@@ -41,7 +42,7 @@ export class BrowserSessionIdentity implements RestIdentity {
     publicBaseUrl,
   }: {
     sessions: SessionReader;
-    authz: Pick<Authorize, "getDecision">;
+    authz: Pick<Authorize, "getDecision" | "getPlatformDecision">;
     publicBaseUrl: string | undefined;
   }): BrowserSessionIdentity {
     const publicOrigin =
@@ -98,5 +99,25 @@ export class BrowserSessionIdentity implements RestIdentity {
     if (!caller.actor || caller.actor.type !== "user") throw new SurfaceUnverifiedError("browser");
 
     return this.#authz.getDecision({ userId: caller.actor.id, permission, scope: target });
+  }
+
+  /** Asked of the operator behind an impersonated session; no platform question refuses. */
+  async authorizePlatform({
+    caller,
+    permission,
+  }: {
+    caller: RestCaller;
+    permission: PlatformTierPermission;
+  }): Promise<PlatformDecision> {
+    if (!this.#authz.getPlatformDecision) {
+      throw new Error(
+        `"${permission}" is asked at the platform, and authz answers no platform question`,
+      );
+    }
+
+    const userId = platformPrincipalOf(caller.actor);
+    if (!userId) return { permitted: false };
+
+    return this.#authz.getPlatformDecision({ userId, permission });
   }
 }

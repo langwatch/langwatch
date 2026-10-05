@@ -37,6 +37,7 @@ export {
   type RestDeprecation,
   type RestDoorCredential,
   type RestMethodName,
+  type RestPermissionPlatform,
   type RestPermissionReach,
   type RestPermissionTarget,
   type RestRouteAnswers,
@@ -307,9 +308,32 @@ export { SessionKeyIdentity } from "./session-key-identity.ts";
 export {
   CliTokenIdentity,
   type CliTokenHolder,
+  type CliTokenPermissionQuestion,
   type CliTokenPresented,
 } from "./cli-token-identity.ts";
+export {
+  assertKeyKind,
+  keyCredentialOf,
+  REST_KEY_KINDS,
+  type RestKeyCredential,
+  type RestKeyDoor,
+  type RestKeyKind,
+  type RestKeyKinds,
+} from "./key-credential.ts";
 
 export type { RestDeclaredResult } from "./declaration.ts";
 
-export type { RouteAccess } from "../access/access.ts";
+// Named by every declaration's inferred type, so a module's declaration emit can name them.
+export type {
+  ApiEntitlement,
+  EntitlementOptions,
+  PlatformPermissionDeclaration,
+  PlatformPermissionTarget,
+  RouteAccess,
+} from "../access/access.ts";
+export type {
+  ExactInputPermission,
+  InputPermission,
+  PermissionChoice,
+  PermissionMap,
+} from "../access/input-permission.ts";

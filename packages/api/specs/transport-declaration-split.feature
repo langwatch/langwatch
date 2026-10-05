@@ -358,3 +358,44 @@ Feature: Transport declaration split
     And the registry records every permission the map can ask
     And a map whose keys are not exactly the values the field parses as, an entry naming a tier that cannot grant its permission, or a choice asked at a key's reach is refused where it is written
     And a mount whose door cannot identify or authorize, or a browser route asking a bare entry at the credential's scope, is refused, naming the route
+
+  @integration
+  Scenario: A platform route asks the operator's platform grant at its door
+    Given a route behind the browser door declares a platform-tier permission at the platform (Alex, 2026-10-05, E4)
+    When a signed-in caller holding that permission at the platform calls it
+    Then the door asks the platform question before the body is read, and the handler runs
+    And a caller acting as another user is asked about the grant of the operator behind them
+    And a caller lacking it is refused 403 permission_denied naming the permission, and a caller with no session 401, before the body is read
+    And a non-platform permission asked at the platform, or a platform permission asked anywhere else, is refused where it is written
+    And a mount whose door cannot identify the caller or answer the platform question is refused, naming the route
+
+  @integration
+  Scenario: A hidden platform route answers not found to everyone it refuses
+    Given a platform route declares its refusal hidden (Alex, 2026-10-05, E4)
+    When a caller with no session, or a signed-in caller lacking the permission, calls it with a body over the route's cap
+    Then each is answered 404 not_found, the same answer, before the body is read
+
+  @integration
+  Scenario: A route hands its handler the key the door resolved
+    Given a route behind a key door declares that its handler reads the key (Alex, 2026-10-05, E5)
+    When a caller presents an API key, a person's access token or a legacy project key
+    Then the handler is handed the key's kind, its key id and its owner beside the actor, with no key id for a token or a legacy key and no owner for an ownerless key
+    And an ingestion key and a Langy session key are handed as their own kinds
+    And a route that did not declare it is handed no key
+    And a door that resolves no key cannot declare it: refused by the compiler and where it is written
+
+  @integration
+  Scenario: A route admits only the key kinds it names
+    Given a route behind the project door names the key kinds it admits (Alex, 2026-10-05, E7)
+    When a caller presents a key of a kind the route does not name
+    Then the door is told the admitted kinds, and the caller is refused 403 key_type_not_allowed before the body is read and before the handler
+    And a door that ignored the list is backed by the runtime, which refuses the same key after the door
+    And a list that is empty or repeats a kind, or a list on any door but the project door, is refused where it is written
+
+  @integration
+  Scenario: A permission behind the CLI token door is asked of the token's person at its organization
+    Given a route behind the CLI token door declares a permission, with no target or at the organization (Alex, 2026-10-05, E8)
+    When a caller presents a live CLI token
+    Then the door asks whether the token's person holds the permission at the token's organization, before the body is read
+    And a caller lacking it is refused 403 permission_denied, and the handler never runs
+    And a CLI token door built with no way to ask that question refuses the mount of such a route, naming it

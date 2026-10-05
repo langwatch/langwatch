@@ -8,6 +8,7 @@ import type {
   AuthzDeclaredScopeId,
   AuthzPermission,
   CliTokenActor,
+  PlatformTierPermission,
   ScopeTierField,
 } from "@langwatch/authorization";
 import type { ModuleApiToken } from "@langwatch/module";
@@ -16,9 +17,13 @@ import type * as httpStatusModule from "hono/utils/http-status";
 import { z } from "zod";
 
 import {
+  assertNotPlatformPermission,
   permissionsTogether,
+  platformPermissionOf,
   SCOPE_INPUT_FIELDS,
   type ApiEntitlement,
+  type PlatformPermissionDeclaration,
+  type PlatformPermissionTarget,
   type Credential,
   type EntitlementGate,
   type EntitlementOptions,
@@ -43,6 +48,14 @@ import {
   type RestAddressingOptions,
 } from "./addressing.ts";
 import type { RestIdempotency } from "./idempotency.ts";
+import {
+  isKeyDoor,
+  keyKindsOf,
+  type RestKeyCredential,
+  type RestKeyDoor,
+  type RestKeyKindDoor,
+  type RestKeyKinds,
+} from "./key-credential.ts";
 import type { RestTransportDocs } from "./openapi.ts";
 import {
   defineRestMiddleware,
@@ -211,6 +224,21 @@ type RouteSession = z.ZodType | Missing;
 type SessionArguments<Session extends RouteSession> = Session extends z.ZodType
   ? { readonly session: z.output<Session> }
   : unknown;
+/** The key the door resolved (E5), handed only to a route that declared it reads it. */
+type KeyArguments<Key extends boolean> = Key extends true
+  ? { readonly key: RestKeyCredential }
+  : unknown;
+/**
+ * What a route's own door may be told: the session it hands, whether the handler reads the key
+ * (key doors only, E5), and the key kinds it admits (the project door only, E7).
+ */
+type RouteCredentialOptions<
+  Door extends RestDoorCredential,
+  Session extends RouteSession,
+> = Readonly<
+  { session?: Session } & ([Door] extends [RestKeyDoor] ? unknown : { key?: never }) &
+    ([Door] extends [RestKeyKindDoor] ? { keyKinds?: RestKeyKinds } : { keyKinds?: never })
+>;
 type ScopedHandlerArguments<
   Input,
   App,
@@ -287,6 +315,8 @@ export type StoredHandlerArguments<Api> = Readonly<{
   target: AuthzDeclaredScopeId | null;
   /** The door's session parsed against the route's schema; undefined when it declared none. */
   session: unknown;
+  /** The key the door resolved, for a route that declared it reads it; undefined elsewhere. */
+  key: RestKeyCredential | undefined;
   signal: AbortSignal | undefined;
   /** Read once, only for a route that declared it; undefined everywhere else. */
   raw: string | Uint8Array | ReadableStream<Uint8Array> | null | undefined;
@@ -446,6 +476,9 @@ export type RestPermissionTarget =
   | Readonly<{ at: "route"; param: ScopeTierField; field?: string }>
   | Readonly<{ at: "header"; param: ScopeTierField; header: string }>;
 
+/** A platform-tier permission asked of the operator's PLATFORM grant (E4). */
+export type RestPermissionPlatform = PlatformPermissionTarget;
+
 /**
  * How far a key that names no project is asked the route's permission. `grants` passes when it
  * holds the permission at any scope it is granted at, for a resource that names its own scopes;
@@ -473,6 +506,12 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly permissionTarget?: RestPermissionTarget;
   /** How far the key door asks it; absent means the key's project, else its organization. */
   readonly permissionReach?: RestPermissionReach["at"];
+  /** Present exactly when `permission` is asked at the platform, with how it refuses (E4). */
+  readonly permissionPlatform?: PlatformPermissionDeclaration;
+  /** Present exactly when the handler is handed the key its door resolved (E5). */
+  readonly key?: true;
+  /** Present exactly when the route admits only these key kinds (E7). */
+  readonly keyKinds?: RestKeyKinds;
   /** Present exactly when the route named an access kind instead. */
   readonly access?: RouteAccess;
   readonly permissionScope?: string;
@@ -565,6 +604,9 @@ type RouteState = Readonly<{
   permissionBy?: InputPermission;
   permissionTarget?: RestPermissionTarget;
   permissionReach?: RestPermissionReach["at"];
+  permissionPlatform?: PlatformPermissionDeclaration;
+  key?: true;
+  keyKinds?: RestKeyKinds;
   access?: RouteAccess;
   version?: DateVersion;
   docs?: RestTransportDocs;
@@ -640,6 +682,8 @@ type RouteShape = Readonly<{
   /** The family's session schema, and the one this route's own door declared. */
   familySession: RouteSession;
   session: RouteSession;
+  /** Whether the handler is handed the key its door resolved. */
+  key: boolean;
   strict: boolean;
 }>;
 
@@ -968,12 +1012,26 @@ class RouteBuilder<Api, S extends RouteShape> {
     choice: Choice & ExactInputPermission<RouteInput<S["params"], S["query"], S["body"]>, Choice>,
     target?: RestPermissionTarget,
   ): RouteBuilder<Api, With<S, { permission: true }>>;
+  /**
+   * A platform-tier permission, asked at S1 of the operator's PLATFORM grant (E4); `hidden`
+   * answers every refusal 404 `not_found` before the body, as the hidden family does.
+   */
+  withPermission<P extends PlatformTierPermission>(
+    permission: P,
+    target: RestPermissionPlatform,
+  ): RouteBuilder<Api, With<S, { permission: true }>>;
   withPermission(
     declared: AuthzPermission | readonly AuthzPermission[] | InputPermission,
-    target?: RestPermissionTarget | RestPermissionReach,
+    target?: RestPermissionTarget | RestPermissionReach | RestPermissionPlatform,
   ): RouteBuilder<Api, With<S, { permission: true }>> {
+    if (target?.at === "platform") return this.#platformPermission(declared, target);
+
     const reach = target?.at === "grants" || target?.at === "organization" ? target.at : void 0;
     const scoped = target && "param" in target ? target : void 0;
+
+    if (typeof declared === "string") {
+      assertNotPlatformPermission({ address: `REST ${this.operation}`, permissions: [declared] });
+    }
 
     return new RouteBuilder<Api, With<S, { permission: true }>>({
       router: this.router,
@@ -986,6 +1044,29 @@ class RouteBuilder<Api, S extends RouteShape> {
         ...(scoped ? { permissionTarget: scoped } : {}),
         ...(reach ? { permissionReach: reach } : {}),
       },
+    });
+  }
+
+  #platformPermission(
+    declared: AuthzPermission | readonly AuthzPermission[] | InputPermission,
+    target: RestPermissionPlatform,
+  ): RouteBuilder<Api, With<S, { permission: true }>> {
+    if (typeof declared !== "string") {
+      throw new Error(`REST ${this.operation} asks one permission at the platform, and only one`);
+    }
+
+    const platform = platformPermissionOf({
+      address: `REST ${this.operation}`,
+      permission: declared,
+      target,
+    });
+
+    return new RouteBuilder<Api, With<S, { permission: true }>>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, permission: declared, permissionPlatform: platform },
     });
   }
 
@@ -1218,6 +1299,7 @@ class RouteBuilder<Api, S extends RouteShape> {
         S["door"],
         S["session"]
       > &
+        KeyArguments<S["key"]> &
         RawBodyArguments<S["body"]> &
         MultipartArguments<S["body"]> &
         RawResponseArguments<S["answer"]> &
@@ -1334,13 +1416,30 @@ class RouteBuilder<Api, S extends RouteShape> {
    * retypes actor/scope through `DOOR_SCOPE_TIER`. A `session` schema types and parses
    * the session that door hands beside the actor; the family's does not carry over.
    */
-  withCredential<NewDoor extends RestDoorCredential, NewSession extends RouteSession = Missing>(
+  withCredential<
+    NewDoor extends RestDoorCredential,
+    NewSession extends RouteSession = Missing,
+    Key extends boolean = false,
+  >(
     credential: NewDoor,
-    options?: Readonly<{ session: NewSession }>,
-  ): RouteBuilder<Api, With<S, { door: NewDoor; session: NewSession }>> {
+    options?: RouteCredentialOptions<NewDoor, NewSession> & Readonly<{ key?: Key }>,
+  ): RouteBuilder<Api, With<S, { door: NewDoor; session: NewSession; key: Key }>> {
     assertSourceUnset("credential", this.state.credential);
+    const address = `REST ${this.operation}`;
 
-    return new RouteBuilder<Api, With<S, { door: NewDoor; session: NewSession }>>({
+    if (options?.key !== undefined && (options.key !== true || !isKeyDoor(credential))) {
+      throw new Error(`${address} reads the key of the "${credential}" door, which resolves none`);
+    }
+
+    if (options?.keyKinds !== undefined && credential !== "project") {
+      throw new Error(
+        `${address} admits key kinds behind the "${credential}" door; only the project door tells them apart`,
+      );
+    }
+
+    const keyKinds = options?.keyKinds ? keyKindsOf({ address, kinds: options.keyKinds }) : void 0;
+
+    return new RouteBuilder<Api, With<S, { door: NewDoor; session: NewSession; key: Key }>>({
       router: this.router,
       method: this.method,
       path: this.path,
@@ -1349,6 +1448,8 @@ class RouteBuilder<Api, S extends RouteShape> {
         ...this.state,
         credential,
         ...(options?.session ? { session: options.session } : {}),
+        ...(options?.key ? { key: true as const } : {}),
+        ...(keyKinds ? { keyKinds } : {}),
       },
     });
   }
@@ -1394,9 +1495,22 @@ function accessParts(
   state: RouteState,
 ): Pick<
   RestTransportRoute<unknown>,
-  "access" | "permission" | "permissions" | "permissionBy" | "permissionTarget" | "permissionReach"
+  | "access"
+  | "permission"
+  | "permissions"
+  | "permissionBy"
+  | "permissionTarget"
+  | "permissionReach"
+  | "permissionPlatform"
 > {
   if (state.access) return { access: state.access };
+
+  if (state.permissionPlatform) {
+    return {
+      permission: state.permissionPlatform.permission,
+      permissionPlatform: state.permissionPlatform,
+    };
+  }
 
   if (state.permissionBy) {
     return {
@@ -1426,6 +1540,8 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
     ...(state.rawResponse ? { rawResponse: state.rawResponse } : {}),
     ...(state.response ? { response: state.response } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
+    ...(state.key ? { key: state.key } : {}),
+    ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),
     ...(state.audit ? { audit: state.audit } : {}),
   };
 }
@@ -1454,6 +1570,7 @@ type OpenRoute<
     door: Door;
     familySession: Session;
     session: Session;
+    key: false;
     strict: StrictJsonSchemas;
   }
 >;

@@ -28,12 +28,15 @@ import {
   chosenPermission,
   decide,
   decideEntitlement,
+  decidePlatform,
+  platformRefusal,
   refuseImpersonatedMint,
   routeScopeOf,
   type AccessDenial,
   type Authorize,
   type Credential,
   type Entitlements,
+  type PlatformPermissionDeclaration,
 } from "../access/access.ts";
 import {
   MediaTypeMalformedRequestError,
@@ -71,6 +74,12 @@ import {
   readIdempotencyKey,
   type IdempotentRunner,
 } from "./idempotency.ts";
+import {
+  assertKeyKind,
+  isKeyDoor,
+  keyCredentialOfDoor,
+  type RestKeyCredential,
+} from "./key-credential.ts";
 import {
   CREDENTIAL_CLASS_BY_DOOR as CREDENTIAL_CLASS,
   deprecatedAlias,
@@ -371,12 +380,50 @@ function assertPortsBound<Api>({
 
     assertCapabilityPorts({ address, route, ports });
 
+    assertDoorQuestions({ address, route, door, credential });
+
     if (route.access?.kind === "optional" && !door.identifyOptional) {
       throw new Error(
         `REST ${address} answers with or without the family's credential, and this runtime ` +
           "supplied no identity.identifyOptional",
       );
     }
+  }
+}
+
+/**
+ * A platform route needs the door's platform question (E4), and a permission behind the CLI
+ * token door needs the question it asks at the token's organization (E8).
+ */
+function assertDoorQuestions({
+  address,
+  route,
+  door,
+  credential,
+}: {
+  address: string;
+  route: RestTransportRoute<unknown>;
+  door: RestIdentity;
+  credential: RestDoorCredential;
+}): void {
+  if (route.permissionPlatform && !door.authorizePlatform) {
+    throw new Error(
+      `REST ${address} asks "${route.permission}" at the platform, and this runtime supplied no ` +
+        "identity.authorizePlatform",
+    );
+  }
+
+  if (credential === "cli_token" && !route.access && !door.authorize) {
+    throw new Error(
+      `REST ${address} asks "${routePermissions(route).join(", ")}" behind the CLI token door, ` +
+        "and that door was built with no way to ask it at the token's organization",
+    );
+  }
+
+  if (route.key && !isKeyDoor(credential)) {
+    throw new Error(
+      `REST ${address} reads the key of the "${credential}" door, which resolves none`,
+    );
   }
 }
 
@@ -389,6 +436,8 @@ function identifiedFirst({
   credential: RestDoorCredential;
 }): boolean {
   if (route.access?.kind === "authenticated" || route.access?.kind === "deferred") return true;
+
+  if (route.permissionPlatform) return true;
 
   return (
     Boolean(route.permissionBy) || (credential === "browser" && Boolean(route.permissionTarget))
@@ -441,9 +490,13 @@ function assertReachDoor({
 }): void {
   if (!route.permissionReach || credential === "api_key") return;
 
+  // The CLI token's scope is its organization, so asking there is what the door already does.
+  if (credential === "cli_token" && route.permissionReach === "organization") return;
+
   throw new Error(
     `REST ${address} asks "${route.permission}" at the reach of a key's grants, and only ` +
-      'the "api_key" door reads a key that names no project',
+      'the "api_key" door reads a key that names no project (the "cli_token" door takes ' +
+      '{ at: "organization" })',
   );
 }
 
@@ -663,6 +716,14 @@ function authenticateMiddleware({
         request: context.req.raw,
         rawBody: context.get(ROUTE_RAW_BODY),
       });
+
+      // The door is told the admitted kinds; the runtime still refuses one it let through.
+      if (caller && route.keyKinds) {
+        assertKeyKind({
+          key: keyCredentialOfDoor({ door: "project", request: context.req.raw }),
+          admitted: route.keyKinds,
+        });
+      }
 
       callers.set(context, caller);
     }
@@ -1153,6 +1214,7 @@ function handlerMiddleware<Api>({
               scope: handlerScopeOf({ route, credential, caller }),
               target,
               session: sessionOf({ route, credential, caller }),
+              key: keyOf({ route, credential, request: context.req.raw }),
             }),
             ...(await resolveFacts({ route, facts, context })),
           ),
@@ -1489,6 +1551,21 @@ function sessionOf({
   return parsed.data;
 }
 
+/** The key the door recorded, for a route that declared its handler reads it (E5). */
+function keyOf({
+  route,
+  credential,
+  request,
+}: {
+  route: RestTransportRoute<unknown>;
+  credential: RestDoorCredential;
+  request: Request;
+}): RestKeyCredential | undefined {
+  if (!route.key || !isKeyDoor(credential)) return undefined;
+
+  return keyCredentialOfDoor({ door: credential, request });
+}
+
 /** What every handler is called with, whichever door let the request in. */
 function handlerArguments<Api>({
   context,
@@ -1499,6 +1576,7 @@ function handlerArguments<Api>({
   scope,
   target,
   session,
+  key,
 }: {
   context: Context;
   route: RestTransportRoute<Api>;
@@ -1508,6 +1586,7 @@ function handlerArguments<Api>({
   scope: AuthzDeclaredScopeId | null;
   target: AuthzDeclaredScopeId | null;
   session?: unknown;
+  key?: RestKeyCredential | undefined;
 }): StoredHandlerArguments<Api> {
   return {
     app: options.app(),
@@ -1516,6 +1595,7 @@ function handlerArguments<Api>({
     scope,
     target,
     session,
+    key,
     signal: context.req.raw.signal,
     request: context.req.raw,
     raw: route.rawBody
@@ -1711,6 +1791,10 @@ async function callerOf({
 }): Promise<RestCaller | null> {
   const kind = route.access?.kind;
 
+  if (route.permissionPlatform) {
+    return platformCallerOf({ door, request, platform: route.permissionPlatform });
+  }
+
   if (credential === "browser" && route.permissionTarget) return requireIdentify(door)({ request });
 
   // Chosen from the input, so asked once the body is read; the door only says who is calling.
@@ -1728,7 +1812,37 @@ async function callerOf({
     permission: permissionOf(route.permission),
     permissions: routePermissions(route),
     ...(route.permissionReach ? { reach: route.permissionReach } : {}),
+    ...(route.keyKinds ? { keyKinds: route.keyKinds } : {}),
   });
+}
+
+/**
+ * Who calls a platform route (E4): the door identifies, then answers the platform question.
+ * A hidden route answers every refusal, a missing session's included, with the same 404.
+ */
+async function platformCallerOf({
+  door,
+  request,
+  platform,
+}: {
+  door: RestIdentity;
+  request: Request;
+  platform: PlatformPermissionDeclaration;
+}): Promise<RestCaller> {
+  const caller = await Promise.resolve(requireIdentify(door)({ request })).catch(
+    (error: unknown) => {
+      const refused = error instanceof HandledError && error.httpStatus < 500;
+      throw refused && platform.refusal === "hidden" ? platformRefusal(platform) : error;
+    },
+  );
+
+  await decidePlatform({
+    declaration: platform,
+    actor: caller.actor,
+    ask: ({ permission }) => requireAuthorizePlatform(door)({ caller, permission }),
+  });
+
+  return caller;
 }
 
 /**
@@ -1781,6 +1895,17 @@ function requireIdentify(door: RestIdentity): NonNullable<RestIdentity["identify
   if (!identify) throw new Error("REST runtime supplied no identity.identify");
 
   return identify.bind(door);
+}
+
+/** @see assertDoorQuestions, which refuses this before a request arrives. */
+function requireAuthorizePlatform(
+  door: RestIdentity,
+): NonNullable<RestIdentity["authorizePlatform"]> {
+  const authorizePlatform = door.authorizePlatform;
+
+  if (!authorizePlatform) throw new Error("REST runtime supplied no identity.authorizePlatform");
+
+  return authorizePlatform.bind(door);
 }
 
 /** @see assertPortsBound, which refuses these before a request arrives. */

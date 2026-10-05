@@ -3,9 +3,11 @@ import type {
   AuthzDeclaredScopeId,
   AuthzPermission,
   PermissionDecision,
+  PlatformTierPermission,
 } from "@langwatch/authorization";
 
-import type { Authorize, Entitlements } from "../access/access.ts";
+import type { Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
+import type { RestKeyKind } from "../rest/key-credential.ts";
 import type { SessionVerification } from "./session-reader.ts";
 import type { TransportFactBinding, TransportPeers } from "./transport-hosts.ts";
 
@@ -110,6 +112,11 @@ export type RestIdentity = Readonly<{
     permissions: readonly AuthzPermission[];
     /** How far a key door asks the permission; only a route that declared one carries it. */
     reach?: "grants" | "organization";
+    /**
+     * The key kinds the route admits (E7): a project door refuses any other kind once the key
+     * resolves and before the permission, with `KeyKindRefusedError`. Absent admits every kind.
+     */
+    keyKinds?: readonly RestKeyKind[];
   }): Promise<RestCaller> | RestCaller;
   /**
    * The door, opened with no permission asked of it. Only a declaration
@@ -136,6 +143,15 @@ export type RestIdentity = Readonly<{
     permission: AuthzPermission;
     target: AuthzDeclaredScopeId;
   }): Promise<PermissionDecision> | PermissionDecision;
+  /**
+   * Whether the caller holds a platform-tier permission at the PLATFORM (E4), asked of the
+   * operator behind an impersonated caller. Only a declaration carrying a platform route needs
+   * it, and a mount that supplies none is refused by name.
+   */
+  authorizePlatform?(input: {
+    caller: RestCaller;
+    permission: PlatformTierPermission;
+  }): Promise<PlatformDecision> | PlatformDecision;
 }>;
 
 /**

@@ -8,6 +8,7 @@
 import {
   type Actor,
   BlankScopeIdError,
+  isPlatformTierPermission,
   permissionGrantTiers,
   PermissionDeniedError,
   SCOPE_TIER_BY_FIELD,
@@ -21,11 +22,17 @@ import {
   type AuthzScopeLineageResult,
   type DeclaredScopeTier,
   type PermissionDecision,
+  type PlatformTierPermission,
   type ScopeTierField,
 } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 
-import { EnterprisePlanRequiredError, ScopeInputMismatchError } from "../errors.ts";
+import {
+  EnterprisePlanRequiredError,
+  PlatformPermissionDeniedError,
+  PlatformSurfaceHiddenError,
+  ScopeInputMismatchError,
+} from "../errors.ts";
 import { resolveDeclaredScope } from "./declaration.ts";
 import {
   AUTHZ_DECLARATION,
@@ -50,10 +57,24 @@ export type PermissionAllDeclaration = Readonly<
 /** A permission chosen from the parsed input; `via` is where a bare entry is asked. */
 export type InputPermissionDeclaration = InputPermission & Readonly<{ via?: ScopeTierField }>;
 
+/**
+ * Where a platform-tier permission is asked (E4): of the operator's PLATFORM grant. `hidden`
+ * answers every refusal 404 `not_found`, as the hidden family does; `denied` is 401 or 403.
+ */
+export type PlatformPermissionTarget = Readonly<{ at: "platform"; refusal?: "denied" | "hidden" }>;
+
+/** A platform-tier permission asked at the platform, with how its refusal answers. */
+export type PlatformPermissionDeclaration = Readonly<{
+  kind: "permission-platform";
+  permission: PlatformTierPermission;
+  refusal: "denied" | "hidden";
+}>;
+
 export type AccessDeclaration =
   | Exclude<AuthzDeclaration, { kind: "custom" | "public" | "permission-all" }>
   | PermissionAllDeclaration
-  | InputPermissionDeclaration;
+  | InputPermissionDeclaration
+  | PlatformPermissionDeclaration;
 
 export function declareAccessMiddleware<M extends (params: never) => Promise<unknown>>(
   declaration: AccessDeclaration | PublicRouteAccess,
@@ -62,7 +83,8 @@ export function declareAccessMiddleware<M extends (params: never) => Promise<unk
   if (
     declaration.kind !== "permission-all" &&
     declaration.kind !== "public" &&
-    declaration.kind !== "permission-by-input"
+    declaration.kind !== "permission-by-input" &&
+    declaration.kind !== "permission-platform"
   ) {
     return declareAuthzMiddleware(declaration, middleware);
   }
@@ -140,6 +162,116 @@ export interface Authorize {
   getDecision(input: AuthzGetDecisionInput): Promise<PermissionDecision>;
   getProjectAnyDecision(input: AuthzGetProjectAnyDecisionInput): Promise<PermissionDecision>;
   checkScopeLineage(input: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;
+  /** Whether this user holds a platform-tier permission at the PLATFORM (E4); absent refuses. */
+  getPlatformDecision?(input: {
+    userId: string;
+    permission: PlatformTierPermission;
+  }): Promise<PlatformDecision>;
+}
+
+/** The platform question's answer: a platform grant carries no organization role. */
+export type PlatformDecision = Readonly<{ permitted: boolean }>;
+
+/**
+ * Who a platform permission is asked of: the operator behind an impersonated caller, else the
+ * caller (record §8, ADR-092). Null for an actor that is no person.
+ */
+export function platformPrincipalOf(actor: Actor | null): string | null {
+  if (actor?.type !== "user") return null;
+
+  return actor.impersonatorId ?? actor.id;
+}
+
+/**
+ * A platform-tier permission at the platform, and nowhere else; refused where it is written.
+ * Returns the declaration both transports carry.
+ */
+export function platformPermissionOf({
+  address,
+  permission,
+  target,
+}: {
+  address: string;
+  permission: AuthzPermission;
+  target: PlatformPermissionTarget;
+}): PlatformPermissionDeclaration {
+  if (!isPlatformTierPermission(permission)) {
+    throw new Error(
+      `${address} asks "${permission}" at the platform, and only a platform-tier permission is granted there`,
+    );
+  }
+
+  const refusal = target.refusal ?? "denied";
+
+  if (refusal !== "denied" && refusal !== "hidden") {
+    throw new Error(`${address} names "${String(refusal)}", which is no platform refusal`);
+  }
+
+  return { kind: "permission-platform", permission: permission as PlatformTierPermission, refusal };
+}
+
+/** A platform-tier permission asked anywhere but the platform is refused where it is written. */
+export function assertNotPlatformPermission({
+  address,
+  permissions,
+}: {
+  address: string;
+  permissions: readonly AuthzPermission[];
+}): void {
+  const platform = permissions.find((permission) => isPlatformTierPermission(permission));
+
+  if (!platform) return;
+
+  throw new Error(
+    `${address} asks "${platform}", which is granted only at the platform: declare { at: "platform" }`,
+  );
+}
+
+/** The refusal a platform route gives: the hidden family's 404, or 403 naming the permission. */
+export function platformRefusal(declaration: PlatformPermissionDeclaration): Error {
+  return declaration.refusal === "hidden"
+    ? new PlatformSurfaceHiddenError()
+    : new PlatformPermissionDeniedError(declaration.permission);
+}
+
+/**
+ * Asks the platform question for one caller. An actor that is no person, or a holder the
+ * process says lacks the grant, is refused; a process that cannot answer refuses too.
+ */
+export async function decidePlatform({
+  declaration,
+  actor,
+  ask,
+}: {
+  declaration: PlatformPermissionDeclaration;
+  actor: Actor | null;
+  ask:
+    | ((input: {
+        userId: string;
+        permission: PlatformTierPermission;
+      }) => Promise<PlatformDecision> | PlatformDecision)
+    | undefined;
+}): Promise<void> {
+  if (!ask) {
+    throw new Error(
+      `"${declaration.permission}" is asked at the platform, and this process supplied no platform decision`,
+    );
+  }
+
+  const userId = platformPrincipalOf(actor);
+  const decision = userId ? await ask({ userId, permission: declaration.permission }) : null;
+
+  if (decision?.permitted) return;
+
+  logger.warn(
+    {
+      permission: declaration.permission,
+      impersonated: actor?.type === "user" && actor.impersonatorId !== undefined,
+    },
+    "a platform-tier permission was refused",
+  );
+
+  throw platformRefusal(declaration);
 }
 
 /**
@@ -328,6 +460,11 @@ export async function decide({
   authorize?: Authorize;
   denials?: AccessDenial;
 }): Promise<AccessDecision> {
+  // A platform permission names no tenant, so no input scope is checked before it is asked.
+  if (declaration.kind === "permission-platform") {
+    return decidePlatformCaller({ declaration, caller, ...(authorize ? { authorize } : {}) });
+  }
+
   const credentialScope = caller.scope ?? null;
   assertInputScope({ input, scope: credentialScope });
 
@@ -383,6 +520,27 @@ export function securityRequirement(credential: Credential): readonly Record<str
           "so it cannot be advertised in the published document",
       );
   }
+}
+
+/** A platform procedure: an anonymous caller is refused as the declaration says, scope none. */
+async function decidePlatformCaller({
+  declaration,
+  caller,
+  authorize,
+}: {
+  declaration: PlatformPermissionDeclaration;
+  caller: Caller;
+  authorize?: Authorize;
+}): Promise<AccessDecision> {
+  if (!caller.actor && declaration.refusal !== "hidden") throw new AuthenticationRequiredError();
+
+  await decidePlatform({
+    declaration,
+    actor: caller.actor,
+    ask: authorize?.getPlatformDecision?.bind(authorize),
+  });
+
+  return { actor: caller.actor, scope: null };
 }
 
 async function decidePermission({
@@ -784,6 +942,7 @@ function denialReasonOf(decision: PermissionDecision): AuthzDenialReason {
 function declaredPermissionOf(declaration: AccessDeclaration): string {
   switch (declaration.kind) {
     case "permission":
+    case "permission-platform":
       return declaration.permission;
     case "permission-any":
     case "permission-all":

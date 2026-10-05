@@ -17,6 +17,7 @@ export {
   publicRoute,
   routeScopeOf,
   SCOPE_INPUT_FIELDS,
+  platformPrincipalOf,
   securityRequirement,
   sharedGrantTiers,
   type AccessActor,
@@ -35,6 +36,9 @@ export {
   type InputPermissionDeclaration,
   type OptionalCredentialAccess,
   type PermissionAllDeclaration,
+  type PlatformDecision,
+  type PlatformPermissionDeclaration,
+  type PlatformPermissionTarget,
   type PublicRouteAccess,
   type RouteAccess,
 } from "./access.ts";

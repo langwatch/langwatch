@@ -205,3 +205,12 @@ Feature: tRPC framework boundary
     When a caller the access check admitted reaches it
     Then the plan is asked about that capability by name, at the scope access resolved
     And a tenant without it is refused with the refusal the process gives for that capability, before the handler
+
+  @unit
+  Scenario: A procedure asks a platform-tier permission of the operator's grant
+    Given a procedure declares a platform-tier permission at the platform (Alex, 2026-10-05, E4)
+    When a caller holding that permission at the platform calls it
+    Then the platform question is asked before the handler, of the operator behind an impersonated caller where there is one
+    And a caller lacking it is refused FORBIDDEN permission_denied, and a hidden procedure answers NOT_FOUND not_found to a caller lacking it and to an anonymous one
+    And a non-platform permission asked at the platform is refused by the compiler and where it is written
+    And a process that cannot answer the platform question refuses the call, and the handler never runs

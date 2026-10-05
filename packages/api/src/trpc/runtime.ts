@@ -10,6 +10,7 @@ import {
   declaredScopeIdSchema,
   type AuthzDeclaredScopeId,
   type AuthzPermission,
+  type PlatformTierPermission,
   type ScopeTierField,
 } from "@langwatch/authorization";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
@@ -51,7 +52,9 @@ import {
   decideEntitlement,
   declareAccessMiddleware,
   SCOPE_INPUT_FIELDS,
+  assertNotPlatformPermission,
   permissionsTogether,
+  platformPermissionOf,
   refuseImpersonatedMint,
   type AccessDeclaration,
   type AccessDenial,
@@ -61,6 +64,7 @@ import {
   type EntitlementGate,
   type EntitlementOptions,
   type Entitlements,
+  type PlatformPermissionTarget,
   type PublicRouteAccess,
 } from "../access/access.ts";
 import type { AuthzDeclaration, EnforcedScopeFields } from "../access/declared-middleware.ts";
@@ -492,6 +496,14 @@ export interface TrpcRouterAccess<
     options: { via: ScopeTierField },
   ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
   /**
+   * A platform-tier permission, asked of the operator's PLATFORM grant before the handler (E4);
+   * `hidden` answers NOT_FOUND to every caller it refuses, an anonymous one included.
+   */
+  withPermission<P extends PlatformTierPermission>(
+    permission: P,
+    options: PlatformPermissionTarget,
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  /**
    * Every one of them, asked before the handler at the one scope the input
    * names. Naming an array is what says AND; a single permission is declared
    * on its own.
@@ -675,8 +687,15 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
           audit: { target: target.target, via: target.via },
         });
       },
-      withPermission: (access: PermissionArgument, options?: { via: ScopeTierField }) =>
-        implement(permissionDeclarationOf({ contract, name, access, via: options?.via })),
+      withPermission: (
+        access: PermissionArgument,
+        options?: { via: ScopeTierField } | PlatformPermissionTarget,
+      ) =>
+        implement(
+          options && "at" in options
+            ? platformDeclarationOf({ contract, name, access, target: options })
+            : permissionDeclarationOf({ contract, name, access, via: options?.via }),
+        ),
       withAccess: (access: PublicRouteAccess) => {
         assertNoTenantQuestion({ contract, name, entitlement });
 
@@ -755,6 +774,11 @@ function permissionDeclarationOf({
   via?: ScopeTierField;
 }): AccessDeclaration {
   if (typeof access === "string") {
+    assertNotPlatformPermission({
+      address: `tRPC ${contract.namespace}.${name}`,
+      permissions: [access],
+    });
+
     return via === undefined
       ? { kind: "permission", permission: access }
       : { kind: "permission", permission: access, via };
@@ -803,6 +827,27 @@ function permissionDeclarationOf({
   }
 
   return access;
+}
+
+/** One platform-tier permission at the platform (E4); anything else is refused where written. */
+function platformDeclarationOf({
+  contract,
+  name,
+  access,
+  target,
+}: {
+  contract: TrpcContract;
+  name: string;
+  access: PermissionArgument;
+  target: PlatformPermissionTarget;
+}): AccessDeclaration {
+  const address = `tRPC ${contract.namespace}.${name}`;
+
+  if (typeof access !== "string") {
+    throw new Error(`${address} asks one permission at the platform, and only one`);
+  }
+
+  return platformPermissionOf({ address, permission: access, target });
 }
 
 /**

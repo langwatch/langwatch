@@ -25,8 +25,11 @@ export {
   formatError,
   ProjectInputMismatchError,
   InvalidApiVersionError,
+  KeyKindRefusedError,
   MediaTypeMalformedRequestError,
   PayloadTooLargeError,
+  PlatformPermissionDeniedError,
+  PlatformSurfaceHiddenError,
   ScopeInputMismatchError,
   UnsupportedMediaTypeError,
 } from "./errors.ts";

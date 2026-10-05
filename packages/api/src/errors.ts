@@ -161,6 +161,38 @@ export class MediaTypeMalformedRequestError extends HandledError {
   }
 }
 
+/** A caller lacking a platform-tier permission a route asks at the platform (E4). */
+export class PlatformPermissionDeniedError extends HandledError {
+  constructor(permission: AuthzPermission) {
+    super("permission_denied", "This is an operator-only surface.", {
+      httpStatus: 403,
+      fault: "customer",
+      meta: { permission },
+    });
+    this.name = "PlatformPermissionDeniedError";
+  }
+}
+
+/** The hidden family's answer to every caller a platform route refuses (record §8, E4). */
+export class PlatformSurfaceHiddenError extends HandledError {
+  constructor() {
+    super("not_found", "Not found", { httpStatus: 404, fault: "customer" });
+    this.name = "PlatformSurfaceHiddenError";
+  }
+}
+
+/** A key of a kind the route does not admit (E7); `kind` names the kind, never the key. */
+export class KeyKindRefusedError extends HandledError {
+  constructor(kind: string) {
+    super("key_type_not_allowed", `This endpoint does not accept a key of kind ${kind}`, {
+      httpStatus: 403,
+      fault: "customer",
+      meta: { kind },
+    });
+    this.name = "KeyKindRefusedError";
+  }
+}
+
 export class RateLimitedError extends HandledError {
   constructor() {
     super("rate_limited", "Too many requests", { httpStatus: 429, retryable: true });

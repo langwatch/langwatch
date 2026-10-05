@@ -40,7 +40,7 @@ function makePorts(
     >;
   } = {},
 ): TrpcDeclaredAuthzMembers<TrpcDeclaredAuthzContext> & {
-  decisions: { [K in keyof Authorize]-?: Mock<Authorize[K]> };
+  decisions: { [K in keyof Authorize]: Mock<NonNullable<Authorize[K]>> };
 } {
   const actorId = "actorId" in options ? options.actorId : "alice";
 
