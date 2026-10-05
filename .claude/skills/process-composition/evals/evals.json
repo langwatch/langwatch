@@ -1,0 +1,47 @@
+{
+  "skill_name": "process-composition",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I've added a new module to modules/catalogue.json. Do I need to add it to apps/api/src/main.ts and apps/worker/src/main.ts too?",
+      "expected_output": "No. Run pnpm generate:modules, which rewrites each app's process-modules.generated.ts; main.ts composes the whole list through withConfig(processConfig(processModules)) and server.container(role), and names no module. Cites §5 (installing edits the catalogue, the root never grows), langwatch/package-boundaries (compositionRoot) and the generated-module-lists enforcer test. Proves the install with the api, worker and tasks installation tests, not a unit test.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The gateway needs GATEWAY_REGION from the environment. Can I read it in apps/api/src/config.ts and pass it into the container?",
+      "expected_output": "Refuses: an app's config.ts holds only processEnvironment (§4, §6). The leaf is declared once in the owning module's contract config (Config.define, c.env), attached as static readonly config on the module class, parsed by processConfig and handed to create() as the module's slice; main.ts does not change. Names langwatch/environment-boundaries and policy feature-configuration, and the ConfigCollisionError boot refusal for a second claim. Does not invent a member, withMember or .provide.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Add a withMember('slackClient', ...) call to the worker's container so the notification module can get its Slack client.",
+      "expected_output": "Refuses: the container answers stores and peers only; withMember, .provide and supply tokens are deleted (§4, §5, §15), even though ProcessContainer.withMember still exists in packages/process/src/process-container.ts. The Slack client is built by notification's own channel registry from its declared secrets (secrets.into), not by the process. States that this rule is unbacked by lint today and names the proposed backlog item.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "I wrote a scenario 'the worker hosts the billing meter pipeline' and bound it to a unit test that builds BillingModule with createApiFixture peers. check:feature-parity is green. Done?",
+      "expected_output": "No: a composition scenario is proven by booting the installed list in the worker role over memory stores (apps/worker/src/__tests__/worker-installation.integration.test.ts, bootInstalledProcess, §13), not by a unit test with fakes, which proves only the module's behaviour. Notes that parity cannot see the difference today (unbacked, backlog item 8) and that the fixture's members bag must not grow.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "The API pod should run the Prisma migrations on start so deploys are simpler. Where do I put that in apps/api/src/main.ts?",
+      "expected_output": "Refuses: migrations are tasks run before serve by the start script and the deploy pipeline (pnpm --filter @langwatch/tasks task prisma-migrate clickhouse-migrate), never by the serving api (§7). Names the start-path and system-migrations-start-order tests that back it, and that a module's in-place migration goes through its own private migration repository (policy prisma-migration-access).",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Locally I want the api on memory stores. I set LANGWATCH_STORES=memory but it still tries to connect to Postgres. Is that a bug?",
+      "expected_output": "Explains §7's ruling (one knob by the word, refused in production, absence refuses) and then that the knob has not landed: no code reads LANGWATCH_STORES, and packages/process/src/tiers.ts states the opposite default. Reports it as a record/tree disagreement rather than inventing a fallback; tests reach memory by handing memoryStores() to bootInstalledProcess.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "boot() fails with 'trace needs surface.rest' in a process I'm writing that only serves tRPC. The record says unselected surfaces are skipped. Should I patch the container?",
+      "expected_output": "Identifies the D3 disagreement: §4 says an unselected surface's declarations are skipped, while packages/process/src/process-container.ts still refuses an omitted declared transport by name. Does not patch the framework from a lane; reports it, and either selects .rest() in exposeTransports or asks for the D3 change as its own task.",
+      "files": []
+    }
+  ]
+}
