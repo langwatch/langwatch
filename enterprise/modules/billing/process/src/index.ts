@@ -61,7 +61,6 @@ export type {
 export { ConnectedStatementMailChannel } from "./channels/connected-statement-mail.channel.ts";
 export { connectedStatementMailChannels } from "./channels/connected-statement-mail-channels.registry.ts";
 export type { BillableEventsWindow } from "./repositories/billable-events.repository.ts";
-export type { TenantOrganizationRepository } from "./repositories/tenant-organization.repository.ts";
 /**
  * What a process composes billing's process-side work from. The repositories
  * and services behind these stay private to this feature server.
@@ -69,13 +68,9 @@ export type { TenantOrganizationRepository } from "./repositories/tenant-organiz
 export {
   createBillableEventsQuery,
   createBillingOrganizationCache,
-  createBillingTenantOrganizations,
   createDeploymentPlanSources,
   createStripeUsageReporting,
 } from "./billing.module.ts";
-export type { BillingTenantOrganizationCache } from "./services/tenant-organization.service.ts";
-export type { BillingTenantOrganizationCacheRedis } from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
-export type { BillingTenantOrganizationDatabase } from "./repositories/prisma/prisma.tenant-organization.repository.ts";
 export type { BillingSubscriptionRepository } from "./repositories/subscription.repository.ts";
 export type { BillingCooldownCache } from "./services/billing-alert-cooldown.service.ts";
 export type {

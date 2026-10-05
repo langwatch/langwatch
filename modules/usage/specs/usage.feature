@@ -45,20 +45,20 @@ Feature: Usage meters, decisions and who learns them
 
   # --- The billable-events meter ------------------------------------------------
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: The billable-events meter keeps its lane name
     When the usage pipeline registers its global projections
     Then the billable-events meter is registered as "orgBillableEventsMeter"
     And billing registers no projection of that name
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: A billable event from an orphan project is skipped, loudly
     Given a project that belongs to no organization
     When a billable event arrives for it
     Then no meter row is written
     And a warning is logged naming the project
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: A project's organization is not remembered as missing
     Given a project whose organization could not be found a moment ago
     When the project joins an organization and its next billable event arrives
@@ -66,19 +66,19 @@ Feature: Usage meters, decisions and who learns them
 
   # --- Deciding the limit -------------------------------------------------------
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: Crossing the allowance records the limit as reached
     Given the organization's month's count reaches 1,000
     When usage counts the organization's month
     Then a limit_reached event is recorded with the count, the allowance, the plan name and the unit
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: Counting again past the allowance records nothing new
     Given the limit is already recorded as reached this month
     When usage counts the organization's month again
     Then no further limit event is recorded
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: An upgrade clears a reached limit
     Given the limit is recorded as reached this month
     And the organization's plan is raised to 10,000 traces a month

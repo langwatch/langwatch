@@ -362,8 +362,6 @@ export class BillingModule
       | "webhookOrganizations"
       | "seatEventSubscriptions"
       | "organizations"
-      | "tenantOrganizations"
-      | "tenantOrganizationCache"
     >;
     config: Pick<BillingServerConfig, "bankDetails" | "licensePaymentLinkId">;
     peers: ConnectedBillingPeers;

@@ -14,8 +14,6 @@ import { MemoryDuplicateSubscriptionsReportRepository } from "./memory.duplicate
 import { MemoryOrganizationPricingRepository } from "./memory.organization-pricing.repository.ts";
 import { MemorySeatEventSubscriptionRepository } from "./memory.seat-event-subscription.repository.ts";
 import { MemoryBillingSubscriptionRepository } from "./memory.subscription.repository.ts";
-import { MemoryBillingTenantOrganizationCacheRepository } from "./memory.tenant-organization-cache.repository.ts";
-import { MemoryBillingTenantOrganizationRepository } from "./memory.tenant-organization.repository.ts";
 
 /** The "memory" tier: every billing repository, with no database behind it. */
 export class MemoryBillingRepositories {
@@ -39,8 +37,6 @@ export class MemoryBillingRepositories {
       reportOrganizations: MemoryBillingReportOrganizationRepository.create(store),
       seatEventSubscriptions: MemorySeatEventSubscriptionRepository.create(store),
       subscriptions,
-      tenantOrganizations: MemoryBillingTenantOrganizationRepository.create(store),
-      tenantOrganizationCache: MemoryBillingTenantOrganizationCacheRepository.create(),
       webhookOrganizations: MemoryBillingWebhookOrganizationRepository.create(store),
       webhookSubscriptions: MemoryBillingWebhookSubscriptionRepository.create({
         subscriptions,

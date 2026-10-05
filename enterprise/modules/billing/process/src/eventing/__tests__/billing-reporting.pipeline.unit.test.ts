@@ -121,6 +121,25 @@ describe("the monthly billing roll-up's eventing declaration", () => {
     });
   });
 
+  describe("given usage owns the billable-events meter", () => {
+    /** @scenario "The billable-events meter keeps its lane name" */
+    it("registers no projection under the meter's lane name", () => {
+      const pipeline = BillingModule.assemble({
+        usageWarnings: createApiFixture<UsageWarningService>({}),
+        resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
+        members: { isSaas: true, nodeEnvironment: "test" },
+        repositories: MemoryBillingRepositories.create(),
+        config: { bankDetails: undefined, licensePaymentLinkId: undefined },
+        peers,
+        stripeSecretKey: undefined,
+      }).reportingPipeline({ participation: "produce" });
+
+      expect(pipeline.globalProjections?.map(({ name }) => name)).not.toContain(
+        "orgBillableEventsMeter",
+      );
+    });
+  });
+
   describe("given usage records a month's counted total", () => {
     /** @scenario "Billing reports to Stripe from the month's counted total" */
     it("subscribes to month_counted and dispatches the month's report with that total", async () => {

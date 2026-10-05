@@ -19,18 +19,12 @@ import {
   RedisBillingOrganizationCacheRepository,
   type BillingOrganizationCacheRedis,
 } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
-import {
-  RedisBillingTenantOrganizationCacheRepository,
-  type BillingTenantOrganizationCacheRedis,
-} from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
-import type { TenantOrganizationRepository } from "./repositories/tenant-organization.repository.ts";
 import { BillableEventsQueryService } from "./services/billable-events-query.service.ts";
 import {
   DeploymentPlanSourcesService,
   type DeploymentPlanSources,
   type DeploymentPlanSourcesOptions,
 } from "./services/deployment-plan-sources.service.ts";
-import { BillingTenantOrganizationService } from "./services/tenant-organization.service.ts";
 import {
   StripeUsageReportingBuilder,
   type UsageReportingService,
@@ -84,17 +78,6 @@ export function createBillingOrganizationCache(options: {
   redis: BillingOrganizationCacheRedis;
 }): BillingOrganizationCacheRepository {
   return RedisBillingOrganizationCacheRepository.create(options);
-}
-
-/** Tenant-to-organization resolution, cached on the process's own Redis. */
-export function createBillingTenantOrganizations(options: {
-  organizations: TenantOrganizationRepository;
-  redis: BillingTenantOrganizationCacheRedis;
-}): BillingTenantOrganizationService {
-  return BillingTenantOrganizationService.create({
-    organizations: options.organizations,
-    cache: RedisBillingTenantOrganizationCacheRepository.create({ redis: options.redis }),
-  });
 }
 
 /**
