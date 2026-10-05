@@ -215,6 +215,7 @@ describe("ApiKeyGrantPolicyService", () => {
         });
       }
 
+      /** @scenario A built-in role is checked as every permission it confers */
       it("refuses an organization Member key to someone who holds only organization:view", async () => {
         const { service } = policyWith({
           allow: (permission) => permission === "organization:view",

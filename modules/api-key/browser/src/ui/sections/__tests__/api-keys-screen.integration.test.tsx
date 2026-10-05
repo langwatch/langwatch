@@ -438,6 +438,7 @@ describe("given the project still has a legacy key", () => {
 
 describe("given a reader who is not an organization admin", () => {
   /** @scenario A member manages only their own keys */
+  /** @scenario A member sees the page and not the write controls */
   it("offers the actions menu on their own key and on nobody else's", () => {
     state.members = [];
     state.keys = [keyRow(), keyRow({ id: "key-3", name: "Someone else's", userId: "user-9" })];

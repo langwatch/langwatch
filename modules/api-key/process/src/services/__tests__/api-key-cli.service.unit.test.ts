@@ -230,6 +230,7 @@ describe("given a CLI login key mint", () => {
 
   describe("when the user logs in again from the same device", () => {
     /** @scenario A re-login names rotation as the cause of the login key it replaces */
+    /** @scenario A second CLI login from the same device replaces the first key */
     it("revokes the previous key with cause rotation, not a person's own decision", async () => {
       const { service, revoke } = serviceWith({
         findForUser: () => Promise.resolve([OLD_KEY]),
@@ -245,6 +246,32 @@ describe("given a CLI login key mint", () => {
       expect(revoke).toHaveBeenCalledWith(
         expect.objectContaining({ id: OLD_KEY.id, cause: "rotation" }),
       );
+    });
+  });
+
+  describe("when the same user has a login key on another device", () => {
+    /** @scenario A second CLI login from the same device replaces the first key */
+    it("leaves a key for another device untouched", async () => {
+      const otherDeviceKey = {
+        ...loginKey({ id: "apikey-desktop", createdAt: new Date("2026-01-01T00:00:00Z") }),
+        name: "CLI login - desktop",
+        createdByDeviceLabel: "desktop",
+      };
+      const { service, revoke } = serviceWith({
+        findForUser: () => Promise.resolve([OLD_KEY, otherDeviceKey]),
+      });
+
+      await service.mintCliLoginKey({
+        userId: "user-1",
+        organizationId: "org-1",
+        deviceLabel: "laptop",
+        selection: { bindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }], permissions: [] },
+      });
+
+      expect(revoke).toHaveBeenCalledWith(
+        expect.objectContaining({ id: OLD_KEY.id, cause: "rotation" }),
+      );
+      expect(revoke).not.toHaveBeenCalledWith(expect.objectContaining({ id: otherDeviceKey.id }));
     });
   });
 
@@ -297,6 +324,48 @@ describe("given a CLI login key mint", () => {
       expect(extendLoginKeyExpiry).toHaveBeenCalledWith(
         expect.objectContaining({ id: "apikey-1", organizationId: "org-1", userId: "user-1" }),
       );
+    });
+
+    /** @scenario A refresh extends the login key's expiry with the session */
+    it("moves the expiry to the new refresh window when the session ceiling is further off", async () => {
+      const { service, extendLoginKeyExpiry } = serviceWith({});
+      const before = Date.now();
+
+      await service.extendCliLoginKeyExpiry({
+        apiKeyId: "apikey-1",
+        userId: "user-1",
+        organizationId: "org-1",
+        sessionStartedAtMs: before - 1000,
+        maxSessionDurationDays: 7,
+        refreshWindowMs: 60_000,
+      });
+
+      const { expiresAt } = extendLoginKeyExpiry.mock.calls[0]![0] as {
+        expiresAt: { epochMilliseconds: number };
+      };
+      expect(expiresAt.epochMilliseconds).toBeGreaterThanOrEqual(before + 60_000);
+      expect(expiresAt.epochMilliseconds).toBeLessThanOrEqual(Date.now() + 60_000);
+    });
+
+    /** @scenario A refresh extends the login key's expiry with the session */
+    it("never moves it past the organization's max session duration from the session start", async () => {
+      const { service, extendLoginKeyExpiry } = serviceWith({});
+      const dayMs = 24 * 60 * 60 * 1000;
+      const sessionStartedAtMs = Date.now() - 6 * dayMs;
+
+      await service.extendCliLoginKeyExpiry({
+        apiKeyId: "apikey-1",
+        userId: "user-1",
+        organizationId: "org-1",
+        sessionStartedAtMs,
+        maxSessionDurationDays: 7,
+        refreshWindowMs: 3 * dayMs,
+      });
+
+      const { expiresAt } = extendLoginKeyExpiry.mock.calls[0]![0] as {
+        expiresAt: { epochMilliseconds: number };
+      };
+      expect(expiresAt.epochMilliseconds).toBe(sessionStartedAtMs + 7 * dayMs);
     });
   });
 });

@@ -298,6 +298,7 @@ describe("the api-keys REST family", () => {
 
   describe("given a caller who holds organization:manage but is not an organization admin", () => {
     /** @scenario A manage-permission holder cannot mint an unbound service key */
+    /** @scenario Only an organization admin mints a service key */
     it("refuses a service key and mints nothing", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
       const isOrgAdmin = vi.fn(async () => false);

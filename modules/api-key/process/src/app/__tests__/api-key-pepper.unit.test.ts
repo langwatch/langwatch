@@ -98,6 +98,20 @@ describe("given a key main hashed under the deployment's credentials secret", ()
     });
   });
 
+  describe("when API_KEY_PEPPER is set", () => {
+    /** @scenario The API-key pepper reaches the service verbatim */
+    it("verifies a key hashed under that exact value, not one derived from it", async () => {
+      const app = await appOver({
+        environment: { API_KEY_PEPPER: "dedicated-pepper" },
+        hashedUnder: "dedicated-pepper",
+      });
+
+      await expect(app.findVerifiedToken({ token: TOKEN })).resolves.toMatchObject({
+        name: "Local Dev Private Access Token",
+      });
+    });
+  });
+
   describe("when none of the chain is set", () => {
     it("refuses to build, naming the secrets it looked for", async () => {
       const refused = appOver({ environment: { API_KEY_PEPPER: "" }, hashedUnder: "" });
