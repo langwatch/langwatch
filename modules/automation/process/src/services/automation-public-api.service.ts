@@ -22,6 +22,7 @@ import {
   TriggerFilterQueryInvalidError,
   TriggerFiltersRequiredError,
   TriggerFiltersUnsupportedError,
+  TriggerGraphImmutableError,
   TriggerKindImmutableError,
   TriggerNotFoundError,
   TriggerTestFireRateLimitedError,
@@ -779,7 +780,7 @@ const storedWebhookSchema = z
   })
   .loose();
 
-/** The channel and the kind are fixed once an automation exists. */
+/** The channel, the kind and an alert's graph are fixed once an automation exists. */
 function assertWhatIsFixedIsUnchanged({
   stored,
   input,
@@ -791,10 +792,29 @@ function assertWhatIsFixedIsUnchanged({
     throw new TriggerActionImmutableError(stored.action);
   }
   const kind = stored.triggerKind.toLowerCase();
+  assertGraphIsUnchanged({ stored, stated: input.customGraphId, kind });
   if (input.graphAlert !== undefined && stored.customGraphId === null)
     throw new TriggerKindImmutableError(kind);
   if (input.report !== undefined && stored.triggerKind !== "REPORT")
     throw new TriggerKindImmutableError(kind);
+}
+
+/** A stated graph must be the one stored. Adding or removing one changes the
+ *  kind; naming another moves an alert out of the graph slot it owns. */
+function assertGraphIsUnchanged({
+  stored,
+  stated,
+  kind,
+}: {
+  stored: Trigger;
+  stated: string | null | undefined;
+  kind: string;
+}): void {
+  if (stated === undefined || stated === stored.customGraphId) return;
+  if (stored.customGraphId === null || stated === null) {
+    throw new TriggerKindImmutableError(kind);
+  }
+  throw new TriggerGraphImmutableError(stored.customGraphId);
 }
 
 /** Conditions on fields this platform no longer filters on are dropped; only those alone refuse. */

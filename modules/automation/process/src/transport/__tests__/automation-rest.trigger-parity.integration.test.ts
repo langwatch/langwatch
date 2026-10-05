@@ -396,4 +396,70 @@ describe("Feature: automations over the public API express what the dashboard ex
       expect(await response.json()).toMatchObject({ code: "trigger_kind_immutable" });
     });
   });
+
+  // A different `customGraphId` used to answer 200 and leave the alert on its
+  // old graph.
+  describe("when an update names a graph", () => {
+    const alertRow = triggerRow({
+      id: "trigger_alert",
+      action: TriggerAction.SEND_EMAIL,
+      actionParams: { members: ["a@example.com"], ...rule },
+      triggerKind: "ALERT",
+      customGraphId: "graph_1",
+    });
+    const rigWith = () =>
+      createPublicApiRig({ rows: [alertRow, emailRow], graphIds: ["graph_1", "graph_2"] });
+
+    it("refuses a different graph on an alert rather than ignoring the field", async () => {
+      const rig = rigWith();
+      const response = await rig.api.patch("/api/triggers/trigger_alert", {
+        customGraphId: "graph_2",
+      });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "trigger_graph_immutable" });
+      expect(rig.rows.get("trigger_alert")).toMatchObject({ customGraphId: "graph_1" });
+    });
+
+    it("accepts the graph an alert already watches, so a read can be written back", async () => {
+      const response = await rigWith().api.patch("/api/triggers/trigger_alert", {
+        customGraphId: "graph_1",
+        name: "Renamed",
+      });
+
+      expect(response.status).toBe(200);
+      expect(await readTrigger(response)).toMatchObject({
+        customGraphId: "graph_1",
+        name: "Renamed",
+      });
+    });
+
+    it("refuses a graph on an automation that is not an alert", async () => {
+      const rig = rigWith();
+      const response = await rig.api.patch("/api/triggers/trigger_1", {
+        customGraphId: "graph_1",
+      });
+
+      expect(await response.json()).toMatchObject({ code: "trigger_kind_immutable" });
+      expect(rig.rows.get("trigger_1")).toMatchObject({ customGraphId: null });
+    });
+
+    it("refuses clearing the graph of an alert", async () => {
+      const rig = rigWith();
+      const response = await rig.api.patch("/api/triggers/trigger_alert", {
+        customGraphId: null,
+      });
+
+      expect(await response.json()).toMatchObject({ code: "trigger_kind_immutable" });
+      expect(rig.rows.get("trigger_alert")).toMatchObject({ customGraphId: "graph_1" });
+    });
+
+    it("accepts the null a trace automation reads back with", async () => {
+      const response = await rigWith().api.patch("/api/triggers/trigger_1", {
+        customGraphId: null,
+      });
+
+      expect(response.status).toBe(200);
+    });
+  });
 });

@@ -48330,6 +48330,9 @@ type PatchApiTriggersByIdJSONBody struct {
 	Active       *bool                                      `json:"active,omitempty"`
 	AlertType    *PatchApiTriggersByIdJSONBodyAlertType     `json:"alertType,omitempty"`
 
+	// CustomGraphId The graph this alert watches, which an update cannot change. Accepted so that writing the read response back works; a different graph is refused. Create an alert on the other graph and delete this one.
+	CustomGraphId *string `json:"customGraphId,omitempty"`
+
 	// FilterQuery The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`.
 	FilterQuery *string                                                               `json:"filterQuery,omitempty"`
 	Filters     *map[string]PatchApiTriggersByIdJSONBody_Filters_AdditionalProperties `json:"filters,omitempty"`

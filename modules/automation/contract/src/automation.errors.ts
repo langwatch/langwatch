@@ -103,6 +103,28 @@ export class TriggerKindImmutableError extends HandledError {
 }
 
 /**
+ * A graph alert watches the graph it was created on. It owns that graph's one
+ * alert slot, so watching another graph is a create there and a delete here
+ * rather than an edit.
+ */
+export class TriggerGraphImmutableError extends HandledError {
+  declare readonly code: "trigger_graph_immutable";
+
+  constructor(
+    /** The graph this alert watches and keeps watching. */
+    public readonly customGraphId: string,
+  ) {
+    super(
+      "trigger_graph_immutable",
+      "An alert keeps the graph it was created on. Create an alert on the " +
+        "graph you want and delete this one.",
+      { meta: { field: "customGraphId", customGraphId }, httpStatus: 422 },
+    );
+    this.name = "TriggerGraphImmutableError";
+  }
+}
+
+/**
  * The delivery configuration named fields the channel does not have. Refused,
  * not dropped: `slackChannelID` for `slackChannelId` used to save cleanly and
  * deliver nowhere, and an update replaces the stored configuration whole.
