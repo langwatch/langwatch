@@ -7,12 +7,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   type InstantEvalBudgetReservationsRedis,
-  RedisInstantEvalBudgetReservationsChannel,
-} from "../redis/redis.instant-eval-budget-reservations.channel.ts";
+  RedisInstantEvalBudgetReservationsRepository,
+} from "../redis/redis.instant-eval-budget-reservations.repository.ts";
 
 type Call = { script: string; keyCount: number; args: string[] };
 
-function channelAnswering(reply: unknown) {
+function repositoryAnswering(reply: unknown) {
   const evals: Call[] = [];
   const deleted: string[] = [];
   const removed: [string, string][] = [];
@@ -30,7 +30,7 @@ function channelAnswering(reply: unknown) {
     evals,
     deleted,
     removed,
-    channel: RedisInstantEvalBudgetReservationsChannel.create({ redis }),
+    repository: RedisInstantEvalBudgetReservationsRepository.create({ redis }),
   };
 }
 
@@ -38,9 +38,9 @@ describe("given holds kept where every pod can see them", () => {
   describe("when one is taken", () => {
     /** @scenario "Holds are shared across processes" */
     it("keys the index and the hold in one hash slot, with the lifetime in seconds", async () => {
-      const { channel, evals } = channelAnswering([1, "40"]);
+      const { repository, evals } = repositoryAnswering([1, "40"]);
 
-      const outcome = await channel.reserve({
+      const outcome = await repository.reserve({
         organizationId: "org_1",
         reservationId: "run_a",
         nanoUsd: 40.4,
@@ -59,10 +59,10 @@ describe("given holds kept where every pod can see them", () => {
   describe("when it does not fit", () => {
     /** @scenario "Runs accepted together share the budget" */
     it("reports the refusal with what the others hold", async () => {
-      const { channel } = channelAnswering([0, "55"]);
+      const { repository } = repositoryAnswering([0, "55"]);
 
       await expect(
-        channel.reserve({
+        repository.reserve({
           organizationId: "org_1",
           reservationId: "run_b",
           nanoUsd: 40,
@@ -76,9 +76,9 @@ describe("given holds kept where every pod can see them", () => {
   describe("when a hold is released", () => {
     /** @scenario "A hold is released when the run's spend lands" */
     it("drops the hold key and its index member", async () => {
-      const { channel, deleted, removed } = channelAnswering([1, "0"]);
+      const { repository, deleted, removed } = repositoryAnswering([1, "0"]);
 
-      await channel.release({ organizationId: "org_1", reservationId: "run_a" });
+      await repository.release({ organizationId: "org_1", reservationId: "run_a" });
 
       expect(deleted).toEqual(["langwatch:{instant-evals:free-budget:org_1}:reservation:run_a"]);
       expect(removed).toEqual([
@@ -90,12 +90,12 @@ describe("given holds kept where every pod can see them", () => {
   describe("when the total is read leaving the caller's own hold out", () => {
     /** @scenario "A run under way counts the runs accepted beside it" */
     it("passes the exclusion, and an empty one when there is none", async () => {
-      const { channel, evals } = channelAnswering("30");
+      const { repository, evals } = repositoryAnswering("30");
 
-      await expect(channel.heldNanoUsd({ organizationId: "org_1", except: "run_a" })).resolves.toBe(
-        30,
-      );
-      await channel.heldNanoUsd({ organizationId: "org_1" });
+      await expect(
+        repository.heldNanoUsd({ organizationId: "org_1", except: "run_a" }),
+      ).resolves.toBe(30);
+      await repository.heldNanoUsd({ organizationId: "org_1" });
 
       expect(evals[0]!.args[2]).toBe("run_a");
       expect(evals[1]!.args[2]).toBe("");

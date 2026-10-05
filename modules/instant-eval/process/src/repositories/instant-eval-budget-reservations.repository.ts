@@ -12,7 +12,7 @@ export interface InstantEvalBudgetReservationOutcome {
   readonly heldNanoUsd: number;
 }
 
-export interface InstantEvalBudgetReservationsChannel {
+export interface InstantEvalBudgetReservationsRepository {
   /**
    * Holds `nanoUsd` under `reservationId` when it fits: the other live
    * reservations of the organization plus this amount stay within the limit.

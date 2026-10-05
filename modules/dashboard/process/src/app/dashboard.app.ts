@@ -10,6 +10,7 @@ import {
   type DashboardWidget,
   type DashboardWidgetDefinitionInput,
   type LangWatchQLBudgetOverflowMode,
+  type LangWatchQLCaller,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
@@ -39,11 +40,10 @@ import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/pr
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
 import { dashboardPlatformUrl } from "../rules/dashboard-platform-url.rules.ts";
 import { DashboardWidgetService } from "../services/dashboard-widget.service.ts";
-import { DashboardService } from "../services/dashboard.service.ts";
+import { DashboardService, type WorkbenchAccess } from "../services/dashboard.service.ts";
 import { SavedViewService } from "../services/saved-view.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../services/saved-workbench-chart-policy.service.ts";
 import { SavedWorkbenchChartService } from "../services/saved-workbench-chart.service.ts";
-import type { WorkbenchAccess, WorkbenchCaller } from "./dashboard.members.ts";
 
 type DashboardDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
@@ -64,6 +64,18 @@ type DashboardSetup = FeatureSetup<
   undefined,
   DashboardRepositories
 >;
+
+/** The member's own content protections, and the identity a session-authenticated run uses. */
+interface WorkbenchCaller {
+  resolveProtections(input: {
+    actorId: string;
+    projectId: string;
+  }): Promise<LangWatchQLProtections>;
+  resolveRunCaller(input: {
+    actorId: string;
+    projectId: string;
+  }): Promise<Readonly<{ project: LangWatchQLCaller; protections: LangWatchQLProtections }>>;
+}
 
 /**
  * Thin adapter to AnalyticsApi: forwards rollout gate and RBAC checks while

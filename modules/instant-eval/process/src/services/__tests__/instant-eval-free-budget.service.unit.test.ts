@@ -8,7 +8,7 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryInstantEvalBudgetReservationsChannel } from "../../channels/memory/memory.instant-eval-budget-reservations.channel.ts";
+import { MemoryInstantEvalBudgetReservationsRepository } from "../../repositories/memory/memory.instant-eval-budget-reservations.repository.ts";
 import { INSTANT_EVAL_FREE_BUDGET_USD } from "../../rules/instant-eval-budget.rules.ts";
 import { InstantEvalFreeBudgetService } from "../instant-eval-free-budget.service.ts";
 
@@ -27,7 +27,7 @@ function serviceWith({
 } = {}) {
   const clock = { now: 0 };
   const sumSpendNanoUsdByRequestType = vi.fn(async () => spentNanoUsd);
-  const reservations = MemoryInstantEvalBudgetReservationsChannel.create({
+  const reservations = MemoryInstantEvalBudgetReservationsRepository.create({
     now: () => Temporal.Instant.fromEpochMilliseconds(clock.now),
   });
   const service = InstantEvalFreeBudgetService.create({

@@ -6,11 +6,11 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { MemoryInstantEvalCancellationChannel } from "../../channels/memory/memory.instant-eval-cancellation.channel.ts";
 import type {
   InstantEvalJudgmentPage,
   InstantEvalJudgmentsRepository,
 } from "../../repositories/instant-eval-judgments.repository.ts";
+import { MemoryInstantEvalCancellationRepository } from "../../repositories/memory/memory.instant-eval-cancellation.repository.ts";
 import { MemoryInstantEvalRunRepository } from "../../repositories/memory/memory.instant-eval-run.repository.ts";
 import type { InstantEvalStoredStatus } from "../../rules/instant-eval-run-status.rules.ts";
 import {
@@ -70,7 +70,7 @@ async function harness(options: { status?: InstantEvalStoredStatus; failure?: Er
   });
   if (options.status) await runs.write({ ...row, status: options.status });
   const commands = new RecordingCommands(options.failure);
-  const cancellations = MemoryInstantEvalCancellationChannel.create();
+  const cancellations = MemoryInstantEvalCancellationRepository.create();
 
   return {
     runs,

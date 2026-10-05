@@ -5,12 +5,11 @@
 
 import { describe, expect, it } from "vitest";
 
-import { MemoryInstantEvalCancellationChannel } from "../memory/memory.instant-eval-cancellation.channel.ts";
+import { MemoryInstantEvalCancellationRepository } from "../memory/memory.instant-eval-cancellation.repository.ts";
 import {
-  instantEvalCancelKey,
   type InstantEvalCancellationRedis,
-  RedisInstantEvalCancellationChannel,
-} from "../redis/redis.instant-eval-cancellation.channel.ts";
+  RedisInstantEvalCancellationRepository,
+} from "../redis/redis.instant-eval-cancellation.repository.ts";
 
 /** A Redis that records what it was told, and can be made to fail. */
 function recordingRedis(failing = false) {
@@ -38,19 +37,22 @@ describe("given a run someone asked to stop", () => {
     it("writes one key for the run, expiring past the longest run", async () => {
       const { redis, keys } = recordingRedis();
 
-      await RedisInstantEvalCancellationChannel.create(redis).request({ runId: "run-1" });
+      await RedisInstantEvalCancellationRepository.create(redis).request({ runId: "run-1" });
 
-      expect(keys.get(instantEvalCancelKey("run-1"))).toEqual({ value: "1", ttlSeconds: 3600 });
+      expect(keys.get(RedisInstantEvalCancellationRepository.keyOf("run-1"))).toEqual({
+        value: "1",
+        ttlSeconds: 3600,
+      });
     });
 
     it("is read back as requested by the page about to start", async () => {
       const { redis } = recordingRedis();
-      const channel = RedisInstantEvalCancellationChannel.create(redis);
+      const repository = RedisInstantEvalCancellationRepository.create(redis);
 
-      await channel.request({ runId: "run-1" });
+      await repository.request({ runId: "run-1" });
 
-      expect(await channel.isRequested({ runId: "run-1" })).toBe(true);
-      expect(await channel.isRequested({ runId: "run-2" })).toBe(false);
+      expect(await repository.isRequested({ runId: "run-1" })).toBe(true);
+      expect(await repository.isRequested({ runId: "run-2" })).toBe(false);
     });
   });
 
@@ -59,7 +61,7 @@ describe("given a run someone asked to stop", () => {
       const { redis } = recordingRedis(true);
 
       await expect(
-        RedisInstantEvalCancellationChannel.create(redis).request({ runId: "run-1" }),
+        RedisInstantEvalCancellationRepository.create(redis).request({ runId: "run-1" }),
       ).resolves.toBeUndefined();
     });
 
@@ -67,7 +69,7 @@ describe("given a run someone asked to stop", () => {
       const { redis } = recordingRedis(true);
 
       expect(
-        await RedisInstantEvalCancellationChannel.create(redis).isRequested({ runId: "run-1" }),
+        await RedisInstantEvalCancellationRepository.create(redis).isRequested({ runId: "run-1" }),
       ).toBe(false);
     });
   });
@@ -75,12 +77,12 @@ describe("given a run someone asked to stop", () => {
 
 describe("given a deployment with no Redis", () => {
   it("keeps the hint in this process, which is where the suite reads it", async () => {
-    const channel = MemoryInstantEvalCancellationChannel.create();
+    const repository = MemoryInstantEvalCancellationRepository.create();
 
-    expect(await channel.isRequested({ runId: "run-1" })).toBe(false);
+    expect(await repository.isRequested({ runId: "run-1" })).toBe(false);
 
-    await channel.request({ runId: "run-1" });
+    await repository.request({ runId: "run-1" });
 
-    expect(await channel.isRequested({ runId: "run-1" })).toBe(true);
+    expect(await repository.isRequested({ runId: "run-1" })).toBe(true);
   });
 });

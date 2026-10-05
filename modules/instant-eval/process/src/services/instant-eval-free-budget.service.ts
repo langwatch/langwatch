@@ -11,7 +11,7 @@ import {
 } from "@langwatch/instant-eval-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type { InstantEvalBudgetReservationsChannel } from "../channels/instant-eval-budget-reservations.channel.ts";
+import type { InstantEvalBudgetReservationsRepository } from "../repositories/instant-eval-budget-reservations.repository.ts";
 import {
   freeInstantEvalStanding,
   INSTANT_EVAL_FREE_BUDGET_USD,
@@ -51,13 +51,13 @@ export class InstantEvalFreeBudgetService {
   readonly #spent = new Map<string, CachedSpend>();
 
   private readonly peers: InstantEvalBudgetPeers;
-  private readonly reservations: InstantEvalBudgetReservationsChannel;
+  private readonly reservations: InstantEvalBudgetReservationsRepository;
   private readonly isBounded: boolean;
   private readonly now: () => Instant;
 
   private constructor(options: {
     peers: InstantEvalBudgetPeers;
-    reservations: InstantEvalBudgetReservationsChannel;
+    reservations: InstantEvalBudgetReservationsRepository;
     isBounded: boolean;
     now: () => Instant;
   }) {
@@ -79,7 +79,7 @@ export class InstantEvalFreeBudgetService {
     now,
   }: {
     peers: InstantEvalBudgetPeers;
-    reservations: InstantEvalBudgetReservationsChannel;
+    reservations: InstantEvalBudgetReservationsRepository;
     isBounded?: boolean;
     now?: () => Instant;
   }): InstantEvalFreeBudgetService {

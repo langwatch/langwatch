@@ -13,12 +13,12 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { InstantEvalCancellationChannel } from "../channels/instant-eval-cancellation.channel.ts";
 import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
 import type {
   InstantEvalPageOutcome,
   InstantEvalRunExecutor,
 } from "../eventing/instant-eval-processing.intent.ts";
+import type { InstantEvalCancellationRepository } from "../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalJudgmentsRepository } from "../repositories/instant-eval-judgments.repository.ts";
 import {
   assertInstantEvalPageBudget,
@@ -106,7 +106,7 @@ export class InstantEvalJudgePageService {
   private readonly textSource: InstantEvalTextSource;
   private readonly judge: InstantEvalJudgeChannel;
   private readonly judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
-  private readonly cancellation: InstantEvalCancellationChannel;
+  private readonly cancellation: InstantEvalCancellationRepository;
   private readonly budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
   private readonly readAhead: InstantEvalReadAheadService;
   private readonly concurrency: number;
@@ -118,7 +118,7 @@ export class InstantEvalJudgePageService {
     textSource: InstantEvalTextSource;
     judge: InstantEvalJudgeChannel;
     judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
-    cancellation: InstantEvalCancellationChannel;
+    cancellation: InstantEvalCancellationRepository;
     budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
     readAhead: InstantEvalReadAheadService;
     concurrency: number;
@@ -153,7 +153,7 @@ export class InstantEvalJudgePageService {
     textSource: InstantEvalTextSource;
     judge: InstantEvalJudgeChannel;
     judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
-    cancellation: InstantEvalCancellationChannel;
+    cancellation: InstantEvalCancellationRepository;
     budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
     /** The next page of each run, read while the current one judges. */
     readAhead?: InstantEvalReadAheadService;

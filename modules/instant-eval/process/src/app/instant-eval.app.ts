@@ -32,26 +32,18 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import { HttpInstantEvalJudgeChannel } from "../channels/http/http.instant-eval-judge.channel.ts";
-import type { InstantEvalCancellationChannel } from "../channels/instant-eval-cancellation.channel.ts";
 import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
-import { MemoryInstantEvalBudgetReservationsChannel } from "../channels/memory/memory.instant-eval-budget-reservations.channel.ts";
-import { MemoryInstantEvalCancellationChannel } from "../channels/memory/memory.instant-eval-cancellation.channel.ts";
 import {
   DeterministicInstantEvalJudgeChannel,
   MemoryInstantEvalJudgeChannel,
 } from "../channels/memory/memory.instant-eval-judge.channel.ts";
-import { RedisInstantEvalBudgetReservationsChannel } from "../channels/redis/redis.instant-eval-budget-reservations.channel.ts";
-import { RedisInstantEvalCancellationChannel } from "../channels/redis/redis.instant-eval-cancellation.channel.ts";
-import {
-  type InstantEvalRateLimiterRedis,
-  RedisInstantEvalRateLimiterChannel,
-} from "../channels/redis/redis.instant-eval-rate-limiter.channel.ts";
 import type { InstantEvalRunExecutor } from "../eventing/instant-eval-processing.intent.ts";
 import {
   InstantEvalProcessingPipelineAdapter,
   type InstantEvalProcessingPipelineDefinition,
 } from "../eventing/instant-eval-processing.pipeline.ts";
 import { InstantEvalRunProjectionStore } from "../eventing/instant-eval-run.store.ts";
+import type { InstantEvalCancellationRepository } from "../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalRepositories } from "../repositories/instant-eval.repositories.ts";
 import { instantEvalJudgeKind } from "../rules/instant-eval-judge-choice.rules.ts";
 import {
@@ -74,6 +66,7 @@ import { InstantEvalFreeBudgetService } from "../services/instant-eval-free-budg
 import { InstantEvalJudgePageService } from "../services/instant-eval-judge-page.service.ts";
 import { InstantEvalOptInService } from "../services/instant-eval-opt-in.service.ts";
 import { InstantEvalPlanService } from "../services/instant-eval-plan.service.ts";
+import { InstantEvalRateLimiterService } from "../services/instant-eval-rate-limiter.service.ts";
 import { InstantEvalReadsService } from "../services/instant-eval-reads.service.ts";
 import { InstantEvalRowSourceService } from "../services/instant-eval-row-source.service.ts";
 import { InstantEvalRunContextService } from "../services/instant-eval-run-context.service.ts";
@@ -101,21 +94,7 @@ function spendAttributionOf(
   };
 }
 
-/**
- * The Redis surface this module uses: the judge's token bucket, the budget
- * holds and the cancellation hint. Absent in a memory process, where each has
- * its own twin.
- */
-type InstantEvalRedis = InstantEvalRateLimiterRedis & {
-  del(key: string): Promise<unknown>;
-  srem(key: string, member: string): Promise<unknown>;
-  set(key: string, value: string, mode: "EX", seconds: number): Promise<unknown>;
-  exists(key: string): Promise<number>;
-};
-
 type InstantEvalMembers = Readonly<{
-  /** The shared bucket, holds and cancel hints; absent in a memory process. */
-  redis: InstantEvalRedis | null;
   /** The raw NODE_ENV; "production" refuses the memory judge. */
   nodeEnvironment: string | undefined;
 }>;
@@ -164,8 +143,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
   static readonly secrets = {
     classifierApiKey: Secret.load("JEV_API_KEY", { optional: true }),
   } as const;
-  /** `redis` is the shared token bucket that paces the judge across every pod. */
-  static readonly reads = ["redis", "nodeEnvironment"] as const;
+  static readonly reads = ["nodeEnvironment"] as const;
 
   private readonly access: InstantEvalAccessService;
   private readonly optIns: InstantEvalOptInService;
@@ -233,12 +211,10 @@ export class InstantEvalModule implements InstantEvalApiContract {
     const textSource: InstantEvalTextSource = {
       texts: (input) => analytics.hydrateLangWatchQLTexts(input),
     };
-    const cancellations = setup.members.redis
-      ? RedisInstantEvalCancellationChannel.create(setup.members.redis)
-      : MemoryInstantEvalCancellationChannel.create();
+    const cancellations = repositories.cancellations;
     // A hold one process keeps to itself admits the same organization's runs
     // on every other, so a bounded budget refuses a process-local store.
-    if (setup.config.isBounded && !setup.members.redis) {
+    if (setup.config.isBounded && setup.tier !== "live") {
       throw new Error(
         "Instant Evals with a bounded free budget (INSTANT_EVAL_BOUNDED) needs a Redis connection for the budget holds, and this process has none",
       );
@@ -251,9 +227,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
           (await plans.getActivePlan({ organizationId })).free,
         sumSpendNanoUsdByRequestType: (input) => gateway.sumSpendNanoUsdByRequestType(input),
       },
-      reservations: setup.members.redis
-        ? RedisInstantEvalBudgetReservationsChannel.create({ redis: setup.members.redis })
-        : MemoryInstantEvalBudgetReservationsChannel.create(),
+      reservations: repositories.budgetReservations,
       isBounded: setup.config.isBounded,
     });
     const context = InstantEvalRunContextService.create({
@@ -418,7 +392,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
     textSource: InstantEvalTextSource;
     judge: InstantEvalJudgeChannel;
     judgments: InstantEvalRepositories["judgments"];
-    cancellations: InstantEvalCancellationChannel;
+    cancellations: InstantEvalCancellationRepository;
     budget: InstantEvalFreeBudgetService;
     analytics: AnalyticsApi;
     projects: ProjectApi;
@@ -496,8 +470,8 @@ export class InstantEvalModule implements InstantEvalApiContract {
       apiKey,
       ...(setup.config.classifierBaseUrl ? { baseUrl: setup.config.classifierBaseUrl } : {}),
       ...(setup.config.classifierModel ? { model: setup.config.classifierModel } : {}),
-      limiter: RedisInstantEvalRateLimiterChannel.create({
-        redis: setup.members.redis,
+      limiter: InstantEvalRateLimiterService.create({
+        buckets: setup.repositories.rateLimits,
         tokensPerSecond,
         capacity: tokensPerSecond * BUCKET_BURST_SECONDS,
         tenantTokensPerSecond,

@@ -4,15 +4,15 @@
  * and what a suite drives the executor's stop path with.
  */
 
-import type { InstantEvalCancellationChannel } from "../instant-eval-cancellation.channel.ts";
+import type { InstantEvalCancellationRepository } from "../instant-eval-cancellation.repository.ts";
 
-export class MemoryInstantEvalCancellationChannel implements InstantEvalCancellationChannel {
+export class MemoryInstantEvalCancellationRepository implements InstantEvalCancellationRepository {
   #requested = new Set<string>();
 
   private constructor() {}
 
-  static create(): MemoryInstantEvalCancellationChannel {
-    return new MemoryInstantEvalCancellationChannel();
+  static create(): MemoryInstantEvalCancellationRepository {
+    return new MemoryInstantEvalCancellationRepository();
   }
 
   async request({ runId }: { runId: string }): Promise<void> {

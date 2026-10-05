@@ -6,13 +6,13 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { MemoryInstantEvalBudgetReservationsChannel } from "../memory/memory.instant-eval-budget-reservations.channel.ts";
+import { MemoryInstantEvalBudgetReservationsRepository } from "../memory/memory.instant-eval-budget-reservations.repository.ts";
 
 const ORG = "org_1";
 const HOUR = 60 * 60 * 1000;
 
 function storeOn(clock: { now: number } = { now: 0 }) {
-  return MemoryInstantEvalBudgetReservationsChannel.create({
+  return MemoryInstantEvalBudgetReservationsRepository.create({
     now: () => Temporal.Instant.fromEpochMilliseconds(clock.now),
   });
 }

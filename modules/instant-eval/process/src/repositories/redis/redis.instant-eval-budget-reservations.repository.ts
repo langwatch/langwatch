@@ -6,10 +6,10 @@
 
 import type {
   InstantEvalBudgetReservationOutcome,
-  InstantEvalBudgetReservationsChannel,
-} from "../instant-eval-budget-reservations.channel.ts";
+  InstantEvalBudgetReservationsRepository,
+} from "../instant-eval-budget-reservations.repository.ts";
 
-/** The Redis surface this channel uses, structurally. */
+/** The Redis surface this repository uses, structurally. */
 export type InstantEvalBudgetReservationsRedis = {
   eval(script: string, keyCount: number, ...args: string[]): Promise<unknown>;
   del(key: string): Promise<unknown>;
@@ -78,13 +78,13 @@ end
 return tostring(held)
 `;
 
-export class RedisInstantEvalBudgetReservationsChannel implements InstantEvalBudgetReservationsChannel {
+export class RedisInstantEvalBudgetReservationsRepository implements InstantEvalBudgetReservationsRepository {
   private constructor(private readonly redis: InstantEvalBudgetReservationsRedis) {}
 
   static create(input: {
     redis: InstantEvalBudgetReservationsRedis;
-  }): RedisInstantEvalBudgetReservationsChannel {
-    return new RedisInstantEvalBudgetReservationsChannel(input.redis);
+  }): RedisInstantEvalBudgetReservationsRepository {
+    return new RedisInstantEvalBudgetReservationsRepository(input.redis);
   }
 
   async reserve({

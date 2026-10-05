@@ -5,7 +5,7 @@
  * @see dev/docs/adr/153-instant-eval-run-is-a-judgment-job.md
  */
 
-export interface InstantEvalCancellationChannel {
+export interface InstantEvalCancellationRepository {
   /** Publishes the hint. Never throws: the event behind it is the record. */
   request(input: { runId: string }): Promise<void>;
   /**

@@ -344,11 +344,14 @@ function boot({
     .withRelational(database.client)
     .withAnalytical(new ClickHouseQueryClient({ driver: new EmptyDriver() }))
     .withConfig({
-      experiment: { blockLocalHttpCalls: false, allowedProxyHosts: [], runConcurrency },
+      experiment: {
+        blockLocalHttpCalls: false,
+        allowedProxyHosts: [],
+        runConcurrency,
+        publicBaseUrl,
+        isSaas: false,
+      },
     })
-    .withMember("publicBaseUrl", publicBaseUrl)
-    .withMember("processName", `langwatch-test-${role}`)
-    .withMember("isSaas", false)
     .withObservability((observability) => observability.withLogging(createTestLogger().logger));
 
   return app

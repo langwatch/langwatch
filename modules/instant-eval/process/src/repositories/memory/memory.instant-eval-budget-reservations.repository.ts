@@ -8,22 +8,24 @@ import { nowInstant, type Instant } from "@langwatch/time";
 
 import type {
   InstantEvalBudgetReservationOutcome,
-  InstantEvalBudgetReservationsChannel,
-} from "../instant-eval-budget-reservations.channel.ts";
+  InstantEvalBudgetReservationsRepository,
+} from "../instant-eval-budget-reservations.repository.ts";
 
 interface HeldReservation {
   readonly nanoUsd: number;
   readonly expiresAt: number;
 }
 
-export class MemoryInstantEvalBudgetReservationsChannel implements InstantEvalBudgetReservationsChannel {
+export class MemoryInstantEvalBudgetReservationsRepository implements InstantEvalBudgetReservationsRepository {
   readonly #held = new Map<string, Map<string, HeldReservation>>();
 
   private constructor(private readonly now: () => Instant) {}
 
   /** `now` is injected so a suite can drive a lapse without sleeping. */
-  static create(options: { now?: () => Instant } = {}): MemoryInstantEvalBudgetReservationsChannel {
-    return new MemoryInstantEvalBudgetReservationsChannel(options.now ?? nowInstant);
+  static create(
+    options: { now?: () => Instant } = {},
+  ): MemoryInstantEvalBudgetReservationsRepository {
+    return new MemoryInstantEvalBudgetReservationsRepository(options.now ?? nowInstant);
   }
 
   async reserve({

@@ -14,11 +14,11 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { instantEvalRunRow } from "../../__tests__/instant-eval.fixtures.ts";
-import type { InstantEvalCancellationChannel } from "../../channels/instant-eval-cancellation.channel.ts";
 import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgeChannel,
 } from "../../channels/instant-eval-judge.channel.ts";
+import type { InstantEvalCancellationRepository } from "../../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalJudgmentRecord } from "../../repositories/instant-eval-judgments.repository.ts";
 import { MemoryInstantEvalRunRepository } from "../../repositories/memory/memory.instant-eval-run.repository.ts";
 import {
@@ -158,7 +158,7 @@ class CapturedJudgments {
 }
 
 /** A cancel nobody has asked for until a test asks for it. */
-class ScriptedCancellation implements InstantEvalCancellationChannel {
+class ScriptedCancellation implements InstantEvalCancellationRepository {
   isCancelled = false;
   reads = 0;
 

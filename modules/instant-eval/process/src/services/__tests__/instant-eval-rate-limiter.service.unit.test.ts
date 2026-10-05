@@ -10,9 +10,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   type InstantEvalRateLimiterRedis,
+  RedisInstantEvalRateLimitRepository,
+} from "../../repositories/redis/redis.instant-eval-rate-limit.repository.ts";
+import {
+  InstantEvalRateLimiterService,
   LOCAL_FALLBACK_TOKENS_PER_SECOND,
-  RedisInstantEvalRateLimiterChannel,
-} from "../redis/redis.instant-eval-rate-limiter.channel.ts";
+} from "../instant-eval-rate-limiter.service.ts";
 
 const GLOBAL_REFILL = 300_000;
 const GLOBAL_CAPACITY = 600_000;
@@ -81,11 +84,11 @@ function limiterOn({
   redis,
   clock,
 }: {
-  redis: InstantEvalRateLimiterRedis | null;
+  redis: InstantEvalRateLimiterRedis;
   clock: { now: number };
 }) {
-  return RedisInstantEvalRateLimiterChannel.create({
-    redis,
+  return InstantEvalRateLimiterService.create({
+    buckets: RedisInstantEvalRateLimitRepository.create(redis),
     tokensPerSecond: GLOBAL_REFILL,
     capacity: GLOBAL_CAPACITY,
     tenantTokensPerSecond: TENANT_REFILL,

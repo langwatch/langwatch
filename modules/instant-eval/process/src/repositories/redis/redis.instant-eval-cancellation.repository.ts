@@ -7,7 +7,7 @@
 
 import { createLogger } from "@langwatch/observability";
 
-import type { InstantEvalCancellationChannel } from "../instant-eval-cancellation.channel.ts";
+import type { InstantEvalCancellationRepository } from "../instant-eval-cancellation.repository.ts";
 
 const logger = createLogger("langwatch:instant-evals:cancellation");
 
@@ -18,31 +18,37 @@ const logger = createLogger("langwatch:instant-evals:cancellation");
  */
 const CANCEL_TTL_SECONDS = 60 * 60;
 
-export function instantEvalCancelKey(runId: string): string {
-  return `instant_eval:cancel:${runId}`;
-}
-
 /** The two Redis calls this needs, and nothing more. */
 export interface InstantEvalCancellationRedis {
   set(key: string, value: string, mode: "EX", seconds: number): Promise<unknown>;
   exists(key: string): Promise<number>;
 }
 
-/** Both directions fail soft; see the channel for why each answer is safe. */
-export class RedisInstantEvalCancellationChannel implements InstantEvalCancellationChannel {
+/** Both directions fail soft; see the repository for why each answer is safe. */
+export class RedisInstantEvalCancellationRepository implements InstantEvalCancellationRepository {
   #redis: InstantEvalCancellationRedis;
 
   private constructor(redis: InstantEvalCancellationRedis) {
     this.#redis = redis;
   }
 
-  static create(redis: InstantEvalCancellationRedis): RedisInstantEvalCancellationChannel {
-    return new RedisInstantEvalCancellationChannel(redis);
+  /** The key a run's hint is written under. */
+  static keyOf(runId: string): string {
+    return `instant_eval:cancel:${runId}`;
+  }
+
+  static create(redis: InstantEvalCancellationRedis): RedisInstantEvalCancellationRepository {
+    return new RedisInstantEvalCancellationRepository(redis);
   }
 
   async request({ runId }: { runId: string }): Promise<void> {
     try {
-      await this.#redis.set(instantEvalCancelKey(runId), "1", "EX", CANCEL_TTL_SECONDS);
+      await this.#redis.set(
+        RedisInstantEvalCancellationRepository.keyOf(runId),
+        "1",
+        "EX",
+        CANCEL_TTL_SECONDS,
+      );
     } catch (error) {
       logger.warn(
         { runId, error },
@@ -53,7 +59,7 @@ export class RedisInstantEvalCancellationChannel implements InstantEvalCancellat
 
   async isRequested({ runId }: { runId: string }): Promise<boolean> {
     try {
-      return (await this.#redis.exists(instantEvalCancelKey(runId))) > 0;
+      return (await this.#redis.exists(RedisInstantEvalCancellationRepository.keyOf(runId))) > 0;
     } catch (error) {
       logger.warn(
         { runId, error },

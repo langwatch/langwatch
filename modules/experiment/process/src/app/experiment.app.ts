@@ -84,6 +84,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi, type ModelCostRate } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
+import { createLogger } from "@langwatch/observability";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
@@ -198,8 +199,7 @@ const NO_RUNS: ExperimentRunAggregate = { runsCount: 0, lastRunAt: null };
 
 type ExperimentSetup = FeatureSetup<
   typeof ExperimentModule.dependencies,
-  MembersRead<readonly ["prisma", "clickhouse", "redis", "logger"]> &
-    Readonly<{ publicBaseUrl: string | undefined; processName: string; isSaas: boolean }>,
+  MembersRead<readonly ["prisma", "clickhouse", "redis"]>,
   ExperimentServerConfig
 >;
 
@@ -233,19 +233,12 @@ export class ExperimentModule implements ExperimentApi {
     storedObjects: StoredObjectApi,
   };
   static readonly config = experimentConfig;
-  static readonly reads = [
-    "prisma",
-    "clickhouse",
-    "redis",
-    "logger",
-    "publicBaseUrl",
-    "processName",
-    "isSaas",
-  ] as const;
+  static readonly reads = ["prisma", "clickhouse", "redis"] as const;
 
   static create(setup: ExperimentSetup): ExperimentModule {
     const { members, dependencies, config } = setup;
-    const { prisma, clickhouse, logger } = members;
+    const { prisma, clickhouse } = members;
+    const logger = createLogger("langwatch:experiment");
     const { workflows, dataset, agents, evaluators, prompts, retention } = dependencies;
     const commands = ExperimentRunCommandDispatcherService.create();
     const senders: { commands?: EventingCommands<ExperimentLifecyclePipeline> } = {};
@@ -280,6 +273,8 @@ export class ExperimentModule implements ExperimentApi {
       members,
       peers: dependencies,
       config,
+      // A start's refusal names the role; a suite that builds by hand names none.
+      role: setup.role ?? "this process",
     });
     const targetNames = ExperimentWorkbenchTargetNamesService.create();
     const entities = ExperimentTargetEntityNamesService.create({ agents, evaluators });

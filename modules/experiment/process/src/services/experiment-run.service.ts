@@ -7,6 +7,7 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentServerConfig } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import type { MembersRead } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -74,8 +75,7 @@ export type ExperimentRunProcessing = Readonly<{
   refusals: ExperimentRunRefusals;
 }>;
 
-type ExperimentRunMembers = MembersRead<readonly ["redis", "logger"]> &
-  Readonly<{ publicBaseUrl: string | undefined; processName: string; isSaas: boolean }>;
+type ExperimentRunMembers = MembersRead<readonly ["redis"]>;
 
 type ExperimentRunPeers = Readonly<{
   workflows: WorkflowApi;
@@ -101,15 +101,18 @@ type ExperimentRunDeps = Readonly<{
   peers: ExperimentRunPeers;
   config: Pick<
     ExperimentServerConfig,
-    "blockLocalHttpCalls" | "allowedProxyHosts" | "runConcurrency"
+    "blockLocalHttpCalls" | "allowedProxyHosts" | "runConcurrency" | "publicBaseUrl" | "isSaas"
   >;
+  /** The role this process serves, named in a start's refusal. */
+  role: string;
 }>;
 
 /** The run machinery: folds, stop signal, frames, cells, board write-back and the run pipeline. */
 export class ExperimentRunService {
   static create(deps: ExperimentRunDeps): ExperimentRunService {
-    const { commands, experiments, resolveClient, members, peers, config } = deps;
-    const { redis, logger, publicBaseUrl, processName } = members;
+    const { commands, experiments, resolveClient, members, peers, config, role } = deps;
+    const { redis } = members;
+    const { publicBaseUrl } = config;
     const { retention } = peers;
     const defaultRetentionDays = () => retention.getPlatformDefaultRetentionDays();
     const repositories = redis
@@ -122,10 +125,10 @@ export class ExperimentRunService {
     const refusals = runRefusalsOf({
       sharedStore: redis !== undefined,
       publicBaseUrl,
-      processName,
+      processName: role,
     });
     if (refusals.start) {
-      logger.warn(
+      createLogger("langwatch:experiment:run").warn(
         { capability: refusals.start.capability },
         "experiment runs are refused in this process",
       );
@@ -204,7 +207,7 @@ function executionDataServicesOf(peers: ExperimentRunPeers): ExecutionDataServic
 }
 
 function createRunCells({
-  deps: { experiments, members, peers, config },
+  deps: { experiments, peers, config },
   folds,
   stream,
   services,
@@ -239,7 +242,7 @@ function createRunCells({
           policy: {
             blockLocal: config.blockLocalHttpCalls,
             allowedHosts: config.allowedProxyHosts,
-            verifyTls: members.isSaas,
+            verifyTls: config.isSaas,
           },
         }),
       }),
