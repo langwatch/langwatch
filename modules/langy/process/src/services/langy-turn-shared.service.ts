@@ -88,7 +88,7 @@ export interface LangyTurnServiceDeps {
   promptProjectId?: string;
   models: LangyModel;
   worker: LangyWorker | null;
-  tokenBuffer: LangyTokenBufferRepository | null;
+  tokenBuffer: LangyTokenBufferRepository;
   permits: LangyGithubPermit;
   harness?: LangyHarness;
   perDayPrCap: number;
@@ -98,8 +98,8 @@ export interface LangyTurnServiceDeps {
   skillGates: LangySkillGates;
   metrics: LangyTurnMetrics;
   admission: LangyTurnAdmissionRepository;
-  accessStore: LangyTurnAccessRepository | null;
-  handoffStore: LangyTurnHandoffRepository | null;
+  accessStore: LangyTurnAccessRepository;
+  handoffStore: LangyTurnHandoffRepository;
   messages: LangyMessageRepository | null;
 }
 
@@ -113,7 +113,7 @@ export type LangyTurnTechnicalMembers = {
   promptProjectId?: string;
   models: LangyModel;
   worker: LangyWorker | null;
-  tokenBuffer: LangyTokenBufferRepository | null;
+  tokenBuffer: LangyTokenBufferRepository;
   permits: LangyGithubPermit;
   harness?: LangyHarness;
   perDayPrCap: number;
@@ -122,8 +122,8 @@ export type LangyTurnTechnicalMembers = {
   uiActionSurface: LangyUiActionSurface;
   skillGates: LangySkillGates;
   metrics: LangyTurnMetrics;
-  accessStore: LangyTurnAccessRepository | null;
-  handoffStore: LangyTurnHandoffRepository | null;
+  accessStore: LangyTurnAccessRepository;
+  handoffStore: LangyTurnHandoffRepository;
 };
 
 export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";

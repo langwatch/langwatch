@@ -2,6 +2,7 @@ import type { LangyWorkerCredentials } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 
+import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import type { ConversationDetail } from "../../rules/langy-conversation-shape.rules.ts";
 import type {
   LangyTurnServiceDependencies,
@@ -10,7 +11,10 @@ import type {
 
 type Slot<T> = T extends object ? Partial<T> : T;
 
-/** Each member stubbed by name; an absent one throws when the turn reaches it. */
+/**
+ * Each member stubbed by name; an absent one throws when the turn reaches it,
+ * except the live-edge rows, which default to the memory tier's.
+ */
 export type LangyTurnDepsOverrides = {
   [K in keyof LangyTurnServiceDependencies]?: Slot<LangyTurnServiceDependencies[K]>;
 };
@@ -24,6 +28,7 @@ function optional<T extends object>(value: Partial<T> | undefined, name: string)
 }
 
 export function langyTurnDeps(over: LangyTurnDepsOverrides = {}): LangyTurnServiceDeps {
+  const rows = MemoryLangyRepositories.create();
   return {
     finalParts: optional(over.finalParts, "finalParts"),
     conversations: createApiFixture(over.conversations, "conversations"),
@@ -32,7 +37,9 @@ export function langyTurnDeps(over: LangyTurnDepsOverrides = {}): LangyTurnServi
     promptProjectId: over.promptProjectId,
     models: createApiFixture(over.models, "models"),
     worker: nullable(over.worker, "worker"),
-    tokenBuffer: nullable(over.tokenBuffer, "tokenBuffer"),
+    tokenBuffer: over.tokenBuffer
+      ? createApiFixture(over.tokenBuffer, "tokenBuffer")
+      : rows.tokenBuffer.open(),
     permits: createApiFixture(over.permits, "permits"),
     harness: optional(over.harness, "harness"),
     perDayPrCap: over.perDayPrCap ?? 0,
@@ -45,8 +52,12 @@ export function langyTurnDeps(over: LangyTurnDepsOverrides = {}): LangyTurnServi
     ),
     metrics: createApiFixture(over.metrics, "metrics"),
     admission: createApiFixture(over.admission, "admission"),
-    accessStore: nullable(over.accessStore, "accessStore"),
-    handoffStore: nullable(over.handoffStore, "handoffStore"),
+    accessStore: over.accessStore
+      ? createApiFixture(over.accessStore, "accessStore")
+      : rows.turnAccess,
+    handoffStore: over.handoffStore
+      ? createApiFixture(over.handoffStore, "handoffStore")
+      : rows.turnHandoff,
     messages: nullable(over.messages, "messages"),
   };
 }

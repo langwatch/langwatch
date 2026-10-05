@@ -62,8 +62,8 @@ export class LangyTurnPreparationService {
     isRetry: boolean;
     turnContext: object;
     worker: NonNullable<LangyTurnServiceDependencies["worker"]>;
-    accessStore: NonNullable<LangyTurnServiceDependencies["accessStore"]>;
-    handoffStore: NonNullable<LangyTurnServiceDependencies["handoffStore"]>;
+    accessStore: LangyTurnServiceDependencies["accessStore"];
+    handoffStore: LangyTurnServiceDependencies["handoffStore"];
     credentials: LangyCredentials;
     turnModel: string;
     conversation: { id: string; isNew: boolean };

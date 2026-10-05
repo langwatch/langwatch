@@ -89,10 +89,6 @@ export class LangyTurnStartService {
       throw new LangyAgentUnavailableError("Agent not configured");
     }
 
-    if (!accessStore || !handoffStore) {
-      throw new LangyAgentUnavailableError();
-    }
-
     return { worker, accessStore, handoffStore };
   }
 

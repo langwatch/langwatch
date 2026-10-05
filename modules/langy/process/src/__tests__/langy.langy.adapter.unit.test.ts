@@ -79,7 +79,16 @@ function commands(): LangyConversationCommands {
   };
 }
 
-function composition(turns: LangyTurnTechnicalMembers) {
+function composition(
+  members: Omit<LangyTurnTechnicalMembers, "tokenBuffer" | "accessStore" | "handoffStore">,
+) {
+  const rows = MemoryLangyRepositories.create();
+  const turns: LangyTurnTechnicalMembers = {
+    ...members,
+    tokenBuffer: rows.tokenBuffer.open(),
+    accessStore: rows.turnAccess,
+    handoffStore: rows.turnHandoff,
+  };
   return {
     commands: commands(),
     credentials: {
@@ -120,9 +129,6 @@ describe("LangyPostgresService", () => {
     const options = composition({
       models: { resolve: vi.fn() },
       worker: null,
-      tokenBuffer: null,
-      accessStore: null,
-      handoffStore: null,
       permits: {
         reserve: vi.fn(),
         release: vi.fn(),
@@ -260,9 +266,6 @@ function compositionOptions() {
   return composition({
     models: { resolve: vi.fn() },
     worker: null,
-    tokenBuffer: null,
-    accessStore: null,
-    handoffStore: null,
     permits: { reserve: vi.fn(), release: vi.fn(), check: vi.fn() },
     perDayPrCap: 0,
     sessionKeys: { mint: vi.fn(), revoke: vi.fn() },

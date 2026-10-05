@@ -23,7 +23,7 @@ function makeStopDeps(
     currentTurnId?: string | null;
     deltas?: string[];
     cancelRejects?: boolean;
-    noBuffer?: boolean;
+    emptyBuffer?: boolean;
   } = {},
 ) {
   const finalizeTurn = vi.fn(async (_args: Record<string, unknown>) => ({ messageId: "a1" }));
@@ -50,9 +50,8 @@ function makeStopDeps(
     conversations: { finalizeTurn, findByIdVisible },
     credentials: {},
     worker: { cancel },
-    tokenBuffer: over.noBuffer ? null : { readTail, markEnd },
+    tokenBuffer: over.emptyBuffer ? undefined : { readTail, markEnd },
     accessStore: { isTurnActor },
-    handoffStore: null,
     messages: null,
     finalParts: LangyFinalPartsService.create(),
   });
@@ -175,9 +174,9 @@ describe("LangyTurnStopService.stopTurn", () => {
     });
   });
 
-  describe("when there is no live buffer to read a partial from", () => {
+  describe("when the live buffer holds no partial answer", () => {
     it("still records a stopped terminal, with an empty answer", async () => {
-      const { deps, mocks } = makeStopDeps({ noBuffer: true });
+      const { deps, mocks } = makeStopDeps({ emptyBuffer: true });
 
       await LangyTurnStopService.create(deps).stopTurn(stopArgs);
 

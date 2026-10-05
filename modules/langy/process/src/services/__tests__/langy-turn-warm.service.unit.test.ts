@@ -67,7 +67,6 @@ function makeDeps(over: LangyTurnDepsOverrides = {}) {
     credentials,
     models: { resolve: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })) },
     worker: { probe, warm, dispatch, cancel },
-    tokenBuffer: null,
     permits: {
       reserve: reservePermit,
       release: vi.fn(async () => {}),
@@ -76,8 +75,6 @@ function makeDeps(over: LangyTurnDepsOverrides = {}) {
     perDayPrCap: 5,
     sessionKeys: { mint: mintSessionKey, revoke: vi.fn(async () => {}) },
     admission: {},
-    accessStore: null,
-    handoffStore: null,
     messages: null,
     ...over,
     finalParts: LangyFinalPartsService.create(),
