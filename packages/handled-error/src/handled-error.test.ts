@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { HandledError, handledErrorFromHerr, NotFoundError, setTraceUrlProvider } from "./index.ts";
+import {
+  HandledError,
+  handledErrorFromHerr,
+  NotFoundError,
+  serializedHandledErrorSchema,
+  setTraceUrlProvider,
+} from "./index.ts";
 
 class TestError extends HandledError {
   declare readonly code: "test_error";
@@ -31,8 +37,8 @@ async function duplicatedHandledError(
 
 describe("HandledError.serialize", () => {
   /** @scenario "Remediation fields are additive and optional" */
-  it("defaults fault to customer, retryable to false, and omits empty remediation fields", () => {
-    const serialized = new TestError().serialize();
+  it("defaults retryable to false and omits empty remediation fields", () => {
+    const serialized = new TestError("x", { httpStatus: 422 }).serialize();
 
     expect(serialized.fault).toBe("customer");
     expect(serialized.retryable).toBe(false);
@@ -310,5 +316,44 @@ describe("serialising a reason chain", () => {
     expect(error.serialize().reasons).toEqual([
       { code: "unknown", kind: "unknown", retryable: false },
     ]);
+  });
+});
+
+describe("HandledError fault default", () => {
+  /** @scenario "An undeclared fault at 5xx is presumed the platform's" */
+  it("presumes the platform's fault for an undeclared fault at 5xx", () => {
+    expect(new TestError("x", { httpStatus: 503 }).fault).toBe("presumed_platform");
+    expect(new TestError().fault).toBe("presumed_platform");
+  });
+
+  /** @scenario "An undeclared fault below 5xx stays the caller's" */
+  it("keeps an undeclared fault below 5xx the caller's", () => {
+    expect(new TestError("x", { httpStatus: 422 }).fault).toBe("customer");
+    expect(new TestError("x", { httpStatus: 404 }).fault).toBe("customer");
+  });
+
+  /** @scenario "A declared fault wins over the status" */
+  it("lets a declared fault win at any status", () => {
+    expect(new TestError("x", { httpStatus: 503, fault: "customer" }).fault).toBe("customer");
+    expect(new TestError("x", { httpStatus: 502, fault: "provider" }).fault).toBe("provider");
+    expect(new TestError("x", { httpStatus: 400, fault: "platform" }).fault).toBe("platform");
+  });
+
+  /** @scenario "An undeclared fault at 5xx is presumed the platform's" */
+  it("presumes the platform's fault for a herr envelope relayed at 5xx with no fault", () => {
+    const relayed = handledErrorFromHerr(
+      { type: "upstream_unavailable", message: "upstream timed out" },
+      { httpStatus: 503 },
+    );
+
+    expect(relayed.fault).toBe("presumed_platform");
+  });
+
+  /** @scenario "A presumed platform fault goes on the wire as itself" */
+  it("serializes presumed_platform as itself, and the wire schema reads it back", () => {
+    const serialized = new TestError("x", { httpStatus: 503 }).serialize();
+
+    expect(serialized.fault).toBe("presumed_platform");
+    expect(serializedHandledErrorSchema.parse(serialized).fault).toBe("presumed_platform");
   });
 });

@@ -54,6 +54,14 @@ describe("readHandledError", () => {
       expect(result?.code).toBe("project_not_found");
     });
 
+    it("accepts a presumed platform fault as itself", () => {
+      const result = readHandledError(
+        trpcError({ code: "upstream_unavailable", httpStatus: 503, fault: "presumed_platform" }),
+      );
+
+      expect(result?.fault).toBe("presumed_platform");
+    });
+
     it("defaults missing fault and retryability, matching the server", () => {
       const result = readHandledError(trpcError({ code: "project_not_found", httpStatus: 404 }));
 

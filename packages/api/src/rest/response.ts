@@ -1,6 +1,8 @@
 import type { Actor, AuthzPermission } from "@langwatch/authorization";
 import {
   HandledError,
+  handledErrorFaultSchema,
+  type HandledErrorFault,
   isZodLikeError,
   type SerializedReason,
   ValidationError,
@@ -263,7 +265,7 @@ export const apiErrorSchema = z.object({
    */
   tips: z.array(z.string()).optional(),
   docs_url: z.string().optional(),
-  fault: z.enum(["customer", "platform", "provider"]).optional(),
+  fault: handledErrorFaultSchema.optional(),
   /**
    * The cause chain a multi-fact refusal IS — one entry per offending
    * field for a schema failure.
@@ -322,7 +324,7 @@ export function apiErrorBody({
   spanId?: string;
   tips?: readonly string[];
   docsUrl?: string;
-  fault?: "customer" | "platform" | "provider";
+  fault?: HandledErrorFault;
   reasons?: readonly SerializedReason[];
 }): ApiErrorBody {
   return {
@@ -802,9 +804,9 @@ export function canonicalErrorFor(
 }
 
 /**
- * The envelope for a handled error: its own code, status, meta and reason chain below
- * 5xx; the opaque body at 5xx. A handled message is customer-safe by construction
- * (ADR-045), and customer-safe is not the same question as caller-actionable.
+ * The envelope for a handled error: its own code, status, meta and reason chain, except a
+ * 5xx whose class does not declare the fault the caller's, which answers the opaque body
+ * (ruling 2026-10-05). A handled message is customer-safe by construction (ADR-045).
  */
 function handledErrorEnvelope(
   error: HandledError,
@@ -816,7 +818,7 @@ function handledErrorEnvelope(
     isValidation ? VALIDATION_ERROR_STATUS : (error.httpStatus ?? 500)
   ) as ContentfulStatusCode;
 
-  if (status >= 500) {
+  if (status >= 500 && error.fault !== "customer") {
     return {
       status,
       body: apiErrorBody({

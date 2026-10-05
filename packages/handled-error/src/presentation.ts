@@ -5949,6 +5949,7 @@ const FAULT_TITLES: Record<HandledErrorFault, string> = {
   customer: "Check your input",
   platform: "Something went wrong on our end",
   provider: "A connected service didn't respond",
+  presumed_platform: "Something went wrong on our end",
 };
 
 /**

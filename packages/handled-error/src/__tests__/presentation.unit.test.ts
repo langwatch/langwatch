@@ -390,6 +390,12 @@ describe("explainHandledError", () => {
       expect(title).toBe("Something went wrong on our end");
       expect(isRegistered).toBe(false);
     });
+
+    it("titles a presumed platform fault as ours", () => {
+      const { title } = explainHandledError(shape({ code: "", fault: "presumed_platform" }));
+
+      expect(title).toBe("Something went wrong on our end");
+    });
   });
 
   describe("given a mediated LLM call the gateway forwarded from a provider", () => {

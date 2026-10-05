@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { REQUEST_CAUSE_FIELD } from "../constants.ts";
 import {
+  getLogLevelForRequest,
   getLogLevelFromStatusCode,
   getStatusCodeFromError,
+  handledFaultOf,
   hasAuthorizationToken,
   logHttpRequest,
 } from "../request/requestLogging.ts";
@@ -86,6 +88,22 @@ describe("requestLogging", () => {
         expect(getLogLevelFromStatusCode(200)).toBe("info");
         expect(getLogLevelFromStatusCode(301)).toBe("info");
       });
+    });
+  });
+
+  describe("when a handled error presumes the platform's fault", () => {
+    const presumed = { code: "upstream_unavailable", httpStatus: 503, fault: "presumed_platform" };
+
+    it("reports the presumed_platform fault", () => {
+      expect(handledFaultOf(presumed)).toBe("presumed_platform");
+    });
+
+    it("logs at error level", () => {
+      expect(getLogLevelForRequest(presumed, 503)).toBe("error");
+    });
+
+    it("still warns for a declared customer fault at 5xx", () => {
+      expect(getLogLevelForRequest({ ...presumed, fault: "customer" }, 503)).toBe("warn");
     });
   });
 

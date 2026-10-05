@@ -459,6 +459,19 @@ describe("the tRPC error formatter", () => {
     });
   });
 
+  describe("given a handled 5xx whose class declares no fault", () => {
+    /** @scenario "A presumed platform fault goes on the wire as itself" */
+    it("serializes its fault as presumed_platform", () => {
+      class UndeclaredBoom extends HandledError {
+        constructor() {
+          super("undeclared_boom", "upstream timed out", { httpStatus: 503 });
+        }
+      }
+
+      expect(format(new UndeclaredBoom()).data.error).toMatchObject({ fault: "presumed_platform" });
+    });
+  });
+
   describe("given a failure that is not a validation error at all", () => {
     /** @scenario "A database crash is reported to the client as unknown" */
     it("keeps the stack off the wire and reports no handled error", () => {

@@ -1,4 +1,5 @@
 import {
+  handledErrorFaultSchema,
   type HandledErrorFault,
   serializedReasonSchema,
   type SerializedHandledError,
@@ -26,7 +27,7 @@ export interface HandledErrorShape {
   reasons: readonly SerializedReason[];
 }
 
-const FAULTS = new Set<string>(["customer", "platform", "provider"]);
+const FAULTS = new Set<string>(handledErrorFaultSchema.options);
 
 /**
  * Lifts the handled-error payload off whichever transport carried it, tried

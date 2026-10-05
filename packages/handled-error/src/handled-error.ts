@@ -90,7 +90,7 @@ abstract class HandledErrorRuntime extends Error {
     this.spanId = options.spanId ?? ctx?.spanId;
     this.meta = options.meta ?? {};
     this.httpStatus = options.httpStatus ?? 500;
-    this.fault = options.fault ?? "customer";
+    this.fault = options.fault ?? defaultFault(this.httpStatus);
     this.retryable = options.retryable ?? false;
     this.tips = options.tips ?? [];
     this.docsUrl = options.docsUrl;
@@ -197,6 +197,11 @@ function handledErrorConstructor(): typeof HandledErrorRuntime {
     writable: false,
   });
   return HandledErrorRuntime;
+}
+
+/** A declared fault wins; an undeclared one at 5xx is presumed ours, below 5xx the caller's. */
+function defaultFault(httpStatus: number): HandledErrorFault {
+  return httpStatus >= 500 ? "presumed_platform" : "customer";
 }
 
 export type HandledError = HandledErrorRuntime;
