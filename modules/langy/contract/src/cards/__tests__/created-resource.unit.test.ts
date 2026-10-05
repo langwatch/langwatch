@@ -102,6 +102,7 @@ describe("reading a create result as a created-resource card", () => {
       expect(SCHEMA_BY_CARD_KIND.resourceCreated.validate([])).toBe(false);
     });
 
+    /** @scenario "An empty create result is not a created-resource card" */
     it("fails to parse as a create result", () => {
       const parsed = parseCliResult({
         resource: "scenario",
@@ -111,6 +112,7 @@ describe("reading a create result as a created-resource card", () => {
       expect(parsed).toMatchObject({ ok: false, kind: "resourceCreated" });
     });
 
+    /** @scenario "An empty create result is not a created-resource card" */
     it("records the outcome as unconfirmed rather than dropping the card", () => {
       expect(toCliToolResult({ resource: "scenario", verb: "create", payload: [] })).toEqual({
         kind: "card",
@@ -131,6 +133,7 @@ describe("reading a create result as a created-resource card", () => {
   });
 
   describe("when the result names the created resource", () => {
+    /** @scenario "A create that names the resource is still a created-resource card" */
     it("parses as a create result", () => {
       const parsed = parseCliResult({
         resource: "scenario",
@@ -140,6 +143,7 @@ describe("reading a create result as a created-resource card", () => {
       expect(parsed.ok).toBe(true);
     });
 
+    /** @scenario "A create that names the resource is still a created-resource card" */
     it("records no unconfirmed verdict", () => {
       const result = toCliToolResult({
         resource: "scenario",

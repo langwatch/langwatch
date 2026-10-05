@@ -297,6 +297,7 @@ describe("LangyDeclarativeCard", () => {
 
   describe("given a prompt push (diff widget)", () => {
     describe("when the result names what changed", () => {
+      /** @scenario "A prompt push renders what changed" */
       it("shows the prompt, its new version, and the changed fields", () => {
         renderCard({
           name: "langwatch.prompt.push",
@@ -422,6 +423,7 @@ describe("LangyDeclarativeCard", () => {
 
   describe("given a resource the catalog has never heard of", () => {
     describe("when the card renders", () => {
+      /** @scenario "A LangWatch action the panel does not recognise yet still reads cleanly" */
       it("still shows a readable card worded from the command", () => {
         renderCard({
           name: "langwatch.flux-capacitor.list",
@@ -434,6 +436,7 @@ describe("LangyDeclarativeCard", () => {
         expect(screen.getByText("Prototype")).toBeTruthy();
       });
 
+      /** @scenario "A LangWatch action the panel does not recognise yet still reads cleanly" */
       it("offers no link rather than a broken one", () => {
         renderCard({
           name: "langwatch.flux-capacitor.list",
@@ -555,6 +558,7 @@ describe("LangyDeclarativeCard", () => {
     });
 
     describe("when none of the referenced prompts exist any more", () => {
+      /** @scenario "A deleted entity renders honestly" */
       it("says so honestly instead of inventing an empty list", () => {
         useCapabilityDataMock.mockReturnValue({
           status: "hydrated",
@@ -566,6 +570,8 @@ describe("LangyDeclarativeCard", () => {
         renderHydrated();
 
         expect(screen.getByText("These prompts are no longer available.")).toBeTruthy();
+        expect(screen.getByText("7 prompts")).toBeTruthy();
+        expect(screen.getByText(/Open in Prompts/)).toBeTruthy();
         expect(screen.queryByText("No prompts yet.")).toBeNull();
       });
     });

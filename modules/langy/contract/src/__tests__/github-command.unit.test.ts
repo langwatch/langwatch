@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { needsGithubAuth } from "../github-command.ts";
+import { githubProgressFromToolParts, needsGithubAuth } from "../github-command.ts";
 
 describe("needsGithubAuth", () => {
   it("recognises every GitHub CLI invocation", () => {
@@ -62,5 +62,70 @@ describe("needsGithubAuth", () => {
     for (const command of ["", "   ", "&&"]) {
       expect(needsGithubAuth(command)).toBe(false);
     }
+  });
+});
+
+describe("githubProgressFromToolParts", () => {
+  const part = (command: string, state: string, output?: unknown) => ({
+    type: "tool-bash",
+    input: { command },
+    state,
+    output,
+  });
+
+  describe("given one command that commits, pushes and opens the pull request", () => {
+    /** @scenario "One command that commits, pushes and opens the PR ticks all three steps" */
+    it("reaches the committed, pushed and opened steps", () => {
+      const events = githubProgressFromToolParts([
+        part(
+          "git add . && git commit -m x && git push -u origin HEAD && gh pr create --base main",
+          "output-available",
+          "https://github.com/acme/service-x/pull/12",
+        ),
+      ]);
+
+      expect(events.map((event) => event.stage)).toEqual(["committed", "pushed", "opened"]);
+    });
+  });
+
+  describe("given a command that commits and pushes but failed", () => {
+    /** @scenario "A step whose command errored is not reached" */
+    it("reaches no step of that command", () => {
+      const events = githubProgressFromToolParts([
+        part("git add . && git commit -m x && git push -u origin HEAD", "output-error"),
+      ]);
+
+      expect(events).toEqual([]);
+    });
+  });
+
+  describe("given a command that printed a warning line and then the pull request URL", () => {
+    /** @scenario "The pull request URL printed by the command reaches the opened step" */
+    it("carries the URL on the opened step", () => {
+      const events = githubProgressFromToolParts([
+        part(
+          "git add -A && git commit -m x && git push -u origin HEAD && gh pr create --title t --body b",
+          "output-available",
+          "Warning: 1 uncommitted change\nhttps://github.com/acme/service-x/pull/12\n",
+        ),
+      ]);
+
+      expect(events.find((event) => event.stage === "opened")?.url).toBe(
+        "https://github.com/acme/service-x/pull/12",
+      );
+    });
+  });
+
+  describe("given a pull request command that printed no pull request URL", () => {
+    /** @scenario "A command that opened no pull request leaves the opened step without a URL" */
+    it("leaves the opened step without a URL", () => {
+      const events = githubProgressFromToolParts([
+        part("gh pr create --title t --body b", "output-available", "nothing to report"),
+      ]);
+
+      const opened = events.find((event) => event.stage === "opened");
+      expect(opened).toBeDefined();
+      expect(opened?.url).toBeUndefined();
+    });
   });
 });

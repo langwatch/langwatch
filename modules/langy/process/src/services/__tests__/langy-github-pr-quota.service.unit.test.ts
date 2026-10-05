@@ -152,6 +152,7 @@ describe("LangyGithubPrQuotaService.reservePermit", () => {
 
 describe("LangyGithubPrQuotaService.releasePermit", () => {
   describe("when called for a turn that opened no PR", () => {
+    /** @scenario "Permit must be released on every non-PR exit" */
     it("gives the slot back through the floored decrement, never below zero", async () => {
       floored.mockResolvedValue(4);
       await quota.releasePermit({ userId: "u1" });

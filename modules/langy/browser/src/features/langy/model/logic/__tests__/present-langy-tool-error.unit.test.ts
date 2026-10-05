@@ -336,6 +336,28 @@ describe("presentLangyToolError", () => {
   });
 
   describe("given the developer's own gh in the shared folder", () => {
+    /** @scenario "A shell command that ran in the shared folder keeps gh's own instruction" */
+    it("shows what gh said and claims no missing App, while an unmarked shell still does", () => {
+      const ghOutput = "To get started with GitHub CLI, please run: gh auth login";
+      const shared = presentLangyToolError({
+        title: "Running a command",
+        errorText: ghOutput,
+        toolName: "local_bash",
+      });
+      const unmarked = presentLangyToolError({
+        title: "Running a command",
+        errorText: ghOutput,
+        toolName: "bash",
+      });
+
+      expect(shared.detail).toContain("gh auth login");
+      expect(shared.title).not.toContain("GitHub App");
+      expect(shared.message).not.toContain("GitHub App");
+      expect(shared.code).toBeUndefined();
+      expect(unmarked.code).toBe("langy_github_not_connected");
+      expect(unmarked.title).toBe("Install the GitHub App to continue");
+    });
+
     /** @scenario "The developer's own gh keeps its own instruction" */
     it("keeps gh's instruction, because that shell is theirs", () => {
       const presentation = presentLangyToolError({

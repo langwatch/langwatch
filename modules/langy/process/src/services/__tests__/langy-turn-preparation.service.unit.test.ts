@@ -412,6 +412,7 @@ describe("LangyTurnPreparationService golden path", () => {
     expect(fixture.dispatch).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Invalid modelOverride must NOT burn a permit" */
   it("rejects a disallowed model and releases the admission", async () => {
     const abort = vi.fn(async () => undefined);
     const reserve = vi.fn(async () => ({ reserved: false, allowed: true, resetAt: 0 }));
@@ -445,7 +446,7 @@ describe("LangyTurnPreparationService golden path", () => {
         ...input,
         modelOverride: "evil/model",
       }),
-    ).rejects.toBeInstanceOf(LangyModelNotAllowedError);
+    ).rejects.toMatchObject({ code: "langy_model_not_allowed", httpStatus: 400 });
 
     expect(abort).toHaveBeenCalledOnce();
     expect(reserve).not.toHaveBeenCalled();
@@ -469,6 +470,7 @@ describe("LangyTurnPreparationService golden path", () => {
     expect(fixture.dispatch).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Permit must be released on every non-PR exit" */
   it("revokes the key, releases the permit, and aborts when acceptance fails", async () => {
     const revoke = vi.fn(async () => undefined);
     const release = vi.fn(async () => undefined);
