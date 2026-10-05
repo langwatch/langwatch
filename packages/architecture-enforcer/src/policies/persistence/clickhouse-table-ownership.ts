@@ -6,7 +6,7 @@ import ts from "typescript";
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
 import { getAnchor } from "../../workspace/anchors.ts";
 import { listFiles } from "../../workspace/layout.ts";
-import { sourceFile, sourceText } from "../../workspace/module-graph.ts";
+import { mayMention, sourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 /**
@@ -189,6 +189,8 @@ function readFile({
   found: Access[];
 }): void {
   if (!/from|join|into|table/i.test(sourceText({ file }))) return;
+
+  if (!mayMention({ file, words: tables.keys() })) return;
 
   const source = sourceFile({ file });
   const reader: Reader = { source, module, tables, constants: literalConstants(source), found };

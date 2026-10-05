@@ -160,18 +160,75 @@ export function sourceFile({
   const known = usable ? entry.value.tree.deref() : void 0;
   if (known) return known;
 
-  const parsed = ts.createSourceFile(
-    file,
-    sourceText({ file }),
-    ts.ScriptTarget.Latest,
-    parents,
-    resolvedKind,
-  );
+  const parsed = parseTree({ file, kind: resolvedKind, parents });
 
   syntaxTrees.set(key, stamp(file, { tree: new WeakRef(parsed), parents }));
 
   return parsed;
 }
+
+function parseTree({
+  file,
+  kind,
+  parents,
+  jsDoc = ts.JSDocParsingMode.ParseAll,
+}: {
+  file: string;
+  kind: ts.ScriptKind;
+  parents: boolean;
+  jsDoc?: ts.JSDocParsingMode;
+}): ts.SourceFile {
+  const options = { languageVersion: ts.ScriptTarget.Latest, jsDocParsingMode: jsDoc };
+
+  return ts.createSourceFile(file, sourceText({ file }), options, parents, kind);
+}
+
+/**
+ * `read` over this file's tree without retaining it: a whole-tree pass keeps
+ * only the import facts it derives. A `WeakRef` target lives until the job ends,
+ * and a lint run is one synchronous job, so a cached tree is never released.
+ */
+export function readSourceOnce<T>({
+  file,
+  read,
+}: {
+  file: string;
+  read: (source: ts.SourceFile) => T;
+}): T {
+  const kind = scriptKind(file);
+  const entry = syntaxTrees.get(`${file}\0${kind}`);
+  const known = entry !== void 0 && fresh(entry, file) ? entry.value.tree.deref() : void 0;
+  // No caller sees this tree but `read` and the import walk, and neither reads JSDoc.
+  const jsDoc = ts.JSDocParsingMode.ParseNone;
+  const source = known ?? parseTree({ file, kind, parents: false, jsDoc });
+
+  if (!fresh(parsedSources.get(file), file)) {
+    parsedSources.set(file, stamp(file, collectParsedSource({ file, source })));
+  }
+
+  return read(source);
+}
+
+/** Escapes that can spell a word in a literal or identifier without its raw characters. */
+const SPELLING_ESCAPE = /\\[ux0-7\r\n\u2028\u2029]/;
+
+/** Whether this file could name any of `words`: false only when no spelling of it can. */
+export function mayMention({ file, words }: { file: string; words: Iterable<string> }): boolean {
+  const text = sourceText({ file });
+
+  for (const word of words) if (text.includes(word)) return true;
+
+  const known = escapedTexts.get(file);
+  if (known?.text === text) return known.escaped;
+
+  const escaped = SPELLING_ESCAPE.test(text);
+  escapedTexts.set(file, { text, escaped });
+
+  return escaped;
+}
+
+/** Whether each file's current text holds a spelling escape; a rewritten text is tested again. */
+const escapedTexts = new Map<string, { text: string; escaped: boolean }>();
 
 export function scriptKind(file: string): ts.ScriptKind {
   const isTsxLike = file.endsWith(".tsx") || file.endsWith(".jsx");
@@ -188,9 +245,19 @@ export function scriptKind(file: string): ts.ScriptKind {
   return ts.ScriptKind.TS;
 }
 
-function isJsxNode(node: ts.Node): boolean {
-  return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
-}
+const JSX_KINDS = new Set([
+  ts.SyntaxKind.JsxElement,
+  ts.SyntaxKind.JsxSelfClosingElement,
+  ts.SyntaxKind.JsxFragment,
+]);
+
+/** The node kinds `importRecordFor` reads; every other node is walked past unexamined. */
+const IMPORT_RECORD_KINDS = new Set([
+  ts.SyntaxKind.ImportDeclaration,
+  ts.SyntaxKind.ExportDeclaration,
+  ts.SyntaxKind.ImportEqualsDeclaration,
+  ts.SyntaxKind.CallExpression,
+]);
 
 type ImportRecordInput = {
   node: ts.Node;
@@ -250,17 +317,21 @@ function parseSource(file: string): ParsedSource {
   const entry = parsedSources.get(file);
   if (entry && fresh(entry, file)) return entry.value;
 
-  const parsed = collectParsedSource(file);
+  // Import extraction never walks upward, and binding a parent onto every node
+  // of 14,000 files is the single most expensive thing the run would do.
+  const parsed = collectParsedSource({ file, source: sourceFile({ file, parents: false }) });
   parsedSources.set(file, stamp(file, parsed));
 
   return parsed;
 }
 
-function collectParsedSource(file: string): ParsedSource {
-  // Import extraction never walks upward, and binding a parent onto every node
-  // of 14,000 files is the single most expensive thing the run would do.
-  const source = sourceFile({ file, parents: false });
-
+function collectParsedSource({
+  file,
+  source,
+}: {
+  file: string;
+  source: ts.SourceFile;
+}): ParsedSource {
   const imports: ModuleImport[] = [];
   let rendersJsx = false;
 
@@ -281,9 +352,9 @@ function collectParsedSource(file: string): ParsedSource {
   };
 
   const visit = (node: ts.Node): void => {
-    if (isJsxNode(node)) rendersJsx = true;
+    if (JSX_KINDS.has(node.kind)) rendersJsx = true;
 
-    const importRecord = importRecordFor(node);
+    const importRecord = IMPORT_RECORD_KINDS.has(node.kind) ? importRecordFor(node) : void 0;
     if (importRecord) record(importRecord);
 
     ts.forEachChild(node, visit);

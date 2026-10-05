@@ -4,11 +4,13 @@ import { FEATURE_PREFIX } from "@langwatch/oxlint-rules/grammar/feature-layout-p
 import ts from "typescript";
 
 import type { ArchitectureViolation } from "../../types.ts";
-import { sourceFile } from "../../workspace/module-graph.ts";
+import { mayMention, sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 const PROJECTION_WRITE_TYPES = new Set(["FoldProjectionStore", "ProjectionStore"]);
 const PROJECTION_WRITE_METHODS = new Set(["storeProjection", "storeProjectionBatch"]);
+
+const PROJECTION_WRITE_WORDS = [...PROJECTION_WRITE_TYPES, ...PROJECTION_WRITE_METHODS];
 
 type TypeDeclaration = ts.ClassDeclaration | ts.InterfaceDeclaration | ts.TypeAliasDeclaration;
 
@@ -305,9 +307,15 @@ export function lintServiceProjectionBoundaries(
       accept: (file) => file.endsWith(".ts"),
     });
 
+    // Every finding names one of these words, so a package naming none is clean unparsed.
+    const services = sourceFiles.filter(isDomainServiceFile);
+    if (services.length === 0) continue;
+
+    if (!sourceFiles.some((file) => mayMention({ file, words: PROJECTION_WRITE_WORDS }))) continue;
+
     const types = packageTypes(sourceFiles);
 
-    for (const file of sourceFiles.filter(isDomainServiceFile)) {
+    for (const file of services) {
       const sourceFile = types.sourceByPath.get(file);
       if (!sourceFile) continue;
 

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 
-import ts from "typescript";
+import type ts from "typescript";
 
 import type { ArchitectureViolation } from "../../types.ts";
 import { SOURCE_ROOTS, listFiles } from "../../workspace/layout.ts";
@@ -12,6 +12,13 @@ import {
   type WorkspaceModuleResolver,
 } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+import {
+  DEFAULT_NAME,
+  EVERY_NAME,
+  exportedNamesFrom,
+  readFileReferences,
+  type StaticReference,
+} from "./module-references.ts";
 
 /**
  * A name a module's server package exports that no file in the repository
@@ -21,12 +28,6 @@ import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 /** A module server package's own source, core and enterprise. */
 const MODULE_GROUPS = ["modules", join("enterprise", "modules")];
-
-/** The marker a whole-module reference records in place of a member name. */
-const EVERY_NAME = "*";
-
-/** The name a default export is imported under. */
-const DEFAULT_NAME = "default";
 
 const SKIPPED_DIRECTORIES = new Set(["__tests__", "__mocks__", "generated", "testing"]);
 
@@ -143,105 +144,19 @@ function targetOf({
   return resolveSpecifier({ specifier, file });
 }
 
-type ModuleReference = ts.ImportDeclaration | ts.ExportDeclaration;
-
-/** The file this declaration reads, or nothing when it reads no source of ours. */
-function specifierTarget({
-  statement,
-  file,
-  resolveSpecifier,
-}: {
-  statement: ModuleReference;
-  file: string;
-  resolveSpecifier: ResolveSpecifier;
-}): string | undefined {
-  const specifier = statement.moduleSpecifier;
-  if (specifier === void 0) return void 0;
-
-  if (!ts.isStringLiteralLike(specifier)) return void 0;
-
-  const target = targetOf({ file, specifier: specifier.text, resolveSpecifier });
-
-  return target === file ? void 0 : target;
-}
-
-/** What a clause element takes: the name at the source, not the local alias. */
-function takenName(element: ts.ImportSpecifier | ts.ExportSpecifier): string {
-  return (element.propertyName ?? element.name).text;
-}
-
-function readImportClause({
-  clause,
-  target,
-  usage,
-}: {
-  clause: ts.ImportClause | undefined;
-  target: string;
-  usage: Usage;
-}): void {
-  if (clause === void 0) return;
-
-  if (clause.name !== void 0) record({ usage, target, name: DEFAULT_NAME });
-
-  const bindings = clause.namedBindings;
-  if (bindings === void 0) return;
-
-  if (ts.isNamespaceImport(bindings)) {
-    record({ usage, target, name: EVERY_NAME });
-
-    return;
-  }
-
-  for (const element of bindings.elements) {
-    record({ usage, target, name: takenName(element) });
-  }
-}
-
-function readExportClause({
-  statement,
-  target,
-  usage,
-}: {
-  statement: ts.ExportDeclaration;
-  target: string;
-  usage: Usage;
-}): void {
-  const clause = statement.exportClause;
-
-  if (clause === void 0) {
-    record({ usage, target, name: EVERY_NAME });
-
-    return;
-  }
-
-  if (!ts.isNamedExports(clause)) {
-    record({ usage, target, name: EVERY_NAME });
-
-    return;
-  }
-
-  for (const element of clause.elements) {
-    record({ usage, target, name: takenName(element) });
-  }
-}
-
 type FileReadArgs = { file: string; resolveSpecifier: ResolveSpecifier; usage: Usage };
 
-function readStaticReferences({ file, resolveSpecifier, usage }: FileReadArgs): void {
-  for (const statement of statementsOf(file)) {
-    if (ts.isImportDeclaration(statement)) {
-      const target = specifierTarget({ statement, file, resolveSpecifier });
+function recordStaticReferences({
+  file,
+  statics,
+  resolveSpecifier,
+  usage,
+}: FileReadArgs & { statics: readonly StaticReference[] }): void {
+  for (const { specifier, names } of statics) {
+    const target = targetOf({ file, specifier, resolveSpecifier });
+    if (target === void 0 || target === file) continue;
 
-      if (target !== void 0) readImportClause({ clause: statement.importClause, target, usage });
-
-      continue;
-    }
-
-    if (!ts.isExportDeclaration(statement)) continue;
-
-    const target = specifierTarget({ statement, file, resolveSpecifier });
-
-    if (target !== void 0) readExportClause({ statement, target, usage });
+    for (const name of names) record({ usage, target, name });
   }
 }
 
@@ -260,96 +175,48 @@ function readDynamicReferences({ file, resolveSpecifier, usage }: FileReadArgs):
 }
 
 /** Which names each file is read for, across the whole repository. */
+type UsageGraph = { usage: Usage; exported: ReadonlyMap<string, string[]> };
+
+/** What every file reads, from one parse each, and what each `declared` file exports. */
 function usageGraph({
   files,
+  declared,
   resolveSpecifier,
 }: {
   files: readonly string[];
+  declared: ReadonlySet<string>;
   resolveSpecifier: ResolveSpecifier;
-}): Usage {
+}): UsageGraph {
   const usage: Usage = new Map();
-
+  const exported = new Map<string, string[]>();
   for (const file of files) {
-    readStaticReferences({ file, resolveSpecifier, usage });
+    if (!existsSync(file)) continue;
+
+    const read = readFileReferences({ file, declared: declared.has(file) });
+
+    recordStaticReferences({ file, statics: read.statics, resolveSpecifier, usage });
+
+    if (read.exported !== void 0) exported.set(file, read.exported);
+
     readDynamicReferences({ file, resolveSpecifier, usage });
   }
 
-  return usage;
+  return { usage, exported };
 }
 
-function boundNames(name: ts.BindingName): string[] {
-  if (ts.isIdentifier(name)) return [name.text];
-
-  return name.elements.flatMap((element) =>
-    ts.isBindingElement(element) ? boundNames(element.name) : [],
-  );
-}
-
-function isExported(statement: ts.Statement): boolean {
-  if (!ts.canHaveModifiers(statement)) return false;
-
-  const modifiers = ts.getModifiers(statement) ?? [];
-
-  return modifiers.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
-}
-
-/** The name a declaration statement publishes, one statement kind at a time. */
-function declaredName(statement: ts.Statement): string | undefined {
-  if (ts.isFunctionDeclaration(statement)) return statement.name?.text;
-
-  if (ts.isClassDeclaration(statement)) return statement.name?.text;
-
-  if (ts.isInterfaceDeclaration(statement)) return statement.name.text;
-
-  if (ts.isTypeAliasDeclaration(statement)) return statement.name.text;
-
-  if (ts.isEnumDeclaration(statement)) return statement.name.text;
-
-  if (!ts.isModuleDeclaration(statement)) return void 0;
-
-  return ts.isIdentifier(statement.name) ? statement.name.text : void 0;
-}
-
-/**
- * A star re-export republishes names this file never spells; there is nothing
- * here to report, and the module it names is checked itself.
- */
-function reexportedNames(statement: ts.ExportDeclaration): string[] {
-  const clause = statement.exportClause;
-  if (clause === void 0) return [];
-
-  if (!ts.isNamedExports(clause)) return [];
-
-  return clause.elements.map((element) => element.name.text);
-}
-
-function exportedNamesIn(statement: ts.Statement): string[] {
-  if (ts.isExportAssignment(statement)) {
-    return statement.isExportEquals === true ? [] : [DEFAULT_NAME];
-  }
-
-  if (ts.isExportDeclaration(statement)) return reexportedNames(statement);
-
-  if (!isExported(statement)) return [];
-
-  if (ts.isVariableStatement(statement)) {
-    return statement.declarationList.declarations.flatMap((one) => boundNames(one.name));
-  }
-
-  const name = declaredName(statement);
-
-  return name === void 0 ? [] : [name];
-}
-
-/** Every name this file publishes, whatever a reader would have to write to take it. */
 export function exportedNamesOf(file: string): string[] {
-  const names = statementsOf(file).flatMap((statement) => exportedNamesIn(statement));
-
-  return [...new Set(names)];
+  return exportedNamesFrom(statementsOf(file));
 }
 
-/** The names this file publishes that nothing reads. */
-function unusedNamesIn({ file, read }: { file: string; read?: ReadonlySet<string> }): string[] {
+function unusedNamesIn({
+  file,
+  read,
+  exported,
+}: {
+  file: string;
+  read?: ReadonlySet<string>;
+  exported?: readonly string[];
+}): string[] {
   if (isBarrel(file)) return [];
 
   if (isTestModule(file)) return [];
@@ -359,7 +226,7 @@ function unusedNamesIn({ file, read }: { file: string; read?: ReadonlySet<string
 
   const config = isConfigModule(file);
 
-  return exportedNamesOf(file).filter((name) => {
+  return (exported ?? exportedNamesOf(file)).filter((name) => {
     if (names.has(name)) return false;
 
     return !config || name !== DEFAULT_NAME;
@@ -398,10 +265,14 @@ export function collectUnusedModuleExportFindings({
 
   const resolveSpecifier = (resolver ?? workspaceModuleResolver({ root })).resolve;
 
-  const usage = usageGraph({ files: repositorySources(root), resolveSpecifier });
+  const { usage, exported } = usageGraph({
+    files: repositorySources(root),
+    declared: new Set(declared),
+    resolveSpecifier,
+  });
 
   const findings = declared.flatMap((file) =>
-    unusedNamesIn({ file, read: usage.get(file) }).map((name) =>
+    unusedNamesIn({ file, read: usage.get(file), exported: exported.get(file) }).map((name) =>
       finding({ path: relative(root, file), name }),
     ),
   );
