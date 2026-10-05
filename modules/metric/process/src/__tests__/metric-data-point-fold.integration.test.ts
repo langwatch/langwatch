@@ -11,6 +11,7 @@ import {
   METRIC_ROLLUP_INTERVAL_MS,
   type CanonicalMetricDataPoint,
 } from "@langwatch/metric-contract";
+import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { point } from "../app/__tests__/metric.fixture.ts";
@@ -588,8 +589,8 @@ describe("given points ensured for the tenant's organization", () => {
       const estimates = await repo.queryUsageEstimates({
         organizationId: dedupOrganizationId,
         tenantId: dedupTenantId,
-        from: new Date(acceptedAt - 60 * 60_000),
-        to: new Date(acceptedAt + 33 * DAY_MS),
+        from: Temporal.Instant.fromEpochMilliseconds(acceptedAt - 60 * 60_000),
+        to: Temporal.Instant.fromEpochMilliseconds(acceptedAt + 33 * DAY_MS),
         groupBy: "organization",
       });
 
@@ -608,8 +609,8 @@ describe("given points ensured for the tenant's organization", () => {
       const estimates = await repo.queryUsageEstimates({
         organizationId,
         tenantId,
-        from: new Date(acceptedAt - 60 * 60_000),
-        to: new Date(acceptedAt + 60 * 60_000),
+        from: Temporal.Instant.fromEpochMilliseconds(acceptedAt - 60 * 60_000),
+        to: Temporal.Instant.fromEpochMilliseconds(acceptedAt + 60 * 60_000),
         groupBy: "organization",
       });
 
