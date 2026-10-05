@@ -590,6 +590,7 @@ export const APP_ERROR_CODES = [
   "trigger_filter_query_invalid",
   "trigger_filters_required",
   "trigger_filters_unsupported",
+  "trigger_graph_immutable",
   "trigger_kind_immutable",
   "trigger_not_found",
   "trigger_rule_fields_misplaced",

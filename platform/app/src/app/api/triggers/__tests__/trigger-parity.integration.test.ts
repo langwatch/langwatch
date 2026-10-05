@@ -850,4 +850,102 @@ describe("Feature: automations over the public API express what the dashboard ex
       expect((await response.json()).error).toBe("trigger_kind_immutable");
     });
   });
+
+  // langwatch/tasks#920: a different `customGraphId` used to answer 200 and
+  // leave the alert on its old graph.
+  describe("when an update names a graph for an alert", () => {
+    const graph = (name: string) =>
+      prisma.customGraph.create({
+        data: { projectId: projectId(), name: `${name} ${ns}`, graph: {} },
+      });
+
+    const alertOn = async (customGraphId: string) =>
+      created(
+        await createTrigger({
+          name: `Alert on ${customGraphId}`,
+          action: TriggerAction.SEND_EMAIL,
+          actionParams: { members: ["oncall@example.com"] },
+          alertType: "WARNING",
+          customGraphId,
+          graphAlert: {
+            seriesName: "errors",
+            operator: "gt",
+            threshold: 1,
+            timePeriod: 5,
+          },
+        }),
+      );
+
+    it("refuses a different graph rather than ignoring the field", async () => {
+      const watched = await graph("Watched");
+      const other = await graph("Other");
+      const alert = await alertOn(watched.id);
+
+      const response = await patch(`/api/triggers/${alert.id}`, {
+        customGraphId: other.id,
+      });
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe("trigger_graph_immutable");
+      expect(await storedRow(alert.id)).toMatchObject({
+        customGraphId: watched.id,
+      });
+    });
+
+    it("accepts the graph it already watches, so a read can be written back", async () => {
+      const watched = await graph("Read back");
+      const alert = await alertOn(watched.id);
+
+      const response = await patch(`/api/triggers/${alert.id}`, {
+        customGraphId: watched.id,
+        name: `Renamed ${ns}`,
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        customGraphId: watched.id,
+        name: `Renamed ${ns}`,
+      });
+    });
+
+    it("refuses a graph on an automation that is not an alert", async () => {
+      const watched = await graph("Not an alert");
+      const automation = await emailAutomation(`Trace automation ${ns}`);
+
+      const response = await patch(`/api/triggers/${automation.id}`, {
+        customGraphId: watched.id,
+      });
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe("trigger_kind_immutable");
+      expect(await storedRow(automation.id)).toMatchObject({
+        customGraphId: null,
+      });
+    });
+
+    it("refuses clearing the graph of an alert", async () => {
+      const watched = await graph("Cleared");
+      const alert = await alertOn(watched.id);
+
+      const response = await patch(`/api/triggers/${alert.id}`, {
+        customGraphId: null,
+      });
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe("trigger_kind_immutable");
+      expect(await storedRow(alert.id)).toMatchObject({
+        customGraphId: watched.id,
+      });
+    });
+
+    it("accepts the null a trace automation reads back with", async () => {
+      const automation = await emailAutomation(`Null graph ${ns}`);
+
+      const response = await patch(`/api/triggers/${automation.id}`, {
+        customGraphId: null,
+      });
+
+      expect(response.status).toBe(200);
+    });
+  });
 });
