@@ -55,6 +55,7 @@ const command = {
   commandId: "cmd_1",
   occurredAtMs: 1_699_000_000_000,
   notifyAdmins: true,
+  origin: "web" as const,
   actor: { type: "user" as const, id: "user_ana" },
 };
 
