@@ -175,6 +175,49 @@ describe("the scenarios REST declaration", () => {
       });
     });
   });
+
+  describe.each(["PUT", "PATCH"])(
+    "when a %s body carries a field the endpoint does not have",
+    (method) => {
+      async function updateWithUnknownField() {
+        const family = await buildScenarioFamily();
+        const createdResponse = await createScenario(family, {
+          name: "Unknown Field",
+          situation: "Original situation",
+          labels: ["original"],
+        });
+        const created = scenarioRestResponseWithPlatformUrlSchema.parse(
+          await createdResponse.json(),
+        );
+        const versionsBefore = await family.request(`/api/scenarios/${created.id}/versions`);
+        const response = await family.request(`/api/scenarios/${created.id}`, {
+          method,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ labels: ["relabelled"], status: "active" }),
+        });
+
+        return { family, created, response, versionsBefore: await versionsBefore.json() };
+      }
+
+      it("answers 422 naming the field", async () => {
+        const { response } = await updateWithUnknownField();
+
+        expect(response.status).toBe(422);
+        const body = (await response.json()) as { error: string; reasons: string[] };
+        expect(body.error).toBe("validation_error");
+        expect(body.reasons.join(" ")).toContain("status");
+      });
+
+      it("leaves the scenario and its version history as they were", async () => {
+        const { family, created, versionsBefore } = await updateWithUnknownField();
+
+        const row = await family.app.getById({ id: created.id, projectId: PROJECT_ID });
+        expect(row.labels).toEqual(["original"]);
+        const versionsAfter = await family.request(`/api/scenarios/${created.id}/versions`);
+        await expect(versionsAfter.json()).resolves.toEqual(versionsBefore);
+      });
+    },
+  );
 });
 
 describe("given an id no scenario in this project carries", () => {

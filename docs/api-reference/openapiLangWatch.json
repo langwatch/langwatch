@@ -84986,7 +84986,8 @@
                       ]
                     }
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -85401,7 +85402,8 @@
                       ]
                     }
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }

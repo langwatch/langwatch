@@ -157,7 +157,7 @@ export const scenarioRestTestErrors: RestErrorHandler = (error, context) => {
 
   if (HandledError.isHandled(error)) {
     return context.json(
-      { error: error.code, message: error.message },
+      { error: error.code, message: error.message, reasons: error.reasons.map((r) => r.message) },
       (error.httpStatus ?? 500) as ContentfulStatusCode,
     );
   }
