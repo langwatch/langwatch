@@ -1,6 +1,9 @@
 import { AuthenticatedActorRequiredError } from "@langwatch/api";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import {
+  AuthzScopeNotFoundError,
+  type AuthzApi,
+  type AuthzScopeRef,
+} from "@langwatch/authz-contract";
 import {
   getSecretValuesByNameInputSchema,
   listSecretsInputSchema,
@@ -29,8 +32,7 @@ export interface SecretServiceOptions {
   encryption: SecretEncryption;
   reservedNames: readonly string[];
   maximumPerProject?: number;
-  projects: Pick<ProjectApi, "getWithTeam">;
-  permissions: Pick<AuthzApi, "listTeamMemberBindings">;
+  permissions: Pick<AuthzApi, "getScope" | "listTeamMemberBindings">;
 }
 
 export class SecretService {
@@ -164,15 +166,28 @@ export class SecretService {
   private async getAttributedUserId(projectId: string, by?: SecretCaller): Promise<string> {
     if (by) return by.id;
 
-    const project = await this.options.projects.getWithTeam(projectId);
+    const scope = await this.getProjectScope(projectId);
     const bindings = await this.options.permissions.listTeamMemberBindings({
-      organizationId: project.team.organizationId,
-      teamIds: [project.teamId],
+      organizationId: scope.organizationId,
+      teamIds: [scope.teamId],
     });
-    const [owner] = bindings.get(project.teamId) ?? [];
+    const [owner] = bindings.get(scope.teamId) ?? [];
     if (!owner) throw new AuthenticatedActorRequiredError();
 
     return owner.userId;
+  }
+
+  /** The project's team and organization; a project authz cannot resolve answers as not found. */
+  private async getProjectScope(
+    projectId: string,
+  ): Promise<Extract<AuthzScopeRef, { type: "project" }>> {
+    const scope = await this.options.permissions.getScope({ projectId }).catch((error: unknown) => {
+      if (AuthzScopeNotFoundError.is(error)) return null;
+      throw error;
+    });
+    if (scope?.type !== "project") throw new SecretNotFoundError();
+
+    return scope;
   }
 
   /**

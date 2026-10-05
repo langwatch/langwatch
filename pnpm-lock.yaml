@@ -13308,9 +13308,6 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
-      '@langwatch/project-contract':
-        specifier: workspace:*
-        version: link:../../project/contract
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client

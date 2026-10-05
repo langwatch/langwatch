@@ -11,7 +11,7 @@ function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(secretProcessModule)])
     .withEncryption(new ReversibleTestSecretEncryption())
-    .provide({ project: team.projects, authz: team.permissions });
+    .provide({ authz: team.permissions });
 }
 
 const input = { projectId: "project-1", name: "OPENAI_API_KEY", value: "sk-live" };
@@ -69,11 +69,11 @@ describe("secret app installation", () => {
     const team = teamWithMembers(["user-first"]);
     const keyless = createApp({ role: "api" })
       .withModules([withMemoryRepositories(secretProcessModule)])
-      .provide({ project: team.projects, authz: team.permissions });
+      .provide({ authz: team.permissions });
 
     await expect(
       Promise.resolve().then(() =>
-        // @ts-expect-error MissingSupply: the compiler refuses a process that supplies no encryption
+        // @ts-expect-error MissingSupply: the compiler refuses a process supplying no encryption
         keyless.boot(),
       ),
     ).rejects.toThrow(/encryption/i);

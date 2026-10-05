@@ -1,3 +1,4 @@
+import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
 import type { Secret } from "@langwatch/secret-contract";
 import {
   SecretDuplicateError,
@@ -6,6 +7,7 @@ import {
   SecretReservedNameError,
   SecretUnreadableError,
 } from "@langwatch/secret-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -302,6 +304,31 @@ describe("SecretService", () => {
       await expect(
         service.update({ projectId: "project-1", id: "secret-1", value: "rotated" }),
       ).rejects.toMatchObject({ code: "authenticated_actor_required" });
+      expect(repository.createCall).not.toHaveBeenCalled();
+      expect(repository.updateCall).not.toHaveBeenCalled();
+    });
+
+    it("answers as not found and writes nothing when authz resolves no project scope", async () => {
+      const repository = new RecordingSecretRepository();
+      const service = SecretService.create({
+        repository,
+        encryption: new EncryptionRefusingCorruptRows(),
+        reservedNames: [],
+        permissions: createApiFixture<AuthzApi>({
+          getScope: async ({ projectId }) => {
+            throw new AuthzScopeNotFoundError({ projectId });
+          },
+          listTeamMemberBindings: async () => new Map(),
+        }),
+      });
+      repository.rows.push(row());
+
+      await expect(
+        service.create({ projectId: "project-gone", name: "NEW_KEY", value: "value" }),
+      ).rejects.toBeInstanceOf(SecretNotFoundError);
+      await expect(
+        service.update({ projectId: "project-1", id: "secret-1", value: "rotated" }),
+      ).rejects.toMatchObject({ code: "secret_not_found" });
       expect(repository.createCall).not.toHaveBeenCalled();
       expect(repository.updateCall).not.toHaveBeenCalled();
     });
