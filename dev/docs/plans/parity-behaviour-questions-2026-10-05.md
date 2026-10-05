@@ -214,3 +214,10 @@ Date: 2026-10-05. Branch: feat/strict-feature-layout-v0. Each row stays unbound 
 | guided-tour.feature 281, 287, 298, 306 (the gateway tour's create, reveal and record steps) | nothing calls useRegisterTourActions or onboarding.recordVirtualKeyReveal; the gateway key screens carry none of the tour targets (lost in the restructure? likely defect) |
 | langy-guided-onboarding.feature 190, 204 (the brief is settled on the server)               | settleGuidedKickoffParts has three copies (onboarding, langy browser, apps/ui shell) and no product caller; the turn preparation does not settle it                        |
 | api-keys-v2.feature 118 (setup screens offer "Create a key")                                | onboarding says "Create a personal access token"                                                                                                                           |
+
+## Workflow
+
+| Scenario                                                                                                         | Product does                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| studio-lambda-cache:46 A config-only rollout (timeout change, no new image) invalidates the cache and reconciles | the cache entry is only { arn, imageUri }: a timeout-only change is not invalidated and heals at the 600 s TTL (fingerprint the config, or reword) |
+| component-execution:14, :20, :26 (trace and span id format, uniqueness)                                          | the generators live in trace contract (trace-otel-ids.ts) with no test of their own; proposed trace-otel-ids.unit.test.ts                          |
