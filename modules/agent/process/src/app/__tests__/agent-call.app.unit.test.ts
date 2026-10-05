@@ -43,6 +43,24 @@ describe("AgentModule.call", () => {
     },
   );
 
+  describe("given a personal agent whose process is not connected", () => {
+    /** @scenario "The owner-only refusal comes before the offline one" */
+    it("refuses another person as agent_owner_only, never as agent_offline", async () => {
+      const dispatch = vi.spyOn(ConnectedAgentService.prototype, "dispatch");
+      const { app } = createAgentAppFixture({
+        users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+      });
+      await app.registerConnected(register);
+
+      const failure = await app
+        .call(input, { viewerUserId: "another_user", traceparent: null })
+        .catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({ code: "agent_owner_only" });
+      expect(dispatch).not.toHaveBeenCalled();
+    });
+  });
+
   it("does not read an agent from another project", async () => {
     const dispatch = vi.spyOn(ConnectedAgentService.prototype, "dispatch");
     const { app } = createAgentAppFixture();
