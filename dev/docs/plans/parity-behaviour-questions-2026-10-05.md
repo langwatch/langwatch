@@ -151,3 +151,12 @@ Date: 2026-10-05. Branch: feat/strict-feature-layout-v0. Each row stays unbound 
 | A handled refusal says who can act on it                          | the canonical envelope has no `fault` field (a platform-fault refusal answered 412 without one) |
 | personal virtual key rows (vk-scope-rbac 149, 157, 164, 183, 192) | the gateway serves neither `routingPolicy` nor `personalVirtualKeys` (governance gap?)          |
 | A ledger line with an unrecognised status is listed as written    | bound; the badge lowercases every status ("QUEUED" shows "queued")                              |
+
+## Transport framework
+
+| Scenario                                                                                                                                      | Product does                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| A REST request is parsed before its credential is resolved                                                                                    | authenticate-first (Alex, 2026-09-30): reword the scenario                                         |
+| An endpoint's middleware array cannot displace its declared check; a registered policy that promises an unenforced permission fails the build | no endpoint middleware array, no policy-versus-config check: stale                                 |
+| Every route still admits the roles that could already reach it; one refusal renders one body whichever half answers it                        | the per-route registry audit and the security middleware no longer exist: stale                    |
+| The signed-out tRPC surface keys on the resolved address                                                                                      | only the host's resolved address is tested; the throttle and its wiring together are not (unbound) |
