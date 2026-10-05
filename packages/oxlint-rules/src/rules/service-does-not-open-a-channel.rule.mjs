@@ -90,7 +90,7 @@ export const serviceDoesNotOpenAChannelRule = defineRule({
   messages: {
     serviceOpensAChannel: {
       what: "A service opens {{conduit}} directly (`{{specifier}}`).",
-      why: "Messages to or from something the module does not own are a channel: an interface the module names, a live implementation per tier and a memory twin a test asserts against.",
+      why: "A message to something the module does not own is a channel: a named interface, a live tier and a memory twin.",
       fix: "Move the conduit to `channels/{{tier}}/{{tier}}.<subject>.channel.ts` and inject the channel interface. Read the `process-module` skill.",
     },
   },

@@ -29,7 +29,7 @@ describe("given a strict feature service module", () => {
       expect(found[0].messageId).toBe("chainTooDeep");
       expect(found[0].data).toEqual({ hops: 3, maxHops: 2 });
       expect(found[0].message).toBe(
-        "This test reads a chain 3 properties deep and also calls or combines; `maxHops` is 2." +
+        "This test reads a chain 3 properties deep and also calls or combines; `maxHops` is 2. A test nobody can read at a glance is where the wrong branch hides." +
           " Read the chain into a named `const` above the test; a chain alone, however deep, is" +
           " fine once it stops combining with anything else.",
       );

@@ -43,13 +43,13 @@ Feature: The suppression-states-why lint rule
   Scenario: An escapable rule's message ends with the one escape sentence
     Given a rule declared with escape naming its framework
     When its messages are built
-    Then each prints what, then fix, then one sentence: extend the framework or disable with why, and ask the human if confused
+    Then each prints what, then why, then fix, then one sentence: extend the framework or disable with why, and ask the human if confused
 
   @unit
   Scenario: A house rule's message carries no escape sentence
     Given a rule declared without escape
     When its messages are built
-    Then they print what and fix alone
+    Then they print what, why and fix alone
 
   @unit
   Scenario: No house rule opts in to a disable yet

@@ -124,12 +124,6 @@ surface.<protocol>` (`packages/process/src/process-container.ts`), and §4 contr
 - `ProcessContainer.withMember` still exists though §4 and §15 delete it; the grammar still accepts
   `app/<f>.members.ts` and `-composition.build.ts` (36 files) and nothing shrinks the count.
 - github declares its secret handles in the process half (`github.app.ts`); §6 puts them in the contract.
-- `environment-boundaries` lets `src/main.ts` read `process.env`; the record allows only `config.ts`.
-- The `feature-configuration` policy demands `*ServerConfigSchema` exports that §15 deletes, and
-  `package-boundaries`' `browserSideDoor` text names `withCapabilities` (§15); both await a ruling.
-- §17 says a drift rule's message explains why the shape is wrong; `defineRule` prints `what` and
-  `fix` only and keeps `why` as documentation on purpose (`packages/oxlint-rules/src/define-rule.mjs`).
-  Awaiting a ruling; until then put the reason in `what`.
 - §10 has project lend `projectSwitcher` through `withCapabilities`, which §15 deletes for a peer lend.
 - §2 makes `@langwatch/module` a contract's only framework import; analytics and trace contracts import
   `@langwatch/api/dates` and gateway's imports `@langwatch/api/hosting`.

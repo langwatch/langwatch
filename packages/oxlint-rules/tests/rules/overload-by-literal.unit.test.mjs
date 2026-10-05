@@ -33,7 +33,7 @@ export function configUrl(options?: { env?: string; optional?: boolean }): Leaf<
       expect(found[0].messageId).toBe("splitTheOverloads");
       expect(found[0].message).toBe(
         "configUrl carries overloads that differ only by `optional: true` versus" +
-          ` \`optional: false\`. ${ALLOWED}`,
+          ` \`optional: false\`. An overload set that only flips a flag makes the reader diff two signatures. Read the \`contract\` skill. ${ALLOWED}`,
       );
     });
 

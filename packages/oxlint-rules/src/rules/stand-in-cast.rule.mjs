@@ -81,7 +81,7 @@ export const standInCastRule = defineRule({
     doubleCastInTest: {
       what: "`as {{through}} as {{target}}` forces this test value to {{target}} without checking it.",
       fix: "Build the stub to {{target}}'s real shape instead of casting: give each mocked member its real signature so the object type-checks without the cast. Only when the test proves how the code handles a wrong-typed input, write `// wrong-typed input: <why>` on the line above the cast.",
-      why: "A test value never crossed a trust boundary, so there is nothing to parse; the marker excuses one reviewed cast, where a test name would excuse every cast in the test.",
+      why: "A test value never crossed a trust boundary; the marker excuses one reviewed cast, not every cast in the test.",
     },
   },
   create(context, file) {

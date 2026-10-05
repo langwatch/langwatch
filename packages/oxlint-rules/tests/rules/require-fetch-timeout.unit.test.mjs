@@ -31,7 +31,7 @@ describe("given a channel in a module's process half", () => {
         [3, "fetchWithoutSignal"],
       ]);
       expect(found[0].message).toBe(
-        "This `fetch` has no abort signal, so a peer that never answers hangs the caller." +
+        "This `fetch` has no abort signal, so a peer that never answers hangs the caller. A request with no deadline holds the caller, and its slot, for as long as the peer stays silent." +
           " Pass `signal: AbortSignal.timeout(ms)` (or a controller's signal) in the init object." +
           " Read the `backend` skill.",
       );

@@ -34,6 +34,7 @@ export const requireFetchTimeoutRule = defineRule({
   messages: {
     fetchWithoutSignal: {
       what: "This `fetch` has no abort signal, so a peer that never answers hangs the caller.",
+      why: "A request with no deadline holds the caller, and its slot, for as long as the peer stays silent.",
       fix: "Pass `signal: AbortSignal.timeout(ms)` (or a controller's signal) in the init object. Read the `backend` skill.",
     },
   },

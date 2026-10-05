@@ -32,7 +32,7 @@ describe("given a Prisma repository seam file", () => {
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("countInsideFindMany");
       expect(found[0].message).toBe(
-        "`_count` rides this `findMany`, and the planner can re-run its aggregate once per listed row." +
+        "`_count` rides this `findMany`, and the planner can re-run its aggregate once per listed row. Prisma builds `_count` as an uncorrelated join over the whole related table." +
           " Drop `_count` from the query and run a second `groupBy` count restricted to the listed row ids." +
           " Read the `process-module` skill.",
       );

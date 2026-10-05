@@ -132,11 +132,6 @@ in `modules/webhook/process/src/eventing/webhook-delivery.pipeline.ts:68`. Gatew
 
 ## Known disagreements (report, do not fix)
 
-- Policy `feature-configuration` demands `<name>ServerConfigSchema` or `<name>WebConfigSchema` in
-  every `<name>.config.ts` (28 findings, 2026-10-05). `*ServerConfigSchema` is a §15 deleted
-  spelling and §6 teaches `Config.define` plus `defineBrowserConfig`. Do not add the export.
-- `langwatch/package-boundaries`' `browserSideDoor` fix names a `withCapabilities` slot, which §15
-  deletes for a peer lend.
 - `dev/docs/plans/peer-cycles-2026-10-05.md` still names a shrink-only edge list; §5 deleted it.
 
 ## Links

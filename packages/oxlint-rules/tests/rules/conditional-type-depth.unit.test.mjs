@@ -35,7 +35,7 @@ describe("given a type alias in a feature contract", () => {
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("stateTheShape");
       expect(found[0].message).toBe(
-        `Type Resolve nests 4 conditional types; the maximum is 3. ${ALLOWED}`,
+        `Type Resolve nests 4 conditional types; the maximum is 3. A type this deep re-computes what a plain interface or discriminated union already says. Read the \`contract\` skill. ${ALLOWED}`,
       );
     });
 

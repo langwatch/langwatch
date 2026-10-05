@@ -486,78 +486,97 @@ export const transportDeclaresRule = defineRule({
   messages: {
     compositionImport: {
       what: "This source imports `@langwatch/api/composition`, which only a process imports.",
+      why: "The composition belongs to the process, so a transport importing it binds itself to one process's wiring.",
       fix: DECLARE_ROUTE_FIX,
     },
     handlerBindingCall: {
       what: "This source calls `createTrpcHandlerBinding`.",
+      why: "The process binds handlers once when it mounts a router; a second binding here can drift from it.",
       fix: "Delete the call and export the `defineTrpcRouter` declaration; the process binds handlers when it mounts the router. Read the `api-transports` skill.",
     },
     trpcRoot: {
       what: "This source creates a tRPC root with `{{call}}`.",
+      why: "A second tRPC root skips the process's one parser and permission chain, so its procedures run unchecked.",
       fix: "Declare the procedures with `defineTrpcRouter`; the process owns the one tRPC root and applies each permission after the parser.",
     },
     outputUnchecked: {
       what: "This transport switches output validation off with `{{how}}`.",
+      why: "An unchecked response can leak fields the declared output omits and drift from the published schema.",
       fix: "Declare the response with `.withOutput(schema)` and leave validation on; the framework checks every response against it.",
     },
     rawApp: {
       what: "This source constructs `{{name}}` itself.",
+      why: "A route outside the framework skips its parsing, permission door, serialisation and OpenAPI document.",
       fix: DECLARE_ROUTE_FIX,
     },
     rawContextField: {
       what: "The handler takes `{{field}}` from its context.",
+      why: "The framework resolves the request into declared fields; a raw context read bypasses that declaration.",
       fix: HANDLER_FIELDS_FIX,
     },
     rawContextSpread: {
       what: "The handler collects the rest of its context into `{{name}}`.",
+      why: "Collecting the raw context hands the handler transport details the framework is meant to resolve.",
       fix: HANDLER_FIELDS_FIX,
     },
     rawContextAccess: {
       what: "The handler reaches the raw request through `{{text}}`.",
+      why: "The raw request bypasses the declared input, so the published schema no longer says what the handler reads.",
       fix: HANDLER_FIELDS_FIX,
     },
     transportHeaders: {
       what: "The handler reads transport headers through `{{text}}`.",
+      why: "A header read in the handler is invisible to the route's declaration, its docs and its permission door.",
       fix: "Declare what the handler needs with `.withInput(...)`, or read the caller from `actor`; headers are the framework's to resolve.",
     },
     responseMethod: {
       what: "The handler calls the response method `{{name}}()`.",
+      why: "A handler that writes the response skips the framework's serialisation and output check.",
       fix: PLAIN_RESULT_FIX,
     },
     rawResponse: {
       what: "The handler constructs a raw `Response`.",
+      why: "A hand-built Response skips the framework's serialisation, output check and declared status.",
       fix: PLAIN_RESULT_FIX,
     },
     responseMutation: {
       what: "The handler sets response state through `{{text}}`.",
+      why: "Response state set in the handler is invisible to the route's declaration and its OpenAPI document.",
       fix: "Declare the status on the route with `.withStatus(...)`; the handler only returns a value or throws.",
     },
     noContentSentinel: {
       what: "The handler returns the `NO_CONTENT` sentinel.",
+      why: "The sentinel is a second spelling of an empty answer; the framework already renders `undefined` as one.",
       fix: "Return nothing: a handler that returns `undefined` answers with an empty response.",
     },
     legacyRegisterRoute: {
       what: "This route registers its handler through `registerRoute`.",
+      why: "A route split between registration and declaration lets its permission and input drift from its handler.",
       fix: "Declare it with `defineRestRouter`'s chain so the verb, input, output, permission and inline handler form one declaration.",
     },
     handlerNotInline: {
       what: "This route's handler is not written inline.",
+      why: "A handler written elsewhere hides what the route does from the declaration a reviewer reads.",
       fix: "Write the handler as an inline function inside `.handle(...)`, beside the route's input, output and permission.",
     },
     handlerConstructs: {
       what: "The handler constructs `{{name}}`.",
+      why: "A handler that builds services rebuilds them per request and bypasses the module the process installed.",
       fix: "Call the operation on the handler's `app`; the module constructs its services once, when the process boots.",
     },
     multipleOperationCalls: {
       what: "The handler makes {{count}} calls on `app`.",
+      why: "Orchestration in a handler is behaviour outside the module, untested by its services, unseen by other doors.",
       fix: "Call exactly one API operation and move the orchestration into the module; a pure mapping of its result may stay.",
     },
     nestedOperationCall: {
       what: "The handler calls `app` from inside a callback.",
+      why: "A call per item from a callback is a fan-out the module cannot batch, order or make atomic.",
       fix: "Add one operation to the module that does the whole batch, and call it once.",
     },
     handlerControlFlow: {
       what: "The handler branches, loops or catches.",
+      why: "A decision in the handler is behaviour outside the module, so other doors and its tests never see it.",
       fix: "Move the decision into the module behind `app`; the handler calls one operation and returns its result or throws.",
     },
     handlerChecksInput: {
@@ -567,54 +586,67 @@ export const transportDeclaresRule = defineRule({
     },
     mediaTypeCheck: {
       what: "This source decides on the request's media type through `{{text}}`.",
+      why: "A media-type check outside the declaration is invisible to callers and to the OpenAPI document.",
       fix: "Delete the check and declare the body on the route, `.withInput(schema)` for JSON or `.withRawBody(form, { mediaType })` otherwise; the framework refuses a request that does not match its declaration.",
     },
     requestBodyRead: {
       what: "This source reads the request body through `{{text}}`.",
+      why: "A body read by hand skips the framework's parse, size limit and validation, and the published schema.",
       fix: "Declare the body on the route with `.withInput(schema)`, or `.withRawBody(form)` when the handler needs the exact bytes; a middleware binding carries credentials and never reads the body.",
     },
     handlerTooLong: {
       what: "The handler has {{count}} top-level statements; the ceiling is {{max}}.",
+      why: "A long handler is behaviour outside the module, which the module's tests and other doors never see.",
       fix: "Keep it to one operation call on `app` and a pure mapping of the result; declare permission and limits on the route.",
     },
     rbacImport: {
       what: "This transport imports the legacy RBAC module `{{specifier}}`.",
+      why: "A permission checked inside the handler runs after the door, where a forgotten check fails open.",
       fix: PERMISSION_FIX,
     },
     legacyRbacName: {
       what: "This transport names the legacy RBAC identifier `{{name}}`.",
+      why: "A permission checked inside the handler runs after the door, where a forgotten check fails open.",
       fix: PERMISSION_FIX,
     },
     openapiDoorImport: {
       what: "This REST transport imports `{{names}}` from `{{specifier}}`.",
+      why: "A hand-rolled validator or doc drifts from the route the framework declares and checks.",
       fix: "Declare the route with `defineRestRouter`: `.withInput(...)` validates the request and `.withDocs(...)` documents it.",
     },
     zodValidatorImport: {
       what: "This REST transport imports `@hono/zod-validator`.",
+      why: "A middleware validator runs outside the declaration, so the route's input and its docs disagree.",
       fix: "Declare the request shape with `.withInput(schema)` on the route.",
     },
     bareRouter: {
       what: "This tRPC transport builds a bare `router({ … })`.",
+      why: "A bare router applies no permission, so its procedures are open to any caller that reaches them.",
       fix: "Declare each procedure with `defineTrpcRouter`, which applies its permission after the parser.",
     },
     trpcInput: {
       what: "This tRPC transport calls `.input(…)` outside the chain.",
+      why: "Outside the chain the permission runs before the input is parsed, so it cannot check what the input names.",
       fix: "Declare the procedure's input with `.withInput(schema)` so its permission applies after the input is parsed.",
     },
     rawHonoRoute: {
       what: "This transport registers the raw Hono route `{{method}}()`.",
+      why: "A raw Hono route skips the framework's parsing, permission door, serialisation and OpenAPI document.",
       fix: DECLARE_ROUTE_FIX,
     },
     credentialFromContext: {
       what: "This transport reads the credential `{{key}}` off the request context.",
+      why: "A raw credential carries no resolved class or scope, so a check built on it can disagree with the door.",
       fix: "Read the caller from the handler's `actor` and `scope`; the framework resolves the credential, class and all, before the handler runs.",
     },
     stringDispatch: {
       what: "This transport exposes a generic `{{name}}(path: string, …)` dispatcher.",
+      why: "A string-path dispatcher erases the procedure types, so a renamed procedure fails only at runtime.",
       fix: TYPED_DISPATCH_FIX,
     },
     stringPathCall: {
       what: "This transport dispatches through the string path `{{path}}`.",
+      why: "A string path is unchecked by the compiler, so a renamed procedure fails only at runtime.",
       fix: TYPED_DISPATCH_FIX,
     },
   },

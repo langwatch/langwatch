@@ -109,10 +109,12 @@ export const storeContainmentRule = defineRule({
     },
     storeNamed: {
       what: "`{{specifier}}` names {{store}} outside `repositories/{{folder}}/`.",
+      why: "A repository owns its store, so every query against it sits behind the one interface the module tests.",
       fix: "Move the query into `repositories/{{folder}}/{{folder}}.<subject>.repository.ts` behind the `repositories/<subject>.repository.ts` interface and call that from the service; only that folder names {{store}}, even as a type.",
     },
     storeInApplication: {
       what: "`{{specifier}}` is a {{store}} client named in an application.",
+      why: "The `Server` chain opens and closes every store; a client in an app escapes its lifecycle and tiers.",
       fix: "Delete the import: the `Server` chain opens every store, and only a module's repositories and channels hold a client.",
     },
   },

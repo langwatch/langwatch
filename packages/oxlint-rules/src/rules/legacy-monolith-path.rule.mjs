@@ -18,7 +18,7 @@ export const legacyMonolithPathRule = defineRule({
   messages: {
     legacyMonolithPath: {
       what: "`{{name}}` names the deleted monolith; read the `repo-tree` skill.",
-      why: "Nothing maps `~/*` or `@app/*` and `platform/` is gone, so the path resolves to nothing until something reaches the file.",
+      why: "Nothing maps `~/*` or `@app/*` and `platform/` is gone, so the path resolves to nothing.",
       fix: "Find where the code lives now by searching its basename under `modules/*/*/src`, `enterprise/modules/*/*/src`, `packages/*/src` and `apps/*/src`, then import it by that package's name.",
     },
   },

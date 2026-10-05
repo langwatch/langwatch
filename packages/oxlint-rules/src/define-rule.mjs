@@ -1,13 +1,16 @@
 import { classify } from "./classify.mjs";
 
 // The one shape a langwatch rule is written in. A message is not prose here:
-// it is `what` (names the offending symbol) plus `fix` (one imperative the
-// reader can apply without opening another file). `why` is documentation and
-// is deliberately not part of what the linter prints.
+// `what` (names the offending symbol), `why` (one line: why the shape is wrong)
+// and `fix` (one imperative the reader can apply without opening another file).
+// Every finding prints all three (ARCHITECTURE.md §17).
 
 /**
- * @typedef {{ what: string, why?: string, fix: string }} MessageDefinition
+ * @typedef {{ what: string, why: string, fix: string }} MessageDefinition
  */
+
+/** The longest `why` that still prints as one line. */
+export const WHY_MAX_LENGTH = 120;
 
 /**
  * A rule opting in to a justified disable names the framework the disable must say it cannot use.
@@ -19,9 +22,20 @@ import { classify } from "./classify.mjs";
  *   default?: unknown, description?: string }} OptionDefinition
  */
 
-/** `what` and `fix` joined; `why` stays out of the printed message on purpose. */
-export function renderTemplate({ fix, what }) {
-  return `${what.trim()} ${fix.trim()}`.trim();
+/** `what`, `why` and `fix` joined, in that order. */
+export function renderTemplate({ fix, what, why }) {
+  return `${what.trim()} ${why.trim()} ${fix.trim()}`.trim();
+}
+
+function assertWhy({ id, name, why }) {
+  if (typeof why !== "string" || why.trim() === "") {
+    throw new TypeError(`defineRule: ${name}/${id} gives no \`why\`; every finding prints one.`);
+  }
+  if (why.includes("\n") || why.trim().length > WHY_MAX_LENGTH) {
+    throw new TypeError(
+      `defineRule: ${name}/${id}'s \`why\` is longer than one line (${WHY_MAX_LENGTH} characters).`,
+    );
+  }
 }
 
 /** The one sentence an escapable rule prints after `what` + `fix`. */
@@ -49,10 +63,11 @@ export function renderMessage(template, data = {}) {
 }
 
 /** Each message's printed template; an escapable rule's ends with the escape sentence. */
-function templatesFor({ escapable, messages }) {
+function templatesFor({ escapable, messages, name }) {
   const tail = escapable ? ` ${renderEscapeTail(escapable)}` : "";
   const templates = {};
   for (const [id, definition] of Object.entries(messages)) {
+    assertWhy({ id, name, why: definition.why });
     templates[id] = `${renderTemplate(definition)}${tail}`;
   }
 
@@ -109,7 +124,7 @@ export function defineRule({
   options,
 }) {
   const escapable = escapeFor(escape);
-  const templates = templatesFor({ escapable, messages });
+  const templates = templatesFor({ escapable, messages, name });
 
   const defaults = defaultsFor(options);
   // Options arrive as the same object for every file, so the merge is done once per object.

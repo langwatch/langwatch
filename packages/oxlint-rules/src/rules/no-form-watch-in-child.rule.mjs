@@ -21,6 +21,7 @@ export const noFormWatchInChildRule = defineRule({
   messages: {
     watchOnReceivedForm: {
       what: "`{{form}}.watch()` runs on a form this component received as a prop, so the whole form tree re-renders on every keystroke.",
+      why: "`useWatch` subscribes to one field, so the component re-renders only when that field changes.",
       fix: "Read the value with `useWatch({ control: {{form}}.control, name })` instead. Read the `frontend` skill.",
     },
   },

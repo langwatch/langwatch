@@ -1,7 +1,8 @@
 Feature: The environment-boundaries lint rule
   Config is drilled, never ambient: a module, a package or an application
   file never reads `process.env` or `import.meta.env` directly. Only an
-  application's `src/main.ts` or `src/config.ts` reads the environment, and
+  application's `src/config.ts` reads the environment (its `src/main.ts`
+  imports what it needs from there), and
   `@langwatch/secrets` resolves the classified keys; everything downstream
   receives a typed value declared in its module's config schema.
 
@@ -13,14 +14,14 @@ Feature: The environment-boundaries lint rule
     And the message tells the reader to declare the key in the module's config schema
 
   @unit
-  Scenario: An application's main.ts or config.ts may read process.env
-    Given an application's src/main.ts or src/config.ts that reads process.env
+  Scenario: An application's config.ts may read process.env
+    Given an application's src/config.ts that reads process.env
     When the environment-boundaries rule runs over it
     Then it reports nothing
 
   @unit
   Scenario: Any other application file reading process.env is reported
-    Given an application source file that is neither main.ts nor config.ts
+    Given an application source file other than its config.ts, its main.ts included
     When the environment-boundaries rule runs over it
     Then it reports environment
 

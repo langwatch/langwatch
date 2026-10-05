@@ -26,7 +26,7 @@ describe("given a core module process package", () => {
       expect(found[0].messageId).toBe("handledError");
       expect(found[0].message).toBe(
         "`AgentBusyError` is a `HandledError` subclass (it extends `HandledError`) declared in" +
-          " `modules/agent/process/src/services/agent.service.ts`." +
+          " `modules/agent/process/src/services/agent.service.ts`. A service throws it and a client reads its code, so both sides need the class and neither may import a process package." +
           " Move it to `modules/agent/contract/src/agent.errors.ts`." +
           " Read the `contract` skill.",
       );

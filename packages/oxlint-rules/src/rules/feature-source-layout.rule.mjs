@@ -70,10 +70,12 @@ export const featureSourceLayoutRule = defineRule({
   messages: {
     contractMissingSubject: {
       what: "Rename `{{name}}` to `<subject>.{{artifact}}.ts`, e.g. `agent.commands.ts`.",
+      why: "The subject names what the file is about, so readers find it and the catalogue can check its owner.",
       fix: "Add the subject to the filename. Read the `process-module` skill.",
     },
     contractProcessArtifact: {
       what: `\`{{name}}\` is a process artifact: contract source holds none of ${PROCESS_ONLY_ARTIFACT_LIST}.`,
+      why: "A contract is the module's public, runtime-neutral surface; a process artifact there leaks internals.",
       fix:
         "Move it into `modules/{{feature}}/process/src/`: `.repository`, `.store` and" +
         " `.mapper` under `repositories/`, `.channel` under `channels/`, `.projection`," +
@@ -83,6 +85,7 @@ export const featureSourceLayoutRule = defineRule({
     },
     contractFilename: {
       what: "Rename `{{name}}` to `<subject>.<artifact>.ts` in lower kebab case, e.g. `trace-search.service.ts`.",
+      why: "One filename grammar lets readers and the linters tell a file's subject and artifact at a glance.",
       fix:
         "Take the artifact from `app`, `commands`, `errors`, `events`, `queries` or" +
         " `service`, and write the subject and the artifact in lower kebab case with a" +
@@ -90,14 +93,17 @@ export const featureSourceLayoutRule = defineRule({
     },
     processManagerService: {
       what: "`{{path}}` is a process manager named as a service.",
+      why: "A process manager reacts to events in the worker; named as a service it hides from its pipeline.",
       fix: "Move it to `eventing/{{subject}}.process.ts`, beside the pipeline that names it.",
     },
     rulesImpurity: {
       what: "Rules module `{{path}}` may only export functions and constants (found {{found}}).",
+      why: "Rules are pure functions of their arguments, so they test without fakes and run anywhere.",
       fix: "Move the class or the `new` into `services/<name>.service.ts` and pass the constructed value into `{{path}}` as a function parameter.",
     },
     processPath: {
       what: `\`{{path}}\` has no home in layout v0. Only this shape is allowed: ${PROCESS_HOMES}.`,
+      why: "Every file in a module has one home, so readers know where a thing lives and the linters can check it.",
       fix:
         "Move `{{path}}` onto one of those paths: a service flattens to" +
         " `services/<name>.service.ts`, with no subdirectory under `services/` and no" +

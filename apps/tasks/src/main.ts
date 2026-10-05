@@ -6,6 +6,7 @@ import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-c
 import { secretLogRedactPaths, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 
 import {
+  processEnvironment,
   resolveTasksConfig,
   resolveTasksEnvironment,
   tasksSecrets,
@@ -121,10 +122,10 @@ async function main(): Promise<void> {
     }
     return;
   }
-  const source = { ...process.env };
+  const source = { ...processEnvironment };
   const environment = resolveTasksEnvironment(source);
   const config = resolveTasksConfig(source);
-  const chain = SecretsChain.start({ environment: process.env })
+  const chain = SecretsChain.start({ environment: processEnvironment })
     .withEnv()
     .withFile()
     .withOnePassword(config.onePasswordAccount);

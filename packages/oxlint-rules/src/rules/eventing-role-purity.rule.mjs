@@ -130,7 +130,7 @@ export const eventingRolePurityRule = defineRule({
   messages: {
     projectionImpure: {
       what: "Projection {{detail}}.",
-      why: "The worker refolds projections from the ordered stream; side effects or awaits make the read model depend on when it was folded.",
+      why: "The worker refolds projections from the stream; side effects or awaits make the read model depend on when it folded.",
       fix: "Keep the fold synchronous and deterministic: return the next read-model state and let the projection store persist it; side effects belong in a subscriber. Read the `eventing-and-worker` skill.",
     },
     processImpure: {
@@ -140,6 +140,7 @@ export const eventingRolePurityRule = defineRule({
     },
     durableEvent: {
       what: "{{role}} appends durable events itself with `{{name}}()`.",
+      why: "Only a command handler appends events, so the aggregate's invariants are checked once, in order.",
       fix: "Send the owning module's command instead; only a command handler appends durable events.",
     },
     missingRedeliveryTest: {

@@ -51,19 +51,19 @@ them — there is no baseline tier to defer the rest to (step 6). Never ship a r
 
 ## 3. Message contract, enforced by `defineRule`
 
-A message is `what` + `fix`, joined. `why` is documentation and the linter never prints it.
+A message is `what`, a one-line `why` (at most 120 characters; `defineRule` refuses a missing or longer one), then `fix`.
 
 - `what` names the offending symbol or path through `{{name}}`. No "cannot" or "may only"
   without the fix beside it.
 - `fix` is one imperative sentence an agent can apply without opening another file.
-- `why` is one clause, and only when the reason is not obvious. No history, no dates, no
+- `why` is one line, always present (at most 120 characters). No history, no dates, no
   PR numbers.
 - Name something the reader can see — a user-visible path or identifier, never an
   internal helper.
 - The bar is `condition-shape` and `comment-block-size`. Read them before writing yours.
 - A rule that catches drift from the architecture is a prompt to the agent reading it (§17):
-  `what` says why the shape is wrong, `fix` says what to use instead. The linter prints `what`
-  plus `fix` (plus the escape sentence below), never `why`.
+  `what` names the shape, `why` (one line) says why it is wrong, `fix` says what to use instead.
+  The linter prints `what`, `why` and `fix`, plus the escape sentence below.
 
 **Escapable rules** (§17). A disable naming a `langwatch/*` rule is itself an error
 (`langwatch/suppression-states-why`). Only a rule where the framework may genuinely not cover a

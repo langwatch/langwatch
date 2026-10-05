@@ -71,7 +71,7 @@ describe("given package-boundaries", () => {
       expect(found).toHaveLength(1);
       expect(found[0]).toMatchObject({ line: 2, messageId: "crossModuleBrowser" });
       expect(found[0].message).toBe(
-        "`@langwatch/project-browser/surfaces/project-picker` is `project`'s browser package, which is closed to every other module." +
+        "`@langwatch/project-browser/surfaces/project-picker` is `project`'s browser package, which is closed to every other module. A browser package is private to its module, so importing it couples two modules' screens." +
           " Move what this needs out of `project`'s browser package: pure domain logic into the owner's contract," +
           " shared UI into `@langwatch/design-system`, a framework hook into `@langwatch/browser-host`." +
           " Where fewer than two modules share it, inline it here instead (ARCHITECTURE.md §3.4).",
@@ -132,7 +132,7 @@ describe("given package-boundaries", () => {
 
       expect(found.map((entry) => entry.messageId)).toEqual(["browserImportsProcess"]);
       expect(found[0].message).toBe(
-        "`@langwatch/project-process` is process-only, and this is a browser package." +
+        "`@langwatch/project-process` is process-only, and this is a browser package. Process code runs on the server beside secrets and stores; bundled into the browser it breaks or leaks." +
           " Call the procedure through this module's derived tRPC client, and import any shared type" +
           " from the owning module's contract.",
       );
@@ -162,7 +162,7 @@ describe("given package-boundaries", () => {
 
       expect(found.map((entry) => entry.messageId)).toEqual(["contractRuntime"]);
       expect(found[0].message).toBe(
-        "A contract package is runtime-neutral: `node:fs` is a node, browser or process runtime." +
+        "A contract package is runtime-neutral: `node:fs` is a node, browser or process runtime. Both process and browser import the contract, so a runtime import drags into the side that cannot run it." +
           " Keep only schemas, types, errors and the `*Api` token here; move the code that needs" +
           " `node:fs` into this module's process package, or into its browser package when it is a browser import.",
       );
@@ -295,9 +295,14 @@ describe("given package-boundaries", () => {
     it("reports browserSideDoor past the declaration and leaves the declaration alone", () => {
       const shell = "apps/ui/src/shell/navigation.tsx";
 
-      expect(
-        ids(shell, 'import { P } from "@langwatch/project-browser/surfaces/project-picker";'),
-      ).toEqual(["browserSideDoor"]);
+      const found = report(
+        shell,
+        'import { P } from "@langwatch/project-browser/surfaces/project-picker";',
+      );
+
+      expect(found.map((finding) => finding.messageId)).toEqual(["browserSideDoor"]);
+      expect(found[0].message).toContain("useLent(Token)");
+      expect(found[0].message).not.toContain("withCapabilities");
       expect(report(shell, 'import { d } from "@langwatch/project-browser/declaration";')).toEqual(
         [],
       );

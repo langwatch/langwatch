@@ -31,8 +31,8 @@ scenarios live in.
 
 ## Rules that matter
 
-1. **A message is `what` plus `fix`.** `fix` is one imperative you can apply
-   without opening another file. Do it. The `why` is only in the generated doc.
+1. **A message is `what`, one line of `why`, then `fix`.** `fix` is one imperative
+   you can apply without opening another file. Do it.
    An escapable rule's message adds one sentence: how to disable it with a reason.
 2. **Never game a rule by renaming.** A file renamed `*.rules.ts` to dodge a
    service check is the defect, not the fix.

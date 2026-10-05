@@ -48,18 +48,22 @@ export const noRuntimeReflectionRule = defineRule({
   messages: {
     proxy: {
       what: "`new Proxy(...)` stands in for a class here.",
+      why: "A Proxy hides behaviour from the type checker and from every reader of the class it stands in for.",
       fix: "Write the class or app the module already declares instead of intercepting it at runtime. Read the `process-module` skill.",
     },
     reflect: {
       what: "`Reflect.{{member}}` reaches around a method call.",
+      why: "Reflection hides the call from the type checker, so a renamed or removed method fails only at runtime.",
       fix: "Call the method directly; add it to the interface if it is missing.",
     },
     defineProperty: {
       what: "`Object.{{method}}` patches `{{target}}`, which is not a class prototype.",
+      why: "A property patched on afterwards is invisible where the object is defined and unchecked by its type.",
       fix: "Declare the property directly where `{{target}}` is defined — in its class body or its object literal — instead of patching it in afterward.",
     },
     setPrototypeOf: {
       what: "`Object.setPrototypeOf` rewires the prototype of `{{target}}` at runtime.",
+      why: "A swapped prototype makes the object's declared type lie about what it is.",
       fix: "Construct `{{target}}` as the class it should be — `new X(...)`, or `class X extends Y` — instead of swapping its prototype afterward.",
     },
   },

@@ -34,7 +34,7 @@ export const namespaceClassRule = defineRule({
   messages: {
     namespaceClass: {
       what: "`{{name}}` has only static members ({{count}}), so it is a module wearing a class.",
-      why: "A class earns its name by holding state; a bag of statics hides plain functions behind a namespace and a `create` nobody calls.",
+      why: "A class earns its name by holding state; a bag of statics hides plain functions behind a namespace.",
       fix: "Export the functions to `{{target}}` and delete the class. Read the `backend` skill.",
     },
   },

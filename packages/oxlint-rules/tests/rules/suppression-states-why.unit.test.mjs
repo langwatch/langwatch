@@ -17,7 +17,7 @@ function houseRule({ escape, name }) {
   return defineRule({
     name,
     escape,
-    messages: { found: { what: "Found.", fix: "Fix it." } },
+    messages: { found: { what: "Found.", why: "Because.", fix: "Fix it." } },
     create: () => ({}),
   });
 }
@@ -48,7 +48,7 @@ describe("given a disable directive naming a house rule that did not opt in", ()
       ]);
       expect(found[0].message).toBe(
         "`oxlint-disable-next-line` turns off `langwatch/strict-rule`, a house rule that cannot" +
-          " be disabled. Delete the directive and change the code the way" +
+          " be disabled. The langwatch rules state the architecture; a disable would let the code drift. Read the `linting` skill. Delete the directive and change the code the way" +
           " `langwatch/strict-rule`'s own message says; if the case is confusing, stop and ask" +
           " the human instead of disabling it.",
       );
@@ -86,7 +86,7 @@ describe("given a disable directive naming a rule that opted in", () => {
 
       expect(found.map((entry) => entry.messageId)).toEqual(["reasonMissing"]);
       expect(found[0].message).toBe(
-        "`eslint-disable-next-line langwatch/open-route` gives no reason. Append" +
+        "`eslint-disable-next-line langwatch/open-route` gives no reason. A disable is a claim that the framework cannot express this case. Append" +
           " `-- <why the framework cannot express this case>` as a sentence of at least 5 words;" +
           " if you cannot say why, delete the directive and use the shape" +
           " `langwatch/open-route` names, and if the case is confusing, stop and ask the human.",

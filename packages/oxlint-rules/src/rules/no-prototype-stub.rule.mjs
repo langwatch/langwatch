@@ -23,6 +23,7 @@ export const noPrototypeStubRule = defineRule({
   messages: {
     prototypeStub: {
       what: "`Object.create({{name}}.prototype)` builds a test double from a class prototype.",
+      why: "A prototype stub skips the constructor and the type check, so the double drifts from the class.",
       fix: "Write it as an object literal typed `satisfies {{name}}`, or import the module's exported fixture if one already exists for this double. Read the `testing` skill.",
     },
   },

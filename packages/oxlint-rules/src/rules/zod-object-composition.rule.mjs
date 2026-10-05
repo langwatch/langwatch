@@ -17,7 +17,7 @@ export const zodObjectCompositionRule = defineRule({
   messages: {
     spreadShape: {
       what: "`.{{method}}()` builds this schema's type through Zod's mapped `Extend` generic.",
-      why: "Only the shape spread produces a fresh object type; `.safeExtend()` preserves behaviour but instantiates the same generic.",
+      why: "Only the shape spread makes a fresh object type; `.safeExtend()` keeps behaviour but instantiates the same generic.",
       fix:
         "Choose by what the base schema carries. When it is a plain `z.object()` with no" +
         " `.strict()` or `z.strictObject()`, no `.catchall()` and no `.refine()` or" +

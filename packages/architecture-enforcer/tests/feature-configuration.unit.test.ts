@@ -11,19 +11,15 @@ import { snapshotOf } from "./workspace.ts";
 let root: string;
 
 const catalogue: FeatureCatalogueEntry[] = [
-  {
-    classification: "core",
-    id: "widget",
-    root: "modules/widget",
-    subjects: ["widget"],
-  },
-  {
-    classification: "core",
-    id: "gadget",
-    root: "modules/gadget",
-    subjects: ["gadget"],
-  },
+  { classification: "core", id: "widget", root: "modules/widget", subjects: ["widget"] },
+  { classification: "core", id: "gadget", root: "modules/gadget", subjects: ["gadget"] },
 ];
+
+const DECLARED = `export const widgetConfig = Config.define((c) => ({
+  apiUrl: c.env("WIDGET_API_URL", z.string()),
+}));
+export const widgetWebConfigSchema = z.strictObject({ enabled: z.boolean() });
+`;
 
 function write(file: string, text: string): void {
   const target = join(root, file);
@@ -44,72 +40,62 @@ afterEach(() => {
 });
 
 describe("feature configuration", () => {
-  describe("given a feature that declares its own schema", () => {
-    /** @scenario "A feature reads its configuration through its own schema" */
-    it("accepts it", () => {
-      write(
-        "modules/widget/contract/src/widget.config.ts",
-        'export const widgetServerConfigSchema = 1; const leaf = { env: "WIDGET_URL" };',
-      );
+  describe("given a module declaring its config in its contract config module", () => {
+    /** @scenario "A module declaring its configuration in its contract config module passes" */
+    it("reports nothing and asks for no schema export", () => {
+      write("modules/widget/contract/src/widget.config.ts", DECLARED);
+      write("modules/gadget/contract/src/gadget.config.ts", "export const gadgetSecrets = {};\n");
 
       expect(findings()).toEqual([]);
     });
   });
 
-  describe("given a configuration module with no schema of its own", () => {
-    /** @scenario "A feature reads its configuration through its own schema" */
-    it("refuses it and names the export it needs", () => {
-      write("modules/widget/contract/src/widget.config.ts", 'const leaf = { env: "WIDGET_URL" };');
+  describe("given Config.define in a process service", () => {
+    /** @scenario "Config.define outside the contract config module is refused" */
+    it("reports the file and names the contract config module", () => {
+      write("modules/widget/contract/src/widget.config.ts", DECLARED);
+      write(
+        "modules/widget/process/src/services/widget.service.ts",
+        "export const extra = Config.define((c) => ({}));\n",
+      );
 
-      expect(findings()).toHaveLength(1);
-      expect(findings()[0]?.allowed).toContain("widgetServerConfigSchema");
+      const found = findings();
+
+      expect(found.map((entry) => entry.file)).toEqual([
+        join(root, "modules/widget/process/src/services/widget.service.ts"),
+      ]);
+      expect(found[0]?.allowed).toContain("modules/widget/contract/src/widget.config.ts");
     });
   });
 
-  describe("given two features that both bind one variable", () => {
-    /** @scenario "One variable has one owner across every process" */
-    it("refuses the second and names the first", () => {
+  describe("given a deleted config schema spelling", () => {
+    /** @scenario "A deleted config schema spelling is refused" */
+    it("reports a ServerConfigSchema or AppConfigSchema export as a §15 spelling", () => {
       write(
         "modules/widget/contract/src/widget.config.ts",
-        'export const widgetServerConfigSchema = 1; const leaf = { env: "SHARED_URL" };',
+        "export const widgetServerConfigSchema = z.object({});\n",
       );
       write(
         "modules/gadget/contract/src/gadget.config.ts",
-        'export const gadgetServerConfigSchema = 1; const leaf = { env: "SHARED_URL" };',
+        "export const gadgetAppConfigSchema = z.object({});\n",
       );
 
-      const violations = findings();
-      expect(violations).toHaveLength(1);
-      expect(violations[0]?.message).toContain("modules/widget/contract");
+      const messages = findings().map((entry) => entry.message);
+
+      expect(messages).toHaveLength(2);
+      expect(messages.every((message) => message.includes("§15"))).toBe(true);
+      expect(messages.join(" ")).toContain("widgetServerConfigSchema");
+      expect(messages.join(" ")).toContain("gadgetAppConfigSchema");
     });
   });
 
-  describe("given an application that declares a second leaf for a feature's variable", () => {
-    /** @scenario "One variable has one owner across every process" */
-    it("refuses it and points at the feature's own definition", () => {
-      write(
-        "modules/widget/contract/src/widget.config.ts",
-        'export const widgetServerConfigSchema = 1; const leaf = { env: "WIDGET_URL" };',
-      );
-      write(
-        "apps/api/src/platform/config/api.config.ts",
-        'const leaf = Config.value(schema, { env: "WIDGET_URL" });',
-      );
-
-      const violations = findings();
-      expect(violations).toHaveLength(1);
-      expect(violations[0]?.file).toContain("api.config.ts");
-      expect(violations[0]?.allowed).toContain("Spread the feature's own configuration definition");
-    });
-  });
-
-  describe("given an application leaf for a variable no feature owns", () => {
-    /** @scenario "A feature reads its configuration through its own schema" */
-    it("leaves it alone, since infrastructure belongs to the process", () => {
-      write(
-        "apps/api/src/platform/config/api.config.ts",
-        'const leaf = Config.value(schema, { env: "DATABASE_URL" });',
-      );
+  describe("given a test calling Config.define and two modules binding one variable", () => {
+    /** @scenario "Test files and two modules binding one variable are left to their own checks" */
+    it("reports nothing", () => {
+      const binding = `export const config = Config.define((c) => ({ url: c.env("SHARED_URL", s) }));\n`;
+      write("modules/widget/contract/src/widget.config.ts", binding);
+      write("modules/gadget/contract/src/gadget.config.ts", binding);
+      write("modules/widget/process/src/services/__tests__/widget.unit.test.ts", binding);
 
       expect(findings()).toEqual([]);
     });

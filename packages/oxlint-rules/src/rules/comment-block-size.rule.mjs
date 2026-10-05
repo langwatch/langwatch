@@ -1,6 +1,7 @@
 import {
   COMMENT_BLOCK_ERROR_FIX,
   COMMENT_BLOCK_ERROR_WHAT,
+  COMMENT_BLOCK_ERROR_WHY,
   MAX_COMMENT_BLOCK_LINES,
   isExemptBlock,
   marksGeneratedHeader,
@@ -188,14 +189,12 @@ export const commentBlockSizeRule = defineRule({
   messages: {
     commentBlockSize: {
       what: COMMENT_BLOCK_ERROR_WHAT,
-      why:
-        "A comment is for what the code cannot say. The rule makes two checks: a block of" +
-        ` more than ${MAX_COMMENT_BLOCK_LINES} lines, and a comment line wider than ${MAX_COMMENT_COLUMNS} columns.`,
+      why: COMMENT_BLOCK_ERROR_WHY,
       fix: COMMENT_BLOCK_ERROR_FIX,
     },
     commentColumns: {
       what: "Comment line is {{width}} columns; wrap at {{max}}.",
-      why: `The rule's second check: a comment line is at most ${MAX_COMMENT_COLUMNS} columns wide. Read the linting skill.`,
+      why: `A line wider than ${MAX_COMMENT_COLUMNS} columns wraps in editors and diffs, so it reads broken. Read the linting skill.`,
       fix:
         "Wrap it at {{max}} columns, keeping the sentence whole across the break. If it only" +
         " restates the code beside it, delete it instead of wrapping it.",

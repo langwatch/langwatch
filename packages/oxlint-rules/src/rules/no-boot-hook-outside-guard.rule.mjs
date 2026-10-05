@@ -30,6 +30,7 @@ export const noBootHookOutsideGuardRule = defineRule({
   messages: {
     bootHookOutsideGuard: {
       what: '`process.{{method}}("{{event}}", ...)` is registered outside the boot guard.',
+      why: "The boot guard owns shutdown and fatal errors; a second listener races it and can lose the exit code.",
       fix: "Delete this listener and boot through the guard: a long-running process through the `Server` from `@langwatch/process`, a one-shot executable through `bootNodeExecutable` from `@langwatch/observability`. Read the `process-composition` skill.",
     },
   },

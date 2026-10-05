@@ -1,151 +1,90 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { readFileSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "../types.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 
 /**
- * A feature declares runtime configuration once in its contract; no application declares
- * a second reading of the same variable. The check is over environment BINDINGS (not imports)
- * because the variable has one owner and every process reads it through that owner's schema.
+ * A module's configuration is declared once, in its contract's `<name>.config.ts`, as one
+ * `Config.define` (ARCHITECTURE.md §6). One owner per environment variable is boot's
+ * `config_collision`; `static readonly configSchema` is counted by deleted-spellings-in-code.
  */
-const APPLICATION_CONFIG_DIRECTORIES = [
-  join("apps", "api", "src", "platform", "config"),
-  join("apps", "worker", "src", "platform", "config"),
-  join("apps", "tasks", "src", "platform", "config"),
-];
+const SOURCE = /\.tsx?$/;
+const TEST_SOURCE = /(?:^|[\\/])__(?:tests|mocks)__[\\/]|\.(?:test|spec)\.tsx?$/;
+const CONFIG_DECLARATION = /\bConfig\.define\s*\(/;
+const DELETED_SCHEMA = /\bexport\s+const\s+(\w+(?:Server|App)ConfigSchema)\b/;
+const HALVES = ["contract", "process", "browser", "client"] as const;
 
-/**
- * A binding, not a label. `{ env: "NEXTAUTH_URL", value }` in the self-ingest
- * guard's deployment-address list names a variable so a refusal can print it;
- * it reads nothing, so it does not claim ownership.
- */
-const ENV_BINDING = /\benv:\s*"([A-Z0-9_]+)"\s*(?!,\s*value\b)/g;
-const CONFIG_MODULE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.config\.ts$/;
-
-function issue(file: string, message: string, allowed?: string): ArchitectureViolation {
+function issue({
+  file,
+  message,
+  allowed,
+}: {
+  file: string;
+  message: string;
+  allowed: string;
+}): ArchitectureViolation {
   return { policy: "feature-configuration", file, message, allowed };
 }
 
-function camelCase(featureId: string): string {
-  return featureId.replace(/-([a-z0-9])/g, (_match, letter: string) => letter.toUpperCase());
+function moduleSources({
+  snapshot,
+  feature,
+}: {
+  snapshot: WorkspaceSnapshot;
+  feature: FeatureCatalogueEntry;
+}): string[] {
+  return HALVES.flatMap((half) =>
+    snapshot.files({
+      directory: join(snapshot.root, feature.root, half, "src"),
+      accept: (path) => SOURCE.test(path) && !TEST_SOURCE.test(path),
+    }),
+  );
 }
 
-function bindingsIn(file: string): string[] {
+function lintModuleSource({
+  root,
+  feature,
+  file,
+}: {
+  root: string;
+  feature: FeatureCatalogueEntry;
+  file: string;
+}): ArchitectureViolation[] {
   const source = readFileSync(file, "utf8");
+  const home = join(root, feature.root, "contract", "src", `${feature.id}.config.ts`);
+  const violations: ArchitectureViolation[] = [];
 
-  return [...source.matchAll(ENV_BINDING)].map((match) => match[1] ?? "");
-}
+  if (file !== home && CONFIG_DECLARATION.test(source)) {
+    violations.push(
+      issue({
+        file,
+        message: `${relative(root, file).split(sep).join("/")} declares configuration with Config.define outside ${feature.id}'s contract config module.`,
+        allowed: `Move the leaves into the one Config.define in ${relative(root, home).split(sep).join("/")}; the module class attaches it as static readonly config.`,
+      }),
+    );
+  }
 
-function featureConfigModules(root: string, feature: FeatureCatalogueEntry): string[] {
-  const directory = join(root, feature.root, "contract", "src");
-  if (!existsSync(directory)) return [];
+  const deleted = DELETED_SCHEMA.exec(source);
+  if (deleted) {
+    violations.push(
+      issue({
+        file,
+        message: `${deleted[1]} is a deleted spelling (ARCHITECTURE.md §15): a module's config is one Config.define, not a hand-exported schema.`,
+        allowed: `Declare the leaves with Config.define in ${relative(root, home).split(sep).join("/")} and attach it as static readonly config.`,
+      }),
+    );
+  }
 
-  return readdirSync(directory)
-    .filter((name) => CONFIG_MODULE.test(name))
-    .map((name) => join(directory, name));
+  return violations;
 }
 
 export function lintFeatureConfiguration(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root, catalogue } = snapshot;
-  const violations: ArchitectureViolation[] = [];
-  const owners = new Map<string, string>();
 
-  for (const feature of catalogue) {
-    violations.push(...lintFeatureConfigModules({ root, feature, owners }));
-  }
-
-  violations.push(...lintApplicationConfigReads({ root, owners }));
-
-  return violations;
-}
-
-function lintFeatureConfigModules({
-  root,
-  feature,
-  owners,
-}: {
-  root: string;
-  feature: FeatureCatalogueEntry;
-  owners: Map<string, string>;
-}): ArchitectureViolation[] {
-  const violations: ArchitectureViolation[] = [];
-
-  for (const file of featureConfigModules(root, feature)) {
-    const expected = join(root, feature.root, "contract", "src", `${feature.id}.config.ts`);
-    if (file !== expected) continue;
-
-    const source = readFileSync(file, "utf8");
-    const name = camelCase(feature.id);
-
-    const declaresSchema =
-      source.includes(`export const ${name}ServerConfigSchema`) ||
-      source.includes(`export const ${name}WebConfigSchema`);
-
-    if (!declaresSchema) {
-      violations.push(
-        issue(
-          file,
-          "A feature configuration module must export the schema its half is validated by.",
-          `Export ${name}ServerConfigSchema, ${name}WebConfigSchema, or both.`,
-        ),
-      );
-    }
-
-    for (const binding of bindingsIn(file)) {
-      const owner = owners.get(binding);
-
-      if (owner !== undefined && owner !== file) {
-        violations.push(
-          issue(
-            file,
-            `${binding} is already declared by ${relative(root, owner)}.`,
-            "One environment variable has one owning feature. Read the owner's leaf instead of binding it a second time.",
-          ),
-        );
-
-        continue;
-      }
-
-      owners.set(binding, file);
-    }
-  }
-
-  return violations;
-}
-
-function lintApplicationConfigReads({
-  root,
-  owners,
-}: {
-  root: string;
-  owners: ReadonlyMap<string, string>;
-}): ArchitectureViolation[] {
-  const violations: ArchitectureViolation[] = [];
-
-  for (const directory of APPLICATION_CONFIG_DIRECTORIES) {
-    const absolute = join(root, directory);
-    if (!existsSync(absolute)) continue;
-
-    for (const name of readdirSync(absolute)) {
-      if (!name.endsWith(".config.ts")) continue;
-
-      const file = join(absolute, name);
-
-      for (const binding of bindingsIn(file)) {
-        const owner = owners.get(binding);
-        if (owner === undefined) continue;
-
-        violations.push(
-          issue(
-            file,
-            `${binding} is declared by ${relative(root, owner)} and read again here.`,
-            "Spread the feature's own configuration definition into this section instead of declaring a second leaf for the same variable.",
-          ),
-        );
-      }
-    }
-  }
-
-  return violations;
+  return catalogue.flatMap((feature) =>
+    moduleSources({ snapshot, feature }).flatMap((file) =>
+      lintModuleSource({ root, feature, file }),
+    ),
+  );
 }

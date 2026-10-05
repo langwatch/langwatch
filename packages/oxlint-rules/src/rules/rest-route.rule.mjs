@@ -292,32 +292,32 @@ export const restRouteRule = defineRule({
   messages: {
     missingOutput: {
       what: "REST route `{{operation}}` declares no answer.",
-      why: "the framework serialises and documents only what the route declares (ARCHITECTURE.md §8).",
+      why: "The framework serialises and documents only what the route declares (ARCHITECTURE.md §8).",
       fix: "Add `.withOutput(<schema>)` from the module's own contract (`z.void()` for a route that answers with nothing), `.responds({...})` for several statuses, or `.withResponse(<kind>)` for a non-JSON answer. Read the `api-transports` skill.",
     },
     missingInput: {
       what: "REST route `{{operation}}` is a body-carrying method but declares no input.",
-      why: "input is mandatory on every route, and the framework parses and validates only what the route declares (ARCHITECTURE.md §8).",
+      why: "Input is mandatory on every route; the framework parses and validates only what the route declares (§8).",
       fix: "Add `.withInput(<schema>)` from the module's own contract; an action that takes no body declares an empty input schema there. A body nothing should parse uses `.withRawBody(...)` or `.withMultipart(...)` instead.",
     },
     rawResponse: {
       what: "REST route `{{operation}}` answers through `.withRawResponse`, the retired hatch.",
-      why: "a non-JSON protocol declares the kind it answers with, and the handler is handed the one producer for that kind (ARCHITECTURE.md §8).",
+      why: "A non-JSON protocol declares the kind it answers with, and the handler gets that kind's one producer (§8).",
       fix: 'Replace it with `.withResponse("bytes" | "sse" | "redirect" | "protocol" | "forwarded", {...})` and produce the answer through the handler\'s `response` argument; a JSON answer declares `.withOutput(<schema>)` and returns a plain value.',
     },
     manualAnswer: {
       what: "The handler for `{{operation}}` builds its own answer with `{{symbol}}`.",
-      why: "a hand-built answer skips the framework's serialisation, and a hand-built refusal carries no code for the client to key on.",
+      why: "A hand-built answer skips the framework's serialisation, and a hand-built refusal carries no code to key on.",
       fix: "Return the plain value the declared output describes, and throw a HandledError with a stable code for a refusal (a plain Error for anything else).",
     },
     pathParam: {
       what: "REST route `{{operation}}` takes a path parameter named `{{name}}`.",
-      why: "the parameter name is published in the OpenAPI document and becomes the argument name in every generated client.",
+      why: "The parameter name is published in the OpenAPI document and is the argument name in every generated client.",
       fix: "Name it for what it identifies - `:{{suggestion}}` - and rename the matching field in the route's withParams() schema.",
     },
     foreignContract: {
       what: "REST route `{{operation}}` declares its wire with `{{name}}` from `{{source}}`, another module's contract.",
-      why: "every wire schema imports from the module's own contract (ARCHITECTURE.md §8).",
+      why: "Every wire schema imports from the module's own contract (ARCHITECTURE.md §8).",
       fix: "Declare the shape in this module's own contract and import it from there, or move the route to the module that owns `{{source}}`.",
     },
   },

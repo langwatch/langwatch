@@ -25,7 +25,7 @@ describe("given a module's process package", () => {
       expect(found[0].messageId).toBe("handRolledPlanGate");
       expect(found[0].message).toBe(
         "`new EnterprisePlanRequiredError(...)` refuses a plan in" +
-          " `modules/role/process/src/app/role.app.ts`, in the app or transport layer." +
+          " `modules/role/process/src/app/role.app.ts`, in the app or transport layer. The framework asks a declared plan gate after access, so a caller without permission never learns the plan's limits." +
           ' Declare `.withEntitlement("enterprise", { feature, when })` on the route or' +
           " procedure and delete this refusal; a gate that needs loaded data belongs in a" +
           " service method." +

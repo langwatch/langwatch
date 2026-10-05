@@ -131,18 +131,22 @@ export const temporalOnlyRule = defineRule({
     },
     mintNowMilliseconds: {
       what: "{{name}} reads the current moment as Date epoch milliseconds.",
+      why: "One clock: every moment in the product is a Temporal.Instant.",
       fix: "Call `nowInstant().epochMilliseconds` from @langwatch/time.",
     },
     constructInstant: {
       what: "{{name}} builds a Date out of a value.",
+      why: "One clock: every moment in the product is a Temporal.Instant.",
       fix: "Use `Temporal.Instant.from(iso)` for an ISO string, `Temporal.Instant.fromEpochMilliseconds(ms)` for a millisecond count, or `fromDate(date)` from @langwatch/time when a boundary handed you a Date.",
     },
     parseInstant: {
       what: "{{name}} parses a moment through Date.",
+      why: "One clock: every moment in the product is a Temporal.Instant.",
       fix: "Use `Temporal.Instant.from(iso).epochMilliseconds` from @langwatch/time.",
     },
     utcInstant: {
       what: "{{name}} builds an epoch count out of calendar parts through Date.",
+      why: "One clock: every moment in the product is a Temporal.Instant.",
       fix: 'Build the moment with `Temporal.PlainDateTime.from({ year, month, day }).toZonedDateTime("UTC").epochMilliseconds` from @langwatch/time.',
     },
     dateType: {

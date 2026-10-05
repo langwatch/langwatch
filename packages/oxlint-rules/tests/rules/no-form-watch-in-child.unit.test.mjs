@@ -34,7 +34,7 @@ describe("given a browser package source file", () => {
         [6, "form"],
       ]);
       expect(found[0].message).toBe(
-        "`form.watch()` runs on a form this component received as a prop, so the whole form tree re-renders on every keystroke." +
+        "`form.watch()` runs on a form this component received as a prop, so the whole form tree re-renders on every keystroke. `useWatch` subscribes to one field, so the component re-renders only when that field changes." +
           " Read the value with `useWatch({ control: form.control, name })` instead." +
           " Read the `frontend` skill.",
       );

@@ -210,6 +210,7 @@ export const cognitiveComplexityRule = defineRule({
   messages: {
     tooComplex: {
       what: "`{{name}}` has cognitive complexity {{complexity}} (max {{max}}); the {{construct}} at line {{atLine}} carries {{share}} of it.",
+      why: "Each nested branch depends on the ones above it, so a deep function is hard to read and to test.",
       fix: "Extract that {{construct}} into a module-level function (a nested closure still counts toward `{{name}}`) so the rest of `{{name}}` stays flat. Read the `linting` skill.",
     },
     // The score is nesting spread thin rather than one heavy block. Naming a
@@ -218,6 +219,7 @@ export const cognitiveComplexityRule = defineRule({
     // actually pays: fewer levels.
     tooComplexSpread: {
       what: "`{{name}}` has cognitive complexity {{complexity}} (max {{max}}), spread across {{blocks}} nested blocks with no single one carrying a third of it -- the depth is the cost, not any one branch.",
+      why: "Each nested branch depends on the ones above it, so a deep function is hard to read and to test.",
       fix: "Flatten it: take the nesting down with early returns, or lift a whole stage of the work -- the {{construct}} at line {{atLine}} is the largest single block at {{share}} -- into a module-level function; a nested closure still counts toward `{{name}}`.",
     },
   },

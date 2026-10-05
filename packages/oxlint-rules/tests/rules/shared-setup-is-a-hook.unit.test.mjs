@@ -46,7 +46,7 @@ describe("given a describe with sibling it blocks", () => {
       expect(found[0].messageId).toBe("siblingTestsRepeatSetup");
       expect(found[0].data).toEqual({ count: 3, shared: 3 });
       expect(found[0].message).toBe(
-        "These 3 sibling tests each open with the same 3 statements. Move the repeated" +
+        "These 3 sibling tests each open with the same 3 statements. Setup pasted into every sibling drifts one body at a time. Read the `testing` skill. Move the repeated" +
           " statements into a `beforeEach(() => { ... })` at the top of this `describe` and" +
           " delete them from each test.",
       );

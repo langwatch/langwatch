@@ -214,7 +214,7 @@ describe("given a require-prefixed name", () => {
 
       expect(located(found)).toEqual([["requirePrefix", "requireById", 2]]);
       expect(found[0].message).toBe(
-        "`requireById` carries a `require` prefix, which says how it fails rather than what it answers." +
+        "`requireById` carries a `require` prefix, which says how it fails rather than what it answers. ADR-146 names a function for what it answers; how it fails belongs to the verb, not a prefix." +
           " Name it `getById` and leave the body as it is: ADR-146's `get` already answers exactly one thing or throws.",
       );
     });
@@ -250,7 +250,7 @@ describe("given a require-prefixed name that answers nothing", () => {
         ["requireAssertion", "requireQuota", 10],
       ]);
       expect(found[0].message).toBe(
-        "`requireAdmin` carries a `require` prefix, which says how it fails rather than what it checks." +
+        "`requireAdmin` carries a `require` prefix, which says how it fails rather than what it checks. ADR-146 names a function for what it checks; how it fails belongs to the verb, not a prefix." +
           " Name it `assertAdmin` and leave the body as it is: an `assert*` answers nothing and throws when the condition fails.",
       );
     });

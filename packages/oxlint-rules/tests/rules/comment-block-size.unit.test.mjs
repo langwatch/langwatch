@@ -26,7 +26,7 @@ describe("given a source file outside the burn-down allowlist", () => {
 
       expect(found).toHaveLength(1);
       expect(found[0].message).toBe(
-        "Comment block has 9 lines; the maximum is 5. Delete it when the code already says it," +
+        "Comment block has 9 lines; the maximum is 5. A comment is for what the code cannot say, and a long one is narrative that drifts from it. Delete it when the code already says it," +
           " or move the narrative into an ADR under `dev/docs/adr/` and leave one line here" +
           " linking it. See ADR-140.",
       );
@@ -72,7 +72,7 @@ describe("given a source file outside the burn-down allowlist", () => {
       expect(found.map((entry) => entry.messageId)).toEqual(["commentColumns"]);
       expect(found[0].data.width).toBe(wide.length);
       expect(found[0].message).toBe(
-        `Comment line is ${wide.length} columns; wrap at 100.` +
+        `Comment line is ${wide.length} columns; wrap at 100. A line wider than 100 columns wraps in editors and diffs, so it reads broken. Read the linting skill.` +
           " Wrap it at 100 columns, keeping the sentence whole across the break. If it only" +
           " restates the code beside it, delete it instead of wrapping it.",
       );

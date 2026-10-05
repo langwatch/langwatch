@@ -30,7 +30,7 @@ describe("given a production source", () => {
       expect(found[0].messageId).toBe("mintedAtCallSite");
       expect(found[0].message).toBe(
         "`idempotencyKey` is minted here by `crypto.randomUUID()`, so every retry sends a" +
-          " different key and nothing is deduplicated." +
+          " different key and nothing is deduplicated. A key that changes per attempt is a field on the wire, not a guarantee: the server sees each retry as a new operation." +
           " Derive it from the request's own content, or bind it once for the operation it" +
           " identifies — `useState(() => crypto.randomUUID())` for a form, a key threaded from" +
           " the caller for a mutation — and pass that binding here." +

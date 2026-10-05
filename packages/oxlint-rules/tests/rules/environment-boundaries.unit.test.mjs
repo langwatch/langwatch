@@ -30,9 +30,9 @@ describe("given a reusable package", () => {
     });
   });
 
-  describe("when the file is an application's main.ts or config.ts", () => {
-    /** @scenario "An application's main.ts or config.ts may read process.env" */
-    it.each(["apps/api/src/main.ts", "apps/tasks/src/config.ts"])(
+  describe("when the file is an application's config.ts", () => {
+    /** @scenario "An application's config.ts may read process.env" */
+    it.each(["apps/api/src/config.ts", "apps/tasks/src/config.ts"])(
       "reports nothing for %s",
       (file) => {
         expect(report("export const url = process.env.DATABASE_URL;", file)).toEqual([]);
@@ -40,16 +40,18 @@ describe("given a reusable package", () => {
     );
   });
 
-  describe("when an application file is neither main.ts nor config.ts", () => {
+  describe("when an application file is not its config.ts", () => {
     /** @scenario "Any other application file reading process.env is reported" */
-    it.each(["apps/api/src/platform/config/env.composition.ts", "apps/worker/src/boot/start.ts"])(
-      "reports environment for %s",
-      (file) => {
-        const found = report("export const url = process.env.DATABASE_URL;", file);
+    it.each([
+      "apps/api/src/main.ts",
+      "apps/tasks/src/main.ts",
+      "apps/api/src/platform/config/env.composition.ts",
+      "apps/worker/src/boot/start.ts",
+    ])("reports environment for %s", (file) => {
+      const found = report("export const url = process.env.DATABASE_URL;", file);
 
-        expect(found.map((finding) => finding.messageId)).toEqual(["environment"]);
-      },
-    );
+      expect(found.map((finding) => finding.messageId)).toEqual(["environment"]);
+    });
   });
 
   describe("when the file belongs to the published npx CLI", () => {

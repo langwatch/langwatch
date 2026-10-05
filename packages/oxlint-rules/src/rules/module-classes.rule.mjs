@@ -157,22 +157,27 @@ export const moduleClassesRule = defineRule({
   messages: {
     missingDeclared: {
       what: "`{{path}}` declares a {{suffix}} and exports no interface or abstract class named `*{{suffix}}`.",
+      why: "Callers depend on the interface, so the concrete class and its memory twin swap without them noticing.",
       fix: "Export `interface <Name>{{suffix}}` here; the concrete class that implements it lives in its own file. Read the `process-module` skill.",
     },
     missingConcrete: {
       what: "`{{path}}` exports no concrete class named `*{{suffix}}`.",
+      why: "The process installs one concrete class per declaration; a file without one leaves nothing to install.",
       fix: "Export one `class <Name>{{suffix}}` here; an interface for it belongs in the interface file beside it.",
     },
     create: {
       what: "`{{name}}` has no static create, so nothing builds it the one way a process installs it.",
+      why: "The process builds every module class through `create`, so a class without one cannot be installed.",
       fix: "Add {{create}}.",
     },
     publicConstructor: {
       what: "`{{name}}` has `static create`, but its constructor is public, so a caller can bypass create with `new {{name}}(...)`.",
+      why: "A public constructor lets callers build the class outside `create`, skipping what it wires.",
       fix: "Declare the constructor `private` — write `private constructor() {}` when the class has none.",
     },
     standalone: {
       what: "`{{name}}` is a function exported from the {{suffix}} module `{{path}}`; behaviour lives on the module's class.",
+      why: "An exported function beside the class is a second surface the process never installs or replaces.",
       fix:
         "If it is a pure function of its arguments, move it to the module's `rules/` folder," +
         " or drop `export` and keep it a private helper here. Otherwise make it a method {{destination}}.",

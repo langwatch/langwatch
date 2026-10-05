@@ -102,7 +102,7 @@ export const POLICIES: readonly PolicyDefinition[] = [
   }),
   definePolicy({
     id: "feature-configuration",
-    spec: FEATURE_PACKAGE_BOUNDARIES,
+    spec: "specs/tooling/lint-feature-configuration.feature",
     run: lintFeatureConfiguration,
   }),
   definePolicy({

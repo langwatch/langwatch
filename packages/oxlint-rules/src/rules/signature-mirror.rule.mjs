@@ -79,7 +79,7 @@ export const signatureMirrorRule = defineRule({
   messages: {
     mirroredSignature: {
       what: "This boundary type mirrors another signature through `{{name}}<…>`.",
-      why: "A mirrored type changes whenever the mirrored function does, so the contract no longer states what the boundary accepts or returns.",
+      why: "A mirrored type changes whenever the function does, so the contract no longer states what the boundary accepts.",
       fix: "Declare the input and output as named contract types (Zod schema plus `z.infer`) and type the `*Api` operation with them explicitly. Read the `contract` skill.",
     },
   },

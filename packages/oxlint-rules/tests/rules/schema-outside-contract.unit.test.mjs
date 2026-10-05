@@ -26,7 +26,7 @@ describe("given a transport file", () => {
       expect(found[0].messageId).toBe("schema");
       expect(found[0].message).toBe(
         "`CreateAgentSchema` is a Zod schema declared in" +
-          " `modules/agent/process/src/transport/agent.rest.ts`." +
+          " `modules/agent/process/src/transport/agent.rest.ts`. A transport file declares routes and imports its shapes; the vocabulary belongs to every side of the wire." +
           " Move it to `modules/agent/contract/src` and import it here." +
           " Read the `contract` skill.",
       );

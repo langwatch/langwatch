@@ -323,66 +323,82 @@ export const boundaryRule = defineRule({
   messages: {
     compositionRoot: {
       what: "`{{specifier}}` is `{{module}}`'s process package, and an application composes modules without naming one.",
+      why: "An app that names a process package builds the module by hand, beside the installed list it boots.",
       fix: "Take `{{module}}` from the app's generated `process-modules.generated.ts` list (catalogue-driven, `pnpm generate:modules`), and move whatever this root builds from `{{specifier}}` behind the module's own declaration so the module constructs it. Read the `module` skill.",
     },
     processOutsideModule: {
       what: "`{{specifier}}` is `{{module}}`'s process package, and only `{{module}}` itself may import it.",
+      why: "A module is an isolated service: others see only its contract, so its internals stay free to change.",
       fix: "Call `{{api}}` from `{{contract}}` instead; if the operation is not there, it is a new `{{api}}` operation to propose to the module's owner.",
     },
     crossModuleProcess: {
       what: "`{{specifier}}` is another module's process package.",
+      why: "A module is an isolated service: others see only its contract, so its internals stay free to change.",
       fix: "Call `{{api}}` from `{{contract}}` instead; if the operation is not there, it is a new `{{api}}` operation to propose to the module's owner.",
     },
     crossModuleBrowser: {
       what: "`{{specifier}}` is `{{module}}`'s browser package, which is closed to every other module.",
+      why: "A browser package is private to its module, so importing it couples two modules' screens.",
       fix: "Move what this needs out of `{{module}}`'s browser package: pure domain logic into the owner's contract, shared UI into `@langwatch/design-system`, a framework hook into `@langwatch/browser-host`. Where fewer than two modules share it, inline it here instead (ARCHITECTURE.md §3.4).",
     },
     browserSideDoor: {
       what: "`{{specifier}}` reaches past `{{module}}`'s browser declaration, the only door a browser package has.",
-      fix: "Import `@langwatch/{{module}}-browser/declaration` and read the capability from its `withCapabilities` slot, or move a shared component into `@langwatch/design-system`.",
+      why: "Past the declaration is the module's private browser code, which it may change without telling anyone.",
+      fix: "Read what `{{module}}` lends through its token from `{{module}}`'s contract with `useLent(Token)`, the owner declaring `.lends(Token, { load })`, or move a shared component into `@langwatch/design-system`.",
     },
     packageEscape: {
       what: "`{{specifier}}` resolves outside `{{packageRoot}}`, so this package depends on a file it does not own.",
+      why: "A relative path across packages hides the dependency from the manifest, the task graph and the cache.",
       fix: "Replace `{{specifier}}` with the target's package name — `@langwatch/<module>-<contract|process|browser>` for a module package, `@langwatch/<name>` for any other workspace package. Move the file into `{{packageRoot}}` instead only when nothing outside `{{packageRoot}}` imports it.",
     },
     unownedEscape: {
       what: "`{{specifier}}` resolves outside `{{packageRoot}}` into a directory no package owns, so nothing records that this package depends on it.",
+      why: "A file no package owns has no manifest, so no cache or task graph knows this package depends on it.",
       fix: "Give the target directory a `package.json` and add it to `pnpm-workspace.yaml`, then import it by that name — the way `dev/scripts` became `@langwatch/dev-scripts`. Move the file into `{{packageRoot}}` instead when only this package reads it.",
     },
     undeclaredDependency: {
       what: "`{{dependency}}` is imported but not declared in `{{packageRoot}}/package.json`, so the task graph has no edge to it and a cached result survives its changes.",
+      why: "Builds, tests and caches follow package.json, so an undeclared import is an edge they cannot see.",
       fix: 'Add `"{{dependency}}": "workspace:*"` to `{{packageRoot}}/package.json` (`devDependencies` when only tests import it), or remove the import.',
     },
     contractRuntime: {
       what: "A contract package is runtime-neutral: `{{specifier}}` is a node, browser or process runtime.",
+      why: "Both process and browser import the contract, so a runtime import drags into the side that cannot run it.",
       fix: "Keep only schemas, types, errors and the `*Api` token here; move the code that needs `{{specifier}}` into this module's process package, or into its browser package when it is a browser import.",
     },
     browserImportsProcess: {
       what: "`{{specifier}}` is process-only, and this is a browser package.",
+      why: "Process code runs on the server beside secrets and stores; bundled into the browser it breaks or leaks.",
       fix: "Call the procedure through this module's derived tRPC client, and import any shared type from the owning module's contract.",
     },
     processImportsBrowser: {
       what: "`{{specifier}}` is browser-only, and this is a process package.",
+      why: "Browser code needs a DOM and the browser bundle's graph, neither of which a server process has.",
       fix: "Move the browser-only code into this module's browser package; share a type through the contract.",
     },
     coreImportsEnterprise: {
       what: "`{{specifier}}` is an enterprise module's implementation, and this is core code.",
+      why: "Core builds and runs without enterprise code, which is licensed apart and installed only when entitled.",
       fix: "Depend on that module's peer `*Api` from its contract instead; the enterprise module installs like any other and the process resolves the peer (ARCHITECTURE.md §11).",
     },
     libraryRuntime: {
       what: "`{{specifier}}` is a runtime, framework or another package's implementation, and this is a module's portable, framework-free library.",
+      why: "Process and browser both import a module library, so a runtime import ties it to one side.",
       fix: "Import only this module's contract, other module libraries and framework-free packages here; move the code that needs `{{specifier}}` into the module's process or browser package.",
     },
     retiredPackageRuntime: {
       what: "`{{specifier}}` is a retired runtime or package entry point.",
+      why: "A retired entry point is on its way out; each new import adds work to the change that removes it.",
       fix: "Import {{replacement}} instead.",
     },
     schemaBoundary: {
       what: "`{{specifier}}` binds the module to Hono.",
+      why: "A contract is framework-free, so Hono in it couples every reader to one transport.",
       fix: "Export a plain Zod schema from the contract and let the transport adapt it.",
     },
     sealedExports: {
       what: "`{{subpath}}` is not in `{{package}}`'s `exports`.",
+      why: "A package's exports are its public surface; a deep import couples to internals it may move.",
       fix: 'Import from `{{package}}` itself when its entry already re-exports the symbol. A browser package exports only `./declaration`, so there the symbol is private; for a contract or process package, add `"{{subpath}}"` to its `exports` and re-export the symbol from that entry.',
     },
   },
