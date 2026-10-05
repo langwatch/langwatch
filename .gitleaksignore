@@ -25,3 +25,15 @@
 # beside a LICENSE_KEY name. It was never a credential; the test now mints a
 # code at runtime, so only this pull request's history carries the literal.
 ee724546d96949b22f8d04adc3a2ec5d8c79616a:platform/app/ee/sso/__tests__/sso-gate.test.ts:generic-api-key:248
+
+# Test fixtures moved into modules on this branch: a JWT whose payload is
+# {"projectId":"project-1"} signed with the word "signature", and named
+# placeholders (tok_live_partner_123, tok_live_rotated_456, lw-revoked-...).
+# None was ever a credential; the commits carrying them are history.
+41e28084ce434702e92ed7341bd82b8203f113a6:modules/api-key/process/src/services/__tests__/api-key-token-resolution.service.unit.test.ts:jwt:357
+41e28084ce434702e92ed7341bd82b8203f113a6:modules/auth/process/src/services/__tests__/api-rest-credentials.service.unit.test.ts:jwt:262
+635662acfe2f7e9142982b0955b7655b1159ceec:modules/agent/process/src/services/__tests__/agent-http-secrets.integration.test.ts:generic-api-key:56
+635662acfe2f7e9142982b0955b7655b1159ceec:modules/workflow/process/src/channels/__tests__/staged-run-body-seal.unit.test.ts:generic-api-key:13
+635662acfe2f7e9142982b0955b7655b1159ceec:modules/workflow/process/src/services/__tests__/workflow-http-secrets.service.unit.test.ts:generic-api-key:12
+635662acfe2f7e9142982b0955b7655b1159ceec:modules/workflow/process/src/services/__tests__/workflow-http-secrets.service.unit.test.ts:generic-api-key:159
+48f9eb920a2a021bbb8723d1d61896acea00b2b7:modules/api-key/process/src/services/__tests__/api-key-token-resolution-cache.unit.test.ts:generic-api-key:550
