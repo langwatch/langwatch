@@ -21,6 +21,7 @@ import {
   bucketKeysOf,
   chartTypeOf,
   emptyChartOf,
+  groupByToQuery,
   pieChartOf,
   seriesInputsOf,
   trendChartOf,
@@ -214,7 +215,7 @@ async function buildChart({
     endDate: to,
     filters: (graph.filters ?? {}) as AnalyticsTimeseriesInput["filters"],
     series: seriesInputs,
-    groupBy: graphData.groupBy,
+    groupBy: groupByToQuery(type, graphData.groupBy),
     timeScale,
     // A report renders in the project's own frame; the scheduler already fires
     // in the report's timezone, so the buckets only need to be stable.

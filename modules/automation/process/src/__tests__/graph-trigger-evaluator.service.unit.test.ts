@@ -337,11 +337,83 @@ describe("evaluateGraphTrigger", () => {
     });
   });
 
-  describe("given a graph whose grouped result exceeds the row ceiling", () => {
-    // The failure this replaces was not an error at all: the result was
-    // materialised until the process died, so the job neither completed nor
-    // failed. Three of those in a row poison-parked the tenant's whole
-    // graph-trigger lane and silently stopped every alert in the project.
+  describe("given a grouped graph whose series is an average", () => {
+    const AVG_KEY = "0/performance.completion_time/avg";
+
+    function groupedAverageHarness(): Harness {
+      const grouped = makeHarness({
+        trigger: makeTrigger({
+          actionParams: {
+            threshold: 250,
+            operator: "gt",
+            timePeriod: 60,
+            seriesName: AVG_KEY,
+            members: ["a@example.com"],
+          },
+        }),
+        graph: makeGraph({
+          graph: {
+            series: [
+              {
+                name: "Average completion time",
+                metric: "performance.completion_time",
+                aggregation: "avg",
+                colorSet: "blueTones",
+              },
+            ],
+            groupBy: "traces.trace_name",
+            timeScale: 60,
+          },
+        }),
+        series: timeseries(null),
+      });
+      // Two groups averaging 100 ms and 200 ms; across every trace the series
+      // averages 150 ms. Only an ungrouped read can give the latter.
+      grouped.getTimeseries.mockImplementation(
+        async (input: { groupBy?: string }): Promise<TimeseriesResult> =>
+          input.groupBy
+            ? {
+                currentPeriod: [
+                  {
+                    date: "2026-06-20T11:00:00Z",
+                    "traces.trace_name": {
+                      checkout: { [AVG_KEY]: 100 },
+                      search: { [AVG_KEY]: 200 },
+                    },
+                  },
+                ],
+                previousPeriod: [],
+              }
+            : {
+                currentPeriod: [{ date: "2026-06-20T11:00:00Z", [AVG_KEY]: 150 }],
+                previousPeriod: [],
+              },
+      );
+      return grouped;
+    }
+
+    it("compares the series' own value with the threshold, not the groups added together", async () => {
+      const grouped = groupedAverageHarness();
+
+      const result = await evaluateGraphTrigger({
+        deps: grouped.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.value).toBe(150);
+      expect(result.status).toBe("not_breached");
+      expect(grouped.getTimeseries.mock.calls[0]![0].groupBy).toBeUndefined();
+    });
+  });
+
+  describe("given a timeseries read that exceeds the row ceiling", () => {
+    // The read no longer groups, so this is the backstop for any read that
+    // still fans out. The failure it replaced was not an error at all: a
+    // grouped result was materialised until the process died, so the job
+    // neither completed nor failed. Three of those in a row poison-parked the
+    // tenant's whole graph-trigger lane and silently stopped every alert.
     function tooLarge() {
       const error = new Error("Limit for result exceeded: TOO_MANY_ROWS_OR_BYTES");
       (error as Error & { code?: string }).code = "396";

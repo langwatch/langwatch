@@ -364,8 +364,6 @@ export type TimeseriesReadOptions = { maxResultRows?: number };
 
 export type StoredGraphConfig = {
   series: GraphSeries[];
-  groupBy?: string;
-  groupByKey?: string;
   timeScale?: "full" | number;
 };
 

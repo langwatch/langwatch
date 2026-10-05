@@ -77,6 +77,18 @@ export function bucketKeysOf(seriesInputs: AnalyticsSeries[]): string[] {
 }
 
 /**
+ * Only a pie draws the groups, one slice each. Every other chart draws one line per
+ * series, and only the database can compute that line across every group: adding
+ * per-group values back together summed averages.
+ */
+export function groupByToQuery(
+  type: ReportChart["type"],
+  groupBy: CustomGraphInput["groupBy"],
+): CustomGraphInput["groupBy"] {
+  return type === "pie" ? groupBy : void 0;
+}
+
+/**
  * A pie needs one value per slice, not a value per time bucket. When the graph
  * groups (by model, by user, …), each group is a slice; when it does not, each
  * series is its own slice.
@@ -162,12 +174,10 @@ export function trendChartOf({
 }): ReportChart {
   const series = seriesInputs.map((input, index) => ({
     name: graphData.series?.[index]?.name ?? bucketKeys[index]!,
-    data: extractSeriesPoints(buckets, bucketKeys[index]!, graphData.groupBy).map(
-      (point, pointIndex) => ({
-        label: categories[pointIndex] ?? point.timestamp,
-        value: point.value,
-      }),
-    ),
+    data: extractSeriesPoints(buckets, bucketKeys[index]!).map((point, pointIndex) => ({
+      label: categories[pointIndex] ?? point.timestamp,
+      value: point.value,
+    })),
   }));
 
   const primary = series[0];

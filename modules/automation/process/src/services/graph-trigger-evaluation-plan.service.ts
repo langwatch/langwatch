@@ -197,7 +197,9 @@ export class GraphTriggerEvaluationPlanService {
       endDate: endDate.epochMilliseconds,
       filters: (filters ?? {}) as TimeseriesInputType["filters"],
       series: [{ ...series, name: void 0 }],
-      groupBy: graph.groupBy,
+      // Not the graph's `groupBy`: the threshold is checked against one number, and only
+      // the database can compute it across every group. Adding per-group values back
+      // together gave a sum of averages, and counted a trace once per label.
       timeScale: graph.timeScale ?? 60,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     };
