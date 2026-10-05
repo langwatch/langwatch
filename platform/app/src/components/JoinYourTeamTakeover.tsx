@@ -63,7 +63,7 @@ export function JoinYourTeamTakeover({
     decision,
     mine,
     invitation,
-    invitationSetAside,
+    askHeldDown,
     setInvitationAside,
     admitting,
   } = useJoinTakeoverState({ currentOrganizationId, origin });
@@ -127,7 +127,7 @@ export function JoinYourTeamTakeover({
     offerIsNotForHere({
       decision,
       currentOrganizationId,
-      invitationSetAside,
+      askHeldDown,
     })
   )
     return fallback;
@@ -198,7 +198,9 @@ function useJoinTakeoverState({
     mine: mine.data,
     invitation:
       onboarding && !invitationSetAside ? invitations.data?.[0] : undefined,
-    invitationSetAside,
+    // The ask is held down while an invitation might be standing behind it:
+    // one set aside this visit, or one a failed read could not rule out.
+    askHeldDown: invitationSetAside || (onboarding && invitations.isError),
     setInvitationAside: () => setInvitationSetAside(true),
     admitting,
   };
@@ -210,20 +212,21 @@ function useJoinTakeoverState({
  * keeps the offer visible. `undefined` never reaches here (the caller returned
  * on it), so this is `null` (no context) versus a real organization id. An
  * offer naming no organization at all is nothing to show either, and nor is
- * one standing behind an invitation that was just set aside: that button
- * said "create a new organization instead", so raising the ask in its place
- * would make it take two clicks.
+ * one held down by an invitation: set aside just now, whose button said
+ * "create a new organization instead" so raising the ask in its place would
+ * make it take two clicks; or not ruled out because the read failed, where
+ * asking could land the joiner seat over the seat an administrator chose.
  */
 function offerIsNotForHere({
   decision,
   currentOrganizationId,
-  invitationSetAside,
+  askHeldDown,
 }: {
   decision: Extract<JoinLookupDecision, { outcome: "ask" }>;
   currentOrganizationId: string | null;
-  invitationSetAside: boolean;
+  askHeldDown: boolean;
 }): boolean {
-  if (invitationSetAside || decision.organizations.length === 0) return true;
+  if (askHeldDown || decision.organizations.length === 0) return true;
   if (currentOrganizationId === null) return false;
   return !decision.organizations.some(
     (organization) => organization.organizationId === currentOrganizationId,

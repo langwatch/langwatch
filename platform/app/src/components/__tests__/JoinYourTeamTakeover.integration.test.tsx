@@ -42,10 +42,11 @@ const {
   offerRef: { current: { data: undefined as unknown, isPending: false } },
   mineRef: { current: { data: [] as unknown[], isPending: false } },
   invitationsRef: {
-    current: {
-      data: [] as unknown[] | undefined,
-      isPending: false,
-      isSuccess: true,
+    current: { data: [], isPending: false, isSuccess: true } as {
+      data: unknown[] | undefined;
+      isPending: boolean;
+      isSuccess: boolean;
+      isError?: boolean;
     },
   },
   admitFailedRef: { current: false },
@@ -876,6 +877,32 @@ describe("given a sign-up the device page sent to the welcome screen", () => {
       );
 
       await waitFor(() => expect(admitMock).not.toHaveBeenCalled());
+      expect(screen.getByTestId("make-your-own")).toBeInTheDocument();
+    });
+
+    /** @scenario A pending invitation is offered before asking to join */
+    it("offers no ask while the invitation answer failed to come back", () => {
+      // The ask offer from beforeEach stands. A failed read may be hiding
+      // an invitation, and asking instead could land the joiner seat over
+      // the seat an administrator already chose.
+      invitationsRef.current = {
+        data: undefined,
+        isPending: false,
+        isSuccess: false,
+        isError: true,
+      };
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover
+            currentOrganizationId={null}
+            fallback={<div data-testid="make-your-own" />}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(
+        screen.queryByRole("button", { name: /Ask to join/ }),
+      ).not.toBeInTheDocument();
       expect(screen.getByTestId("make-your-own")).toBeInTheDocument();
     });
 
