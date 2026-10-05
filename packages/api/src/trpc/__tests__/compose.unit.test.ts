@@ -214,3 +214,22 @@ function unusedPorts(): TrpcRuntimeMembers<object> {
     errors: { report: unreachable, asError: unreachable, translate: unreachable },
   };
 }
+
+describe("given a procedure that names one permission and the input field holding its scope", () => {
+  it("keeps the scope field on the declaration the runtime builds", () => {
+    const scoped = defineTrpcRouter(ReviewApi, writesContract)
+      .procedure("archive")
+      .withPermission("annotations:update", { via: "projectId" })
+      .handle(({ app, input }) => app.archive(input))
+      .build();
+    const runtime = collectingRuntime();
+
+    composeTrpcRouters("review", [scoped]).router(runtime, () => application);
+
+    expect(runtime.built["review.archive"]?.access).toEqual({
+      kind: "permission",
+      permission: "annotations:update",
+      via: "projectId",
+    });
+  });
+});

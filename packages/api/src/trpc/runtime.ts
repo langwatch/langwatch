@@ -454,6 +454,11 @@ export interface TrpcRouterAccess<
   withPermission(
     access: AuthzPermission | AuthzDeclaration,
   ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  /** One permission, asked at the scope the named input field holds. */
+  withPermission(
+    permission: AuthzPermission,
+    options: { via: ScopeTierField },
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
   /**
    * Every one of them, asked before the handler at the one scope the input
    * names. Naming an array is what says AND; a single permission is declared
@@ -695,7 +700,11 @@ function permissionDeclarationOf({
   access: PermissionArgument;
   via?: ScopeTierField;
 }): AccessDeclaration {
-  if (typeof access === "string") return { kind: "permission", permission: access };
+  if (typeof access === "string") {
+    return via === undefined
+      ? { kind: "permission", permission: access }
+      : { kind: "permission", permission: access, via };
+  }
 
   if (isPermissionList(access)) {
     return permissionAllOf({ contract, name, permissions: access, via });
