@@ -476,7 +476,10 @@ describe("given somebody an administrator already invited", () => {
       invitationsRef.current = { ...INVITED };
       renderTakeover();
 
-      expect(screen.getByTestId("join-team-takeover")).toBeInTheDocument();
+      expect(screen.getByTestId("join-team-invitation")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("join-team-takeover"),
+      ).not.toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /Accept the invitation to Acme/ }),
       ).toBeInTheDocument();
@@ -500,9 +503,7 @@ describe("given somebody an administrator already invited", () => {
       // Waiting on the request would let an approval land the joiner seat;
       // accepting the invitation lands the seat the administrator chose and
       // withdraws the request.
-      expect(
-        screen.getByRole("button", { name: /Accept the invitation to Acme/ }),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("join-team-invitation")).toBeInTheDocument();
       expect(screen.queryByTestId("join-team-waiting")).not.toBeInTheDocument();
     });
 

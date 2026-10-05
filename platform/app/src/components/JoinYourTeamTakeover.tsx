@@ -353,7 +353,7 @@ function InvitationTakeover({
     <Takeover
       title={`You’re invited to join ${invitation.organizationName}`}
       intro={`An administrator has already invited you, as a ${seat}.`}
-      testId="join-team-takeover"
+      testId="join-team-invitation"
     >
       <AuthPrimaryButton
         isBusy={accept.isPending}
