@@ -2,6 +2,7 @@ import {
   Config,
   langevalsStagingThresholdBytes,
   langevalsStagingTtlSeconds,
+  nlpCodeBlockTimeoutSeconds,
   nlpServiceUrl,
   publicBaseUrl,
   type ConfigOf,
@@ -83,6 +84,8 @@ export const workflowConfig = Config.define(() => ({
   relayTurnCeilingMs: nlpFetchMaxTimeoutMs,
   /** The deployment's public origin, for `platformUrl` and the studio Lambda's endpoint. */
   publicBaseUrl,
+  /** The engine's code-block ceiling, raw; the process owner holds the same leaf. */
+  nlpCodeBlockTimeoutSeconds,
 }));
 
 export type WorkflowServerConfig = ConfigOf<typeof workflowConfig>;

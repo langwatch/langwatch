@@ -43,6 +43,7 @@ function harness({ langwatchEndpoint }: { langwatchEndpoint: string | undefined 
       ...scenarioHostMembers,
       nlpServiceUrl: "http://nlp.test",
       nlpInternalSecret: void 0,
+      isSaas: false,
       publicBaseUrl: void 0,
     },
   });

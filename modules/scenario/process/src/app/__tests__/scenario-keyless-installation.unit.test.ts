@@ -97,8 +97,6 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
     .withKeyvalue(memoryRedisDouble())
     .withMember("encryption", encryption)
     .withMember("rateLimiter", { check: async () => ({ allowed: true }) })
-    .withMember("nlpCodeBlockTimeoutSeconds", undefined)
-    .withMember("isSaas", false)
     .withMember("nodeEnvironment", "test")
     .withMember("rawSocketPort", 0)
     .provide({

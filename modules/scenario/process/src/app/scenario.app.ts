@@ -301,8 +301,6 @@ type ScenarioProcessMembers = Readonly<{
   redis: ScenarioRedis | null;
   /** The raw-socket door's port, which the worker's quick tunnel points at. */
   rawSocketPort: number;
-  nlpCodeBlockTimeoutSeconds: string | undefined;
-  isSaas: boolean;
   nodeEnvironment: string | undefined;
 }>;
 
@@ -327,8 +325,6 @@ export class ScenarioModule implements ScenarioApi {
     "rateLimiter",
     "redis",
     "rawSocketPort",
-    "nlpCodeBlockTimeoutSeconds",
-    "isSaas",
     "nodeEnvironment",
   ] as const;
   static readonly config = scenarioConfig;
@@ -435,7 +431,7 @@ export class ScenarioModule implements ScenarioApi {
       voicePublicUrl: voice.publicUrl,
       nlpServiceUrl,
       nlpInternalSecret: nlpInternal,
-      isSaas: setup.members.isSaas,
+      isSaas: setup.config.isSaas,
       nodeEnvironment,
       publicBaseUrl,
     };
@@ -456,7 +452,7 @@ export class ScenarioModule implements ScenarioApi {
         }),
         nlpTimeouts: {
           ...config.nlpTimeouts,
-          engineCodeBlockTimeoutSeconds: Number(setup.members.nlpCodeBlockTimeoutSeconds),
+          engineCodeBlockTimeoutSeconds: Number(setup.config.nlpCodeBlockTimeoutSeconds),
         },
         maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
       }),

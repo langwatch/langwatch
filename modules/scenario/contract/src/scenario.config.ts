@@ -5,6 +5,7 @@ import {
   Config,
   isSaas,
   langwatchDefaultModel,
+  nlpCodeBlockTimeoutSeconds,
   nlpServiceUrl,
   publicBaseUrl,
   type ConfigOf,
@@ -101,6 +102,8 @@ export const scenarioConfig = Config.define((c) => ({
   defaultModel: langwatchDefaultModel,
   /** The shared NLP engine's address; absent, no scenario executor is composed. */
   nlpServiceUrl,
+  /** The engine's code-block ceiling, raw; the process owner holds the same leaf. */
+  nlpCodeBlockTimeoutSeconds,
   /** The deployment's public origin (the shared leaf); absent, platform links refuse by name. */
   publicBaseUrl,
   /** The nlpgo deadlines an agent-test turn answers inside; unusable values clamp to defaults. */

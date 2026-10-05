@@ -378,14 +378,9 @@ export type WorkflowHostMembers = Omit<
   | "signals"
 >;
 
-/** The engine's code-block ceiling is a process fact. */
-type WorkflowProcessFacts = Readonly<{
-  nlpCodeBlockTimeoutSeconds: string | undefined;
-}>;
-
 type WorkflowSetup = FeatureSetup<
   typeof WorkflowModule.dependencies,
-  WorkflowHostMembers & MembersRead<readonly ["prisma"]> & WorkflowProcessFacts,
+  WorkflowHostMembers & MembersRead<readonly ["prisma"]>,
   WorkflowServerConfig,
   WorkflowRepositories
 >;
@@ -468,7 +463,7 @@ function lambdaEngine({
       securityGroupIds: fields.security_group_ids,
     },
     langwatchEndpoint: setup.config.publicBaseUrl ?? "",
-    codeBlockTimeoutRawValue: setup.members.nlpCodeBlockTimeoutSeconds,
+    codeBlockTimeoutRawValue: setup.config.nlpCodeBlockTimeoutSeconds,
     stagingThresholdBytesRawValue: setup.config.stagingThresholdBytes,
     stagingTtlSecondsRawValue: setup.config.stagingTtlSeconds,
   });
@@ -644,7 +639,7 @@ export class WorkflowModule implements WorkflowApi {
   };
   static readonly config = workflowConfig;
   /** `prisma` for `workflowRows`/`workflows`, via this module's `workflowRepositories`. */
-  static readonly reads = ["prisma", "nlpCodeBlockTimeoutSeconds"] as const;
+  static readonly reads = ["prisma"] as const;
   static readonly repositories = workflowRepositories;
   static readonly secrets = {
     nlpLambdaFleet: nlpLambdaFleetSecret,

@@ -32,7 +32,6 @@ async function appWith(
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-      nlpCodeBlockTimeoutSeconds: void 0,
     },
     dependencies: {
       evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
@@ -51,6 +50,7 @@ async function appWith(
       stagingTtlSeconds: 600,
       relayTurnCeilingMs: void 0,
       publicBaseUrl: void 0,
+      nlpCodeBlockTimeoutSeconds: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

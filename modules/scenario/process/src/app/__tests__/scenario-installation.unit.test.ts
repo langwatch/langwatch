@@ -68,8 +68,6 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       decrypt: (value: string) => value,
     })
     .withMember("rateLimiter", { check: async () => ({ allowed: true }) })
-    .withMember("nlpCodeBlockTimeoutSeconds", undefined)
-    .withMember("isSaas", false)
     .withMember("nodeEnvironment", "test")
     .withMember("rawSocketPort", 0)
     .provide({
