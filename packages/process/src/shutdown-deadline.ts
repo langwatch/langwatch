@@ -19,3 +19,9 @@ export function processShutdownDeadlineMs({
   if (queueDrainMs === undefined) return DEFAULT_SHUTDOWN_DEADLINE_MS;
   return queueDrainMs + SHUTDOWN_CLOSE_SLACK_MS;
 }
+
+/** The http door's own phase ceiling: half the 15s process teardown (main's budget.ts). */
+export const HTTP_CLOSE_PHASE_MS = 7_500;
+
+/** What in-flight requests get; the ceiling keeps 2s for the session teardown and the reap. */
+export const HTTP_DRAIN_GRACE_MS = HTTP_CLOSE_PHASE_MS - 2_000;

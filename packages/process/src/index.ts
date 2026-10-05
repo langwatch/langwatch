@@ -111,6 +111,11 @@ export {
 export { Server } from "./server-factory.ts";
 export { hostedRuntime } from "./hosted-runtime.ts";
 export {
+  loadTaskModules,
+  parseTaskModuleSpecifiers,
+  type TaskModuleExports,
+} from "./task-modules-loader.ts";
+export {
   type ApplicationHandler,
   type HealthRoute,
   type ServedApplication,
