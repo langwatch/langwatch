@@ -31,6 +31,8 @@ const BANNED_MODELS = [
   "gpt-4o",
   "gpt-4.1",
 ].map((name) => ({ name, pattern: bannedPattern(name) }));
+// Every banned id contains this, so a literal without it is skipped before the six scans.
+const BANNED_PREFIX = /gpt-/i;
 
 function isGoverned(file) {
   const path = file.workspacePath;
@@ -52,6 +54,7 @@ function isGoverned(file) {
  */
 function findBannedModels(text) {
   const matches = [];
+  if (!BANNED_PREFIX.test(text)) return matches;
   for (const { name, pattern } of BANNED_MODELS) {
     for (const match of text.matchAll(pattern)) {
       matches.push({ end: match.index + match[0].length, name, start: match.index });

@@ -179,6 +179,28 @@ function heaviestExtractable(blocks, score) {
   return heaviest;
 }
 
+/** Reports the function the tally just closed, when its score is over `max`. */
+function reportTooComplex({ context, max, node, tally }) {
+  const { blocks, score: complexity } = tally;
+  if (complexity <= max) return;
+  const heaviest = heaviestExtractable(blocks, complexity);
+  // Under a third of the score, the report says "spread" rather than invent a target.
+  const concentrated = Boolean(heaviest) && heaviest.subtotal * 3 >= complexity;
+  context.report({
+    node,
+    messageId: concentrated ? "tooComplex" : "tooComplexSpread",
+    data: {
+      atLine: heaviest?.node?.loc?.start?.line ?? "?",
+      blocks: blocks.length,
+      complexity,
+      construct: heaviest ? describeConstruct(heaviest.node) : "construct",
+      max,
+      name: functionName(node) ?? "This function",
+      share: heaviest ? `${heaviest.subtotal} of ${complexity}` : "an unclear share",
+    },
+  });
+}
+
 export const cognitiveComplexityRule = defineRule({
   name: "cognitive-complexity",
   kind: "problem",
@@ -202,26 +224,7 @@ export const cognitiveComplexityRule = defineRule({
   create(context, file, { max }) {
     const tally = createTally();
 
-    const report = (node) => {
-      const { blocks, score: complexity } = tally;
-      if (complexity <= max) return;
-      const heaviest = heaviestExtractable(blocks, complexity);
-      // Under a third of the score, the report says "spread" rather than invent a target.
-      const concentrated = Boolean(heaviest) && heaviest.subtotal * 3 >= complexity;
-      context.report({
-        node,
-        messageId: concentrated ? "tooComplex" : "tooComplexSpread",
-        data: {
-          atLine: heaviest?.node?.loc?.start?.line ?? "?",
-          blocks: blocks.length,
-          complexity,
-          construct: heaviest ? describeConstruct(heaviest.node) : "construct",
-          max,
-          name: functionName(node) ?? "This function",
-          share: heaviest ? `${heaviest.subtotal} of ${complexity}` : "an unclear share",
-        },
-      });
-    };
+    const report = (node) => reportTooComplex({ context, max, node, tally });
     const enterFunction = (node) => {
       const owner = functionName(node) ?? tally.owners.at(-1);
       if (tally.top) {

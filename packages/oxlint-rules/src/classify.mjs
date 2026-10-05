@@ -45,6 +45,8 @@ const APPLICATION_ROOTS = new Set(["ui", "api", "worker", "server"]);
 const classificationCache = new Map();
 const modulePackageCache = new Map();
 const libraryRootCache = new Map();
+// Every rule classifies the same file in turn: the last answer is checked before a key is built.
+let last;
 
 /** The absolute path of the file a rule is looking at. */
 export function normalizedFilename(context) {
@@ -213,13 +215,14 @@ function sharedPackageOf(base, workspacePath) {
  * @returns {FileClassification}
  */
 export function classify(context) {
+  const given = context.physicalFilename || context.filename;
+  if (last && given === last.given && context.cwd === last.cwd) return last.classification;
   const filename = normalizedFilename(context);
   const key = `${context.cwd}|${filename}`;
   const cached = classificationCache.get(key);
-  if (cached) return cached;
-
-  const classification = classifyPath(context.cwd, filename);
-  classificationCache.set(key, classification);
+  const classification = cached ?? classifyPath(context.cwd, filename);
+  if (!cached) classificationCache.set(key, classification);
+  last = { classification, cwd: context.cwd, given };
 
   return classification;
 }
@@ -300,4 +303,5 @@ export function resetClassificationCache() {
   classificationCache.clear();
   modulePackageCache.clear();
   libraryRootCache.clear();
+  last = undefined;
 }
