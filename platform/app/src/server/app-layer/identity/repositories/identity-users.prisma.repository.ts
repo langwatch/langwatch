@@ -74,6 +74,18 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
    * and the unique index keeps enforcing it, so calling it free here would
    * hand the customer a refusal from Postgres one step later.
    */
+  async findUserIdByEmail({
+    normalizedValue,
+  }: {
+    normalizedValue: string;
+  }): Promise<string | null> {
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: normalizedValue, mode: "insensitive" } },
+      select: { id: true },
+    });
+    return user?.id ?? null;
+  }
+
   /**
    * The legacy `User.email` column, only where better-auth marked it
    * verified: the address a user not on identifiers yet has proven. An
@@ -89,18 +101,6 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
       select: { email: true, emailVerified: true },
     });
     return row?.emailVerified ? (row.email ?? null) : null;
-  }
-
-  async findUserIdByEmail({
-    normalizedValue,
-  }: {
-    normalizedValue: string;
-  }): Promise<string | null> {
-    const user = await this.prisma.user.findFirst({
-      where: { email: { equals: normalizedValue, mode: "insensitive" } },
-      select: { id: true },
-    });
-    return user?.id ?? null;
   }
 
   /**
