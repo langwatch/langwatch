@@ -1,4 +1,4 @@
-import { createTrpcRuntime } from "@langwatch/api/trpc";
+import { createTrpcRuntime, type TrpcRuntimeAuditEntry } from "@langwatch/api/trpc";
 import { InstantEvalClassifierNotConfiguredError } from "@langwatch/instant-eval-contract";
 /**
  * @vitest-environment node
@@ -55,12 +55,24 @@ function harness({ permitted = () => true }: { permitted?: (permission: string) 
     estimateExplorerEvalRun,
   });
   const permissions: string[] = [];
+  const auditRows: TrpcRuntimeAuditEntry[] = [];
   const trpc = initTRPC.context<TestContext>().create();
   const members = trpcTestMembers<TestContext>({
     permits: (permission) => {
       permissions.push(permission);
 
       return permitted(permission);
+    },
+    overrides: {
+      audit: {
+        record: async (entry) => {
+          auditRows.push(entry);
+        },
+        redact: ({ args }) => args,
+        exempt: () => false,
+        organizationOf: async ({ tier, id }) =>
+          tier === "project" && id === "project-1" ? "organization-1" : null,
+      },
     },
   });
   const router = createTrpcRuntime<TestContext>({
@@ -76,6 +88,7 @@ function harness({ permitted = () => true }: { permitted?: (permission: string) 
     getExplorerEvalAccess,
     enableExplorerEvals,
     permissions,
+    auditRows,
   };
 }
 
@@ -172,6 +185,25 @@ describe("given the opt-in procedures", () => {
         userId: "reader-1",
       });
       expect(permissions).toEqual(["organization:manage"]);
+    });
+  });
+
+  describe("when the switch is thrown", () => {
+    /** @scenario "Switching Instant Eval on is audited against the organization" */
+    it("records the audit row against the project's organization, as main does", async () => {
+      const { caller, auditRows } = harness();
+
+      await caller.enable({ projectId: "project-1" });
+
+      expect(auditRows).toEqual([
+        expect.objectContaining({
+          userId: "reader-1",
+          organizationId: "organization-1",
+          projectId: "project-1",
+          targetKind: "organization",
+          targetId: "organization-1",
+        }),
+      ]);
     });
   });
 

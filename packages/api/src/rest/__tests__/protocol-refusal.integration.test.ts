@@ -55,6 +55,12 @@ const refusal: RestProtocolRefusal = ({ failure, response }) => {
   });
 };
 
+/** Renders only a malformed body, as the legacy family keeps main's sentence for it. */
+const malformedOnly: RestProtocolRefusal = ({ failure, response }) =>
+  HandledError.isHandled(failure) && failure.code === "malformed_request"
+    ? response.write({ status: 400, mediaType: PROTOCOL, body: JSON.stringify({ legacy: true }) })
+    : response.decline();
+
 const directory = defineRestRouter(DirectoryApi)
   .withNamespace("directory")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -96,6 +102,18 @@ const directory = defineRestRouter(DirectoryApi)
 
     return response.write({ status: 204, mediaType: PROTOCOL, body: null });
   })
+
+  .post("/directory/legacy", "directoryLegacy")
+  .withInput(z.object({ userName: z.string() }))
+  .withAccess(anyAuthenticated({ reason: GATE }))
+  .withResponse("protocol", { produces: PROTOCOL, because: BECAUSE, refusal: malformedOnly })
+  .handle(async ({ app, input, response }) =>
+    response.write({
+      status: 201,
+      mediaType: PROTOCOL,
+      body: JSON.stringify(await app.create(input)),
+    }),
+  )
 
   .post("/directory/plain", "directoryPlain")
   .withInput(z.object({ userName: z.string() }))
@@ -268,5 +286,41 @@ describe("a route in the same family that declares no refusal renderer", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ code: "malformed_request" });
+  });
+});
+
+describe("a protocol route whose refusal declines what its protocol has no document for", () => {
+  /** @scenario "A protocol refusal that declines a failure leaves it to the family's boundary" */
+  it("answers a declined door refusal exactly as a route with no renderer does", async () => {
+    const { host, app } = mounted();
+    const request = (path: string) =>
+      host.request(path, {
+        method: "POST",
+        headers: { authorization: "Bearer bad", "content-type": "application/json" },
+        body: JSON.stringify({ userName: "ada" }),
+      });
+    const declinedAnswer = await request("/directory/legacy");
+    const plainAnswer = await request("/directory/plain");
+
+    expect(declinedAnswer.status).toBe(401);
+    expect(declinedAnswer.headers.get("content-type")).toBe(
+      plainAnswer.headers.get("content-type"),
+    );
+    expect(await declinedAnswer.json()).toEqual(await plainAnswer.json());
+    expect(app.create).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A protocol refusal that declines a failure leaves it to the family's boundary" */
+  it("still answers the failure it accepts in the protocol's document", async () => {
+    const { host, app } = mounted();
+    const response = await host.request("/directory/legacy", {
+      method: "POST",
+      headers: { ...AUTHORIZED, "content-type": PROTOCOL },
+      body: "{",
+    });
+
+    expect(response.status).toBe(400);
+    expect(await protocolDocument(response)).toEqual({ legacy: true });
+    expect(app.create).not.toHaveBeenCalled();
   });
 });

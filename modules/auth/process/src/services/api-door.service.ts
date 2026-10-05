@@ -13,6 +13,7 @@ import {
 } from "@langwatch/api/rest";
 import { recordAuditLogCommandSchema, type AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
 import {
   EnterprisePlanRequiredError,
   isEnterpriseTier,
@@ -35,7 +36,7 @@ export type ApiDoorPeers = Readonly<{
   /** Where a project-bound CLI access token is read back to its person and project. */
   cliProjects: ApiRestCredentialPeers["cliProjects"];
   /** The decisions both transports authorize through, and the key ceilings the key doors ask. */
-  authz: ApiDoor["authz"] & ApiRestCredentialPeers["authz"];
+  authz: ApiDoor["authz"] & ApiRestCredentialPeers["authz"] & Pick<AuthzApi, "getScope">;
   organizations: Pick<OrganizationApi, "getSettings" | "getOrganizationIdByTeamId">;
   entitlements: Pick<EntitlementApi, "getActivePlan">;
   auditLog: Pick<AuditLogApi, "record">;
@@ -206,8 +207,20 @@ export class ApiDoorService {
             organizationId: entry.organizationId,
             projectId: entry.projectId,
             error: entry.error?.toString(),
+            targetKind: entry.targetKind,
+            targetId: entry.targetId,
+            metadata: entry.metadata,
           }),
         );
+      },
+      /** The organization holding a project or team; null where authz resolves no such scope. */
+      organizationOf: async (scope) => {
+        const ids = scope.tier === "project" ? { projectId: scope.id } : { teamId: scope.id };
+        const resolved = await this.#peers.authz.getScope(ids).catch((error: unknown) => {
+          if (AuthzScopeNotFoundError.is(error)) return null;
+          throw error;
+        });
+        return resolved?.type === scope.tier ? resolved.organizationId : null;
       },
     };
   }

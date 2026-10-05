@@ -1,5 +1,11 @@
-import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  resolver,
+  type RestProtocolRefusal,
+} from "@langwatch/api/rest";
 import type { PrincipalRef } from "@langwatch/authorization";
+import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { toEpochMs } from "@langwatch/time";
@@ -283,6 +289,19 @@ async function unshareLegacyTrace({
   return answer({ status: "success" }, 200);
 }
 
+/**
+ * Main's 400 for a search body not sent as JSON, in the sentence it has always written;
+ * every other refusal (401, 403, 413) stays on the family's boundary, as before.
+ */
+const searchMalformedBody: RestProtocolRefusal = ({ failure, response }) =>
+  HandledError.isHandled(failure) && failure.code === "malformed_request"
+    ? response.write({
+        status: 400,
+        mediaType: PRODUCES_JSON,
+        body: JSON.stringify({ error: "Invalid body" }),
+      })
+    : response.decline();
+
 /** `searchLegacyTraces`: the deprecated search, behind the project door. */
 async function searchLegacyTraces({
   app,
@@ -457,11 +476,15 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   // The body is the evidence: it is read once and parsed by the family's own
   // schema, so a malformed payload earns the sentence a deployed SDK parses.
   .post("/api/trace/search", "searchLegacyTraces")
-  .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withPermission("traces:view")
   .withMiddleware(tracesRestCredential)
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: LEGACY_PROTOCOL_REASON,
+    refusal: searchMalformedBody,
+  })
   .withDocs({
     operationId: "postApiTraceSearch",
     summary: "Search traces",

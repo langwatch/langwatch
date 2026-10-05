@@ -27,6 +27,13 @@ function scopeId(value: unknown): string | undefined {
   return typeof value === "string" && value !== "" ? value : undefined;
 }
 
+/** The scope id one named input field carries, when it carries one. */
+export function auditScopeId(input: unknown, field: string): string | undefined {
+  if (typeof input !== "object" || input === null) return undefined;
+
+  return scopeId((input as Record<string, unknown>)[field]);
+}
+
 export function auditScopeIds(input: unknown): {
   organizationId: string | undefined;
   projectId: string | undefined;

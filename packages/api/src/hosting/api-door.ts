@@ -164,7 +164,19 @@ export type TrpcAuditSink = Readonly<{
     action: string;
     args?: unknown;
     error?: Error;
+    /** The resource the row is about: a declared target, else what the answer named. */
+    targetKind?: string;
+    targetId?: string;
+    /** The human behind an impersonated call, as `impersonatorId`. */
+    metadata?: Record<string, string>;
   }): Promise<void> | void;
+  /**
+   * The organization holding a project or team, null when none does. A procedure declaring
+   * `.withAudit({ target: "organization", via })` is refused at mount by a sink without it.
+   */
+  organizationOf?(
+    scope: Readonly<{ tier: "project" | "team"; id: string }>,
+  ): Promise<string | null> | string | null;
 }>;
 
 /** Where a caller's session version is read; the authz module answers it. */

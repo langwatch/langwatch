@@ -435,7 +435,18 @@ export type RestRawBodyForm = "text" | "bytes" | "stream";
  * characters a sender wrote, spacing included - so nothing parses it: the form
  * the handler reads it in, and the media type the document publishes for it.
  */
-export type RestRawBody = Readonly<{ form: RestRawBodyForm; mediaType: string }>;
+export type RestRawBody = Readonly<{
+  form: RestRawBodyForm;
+  mediaType: string;
+  /** Present exactly when the route named its media type: what any other type is refused with. */
+  mismatch?: RestMediaTypeMismatch;
+}>;
+
+/**
+ * How a raw-body route refuses a Content-Type it does not read (Alex, 2026-10-05, E9): 415, or
+ * main's 400 where the legacy family and the collector keep it.
+ */
+export type RestMediaTypeMismatch = "unsupported_media_type" | "malformed_request";
 
 /** What the handler is handed for the form it asked for. */
 export type RawBodyValue<Form extends RestRawBodyForm> = Form extends "text"

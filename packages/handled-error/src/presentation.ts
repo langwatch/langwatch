@@ -4702,6 +4702,10 @@ const presentations = {
     title: "That request couldn't be read",
     describe: () => "Check the format of what was sent, then try again.",
   },
+  unsupported_media_type: {
+    title: "That request was sent in the wrong format",
+    describe: () => "Send the body with the Content-Type this endpoint reads, then try again.",
+  },
   // ==========================================================================
   // Codes raised by the Go services (generated into `goErrorCodes` by
   // cmd/herrgen). They reach the browser whenever the control plane proxies a

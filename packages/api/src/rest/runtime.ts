@@ -29,7 +29,12 @@ import {
   type Credential,
   type Entitlements,
 } from "../access/access.ts";
-import { RateLimitedError, SurfaceUnverifiedError } from "../errors.ts";
+import {
+  MediaTypeMalformedRequestError,
+  RateLimitedError,
+  SurfaceUnverifiedError,
+  UnsupportedMediaTypeError,
+} from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
 import { registerRoutePolicy } from "../route-registry.ts";
@@ -292,7 +297,7 @@ function protocolRefusalScope(route: RestTransportRoute<unknown>): MiddlewareHan
 /**
  * The family's error boundary, except on a route whose protocol declared its own
  * refusal: there the door's, the parser's and the handler's refusals all answer in
- * that protocol's document (ARCHITECTURE.md §8).
+ * that protocol's document (ARCHITECTURE.md §8), save one the refusal declines.
  */
 function protocolRefusals(onError: ErrorHandler): ErrorHandler {
   return (error, context) => {
@@ -301,11 +306,10 @@ function protocolRefusals(onError: ErrorHandler): ErrorHandler {
 
     if (!route || !refusal) return onError(error, context);
 
-    return respondProduced({
-      context,
-      route,
-      result: refusal({ failure: error, response: refusalProducer() }),
-    });
+    const result = refusal({ failure: error, response: refusalProducer() });
+    if (isDeclined(result)) return onError(error, context);
+
+    return respondProduced({ context, route, result });
   };
 }
 
@@ -526,6 +530,7 @@ function routeStack<Api>({
     : [];
 
   const raw = route.rawBody ? [rawBodyMiddleware(route.rawBody)] : [];
+  const media = route.rawBody?.mismatch ? [mediaTypeMiddleware(route.rawBody)] : [];
 
   return [
     ...(route.response?.refusal ? [protocolRefusalScope(route)] : []),
@@ -546,9 +551,10 @@ function routeStack<Api>({
       : []),
     // The door answers before the cap drains a byte (main's order), unless it signs over the
     // body: then the capped bytes are read once, exactly as sent, and it verifies those.
+    // The media type is asked after the door either way (E9): a missing credential answers 401.
     ...(doorReadsBody(route)
-      ? [...cap, ...raw, door]
-      : [door, ...credentialFacts({ route, facts }), ...cap, ...raw]),
+      ? [...cap, ...raw, door, ...media]
+      : [door, ...credentialFacts({ route, facts }), ...media, ...cap, ...raw]),
     ...(route.multipart
       ? [
           multipartMiddleware({
@@ -672,6 +678,30 @@ function rawBodyMiddleware(rawBody: RestRawBody): MiddlewareHandler {
 }
 
 const TEXT = new TextDecoder();
+
+/** A Content-Type's essence, lower-cased and without parameters; null when none was sent. */
+function mediaTypeEssence(contentType: string | undefined): string | null {
+  const essence = contentType?.split(";")[0]?.trim().toLowerCase();
+
+  return essence ? essence : null;
+}
+
+/** Refuses a body sent under a media type its route did not declare; reads one header, no bytes. */
+function mediaTypeMiddleware(rawBody: RestRawBody): MiddlewareHandler {
+  return async (context, next) => {
+    const received = mediaTypeEssence(context.req.header("content-type"));
+
+    if (received !== rawBody.mediaType) {
+      const refusal = { received, expected: rawBody.mediaType };
+
+      throw rawBody.mismatch === "malformed_request"
+        ? new MediaTypeMalformedRequestError(refusal)
+        : new UnsupportedMediaTypeError(refusal);
+    }
+
+    await next();
+  };
+}
 
 /**
  * Every deprecated route is reported once per process, on its first call to a runtime that has

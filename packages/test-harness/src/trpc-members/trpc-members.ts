@@ -40,7 +40,12 @@ export function trpcTestMembers<TContext extends { actor: { id: string } | null 
       membershipDisabled: () => new Error("membership disabled"),
       liteMemberRestricted: () => new Error("lite member"),
     },
-    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
+    audit: {
+      record: async () => {},
+      redact: ({ args }) => args,
+      exempt: () => false,
+      organizationOf: async () => null,
+    },
     errors: {
       report: () => {},
       asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),

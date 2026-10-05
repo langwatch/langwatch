@@ -32,6 +32,11 @@ const registry = {
       "The body could not be parsed at all; check for truncated JSON, a trailing comma, or a Content-Type that does not match what was sent",
     ],
   },
+  unsupported_media_type: {
+    tips: [
+      "Send the body with the Content-Type in meta.expected; meta.received names the one that was sent",
+    ],
+  },
 
   // ---- dataset storage ----
   storage_not_writable: {

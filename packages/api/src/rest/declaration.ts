@@ -43,6 +43,7 @@ import {
   type RestMultipart,
   type RestMultipartDeclared,
   type RestMultipartFiles,
+  type RestMediaTypeMismatch,
   type RestRateLimitPolicy,
   type RestRawAnswerDeclared,
   type RestRawBody,
@@ -698,14 +699,14 @@ class RouteBuilder<Api, S extends RouteShape> {
   }
 
   /**
-   * The body is the evidence, so nothing parses it: the handler is handed the
-   * exact characters or bytes it was sent, read once, beside its validated path
-   * and query input. The declared body cap still runs first.
+   * The body is the evidence, so nothing parses it: the handler is handed the exact characters
+   * or bytes it was sent, read once. A named `mediaType` is also enforced after the door: any
+   * other Content-Type is refused with `mismatch` (415 unless the route keeps main's 400).
    */
   withRawBody<Form extends RestRawBodyForm>(
     this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
     form: Form,
-    options: Readonly<{ mediaType?: string }> = {},
+    options: Readonly<{ mediaType?: string; mismatch?: RestMediaTypeMismatch }> = {},
   ): RouteBuilder<
     Api,
     With<S, { method: Exclude<HttpMethod, "get" | "head">; body: RestRawBodyDeclared<Form> }>
@@ -724,7 +725,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       operation: this.operation,
       state: {
         ...this.state,
-        rawBody: { form, mediaType: options.mediaType ?? DEFAULT_RAW_MEDIA_TYPE[form] },
+        rawBody: rawBodyOf({ operation: this.operation, form, options }),
       },
     });
   }
@@ -1700,6 +1701,45 @@ function assertSourceUnset(source: string, schema: unknown): void {
       `REST route already declared with${source[0]!.toUpperCase()}${source.slice(1)}()`,
     );
   }
+}
+
+/** A media type the check can compare a Content-Type against: one essence, no parameters. */
+const MEDIA_TYPE_ESSENCE = /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/;
+
+/**
+ * A raw body as declared: a named media type is enforced, its form's default only published.
+ * A refusal for a type never named, or a type no Content-Type could equal, refuses to build.
+ */
+function rawBodyOf({
+  operation,
+  form,
+  options,
+}: {
+  operation: string;
+  form: RestRawBodyForm;
+  options: Readonly<{ mediaType?: string; mismatch?: RestMediaTypeMismatch }>;
+}): RestRawBody {
+  const { mediaType, mismatch } = options;
+
+  if (mediaType === undefined) {
+    if (mismatch !== undefined) {
+      throw new Error(
+        `REST ${operation} declares how it refuses another media type, and names none it reads`,
+      );
+    }
+
+    return { form, mediaType: DEFAULT_RAW_MEDIA_TYPE[form] };
+  }
+
+  const essence = mediaType.toLowerCase();
+
+  if (!MEDIA_TYPE_ESSENCE.test(essence)) {
+    throw new Error(
+      `REST ${operation} reads its raw body as "${mediaType}", which names no single media type`,
+    );
+  }
+
+  return { form, mediaType: essence, mismatch: mismatch ?? "unsupported_media_type" };
 }
 
 function assertBodyMethod(method: HttpMethod, path: string): void {

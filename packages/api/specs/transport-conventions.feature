@@ -69,6 +69,13 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Then it answers the family's canonical envelope exactly as before
 
     @integration
+    Scenario: A protocol refusal that declines a failure leaves it to the family's boundary
+      Given a protocol route whose refusal renders only the failures its protocol has a document for
+      When the door refuses the caller with a failure the refusal declines
+      Then it answers exactly what a route with no refusal renderer answers
+      And a failure the refusal does not decline still answers in the protocol's document
+
+    @integration
     Scenario: A protocol answer with no content names no media type
       Given a protocol route whose handler writes a 204 with no body
       When it answers
@@ -210,3 +217,32 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Given a family whose own error handler answers anything unhandled as a 500
       When its service's store could not get a Postgres connection in time
       Then the family's handler is handed the handled 503, and the answer is a 503 with Retry-After
+
+  Rule: A raw body is read only under the media type its route declared (Alex, 2026-10-05, E9)
+
+    @integration
+    Scenario: A raw body sent under another media type is refused with 415 before the handler
+      Given a route that reads its raw body and declares the media type it reads
+      When it is called with a body under another media type, or with no Content-Type at all
+      Then it is refused with 415 and the code unsupported_media_type, and the handler is not reached
+      And a body under the declared type, with parameters or in another letter case, reaches the handler as sent
+
+    @integration
+    Scenario: A route that keeps main's 400 declares it, and its protocol renders it
+      Given a route that declares an unmatched media type a malformed request, as the legacy family and the collector do
+      When it is called with a body under another media type
+      Then it is refused with 400 and the code malformed_request, and the handler is not reached
+      And a protocol route that declares its own refusal document renders that 400 in it
+
+    @integration
+    Scenario: A refused credential is answered before the media type is checked
+      Given a raw-body route behind a credential door that declares its media type
+      When a caller presents no credential and a body under another media type
+      Then it is refused with 401, never 415 or 400, and the handler is not reached
+
+    @integration
+    Scenario: A raw body route that names no media type of its own is not checked
+      Given a raw-body route that names no media type, so publishes its form's default
+      When it is called with a body under any media type
+      Then the handler is handed the body as sent
+      And a route that declares a refusal for a media type it never named, or names a media type with parameters or a wildcard, refuses to build

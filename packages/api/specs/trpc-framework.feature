@@ -181,3 +181,11 @@ Feature: tRPC framework boundary
     Given a procedure that declares no permission and no .input()
     When it is called, so tRPC hands its check an undefined input rather than an object
     Then the check passes the call on to the handler instead of throwing
+
+  @unit
+  Scenario: A mutation declared as audited against its organization records the organization
+    Given a mutation whose input names a project, declared as audited against the organization via projectId
+    When an authenticated caller's call finishes, answered or refused by its handler
+    Then the row its audit trail writes names the organization that holds the project as its organization and its target, beside the project
+    And a declaration naming a field its input does not carry, made on a query, or made twice, is refused where it is written
+    And a process that cannot say which organization holds a project is refused at the mount, naming the procedure

@@ -364,6 +364,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
         record: (entry) => this.#record(entry),
         redact: ({ procedure, args }) => redactAuditArgs({ input: args, action: procedure }),
         exempt: (procedure) => isAuditLogExempt(procedure),
+        ...this.#organizationOf(options.audit),
       },
       errors: {
         report: (failure) => this.#logger.error({ error: failure }, "tRPC call failed"),
@@ -374,17 +375,24 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   }
 
   /**
+   * Where a declared audit target is resolved. A process with no sink writes no row, so it
+   * resolves nothing; a sink that cannot answer leaves the port absent and the mount refuses.
+   */
+  #organizationOf(
+    audit: TrpcAuditSink | undefined,
+  ): Pick<TrpcRuntimeMembers<TrpcRequestContext>["audit"], "organizationOf"> {
+    if (!audit) return { organizationOf: async () => null };
+
+    const organizationOf = audit.organizationOf?.bind(audit);
+
+    return organizationOf ? { organizationOf: async (scope) => organizationOf(scope) } : {};
+  }
+
+  /**
    * One mutation on the deployment's trail. A build that installed no audit
    * sink says so once per call rather than dropping the row silently.
    */
-  async #record(entry: {
-    userId: string;
-    organizationId?: string;
-    projectId?: string;
-    action: string;
-    args?: unknown;
-    error?: Error;
-  }): Promise<void> {
+  async #record(entry: Parameters<TrpcAuditSink["record"]>[0]): Promise<void> {
     const audit = this.#options.audit;
 
     if (!audit) {
@@ -407,6 +415,9 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       ...(organizationId === void 0 ? {} : { organizationId }),
       ...(projectId === void 0 ? {} : { projectId }),
       ...(entry.error ? { error: entry.error } : {}),
+      ...(entry.targetKind === void 0 ? {} : { targetKind: entry.targetKind }),
+      ...(entry.targetId === void 0 ? {} : { targetId: entry.targetId }),
+      ...(entry.metadata === void 0 ? {} : { metadata: entry.metadata }),
     });
   }
 }

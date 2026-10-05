@@ -795,6 +795,7 @@ export const APP_ERROR_CODES = [
   "unauthorized",
   "unsubscribe_link_invalid",
   "unsubscribe_rate_limited",
+  "unsupported_media_type",
   "usage_report_failed",
   "user_email_ambiguous",
   "user_last_platform_operator",

@@ -3,6 +3,7 @@ import {
   HandledError,
   isZodLikeError,
   remediation,
+  remediationFor,
   serializedHandledErrorSchema,
   ValidationError,
   type ZodLikeError,
@@ -118,6 +119,45 @@ export class PayloadTooLargeError extends HandledError {
     });
 
     this.name = "PayloadTooLargeError";
+  }
+}
+
+/** What a raw-body route that declared its media type was sent under, against what it reads. */
+type MediaTypeRefusal = Readonly<{ received: string | null; expected: string }>;
+
+function mediaTypeMeta({ received, expected }: MediaTypeRefusal): Record<string, string> {
+  return received === null ? { expected } : { received, expected };
+}
+
+/** A raw body sent under a media type its route does not read (Alex, 2026-10-05, E9). */
+export class UnsupportedMediaTypeError extends HandledError {
+  constructor(refusal: MediaTypeRefusal) {
+    super(
+      "unsupported_media_type",
+      `This endpoint reads ${refusal.expected}, and the body was sent as ${refusal.received ?? "no media type"}`,
+      {
+        httpStatus: 415,
+        fault: "customer",
+        meta: mediaTypeMeta(refusal),
+        ...remediationFor("unsupported_media_type"),
+      },
+    );
+
+    this.name = "UnsupportedMediaTypeError";
+  }
+}
+
+/** The same refusal where the route keeps main's 400: the legacy family and the collector. */
+export class MediaTypeMalformedRequestError extends HandledError {
+  constructor(refusal: MediaTypeRefusal) {
+    super("malformed_request", `The request body could not be read as ${refusal.expected}`, {
+      httpStatus: 400,
+      fault: "customer",
+      meta: mediaTypeMeta(refusal),
+      ...remediation("malformed_request"),
+    });
+
+    this.name = "MediaTypeMalformedRequestError";
   }
 }
 

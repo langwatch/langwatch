@@ -44,6 +44,8 @@ export const tracesInstantEvalTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("enable")
+  // Main's row names the organization whose consent this is, not the project.
+  .withAudit({ target: "organization", via: "projectId" })
   .withPermission({ kind: "permission", permission: "organization:manage", via: "projectId" })
   .handle(({ app, input, actor }) =>
     app.enableExplorerEvals({ projectId: input.projectId, userId: actor.id }),

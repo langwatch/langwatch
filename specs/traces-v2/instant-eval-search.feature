@@ -136,6 +136,12 @@ Feature: Instant Evals inside the Trace Explorer
       And an eval chip of the query is not part of what the run judges
       And a request whose chips name an origin is left as asked
 
+    @unit
+    Scenario: Switching Instant Eval on is audited against the organization
+      Given an organization manager on a project
+      When they switch Instant Eval on through traces.instantEval.enable
+      Then the audit row names the project's organization as its scope and its target
+
   Rule: An eval chip filters by a run's verdicts
 
     @unit

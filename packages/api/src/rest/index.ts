@@ -122,6 +122,7 @@ export {
   type RestRawBody,
   type RestRawBodyDeclared,
   type RestRawBodyForm,
+  type RestMediaTypeMismatch,
   type RestRawBodyOut,
   type RestRawResponse,
   type RestRawResult,

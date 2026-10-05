@@ -8,7 +8,8 @@ import type {
   ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
 import type { RestIdentity } from "@langwatch/api/hosting";
-import { describe, expect, it } from "vitest";
+import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
+import { describe, expect, it, vi } from "vitest";
 
 import { ApiDoorService, type ApiDoorPeers } from "../api-door.service.ts";
 
@@ -79,6 +80,7 @@ const peers: ApiDoorPeers = {
     getProjectAnyDecision: refuseEverything,
     checkScopeLineage: refuseEverything,
     getSessionVersion: refuseEverything,
+    getScope: refuseEverything,
   },
   organizations: {
     getSettings: ({ organizationId }) =>
@@ -188,6 +190,81 @@ describe("the key doors' actor", () => {
       expect(
         await actorThrough(identities.organization, { authorization: "Bearer sk-lw-org-unowned" }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("the tRPC audit sink", () => {
+  function auditedDoor() {
+    const record = vi.fn<ApiDoorPeers["auditLog"]["record"]>(async () => ({
+      id: "audit-1",
+      occurredAt: 0,
+    }));
+    const getScope: AuthzApi["getScope"] = async (ids) => {
+      if (ids.projectId === "project-1") {
+        return { type: "project", id: "project-1", teamId: "team-1", organizationId: "org-1" };
+      }
+      if (ids.teamId === "team-1") return { type: "team", id: "team-1", organizationId: "org-1" };
+      throw new AuthzScopeNotFoundError(ids);
+    };
+    const { audit } = ApiDoorService.create({
+      ...peers,
+      authz: { ...peers.authz, getScope },
+      auditLog: { record },
+    }).door();
+
+    return { trpc: audit.trpc, record };
+  }
+
+  describe("given a project a row is audited against", () => {
+    it("names the project's organization", async () => {
+      const { trpc } = auditedDoor();
+
+      await expect(trpc.organizationOf?.({ tier: "project", id: "project-1" })).resolves.toBe(
+        "org-1",
+      );
+    });
+
+    it("names no organization for a project it does not hold, rather than failing the call", async () => {
+      const { trpc } = auditedDoor();
+
+      await expect(trpc.organizationOf?.({ tier: "project", id: "project-gone" })).resolves.toBe(
+        null,
+      );
+    });
+  });
+
+  describe("given a team a row is audited against", () => {
+    it("names the team's organization", async () => {
+      const { trpc } = auditedDoor();
+
+      await expect(trpc.organizationOf?.({ tier: "team", id: "team-1" })).resolves.toBe("org-1");
+    });
+  });
+
+  describe("given a row that names its target", () => {
+    it("records the target and metadata beside the scope", async () => {
+      const { trpc, record } = auditedDoor();
+
+      await trpc.record({
+        userId: "user-1",
+        action: "traces.instantEval.enable",
+        organizationId: "org-1",
+        projectId: "project-1",
+        targetKind: "organization",
+        targetId: "org-1",
+        metadata: { impersonatorId: "admin-1" },
+      });
+
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org-1",
+          projectId: "project-1",
+          targetKind: "organization",
+          targetId: "org-1",
+          metadata: { impersonatorId: "admin-1" },
+        }),
+      );
     });
   });
 });

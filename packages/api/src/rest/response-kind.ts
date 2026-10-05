@@ -136,17 +136,20 @@ export type RestProtocolProducer<Produces extends string | readonly string[] = s
 
 /**
  * How a foreign protocol answers a refusal: every failure its route raises,
- * the door's and the parser's included, written in the protocol's own document.
+ * the door's and the parser's included, written in the protocol's own document,
+ * or declined to the family's boundary where the protocol has no document for it.
  */
 export type RestProtocolRefusal = (
   refused: Readonly<{ failure: Error; response: RestRefusalProducer }>,
-) => RestAnswer<"protocol">;
+) => RestAnswer<"protocol"> | Declined;
 
 /** What a refusal writes: a failure carries its status as a plain number, not a declared one. */
 export type RestRefusalProducer = Readonly<{
   write(
     options: Readonly<{ status: number; mediaType: string; body: string }>,
   ): RestAnswer<"protocol">;
+  /** This protocol has no document for the failure; the family's boundary renders it. */
+  decline(): Declined;
 }>;
 
 /** What a route that answers with someone else's response hands over. */
@@ -398,6 +401,7 @@ const REFUSAL_PRODUCER: RestRefusalProducer = Object.freeze({
       body: options.body,
     });
   },
+  decline: declined,
 });
 
 /** The producer a protocol route's refusal writes through. */
