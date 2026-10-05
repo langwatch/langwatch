@@ -83,4 +83,25 @@ describe("Analytics timeseries route table", () => {
       ).toBe("evaluation_runs");
     });
   });
+
+  describe("given a query leaving out trace origins", () => {
+    // The rollup is keyed by bucket and holds no origin; the per-trace slim table keeps each
+    // trace's Origin, which its builder filters on (slim-rollup-builders.unit.test.ts).
+    /** @scenario Leaving out an origin stays accurate on optimized analytics storage */
+    it("routes a query the rollup could serve to the per-trace slim table instead", () => {
+      const series = [{ metric: "performance.total_cost" as const, aggregation: "sum" as const }];
+
+      expect(pickAnalyticsTable({ series })).toBe("trace_analytics_rollup");
+      expect(pickAnalyticsTable({ series, excludeOrigins: ["langy"] })).toBe("trace_analytics");
+    });
+
+    it("keeps the rollup when the list of origins to leave out is empty", () => {
+      expect(
+        pickAnalyticsTable({
+          series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+          excludeOrigins: [],
+        }),
+      ).toBe("trace_analytics_rollup");
+    });
+  });
 });

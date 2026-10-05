@@ -10,7 +10,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../../testing.tsx";
 
-const { reads } = vi.hoisted(() => ({ reads: { getById: 0 } }));
+const { reads, stored } = vi.hoisted(() => ({
+  reads: { getById: 0 },
+  stored: { current: undefined as Record<string, unknown> | undefined },
+}));
 
 vi.mock("../../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
@@ -21,7 +24,11 @@ vi.mock("../../../../behavior/analytics-api.ts", () => ({
       getById: {
         useQuery: (_input: unknown, options: { enabled: boolean }) => {
           if (options.enabled) reads.getById += 1;
-          return { data: undefined, isLoading: false, error: null };
+          return {
+            data: options.enabled ? stored.current : undefined,
+            isLoading: false,
+            error: null,
+          };
         },
       },
     },
@@ -53,10 +60,12 @@ async function loadScreen(page: string): Promise<ComponentType> {
 afterEach(() => {
   cleanup();
   reads.getById = 0;
+  stored.current = undefined;
 });
 
 describe("given the custom graph address with no graph id", () => {
   describe("when the browser opens it", () => {
+    /** @scenario "The chart builder is told which of its two addresses it is" */
     it("renders the chart builder for a new graph without reading a stored one", async () => {
       const NewGraphScreen = await loadScreen("pages/[project]/analytics/custom/index");
 
@@ -69,13 +78,31 @@ describe("given the custom graph address with no graph id", () => {
       expect(await screen.findByRole("button", { name: "Add Series" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
       expect(reads.getById).toBe(0);
+      expect(screen.getByTestId("analytics-graph-title")).not.toHaveValue("Latency by model");
     });
   });
 });
 
 describe("given the custom graph address naming a graph", () => {
   describe("when the browser opens it", () => {
-    it("reads that stored graph", async () => {
+    /** @scenario "The chart builder is told which of its two addresses it is" */
+    it("opens the builder on that stored graph", async () => {
+      stored.current = {
+        name: "Latency by model",
+        graph: {
+          graphType: "line",
+          includePrevious: false,
+          timeScale: 1,
+          series: [
+            {
+              name: "Completion time p95",
+              colorSet: "blueTones",
+              metric: "performance.completion_time",
+              aggregation: "p95",
+            },
+          ],
+        },
+      };
       const EditGraphScreen = await loadScreen("pages/[project]/analytics/custom/[id]");
 
       render(
@@ -87,6 +114,8 @@ describe("given the custom graph address naming a graph", () => {
       );
 
       expect(reads.getById).toBeGreaterThan(0);
+      expect(await screen.findByDisplayValue("Latency by model")).toBeInTheDocument();
+      expect(await screen.findByDisplayValue("Completion time p95")).toBeInTheDocument();
     });
   });
 });
