@@ -19,7 +19,8 @@ export {
   codexAuxiliarySessionFacts,
   HELPER_THREAD_ID_ATTR,
   isCodexTemporaryStructuredRequestSpan,
-  queuedThreadIdOf,
+  queuedThreadOf,
+  type QueuedThread,
   REQUEST_QUEUE_SPAN_NAME,
 } from "./telemetry/codex-helper-thread.ts";
 export {

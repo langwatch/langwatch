@@ -252,3 +252,31 @@ describe("given a span whose time cannot be stored", () => {
     });
   });
 });
+
+/** Main's `c.json({ message: "Invalid body, expecting json" }, 400)`, byte for byte. */
+const MAIN_NOT_JSON_BODY = '{"message":"Invalid body, expecting json"}';
+
+function postRaw(raw: string, contentType: string) {
+  return collector.request("/api/collector", {
+    method: "POST",
+    headers: { "X-Auth-Token": "test-token", "Content-Type": contentType },
+    body: raw,
+  });
+}
+
+describe("given a body main refused as not json", () => {
+  describe.each([
+    { case: "sent as text/plain", raw: "{}", contentType: "text/plain" },
+    { case: "that does not parse", raw: "{not json", contentType: "application/json" },
+    { case: "that is a json array", raw: "[]", contentType: "application/json" },
+    { case: "that is json null", raw: "null", contentType: "application/json" },
+  ])("when the body is $case", ({ raw, contentType }) => {
+    it("answers main's 400 body byte for byte", async () => {
+      const response = await postRaw(raw, contentType);
+
+      expect(response.status).toBe(400);
+      expect(response.headers.get("content-type")).toMatch(/^application\/json/);
+      await expect(response.text()).resolves.toBe(MAIN_NOT_JSON_BODY);
+    });
+  });
+});

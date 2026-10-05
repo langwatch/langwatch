@@ -2,7 +2,7 @@ import {
   HELPER_THREAD_ID_ATTR,
   isCodexScope,
   isCodexTemporaryStructuredRequestSpan,
-  queuedThreadIdOf,
+  queuedThreadOf,
   REQUEST_QUEUE_SPAN_NAME,
 } from "@langwatch/coding-agent-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
@@ -65,8 +65,8 @@ function addQueueChildMarker({
   if (span.name !== REQUEST_QUEUE_SPAN_NAME || !span.parentSpanId) return;
   const parentId = OtlpTraceRequestService.normalizeOtlpId(span.parentSpanId);
   if (!requestSpanIds.has(parentId)) return;
-  const threadId = queuedThreadIdOf({ key: stringAttributes(span).key });
-  if (threadId) markers.set(parentId, threadId);
+  const queued = queuedThreadOf({ key: stringAttributes(span).key });
+  if (queued.kind === "named") markers.set(parentId, queued.threadId);
 }
 
 /** The request span with its helper's thread id, the stamp that admits it past the noise filter. */

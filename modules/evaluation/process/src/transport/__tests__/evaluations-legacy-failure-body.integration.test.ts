@@ -43,15 +43,18 @@ function mount(logBatchEvaluation: EvaluationApi["logBatchEvaluation"]) {
     onError: (error, context) => context.json({ error: String(error) }, 500),
   });
 
-  return (body: unknown) =>
+  return (body: unknown, sent: { contentType?: string; raw?: string } = {}) =>
     app.fetch(
       new Request("http://api.test/api/evaluations/batch/log_results", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        headers: { "content-type": sent.contentType ?? "application/json" },
+        body: sent.raw ?? JSON.stringify(body),
       }),
     );
 }
+
+/** Main's `c.json({ message: "Invalid body, expecting json" }, 400)`, byte for byte. */
+const MAIN_NOT_JSON_BODY = '{"message":"Invalid body, expecting json"}';
 
 describe("given the legacy evaluation batch log", () => {
   describe("when the write fails with a driver diagnostic", () => {
@@ -121,6 +124,29 @@ describe("given the legacy evaluation batch log", () => {
       await expect(response.json()).resolves.toEqual({ message: "ok" });
       expect(logged).toHaveLength(1);
       expect((logged[0] as { projectId: string }).projectId).toBe(PROJECT_ID);
+    });
+  });
+
+  describe("when the body is not sent as json", () => {
+    it("answers main's 400 body byte for byte", async () => {
+      const post = mount(() => Promise.reject(new Error("the write must not be reached")));
+
+      const response = await post(undefined, { contentType: "text/plain", raw: "{}" });
+
+      expect(response.status).toBe(400);
+      expect(response.headers.get("content-type")).toMatch(/^application\/json/);
+      await expect(response.text()).resolves.toBe(MAIN_NOT_JSON_BODY);
+    });
+  });
+
+  describe("when the body does not parse as json", () => {
+    it("answers main's 400 body byte for byte", async () => {
+      const post = mount(() => Promise.reject(new Error("the write must not be reached")));
+
+      const response = await post(undefined, { raw: "{not json" });
+
+      expect(response.status).toBe(400);
+      await expect(response.text()).resolves.toBe(MAIN_NOT_JSON_BODY);
     });
   });
 });
