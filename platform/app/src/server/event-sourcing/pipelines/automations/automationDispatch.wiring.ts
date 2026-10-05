@@ -32,7 +32,9 @@ import {
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
 import { defaultRunawayContainmentDeps } from "~/server/app-layer/automations/runaway-containment.deps";
 import { handlePersistCapBreach } from "~/server/app-layer/automations/runaway-containment.service";
+import { createSlackDestinationResolver } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import { createTriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.wiring";
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
@@ -152,6 +154,14 @@ export function buildAutomationDispatchPorts({
   // prisma — same query shape, service/repository layering (no direct
   // prisma in composition-root closures).
   const customGraphs = AutomationCustomGraphService.create(prisma);
+  // ADR-093 §5a: one resolver in front of every Slack dispatch, built once so
+  // the digest path and the graph-alert path can never disagree about where a
+  // delivery goes.
+  const resolveSlackDestination = createSlackDestinationResolver({ prisma });
+  // What each check observed, so the automation's view can explain a quiet
+  // alert. The service swallows its own write failures — an alert must never
+  // go unsent because its observation could not be recorded.
+  const latestEvaluations = createTriggerLatestEvaluationService(prisma);
   const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
     loadTrigger: async ({ triggerId, projectId }) =>
       triggers.getById({ triggerId, projectId }),
@@ -163,6 +173,8 @@ export function buildAutomationDispatchPorts({
     triggerSent: graphTriggerSentRepo,
     updateLastRunAt: async ({ triggerId, projectId }) =>
       triggers.updateLastRunAt(triggerId, projectId),
+    recordEvaluation: async (input) => latestEvaluations.record(input),
+    resolveSlackDestination,
     notifier: {
       dispatch: async (input) =>
         dispatchGraphAlertAction({
@@ -287,6 +299,7 @@ export function buildAutomationDispatchPorts({
       await createManyDatasetRecords(params);
     },
     recordWebhookDelivery,
+    resolveSlackDestination,
     resolvePersistDailyCap: (projectId) => resolvePersistDailyCap(projectId),
     consumePersistCapSlot: (params) =>
       consumePersistCapSlot({ ...params, redis }),

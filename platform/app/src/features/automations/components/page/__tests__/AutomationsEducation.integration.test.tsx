@@ -27,14 +27,14 @@ describe("UseCaseStrip", () => {
 
         expect(onOpen).toHaveBeenCalledWith({
           initialSource: "customGraph",
-          initialName: "Error spike alert",
+          initialName: "Error spike",
           initialAction: "SEND_SLACK_MESSAGE",
         });
       });
     });
 
     describe("when the traffic-drop card is clicked", () => {
-      it("opens the drawer prefilled as an email alert", () => {
+      it("opens the drawer prefilled to watch a graph and email", () => {
         const onOpen = vi.fn();
         render(<UseCaseStrip kind="alert" onOpen={onOpen} />, {
           wrapper: Wrapper,
@@ -44,7 +44,7 @@ describe("UseCaseStrip", () => {
 
         expect(onOpen).toHaveBeenCalledWith({
           initialSource: "customGraph",
-          initialName: "Traffic drop alert",
+          initialName: "Traffic drop",
           initialAction: "SEND_EMAIL",
         });
       });

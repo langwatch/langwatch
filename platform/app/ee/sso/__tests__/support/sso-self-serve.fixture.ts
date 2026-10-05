@@ -12,6 +12,7 @@ import type {
   SsoCredentialKind,
   SsoCredentialStore,
 } from "../../sso-credential-store";
+import type { SsoIssuerDiscoveryPort } from "../../sso-idp-registration";
 import {
   type SsoLegacyIdentityRetirementPort,
   type SsoMigrationFinalizationReadPort,
@@ -38,6 +39,10 @@ import {
   StubMembers,
   StubTestSignIns,
 } from "./in-memory-self-serve";
+
+/** The licence key the fixture's installation holds. Only its hash may
+ *  reach a fact. */
+export const SELF_SERVE_FIXTURE_LICENSE_KEY = "LW-LICENSE-ACME-FIXTURE";
 
 export class StubContext implements SsoSelfServeContextPort {
   constructor(private context: SsoSelfServeContext) {}
@@ -108,6 +113,10 @@ export class InMemoryCredentials implements SsoCredentialStore {
     return ref;
   }
 
+  get count(): number {
+    return this.held.size;
+  }
+
   async read({
     organizationId,
     ref,
@@ -130,6 +139,9 @@ interface SelfServeFixtureOptions {
   migrations?: SsoMigrationProgressReadPort;
   migrationEvidence?: SsoMigrationFinalizationReadPort;
   legacyRetirement?: SsoLegacyIdentityRetirementPort;
+  /** What an issuer's discovery document answers. Reachable and naming no
+   *  issuer unless a scenario says otherwise. */
+  discovery?: SsoIssuerDiscoveryPort;
 }
 
 /** Real services and guards over the production reducer, with I/O held in memory. */
@@ -145,6 +157,7 @@ export function createSsoSelfServeFixture(options: SelfServeFixtureOptions) {
   const testSignIns = new StubTestSignIns();
   const breakGlassReads = new StubBreakGlassReads();
   const members = options.members ?? new StubMembers();
+  const credentials = new InMemoryCredentials();
   const committed: {
     command: SsoConnectionCommand;
     facts: SsoConnectionFactInput[];
@@ -199,10 +212,15 @@ export function createSsoSelfServeFixture(options: SelfServeFixtureOptions) {
     context,
     proofs,
     files,
-    credentials: new InMemoryCredentials(),
-    discovery: { discover: async () => ({ reachable: true }) },
+    credentials,
+    discovery: options.discovery ?? {
+      discover: async () => ({ reachable: true }),
+    },
     baseUrl: "https://app.langwatch.test",
     testSignIns,
+    licenseProof: {
+      currentLicenseKey: async () => SELF_SERVE_FIXTURE_LICENSE_KEY,
+    },
     breakGlass: breakGlassReads,
     members,
     migrations: options.migrations ?? { getProgress: async () => null },
@@ -224,5 +242,6 @@ export function createSsoSelfServeFixture(options: SelfServeFixtureOptions) {
     members,
     committed,
     ledger,
+    credentials,
   };
 }

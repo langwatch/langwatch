@@ -48,6 +48,7 @@ const venvsFn = vi.fn(async () => {
 });
 const nodeDepsFn = vi.fn(async () => {
 	callLog.push("node-deps");
+	return "/tmp/.langwatch-test/app/langwatch";
 });
 const ensureAppDirFn = vi.fn(async () => {
 	callLog.push("app-dir");

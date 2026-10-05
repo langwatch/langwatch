@@ -8,6 +8,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 /** One run parameter an agent declares, as the platform lists it. */
 export interface AgentParameterSpec {
@@ -105,6 +106,7 @@ export class AgentsApiService {
     const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: extractStatusFromResponse(error),
     } });
+    throwIfHandledError({ operation, error, message });
     throw new AgentsApiError(message, operation, error);
   }
 

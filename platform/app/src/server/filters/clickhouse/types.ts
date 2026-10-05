@@ -72,6 +72,14 @@ export type FilterConditionBuilder = (
   options?: FilterConditionOptions,
 ) => FilterConditionResult;
 
+/** Input of the shared custom metadata condition builders. */
+export type CustomMetadataConditionInput = {
+  values: string[];
+  paramId: string;
+  /** Alias of the row carrying `Attributes` in the caller's query. */
+  alias: string;
+};
+
 /**
  * Cross-cutting options threaded to every condition builder.
  */

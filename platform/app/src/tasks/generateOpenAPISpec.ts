@@ -134,6 +134,7 @@ const APP_DERIVED_PREFIXES = [
   "/api/scenario-events",
   "/api/scenarios",
   "/api/secrets",
+  "/api/slack-connections",
   "/api/simulation-runs",
   "/api/suites",
   "/api/v1/instant-evals",
@@ -175,6 +176,7 @@ import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
+import { app as slackConnectionsApp } from "../app/api/slack-connections/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
@@ -301,6 +303,8 @@ export default async function execute() {
   const tracesSpec = await generateSpecs(tracesApp);
   console.log("Building triggers spec...");
   const triggersSpec = await generateSpecs(triggersApp);
+  console.log("Building Slack connections spec...");
+  const slackConnectionsSpec = await generateSpecs(slackConnectionsApp);
   console.log("Building workflows spec...");
   const workflowsSpec = await generateSpecs(workflowsApp);
   const webhooksSpec = await generateSpecs(webhooksApp);
@@ -355,6 +359,7 @@ export default async function execute() {
       groupsSpec,
       tracesSpec,
       triggersSpec,
+      slackConnectionsSpec,
       webhooksSpec,
       gatewaySpendSpec,
       workflowsSpec,

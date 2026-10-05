@@ -2,7 +2,9 @@ import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   DEFAULT_DOMAIN_JOIN_SETTING,
   type DomainJoinSetting,
+  type JoinerRole,
   JoinRequestNotFoundError,
+  readJoinerRole,
 } from "@langwatch/identity";
 import { newJoinRequestCommandId } from "@langwatch/identity-server";
 import { generate } from "@langwatch/ksuid";
@@ -18,6 +20,10 @@ import {
 import { AuthzGrantNotConfirmedError } from "~/server/app-layer/authz/errors";
 import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { liveGrants } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  DEVELOPER_ADMISSION_AUDIT_ACTION,
+  type DeveloperAdmissionVia,
+} from "~/server/app-layer/identity/admission-audit";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
   attachMembershipGrantIntentSchema,
@@ -100,12 +106,46 @@ export class PrismaJoinMembership implements JoinMembershipPort {
   }): Promise<void> {
     const bindingId = generate(KSUID_RESOURCES.ROLE_BINDING).toString();
     const now = Date.now();
+    // The seat the organisation hands to people who join without an
+    // invitation (ADR-143). Read before the transaction: it is configuration,
+    // not part of the admission's own consistency.
+    const joinerRole = readJoinerRole(
+      (
+        await this.prisma.organization.findUnique({
+          where: { id: organizationId },
+          select: { joinerRole: true },
+        })
+      )?.joinerRole,
+    );
     const intentPayload = await this.prisma.$transaction(async (tx) => {
       const membership = await tx.organizationUser.createMany({
-        data: [{ userId, organizationId, role: OrganizationUserRole.MEMBER }],
+        data: [{ userId, organizationId, role: joinerRole }],
         skipDuplicates: true,
       });
       if (membership.count !== 1) return void 0;
+      // A Developer holds their personal team and nothing shared, so the
+      // organisation-wide grant a Full member receives below is never
+      // written for one; the membership row alone is the admission. The
+      // grant is also what reaches the audit page for a Full member, so the
+      // Developer admission writes its own row there instead.
+      if (joinerRole === OrganizationUserRole.DEVELOPER) {
+        await tx.auditLog.create({
+          data: {
+            action: DEVELOPER_ADMISSION_AUDIT_ACTION,
+            userId,
+            actorUserId: approvedByUserId,
+            organizationId,
+            metadata: {
+              seat: OrganizationUserRole.DEVELOPER,
+              joinRequestId,
+              via: (approvedByUserId
+                ? "join-request-approved"
+                : "domain-join") satisfies DeveloperAdmissionVia,
+            },
+          },
+        });
+        return void 0;
+      }
 
       const insertedMembership = await tx.organizationUser.findUniqueOrThrow({
         where: { userId_organizationId: { userId, organizationId } },
@@ -204,16 +244,18 @@ export class PrismaJoinSettings implements JoinSettingPort {
   async read({ organizationId }: { organizationId: string }): Promise<{
     domainJoin: DomainJoinSetting;
     joinDomains: string[];
+    joinerRole: JoinerRole;
   }> {
     const row = await this.prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { domainJoin: true, joinDomains: true },
+      select: { domainJoin: true, joinDomains: true, joinerRole: true },
     });
     return {
       domainJoin: row
         ? readDomainJoin(row.domainJoin)
         : DEFAULT_DOMAIN_JOIN_SETTING,
       joinDomains: row?.joinDomains ?? [],
+      joinerRole: readJoinerRole(row?.joinerRole),
     };
   }
 
@@ -221,14 +263,16 @@ export class PrismaJoinSettings implements JoinSettingPort {
     organizationId,
     domainJoin,
     joinDomains,
+    joinerRole,
   }: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     joinDomains: string[];
+    joinerRole: JoinerRole;
   }): Promise<void> {
     await this.prisma.organization.update({
       where: { id: organizationId },
-      data: { domainJoin, joinDomains },
+      data: { domainJoin, joinDomains, joinerRole },
     });
   }
 }
@@ -515,8 +559,14 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
         disabledAt: null,
         user: { deactivatedAt: null },
       },
-      select: { userId: true },
+      select: { role: true },
     });
+    if (!membership) throw new AuthzGrantNotConfirmedError();
+    // A Developer never receives an organisation-wide grant (ADR-143), so
+    // the membership row alone is the admission. Waiting for a grant here
+    // would hold every notification for a Developer joiner until the outbox
+    // gave up on it.
+    if (membership.role === OrganizationUserRole.DEVELOPER) return true;
     const grant = await liveGrants(this.prisma).findFirst({
       where: {
         organizationId: payload.organizationId,
@@ -528,7 +578,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
       },
       select: { id: true },
     });
-    if (!membership || !grant) throw new AuthzGrantNotConfirmedError();
+    if (!grant) throw new AuthzGrantNotConfirmedError();
     return true;
   }
 

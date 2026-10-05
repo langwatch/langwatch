@@ -14,6 +14,7 @@ import type {
   ProjectScope,
 } from "./credential-decision.repository";
 import {
+  DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   ProjectPermissionDeniedError,
 } from "./errors";
@@ -61,7 +62,9 @@ export class PermissionsService {
    * Asserts that a user holds the given permission on a project.
    *
    * Throws {@link LiteMemberRestrictedError} when the denial is caused by the
-   * user being a Lite Member (EXTERNAL org role), and
+   * user being a Lite Member (EXTERNAL org role),
+   * {@link DeveloperSeatRestrictedError} when it is caused by a Developer seat
+   * (ADR-143) reaching outside its own project, and
    * {@link ProjectPermissionDeniedError} for every other denial (not a member,
    * or a member whose role does not carry the permission). Both are handled
    * errors carrying a code — callers must never tell them apart by message.
@@ -89,6 +92,11 @@ export class PermissionsService {
     if (!permitted) {
       if (organizationRole === "EXTERNAL") {
         throw new LiteMemberRestrictedError(
+          permission.split(":")[0] ?? "unknown",
+        );
+      }
+      if (organizationRole === "DEVELOPER") {
+        throw new DeveloperSeatRestrictedError(
           permission.split(":")[0] ?? "unknown",
         );
       }
@@ -157,6 +165,11 @@ export class PermissionsService {
     }
     if (organizationRole === "EXTERNAL") {
       throw new LiteMemberRestrictedError(
+        check.permission.split(":")[0] ?? "unknown",
+      );
+    }
+    if (organizationRole === "DEVELOPER") {
+      throw new DeveloperSeatRestrictedError(
         check.permission.split(":")[0] ?? "unknown",
       );
     }

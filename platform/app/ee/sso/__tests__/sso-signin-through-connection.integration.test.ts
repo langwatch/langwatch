@@ -729,7 +729,9 @@ describe("given a member provisioned by the same SSO connection", () => {
       expect(normalizeErrorCode(error)).toBe(
         failure === "refused-domain"
           ? "sso_domain_not_verified"
-          : "OAuthAccountNotLinked",
+          : failure === "other-connection"
+            ? "sso_existing_account_unconfirmed"
+            : "OAuthAccountNotLinked",
       );
       expect(
         await prisma.account.count({

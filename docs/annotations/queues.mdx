@@ -32,6 +32,19 @@ In the [Trace Explorer](https://app.langwatch.ai/@project/traces), select traces
 
 In **Send to**, pick one or more queues or people, then click **Send**. A trace is queued once per queue and once per person. From the inbox, select rows and click **Add to queue**; on a queue page the button reads **Move to queue**.
 
+### Send traces automatically
+
+An [automation](/features/automations) with the **Add to annotation queue** action sends every trace that matches its filter to the queues and people you pick. Over the [Triggers API](/api-reference/triggers/overview), `actionParams.annotators` lists them as `{ "id", "name" }`, where `id` is `queue-<queueId>` for a queue or `user-<userId>` for a person.
+
+### From code
+
+Annotation queues have no public REST, CLI or MCP endpoints yet: creating a queue, adding items and working through them happen in the dashboard. Two things are available from code:
+
+- The **automation** route above, to fill a queue from matching traces.
+- **Read-only queries** with [LangWatchQL](/api-reference/query/overview): the `annotation_queues`, `annotation_queue_items` and `annotation_queue_scores` views, which is also where a queue's id comes from.
+
+The [Annotations API](/api-reference/annotations/overview) reads and writes the annotations themselves.
+
 ## Work the queue
 
 Open a queue in the sidebar, or **Inbox**, and click a pending row. The review page shows the conversation with a bar at the bottom. **Annotate** on a reply opens the composer next to the conversation, and the checkbox on a turn marks that trace for the dataset step.

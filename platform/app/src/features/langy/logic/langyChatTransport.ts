@@ -306,12 +306,19 @@ function subscribeTurnStream({
       // model's reasoning — retires it; without this the status line would
       // outrank the thinking line (and its reasoning glimpse) for the whole
       // turn. Cleared once: statuses the agent reports mid-turn keep today's
-      // behavior.
+      // behavior. The placeholder is the FIRST status of the stream; a later
+      // one before any output (a model call's retry line) is a real status.
       let sawOutput = false;
+      let sawReadinessStatus = false;
       const clearColdStartStatus = () => {
         if (sawOutput) return;
         sawOutput = true;
         onSignal({ type: "status", status: "" });
+      };
+      const isReadinessStatus = () => {
+        const readiness = !sawOutput && !sawReadinessStatus;
+        sawReadinessStatus = true;
+        return readiness;
       };
 
       const onEntry = (entry: LangyStreamEntry) => {
@@ -349,7 +356,7 @@ function subscribeTurnStream({
             onSignal(entry);
             return;
           case "status":
-            onSignal({ ...entry, readiness: !sawOutput });
+            onSignal({ ...entry, readiness: isReadinessStatus() });
             return;
           case "progress":
           case "milestone":
