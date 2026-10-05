@@ -22,6 +22,7 @@
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
     "zod": "catalog:"
