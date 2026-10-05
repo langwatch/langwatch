@@ -3,7 +3,7 @@
  * with their origin/main names, kinds and permissions.
  * Spec: modules/experiment/specs/experiment-service.feature.
  */
-import type { AuthzDeclaration } from "@langwatch/api/access";
+import type { AccessDeclaration } from "@langwatch/api/access";
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authorization";
 import { experimentsTrpc } from "@langwatch/experiment-contract";
@@ -19,8 +19,8 @@ import { experimentTrpcTransport } from "../experiment.trpc.ts";
 /** Records the access each declared procedure asked for, building nothing. */
 function accessDeclaredBy(declaration: {
   router(runtime: TrpcProcedureFactory<object>, app: (ctx: object) => never): unknown;
-}): (AuthzPermission | AuthzDeclaration)[] {
-  const declared: (AuthzPermission | AuthzDeclaration)[] = [];
+}): (AuthzPermission | AccessDeclaration)[] {
+  const declared: (AuthzPermission | AccessDeclaration)[] = [];
   const runtime: TrpcProcedureFactory<object> = {
     procedure: ({ access }) => {
       declared.push(access.kind === "permission" ? access.permission : access);
