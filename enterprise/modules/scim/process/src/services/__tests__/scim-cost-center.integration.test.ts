@@ -27,6 +27,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { PrismaScimRepository } from "../../repositories/prisma/prisma.scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
@@ -102,6 +103,7 @@ describe.skipIf(!databaseUrl)("ScimService department auto-assignment", () => {
     const governance = departments();
 
     return ScimService.create({
+      connections: HeldConnectionsFake.of(),
       prisma: PrismaScimRepository.create(prisma),
       writer: new GrantsFake(),
       users: provisioning(),

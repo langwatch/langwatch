@@ -9,6 +9,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
@@ -41,6 +42,7 @@ function directory() {
   const store = MemoryScimRepository.create();
   store.connections.push({ organizationId: ORGANIZATION, connectionId: CONNECTION });
   const service = ScimService.create({
+    connections: HeldConnectionsFake.of(),
     prisma: store,
     writer: new GrantsFake(),
     users: {

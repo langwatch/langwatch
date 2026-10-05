@@ -100,9 +100,20 @@ export interface ScimTokenIdentity {
 }
 
 export interface ScimDirectoryIdentityRecord {
+  organizationId: string;
   connectionId: string;
   externalId: string;
   userId: string;
+}
+
+/** A connection's claim on a person, with or without the directory's own identifier. */
+export interface ScimDirectoryClaim {
+  organizationId: string;
+  connectionId: string;
+  externalId: string | null;
+  userId: string;
+  /** The predecessor whose claim this one replaces, released in the same write. */
+  releasedConnectionIds: readonly string[];
 }
 
 /** Semantic store used by the SCIM service; no transport or ORM vocabulary. */
@@ -237,9 +248,9 @@ export abstract class ScimRepository {
     connectionId: string;
   }): Promise<string[]>;
   /**
-   * Re-homes these tokens and the connection's directory identities onto
-   * another connection at once. An identity the target already holds stays
-   * the target's own, and the source's claim on it is dropped.
+   * Re-homes these tokens and the connection's people and identities onto
+   * another connection at once. What the target already holds stays the
+   * target's own, and the source's claim on it is dropped.
    */
   abstract moveDirectoryToConnection(input: {
     organizationId: string;
@@ -266,17 +277,28 @@ export abstract class ScimRepository {
     connectionId: string;
     externalId: string;
   }): Promise<string | null>;
-  abstract rememberDirectoryIdentity(input: ScimDirectoryIdentityRecord): Promise<void>;
+  /** Ownership is recorded whether or not the directory sent an identifier. */
+  abstract rememberDirectoryIdentity(input: ScimDirectoryClaim): Promise<void>;
   abstract forgetDirectoryIdentity(input: {
     connectionId: string;
     externalId: string;
   }): Promise<void>;
+  /** Ownership and identifiers; a null connection is a legacy token's whole organization. */
   abstract forgetDirectoryIdentitiesForUser(input: {
-    connectionId: string;
+    organizationId: string;
+    connectionId: string | null;
     userId: string;
   }): Promise<void>;
-  abstract findDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]>;
-  /** Whom these connections' directories have claimed, one row per identifier. */
+  /** A retired connection lets go of every person it provisioned. */
+  abstract releaseDirectoryPeople(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<void>;
+  abstract findDirectoryConnectionsForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]>;
+  /** Whom these connections' directories have claimed, one row per person. */
   abstract findDirectoryOwnership(input: {
     connectionIds: string[];
   }): Promise<ScimDirectoryOwnership[]>;

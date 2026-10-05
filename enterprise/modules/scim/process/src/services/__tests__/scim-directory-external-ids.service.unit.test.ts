@@ -32,18 +32,24 @@ describe("ScimDirectoryExternalIdsService", () => {
     it("answers each connection's identifiers and none from another organization's", async () => {
       const { identities, service } = build([connection("okta"), connection("entra")]);
       await identities.rememberDirectoryIdentity({
+        organizationId: "acme",
         connectionId: "okta",
         externalId: "00u1",
+        releasedConnectionIds: [],
         userId: "ada",
       });
       await identities.rememberDirectoryIdentity({
+        organizationId: "acme",
         connectionId: "entra",
         externalId: "e-7",
+        releasedConnectionIds: [],
         userId: "grace",
       });
       await identities.rememberDirectoryIdentity({
+        organizationId: "globex",
         connectionId: "elsewhere",
         externalId: "x-1",
+        releasedConnectionIds: [],
         userId: "mallory",
       });
 
@@ -63,8 +69,10 @@ describe("ScimDirectoryExternalIdsService", () => {
     it("answers no identifiers", async () => {
       const { identities, service } = build([]);
       await identities.rememberDirectoryIdentity({
+        organizationId: "acme",
         connectionId: "okta",
         externalId: "00u1",
+        releasedConnectionIds: [],
         userId: "ada",
       });
 

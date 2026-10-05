@@ -16,6 +16,7 @@ import { fromDate, toDate, type Instant } from "@langwatch/time";
 import type { ScimTokenHashScheme } from "../../rules/scim-token-digest.rules.ts";
 import {
   ScimRepository,
+  type ScimDirectoryClaim,
   type ScimGroupMembershipRecord,
   type ScimGroupRecord,
   type ScimMembershipRecord,
@@ -74,44 +75,7 @@ function scimGroupRecordOf(row: {
   };
 }
 
-type ScimIdentityDatabase = {
-  ssoConnection: {
-    findFirst(input: {
-      where: { id: string; organizationId: string };
-      select: { id: true };
-    }): Promise<{ id: string } | null>;
-  };
-  scimExternalId: {
-    findUnique(input: {
-      where: {
-        connectionId_externalId: { connectionId: string; externalId: string };
-      };
-      select: { userId: true };
-    }): Promise<{ userId: string } | null>;
-    findMany(input: {
-      where: { userId: string };
-      select: { connectionId: true };
-    }): Promise<{ connectionId: string }[]>;
-    findMany(input: {
-      where: { connectionId: { in: string[] } };
-      select: { connectionId: true; userId: true };
-    }): Promise<{ connectionId: string; userId: string }[]>;
-    upsert(input: {
-      where: {
-        connectionId_externalId: { connectionId: string; externalId: string };
-      };
-      create: { connectionId: string; externalId: string; userId: string };
-      update: { userId: string };
-    }): Promise<unknown>;
-    deleteMany(input: {
-      where:
-        | { connectionId: string; externalId: string }
-        | { connectionId: string; userId: string };
-    }): Promise<unknown>;
-  };
-};
-
-type ScimDatabase = PrismaClient & ScimIdentityDatabase;
+type ScimDatabase = PrismaClient;
 
 function isScimDatabase(value: object): value is ScimDatabase {
   return (
@@ -121,7 +85,8 @@ function isScimDatabase(value: object): value is ScimDatabase {
     "groupMembership" in value &&
     "scimToken" in value &&
     "ssoConnection" in value &&
-    "scimExternalId" in value
+    "scimExternalId" in value &&
+    "scimDirectoryUser" in value
   );
 }
 
@@ -562,6 +527,16 @@ export class PrismaScimRepository extends ScimRepository {
       select: { id: true, organizationId: true, connectionId: true },
     });
   }
+  async releaseDirectoryPeople(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.scimDirectoryUser.deleteMany({ where: input }),
+      this.prisma.scimExternalId.deleteMany({ where: input }),
+    ]);
+  }
+
   async revokeTokensForConnection(input: {
     organizationId: string;
     connectionId: string;
@@ -591,12 +566,29 @@ export class PrismaScimRepository extends ScimRepository {
     tokenIds: readonly string[];
   }): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      const ownExternalIds = await tx.scimExternalId.findMany({
-        where: { organizationId, connectionId: toConnectionId },
-        select: { externalId: true },
-      });
+      const [ownPeople, ownExternalIds] = await Promise.all([
+        tx.scimDirectoryUser.findMany({
+          where: { organizationId, connectionId: toConnectionId },
+          select: { userId: true },
+        }),
+        tx.scimExternalId.findMany({
+          where: { organizationId, connectionId: toConnectionId },
+          select: { externalId: true },
+        }),
+      ]);
       await tx.scimToken.updateMany({
         where: { organizationId, connectionId: fromConnectionId, id: { in: [...tokenIds] } },
+        data: { connectionId: toConnectionId },
+      });
+      await tx.scimDirectoryUser.deleteMany({
+        where: {
+          organizationId,
+          connectionId: fromConnectionId,
+          userId: { in: ownPeople.map(({ userId }) => userId) },
+        },
+      });
+      await tx.scimDirectoryUser.updateMany({
+        where: { organizationId, connectionId: fromConnectionId },
         data: { connectionId: toConnectionId },
       });
       await tx.scimExternalId.deleteMany({
@@ -654,21 +646,36 @@ export class PrismaScimRepository extends ScimRepository {
     return row?.userId ?? null;
   }
 
-  async rememberDirectoryIdentity(input: {
-    connectionId: string;
-    externalId: string;
-    userId: string;
-  }): Promise<void> {
-    await this.prisma.scimExternalId.upsert({
-      where: {
-        connectionId_externalId: {
-          connectionId: input.connectionId,
-          externalId: input.externalId,
-        },
-      },
-      create: input,
-      update: { userId: input.userId },
-    });
+  async rememberDirectoryIdentity({
+    organizationId,
+    connectionId,
+    externalId,
+    userId,
+    releasedConnectionIds,
+  }: ScimDirectoryClaim): Promise<void> {
+    const released = { organizationId, connectionId: { in: [...releasedConnectionIds] }, userId };
+    await this.prisma.$transaction([
+      ...(releasedConnectionIds.length === 0
+        ? []
+        : [
+            this.prisma.scimDirectoryUser.deleteMany({ where: released }),
+            this.prisma.scimExternalId.deleteMany({ where: released }),
+          ]),
+      this.prisma.scimDirectoryUser.upsert({
+        where: { connectionId_userId: { connectionId, userId } },
+        create: { organizationId, connectionId, userId },
+        update: {},
+      }),
+      ...(externalId === null
+        ? []
+        : [
+            this.prisma.scimExternalId.upsert({
+              where: { connectionId_externalId: { connectionId, externalId } },
+              create: { organizationId, connectionId, externalId, userId },
+              update: { userId },
+            }),
+          ]),
+    ]);
   }
 
   async forgetDirectoryIdentity(input: {
@@ -678,19 +685,32 @@ export class PrismaScimRepository extends ScimRepository {
     await this.prisma.scimExternalId.deleteMany({ where: input });
   }
 
-  async forgetDirectoryIdentitiesForUser(input: {
-    connectionId: string;
+  async forgetDirectoryIdentitiesForUser({
+    organizationId,
+    connectionId,
+    userId,
+  }: {
+    organizationId: string;
+    connectionId: string | null;
     userId: string;
   }): Promise<void> {
-    await this.prisma.scimExternalId.deleteMany({ where: input });
+    const where = { organizationId, userId, ...(connectionId === null ? {} : { connectionId }) };
+    await this.prisma.$transaction([
+      this.prisma.scimExternalId.deleteMany({ where }),
+      this.prisma.scimDirectoryUser.deleteMany({ where }),
+    ]);
   }
 
-  async findDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]> {
-    const rows = await this.prisma.scimExternalId.findMany({
-      where: input,
-      select: { connectionId: true },
-    });
-    return rows.map((row) => row.connectionId);
+  /** Both tables are read: an identifier remembered before ownership rows existed still claims. */
+  async findDirectoryConnectionsForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]> {
+    const [owned, identified] = await Promise.all([
+      this.prisma.scimDirectoryUser.findMany({ where: input, select: { connectionId: true } }),
+      this.prisma.scimExternalId.findMany({ where: input, select: { connectionId: true } }),
+    ]);
+    return [...new Set([...owned, ...identified].map((row) => row.connectionId))];
   }
 
   async findDirectoryIdentities(input: {
@@ -723,10 +743,17 @@ export class PrismaScimRepository extends ScimRepository {
   }): Promise<ScimDirectoryOwnership[]> {
     if (input.connectionIds.length === 0) return [];
 
-    return this.prisma.scimExternalId.findMany({
-      where: { connectionId: { in: input.connectionIds } },
-      select: { connectionId: true, userId: true },
-    });
+    const where = { connectionId: { in: input.connectionIds } };
+    const select = { connectionId: true, userId: true } as const;
+    const [owned, identified] = await Promise.all([
+      this.prisma.scimDirectoryUser.findMany({ where, select }),
+      this.prisma.scimExternalId.findMany({ where, select }),
+    ]);
+    const ownership = new Map<string, ScimDirectoryOwnership>();
+    for (const row of [...owned, ...identified]) {
+      ownership.set(`${row.connectionId}\u0000${row.userId}`, row);
+    }
+    return [...ownership.values()];
   }
 
   async findDirectoryExternalIds(input: {

@@ -47,6 +47,7 @@ describe("the back office's audit trail", () => {
 
   describe("given a ledger that refuses the command", () => {
     /** @scenario "A command the ledger refuses still leaves its audit row" */
+    /** @scenario "An attempt the ledger refuses keeps its audit row" */
     it("writes the attempt's row even though the ledger threw", async () => {
       const refusal = new Error("the ledger refused this transition");
       context.connections.attestDomain.mockRejectedValueOnce(refusal);
@@ -79,6 +80,7 @@ describe("the back office's audit trail", () => {
 
   describe("given a ledger that completes the command", () => {
     /** @scenario "An operator command is recorded before it runs" */
+    /** @scenario "An operator's attempt is audited before the ledger answers" */
     it("writes exactly one row, before the ledger is asked", async () => {
       await context.app.attestDomain(TARGET, { id: STAFF_ID });
 

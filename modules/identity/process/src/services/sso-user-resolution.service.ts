@@ -285,7 +285,10 @@ export class SsoUserResolutionService {
     input: SsoUserResolutionInput;
     userId: string;
   }): Promise<boolean> {
-    const owners = await this.deps.directory.findDirectoryConnectionsForUser({ userId });
+    const owners = await this.deps.directory.findDirectoryConnectionsForUser({
+      organizationId: connection.organizationId,
+      userId,
+    });
     if (owners.includes(input.providerId)) return true;
     const replaced = connection.replacesConnectionId;
     return replaced !== null && owners.includes(replaced);

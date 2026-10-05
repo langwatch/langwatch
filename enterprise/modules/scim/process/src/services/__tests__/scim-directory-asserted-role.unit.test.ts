@@ -10,6 +10,7 @@ import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake, listedGrant } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
@@ -65,6 +66,7 @@ function serviceOver({
     create: vi.fn(async () => person),
   } satisfies ScimUserProvisioning;
   return ScimService.create({
+    connections: HeldConnectionsFake.of(),
     prisma: repository,
     writer,
     users,

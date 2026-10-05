@@ -9,6 +9,7 @@ import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import type {
@@ -211,6 +212,7 @@ function directory(store: DirectoryStore) {
     users,
     minted,
     service: ScimService.create({
+      connections: HeldConnectionsFake.of(),
       prisma: store.repository(),
       writer: new GrantsFake(),
       users,
@@ -284,7 +286,8 @@ describe("the organization's own directory resource", () => {
         },
       }),
     ).resolves.toMatchObject({ active: false });
-    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(false);
+    // The leaver keeps the row and holds nothing; the reactivation below restores no grant.
+    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(true);
     expect(store.memberships.has(`${OTHER_ORGANIZATION}:user-1`)).toBe(true);
     expect(store.accounts.get("user-1")).toEqual(
       account({ id: "user-1", email: "shared@example.test" }),
@@ -300,7 +303,7 @@ describe("the organization's own directory resource", () => {
         },
       }),
     ).resolves.toMatchObject({ active: true });
-    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(false);
+    expect(store.memberships.has(`${ORGANIZATION}:user-1`)).toBe(true);
     expect(users.findByEmail).not.toHaveBeenCalled();
   });
 
@@ -467,6 +470,7 @@ describe("the organization's own directory resource", () => {
     vi.spyOn(repository, "findUserByResourceName").mockResolvedValue(null);
 
     const raced = ScimService.create({
+      connections: HeldConnectionsFake.of(),
       prisma: repository,
       writer: new GrantsFake(),
       users: directory(store).users,

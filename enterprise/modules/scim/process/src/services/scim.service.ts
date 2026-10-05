@@ -35,7 +35,10 @@ import {
 } from "../rules/scim-token-digest.rules.ts";
 import type { ScimDepartmentAssignment } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
-import { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
+import {
+  ScimDirectoryIdentityService,
+  type ScimHeldConnections,
+} from "./scim-directory-identity.service.ts";
 import { ScimDirectoryService } from "./scim-directory.service.ts";
 import { type ScimGrantAuthority, ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimProvisioningService, type ScimUserProvisioning } from "./scim-provisioning.service.ts";
@@ -78,6 +81,7 @@ export class ScimService extends ScimServiceContract {
     lifecycle,
     provenOffboarding,
     tokenPepper,
+    connections,
   }: {
     prisma: ScimRepository;
     writer: ScimGrantAuthority;
@@ -88,12 +92,13 @@ export class ScimService extends ScimServiceContract {
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     tokenPepper: string | undefined;
+    connections: ScimHeldConnections;
   }) {
     super();
     this.repository = prisma;
     this.tokenPepper = tokenPepper;
     this.requests = ScimRequestLogService.create(prisma);
-    this.identities = ScimDirectoryIdentityService.create(prisma);
+    this.identities = ScimDirectoryIdentityService.create({ repository: prisma, connections });
     this.lifecycle = lifecycle;
     const grants = ScimGrantsService.create({ grants: writer });
     this.userOperations = ScimProvisioningService.create({
@@ -105,6 +110,7 @@ export class ScimService extends ScimServiceContract {
       organization,
       lifecycle,
       provenOffboarding,
+      authority: this.identities,
     });
     this.entitlements = entitlements;
     this.groups = ScimDirectoryService.create({
@@ -125,6 +131,7 @@ export class ScimService extends ScimServiceContract {
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     tokenPepper: string | undefined;
+    connections: ScimHeldConnections;
   }): ScimService {
     return new ScimService(options);
   }
@@ -241,6 +248,8 @@ export class ScimService extends ScimServiceContract {
     connectionId: string;
   }): Promise<{ revoked: number }> {
     const revoked = await this.repository.revokeTokensForConnection(input);
+    // A retired connection lets its people go, so a successor may provision them.
+    await this.repository.releaseDirectoryPeople(input);
     await this.lifecycle.revoked({
       ...input,
       tokenId: null,
@@ -381,8 +390,9 @@ export class ScimService extends ScimServiceContract {
           request: input.request,
         })
       : await this.userOperations.createUser(input);
-    if (input.connectionId && externalId) {
+    if (input.connectionId) {
       await this.identities.remember({
+        organizationId: input.organizationId,
         connectionId: input.connectionId,
         externalId,
         userId: user.id,
@@ -420,13 +430,15 @@ export class ScimService extends ScimServiceContract {
     connectionId?: string | null;
   }): Promise<ScimUser> {
     await this.identities.assertWritable({
+      organizationId: input.organizationId,
       connectionId: input.connectionId ?? null,
       userId: input.id,
     });
     const user = await this.userOperations.replaceUser(input);
     const externalId = input.request.externalId;
-    if (input.connectionId && externalId) {
+    if (input.connectionId) {
       await this.identities.remember({
+        organizationId: input.organizationId,
         connectionId: input.connectionId,
         externalId,
         userId: input.id,
@@ -450,10 +462,20 @@ export class ScimService extends ScimServiceContract {
     connectionId?: string | null;
   }): Promise<ScimUser> {
     await this.identities.assertWritable({
+      organizationId: input.organizationId,
       connectionId: input.connectionId ?? null,
       userId: input.id,
     });
     const user = await this.userOperations.updateUser(input);
+    // Deactivation keeps ownership, so the same directory can bring them back.
+    if (input.connectionId) {
+      await this.identities.remember({
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        externalId: null,
+        userId: input.id,
+      });
+    }
     await this.recordUserPush({
       ...input,
       userId: input.id,
@@ -470,16 +492,16 @@ export class ScimService extends ScimServiceContract {
     connectionId?: string | null;
   }): Promise<void> {
     await this.identities.assertWritable({
+      organizationId: input.organizationId,
       connectionId: input.connectionId ?? null,
       userId: input.id,
     });
     await this.userOperations.deleteUser(input);
-    if (input.connectionId) {
-      await this.identities.forgetUser({
-        connectionId: input.connectionId,
-        userId: input.id,
-      });
-    }
+    await this.identities.forgetUser({
+      organizationId: input.organizationId,
+      connectionId: input.connectionId ?? null,
+      userId: input.id,
+    });
 
     await this.recordUserPush({
       ...input,

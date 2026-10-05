@@ -14,6 +14,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import { ScimSyncLedgerWriterService } from "../eventing-scim-sync-ledger.service.ts";
@@ -93,6 +94,7 @@ function directoryOver({ ledger }: { ledger: ScimSyncLedgerWriterService }) {
   let commandIds = 0;
 
   return ScimService.create({
+    connections: HeldConnectionsFake.of([CONNECTION]),
     prisma: store,
     writer: new GrantsFake(),
     users,

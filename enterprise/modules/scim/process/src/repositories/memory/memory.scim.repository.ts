@@ -10,6 +10,7 @@ import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import type { ScimTokenHashScheme } from "../../rules/scim-token-digest.rules.ts";
 import {
   ScimRepository,
+  type ScimDirectoryClaim,
   type ScimDirectoryIdentityRecord,
   type ScimGroupMembershipRecord,
   type ScimGroupRecord,
@@ -26,6 +27,7 @@ type StoredRequest = ScimRequestLogEntry;
 type StoredMembership = { organizationId: string; userId: string; role: string };
 type StoredGroupMember = { groupId: string; userId: string };
 type StoredOrganization = { id: string; ssoDomain: string | null };
+type StoredDirectoryUser = { organizationId: string; connectionId: string; userId: string };
 
 const sameName = (left: string, right: string): boolean =>
   left.trim().toLowerCase() === right.trim().toLowerCase();
@@ -46,6 +48,7 @@ export class MemoryScimRepository extends ScimRepository {
   readonly tokens: StoredToken[] = [];
   readonly requests: StoredRequest[] = [];
   readonly directoryIdentities: ScimDirectoryIdentityRecord[] = [];
+  readonly directoryUsers: StoredDirectoryUser[] = [];
   readonly #identityTimes = new Map<string, { createdAtMs: number; updatedAtMs: number }>();
   #sequence = 0;
 
@@ -514,6 +517,19 @@ export class MemoryScimRepository extends ScimRepository {
       return [{ ...row, connectionId: toConnectionId }];
     });
     this.directoryIdentities.splice(0, this.directoryIdentities.length, ...moved);
+    const ownPeople = new Set(
+      this.directoryUsers
+        .filter((row) => row.connectionId === toConnectionId)
+        .map((row) => row.userId),
+    );
+    const movedPeople = this.directoryUsers.flatMap((row) => {
+      if (row.organizationId !== organizationId || row.connectionId !== fromConnectionId) {
+        return [row];
+      }
+      if (ownPeople.has(row.userId)) return [];
+      return [{ ...row, connectionId: toConnectionId }];
+    });
+    this.directoryUsers.splice(0, this.directoryUsers.length, ...movedPeople);
   }
 
   async findTokensByHashes(hashedTokens: string[]): Promise<ScimTokenIdentity[]> {
@@ -550,12 +566,25 @@ export class MemoryScimRepository extends ScimRepository {
     );
   }
 
-  async rememberDirectoryIdentity(input: ScimDirectoryIdentityRecord): Promise<void> {
-    const key = `${input.connectionId}\u0000${input.externalId}`;
+  async rememberDirectoryIdentity({
+    releasedConnectionIds,
+    externalId,
+    ...claim
+  }: ScimDirectoryClaim): Promise<void> {
+    for (const connectionId of releasedConnectionIds) {
+      await this.forgetDirectoryIdentitiesForUser({ ...claim, connectionId });
+    }
+    const owns = this.directoryUsers.some(
+      (row) => row.connectionId === claim.connectionId && row.userId === claim.userId,
+    );
+    if (!owns) this.directoryUsers.push({ ...claim });
+    if (externalId === null) return;
+
+    const key = `${claim.connectionId}\u0000${externalId}`;
     const at = this.now().epochMilliseconds;
     const createdAtMs = this.#identityTimes.get(key)?.createdAtMs ?? at;
-    await this.forgetDirectoryIdentity(input);
-    this.directoryIdentities.push({ ...input });
+    await this.forgetDirectoryIdentity({ connectionId: claim.connectionId, externalId });
+    this.directoryIdentities.push({ ...claim, externalId });
     this.#identityTimes.set(key, { createdAtMs, updatedAtMs: at });
   }
 
@@ -587,12 +616,31 @@ export class MemoryScimRepository extends ScimRepository {
   }
 
   async forgetDirectoryIdentitiesForUser(input: {
-    connectionId: string;
+    organizationId: string;
+    connectionId: string | null;
     userId: string;
   }): Promise<void> {
-    this.#dropIdentities(
-      (row) => row.connectionId === input.connectionId && row.userId === input.userId,
-    );
+    const matches = (row: StoredDirectoryUser): boolean =>
+      row.organizationId === input.organizationId &&
+      row.userId === input.userId &&
+      (input.connectionId === null || row.connectionId === input.connectionId);
+    this.#dropIdentities(matches);
+    this.#dropDirectoryUsers(matches);
+  }
+
+  async releaseDirectoryPeople(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<void> {
+    const matches = (row: StoredDirectoryUser): boolean =>
+      row.organizationId === input.organizationId && row.connectionId === input.connectionId;
+    this.#dropIdentities(matches);
+    this.#dropDirectoryUsers(matches);
+  }
+
+  #dropDirectoryUsers(matches: (row: StoredDirectoryUser) => boolean): void {
+    const kept = this.directoryUsers.filter((row) => !matches(row));
+    this.directoryUsers.splice(0, this.directoryUsers.length, ...kept);
   }
 
   #dropIdentities(matches: (row: ScimDirectoryIdentityRecord) => boolean): void {
@@ -600,18 +648,28 @@ export class MemoryScimRepository extends ScimRepository {
     this.directoryIdentities.splice(0, this.directoryIdentities.length, ...kept);
   }
 
-  async findDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]> {
-    return this.directoryIdentities
-      .filter((row) => row.userId === input.userId)
-      .map((row) => row.connectionId);
+  async findDirectoryConnectionsForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]> {
+    const claims = [...this.directoryUsers, ...this.directoryIdentities].filter(
+      (row) => row.organizationId === input.organizationId && row.userId === input.userId,
+    );
+    return [...new Set(claims.map((row) => row.connectionId))];
   }
 
   async findDirectoryOwnership(input: {
     connectionIds: string[];
   }): Promise<ScimDirectoryOwnership[]> {
-    return this.directoryIdentities
-      .filter((row) => input.connectionIds.includes(row.connectionId))
-      .map((row) => ({ connectionId: row.connectionId, userId: row.userId }));
+    const owned = new Map<string, ScimDirectoryOwnership>();
+    for (const row of [...this.directoryUsers, ...this.directoryIdentities]) {
+      if (!input.connectionIds.includes(row.connectionId)) continue;
+      owned.set(`${row.connectionId}\u0000${row.userId}`, {
+        connectionId: row.connectionId,
+        userId: row.userId,
+      });
+    }
+    return [...owned.values()];
   }
 
   async findDirectoryExternalIds(input: {

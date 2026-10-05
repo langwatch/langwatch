@@ -38,7 +38,11 @@ export class ScimDirectoryExternalIdsService {
     return resource !== null && !resource.active;
   }
 
-  findDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]> {
+  /** Scoped to the organization: another organization's directory never answers here. */
+  findDirectoryConnectionsForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]> {
     return this.reads.identities.findDirectoryConnectionsForUser(input);
   }
 }

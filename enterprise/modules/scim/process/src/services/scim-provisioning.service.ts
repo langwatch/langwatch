@@ -23,6 +23,7 @@ import {
   ScimDeprovisionService,
   type ScimOrganizationAdministration,
 } from "./scim-deprovision.service.ts";
+import type { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
 import type { ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimUserPatchService } from "./scim-user-patch.service.ts";
 
@@ -56,6 +57,7 @@ export class ScimProvisioningService {
   private readonly provenOffboarding: boolean;
   private readonly costCenters: ScimCostCenterService;
   private readonly patches: ScimUserPatchService;
+  private readonly authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
 
   private constructor({
     prisma,
@@ -66,6 +68,7 @@ export class ScimProvisioningService {
     organization,
     lifecycle,
     provenOffboarding,
+    authority,
   }: {
     prisma: ScimRepository;
     writer: AuthzGrantsService;
@@ -75,8 +78,10 @@ export class ScimProvisioningService {
     organization: ScimOrganizationAdministration;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
+    authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
   }) {
     this.prisma = prisma;
+    this.authority = authority;
     this.writer = writer;
     this.userService = users;
     this.grants = grants;
@@ -100,6 +105,7 @@ export class ScimProvisioningService {
     organization: ScimOrganizationAdministration;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
+    authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
   }): ScimProvisioningService {
     return new ScimProvisioningService(options);
   }
@@ -275,20 +281,33 @@ export class ScimProvisioningService {
       revokedGrantIds: visibleGrants.map((row) => row.id),
       actor: ScimProvisioningService.ACTOR,
     });
-    await this.prisma.removeMembership({ userId, organizationId });
+    // A leaver stays a member holding nothing; only a deletion takes the row.
+    if (op === "delete_user") {
+      await this.prisma.removeMembership({ userId, organizationId });
+    }
   }
 
   async createUser({
     request,
     organizationId,
+    connectionId = null,
   }: {
     request: ScimCreateUserRequest;
     organizationId: string;
+    connectionId?: string | null;
   }): Promise<ScimUser> {
     assertScimOrganizationId(organizationId);
     const existingUser = await this.resolveUser({ organizationId, email: request.userName });
+    // A POST naming somebody this organization still holds a resource for is a
+    // return, and a return restores nothing on its own: the next push asserts it.
+    let returning = false;
 
     if (existingUser) {
+      await this.authority.assertWritable({
+        organizationId,
+        connectionId,
+        userId: existingUser.id,
+      });
       const [membership, previous] = await Promise.all([
         this.prisma.findMembership({ organizationId, userId: existingUser.id }),
         this.prisma.findUserResource({ organizationId, userId: existingUser.id }),
@@ -299,6 +318,7 @@ export class ScimProvisioningService {
           detail: "User already exists in this organization",
         });
       }
+      returning = previous !== null && previous.deletedAt === null;
     }
 
     await this.assertUserNameIsFree({
@@ -312,7 +332,7 @@ export class ScimProvisioningService {
     const user = existingUser ?? (await this.userService.create({ name, email: request.userName }));
     const active = request.active !== false;
 
-    if (active) {
+    if (active && !returning) {
       await this.admit({ userId: user.id, organizationId });
       await this.costCenters.sync({
         userId: user.id,

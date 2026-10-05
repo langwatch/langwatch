@@ -15,6 +15,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import type { ScimUserRecord } from "../../repositories/scim.repository.ts";
@@ -92,6 +93,7 @@ function world() {
     }),
   } satisfies ScimUserProvisioning;
   const service = ScimService.create({
+    connections: HeldConnectionsFake.of([OKTA, ENTRA]),
     prisma: store,
     writer,
     users,
@@ -220,7 +222,7 @@ describe("a directory creating a person who is inactive", () => {
         expect.objectContaining({ userId: first.id, userName: "ghost@acme.test", active: false }),
       ]);
       expect(w.store.directoryIdentities).toEqual([
-        { connectionId: OKTA, externalId: "okta-ghost", userId: first.id },
+        { organizationId: ACME, connectionId: OKTA, externalId: "okta-ghost", userId: first.id },
       ]);
       expect(w.store.users.get(first.id)?.deactivatedAt).toBeNull();
       expect(w.membershipsIn(ACME)).toEqual([]);
@@ -257,7 +259,7 @@ describe("a directory creating a person who is inactive", () => {
         { organizationId: GLOBEX, userId: "user_ada", role: "ADMIN" },
       ]);
       expect(w.store.directoryIdentities).toEqual([
-        { connectionId: OKTA, externalId: "okta-ada", userId: "user_ada" },
+        { organizationId: ACME, connectionId: OKTA, externalId: "okta-ada", userId: "user_ada" },
       ]);
       expectNoAccessWritten(w);
     });
@@ -310,7 +312,7 @@ describe("a directory creating a person who is inactive", () => {
         costCenter: "Engineering",
       });
       await deactivate({ service: w.service, id: created.id });
-      expect(w.membershipsIn(ACME)).toEqual([]);
+      const membershipsBefore = w.membershipsIn(ACME);
       const grantsBefore = w.writer.attachBindings.mock.calls.length;
       const seatsBefore = w.departments.departmentAssignUser.mock.calls.length;
 
@@ -326,7 +328,7 @@ describe("a directory creating a person who is inactive", () => {
       expect(w.live(ACME)).toEqual([
         expect.objectContaining({ userId: created.id, active: false }),
       ]);
-      expect(w.membershipsIn(ACME)).toEqual([]);
+      expect(w.membershipsIn(ACME)).toEqual(membershipsBefore);
       expect(w.writer.attachBindings.mock.calls).toHaveLength(grantsBefore);
       expect(w.departments.departmentAssignUser.mock.calls).toHaveLength(seatsBefore);
     });
@@ -345,8 +347,10 @@ describe("a directory deleting a person it no longer has in the organization", (
       });
       w.store.memberships.push({ organizationId: GLOBEX, userId: created.id, role: "ADMIN" });
       await w.store.rememberDirectoryIdentity({
+        organizationId: GLOBEX,
         connectionId: ENTRA,
         externalId: "entra-ada",
+        releasedConnectionIds: [],
         userId: created.id,
       });
       w.store.memberships.splice(
@@ -359,7 +363,12 @@ describe("a directory deleting a person it no longer has in the organization", (
 
       expect(w.live(ACME)).toEqual([]);
       expect(w.store.directoryIdentities).toEqual([
-        { connectionId: ENTRA, externalId: "entra-ada", userId: created.id },
+        {
+          organizationId: GLOBEX,
+          connectionId: ENTRA,
+          externalId: "entra-ada",
+          userId: created.id,
+        },
       ]);
       await expect(w.store.findDirectoryExternalIds({ connectionIds: [OKTA] })).resolves.toEqual(
         [],
@@ -439,7 +448,7 @@ describe("a directory push that arrives for a person", () => {
       ]);
       expect(w.membershipsIn(ACME)).toHaveLength(1);
       expect(w.store.directoryIdentities).toEqual([
-        { connectionId: OKTA, externalId: "okta-ada", userId: first.id },
+        { organizationId: ACME, connectionId: OKTA, externalId: "okta-ada", userId: first.id },
       ]);
     });
   });

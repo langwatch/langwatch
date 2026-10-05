@@ -299,6 +299,7 @@ export class ScimModule implements ScimApiContract {
     });
     // The activity log arrives when scim_sync is built over its own store; see readScimSyncFrom.
     const syncs = ScimSyncReadsService.create({ syncs: repositories.scimSyncs, activity: null });
+    const connections = ScimConnectionsService.create(dependencies.identity);
     const scim = PostgresScimService.create({
       repository: repositories.scim,
       writer: dependencies.authorization,
@@ -309,9 +310,8 @@ export class ScimModule implements ScimApiContract {
       lifecycle,
       provenOffboarding: config.provenOffboarding,
       tokenPepper,
+      connections,
     });
-
-    const connections = ScimConnectionsService.create(dependencies.identity);
 
     const app = ScimModule.createWithService({
       scim,
@@ -421,7 +421,10 @@ export class ScimModule implements ScimApiContract {
     return this.#directoryExternalIds.isDirectoryUserInactive(input);
   }
 
-  findDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]> {
+  findDirectoryConnectionsForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]> {
     return this.#directoryExternalIds.findDirectoryConnectionsForUser(input);
   }
 

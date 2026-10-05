@@ -68,6 +68,7 @@ export function scimRepositoryFixture(overrides: Partial<ScimRepository> = {}): 
     rememberDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentitiesForUser: vi.fn(async () => undefined),
+    releaseDirectoryPeople: vi.fn(async () => undefined),
     findDirectoryConnectionsForUser: vi.fn(async () => []),
     ...overrides,
   };

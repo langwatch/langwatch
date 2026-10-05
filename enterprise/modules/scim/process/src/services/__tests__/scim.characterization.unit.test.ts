@@ -7,6 +7,7 @@ import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
@@ -36,6 +37,7 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     rememberDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentitiesForUser: vi.fn(async () => undefined),
+    releaseDirectoryPeople: vi.fn(async () => undefined),
     findDirectoryConnectionsForUser: vi.fn(async () => []),
     findMembership: vi.fn(async () => null),
     findOrganizationUsers: vi.fn(async () => ({ rows: [], total: 0 })),
@@ -95,6 +97,7 @@ function service(
   lifecycle: ScimSyncLifecycle = new QuietScimSyncLifecycle(),
 ): ScimService {
   return ScimService.create({
+    connections: HeldConnectionsFake.of(),
     prisma: repo,
     writer: new GrantsFake(),
     users: {
@@ -295,6 +298,7 @@ describe("SCIM characterization: provisioning invariants", () => {
       create: vi.fn(),
     } satisfies ScimUserProvisioning;
     const scim = ScimService.create({
+      connections: HeldConnectionsFake.of(),
       prisma: repo,
       users,
       writer,
@@ -389,6 +393,7 @@ describe("SCIM characterization: provisioning invariants", () => {
       create: vi.fn(),
     } satisfies ScimUserProvisioning;
     const scim = ScimService.create({
+      connections: HeldConnectionsFake.of(),
       prisma: repo,
       users,
       writer,
@@ -461,6 +466,7 @@ describe("SCIM characterization: provisioning invariants", () => {
           })),
         } satisfies ScimUserProvisioning;
         const scim = ScimService.create({
+          connections: HeldConnectionsFake.of(),
           prisma: repository({ addMembership: vi.fn(async () => undefined) }),
           writer,
           users,
