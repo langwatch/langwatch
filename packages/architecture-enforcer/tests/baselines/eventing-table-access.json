@@ -10,7 +10,7 @@
     "analytics|modules/analytics/process/src/rules/lwql-view-catalog.rules.ts|named:event_log": 1,
     "data-retention|modules/data-retention/contract/src/retention-tables.ts|named:event_log": 1,
     "data-retention|modules/data-retention/process/src/repositories/clickhouse/clickhouse.retroactive-retention.repository.ts|named:event_log": 1,
-    "identity|modules/identity/process/src/app/identity-composition.build.ts|event-store:getEventStore": 1,
+    "identity|modules/identity/process/src/app/identity.app.ts|event-store:getEventStore": 1,
     "identity|modules/identity/process/src/eventing/join-request-appending-ledger.store.ts|event-store:getEventStore": 1,
     "identity|modules/identity/process/src/eventing/join-request-appending-ledger.store.ts|event-store:storeEvents": 1,
     "identity|modules/identity/process/src/eventing/sso-connection-ledger.store.ts|event-store:getEventStore": 1,
@@ -27,7 +27,6 @@
     "ops|modules/ops/process/src/repositories/prisma/prisma.process-ops.repository.ts|sql:ProcessManagerInstance": 4,
     "ops|modules/ops/process/src/repositories/prisma/prisma.process-ops.repository.ts|sql:ProcessManagerOutbox": 11,
     "ops|modules/ops/process/src/services/storage-stats-collection.service.ts|named:event_log": 1,
-    "scim|enterprise/modules/scim/process/src/app/scim.app.ts|event-store:getEventStore": 1,
     "topic|modules/topic/process/src/repositories/prisma/prisma.topic-clustering.repository.ts|delegate:ProcessManagerInstance": 1,
     "trace|modules/trace/process/src/repositories/clickhouse/trace-event-payload.repository.ts|sql:event_log": 1,
     "trace|modules/trace/process/src/services/trace-blob-store.service.ts|sql:event_log": 1
