@@ -23,8 +23,8 @@ import type { GatewayRealtimeSession } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { ATTR_KEYS as ATTR } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import type { SpendUsage } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
-import { epochMsToOtlpNanos } from "~/server/traces/collectorSpan.utils";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { epochMsToOtlpNanos } from "~/server/traces/collectorSpan.utils";
 
 const logger = createLogger("langwatch:gateway:realtime-session-span");
 

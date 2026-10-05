@@ -8,17 +8,13 @@ import { epochMsToOtlpNanos } from "../collectorSpan.utils";
 describe("epochMsToOtlpNanos", () => {
   describe("given a current epoch millisecond value", () => {
     it("produces the exact nanosecond string", () => {
-      expect(epochMsToOtlpNanos(1_757_400_000_001)).toBe(
-        "1757400000001000000",
-      );
+      expect(epochMsToOtlpNanos(1_757_400_000_001)).toBe("1757400000001000000");
     });
 
     it("stays exact past Number.MAX_SAFE_INTEGER nanoseconds", () => {
       // ~1.7e18 ns is far beyond 2^53; BigInt keeps every digit where float
       // arithmetic is only saved by shortest-round-trip printing today.
-      expect(epochMsToOtlpNanos(1_757_399_999_999)).toBe(
-        "1757399999999000000",
-      );
+      expect(epochMsToOtlpNanos(1_757_399_999_999)).toBe("1757399999999000000");
     });
   });
 
@@ -42,9 +38,11 @@ describe("epochMsToOtlpNanos", () => {
     });
 
     it("carries a remainder that rounds up into the next millisecond", () => {
-      expect(epochMsToOtlpNanos(1_757_400_000_000.9999999)).toBe(
-        "1757400000001000000",
-      );
+      // At epoch magnitudes a double is spaced 2^-12 ms apart, so a literal
+      // like 1_757_400_000_000.9999999 is stored as exactly 1_757_400_000_001
+      // and never reaches the carry. A small value keeps the 0.9999999 ms
+      // fraction, whose remainder rounds up to a whole millisecond.
+      expect(epochMsToOtlpNanos(41.9999999)).toBe("42000000");
     });
   });
 
