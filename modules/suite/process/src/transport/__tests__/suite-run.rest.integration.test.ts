@@ -3,7 +3,6 @@
  * @see specs/scenarios/scenario-run-parameters.feature
  */
 import {
-  bindRestHeader,
   bindRestMiddleware,
   createRestRuntime,
   projectRestFacts,
@@ -14,7 +13,7 @@ import { suiteSchema, type SuiteApi, type SuiteRunResult } from "@langwatch/suit
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { suiteCallerKeyFact, suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";
+import { suiteRunOriginFact } from "../../rules/suite-wire-v1.rules.ts";
 import { createSuitesAliasRest } from "../suites-alias.rest.ts";
 
 class ScenarioParameterUnknownTestError extends HandledError {
@@ -71,8 +70,10 @@ function buildApi(run: (...args: never[]) => unknown) {
         viewerUserId: null,
         actorId: "project-key-1",
       })),
-      bindRestHeader(suiteSurfaceFact, "x-langwatch-surface"),
-      bindRestMiddleware(suiteCallerKeyFact, () => null),
+      bindRestMiddleware(suiteRunOriginFact, (context) => ({
+        surface: context.req.header("x-langwatch-surface") ?? null,
+        callerKey: null,
+      })),
     ],
   });
 

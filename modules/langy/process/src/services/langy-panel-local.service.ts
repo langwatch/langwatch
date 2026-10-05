@@ -136,14 +136,22 @@ export class LangyPanelLocalService {
     connected: boolean;
   }) {
     const now = nowInstant().epochMilliseconds;
-    if (open) return controlRequestState({ open, latest: null, claimed: false, connected, now });
+    if (open)
+      return controlRequestState({
+        open,
+        latest: { kind: "no_request_recorded" },
+        claimed: false,
+        connected,
+        now,
+      });
     const latest = await this.members.conversations.getLatestLocalControlRequest({
       projectId,
       conversationId,
     });
-    const claimed = latest
-      ? await this.members.runtime.requests.wasApproved(latest.requestId)
-      : false;
+    const claimed =
+      latest.kind === "recorded"
+        ? await this.members.runtime.requests.wasApproved(latest.request.requestId)
+        : false;
     return controlRequestState({ open, latest, claimed, connected, now });
   }
 

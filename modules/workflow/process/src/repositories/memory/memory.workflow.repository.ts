@@ -3,7 +3,7 @@
  * same contract the Prisma tier answers: a missing row is null, an archived
  * workflow is invisible unless asked for, and a DSL-less version reads as an empty graph.
  */
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import {
   workflowDslSchema,
   type Workflow,
@@ -290,13 +290,13 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
     id: string;
     projectId: string;
     dsl: WorkflowDsl;
-    updatedAt: Date;
+    updatedAt: Instant;
   }): Promise<boolean> {
     const existing = this.store.versions.get(input.id);
     if (
       !existing ||
       existing.projectId !== input.projectId ||
-      existing.updatedAt.getTime() !== input.updatedAt.getTime()
+      existing.updatedAt.getTime() !== input.updatedAt.epochMilliseconds
     ) {
       return Promise.resolve(false);
     }

@@ -6,7 +6,8 @@ test("experiment creation keeps the SDK workflow discoverable", async ({ page },
 
   await page.goto(`/${projectSlug}/evaluations`);
   const newExperiment = page.getByRole("button", { name: "New Experiment" }).first();
-  await expect(newExperiment).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  // The solid primary button: design-system token orange.solid, #ED8926.
+  await expect(newExperiment).toHaveCSS("background-color", "rgb(237, 137, 38)");
   await newExperiment.click();
   const sdkExperiment = page.getByRole("menuitem", {
     name: /New Experiment via SDK/,

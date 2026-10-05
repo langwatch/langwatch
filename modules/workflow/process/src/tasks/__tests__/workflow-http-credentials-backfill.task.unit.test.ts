@@ -1,5 +1,6 @@
 import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { Instant } from "@langwatch/time";
 import type { Workflow, WorkflowVersion } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
@@ -35,7 +36,7 @@ const versionOf = (id: string, nodes: unknown[]): WorkflowVersion => ({
   updatedAt: at,
 });
 
-type VersionWrite = { id: string; projectId: string; dsl: unknown; updatedAt: Date };
+type VersionWrite = { id: string; projectId: string; dsl: unknown; updatedAt: Instant };
 
 type SecretRow = Awaited<ReturnType<SecretApi["create"]>>;
 
@@ -136,7 +137,10 @@ describe("moving credentials typed inline before they became project secrets", (
 
     await run(task);
 
-    expect(attempted.map((write) => write.updatedAt)).toEqual([at, at]);
+    expect(attempted.map((write) => write.updatedAt.epochMilliseconds)).toEqual([
+      at.getTime(),
+      at.getTime(),
+    ]);
     expect(rewritten).toEqual([]);
   });
 });

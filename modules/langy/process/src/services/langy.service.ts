@@ -23,7 +23,7 @@ import {
   type ConversationListItem,
   type ConversationListPage,
 } from "../rules/langy-conversation-shape.rules.ts";
-import type { LatestControlRequest } from "../rules/langy-local-control-request-state.rules.ts";
+import type { LatestControlRequestReading } from "../rules/langy-local-control-request-state.rules.ts";
 import {
   type LangyConversationService,
   type LangyConversationEventsReader,
@@ -176,7 +176,7 @@ export class LangyService {
   getLatestLocalControlRequest(input: {
     projectId: string;
     conversationId: string;
-  }): Promise<LatestControlRequest | null> {
+  }): Promise<LatestControlRequestReading> {
     return this.conversations.getLatestLocalControlRequest(input);
   }
 

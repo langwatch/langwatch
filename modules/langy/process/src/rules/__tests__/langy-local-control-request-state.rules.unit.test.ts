@@ -118,9 +118,8 @@ describe("pickLatestControlRequest", () => {
       ]);
 
       expect(latest).toEqual({
-        requestId: "lcr_2",
-        expiresAt: NOW + FIFTEEN_MINUTES,
-        approved: false,
+        kind: "recorded",
+        request: { requestId: "lcr_2", expiresAt: NOW + FIFTEEN_MINUTES, approved: false },
       });
     });
   });
@@ -134,7 +133,7 @@ describe("pickLatestControlRequest", () => {
             data: { requestId: "lcr_1" },
           },
         ]),
-      ).toBeNull();
+      ).toEqual({ kind: "no_request_recorded" });
     });
   });
 });

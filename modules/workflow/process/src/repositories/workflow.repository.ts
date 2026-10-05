@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import type {
   Workflow,
   WorkflowDsl,
@@ -108,7 +109,7 @@ export abstract class WorkflowRepository {
     id: string;
     projectId: string;
     dsl: WorkflowDsl;
-    updatedAt: Date;
+    updatedAt: Instant;
   }): Promise<boolean>;
   abstract setVersionPointers(input: {
     id: string;

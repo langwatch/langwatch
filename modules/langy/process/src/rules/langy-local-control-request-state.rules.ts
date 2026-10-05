@@ -24,13 +24,18 @@ export interface LatestControlRequest {
   approved: boolean;
 }
 
+/** What the log holds: a request, or the plain fact that the conversation never asked. */
+export type LatestControlRequestReading =
+  | { kind: "recorded"; request: LatestControlRequest }
+  | { kind: "no_request_recorded" };
+
 const field = (data: unknown, key: string): unknown =>
   typeof data === "object" && data !== null ? (data as Record<string, unknown>)[key] : undefined;
 
 /** The last request in the log, or nothing when the conversation never asked. */
 export function pickLatestControlRequest(
   events: readonly ControlRequestHistoryEvent[],
-): LatestControlRequest | null {
+): LatestControlRequestReading {
   let latest: LatestControlRequest | null = null;
   for (const event of events) {
     if (event.type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_CONTROL_REQUESTED) {
@@ -50,7 +55,7 @@ export function pickLatestControlRequest(
       latest = { ...latest, approved: true };
     }
   }
-  return latest;
+  return latest ? { kind: "recorded", request: latest } : { kind: "no_request_recorded" };
 }
 
 /**
@@ -65,7 +70,7 @@ export function controlRequestState({
   now,
 }: {
   open: { expiresAt: number } | null;
-  latest: LatestControlRequest | null;
+  latest: LatestControlRequestReading;
   claimed: boolean;
   /** A folder is connected to the conversation right now. */
   connected: boolean;
@@ -74,8 +79,8 @@ export function controlRequestState({
   if (connected) return "approved";
   if (open && open.expiresAt > now) return "open";
   if (open) return "expired";
-  if (!latest) return "none";
-  if (latest.approved) return "ended";
-  if (latest.expiresAt <= now) return "expired";
+  if (latest.kind === "no_request_recorded") return "none";
+  if (latest.request.approved) return "ended";
+  if (latest.request.expiresAt <= now) return "expired";
   return claimed ? "open" : "declined";
 }

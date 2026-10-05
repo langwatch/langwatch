@@ -20,11 +20,11 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import { billingSlackChannels } from "../channels/billing-slack-channels.registry.ts";
+import { billingAlertChannels } from "../channels/billing-alert-channels.registry.ts";
 import type {
-  BillingSlackChannel,
-  BillingSlackMessage,
-} from "../channels/billing-slack.channel.ts";
+  BillingAlertChannel,
+  BillingAlertMessage,
+} from "../channels/billing-alert.channel.ts";
 import { hubspotFormChannels } from "../channels/hubspot-form-channels.registry.ts";
 import type { HubspotFormChannel } from "../channels/hubspot-form.channel.ts";
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
@@ -78,7 +78,7 @@ type NotificationServiceOptions = {
     hubspotReachedLimitFormId?: string;
     hubspotFormId?: string;
   };
-  slack?: BillingSlackChannel;
+  slack?: BillingAlertChannel;
   hubspotForms?: HubspotFormChannel;
   errorReporter?: BillingErrorReporter;
   usageLimitEmail?: UsageLimitEmailChannel;
@@ -94,14 +94,14 @@ type NotificationServiceOptions = {
  */
 export class NotificationService {
   private readonly config: NotificationServiceOptions["config"];
-  private readonly slack: BillingSlackChannel;
+  private readonly slack: BillingAlertChannel;
   private readonly hubspotForms: HubspotFormChannel;
   private readonly errorReporter: BillingErrorReporter;
   private readonly usageLimitEmail: UsageLimitEmailChannel;
 
   private constructor(options: NotificationServiceOptions) {
     this.config = options.config;
-    this.slack = options.slack ?? billingSlackChannels.live.create();
+    this.slack = options.slack ?? billingAlertChannels.live.create();
     this.hubspotForms = options.hubspotForms ?? hubspotFormChannels.live.create();
     this.errorReporter = options.errorReporter ?? NullBillingErrorReporter.create();
     this.usageLimitEmail = options.usageLimitEmail ?? usageLimitEmailChannels.memory.create();
@@ -144,7 +144,7 @@ export class NotificationService {
     errorLog,
   }: {
     channelUrl?: string;
-    message: (origin: NoticeOrigin) => BillingSlackMessage;
+    message: (origin: NoticeOrigin) => BillingAlertMessage;
     missingConfigLog?: string;
     errorLog: string;
   }): Promise<void> {

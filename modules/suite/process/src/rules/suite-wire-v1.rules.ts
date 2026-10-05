@@ -26,19 +26,16 @@ import {
 import { z } from "zod";
 
 /**
- * Which surface started a run, as `X-LangWatch-Surface` spells it. Declared
- * here because all three suite families record it on the runs they queue, and
- * bound once by the process that reads the header.
+ * Where a run was started from, bound once by the process: the surface as `X-LangWatch-Surface`
+ * spells it, and the API key the run started with so the run's own key holds no more. The key is
+ * null for a legacy API key or a project-bound access token, which have no key row.
  */
-export const suiteSurfaceFact = defineRestMiddleware("suiteSurface", z.string().nullable());
-
-/**
- * The API key a run was started with, so the run's own key holds no more; null for a legacy
- * API key or a project-bound access token, which have no key row.
- */
-export const suiteCallerKeyFact = defineRestMiddleware(
-  "suiteCallerKey",
-  z.string().min(1).nullable(),
+export const suiteRunOriginFact = defineRestMiddleware(
+  "suiteRunOrigin",
+  z.object({
+    surface: z.string().nullable(),
+    callerKey: z.string().min(1).nullable(),
+  }),
 );
 
 export const suiteFieldWireSchema = suiteFieldDefinitionSchema.describe(

@@ -86,7 +86,7 @@ function service({
     }),
     conversations: createApiFixture<LangyPanelLocalMembers["conversations"]>({
       findByIdVisible: async () => conversation,
-      getLatestLocalControlRequest: async () => null,
+      getLatestLocalControlRequest: async () => ({ kind: "no_request_recorded" }),
     }),
     runtime,
     commands: createApiFixture<LangyPanelLocalMembers["commands"]>({

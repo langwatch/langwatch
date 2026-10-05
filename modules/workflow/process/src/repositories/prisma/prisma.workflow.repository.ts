@@ -1,3 +1,4 @@
+import { toDate, type Instant } from "@langwatch/time";
 import {
   workflowDslSchema,
   workflowSchema,
@@ -323,10 +324,10 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
     id: string;
     projectId: string;
     dsl: WorkflowDsl;
-    updatedAt: Date;
+    updatedAt: Instant;
   }): Promise<boolean> {
     const written = await this.database.workflowVersion.updateMany({
-      where: { id: input.id, projectId: input.projectId, updatedAt: input.updatedAt },
+      where: { id: input.id, projectId: input.projectId, updatedAt: toDate(input.updatedAt) },
       data: { dsl: input.dsl },
     });
 

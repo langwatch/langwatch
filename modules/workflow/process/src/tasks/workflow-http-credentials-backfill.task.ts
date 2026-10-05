@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
+import { fromDate } from "@langwatch/time";
 import type { WorkflowDsl, WorkflowVersion } from "@langwatch/workflow-contract";
 
 import type { WorkflowHttpSecrets } from "../app/workflow.app.ts";
@@ -77,7 +78,7 @@ export class WorkflowHttpCredentialsBackfillTask extends Task {
       id: version.id,
       projectId,
       dsl,
-      updatedAt: version.updatedAt,
+      updatedAt: fromDate(version.updatedAt),
     });
     if (written) {
       logger.info({ projectId, versionId: version.id }, "version credentials moved to secrets");

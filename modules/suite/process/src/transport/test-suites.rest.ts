@@ -24,8 +24,7 @@ import { z } from "zod";
 
 import {
   runPlanRunResultSchema,
-  suiteCallerKeyFact,
-  suiteSurfaceFact,
+  suiteRunOriginFact,
   testSuiteCreateInputSchema,
   testSuiteDetailWireSchema,
   testSuiteRunInputSchema,
@@ -325,9 +324,16 @@ export function createTestSuitesRest(): Readonly<{
         "Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.",
       responses: notFound,
     })
-    .withMiddleware(projectRestFacts, suiteSurfaceFact, suiteCallerKeyFact)
-    .handle(({ app, input, scope }, project, surface, callerKey) =>
-      runTestSuite({ app, input, projectId: scope.id, project, surface, callerKey }),
+    .withMiddleware(projectRestFacts, suiteRunOriginFact)
+    .handle(({ app, input, scope }, project, origin) =>
+      runTestSuite({
+        app,
+        input,
+        projectId: scope.id,
+        project,
+        surface: origin.surface,
+        callerKey: origin.callerKey,
+      }),
     )
     .build();
 }
