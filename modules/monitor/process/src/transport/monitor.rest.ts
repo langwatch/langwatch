@@ -119,7 +119,7 @@ export function createMonitorsRest(): Readonly<{
         monitorWire({
           app,
           projectSlug: project.projectSlug,
-          monitor: await app.create({
+          monitor: await app.createPublicMonitor({
             projectId: scope.id,
             name: input.name,
             checkType: input.checkType,

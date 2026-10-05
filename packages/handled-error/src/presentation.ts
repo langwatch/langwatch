@@ -778,6 +778,11 @@ const presentations = {
     title: "Online evaluation not found",
     describe: () => "It may have been deleted. Reload the list and pick another one.",
   },
+  monitor_parameters_unused: {
+    title: "These settings belong to the evaluator",
+    describe: () =>
+      "This evaluation runs with its evaluator's settings. Change them on the evaluator instead.",
+  },
   monitor_check_type_unknown: {
     // The reader is in the online evaluation wizard, having chosen a check the
     // platform no longer runs — usually a saved draft from an older release.

@@ -38,12 +38,14 @@ import type {
   EvaluationRunLookup,
   EvaluationRunsByTraceQuery,
   EvaluationSummariesByTraceIdsQuery,
+  EvaluatorOwnSettingsQuery,
   TraceEvaluationsQuery,
 } from "./evaluation.queries.ts";
 import type {
   EvaluationRunOutcome,
   EvaluationWarmup,
   EvaluatorCatalogue,
+  EvaluatorOwnSettings,
 } from "./evaluation.responses.ts";
 import type {
   EvaluationExecutionResult,
@@ -109,6 +111,11 @@ export interface EvaluationApi {
   reportEvaluation(data: ReportEvaluationCommandData): Promise<void>;
   /** Queues a trace's online evaluation with the trigger's delay and dedup. */
   queueTraceEvaluation(data: ExecuteEvaluationCommandData): Promise<void>;
+  /**
+   * The settings an evaluator runs with in place of a monitor's parameters,
+   * resolved as the runner resolves them, operator rollback included.
+   */
+  findEvaluatorOwnSettings(input: EvaluatorOwnSettingsQuery): Promise<EvaluatorOwnSettings>;
   /** The evaluator-id slug rule for an evaluation that names no evaluator. */
   deriveEvaluatorId(name: string): string;
   /** The evaluation half of a trigger's legacy filters against a trace's runs. */

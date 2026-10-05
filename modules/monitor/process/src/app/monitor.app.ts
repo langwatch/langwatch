@@ -17,6 +17,7 @@ import {
   MonitorApi,
   MonitorCheckSettingsInvalidError,
   MonitorCheckTypeUnknownError,
+  MonitorParametersUnusedError,
   MonitorSourceProjectForbiddenError,
   monitorSettingsSchema,
   type Monitor,
@@ -42,6 +43,7 @@ import { nowInstant } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { MonitorRepositories } from "../repositories/monitor.repositories.ts";
+import { areParametersUnused } from "../rules/monitor-parameters.rules.ts";
 import { previousPeriodStartMs } from "../rules/monitor-performance-window.rules.ts";
 import { monitorPlatformUrl } from "../rules/monitor-platform-url.rules.ts";
 import { MonitorCatalogService } from "../services/monitor-catalog.service.ts";
@@ -165,6 +167,19 @@ export class MonitorModule implements MonitorApi {
     return this.#monitors.create(input);
   }
 
+  /** The public API's create, which also refuses parameters the run would set aside. */
+  async createPublicMonitor(input: MonitorCreateInput): Promise<Monitor> {
+    if (input.evaluatorId !== undefined) {
+      await this.#assertParametersWillRun({
+        projectId: input.projectId,
+        evaluatorId: input.evaluatorId,
+        parameters: input.parameters,
+      });
+    }
+
+    return this.create(input);
+  }
+
   update(input: MonitorUpdateInput): Promise<Monitor> {
     return this.#monitors.update(input);
   }
@@ -178,7 +193,11 @@ export class MonitorModule implements MonitorApi {
     return this.#monitors.upsertForExperiment(input);
   }
 
-  /** Applies a partial change, keeping every field the caller did not mention. */
+  /**
+   * Applies a partial change, keeping every field the caller did not mention.
+   * Refuses parameters the run would set aside; a move to another evaluator
+   * re-checks the stored ones, since its settings may override them.
+   */
   async patch(input: MonitorPatchInput): Promise<Monitor> {
     const { id, projectId, changes } = input;
     const existing = await this.#monitors.getById({ id, projectId });
@@ -187,6 +206,17 @@ export class MonitorModule implements MonitorApi {
     // replaced with an empty object rather than carried forward, so a monitor
     // whose evaluator changed shape does not fail every later edit.
     const existingParameters = monitorSettingsSchema.safeParse(existing.parameters);
+    const parameters =
+      changes.parameters ?? (existingParameters.success ? existingParameters.data : {});
+
+    // Checked against the evaluator it runs with after this update: the one it
+    // moves to, or the one it has when only the parameters change. Removing the
+    // evaluator is refused by the update itself, so it is not checked here.
+    const movesTo = typeof changes.evaluatorId === "string" ? changes.evaluatorId : undefined;
+    const evaluatorId = movesTo ?? (changes.parameters === undefined ? null : existing.evaluatorId);
+    if (evaluatorId && changes.evaluatorId !== null) {
+      await this.#assertParametersWillRun({ projectId, evaluatorId, parameters });
+    }
 
     return this.update({
       id,
@@ -195,7 +225,7 @@ export class MonitorModule implements MonitorApi {
       checkType: changes.checkType ?? existing.checkType,
       executionMode: changes.executionMode ?? existing.executionMode,
       preconditions: changes.preconditions ?? existing.preconditions,
-      parameters: changes.parameters ?? (existingParameters.success ? existingParameters.data : {}),
+      parameters,
       mappings: changes.mappings !== undefined ? changes.mappings : existing.mappings,
       sample: changes.sample ?? existing.sample,
       enabled: changes.enabled,
@@ -314,6 +344,24 @@ export class MonitorModule implements MonitorApi {
 
   deleteForExperiment(input: { projectId: string; experimentId: string }): Promise<void> {
     return this.#monitors.deleteForExperiment(input);
+  }
+
+  /** Refuses parameters the evaluator's own settings would override at run time. */
+  async #assertParametersWillRun(
+    input: Readonly<{
+      projectId: string;
+      evaluatorId: string;
+      parameters: Record<string, unknown> | undefined;
+    }>,
+  ): Promise<void> {
+    const ownSettings = await this.#evaluation.findEvaluatorOwnSettings({
+      projectId: input.projectId,
+      evaluatorId: input.evaluatorId,
+    });
+
+    if (areParametersUnused({ ownSettings, parameters: input.parameters })) {
+      throw new MonitorParametersUnusedError(input.evaluatorId);
+    }
   }
 
   /** Standing in the project a monitor is copied FROM, which is the caller's own. */

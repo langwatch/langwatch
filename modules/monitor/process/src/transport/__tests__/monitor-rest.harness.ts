@@ -15,6 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   createMonitorTestApp,
   createMonitorTestRepositories,
+  FakeEvaluatorOwnSettings,
   FakeMonitorEvaluators,
 } from "../../app/__tests__/monitor.fixture.ts";
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
@@ -32,13 +33,19 @@ export async function errorCodeOf(response: Response): Promise<string | undefine
 
 /** The family, one application, one repository the test may seed. */
 export function mountMonitorRest(
-  options: { permits?: boolean; seed?: readonly MonitorWithEvaluator[] } = {},
+  options: {
+    permits?: boolean;
+    seed?: readonly MonitorWithEvaluator[];
+    /** The settings an evaluator runs with in place of a monitor's parameters, by id. */
+    evaluatorSettings?: Record<string, Record<string, unknown>>;
+  } = {},
 ) {
   const repository = MemoryMonitorRepository.create({ seed: options.seed ?? [] });
 
   const app = createMonitorTestApp({
     repositories: createMonitorTestRepositories(repository),
     evaluators: new FakeMonitorEvaluators(["evaluator-1", "evaluator-2"]),
+    ownSettings: new FakeEvaluatorOwnSettings(options.evaluatorSettings),
     permissions: createApiFixture<AuthzApi>({
       hasProjectPermission: async () => options.permits ?? true,
     }),

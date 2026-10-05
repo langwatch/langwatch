@@ -28,6 +28,30 @@ export class MonitorEvaluatorRequiredError extends HandledError {
   }
 }
 
+/**
+ * A monitor's `parameters` are only read when its evaluator has no settings of
+ * its own. Parameters that disagree with those settings saved cleanly and read
+ * back like the live configuration while never running, so they are refused.
+ */
+export class MonitorParametersUnusedError extends HandledError {
+  declare readonly code: "monitor_parameters_unused";
+
+  constructor(readonly evaluatorId: string) {
+    super(
+      "monitor_parameters_unused",
+      "This monitor runs with its evaluator's settings, so these parameters would never be used. " +
+        "Change the evaluator's settings instead, or send parameters as an empty object.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { field: "parameters", evaluatorId },
+        ...remediation("monitor_parameters_unused"),
+      },
+    );
+    this.name = "MonitorParametersUnusedError";
+  }
+}
+
 /** The monitor names a check this platform runs no evaluator for. */
 export class MonitorCheckTypeUnknownError extends HandledError {
   declare readonly code: "monitor_check_type_unknown";

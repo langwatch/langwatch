@@ -6,6 +6,7 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   EvaluationApi,
+  EvaluatorOwnSettings,
   MonitorPerformanceQuery,
   OnlineEvaluationPerformance,
 } from "@langwatch/evaluation-contract";
@@ -67,6 +68,17 @@ export class FakeMonitorEvaluators {
   }
 }
 
+/** The settings each evaluator runs with in place of a monitor's parameters, by id. */
+export class FakeEvaluatorOwnSettings {
+  constructor(private readonly byEvaluator: Record<string, Record<string, unknown>> = {}) {}
+
+  async find(input: { evaluatorId: string }): Promise<EvaluatorOwnSettings> {
+    const settings = this.byEvaluator[input.evaluatorId];
+
+    return settings ? { kind: "own", settings } : { kind: "none" };
+  }
+}
+
 /** The trend, answered from whatever the test seeded. */
 export class FakeMonitorPerformance {
   readonly queries: MonitorPerformanceQuery[] = [];
@@ -121,12 +133,14 @@ export function createMonitorTestApp(
     repositories?: MonitorRepositories;
     permissions?: AuthzApi;
     evaluators?: FakeMonitorEvaluators;
+    ownSettings?: FakeEvaluatorOwnSettings;
     performance?: FakeMonitorPerformance;
     replication?: FakeMonitorReplication;
     publicBaseUrl?: string;
   }> = {},
 ): MonitorModule {
   const evaluators = input.evaluators ?? new FakeMonitorEvaluators();
+  const ownSettings = input.ownSettings ?? new FakeEvaluatorOwnSettings();
   const performance = input.performance ?? new FakeMonitorPerformance();
   const replication =
     input.replication ?? new FakeMonitorReplication({ id: "evaluator_copy", workflowId: null });
@@ -144,6 +158,7 @@ export function createMonitorTestApp(
       }),
       evaluation: createApiFixture<EvaluationApi>({
         getMonitorPerformance: (query) => performance.getMonitorPerformance(query),
+        findEvaluatorOwnSettings: (query) => ownSettings.find(query),
       }),
       workflows: createApiFixture<WorkflowApi>({
         deleteUncommitted: (reference) => replication.deleteUncommitted(reference),

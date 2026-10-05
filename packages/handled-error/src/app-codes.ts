@@ -514,6 +514,7 @@ export const APP_ERROR_CODES = [
   "monitor_check_type_unknown",
   "monitor_evaluator_required",
   "monitor_not_found",
+  "monitor_parameters_unused",
   "monitor_source_project_forbidden",
   "no_admin_configured",
   "no_eligible_model_providers",

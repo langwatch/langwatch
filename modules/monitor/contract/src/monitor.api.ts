@@ -48,8 +48,16 @@ export interface MonitorApi {
   /** Refuses by name when this check cannot run; answers nothing when it can. */
   assertCheckRunnable(input: MonitorRunnableCheckInput): Promise<void>;
   create(input: MonitorCreateInput): Promise<Monitor>;
+  /**
+   * The public API's create. Also refuses, with `MonitorParametersUnusedError`,
+   * parameters the evaluator's own settings would override at run time.
+   */
+  createPublicMonitor(input: MonitorCreateInput): Promise<Monitor>;
   update(input: MonitorUpdateInput): Promise<Monitor>;
-  /** Applies a partial change, keeping every field the caller did not mention. */
+  /**
+   * Applies a partial change, keeping every field the caller did not mention.
+   * Refuses parameters the evaluator's own settings would override.
+   */
   patch(input: MonitorPatchInput): Promise<Monitor>;
   upsertForExperiment(input: MonitorExperimentUpsertInput): Promise<Monitor>;
   toggle(input: MonitorToggleInput): Promise<{ success: true }>;

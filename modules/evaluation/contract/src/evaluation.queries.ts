@@ -34,3 +34,10 @@ export const evaluationInputsQuerySchema = z.object({
   evaluationId: z.string(),
 });
 export type EvaluationInputsQuery = z.infer<typeof evaluationInputsQuerySchema>;
+
+/** One of a project's evaluators, named by id. */
+export const evaluatorOwnSettingsQuerySchema = z.object({
+  projectId: z.string(),
+  evaluatorId: z.string(),
+});
+export type EvaluatorOwnSettingsQuery = z.infer<typeof evaluatorOwnSettingsQuerySchema>;

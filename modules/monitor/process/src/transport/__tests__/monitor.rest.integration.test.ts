@@ -205,6 +205,126 @@ describe("the monitors REST family", () => {
     });
   });
 
+  // Parameters the evaluator's own settings override used to be stored and
+  // read back as the live configuration while the run used the settings.
+  describe("when the evaluator carries its own settings", () => {
+    const evaluatorSettings = {
+      "evaluator-1": { model: "openai/gpt-5" },
+      "evaluator-2": { model: "anthropic/claude" },
+    };
+    const mount = (seed: readonly MonitorWithEvaluator[] = []) =>
+      mountMonitorRest({ seed, evaluatorSettings });
+
+    it("refuses a create whose parameters would never run", async () => {
+      const api = mount();
+
+      const response = await api.post("/api/monitors", create);
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "monitor_parameters_unused",
+        meta: { field: "parameters", evaluatorId: "evaluator-1" },
+      });
+      await expect(api.repository.findAll({ projectId: TEST_PROJECT.id })).resolves.toEqual([]);
+    });
+
+    it("accepts parameters that repeat the evaluator's settings", async () => {
+      const response = await mount().post("/api/monitors", {
+        ...create,
+        parameters: { model: "openai/gpt-5" },
+      });
+
+      expect(response.status).toBe(201);
+    });
+
+    it("accepts a create without parameters", async () => {
+      const { parameters: _parameters, ...bare } = create;
+
+      const response = await mount().post("/api/monitors", bare);
+
+      expect(response.status).toBe(201);
+    });
+
+    it("refuses an update whose parameters would never run, keeping the stored ones", async () => {
+      const api = mount([{ ...seeded, parameters: {} }]);
+
+      const response = await api.patch("/api/monitors/monitor-1", {
+        parameters: { model: "openai/gpt-5-mini" },
+      });
+
+      expect(response.status).toBe(422);
+      await expect(errorCodeOf(response)).resolves.toBe("monitor_parameters_unused");
+      await expect(
+        api.repository.findById({ id: "monitor-1", projectId: TEST_PROJECT.id }),
+      ).resolves.toMatchObject({ parameters: {} });
+    });
+
+    it("checks the parameters against the evaluator the update moves to", async () => {
+      const response = await mount([{ ...seeded, parameters: {} }]).patch(
+        "/api/monitors/monitor-1",
+        { evaluatorId: "evaluator-2", parameters: { model: "anthropic/claude" } },
+      );
+
+      expect(response.status).toBe(200);
+    });
+
+    it("refuses a move that would leave the stored parameters unused", async () => {
+      const api = mount([{ ...seeded, parameters: { model: "openai/gpt-5" } }]);
+
+      const response = await api.patch("/api/monitors/monitor-1", { evaluatorId: "evaluator-2" });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "monitor_parameters_unused",
+        meta: { evaluatorId: "evaluator-2" },
+      });
+      await expect(
+        api.repository.findById({ id: "monitor-1", projectId: TEST_PROJECT.id }),
+      ).resolves.toMatchObject({ evaluatorId: "evaluator-1" });
+    });
+
+    it("names the missing evaluator before the parameters when an update removes it", async () => {
+      const response = await mount([{ ...seeded, parameters: {} }]).patch(
+        "/api/monitors/monitor-1",
+        { evaluatorId: null, parameters: { model: "openai/gpt-5-mini" } },
+      );
+
+      await expect(errorCodeOf(response)).resolves.toBe("monitor_evaluator_required");
+    });
+
+    it("accepts a move that clears the parameters", async () => {
+      const api = mount([{ ...seeded, parameters: { model: "openai/gpt-5" } }]);
+
+      const response = await api.patch("/api/monitors/monitor-1", {
+        evaluatorId: "evaluator-2",
+        parameters: {},
+      });
+
+      expect(response.status).toBe(200);
+      await expect(
+        api.repository.findById({ id: "monitor-1", projectId: TEST_PROJECT.id }),
+      ).resolves.toMatchObject({ evaluatorId: "evaluator-2", parameters: {} });
+    });
+  });
+
+  describe("when a monitor without an evaluator is given parameters", () => {
+    it("stores them, since they are what runs", async () => {
+      const api = mountMonitorRest({
+        seed: [{ ...seeded, id: "monitor-legacy", evaluatorId: null }],
+        evaluatorSettings: { "evaluator-1": { model: "openai/gpt-5" } },
+      });
+
+      const response = await api.patch("/api/monitors/monitor-legacy", {
+        parameters: { model: "openai/gpt-5-nano" },
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        parameters: { model: "openai/gpt-5-nano" },
+      });
+    });
+  });
+
   describe("when the project has no such monitor", () => {
     it("answers 404 on the read", async () => {
       const api = mountMonitorRest();

@@ -639,6 +639,13 @@ const registry = {
     ],
     docsPath: "/evaluations/online-evaluation/overview",
   },
+  monitor_parameters_unused: {
+    tips: [
+      "Change the settings on the evaluator named in meta.evaluatorId: PUT /api/evaluators/{evaluatorId}",
+      "Or send parameters as {}; the evaluator's settings are what run, and a move to another evaluator re-checks the stored parameters",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
   monitor_check_type_unknown: {
     tips: [
       "The value in meta.checkType is not an evaluator this platform runs; pick one from langwatch evaluator list",

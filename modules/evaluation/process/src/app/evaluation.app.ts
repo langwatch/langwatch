@@ -95,6 +95,8 @@ import { EvaluationSpanDigestService } from "../services/evaluation-span-digest.
 import { EvaluationService } from "../services/evaluation.service.ts";
 import { EvaluatorEnvironmentService } from "../services/evaluator-environment.service.ts";
 import { EvaluatorModelEnvService } from "../services/evaluator-model-env.service.ts";
+import { EvaluatorOwnSettingsService } from "../services/evaluator-own-settings.service.ts";
+import { EvaluatorSettingsService } from "../services/evaluator-settings.service.ts";
 import { LangevalsClusteringService } from "../services/langevals-clustering.service.ts";
 import { LangevalsEvaluatorService } from "../services/langevals-evaluator.service.ts";
 import { LangevalsPiiDetectionService } from "../services/langevals-pii-detection.service.ts";
@@ -301,6 +303,7 @@ export class EvaluationModule implements EvaluationApiContract {
   readonly #batchLog: EvaluationBatchLogService;
   readonly #autoslug: EvaluationNameAutoslugService;
   readonly #filterMatching: EvaluationFilterMatchingService;
+  readonly #ownSettings: EvaluatorOwnSettingsService;
   readonly #experiments: EvaluationExperimentDirectory;
   readonly #slugs: EvaluationSlugDirectory;
   readonly #savedEvaluators: EvaluationSavedEvaluatorDirectory;
@@ -362,6 +365,11 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#commands = commands;
     this.#autoslug = EvaluationNameAutoslugService.create();
     this.#filterMatching = EvaluationFilterMatchingService.create();
+    this.#ownSettings = EvaluatorOwnSettingsService.create({
+      evaluators: dependencies.evaluators,
+      settings: EvaluatorSettingsService.create(),
+      settingsRecovery: EvaluationSettingsRecoverySwitchService.create(dependencies.featureFlags),
+    });
     this.#batchLog = EvaluationBatchLogService.create({
       experiments: members.experiments,
       runs: members.experimentRuns,
@@ -638,6 +646,8 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#ledger.recordCost(input);
   recordDatasetEvaluationRow: EvaluationApiContract["recordDatasetEvaluationRow"] = (input) =>
     this.#ledger.recordDatasetRow(input);
+  findEvaluatorOwnSettings: EvaluationApiContract["findEvaluatorOwnSettings"] = (input) =>
+    this.#ownSettings.find(input);
   deriveEvaluatorId: EvaluationApiContract["deriveEvaluatorId"] = (name) =>
     this.#autoslug.derive(name);
   matchesEvaluationFilters: EvaluationApiContract["matchesEvaluationFilters"] = (input) =>

@@ -48,3 +48,13 @@ export type EvaluationRunOutcome = z.infer<typeof evaluationRunOutcomeSchema>;
 /** What the evaluator-runtime warm-up answers with. */
 export const evaluationWarmupSchema = z.object({ success: z.boolean(), count: z.number() });
 export type EvaluationWarmup = z.infer<typeof evaluationWarmupSchema>;
+
+/**
+ * The settings an evaluator runs with whatever a monitor's parameters say, or
+ * none when the run reads the monitor's parameters.
+ */
+export const evaluatorOwnSettingsSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("own"), settings: z.record(z.string(), z.unknown()) }),
+  z.object({ kind: z.literal("none") }),
+]);
+export type EvaluatorOwnSettings = z.infer<typeof evaluatorOwnSettingsSchema>;
