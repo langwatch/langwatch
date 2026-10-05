@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PrismaSsoAccountFactsRepository } from "../sso-account-facts.prisma.repository";
 
@@ -66,6 +68,7 @@ describe("PrismaSsoAccountFactsRepository", () => {
       repository.findLatestForConnection({
         organizationId: "org_other",
         connectionId: "ssoc_acme",
+        issuer: null,
       }),
     ).resolves.toBeNull();
     expect(ssoConnection.findFirst).toHaveBeenCalledWith({
@@ -88,6 +91,7 @@ describe("PrismaSsoAccountFactsRepository", () => {
       repository.findLatestForConnection({
         organizationId: "org_acme",
         connectionId: "ssoc_acme",
+        issuer: "https://idp.acme.example",
       }),
     ).resolves.toEqual({
       accountId: "account_1",
@@ -95,9 +99,42 @@ describe("PrismaSsoAccountFactsRepository", () => {
       atMs: createdAt.getTime(),
     });
     expect(account.findFirst).toHaveBeenCalledWith({
-      where: { provider: "ssoc_acme" },
+      where: {
+        provider: "ssoc_acme",
+        OR: [{ issuer: "https://idp.acme.example" }, { issuer: null }],
+      },
       select: { id: true, userId: true, createdAt: true },
       orderBy: { createdAt: "desc" },
+    });
+  });
+
+  describe("when a sign-on callback transaction is open", () => {
+    /** @scenario "A verified domain's identity provider links an unconfirmed password account" */
+    it("reads the link candidate inside it, so the resolver's confirmation is seen", async () => {
+      const transaction = {
+        account: { count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
+        user: { findUnique: vi.fn() },
+        ssoConnection: { findFirst: vi.fn() },
+      };
+      transaction.user.findUnique.mockResolvedValue({ emailVerified: true });
+      transaction.account.count.mockResolvedValue(1);
+      user.findUnique.mockResolvedValue({ emailVerified: false });
+      const transactions = new AsyncLocalStorage<typeof transaction>();
+      const inTransaction = new PrismaSsoAccountFactsRepository(
+        { account, user, ssoConnection },
+        transactions,
+      );
+
+      await expect(
+        transactions.run(transaction, () =>
+          inTransaction.findCandidate({ userId: "user_1" }),
+        ),
+      ).resolves.toEqual({ holdsVerifiedEmail: true, attachedAccounts: 1 });
+      expect(user.findUnique).not.toHaveBeenCalled();
+
+      await expect(
+        inTransaction.findCandidate({ userId: "user_1" }),
+      ).resolves.toMatchObject({ holdsVerifiedEmail: false });
     });
   });
 });

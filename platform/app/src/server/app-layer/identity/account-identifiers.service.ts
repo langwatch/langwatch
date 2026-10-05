@@ -123,13 +123,25 @@ export class AccountIdentifiersService {
    */
   async listIdentifiers({
     userId,
+    accountAddress = null,
   }: {
     userId: string;
+    /**
+     * The account's own address, and whether `User.emailVerified` holds it as
+     * confirmed. Sign-in linking and the address nudge read that column, so
+     * the row for the same address says confirmed whenever they do, also
+     * where the identifier itself was never verified (an operator who set the
+     * column by hand on an installation that cannot send email).
+     */
+    accountAddress?: { email: string; confirmed: boolean } | null;
   }): Promise<AccountIdentifier[]> {
     const heads = await this.heads.findHeads({ userId });
     const live = Object.values(heads.identifiers).filter(
       (head) => head.state !== "DETACHED",
     );
+    const confirmedAccountAddress = accountAddress?.confirmed
+      ? normalizeIdentifierValue(accountAddress.email)
+      : null;
 
     return live
       .sort((left, right) => left.attachedAtMs - right.attachedAtMs)
@@ -140,16 +152,22 @@ export class AccountIdentifiersService {
         const strands = isActive
           ? detachStrandsUser({ heads, identifierId: head.identifierId })
           : null;
+        const confirmed =
+          isActive ||
+          (head.provider === "email" &&
+            head.value !== null &&
+            confirmedAccountAddress !== null &&
+            normalizeIdentifierValue(head.value) === confirmedAccountAddress);
         return {
           identifierId: head.identifierId,
           accountId: head.accountId,
           provider: head.provider,
           value: head.value,
           isPrimary: head.state === "PRIMARY",
-          confirmed: isActive,
+          confirmed,
           // Only an email can be confirmed by an emailed link, and only one
           // that has not been.
-          resendable: head.provider === "email" && !isActive,
+          resendable: head.provider === "email" && !confirmed,
           removable: strands === null,
           refusalCode: strands?.code ?? null,
           demotesFirst: head.state === "PRIMARY",

@@ -212,7 +212,7 @@ describe("the single sign-on settings surface", () => {
       // the ones the rest of the screen offers.
       for (const refused of [
         /prove this domain/i,
-        /prove with our licence/i,
+        /prove with our license/i,
         /get a fresh record/i,
         /claim it again/i,
         /^remove$/i,
@@ -246,7 +246,7 @@ describe("the single sign-on settings surface", () => {
       // manager is offered one at all.
       expect(
         screen.getByRole("button", {
-          name: /prove this domain|prove with our licence|get a fresh record|claim it again/i,
+          name: /prove this domain|prove with our license|get a fresh record|claim it again/i,
         }),
       ).toBeTruthy();
       // And the way back out, which only a manager is offered.

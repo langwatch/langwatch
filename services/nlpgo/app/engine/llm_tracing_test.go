@@ -54,7 +54,8 @@ func TestStartLLMSpan_NameAndReservedAttrs(t *testing.T) {
 	assert.Equal(t, "llm", attrs["langwatch.span.type"],
 		"span.type must be 'llm' — Studio's drawer groups by this exact reserved value to render LLM-flavored rows")
 	assert.Equal(t, "openai", attrs["gen_ai.system"])
-	assert.Equal(t, "gpt-5-mini", attrs["gen_ai.request.model"])
+	assert.Equal(t, "openai/gpt-5-mini", attrs["gen_ai.request.model"],
+		"the model must carry its provider prefix, as the SDK and gateway spans do, so one model is one row when traces are grouped by model")
 	assert.EqualValues(t, 12, attrs["gen_ai.usage.input_tokens"])
 	assert.EqualValues(t, 1, attrs["gen_ai.usage.output_tokens"])
 	assert.InDelta(t, 0.00018, toFloat(attrs["langwatch.cost"]), 1e-9)
@@ -79,6 +80,29 @@ func TestStartLLMSpan_NameAndReservedAttrs(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(outJSON), &outMsg))
 	assert.Equal(t, "assistant", outMsg.Role)
 	assert.Equal(t, "4", outMsg.Content)
+}
+
+// @scenario "A Studio or playground model call names the model with its provider"
+func TestStartLLMSpan_ModelID(t *testing.T) {
+	cases := []struct {
+		name, model, provider, want string
+	}{
+		{"prefixes a bare model with its provider", "gpt-5.6-terra", "openai", "openai/gpt-5.6-terra"},
+		{"prefixes a model with slashes of its own", "Qwen/Qwen2.5-32B-Instruct", "custom", "custom/Qwen/Qwen2.5-32B-Instruct"},
+		{"keeps a model that already starts with its provider", "openai/gpt-5-mini", "openai", "openai/gpt-5-mini"},
+		{"keeps the model when the provider is unknown", "gpt-5-mini", "", "gpt-5-mini"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := withRecorder(t)
+			_, llmSpan := startLLMSpan(context.Background(), tc.model, tc.provider, nil)
+			endLLMSpan(llmSpan, &app.LLMResponse{Content: "ok"}, nil)
+			spans := rec.Ended()
+			require.Len(t, spans, 1)
+			assert.Equal(t, tc.want, attrMap(spans[0].Attributes())["gen_ai.request.model"])
+			assert.Equal(t, tc.want, spans[0].Name(), "the span name spells the model the same way")
+		})
+	}
 }
 
 // TestEndLLMSpan_ErrorPathDoesNotStampOutput pins the error-path

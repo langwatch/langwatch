@@ -8,6 +8,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 export type SimulationRunsListResponse =
   paths["/api/simulation-runs"]["get"]["responses"]["200"]["content"]["application/json"];
@@ -55,6 +56,7 @@ export class SimulationRunsApiService {
     const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: extractStatusFromResponse(error),
     } });
+    throwIfHandledError({ operation, error, message });
     throw new SimulationRunsApiError(message, operation, error);
   }
 

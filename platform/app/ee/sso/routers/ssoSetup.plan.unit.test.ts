@@ -14,11 +14,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { ssoSetupRouter } from "./ssoSetup";
 
-const { mockSelfServe, mockBreakGlass, mockAuditLog, mockPlan } = vi.hoisted(
-  () => ({
+const { mockSelfServe, mockBreakGlass, mockAuditLog, mockPlan, mockDecision } =
+  vi.hoisted(() => ({
     mockSelfServe: {
       getSetup: vi.fn(),
       registerConnection: vi.fn(),
+      updateIdentityProvider: vi.fn(),
       startLegacyMigration: vi.fn(),
       activate: vi.fn(),
       breakGlassHistory: vi.fn(),
@@ -27,8 +28,8 @@ const { mockSelfServe, mockBreakGlass, mockAuditLog, mockPlan } = vi.hoisted(
     mockBreakGlass: { grant: vi.fn(), renew: vi.fn() },
     mockAuditLog: vi.fn<(...args: unknown[]) => Promise<void>>(),
     mockPlan: vi.fn<() => Promise<{ type: string }>>(),
-  }),
-);
+    mockDecision: vi.fn(),
+  }));
 
 /** Enough of better-auth's adapter shape for `betterAuth()` to finish
  *  constructing: the auth module is on this router's import graph. Hoisted
@@ -124,13 +125,7 @@ vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: mockAuditLog }));
 vi.mock("~/server/app-layer/app", () => {
   const app = {
     planProvider: { getActivePlan: mockPlan },
-    permissions: {
-      getDecision: async () => ({
-        permitted: true,
-        organizationRole: "ADMIN",
-        denialReason: null,
-      }),
-    },
+    permissions: { getDecision: mockDecision },
   };
   return { getApp: () => app, tryGetApp: () => app };
 });
@@ -179,6 +174,11 @@ const OIDC = {
 describe("the organization's single sign-on setup surface", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDecision.mockResolvedValue({
+      permitted: true,
+      organizationRole: "ADMIN",
+      denialReason: null,
+    });
     mockAuditLog.mockResolvedValue(undefined);
     mockSelfServe.getSetup.mockResolvedValue({ availability: {} });
     mockSelfServe.registerConnection.mockResolvedValue({
@@ -287,6 +287,7 @@ describe("the organization's single sign-on setup surface", () => {
       ).resolves.toBeDefined();
       expect(mockSelfServe.getSetup).toHaveBeenCalledWith({
         organizationId: "org_acme",
+        viewerId: "user_ana",
       });
     });
   });
@@ -340,6 +341,55 @@ describe("the organization's single sign-on setup surface", () => {
       ];
       expect(JSON.stringify(entry.args)).not.toContain(OIDC.clientSecret);
       expect(entry.args).toMatchObject({ protocol: "oidc" });
+    });
+
+    describe("when an administrator edits the identity provider settings", () => {
+      it("passes them on for the same connection, and audits no secret", async () => {
+        await caller().updateIdentityProvider({
+          organizationId: "org_acme",
+          connectionId: "ssoconn_1",
+          idp: OIDC,
+        });
+
+        expect(mockSelfServe.updateIdentityProvider).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "org_acme",
+            connectionId: "ssoconn_1",
+            idp: OIDC,
+            actor: { userId: "user_ana" },
+          }),
+        );
+        const [entry] = mockAuditLog.mock.calls[0] as [
+          { action: string; args: Record<string, unknown> },
+        ];
+        expect(entry.action).toBe("ssoSetup.updateIdentityProvider");
+        expect(JSON.stringify(entry.args)).not.toContain(OIDC.clientSecret);
+      });
+    });
+
+    describe("when a member who may not manage single sign-on edits them", () => {
+      /** @scenario "Only an administrator who may manage single sign-on can edit" */
+      it("refuses before anything is attempted", async () => {
+        mockDecision.mockResolvedValue({
+          permitted: false,
+          organizationRole: "MEMBER",
+          denialReason: "missing_permission",
+        });
+
+        const refusal = await caller()
+          .updateIdentityProvider({
+            organizationId: "org_acme",
+            connectionId: "ssoconn_1",
+            idp: OIDC,
+          })
+          .then(() => "no refusal")
+          .catch((error: unknown) => error);
+
+        expect((refusal as { cause?: { code?: string } }).cause?.code).toBe(
+          "permission_denied",
+        );
+        expect(mockSelfServe.updateIdentityProvider).not.toHaveBeenCalled();
+      });
     });
   });
 });

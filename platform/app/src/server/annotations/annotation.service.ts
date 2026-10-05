@@ -7,6 +7,8 @@ import {
   type ProjectionAnnotationRow,
   type UpdateAnnotationInput,
 } from "./annotation.repository";
+import { AnnotationNotFoundError } from "./errors";
+import { syncAnnotationToTrace } from "./syncAnnotationToTrace";
 
 export class AnnotationService {
   constructor(private readonly repository: AnnotationRepository) {}
@@ -15,8 +17,21 @@ export class AnnotationService {
     return new AnnotationService(new AnnotationRepository(prisma));
   }
 
+  /**
+   * Every annotation write goes through here, so the trace summary that
+   * `has:annotation` reads never drifts from Postgres, whichever API wrote it.
+   * Anchored comments sync too: a comment on one span still means a human
+   * touched the trace.
+   */
   async create(input: CreateAnnotationInput): Promise<Annotation> {
-    return this.repository.create(input);
+    const annotation = await this.repository.create(input);
+    await syncAnnotationToTrace({
+      action: "add",
+      projectId: annotation.projectId,
+      traceId: annotation.traceId,
+      annotationId: annotation.id,
+    });
+    return annotation;
   }
 
   async update(input: UpdateAnnotationInput): Promise<Annotation> {
@@ -24,7 +39,17 @@ export class AnnotationService {
   }
 
   async delete(input: DeleteAnnotationInput): Promise<Annotation> {
-    return this.repository.delete(input);
+    const annotation = await this.repository.delete(input);
+    if (!annotation) {
+      throw new AnnotationNotFoundError({ annotationId: input.id });
+    }
+    await syncAnnotationToTrace({
+      action: "remove",
+      projectId: annotation.projectId,
+      traceId: annotation.traceId,
+      annotationId: annotation.id,
+    });
+    return annotation;
   }
 
   /**

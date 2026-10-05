@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
@@ -47,6 +47,7 @@ vi.mock("../../licensing/validation", () => ({
 }));
 
 import { env } from "~/env.mjs";
+import { mintActivationCode } from "../../licensing/activation/activationCode";
 import {
   isExpired,
   parseLicenseKey,
@@ -56,6 +57,8 @@ import { PLAIN_OIDC_PROVIDERS } from "../providers";
 import {
   __resetSsoGateForTests,
   __setSsoLicenseRepositoryForTests,
+  DENIED_GATE_TTL_MS,
+  invalidateSsoGate,
   platformSSOAllowed,
   resolveAuthProvider,
 } from "../sso-gate";
@@ -242,6 +245,20 @@ describe("platformSSOAllowed", () => {
     });
   });
 
+  describe("given an activation code set as the instance license key", () => {
+    /** @scenario "an activation code in the license variable is not read as a license" */
+    it("does not parse the code as a license and lets the organization scan decide", async () => {
+      const code = mintActivationCode();
+      envMock.LANGWATCH_LICENSE_KEY = code;
+      __setSsoLicenseRepositoryForTests(repoWithOrgs([]));
+
+      const allowed = await platformSSOAllowed();
+
+      expect(allowed).toBe(false);
+      expect(parseLicenseKey).not.toHaveBeenCalledWith(code);
+    });
+  });
+
   describe("given the licensing store cannot be reached on the first sign-in attempt", () => {
     /** @scenario A licensing-store outage refuses SSO and heals itself */
     it("denies the first attempt without memoizing, then allows once the store answers", async () => {
@@ -319,31 +336,90 @@ describe("platformSSOAllowed", () => {
   });
 
   describe("given the gate already resolved to deny earlier in this process", () => {
-    /** @scenario Activating a license takes effect at the next restart */
-    it("stays denied even after a genuine license appears in the DB, until the process restarts", async () => {
+    const licenseAppearsAfterFirstScan = () => {
       const findOrganizationsWithLicense = vi
         .fn()
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ id: "org_1", license: "encoded" }]);
+        .mockResolvedValue([{ id: "org_1", license: "encoded" }]);
       __setSsoLicenseRepositoryForTests({ findOrganizationsWithLicense });
-
-      const firstAttempt = await platformSSOAllowed();
-      expect(firstAttempt).toBe(false);
-
+      return findOrganizationsWithLicense;
+    };
+    const licenseVerifies = () => {
       vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
       vi.mocked(verifySignature).mockReturnValue(true);
       vi.mocked(isExpired).mockReturnValue(false);
+    };
 
-      const secondAttemptSameProcess = await platformSSOAllowed();
-      expect(secondAttemptSameProcess).toBe(false);
-      expect(findOrganizationsWithLicense).toHaveBeenCalledTimes(1);
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
-      // Simulate a restart: the module-level memo is cleared.
-      __resetSsoGateForTests();
+    /** @scenario Activating a license turns SSO on without a restart */
+    it("allows at once after the process that stored the license invalidates it", async () => {
+      const findOrganizationsWithLicense = licenseAppearsAfterFirstScan();
+
+      expect(await platformSSOAllowed()).toBe(false);
+      licenseVerifies();
+      invalidateSsoGate();
+
+      expect(await platformSSOAllowed()).toBe(true);
+      expect(findOrganizationsWithLicense).toHaveBeenCalledTimes(2);
+    });
+
+    /** @scenario An allow is kept and a deny is not re-read on every request */
+    it("keeps an allow through an invalidation, so a store outage cannot turn it off", async () => {
+      licenseVerifies();
+      const findOrganizationsWithLicense = vi
+        .fn()
+        .mockResolvedValueOnce([{ id: "org_1", license: "encoded" }])
+        .mockRejectedValue(new Error("store down"));
       __setSsoLicenseRepositoryForTests({ findOrganizationsWithLicense });
 
-      const afterRestart = await platformSSOAllowed();
-      expect(afterRestart).toBe(true);
+      expect(await platformSSOAllowed()).toBe(true);
+      invalidateSsoGate();
+
+      expect(await platformSSOAllowed()).toBe(true);
+      expect(findOrganizationsWithLicense).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario Another replica picks up an activation within a minute */
+    it("re-reads the store once the deny is older than its TTL, with no restart", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-01T10:00:00Z"));
+      const findOrganizationsWithLicense = licenseAppearsAfterFirstScan();
+
+      expect(await platformSSOAllowed()).toBe(false);
+      licenseVerifies();
+
+      vi.setSystemTime(new Date(Date.now() + DENIED_GATE_TTL_MS - 1));
+      expect(await platformSSOAllowed()).toBe(false);
+      expect(findOrganizationsWithLicense).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(new Date(Date.now() + 1));
+      expect(await platformSSOAllowed()).toBe(true);
+      expect(findOrganizationsWithLicense).toHaveBeenCalledTimes(2);
+    });
+
+    /** @scenario An allow is kept and a deny is not re-read on every request */
+    it("keeps an allow past the TTL and warns about email mode once", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-01T10:00:00Z"));
+      envMock.NEXTAUTH_PROVIDER = "okta";
+      const findOrganizationsWithLicense = licenseAppearsAfterFirstScan();
+
+      await platformSSOAllowed();
+      vi.setSystemTime(new Date(Date.now() + DENIED_GATE_TTL_MS));
+      licenseVerifies();
+      expect(await platformSSOAllowed()).toBe(true);
+
+      vi.setSystemTime(new Date(Date.now() + 10 * DENIED_GATE_TTL_MS));
+      expect(await platformSSOAllowed()).toBe(true);
+      expect(findOrganizationsWithLicense).toHaveBeenCalledTimes(2);
+
+      const emailModeWarnings = loggerMock.warn.mock.calls.filter((call) =>
+        String(call[1]).includes("no genuine license was found"),
+      );
+      expect(emailModeWarnings).toHaveLength(1);
     });
   });
 

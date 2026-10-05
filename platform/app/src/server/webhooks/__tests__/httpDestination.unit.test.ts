@@ -57,6 +57,48 @@ describe("sendHttpDestination", () => {
       });
     });
 
+    /** @scenario "A failed attempt keeps the receiver's response for debugging" */
+    it("keeps the name but redacts the value of a credential-bearing response header", async () => {
+      mockedFetch.mockResolvedValue(
+        new Response("nope", {
+          status: 401,
+          headers: {
+            "WWW-Authenticate": 'Bearer realm="x", nonce="secret-nonce"',
+            "x-request-id": "req-1",
+          },
+        }) as unknown as MockedResponse,
+      );
+
+      const result = await send();
+
+      // The header NAME is the debugging signal; the value can be a live
+      // credential the receiver's framework attached, and the delivery log
+      // shows stored headers to every drawer reader.
+      expect(result.responseHeaders).toMatchObject({
+        "www-authenticate": "[redacted]",
+        "x-request-id": "req-1",
+      });
+    });
+
+    it("redacts a legacy Set-Cookie2 value the same as Set-Cookie", async () => {
+      mockedFetch.mockResolvedValue(
+        new Response("nope", {
+          status: 401,
+          headers: {
+            "Set-Cookie2": 'session="live-session-value"; Version="1"',
+            "x-request-id": "req-2",
+          },
+        }) as unknown as MockedResponse,
+      );
+
+      const result = await send();
+
+      expect(result.responseHeaders).toMatchObject({
+        "set-cookie2": "[redacted]",
+        "x-request-id": "req-2",
+      });
+    });
+
     it("caps an oversized response body", async () => {
       fetchResolves(200, "x".repeat(100_000));
       const res = await send();

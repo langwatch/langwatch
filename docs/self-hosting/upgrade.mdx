@@ -8,6 +8,7 @@ description: "How to upgrade LangWatch to the latest version"
 1. **Check release notes** for breaking changes at [github.com/langwatch/langwatch/releases](https://github.com/langwatch/langwatch/releases)
 2. **Back up your databases**: see [Backups](/self-hosting/configuration/backups)
 3. **Test in a staging environment** before upgrading production
+4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. See [Credentials secret](/self-hosting/security#credentials-secret)
 
 ## Automatic identity and access migration
 
@@ -158,7 +159,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.18.0 \
+  --version 3.20.1 \
   -f values-production.yaml
 # x-release-please-end
 ```
@@ -212,6 +213,54 @@ docker compose up -d
 
 ## Breaking Changes
 
+### Internal authentication for the NLP service
+
+The app can now authenticate itself to the NLP service with a shared credential, `LANGWATCH_NLP_INTERNAL_SECRET`. The app sends it on every NLP request, and the NLP service refuses requests that do not carry it. With the variable unset on the NLP service, it accepts unauthenticated requests as before.
+
+An upgrade requires no change, and an install that never sets the variable keeps working. Setting it is recommended, and the value has to be the same on both sides:
+
+- **Docker Compose**: the app, the workers and `langwatch_nlp` all read `platform/app/.env`, so add one `LANGWATCH_NLP_INTERNAL_SECRET` line there (`openssl rand -hex 32`) and restart the stack.
+- **Helm chart**: with `autogen.enabled=true` the chart generates the value into the app Secret and points the app, the workers and the NLP Deployment at the same key, so a default install needs no change. A value already in that Secret is kept, so an upgrade does not rotate it.
+
+  If you supply the app Secret yourself, add a `LANGWATCH_NLP_INTERNAL_SECRET` key to it and roll the three Deployments. Until you do, the key is absent, the variable stays unset on all three, and the install carries on.
+
+Docker Compose also no longer publishes the NLP service on host port 5561. The app and the workers reach it over the compose network at `langwatch_nlp:5561`, which is what `LANGWATCH_NLP_SERVICE` already points at. If you were calling port 5561 from the host, add a `ports` entry for `langwatch_nlp` in your own compose override.
+
+### LangWatch AI Gateway Ingress moved to the app Ingress (Helm)
+
+The gateway sub-chart used to create its own Ingress on every install, with class `nginx`, host `gateway.langwatch.ai`, TLS secret `gateway-tls`, a `letsencrypt-prod` cert-manager issuer and ingress-nginx streaming annotations. It now renders no Ingress. The `gateway.ingress.*` values are gone.
+
+To keep publishing the gateway through an Ingress, set its host on the app Ingress. The chart renders a second Ingress, `<release>-gateway-ingress`, with the app Ingress `className`, `labels` and `annotations`:
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  # ...your existing app hosts, tls and annotations
+  gateway:
+    host: gateway.acme.com
+    tls:
+      secretName: gateway-tls
+```
+
+With `className: nginx` the chart still adds the streaming and timeout annotations to the gateway Ingress, and now sets a 32 MB body limit. The paths are fixed at `/v1` (Prefix) and `/health` (Exact). For other paths, such as `/v1beta`, write your own route. If you relied on a cert-manager issuer only on the gateway Ingress, add it to `ingress.annotations` or `ingress.gateway.annotations`.
+
+A values file that still sets `gateway.ingress.*` fails to render with a message naming `ingress.gateway.host`, so the Ingress cannot disappear on upgrade without an error. `gateway.ingress.enabled: false` on its own is accepted. If you route to the gateway another way, remove the block and set `gateway.publicUrl`. See [Routing and ingress controllers](/self-hosting/deployment/routing).
+
+The gateway PodDisruptionBudget now uses `maxUnavailable: 1` and renders only when the gateway runs more than one pod. The app, workers, NLP and LangEvals budgets also render only above one replica. The chart refuses a budget that leaves no pod evictable, such as `minAvailable` equal to `replicaCount` or `maxUnavailable: 0`.
+
+### Helm installs with autogen off and Argo CD
+
+With `autogen.enabled=false`, chart-managed Redis and PostgreSQL now need `redis.auth.existingSecret` and `postgresql.auth.existingSecret` (or a password value). The chart used to generate these passwords, and under Argo CD a generated password changed on every sync. A plain `helm upgrade` of a release that already has the chart's own `<release>-redis` and `<release>-postgresql` Secrets keeps them.
+
+Under Argo CD, first copy the password PostgreSQL currently accepts into a Secret of your own with another name: Argo CD prunes the chart's Secret once `existingSecret` is set.
+
+The LangWatchQL render Job is now named `<release>-lwql-access-render-<hash>` from its spec, and the install Job no longer expires. Argo CD no longer recreates it every few minutes or fails the sync on an immutable Job. Missing LangWatchQL passwords no longer block ClickHouse: the Job logs the missing keys and LangWatchQL stays off.
+
+Keep Argo CD pruning on, so a new spec replaces the old Job; without it, delete old render Jobs before a rollback, or the rollback finds its Job already complete and does not render again.
+
+The app now reads the gateway keys named by `gateway.secrets.internalSecretKey` and `gateway.secrets.jwtSecretKey`, the same keys the gateway pod reads.
+
 ### 3.16 or 3.17 to 3.18: Sign-in and SSO
 
 The upgrade keeps existing accounts working with no manual step, apart from the cases below. A Helm upgrade from 3.16.0 with email and password users, an Okta-configured deployment and domain SSO was tested end to end; the Azure AD account move is covered by tests only:
@@ -226,7 +275,7 @@ The first start runs a migration preflight before the app reports ready. `--time
 
 **Provider setting.** The chart now passes `app.nextAuth.provider` to the app as `AUTH_PROVIDER`. `NEXTAUTH_PROVIDER` is still read and logs a deprecation warning. If you select the provider with `NEXTAUTH_PROVIDER` in `app.extraEnvs`, the chart leaves the setting to you, as before. Outside the chart, set `AUTH_PROVIDER`; when both are set it wins.
 
-**Moving password users to SSO.** An SSO sign-in joins an existing password account only once its address is confirmed. See [Migrating from Email/Password to SSO](/self-hosting/configuration/sso) on the SSO page.
+**Moving password users to SSO.** An SSO sign-in joins an existing password account only once its address is confirmed. See [Existing email and password accounts](/self-hosting/configuration/sso#existing-email-and-password-accounts) for how linking works in the current release.
 
 **Okta and Auth0.** The id token is now verified: its `iss` must equal the `issuer` in the provider's discovery document. A provider behind a proxy that rewrites one but not the other stops signing people in until the two agree.
 

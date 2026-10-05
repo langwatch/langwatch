@@ -207,14 +207,25 @@ export class StubPlatformOperators implements SsoPlatformOperatorRepository {
  * organization can never reach the licence-bound path.
  */
 export class StubLicenseAuthority implements SsoLicenseAuthorityRepository {
-  constructor(private licensed = false) {}
+  constructor(
+    private licensed = false,
+    private singleOrganization = true,
+  ) {}
 
   async licenseAuthorizesDomainClaims(): Promise<boolean> {
     return this.licensed;
   }
 
+  async hostsSingleOrganization(): Promise<boolean> {
+    return this.singleOrganization;
+  }
+
   set(licensed: boolean): void {
     this.licensed = licensed;
+  }
+
+  setSingleOrganization(singleOrganization: boolean): void {
+    this.singleOrganization = singleOrganization;
   }
 }
 

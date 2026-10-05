@@ -6,8 +6,9 @@
  * Spec: specs/identity/domain-auto-join.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { DomainJoinSetting } from "@langwatch/identity";
+import type { DomainJoinSetting, JoinerRole } from "@langwatch/identity";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockIsEnterprise, mockIsSaaS } = vi.hoisted(() => ({
@@ -34,9 +35,13 @@ function renderCard({
   // opens the door was passing a value the helper's own signature refused.
   domainJoin = "off",
   joinDomains = [] as string[],
+  joinerRole = "MEMBER" as JoinerRole,
+  ssoLive = false,
 }: {
   domainJoin?: DomainJoinSetting;
   joinDomains?: string[];
+  joinerRole?: JoinerRole;
+  ssoLive?: boolean;
 } = {}) {
   const onSave = vi.fn();
   render(
@@ -44,8 +49,10 @@ function renderCard({
       <JoinPolicyCard
         domainJoin={domainJoin}
         joinDomains={joinDomains}
+        joinerRole={joinerRole}
         saving={false}
         onSave={onSave}
+        ssoLive={ssoLive}
       />
     </ChakraProvider>,
   );
@@ -156,6 +163,71 @@ describe("given the who-can-join policy", () => {
       expect(card.textContent).toContain(
         "must be verified by your organization",
       );
+    });
+  });
+});
+
+describe("given the seat newcomers receive (ADR-143)", () => {
+  beforeEach(() => {
+    mockIsEnterprise.current = true;
+    mockIsSaaS.current = true;
+  });
+
+  describe("when the door is open", () => {
+    /** @scenario The joiner seat setting lands email joiners as Developers */
+    it("offers Member and Developer, and saves the seat with the door", async () => {
+      const { onSave } = renderCard({ domainJoin: "request" });
+
+      expect(screen.getByText("Seat for people who join")).toBeInTheDocument();
+      // A real pointer sequence: the radio group listens to pointer events
+      // on the item, which a bare click event never produces.
+      const user = userEvent.setup();
+      await user.click(screen.getByText("Developer"));
+      const save = screen.getByRole("button", { name: "Save" });
+      expect(save.hasAttribute("disabled")).toBe(false);
+      await user.click(save);
+
+      expect(onSave).toHaveBeenCalledWith({
+        domainJoin: "request",
+        domains: [],
+        joinerRole: "DEVELOPER",
+      });
+    });
+  });
+
+  describe("when the door is shut", () => {
+    it("asks no seat question, because nobody can join", () => {
+      renderCard({ domainJoin: "off" });
+
+      expect(screen.queryByText("Seat for people who join")).toBeNull();
+    });
+
+    /** @scenario The joiner seat setting lands SSO joiners as Developers */
+    it("still asks the seat question while a connection admits people", () => {
+      renderCard({ domainJoin: "off", ssoLive: true });
+
+      expect(screen.getByText("Seat for people who join")).toBeTruthy();
+      expect(screen.getByTestId("joiner-seat-DEVELOPER")).toBeTruthy();
+    });
+  });
+
+  describe("when the door is shut after a seat was picked", () => {
+    /** @scenario Shutting the door leaves the joiner seat an administrator can no longer see untouched */
+    it("leaves the seat out of the save instead of sending one it stopped showing", async () => {
+      const { onSave } = renderCard({ domainJoin: "request" });
+      const user = userEvent.setup();
+
+      await user.click(screen.getByText("Developer"));
+      await user.click(screen.getByText("Invite only"));
+      expect(screen.queryByText("Seat for people who join")).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onSave.mock.calls[0]?.[0]).toStrictEqual({
+        domainJoin: "off",
+        domains: [],
+      });
     });
   });
 });

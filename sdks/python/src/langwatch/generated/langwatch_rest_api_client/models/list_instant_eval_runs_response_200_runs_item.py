@@ -45,7 +45,6 @@ class ListInstantEvalRunsResponse200RunsItem:
         failed (int): Rows the judge could not answer.
         skipped (int): Rows the judge declined to answer.
         tokens (int): Input tokens the judge billed for.
-        cost_usd (float): What the judging cost us, in United States dollars.
         price_usd (float): What the judging costs you, in United States dollars.
         error (None | str): The code of the failure that ended the run, when one did.
         created_at (str): When the run was accepted.
@@ -68,7 +67,6 @@ class ListInstantEvalRunsResponse200RunsItem:
     failed: int
     skipped: int
     tokens: int
-    cost_usd: float
     price_usd: float
     error: None | str
     created_at: str
@@ -112,8 +110,6 @@ class ListInstantEvalRunsResponse200RunsItem:
 
         tokens = self.tokens
 
-        cost_usd = self.cost_usd
-
         price_usd = self.price_usd
 
         error: None | str
@@ -147,7 +143,6 @@ class ListInstantEvalRunsResponse200RunsItem:
                 "failed": failed,
                 "skipped": skipped,
                 "tokens": tokens,
-                "costUsd": cost_usd,
                 "priceUsd": price_usd,
                 "error": error,
                 "createdAt": created_at,
@@ -222,8 +217,6 @@ class ListInstantEvalRunsResponse200RunsItem:
 
         tokens = d.pop("tokens")
 
-        cost_usd = d.pop("costUsd")
-
         price_usd = d.pop("priceUsd")
 
         def _parse_error(data: object) -> None | str:
@@ -266,7 +259,6 @@ class ListInstantEvalRunsResponse200RunsItem:
             failed=failed,
             skipped=skipped,
             tokens=tokens,
-            cost_usd=cost_usd,
             price_usd=price_usd,
             error=error,
             created_at=created_at,

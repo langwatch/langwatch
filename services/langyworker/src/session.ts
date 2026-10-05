@@ -5,9 +5,10 @@
  *   provider is the mediated gateway, keyed by env reference.
  * - Everything pi persists lives under the worker home: agentDir at
  *   `$HOME/.langy-pi`, the session JSONL under config.sessionDir.
- * - Auto-compaction ON, pi's own transient retry OFF: the manager's LLM
- *   proxy retries a burst rate limit with the provider's Retry-After
- *   (llmretry.go), and the product's self-retry owns the rest.
+ * - Auto-compaction ON, and pi's retry loop ON with the policy in
+ *   model-retry.ts: a model call that fails for a transient reason is made
+ *   again inside the turn. The manager's LLM proxy still re-sends a burst
+ *   rate limit by the provider's Retry-After first (llmretry.go).
  * - The resource loader discovers nothing (noExtensions/noSkills/
  *   noContextFiles): the system prompt is wholly owned by the wrapper, and
  *   the only extensions are the inline factories: `todowrite`, `skill`,
@@ -27,6 +28,7 @@ import {
   type InlineExtension,
 } from "@earendil-works/pi-coding-agent";
 import type { LangyWorkerConfig } from "./config.js";
+import { MODEL_RETRY_MAX_ATTEMPTS, installModelRetry } from "./model-retry.js";
 import { writeModelsJson } from "./models.js";
 import {
   CODE_ACCESS_TOOL_NAME,
@@ -155,7 +157,9 @@ export async function createLangySession({
 
   const settingsManager = SettingsManager.inMemory({
     compaction: { enabled: true },
-    retry: { enabled: false },
+    // pi enters its retry loop only when this is on; the attempts, the waits
+    // and which failures retry come from installModelRetry below.
+    retry: { enabled: true, maxRetries: MODEL_RETRY_MAX_ATTEMPTS },
   });
 
   const resourceLoader = new DefaultResourceLoader({
@@ -198,6 +202,7 @@ export async function createLangySession({
     settingsManager,
     tools: [...ENABLED_TOOLS],
   });
+  installModelRetry({ session });
 
   return { session, resumed };
 }

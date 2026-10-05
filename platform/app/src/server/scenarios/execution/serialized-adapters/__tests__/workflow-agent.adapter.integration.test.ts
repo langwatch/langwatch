@@ -24,6 +24,7 @@ import { resolve } from "node:path";
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { WorkflowAgentData } from "../../types";
+import { directExecuteSyncTransport } from "../execute-sync-transport";
 import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
 
 const NLP = process.env.LANGWATCH_NLP_SERVICE ?? "http://localhost:5561";
@@ -145,7 +146,7 @@ function buildAdapter(workflow: WorkflowDsl): SerializedWorkflowAgentAdapter {
   };
   return new SerializedWorkflowAgentAdapter({
     config,
-    nlpServiceUrl: NLP,
+    transport: directExecuteSyncTransport({ nlpServiceUrl: NLP }),
     projectApiKey: "sk-e2e-3415",
   });
 }
