@@ -13,6 +13,12 @@ import {
   type Unsupported,
 } from "@langwatch/trace-contract";
 
+import {
+  type AndChain,
+  evaluateEvaluationScope,
+  isAndChain,
+  readAndChain,
+} from "./trace-query-evaluation-scope.rules.ts";
 import { FIELD_DEF_BY_NAME } from "./trace-query-fields.rules.ts";
 import { classifyExistenceSource } from "./trace-query-meta-fields.rules.ts";
 import {
@@ -180,11 +186,45 @@ function evaluateLogical({
   trace: InMemoryTrace;
   state: WalkState;
 }): boolean | Unsupported {
+  // An AND chain is read once from its top, binding an evaluator to its
+  // result conditions exactly as `translateNode` does.
+  if (!negated && isAndChain(node)) {
+    return evaluateAndChain({ chain: readAndChain(node), trace, state });
+  }
   const left = evaluateNode({ node: node.left, negated, trace, state });
   if (left === UNSUPPORTED) return UNSUPPORTED;
   const right = evaluateNode({ node: node.right, negated, trace, state });
   if (right === UNSUPPORTED) return UNSUPPORTED;
   return node.operator.operator === "OR" ? left || right : left && right;
+}
+
+/** Mirrors `translateAndChain`: the bound group, ANDed with the rest. */
+function evaluateAndChain({
+  chain,
+  trace,
+  state,
+}: {
+  chain: AndChain;
+  trace: InMemoryTrace;
+  state: WalkState;
+}): boolean | Unsupported {
+  state.nodeCount += chain.nodeCount - 1;
+  if (state.nodeCount > MAX_FILTER_NODE_COUNT) return UNSUPPORTED;
+  let matched = true;
+  if (chain.scope) {
+    const bound = evaluateEvaluationScope(chain.scope, trace);
+    if (bound === UNSUPPORTED) {
+      state.unsupportedFields.push("evaluator");
+      return UNSUPPORTED;
+    }
+    matched = bound;
+  }
+  for (const operand of chain.rest) {
+    const result = evaluateNode({ node: operand, negated: false, trace, state });
+    if (result === UNSUPPORTED) return UNSUPPORTED;
+    matched = matched && result;
+  }
+  return matched;
 }
 
 function evaluateTag(tag: TagToken, negated: boolean, trace: InMemoryTrace): boolean | Unsupported {

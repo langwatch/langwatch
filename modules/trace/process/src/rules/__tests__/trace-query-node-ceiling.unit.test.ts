@@ -50,6 +50,32 @@ describe("given the same sentence in quotes", () => {
   });
 });
 
+describe("given an evaluator bound to excluded verdicts", () => {
+  /**
+   * `head` and n excluded verdicts span 3n + 1 nodes either way. With
+   * `evaluator:X` as the head the group is bound and compiled without walking
+   * it; with `evaluatorStatus` it is walked tag by tag. Both stop at one length.
+   */
+  const chain = (head: string, n: number): string =>
+    [head, ...Array.from({ length: n }, () => "NOT evaluatorVerdict:fail")].join(" AND ");
+  const lastAllowed = Math.floor((MAX_FILTER_NODE_COUNT - 1) / 3);
+
+  describe.each([
+    ["bound", "evaluator:X"],
+    ["walked tag by tag", "evaluatorStatus:processed"],
+  ])("when the chain is %s", (_, head) => {
+    it("compiles at the ceiling", () => {
+      expect(compile(chain(head, lastAllowed))).not.toBeNull();
+    });
+
+    it("refuses one verdict past it", () => {
+      expect(() => compile(chain(head, lastAllowed + 1))).toThrow(
+        expect.objectContaining({ code: "filter_too_complex" }),
+      );
+    });
+  });
+});
+
 describe("given a broken query", () => {
   describe("when it is compiled for ClickHouse", () => {
     it("still answers filter_parse_error: the two refusals stay apart", () => {

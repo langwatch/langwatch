@@ -14,6 +14,12 @@ import {
   type TranslationContext,
 } from "@langwatch/trace-contract";
 
+import {
+  type AndChain,
+  isAndChain,
+  readAndChain,
+  translateEvaluationScope,
+} from "./trace-query-evaluation-scope.rules.ts";
 import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./trace-query-fields.rules.ts";
 import { boundedSubquery } from "./trace-query-subquery.rules.ts";
 import {
@@ -109,11 +115,13 @@ function translateNode({
   negated,
   ctx,
   translateTag,
+  bindEvaluations,
 }: {
   node: LiqeQuery;
   negated: boolean;
   ctx: TranslationContext;
   translateTag: FieldHandler;
+  bindEvaluations: boolean;
 }): string {
   ctx.nodeCount++;
   if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
@@ -121,7 +129,7 @@ function translateNode({
   }
 
   const branch = (side: LiqeQuery, sideNegated: boolean): string =>
-    translateNode({ node: side, negated: sideNegated, ctx, translateTag });
+    translateNode({ node: side, negated: sideNegated, ctx, translateTag, bindEvaluations });
 
   switch (node.type) {
     case "EmptyExpression":
@@ -132,6 +140,9 @@ function translateNode({
 
     case "LogicalExpression": {
       const logExpr = node as LogicalExpressionToken;
+      if (bindEvaluations && !negated && isAndChain(logExpr)) {
+        return translateAndChain({ chain: readAndChain(logExpr), ctx, branch });
+      }
       const op = logExpr.operator.operator === "OR" ? "OR" : "AND";
       return `(${branch(logExpr.left, negated)} ${op} ${branch(logExpr.right, negated)})`;
     }
@@ -150,6 +161,34 @@ function translateNode({
     default:
       throw new FilterParseError(`Unsupported query syntax: ${(node as { type: string }).type}`);
   }
+}
+
+/**
+ * An AND chain read once from its top: the bound evaluator group as one
+ * condition, ANDed with the other operands walked as usual, folded left.
+ */
+function translateAndChain({
+  chain,
+  ctx,
+  branch,
+}: {
+  chain: AndChain;
+  ctx: TranslationContext;
+  branch: (side: LiqeQuery, sideNegated: boolean) => string;
+}): string {
+  // The chain's own node is already counted; its nested ANDs and the bound
+  // group are not walked, so they are counted here to keep the ceiling put.
+  ctx.nodeCount += chain.nodeCount - 1;
+  if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
+    throw new FilterTooComplexError({ maxNodes: MAX_FILTER_NODE_COUNT });
+  }
+  const parts = [
+    ...(chain.scope ? [translateEvaluationScope(chain.scope, ctx)] : []),
+    ...chain.rest.map((operand) => branch(operand, false)),
+  ];
+  const [first = "1 = 1", ...others] = parts;
+  if (others.length === 0) return `(${first})`;
+  return others.reduce((acc, part) => `(${acc} AND ${part})`, first);
 }
 
 function translateTag(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
@@ -386,6 +425,7 @@ export function translateFilter({
     queryText,
     ctx,
     translateTag: (tag, negated, tagCtx) => translateTag(tag, negated, tagCtx),
+    bindEvaluations: true,
   });
 
   return sql === null ? null : { sql, params: ctx.params };
@@ -400,10 +440,14 @@ export function translateFilterAst({
   queryText,
   ctx,
   translateTag,
+  bindEvaluations = false,
 }: {
   queryText: string;
   ctx: TranslationContext;
   translateTag: FieldHandler;
+  /** Compile an evaluator and its result conditions as one evaluation; only
+   * the `trace_summaries` dialect has the evaluator fields. */
+  bindEvaluations?: boolean;
 }): string | null {
   const trimmed = normalizeQuery(queryText);
   if (!trimmed) return null;
@@ -417,7 +461,7 @@ export function translateFilterAst({
 
   if (ast.type === "EmptyExpression") return null;
 
-  const sql = translateNode({ node: ast, negated: false, ctx, translateTag });
+  const sql = translateNode({ node: ast, negated: false, ctx, translateTag, bindEvaluations });
 
   if (Object.keys(ctx.params).length > MAX_PARAM_COUNT) {
     throw new FilterParseError("Too many filter conditions");

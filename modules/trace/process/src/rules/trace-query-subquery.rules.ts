@@ -38,6 +38,26 @@ export function instantEvalJudgmentsSubquery({
   );
 }
 
+// Traces with an evaluation whose latest version passes `innerWhere`:
+// `evaluation_runs` keeps a row per state change until a merge, so a raw row
+// could judge an evaluation by a state it left. IN-tuple dedup, no FINAL;
+// `scopeWhere` narrows both the rows and the dedup scan.
+export function latestEvaluationRunsSubquery({
+  timeCol,
+  scopeWhere,
+  innerWhere,
+}: {
+  timeCol: string;
+  scopeWhere: string;
+  innerWhere: string;
+}): string {
+  const bounds = `TenantId = {tenantId:String} AND ${timeCol} >= fromUnixTimestamp64Milli({timeFrom:Int64}) AND ${timeCol} <= fromUnixTimestamp64Milli({timeTo:Int64}) AND ${scopeWhere}`;
+  return (
+    `TraceId IN (SELECT DISTINCT TraceId FROM evaluation_runs WHERE ${bounds} AND ${innerWhere}` +
+    ` AND (TenantId, EvaluationId, UpdatedAt) IN (SELECT TenantId, EvaluationId, max(UpdatedAt) FROM evaluation_runs WHERE ${bounds} GROUP BY TenantId, EvaluationId))`
+  );
+}
+
 /**
  * Match traces whose hoisted `scenario.run_id` belongs to a scenario run row
  * passing `innerWhere` against the deduped `simulation_runs` table. Uses the
