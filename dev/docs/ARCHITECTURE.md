@@ -140,6 +140,16 @@ open item of 2026-09-29).
 Analytics' filter field registry (`availableFilters` and its field types) is `modules/analytics/filters`
 (`@langwatch/analytics-filters`), an analytics-owned package, portable and framework-free on the same
 terms; analytics' browser and automation's process import it (Alex, 2026-09-30).
+The unkeyed-filter detector (`findUnkeyedFilterFields`) moves to the contract that owns the filter grammar,
+and both trace search and automation triggers import it (Alex, 2026-10-05): that is
+`@langwatch/analytics-filters`, which owns `requiresKey` and which automation already imports, so trace's
+process becomes an importer (coordinator, citing that ruling, 2026-10-05). Trace owns the metadata columns, so
+trace-contract exports main's two metadata key/value condition builders (the three storage formats) and
+analytics imports them: one copy, a contract export, not an Api operation (Alex, 2026-10-05).
+The instant-evals consent columns stay on `Organization`: organization owns them, and instant-eval reads and
+sets them through new `OrganizationApi` operations. Monitor reads an evaluator's effective settings through one
+new `EvaluationApi` read operation. Billing's Slack channel is renamed `billing-alert` (`BillingAlertChannel`),
+ownership unchanged (Alex, 2026-10-05).
 
 ---
 
@@ -849,6 +859,11 @@ so it fails until the last cycle is cut. A cycle is cut from the reactor's side,
 command on the other module's pipeline, or a pull by a scheduled process manager where that would
 itself be a cycle); `dev/docs/plans/peer-cycles-2026-10-05.md` maps them. Once none remains the
 container refuses a peer cycle at boot by name.
+No peer-cycle edge is cut or listed without asking Alex first (Alex, 2026-10-05). Two cuts are ruled:
+`secret -> project`, and `gateway -> webhook`, where webhook subscribes to gateway's events (§9) and
+gateway holds no `WebhookApi` peer. Workflow's HTTP-credentials backfill is still needed for a while: it
+stays, done another way (workflow walks its own rows; the agents half becomes agent's own task), so
+workflow drops `ProjectApi` and `OrganizationApi` (Alex, 2026-10-05).
 
 Online policy execution (guardrails) is a synchronous capability with an end-to-end deadline and
 cancellation, distinct from monitors and run history. The evaluation runtime it calls is a dependency
@@ -857,10 +872,10 @@ removing a cycle may not make a synchronous precondition eventual (Alex, 2026-10
 A request guardrail answers within 800 ms through `EvaluationApi.checkGuardrail`, the gateway's only
 evaluation dependency; a fail-closed deadline answers the retryable 503 (Alex, 2026-10-01).
 
-`gateway -> evaluation` (guardrail checks) and `instant-eval -> licensing` (Connect judge) are listed
+`gateway -> evaluation` (guardrail checks) and `instant-eval -> licensing` (Connect judge) were listed
 temporarily (Alex, 2026-09-30): hosted judging moves to instant-eval, and the guardrail check's owner is
-revisited later.
-`project -> data-privacy` is listed too (Alex, 2026-09-30): `/api/projects/{id}` carries `piiRedactionLevel`
+revisited later. With the list deleted they are reported like every other cycle (Alex, 2026-10-05).
+`project -> data-privacy` was listed too (Alex, 2026-09-30): `/api/projects/{id}` carries `piiRedactionLevel`
 through `DataPrivacyApi.getPiiRedactionLevel`/`setPiiRedactionLevel`, which merge the level into the
 project-scope rule and read `custom` as `STRICT`.
 
@@ -1585,6 +1600,52 @@ close() }`. The api's `serve()` answers a claimed request ahead of every route, 
   is generated from it: the TypeScript, Python and Go clients and the docs site copy
   (`docs/api-reference/openapiLangWatch.json`, which Mintlify needs in the repository). `make
 sync-all-openapi` regenerates all four, and the `openapi-clients` CI job fails on any diff.
+- **Middleware never does the framework's work** (Alex, 2026-10-05): middleware doing what the API framework
+  does (authentication, JSON body parsing) and a route opened to any authenticated or unauthenticated caller
+  are drift, caught by lint rules whose message tells the agent why and what to use instead. Those guard
+  rules are among the few that accept a disable with a reason (§17); the guard list is
+  `dev/docs/plans/api-framework-bypass-2026-10-05.md`.
+- **Framework extensions are shapes first** (Alex, 2026-10-05): for each extension E1 to E8 in that plan, a
+  lane writes the signature and one example route, no code, and Alex approves before any is built. The
+  raw-body media-type refusal (collector, evaluations-legacy `log_results`) joins them as E9, shapes first
+  (coordinator, citing Alex's ingestion-key approval, 2026-10-05). The order: CI green first, then the
+  extension designs and the bypass guard rules (Alex, 2026-10-05).
+- `POST /api/demo/hotel_bot` is for LangWatch staff only (platform operators) (Alex, 2026-10-05): it moves onto
+  the platform-operator door tier (E4) when that lands; until then the route refuses every caller, since
+  nothing in the product calls it.
+- Contract export names are not wire: `secretReferenceOf` and `queuedThreadIdOf` are renamed as
+  `langwatch/fallible-result-naming` says, and `getLatestLocalControlRequest` returns an explicit result
+  instead of `null`. The collector and evaluations-legacy routes keep main's 400 body through the framework's
+  protocol refusal (`withResponse("protocol", { refusal })`), and the suite routes take one combined REST
+  fact (coordinator, citing the lint-findings ruling, 2026-10-05).
+- Workflow's contract keeps `Date` for `updatedAt` on the wire, since a `Temporal.Instant` drops the
+  milliseconds of whole-second timestamps and a test pins today's JSON; the repository carries Temporal
+  (coordinator, citing `langwatch/temporal-only`, 2026-10-05; replaces that day's `Temporal.Instant` wire ruling).
+- api-key's `POST /ingestion` moves its two refusals, same order and conditions, into a new in-module
+  operation, `createIngestionKey` (Alex, 2026-10-05). Because the route calls `ApiKeyApi`, it is declared on
+  the contract (`createIngestionKeyInputSchema`, `ApiKeyApi.createIngestionKey`) (coordinator, citing that
+  approval, 2026-10-05).
+- **The execute-sync relay (#8429) lives in the workflow module**, beside the engine channel; the project comes
+  from the key, never the body (Alex, 2026-10-05). It is one operation,
+  `WorkflowApi.relayExecuteSync({ projectId, event, signal })`, declared with today's doors (project
+  credential, `scenarios:create`, a 50 MiB body limit, a forwarded response, hidden docs); `projectId` is
+  `scope.id`. A timeout answers 504 and a caller
+  gone 408; the ceiling is a workflow config member defaulting to 900000 ms; a non-JSON body answers the
+  framework's 400 `malformed_request` in place of main's bespoke body (coordinator, L6 R1, citing that ruling,
+  2026-10-05). A top-level `projectId` naming another project answers 403 `scope_input_mismatch`, a project
+  inside the event is ignored as on main, and a non-object JSON body answers 422. Scenario learns whether the
+  deployment has per-project engines through one `WorkflowApi.hasPerProjectEngines()` read;
+  `LANGWATCH_NLP_LAMBDA_CONFIG` stays workflow's secret alone, and the `NLP_FETCH_MAX_TIMEOUT_MS` leaf is
+  workflow's, which scenario's agent-test deadline reads as `nlpFetchMaxTimeoutMs` from workflow-contract
+  (coordinator, L6b R2, citing the same ruling, 2026-10-05). R3 is open (§16).
+- The instant-eval opt-in procedures `access` and `enable` are declared in trace's contract under
+  `traces.instantEval` as two `TraceApi` operations that forward to `InstantEvalApi`, as
+  `trace-instant-eval-run.service.ts` already does; instant-eval's process takes `@langwatch/authz-contract`
+  (coordinator, L7 R1 and S1, 2026-10-05). Until E10 is ruled (§16) the enable audit row is the framework's
+  project-level row; no hand-rolled audit write.
+- Parameters the evaluator overrides are refused everywhere, not on REST only as on main: the monitor service
+  refuses them with 422 `monitor_parameters_unused` at every door, so the UI create form must not send them
+  (Alex, 2026-10-05).
 
 ---
 
@@ -1794,8 +1855,8 @@ A fact is recorded by its owner; delivery modules are handed it; there is no rel
 2026-09-29). Gateway's budget crossings and virtual key lifecycle changes are the case: gateway
 detects a crossing after its own debit lands and records it with `recordBudgetCrossing`, keyed by
 (budget, bucket, kind, period), on its `governance_events_processing` pipeline (main's stored
-names). A subscriber there hands each fact to `WebhookApi.requestGatewayEventDelivery`, and webhook
-builds and delivers the envelope. A failed detection throws and the debit is re-driven. That is
+names). Webhook subscribes to those facts and builds and delivers the envelope; gateway holds no
+`WebhookApi` peer (Alex, 2026-10-05; §5). A failed detection throws and the debit is re-driven. That is
 safe because the ledger insert skips any budget the request has already debited.
 Each destination kind owns its sending (Alex, 2026-09-30; [ADR-167](adr/167-outbound-delivery.md)):
 producers call the kind's `requestDelivery`; retry, dead-letter and redrive are the outbox's; SSRF
@@ -2423,6 +2484,9 @@ skills.
 **An orgless SSO test sign-in bounces in navigation** (Alex, 2026-10-01): the landing redirect sends a
 person with no organization back to their own account; the browser-host scope hook does not redirect.
 
+**Going live twice costs nothing and states nothing** (Alex, 2026-10-05): activating an already-active SSO
+connection is a silent no-op; the guard allows ACTIVE -> ACTIVE without a fact, and the spec stands.
+
 ---
 
 ## 12. Errors
@@ -2447,6 +2511,17 @@ deadline, and puts the role labels on the `HandledError`'s `meta`; the presentat
 the sentence, and a failed or late explanation leaves the plain denial.
 A REST error body carries its fields (`type`, `code`, `message`, …) at the root, never nested under an
 `error` key (Alex, 2026-09-30); `GET /api/api-keys` keeps main's `{ data: [...] }` list envelope.
+**An undeclared fault at a 5xx is `presumed_platform`** (Alex, 2026-10-05): a `HandledError` whose class
+declares no fault at a 5xx status gets the fault `presumed_platform` (ambiguous, presumed platform): logged
+at error, reported, retryable where that applies, and its body masked. Below 5xx an undeclared fault stays
+`customer`. It goes on the wire as `presumed_platform` too: the published schemas and the generated SDK
+clients gain the value, and anything parsing our responses (the MCP server, module envelope readers)
+accepts it. A class declaring `fault: "customer"` at a 5xx keeps its body, in `packages/api` as everywhere
+(agent connect's `replica_count_unsupported`); undeclared server errors stay masked (Alex, 2026-10-05).
+A relayed herr error with no fault and no status stays `customer`: `presumed_platform` applies only when a
+status of 500 or more is known (coordinator, citing the ruling's "at a 5xx status", 2026-10-05).
+`LangWatchQLFilterRefusal` is a trace contract error (coordinator, citing Alex's ingestion-key approval,
+2026-10-05).
 
 ---
 
@@ -2475,6 +2550,11 @@ for tests (Alex, 2026-09-29). A test never `vi.spyOn`s a real service; it drives
 fixtures instead (Alex, 2026-09-29).
 A scenario bound from a package's tests counts toward feature parity like one bound from a module's
 (Alex, 2026-09-29).
+**Feature parity binds every scenario** (Alex, 2026-10-05): every scenario is bound and its tests written
+(1461 scenarios in 348 files on 2026-10-05). The method is a matcher first: one lane builds a script that
+ranks candidate tests for every unbound scenario; Sonnet lanes then verify and bind in bulk, writing new
+tests only where nothing fits (Alex, 2026-10-05).
+The "New Experiment" button stays solid primary; its e2e expectation is updated (Alex, 2026-10-05).
 
 The installation test boots the installed list over memory members, with no server
 (`apps/api/src/__tests__/api-installation.fixture.ts`; the worker and tasks have the same):
@@ -2630,6 +2710,14 @@ empty (no module exports `./declaration` yet — the browser serves chrome
 only); the ClickHouse resolver ruling (§7); background loops main runs that this
 branch never starts, each to become a scheduled process manager.
 
+**Open for Alex** (2026-10-05; proposals, not rulings): the usage-named files (annotation's and dataset's
+`*-usage.repository.ts`, their own count queries answering the usage report through their own Api, renamed
+`annotation-count` and `dataset-count`; entitlement's `usage.errors.ts` renamed `plan-limit.errors.ts`; no
+ownership change); the E1 to E9 open questions (§8), which Alex answers by number; L6b R3, whether the
+agent-test turn from the scenario child goes through the execute-sync relay or direct; L7b R2, proposed E10,
+a declared audit target in `packages/api` (such as `.withAudit({ target: "organization", via: "projectId" })`)
+so `traces.instantEval.enable` is audited against the organization as on main rather than the project.
+
 **Parked** (Alex, 2026-10-01; do not re-raise): the ingestion stage plan (Alex will redesign it later);
 erasure tombstones and owner-complete acknowledgement; deployment audience and subscription rollout
 (transport protocol versus audience, cutover and backfill for new durable subscriptions); tenant
@@ -2660,6 +2748,31 @@ out (Alex, 2026-10-01). §5's peer cycles held a third until it was deleted: eve
 (Alex, 2026-10-05).
 The `service-ceilings` policy is ported to a custom langwatch oxlint rule with the same exact limits
 (Alex, 2026-09-29).
+
+**Drift is caught by lint, and the message is a prompt** (Alex, 2026-10-05). Wherever code drifts from
+the architecture direction (middleware doing what the API framework does, such as auth or JSON body
+parsing; routes opened to any authenticated or unauthenticated caller, §8), a new lint rule catches it.
+Its error explains, written to the agent reading it, why the shape is wrong and what to use instead.
+
+**House rules are strict; a disable is very rare** (Alex, 2026-10-05). Most `langwatch/*` rules must not be
+ignored: a disable directive naming one is itself an error (`langwatch/suppression-states-why`). Only a few
+named rules, where the framework may genuinely not cover a case (API middleware usage, opening a route to
+any caller), accept a disable, and only with a reason explaining why the framework cannot be used; a bare
+disable is an error. A rule opts in through `defineRule({ escape })` in `packages/oxlint-rules`. This is for
+the new rules, not a sweep of old directives. When unsure, ask the human: the message on those few rules
+tells the agent that if the case is confusing it stops and asks the human rather than disabling.
+`langwatch/id-generation-origin` stays unsuppressible: it allows a visitor id the contract types as a UUID
+to be minted with `randomUUID` (a named, tested exception in the rule), and the disable directive in
+`modules/feature-flag/browser/src/behavior/anonymous-id.ts` is deleted (Alex, 2026-10-05).
+
+**The lint split and the CI type-aware gate** (Alex, 2026-10-05). oxlint's native rules and the langwatch
+plugin run as two parallel oxlint processes; the root `package.json` lint scripts own the split, and CI,
+lint-staged and the editor call those scripts. CI runs `node dev/nx/lint.mjs --types` in one process
+(affected on a PR via `--base`, all otherwise); the `lint:types` Nx target stays for local per-project runs,
+and ADR-150 is amended to say why. The type-aware pass runs only the rules that need types, from its own
+config. One unused-suppression check replaces oxlint's across the native, plugin and type-aware processes,
+landing in the same change as the split. Because the CI gate is the type-aware run, a directive only a
+type-aware rule uses stays (coordinator, citing this ruling, 2026-10-05). The commands: `dev/docs/TOOLING.md`.
 
 ## 18. Running work
 
@@ -2695,6 +2808,15 @@ the applications, the SDK and the e2e suites, so the two are not the same set.
 
 The cache is local. No Nx Cloud account is configured and `nxCloudId` is
 absent, so no source or task metadata leaves the machine.
+
+**The drive on `feat/strict-feature-layout-v0`** (Alex, 2026-10-05). Reviewed slices are committed and
+pushed directly to the branch; the first goal is the branch's CI green, and the framework-extension designs
+and the bypass guard rules (§8) come after. At most six lanes run at once, their owned paths checked
+disjoint at every spawn, and never two lanes in one module. From the main merge
+(`dev/docs/plans/main-merge-2026-10-05.md`), the developer seat (#8373) is ported now, the server half on
+Opus and the browser half on Sonnet. The webhook deploy drain is an approved operational step: before the
+last old worker stops, confirm the two deleted gateway delivery lanes have nothing queued; afterwards
+re-send blocked spend through the replay route, and governance is re-requested by hand.
 
 ## 19. The dev runtime and the sims
 
