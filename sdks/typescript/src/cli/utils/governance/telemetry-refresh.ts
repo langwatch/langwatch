@@ -362,15 +362,14 @@ export function refreshClaudeUserTelemetryEnv({
 	// block a pre-#8284 CLI wrote — installAppEnv only merges, it never
 	// prunes. Only fires while the block still lacks the replacement key
 	// (see legacyKeysToStrip), so a RAW_API_BODIES the user adds back later
-	// as a deliberate opt-in survives every subsequent refresh.
+	// as a deliberate opt-in survives every subsequent refresh. A block that
+	// lacks the replacement key cannot match `vars`, which carries it, so a
+	// strip always falls through to the install below and returns its label.
 	const legacyKeys = legacyKeysToStrip("claude", current);
-	const strippedLegacy =
-		legacyKeys.length > 0 &&
-		appEnvHasAnyVar(target, legacyKeys) &&
+	if (legacyKeys.length > 0 && appEnvHasAnyVar(target, legacyKeys)) {
 		removeAppEnvVars(target, legacyKeys);
-	if (appEnvHasAllVars(target, vars)) {
-		return strippedLegacy ? `claude telemetry env (${target.displayPath})` : null;
 	}
+	if (appEnvHasAllVars(target, vars)) return null;
 	installAppEnv(target, vars);
 	return `claude telemetry env (${target.displayPath})`;
 }
