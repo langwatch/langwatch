@@ -397,6 +397,10 @@ const presentations = {
     title: "This query couldn't be read",
     describe: () => "Check the SQL syntax and try again.",
   },
+  lwql_busy: {
+    title: "Queries are queued up right now",
+    describe: () => "Too many queries were running at once. Try again in a few seconds.",
+  },
   lwql_not_permitted: {
     title: "This query isn't allowed here",
     describe: () =>

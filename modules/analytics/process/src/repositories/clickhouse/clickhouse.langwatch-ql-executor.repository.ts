@@ -4,6 +4,7 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
   LangWatchQLAppFunctionUnavailableError,
+  LangWatchQLBusyError,
   LangWatchQLProvisioningIncompleteError,
   LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
@@ -26,6 +27,7 @@ import {
   isClickHouseObjectAccessDeniedError,
   isClickHouseObjectMissingError,
   isClickHouseResultTooLargeError,
+  isClickHouseTooManyQueriesError,
   isClickHouseUnknownFunctionError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
@@ -83,6 +85,12 @@ function refusalFor({
   // LIMIT the static validator cannot read still cannot outrun the row cap.
   if (isClickHouseResultTooLargeError(error)) {
     return new LangWatchQLResultTooLargeError(LWQL_MAX_RESULT_BYTES, { reasons: [toError(error)] });
+  }
+
+  // The shared identity is at its concurrency ceiling: refused before running,
+  // and worth the caller's retry rather than an unknown 500.
+  if (isClickHouseTooManyQueriesError(error)) {
+    return new LangWatchQLBusyError({ reasons: [toError(error)] });
   }
 
   // An unknown function in a statement that calls one of ours cannot be the

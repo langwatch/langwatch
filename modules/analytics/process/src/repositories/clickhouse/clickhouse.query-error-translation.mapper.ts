@@ -53,6 +53,13 @@ const TOO_MANY_BYTES: ServerError = { code: "307", name: "TOO_MANY_BYTES" };
 // *output* ceiling, distinct from the read ceilings above. Both settings raise this code.
 const TOO_MANY_ROWS_OR_BYTES: ServerError = { code: "396", name: "TOO_MANY_ROWS_OR_BYTES" };
 
+// `max_concurrent_queries_for_user` (and the server-wide ceiling): the statement was
+// refused before it ran, so nothing about the query itself is at fault.
+const TOO_MANY_SIMULTANEOUS_QUERIES: ServerError = {
+  code: "202",
+  name: "TOO_MANY_SIMULTANEOUS_QUERIES",
+};
+
 const UNKNOWN_FUNCTION: ServerError = { code: "46", name: "UNKNOWN_FUNCTION" };
 
 // The three server-error shapes are grouped deliberately: the two predicates below split
@@ -133,6 +140,16 @@ export function isClickHouseUnknownIdentifierError(error: unknown): boolean {
 export function isClickHouseResultTooLargeError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return raisedServerError({ error, variants: [TOO_MANY_ROWS_OR_BYTES] });
+}
+
+/**
+ * True when the identity already runs as many statements as it may
+ * (TOO_MANY_SIMULTANEOUS_QUERIES, 202). Not mapped in {@link translateClickHouseQueryError}:
+ * only the LangWatchQL profile pins a per-identity concurrency ceiling.
+ */
+export function isClickHouseTooManyQueriesError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: [TOO_MANY_SIMULTANEOUS_QUERIES] });
 }
 
 /**

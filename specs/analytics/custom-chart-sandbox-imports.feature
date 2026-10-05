@@ -69,8 +69,31 @@ Feature: Custom chart widgets import any module and run under their own CSP
 
   @unit
   Scenario: Built-in modules resolve to the frame's own instance
-    When a widget imports "react", "react-dom", "react-dom/client", "recharts" or "@langwatch/charts"
-    Then the specifier is left unchanged so the import map serves the frame's UMD global
+    When the specifier resolver reads "react", "react-dom", "react-dom/client", "recharts" or "@langwatch/charts"
+    Then it leaves the specifier unchanged rather than sending it to esm.sh
+    And the import map, or the compiled import rewritten after it, serves the frame's UMD global
+
+  # WebKit and Firefox ignore an import map that arrives after any module load
+  # has started, and a proxy in front of the app may inject a module script
+  # into the frame document. So the map is markup, ahead of everything else.
+  @unit
+  Scenario: A custom widget that imports recharts renders in Chromium, WebKit and Firefox
+    When the chart frame document is built
+    Then the import map is static markup and the first element of the head
+    And no script, stylesheet or preload comes before it
+    And it maps "react", "react-dom", "react-dom/client", "recharts", "@langwatch/charts" and both JSX runtimes
+    And no script in the document creates an import map at run time
+
+  @unit
+  Scenario: The import map names every export of the bundled charts library
+    When the charts library the frame bundles is evaluated
+    Then the "@langwatch/charts" module in the import map exports exactly its members
+
+  @unit
+  Scenario: A widget's own built-in import loads even where the import map was ignored
+    When a widget imports "recharts", "react" or "@langwatch/charts"
+    Then the compiled module imports the module URL the import map names for that specifier
+    And so the import does not depend on the engine having accepted the import map
 
   @unit
   Scenario: A package built with the automatic JSX runtime shares the frame's React

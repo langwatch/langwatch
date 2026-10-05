@@ -459,6 +459,7 @@ export const APP_ERROR_CODES = [
   "lwql_app_function_key_cap",
   "lwql_app_function_read_budget",
   "lwql_app_function_unavailable",
+  "lwql_busy",
   "lwql_granularity_parameter_type",
   "lwql_granularity_requires_window",
   "lwql_granularity_too_fine",

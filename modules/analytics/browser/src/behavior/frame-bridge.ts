@@ -31,6 +31,8 @@ import {
 } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { nowInstant } from "@langwatch/time";
 
+import { pageWidgetQueryLane, type WidgetQueryLane } from "./widget-query-lane.ts";
+
 /** Upper bound on simultaneously in-flight `lw:query` requests per frame. */
 const MAX_CONCURRENT_QUERIES = 8;
 
@@ -65,6 +67,8 @@ export interface CreateFrameBridgeOptions {
   readonly source: string;
   /** The frame document URL, CHART_FRAME_PATH unless given; the bridge navigates to it. */
   readonly src?: string;
+  /** Where queries wait their turn; the page-wide lane unless given. */
+  readonly queryLane?: WidgetQueryLane;
   readonly onLog: (entry: ChartFrameLogEntry) => void;
   readonly onHeightChange: (px: number) => void;
   /**
@@ -230,14 +234,19 @@ export class FrameBridgeSession implements FrameBridge {
           code: "dashboard_widget_query_overloaded",
           title: "Too many queries at once",
           message: `A widget may run at most ${MAX_CONCURRENT_QUERIES} queries at a time. This one was not started.`,
+          retryable: true,
         },
       });
       return;
     }
     const abort = new AbortController();
     this.#activeAborts.set(requestId, abort);
-    this.#options
-      .executeQuery({ queryName, params, signal: abort.signal })
+    const { executeQuery, queryLane = pageWidgetQueryLane } = this.#options;
+    queryLane
+      .run({
+        task: () => executeQuery({ queryName, params, signal: abort.signal }),
+        signal: abort.signal,
+      })
       .then((result) => this.#settle(requestId, { type: "lw:query-result", requestId, result }))
       .catch((error: unknown) =>
         this.#settle(requestId, {
@@ -266,11 +275,12 @@ function toChartQueryErrorPayload(error: unknown): ChartQueryError {
   if (!("code" in error && "title" in error && "message" in error)) {
     return unknownChartQueryError();
   }
-  const shaped = error as { code: unknown; title: unknown; message: unknown };
+  const shaped = error as { code: unknown; title: unknown; message: unknown; retryable?: unknown };
   return {
     code: String(shaped.code),
     title: String(shaped.title),
     message: String(shaped.message),
+    ...(shaped.retryable === true ? { retryable: true } : {}),
   };
 }
 
