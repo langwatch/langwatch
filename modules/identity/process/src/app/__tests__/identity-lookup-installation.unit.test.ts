@@ -42,8 +42,9 @@ async function bootIdentity() {
   })
     .withModules([identityProcessModule])
     .withStores(memoryStores())
-    .withMembers({ publicBaseUrl: undefined })
-    .withConfig({ identity: { ssoDomainProofDnsServers: [], isSaas: false } })
+    .withConfig({
+      identity: { ssoDomainProofDnsServers: [], isSaas: false, publicBaseUrl: undefined },
+    })
     .withEventing(new EventSourcing({ enabled: false, processManagerMode: "producer-only" }))
     .expose(() => ({ hosts: { trpc: recordingTrpcHost() }, serve: () => undefined }))
     .provide({

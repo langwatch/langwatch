@@ -189,9 +189,6 @@ const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
 type IdentityMembers = Readonly<{
   /** The event stack the appending ledgers and the connection history reach. */
   eventing: EventSourcing;
-  /** Where this deployment answers, which is what a SAML identity provider
-   *  is told LangWatch is called. A process fact, not one of the fourteen. */
-  publicBaseUrl: string | undefined;
 }>;
 
 type IdentitySetup = FeatureSetup<
@@ -454,7 +451,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     /** Where every mail identity sends goes out; notification owns the gateway. */
     notifications: NotificationService,
   };
-  static readonly reads = ["eventing", "publicBaseUrl"] as const;
+  static readonly reads = ["eventing"] as const;
   /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and auth. */
   static readonly secrets = { internalSlackSignupsWebhook } as const;
 
@@ -467,14 +464,14 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       (webhookUrl) =>
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
-          publicBaseUrl: setup.members.publicBaseUrl,
+          publicBaseUrl: setup.config.publicBaseUrl,
           logger: createLogger("langwatch:identity:signup-announcement"),
         }),
     );
     const engineProviders = SsoEngineProviderService.create({
       credentials: setup.repositories.ssoCredentials,
       rows: setup.repositories.ssoEngineProviders,
-      baseUrl: setup.members.publicBaseUrl ?? "",
+      baseUrl: setup.config.publicBaseUrl ?? "",
     });
     const identityEventing = ConnectedIdentityEventing.create();
     const ledger = IdentityLedgerStore.create({
@@ -547,7 +544,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       engineProvider: engineProviders,
       mail: ssoDomainProofMailChannels.ses.create({
         mailer,
-        baseUrl: setup.members.publicBaseUrl ?? "",
+        baseUrl: setup.config.publicBaseUrl ?? "",
       }),
       licensing: setup.dependencies.licensing,
       authorization: setup.dependencies.permissions,
@@ -771,7 +768,7 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
         ceremony: verification,
         mail: addressConfirmationMailChannels.ses.create({
           mailer,
-          baseUrl: setup.members.publicBaseUrl ?? "",
+          baseUrl: setup.config.publicBaseUrl ?? "",
         }),
         rateLimiter: setup.repositories.rateLimits,
         sessions: setup.dependencies.auth,
@@ -860,9 +857,9 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
               context: setup.repositories.joinRequestNotificationContext,
               mail: joinRequestNotificationMailChannels.ses.create({
                 mailer,
-                baseUrl: setup.members.publicBaseUrl ?? "",
+                baseUrl: setup.config.publicBaseUrl ?? "",
               }),
-              baseHost: setup.members.publicBaseUrl ?? "",
+              baseHost: setup.config.publicBaseUrl ?? "",
               plans: setup.dependencies.entitlements,
             }),
           }),

@@ -69,8 +69,9 @@ async function installed() {
   })
     .withModules([identityProcessModule])
     .withStores(memoryStores())
-    .withMembers({ publicBaseUrl: undefined })
-    .withConfig({ identity: { ssoDomainProofDnsServers: [], isSaas: false } })
+    .withConfig({
+      identity: { ssoDomainProofDnsServers: [], isSaas: false, publicBaseUrl: undefined },
+    })
     .withEventing(eventSourcing)
     .provide({
       organization: createApiFixture<OrganizationApi>(),

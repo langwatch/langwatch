@@ -24,8 +24,9 @@ const bootIdentity = () =>
   createApp({ role: "api", secrets: (owner, declared) => noSecretsChain.scopeTo(owner, declared) })
     .withModules([identityProcessModule])
     .withStores(memoryStores())
-    .withMembers({ publicBaseUrl: undefined })
-    .withConfig({ identity: { ssoDomainProofDnsServers: [], isSaas: false } })
+    .withConfig({
+      identity: { ssoDomainProofDnsServers: [], isSaas: false, publicBaseUrl: undefined },
+    })
     .withEventing(new EventSourcing({ enabled: false, processManagerMode: "producer-only" }))
     .provide({
       organization: createApiFixture<OrganizationApi>(),

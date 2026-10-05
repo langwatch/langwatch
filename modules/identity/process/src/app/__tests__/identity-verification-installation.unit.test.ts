@@ -24,8 +24,9 @@ describe("identity verification installation", () => {
     })
       .withModules([identityProcessModule])
       .withStores(memoryStores())
-      .withMembers({ publicBaseUrl: undefined })
-      .withConfig({ identity: { ssoDomainProofDnsServers: [], isSaas: false } })
+      .withConfig({
+        identity: { ssoDomainProofDnsServers: [], isSaas: false, publicBaseUrl: undefined },
+      })
       .withEventing(new EventSourcing({ enabled: false, processManagerMode: "producer-only" }))
       .provide({
         organization: createApiFixture<OrganizationApi>(),
