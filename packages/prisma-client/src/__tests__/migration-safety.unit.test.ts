@@ -18,7 +18,7 @@ const MIGRATIONS_DIR = resolve(import.meta.dirname, "../../prisma/migrations");
  * timestamp, so anything written after the freeze sorts above this — which is
  * what makes "never extend the baseline" checkable. ADR-155.
  */
-const BASELINE_FROZEN_AT = "20260923160000_project_active_day";
+const BASELINE_FROZEN_AT = "20261002120004_project_active_day";
 
 const baseline = parseBaseline(
   readFileSync(resolve(import.meta.dirname, "migration-safety.baseline.txt"), "utf8"),

@@ -4141,7 +4141,7 @@ model RoleBinding {
   updatedAt DateTime @default(now()) @updatedAt
 
   // No uniqueness: the same principal, role and scope may be bound twice
-  // (20260930120000_role_name_live_unique_bindings_not_unique).
+  // (20261002120011_role_name_live_unique_bindings_not_unique).
   @@index([organizationId])
   @@index([userId])
   @@index([groupId])
@@ -4281,7 +4281,7 @@ model Role {
   updatedAt      DateTime  @default(now()) @updatedAt
   // A delete marks the row and frees the name. A name is unique among live
   // roles only: a partial unique index WHERE "deletedAt" IS NULL, raw SQL in
-  // 20260930120000_role_name_live_unique_bindings_not_unique.
+  // 20261002120011_role_name_live_unique_bindings_not_unique.
   deletedAt      DateTime?
 
   @@index([organizationId])
