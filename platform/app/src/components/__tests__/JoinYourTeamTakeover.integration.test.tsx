@@ -595,6 +595,34 @@ describe("given somebody an administrator already invited", () => {
     });
 
     /** @scenario The invitation can be set aside without accepting it */
+    it("reaches the screen beneath in one click when the domain offer also stands", async () => {
+      invitationsRef.current = { ...INVITED };
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover
+            currentOrganizationId={null}
+            dismissLabel="Create a new organization instead"
+            fallback={<div data-testid="make-your-own" />}
+          />
+        </ChakraProvider>,
+      );
+
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: "Create a new organization instead",
+        }),
+      );
+
+      expect(
+        screen.queryByTestId("join-team-takeover"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("make-your-own")).toBeInTheDocument();
+      // Nothing lasting is recorded: the ask screen's own refusal says it
+      // will not ask about the domain again, and this button never did.
+      expect(dismissMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The invitation can be set aside without accepting it */
     it("re-reads the invitations when accepting fails, so a withdrawn one drops off", async () => {
       invitationsRef.current = { ...INVITED };
       acceptInviteMock.mockImplementation(

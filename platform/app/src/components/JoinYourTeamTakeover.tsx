@@ -176,13 +176,16 @@ function useJoinTakeoverState({
 
   // Setting the invitation aside is for this visit only: it still stands,
   // and the mail still carries it. So it never opens the automatic door
-  // (`noInvitation` above reads the answer, not this); the screen simply
-  // decides as if none had been shown.
+  // (`noInvitation` above reads the answer, not this). Its button says
+  // "create a new organization instead", so the domain offer is not raised
+  // in its place either: one click reaches the screen beneath, and nothing
+  // lasting is recorded, unlike the ask screen's own refusal. A request
+  // already waiting still shows, as it always blocks creating one here.
   const [invitationSetAside, setInvitationSetAside] = useState(false);
 
   return {
     settled,
-    decision: offer.data,
+    decision: invitationSetAside ? undefined : offer.data,
     mine: mine.data,
     invitation:
       onboarding && !invitationSetAside ? invitations.data?.[0] : undefined,
