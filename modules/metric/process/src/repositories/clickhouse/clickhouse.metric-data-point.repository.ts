@@ -118,22 +118,22 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
     }
     const client = await this.resolveClient(tenantId);
     // Two hops in one query: the series catalog names the label-matched SeriesIds (deduped with
-    // argMax per the catalog's documented partition/dedup mismatch — its reader must never rely
-    // on the engine having merged), then the rollups, whose buckets are delta-converged, sum to
-    // the series total. `has(PointAttributeKeys, ...)` gates the JSON extraction to rows that
-    // can match at all.
+    // argMax, never relying on a merge), then the delta-converged rollups sum to the series
+    // total. `has(PointAttributeKeys, ...)` gates the JSON extraction to rows that can match.
+    // Columns go through the table alias `s`: PointAttributesJson is also a SELECT alias, and
+    // unqualified it would put the aggregate in WHERE.
     const result = await client.query({
       query: `
         WITH matched AS (
           SELECT
-            SeriesId,
-            argMax(MetricName, LastSeenAt) AS MetricName,
-            argMax(PointAttributesJson, LastSeenAt) AS PointAttributesJson
-          FROM metric_series
-          WHERE TenantId = {tenantId:String}
-            AND has(PointAttributeKeys, {attributeKey:String})
-            AND JSONExtractString(PointAttributesJson, {attributeKey:String}) = {attributeValue:String}
-          GROUP BY SeriesId
+            s.SeriesId AS SeriesId,
+            argMax(s.MetricName, s.LastSeenAt) AS MetricName,
+            argMax(s.PointAttributesJson, s.LastSeenAt) AS PointAttributesJson
+          FROM metric_series AS s
+          WHERE s.TenantId = {tenantId:String}
+            AND has(s.PointAttributeKeys, {attributeKey:String})
+            AND JSONExtractString(s.PointAttributesJson, {attributeKey:String}) = {attributeValue:String}
+          GROUP BY s.SeriesId
         )
         SELECT
           matched.MetricName AS MetricName,
@@ -188,12 +188,14 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
     const dimensions = USAGE_DIMENSIONS[query.groupBy];
     const selectDimensions = dimensions.join(", ");
     const identityWhere = [
-      "OrganizationId = {organizationId:String}",
+      "u.OrganizationId = {organizationId:String}",
       // First acceptance determines billing. The lower window bound belongs in
       // HAVING so min(AcceptedAt) can deduplicate a point across month partitions.
-      "AcceptedAt < {to:DateTime64(3)}",
-      query.tenantId ? "TenantId = {tenantId:String}" : "",
-      query.metricName ? "MetricName = {metricName:String}" : "",
+      // Qualified with the table alias: the SELECT aliases reuse these column names,
+      // and an unqualified name in WHERE would resolve to the aggregate.
+      "u.AcceptedAt < {to:DateTime64(3)}",
+      query.tenantId ? "u.TenantId = {tenantId:String}" : "",
+      query.metricName ? "u.MetricName = {metricName:String}" : "",
     ]
       .filter(Boolean)
       .join(" AND ");
@@ -209,18 +211,18 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
           ActiveSeriesHours AS ProjectedEventEquivalentUsage
           FROM (
           SELECT
-            PointId,
-            any(OrganizationId) AS OrganizationId,
-            any(TenantId) AS TenantId,
-            any(SeriesId) AS SeriesId,
-            any(MetricName) AS MetricName,
-            min(AcceptedAt) AS AcceptedAt,
-            toStartOfHour(min(AcceptedAt)) AS AcceptedHour,
-            any(CanonicalSourceBytes) AS CanonicalSourceBytes
-          FROM metric_usage_estimates
+            u.PointId AS PointId,
+            any(u.OrganizationId) AS OrganizationId,
+            any(u.TenantId) AS TenantId,
+            any(u.SeriesId) AS SeriesId,
+            any(u.MetricName) AS MetricName,
+            min(u.AcceptedAt) AS AcceptedAt,
+            toStartOfHour(min(u.AcceptedAt)) AS AcceptedHour,
+            any(u.CanonicalSourceBytes) AS CanonicalSourceBytes
+          FROM metric_usage_estimates AS u
           WHERE ${identityWhere}
-          GROUP BY PointId
-          HAVING min(AcceptedAt) >= {from:DateTime64(3)}
+          GROUP BY u.PointId
+          HAVING min(u.AcceptedAt) >= {from:DateTime64(3)}
         )
         GROUP BY ${selectDimensions}
         ORDER BY ${selectDimensions}
