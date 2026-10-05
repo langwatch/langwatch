@@ -132,6 +132,31 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     expect(state.providerSkippedAt).toEqual(expect.any(String));
   });
 
+  /** @scenario "Skip anyway skips the tour as well" */
+  it("records the tour as skipped in the same call and tracks both skips", async () => {
+    const { api, records } = createOrganizations({
+      org_1: { state: { paths: [], donePaths: [] }, variant: "guided" },
+    });
+    const events = MemoryPostHogEventsChannel.create();
+    const service = GuidedOnboardingService.create({
+      organizations: api,
+      events,
+      announce: async () => {},
+    });
+
+    await service.recordProviderSkipped({ organizationId: "org_1", userId: "user_1" });
+
+    expect(records.get("org_1")?.state).toMatchObject({
+      providerSkippedAt: expect.any(String),
+      tourSkippedAt: expect.any(String),
+    });
+    expect(events.tracked.map((tracked) => tracked.event)).toEqual([
+      "guided_onboarding_provider_skipped",
+      "guided_onboarding_tour_skipped",
+    ]);
+    expect(events.tracked.every((tracked) => tracked.userId === "user_1")).toBe(true);
+  });
+
   /** @scenario "completing, skipping and replaying the tour are recorded" */
   it("records completing, then skipping, then two replays of the tour", async () => {
     const { api } = createOrganizations({
