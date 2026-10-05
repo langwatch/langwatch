@@ -5,7 +5,7 @@ import {
 } from "@langwatch/coding-agent-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
+import type { CodingAgentCostEstimator } from "../services/model-catalog-cost-estimator.service.ts";
 import {
   type CodingAgentSessionStateProjection,
   type CodingAgentSessionData,

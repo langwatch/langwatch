@@ -4,6 +4,17 @@ import type {
   CodingAgentUsageCount,
 } from "@langwatch/coding-agent-contract";
 
+export type CodingAgentSessionListReadOutcome = "hit" | "empty" | "error";
+
+/** Observes the bounded session-list storage read without coupling the feature to app metrics. */
+export interface CodingAgentReadMetrics {
+  observeSessionListRead(input: {
+    table: string;
+    outcome: CodingAgentSessionListReadOutcome;
+    durationMs: number;
+  }): void;
+}
+
 /** Private persistence port for the session aggregate read model. */
 export abstract class CodingAgentSessionRepository {
   abstract upsert(

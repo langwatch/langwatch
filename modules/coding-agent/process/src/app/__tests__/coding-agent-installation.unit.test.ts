@@ -11,7 +11,7 @@ import type { Project, ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  * The organization rollup, booted the way a process boots coding-agent: its
- * caller scope, visibility and audit come from peers, never from members.
+ * caller scope, visibility and audit come from peers.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";

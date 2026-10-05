@@ -8,7 +8,6 @@ import {
 import type { GithubPullRequest, GithubApi } from "@langwatch/github-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import type { CodingAgentClock } from "../app/coding-agent.members.ts";
 import type {
   CodingAgentSessionEventRepository,
   SessionModelTotalsRow,
@@ -17,6 +16,7 @@ import {
   assignablePullRequests,
   pullRequestIdentity,
 } from "../rules/coding-agent-pull-request.rules.ts";
+import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
 import type {
   CodingAgentPersonalPullRequestValuesService,
   CodingAgentPersonalRepositoryGroup,

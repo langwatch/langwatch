@@ -3,8 +3,22 @@ import { throttledWindow, type SubscriberSpec, type TriggerContext } from "@lang
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import type { CodingAgentPullRequestMapping } from "../app/coding-agent.members.ts";
 import type { CodingAgentSessionState } from "./coding-agent-session.projection.ts";
+
+/** GitHub demand path; answers two questions for the mapping subscriber. */
+export interface CodingAgentPullRequestMapping {
+  /** Whether this instance's GitHub App can answer for that repository host. */
+  canMapRepositoryHost(repositoryHost: string): boolean;
+
+  /** Asks the organization's connection which pull requests host this branch. */
+  requestBranchMapping(input: {
+    tenantId: string;
+    repositoryHost: string;
+    repositoryOwner: string;
+    repositoryName: string;
+    headBranch: string;
+  }): Promise<void>;
+}
 
 const logger = createLogger("langwatch:coding-agent-processing:pull-request-mapping");
 

@@ -4,12 +4,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserFullProfile } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import type {
-  CodingAgentScopePermissions,
-  CodingAgentScopeProject,
-} from "../../app/coding-agent.members.ts";
 import { CodingAgentCallerScopeService } from "../coding-agent-caller-scope.service.ts";
+import type { CodingAgentScopeProject } from "../coding-agent-scope-directory.service.ts";
 import { CodingAgentScopeDirectoryService } from "../coding-agent-scope-directory.service.ts";
+import type { CodingAgentScopePermissions } from "../coding-agent-scope-permissions.service.ts";
 
 const caller = { kind: "user", userId: "user-1" } as const;
 

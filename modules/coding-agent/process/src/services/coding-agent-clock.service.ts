@@ -1,6 +1,9 @@
 import { nowInstant } from "@langwatch/time";
 
-import type { CodingAgentClock } from "../app/coding-agent.members.ts";
+/** The package clock keeps time-dependent read and persistence rules testable. */
+export interface CodingAgentClock {
+  nowMs(): number;
+}
 
 export class SystemCodingAgentClockService implements CodingAgentClock {
   static create(): SystemCodingAgentClockService {

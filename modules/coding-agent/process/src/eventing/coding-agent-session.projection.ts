@@ -16,7 +16,7 @@ import {
 } from "@langwatch/eventing";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
+import type { CodingAgentCostEstimator } from "../services/model-catalog-cost-estimator.service.ts";
 import { CodingAgentSessionLogProjection } from "./coding-agent-session-log.projection.ts";
 import { CodingAgentSessionMetricProjection } from "./coding-agent-session-metric.projection.ts";
 import { CodingAgentSessionSpanProjection } from "./coding-agent-session-span.projection.ts";

@@ -1,6 +1,16 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 
-import type { CodingAgentCostMetrics, CodingAgentCostMetric } from "../app/coding-agent.members.ts";
+export type CodingAgentCostMetric = {
+  eventId: string;
+  agent: string;
+  model: string;
+  valueUsd: number;
+};
+
+export interface CodingAgentCostMetrics {
+  recordComputed(input: CodingAgentCostMetric): void;
+  recordReported(input: CodingAgentCostMetric): void;
+}
 
 /** Cost-drift canary comparing registry vs agent pricing; see coding-agent-cost.feature. */
 export class OtelCodingAgentCostMetricsService implements CodingAgentCostMetrics {

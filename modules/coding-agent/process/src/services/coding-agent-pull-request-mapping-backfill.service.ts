@@ -6,7 +6,7 @@ import {
 import type { GithubApi } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
 
-import type { CodingAgentClock } from "../app/coding-agent.members.ts";
+import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
 import type { CodingAgentSessionReadService } from "./coding-agent-session-read.service.ts";
 
 export const PULL_REQUEST_MAPPING_BACKFILL_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;

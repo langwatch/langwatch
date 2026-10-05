@@ -1,9 +1,18 @@
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type {
-  CodingAgentViewerVisibility,
-  CodingAgentViewerVisibilityReader,
-} from "../app/coding-agent.members.ts";
+/** What one viewer may see of one project: the generated titles travel under content visibility. */
+export type CodingAgentViewerVisibility = Readonly<{
+  canReadCapturedContent: boolean;
+  canSeeCosts: boolean;
+}>;
+
+/** Resolves one viewer's protections over one project; throws when unresolvable. */
+export interface CodingAgentViewerVisibilityReader {
+  readVisibility(input: {
+    userId: string;
+    projectId: string;
+  }): Promise<CodingAgentViewerVisibility>;
+}
 
 /** The same protections the trace surfaces read through, so a session list and its traces agree. */
 export class CodingAgentViewerVisibilityService implements CodingAgentViewerVisibilityReader {

@@ -1,18 +1,13 @@
-export type {
-  CodingAgentBillingPolicy,
-  CodingAgentClock,
-  CodingAgentCostEstimator,
-  CodingAgentProjectActivity,
-  CodingAgentPullRequestMapping,
-} from "./app/coding-agent.members.ts";
+export type { CodingAgentBillingPolicy } from "./services/coding-agent-cost-attribution.service.ts";
+export type { CodingAgentClock } from "./services/coding-agent-clock.service.ts";
+export type { CodingAgentCostEstimator } from "./services/model-catalog-cost-estimator.service.ts";
+export type { CodingAgentProjectActivity } from "./services/coding-agent-session-seen.service.ts";
+export type { CodingAgentPullRequestMapping } from "./eventing/pull-request-mapping.subscriber.ts";
 export type {
   CodingAgentBackfillProjects,
   CodingAgentSessionReads,
 } from "./services/coding-agent-pull-request-mapping-backfill.service.ts";
-export type {
-  CodingAgentCostMetrics,
-  CodingAgentTraceProcessor,
-} from "./app/coding-agent.members.ts";
+export type { CodingAgentCostMetrics } from "./services/coding-agent-cost-metrics.service.ts";
 export { createPullRequestMappingSubscriber } from "./eventing/pull-request-mapping.subscriber.ts";
 /**
  * The feature's application: the one typed thing its transports are given.
@@ -27,7 +22,7 @@ export type {
   CodingAgentCaller,
   CodingAgentCallerScope,
   CodingAgentPullRequestRef,
-  CodingAgentScopeMembers,
+  CodingAgentScopeReads,
 } from "./app/coding-agent.app.ts";
 export { codingAgentProcessModule } from "./coding-agent.module.ts";
 export {
@@ -40,4 +35,4 @@ export { codingAgentTrpcTransport } from "./transport/coding-agent.trpc.ts";
 export type {
   CodingAgentViewerVisibility,
   CodingAgentViewerVisibilityReader,
-} from "./app/coding-agent.members.ts";
+} from "./services/coding-agent-viewer-visibility.service.ts";

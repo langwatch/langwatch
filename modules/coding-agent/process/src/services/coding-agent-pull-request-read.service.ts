@@ -17,13 +17,14 @@ import {
 } from "@langwatch/github-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import type { CodingAgentBillingPolicy, CodingAgentClock } from "../app/coding-agent.members.ts";
 import type { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
 import {
   assignablePullRequests,
   pullRequestIdentity,
 } from "../rules/coding-agent-pull-request.rules.ts";
+import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
+import type { CodingAgentBillingPolicy } from "./coding-agent-cost-attribution.service.ts";
 import {
   CodingAgentPersonalPullRequestReadService,
   USAGE_SESSION_WINDOW_MS,

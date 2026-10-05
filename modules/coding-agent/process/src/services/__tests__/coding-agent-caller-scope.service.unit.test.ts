@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  type CodingAgentCallerScopeDirectory,
-  type CodingAgentScopePermissions,
-  type CodingAgentScopeProject,
-} from "../../app/coding-agent.members.ts";
 import { CodingAgentCallerScopeService } from "../coding-agent-caller-scope.service.ts";
+import type {
+  CodingAgentCallerScopeDirectory,
+  CodingAgentScopeProject,
+} from "../coding-agent-scope-directory.service.ts";
+import type { CodingAgentScopePermissions } from "../coding-agent-scope-permissions.service.ts";
 
 const caller = { kind: "user", userId: "user-1" } as const;
 
