@@ -48,7 +48,33 @@ Date: 2026-10-05. Branch: feat/strict-feature-layout-v0. Each row stays unbound 
 
 ## Langy, second pass
 
-| Row | Scenario says | Product does |
-| --- | --- | --- |
+| Row | Scenario says                                       | Product does                                                                                                                                                  |
+| --- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 128 | the traceback stays reachable behind the disclosure | `LangyToolErrorCard` renders the reference only when `presentation.code` is set, so a bare traceback has no "Show details" and is unreachable (likely defect) |
-| 68 | a trace search card links "Open in Traces" | the action reads "View in Trace Explorer" (wording) |
+| 68  | a trace search card links "Open in Traces"          | the action reads "View in Trace Explorer" (wording)                                                                                                           |
+
+## Scenario
+
+| Ref                                                                                   | Scenario says                                                     | Product does                                                                                      |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| suite-list-view-status.feature:32/46/61/69, suites-page-metrics-display.feature:60/68 | "failed (3/5)", "pending"                                         | `formatRunStatusLabel` returns "Failed (3/5)", "Pending", "Passed" (wording or CSS?)              |
+| simulation-service.feature:46                                                         | a job registered on the worker graph                              | computeRunMetrics sent with delay and deduplication (simulation-command-dispatcher.service.ts:94) |
+| scenario-evaluation-pending.feature:187/238                                           | the grading job carries attachments, field values and definitions | the payload carries ids only                                                                      |
+| simulation-run-metrics.feature:86/190                                                 | metrics triggered on RunFinished                                  | triggered from the trace-settled subscriber                                                       |
+| voice-agents-v1.feature:373                                                           | each child environment is built                                   | caller keys travel in adapterData.callerEnv                                                       |
+| suite-archive-confirmation-dialog.feature:15/23                                       | "Archive suite?", the sidebar                                     | "Archive run plan?", the plans table                                                              |
+
+## Trace
+
+| Row                        | Scenario says                                          | Product does                                                          |
+| -------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------- |
+| 9                          | neither tracked-event URL is served without a recorder | both routes mount and refuse by name (TraceIngestionUnavailableError) |
+| 14, 15                     | the Explorer runs an instant eval from Langy           | no handler registered for explorer.runInstantEval                     |
+| 51, 52                     | unmapped cost suggestion rules                         | nothing ever sets SpanDetail.costSuggestion (unimplemented)           |
+| 27, 29, 30, 32, 36, 37, 44 | "capability services"                                  | installed peers taken directly (stale wording)                        |
+
+## Governance, second pass
+
+| Row | Scenario says               | Product does  |
+| --- | --------------------------- | ------------- |
+| 10  | setupState lists six fields | returns seven |
