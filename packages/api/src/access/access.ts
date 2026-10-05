@@ -5,8 +5,8 @@
  */
 
 // The permission vocabulary is `@langwatch/authorization`'s; nothing here mirrors it.
-import type { Actor } from "@langwatch/authorization";
 import {
+  type Actor,
   BlankScopeIdError,
   permissionGrantTiers,
   PermissionDeniedError,

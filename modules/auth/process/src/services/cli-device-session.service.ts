@@ -585,7 +585,9 @@ export class CliDeviceSessionService {
     return familyId;
   }
 
-  /** Ends every child forked from these sessions' families, answering how many records were held. */
+  /**
+   * Ends every child forked from these sessions' families, answering how many records were held.
+   */
   private async endChildren(
     records: readonly Pick<CliRefreshTokenRecord, "family_id">[],
   ): Promise<number> {

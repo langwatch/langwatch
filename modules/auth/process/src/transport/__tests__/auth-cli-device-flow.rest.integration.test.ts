@@ -655,7 +655,9 @@ describe("given a CLI starting a device login", () => {
           api.post("/api/auth/cli/refresh", { refresh_token }),
         ]);
 
-        expect(answers.map((answer) => answer.status).sort()).toEqual([200, 401]);
+        expect(answers.map((answer) => answer.status).toSorted((a, b) => a - b)).toEqual([
+          200, 401,
+        ]);
       });
     });
 

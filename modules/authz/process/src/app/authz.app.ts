@@ -106,9 +106,13 @@ export class AuthzModule implements AuthzApi {
   #admissions: AuthzAdmissionService | undefined;
   /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no migration. */
   #migration: SystemMigration | undefined;
-  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no version store. */
+  /**
+   * Absent on an app built by {@link AuthzModule.fromServices}, which composes no version store.
+   */
   #sessionVersions: AuthzSessionVersionService | undefined;
-  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no platform tier. */
+  /**
+   * Absent on an app built by {@link AuthzModule.fromServices}, which composes no platform tier.
+   */
   #platformOperators: AuthzPlatformOperatorsService | undefined;
 
   private constructor(

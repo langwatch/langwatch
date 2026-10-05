@@ -44,7 +44,8 @@ export class RunKeyMintService {
     const input = mintRunKeyInputSchema.parse(rawInput);
     const organizationId = await this.checkStarter(input);
     const cacheKey = runKeyCacheKey(input);
-    // No await between finding the entry empty and setting it, so runs starting together share one mint.
+    // No await between finding the entry empty and setting it, so runs starting together share
+    // one mint.
     for (let existing = this.#held.get(cacheKey); existing; existing = this.#held.get(cacheKey)) {
       const held = await existing.catch(() => undefined);
       const nowMs = nowInstant().epochMilliseconds;

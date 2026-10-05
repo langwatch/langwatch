@@ -12,6 +12,7 @@ import { type AuthzApi, authzEffectivePermissionsOutputSchema } from "@langwatch
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 
 import { RUN_KEY_REUSE_MARGIN_MS } from "../../rules/run-key.rules.ts";
 import { RunKeyMintService } from "../run-key-mint.service.ts";
@@ -193,7 +194,7 @@ describe("RunKeyMintService", () => {
         permissions: ["traces:create"],
         minRemainingMs: RUN_KEY_MAX_REMAINING_MS + 1,
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
     expect(created).toHaveLength(0);
   });
 

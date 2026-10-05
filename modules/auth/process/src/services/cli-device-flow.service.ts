@@ -503,7 +503,7 @@ type CliRotatedSession = CliMintedSession &
   Readonly<{ project?: Readonly<{ id: string; slug: string; name: string }> }>;
 
 /** One rotation of a refresh token, for the CLI's `/refresh` and for any peer holding a pair. */
-export async function rotateRefreshToken({
+async function rotateRefreshToken({
   flow,
   refreshToken: refresh_token,
   projectRef,
@@ -749,7 +749,10 @@ async function issueLockedProjectSession({
   });
 }
 
-/** The person and live project behind a bound access bearer; anything else is `invalid_credentials`. */
+/**
+ * The person and live project behind a bound access bearer; anything else is
+ * `invalid_credentials`.
+ */
 async function accessProjectOf({
   flow,
   authorization,

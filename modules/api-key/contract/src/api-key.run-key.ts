@@ -3,7 +3,10 @@ import { z } from "zod";
 /** How long a run's key lives when no caller needs it to outlast a longer bound. */
 export const RUN_KEY_LIFETIME_MS = 15 * 60 * 1000;
 
-/** The longest life a caller may ask a handed-out run key to still have; a run outliving it is refused. */
+/**
+ * The longest life a caller may ask a handed-out run key to still have; a run outliving it is
+ * refused.
+ */
 export const RUN_KEY_MAX_REMAINING_MS = 60 * 60 * 1000;
 
 /** All a code agent's sandbox reaches: the project's agent cache, which user code may read. */

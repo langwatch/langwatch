@@ -45,6 +45,32 @@ import {
 } from "./sign-in-method-picker.tsx";
 import { TwoStepChallengePanel, twoStepChallengeTitle } from "./two-step-challenge-panel.tsx";
 
+/** The picker's local slot: the password form for the address asked, and nothing for any other. */
+function passwordMethodRenderer({
+  email,
+  callbackUrl,
+  onUseDifferentEmail,
+  onSignUpStarted,
+}: {
+  email: string;
+  callbackUrl: string | undefined;
+  onUseDifferentEmail: () => void;
+  onSignUpStarted: (email: string) => void;
+}) {
+  return (method: SignInMethod) => {
+    if (method.kind !== "password") return null;
+    return (
+      <CredentialSignInForm
+        key={method.id}
+        email={email}
+        callbackUrl={callbackUrl}
+        onUseDifferentEmail={onUseDifferentEmail}
+        onSignUpStarted={onSignUpStarted}
+      />
+    );
+  };
+}
+
 /**
  * The identifier-first log-in screen (D13, ADR-117 §6): ask for the address,
  * ask the server where it signs in, render the answer. An address nobody
@@ -249,18 +275,12 @@ export function IdentifierFirstSignIn() {
           })}
           onPasskeyAutoStarted={() => setPasskeyTried(true)}
           onPasskeyDeclined={() => setPasskeyTried(true)}
-          renderLocalMethod={(method) => {
-            if (method.kind !== "password") return null;
-            return (
-              <CredentialSignInForm
-                key={method.id}
-                email={submittedIdentifier ?? ""}
-                callbackUrl={callbackUrl}
-                onUseDifferentEmail={routing.clear}
-                onSignUpStarted={setSigningUpEmail}
-              />
-            );
-          }}
+          renderLocalMethod={passwordMethodRenderer({
+            email: submittedIdentifier ?? "",
+            callbackUrl,
+            onUseDifferentEmail: routing.clear,
+            onSignUpStarted: setSigningUpEmail,
+          })}
         />
         {/* The switch link is always here, carrying the address already
             typed: somebody who meant to sign up gets there in one click, and

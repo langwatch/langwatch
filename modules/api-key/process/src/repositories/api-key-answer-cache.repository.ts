@@ -1,4 +1,6 @@
-/** How long Redis holds a key's answer: the bound on an answer nobody deleted (Alex, 2026-10-01). */
+/**
+ * How long Redis holds a key's answer: the bound on an answer nobody deleted (Alex, 2026-10-01).
+ */
 export const API_KEY_ANSWER_TTL_MS = 5_000;
 /** How long "no such key" is held, so a flood of unknown tokens meets one read a moment. */
 export const API_KEY_UNKNOWN_TTL_MS = 2_000;
