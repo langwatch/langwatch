@@ -32,7 +32,7 @@ export async function queryMetricUsageEstimates({
   const dimensions = DIMENSIONS[query.groupBy];
   const selectDimensions = dimensions.join(", ");
   const identityWhere = [
-    "OrganizationId = {organizationId:String}",
+    "u.OrganizationId = {organizationId:String}",
     // Upper bound only, deliberately. A point is billed at its FIRST
     // acceptance, and this GROUP BY is the only thing that dedups a PointId
     // across months — the table partitions by AcceptedAt, so ReplacingMergeTree
@@ -42,9 +42,9 @@ export async function queryMetricUsageEstimates({
     // whose first acceptance predates the window. OrganizationId leads the sort
     // key and the TTL is 13 months, so the missing lower bound costs this org's
     // rows across at most 13 partitions, not a table scan.
-    "AcceptedAt < {to:DateTime64(3)}",
-    query.tenantId ? "TenantId = {tenantId:String}" : "",
-    query.metricName ? "MetricName = {metricName:String}" : "",
+    "u.AcceptedAt < {to:DateTime64(3)}",
+    query.tenantId ? "u.TenantId = {tenantId:String}" : "",
+    query.metricName ? "u.MetricName = {metricName:String}" : "",
   ]
     .filter(Boolean)
     .join(" AND ");
@@ -62,19 +62,22 @@ export async function queryMetricUsageEstimates({
         -- ClickHouse does not CSE two identical uniqExact states into one.
         ActiveSeriesHours AS ProjectedEventEquivalentUsage
         FROM (
+        -- Every column is read through the table alias: the SELECT aliases
+        -- reuse the column names, and an unqualified name in WHERE or HAVING
+        -- would resolve to the aggregate instead of the column.
         SELECT
-          PointId,
-          any(OrganizationId) AS OrganizationId,
-          any(TenantId) AS TenantId,
-          any(SeriesId) AS SeriesId,
-          any(MetricName) AS MetricName,
-          min(AcceptedAt) AS AcceptedAt,
-          toStartOfHour(min(AcceptedAt)) AS AcceptedHour,
-          any(CanonicalSourceBytes) AS CanonicalSourceBytes
-        FROM metric_usage_estimates
+          u.PointId AS PointId,
+          any(u.OrganizationId) AS OrganizationId,
+          any(u.TenantId) AS TenantId,
+          any(u.SeriesId) AS SeriesId,
+          any(u.MetricName) AS MetricName,
+          min(u.AcceptedAt) AS AcceptedAt,
+          toStartOfHour(min(u.AcceptedAt)) AS AcceptedHour,
+          any(u.CanonicalSourceBytes) AS CanonicalSourceBytes
+        FROM metric_usage_estimates AS u
         WHERE ${identityWhere}
-        GROUP BY PointId
-        HAVING min(AcceptedAt) >= {from:DateTime64(3)}
+        GROUP BY u.PointId
+        HAVING min(u.AcceptedAt) >= {from:DateTime64(3)}
       )
       GROUP BY ${selectDimensions}
       ORDER BY ${selectDimensions}

@@ -584,3 +584,34 @@ describe("given one chunk carrying two series staggered in time", () => {
     }
   });
 });
+
+describe("given points ensured for the tenant's organization", () => {
+  describe("when usage estimates are read for a window holding them", () => {
+    it("counts each accepted point once for the organization", async () => {
+      const estimates = await repo.queryUsageEstimates({
+        organizationId,
+        tenantId,
+        from: new Date(acceptedAt - 60 * 60_000),
+        to: new Date(acceptedAt + 60 * 60_000),
+        groupBy: "organization",
+      });
+
+      expect(estimates).toHaveLength(1);
+      expect(estimates[0]?.organizationId).toBe(organizationId);
+      expect(estimates[0]?.acceptedPoints).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when series totals are read by a point attribute nothing carries", () => {
+    it("runs against the real schema and finds no series", async () => {
+      const totals = await repo.getSeriesTotalsByPointAttribute({
+        tenantId,
+        attributeKey: `absent-${tag}`,
+        attributeValue: "x",
+        fromMs: acceptedAt - 60 * 60_000,
+      });
+
+      expect(totals).toEqual([]);
+    });
+  });
+});
