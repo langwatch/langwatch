@@ -1,9 +1,9 @@
-Feature: Peer Api cycles shrink to zero, then refuse
+Feature: Peer Api cycles are refused
   As a maintainer
-  I want every module pair that depends on each other's Api reported, and no new one landing
+  I want every module pair that depends on each other's Api reported, with no list allowing any
   So that the kernel can refuse a peer cycle at boot by name once the last one is cut
 
-  See dev/docs/ARCHITECTURE.md §5 (Alex, 2026-09-29): a shrink-only list is the transition.
+  See dev/docs/ARCHITECTURE.md §5 (Alex, 2026-10-05): the allowed list is deleted and the test stays red until every cycle is cut.
 
   @unit @architecture
   Scenario: A peer dependency whose peer reaches back is a cycle edge
@@ -24,13 +24,7 @@ Feature: Peer Api cycles shrink to zero, then refuse
     Then the peers that constant names are its edges
 
   @unit @architecture
-  Scenario: No new peer cycle edge lands
-    Given the checked-in list of today's peer cycle edges
+  Scenario: No peer cycle edge exists
+    Given the tree's modules and their static Api dependencies
     When the tree's peer cycle edges are read
-    Then none is missing from the list
-
-  @unit @architecture
-  Scenario: A cut peer cycle edge leaves the list in the same change
-    Given the checked-in list of today's peer cycle edges
-    When the tree's peer cycle edges are read
-    Then every listed edge still exists
+    Then the list of edges is empty

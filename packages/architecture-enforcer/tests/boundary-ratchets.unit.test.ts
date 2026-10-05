@@ -1,6 +1,6 @@
 /**
  * Specs: peer-cycles, eventing-table-access and framework-module-contracts features.
- * Record: dev/docs/ARCHITECTURE.md §5, §7 and §10.1, §17 on these lists.
+ * Record: dev/docs/ARCHITECTURE.md §5 (peer cycles, no list), §7 and §10.1, §17 on the lists.
  */
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,7 +21,6 @@ import { compareRatchet, countByKey, readRatchet } from "./ratchet.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(here, "..", "..", "..");
-const PEER_CYCLES = join(here, "baselines", "peer-cycle-edges.json");
 const EVENTING_TABLES = join(here, "baselines", "eventing-table-access.json");
 const FRAMEWORK_CONTRACTS = join(here, "baselines", "framework-module-contracts.json");
 
@@ -31,15 +30,10 @@ beforeAll(() => {
   snapshot = buildWorkspaceSnapshot({ root: REPO_ROOT, changedFiles: [] });
 });
 
-function peerCycles() {
-  const keys = peerCycleEdges({ packages: snapshot.packages }).map(
+function peerCycleKeys(): string[] {
+  return peerCycleEdges({ packages: snapshot.packages }).map(
     (edge) => `${edge.from} -> ${edge.to}`,
   );
-
-  return compareRatchet({
-    current: countByKey(keys),
-    listed: readRatchet({ file: PEER_CYCLES }).findings,
-  });
 }
 
 function eventingTables() {
@@ -81,16 +75,12 @@ describe("the ruled transition lists", () => {
   });
 
   describe("when the tree's peer cycle edges are read", () => {
-    /** @scenario "No new peer cycle edge lands" */
-    it("finds none missing from the list", () => {
-      expect(peerCycles().grown, "cut the cycle from the reactor's side (§5)").toEqual([]);
-    });
-
-    /** @scenario "A cut peer cycle edge leaves the list in the same change" */
-    it("finds every listed edge still present", () => {
-      expect(peerCycles().stale, "remove these from tests/baselines/peer-cycle-edges.json").toEqual(
-        [],
-      );
+    /** @scenario "No peer cycle edge exists" */
+    it("the tree has no peer cycle edge", () => {
+      expect(
+        peerCycleKeys(),
+        "cut the cycle from the reactor's side (§5); the cycles are mapped in dev/docs/plans/peer-cycles-2026-10-05.md",
+      ).toEqual([]);
     });
   });
 

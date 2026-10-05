@@ -170,8 +170,8 @@ operations. Billing peer-subscribes to `month_counted`; a lower corrected total 
 meter event (Alex, 2026-10-01). Per-entity periodic work is a keyed process manager (§9, "Per-entity calendar
 work"), never `.schedule`. Every limit is soft:
 eventual and fail-open, with a documented enforcement lag and overshoot (Alex, 2026-10-01).
-Not built yet (Alex, 2026-09-30): `entitlement -> trace` and `trace -> entitlement` stay listed in the
-peer-cycle baseline until usage lands.
+Not built yet (Alex, 2026-09-30): `entitlement -> trace` and `trace -> entitlement` are peer cycle edges
+the peer-cycle test refuses until usage lands (the allowed list is gone, §5; Alex, 2026-10-05).
 Slack is a module of its own (Alex, 2026-09-30; supersedes ADR-093 §5a on ownership). `modules/slack`
 owns the Slack connection subjects: the `SlackIntegration` table, its repositories and services,
 `SlackApi` (main's list, create, update and delete of a connection, plus the reads delivery needs), the
@@ -838,16 +838,17 @@ dependencies are its own business — only its API travels), cycles refuse at
 boot by name, and an instance bound at create may not be invoked until
 after boot.
 
-**Peer cycles shrink to zero, then refuse** (Alex, 2026-09-29). Refusal stays the rule, but today
-nothing reaches it: the container hands every `*Api` token a proxy before any module installs and
-orders modules without them, so two modules naming each other's `*Api` in `static dependencies` boot.
-The transition is a shrink-only list. The `peer-cycles` policy reports every declared peer edge whose
-peer reaches back, and `packages/architecture-enforcer/tests/boundary-ratchets.unit.test.ts` refuses an
-edge missing from `tests/baselines/peer-cycle-edges.json` and a listed edge that no longer exists, so
-the list only shrinks and a change that cuts an edge removes it. A cycle is cut in §9's shape (a
+**Peer cycles are refused, and the test stays red until the last is cut** (Alex, 2026-09-29; the list
+deleted 2026-10-05, Alex). Refusal is the rule, but today nothing reaches it at boot: the container hands
+every `*Api` token a proxy before any module installs and orders modules without them, so two modules
+naming each other's `*Api` in `static dependencies` boot. The shrink-only list that held this transition
+was deleted on 2026-10-05 (Alex, 2026-10-05): every cycle is now reported and none is allowed. The
+`peer-cycles` policy reports every declared peer edge whose peer reaches back, and
+`packages/architecture-enforcer/tests/boundary-ratchets.unit.test.ts` expects the edge list to be empty,
+so it fails until the last cycle is cut. A cycle is cut from the reactor's side, in §9's shape (a
 command on the other module's pipeline, or a pull by a scheduled process manager where that would
-itself be a cycle). When the list is empty the container refuses a peer cycle at boot by name, and the
-list is deleted.
+itself be a cycle); `dev/docs/plans/peer-cycles-2026-10-05.md` maps them. Once none remains the
+container refuses a peer cycle at boot by name.
 
 Online policy execution (guardrails) is a synchronous capability with an end-to-end deadline and
 cancellation, distinct from monitors and run history. The evaluation runtime it calls is a dependency
@@ -1369,7 +1370,7 @@ explorer) is eventing's surface, called through the member, never SQL or a Prism
 calling module. The `eventing-table-access` policy reports raw access by module or application code:
 SQL naming a table, a Prisma delegate over one, the table named as a literal, or a direct
 `storeEvents`/`getEventStore` call. Today's findings are a shrink-only list with a count per file,
-`tests/baselines/eventing-table-access.json`, held by the same ratchet as §5's peer cycles.
+`tests/baselines/eventing-table-access.json`, held by the shrink-only ratchet in `tests/boundary-ratchets.unit.test.ts`.
 
 A check that holds a summary against the facts it was folded from keeps its own record of those
 facts, a projection over the same events on its own pipeline, and never reads `event_log`:
@@ -1576,14 +1577,14 @@ close() }`. The api's `serve()` answers a claimed request ahead of every route, 
   crashed presenting the document rather than at the split.
 - **The OpenAPI document is generated, never committed** (Rogerio, 2026-10-02). The api builds it
   once at boot from the routes it mounts and serves it at `/api/openapi.json`; `pnpm --filter
-  @langwatch/platform-api openapi:generate` mounts the same declarations on a host whose doors all
+@langwatch/platform-api openapi:generate` mounts the same declarations on a host whose doors all
   refuse and writes it to `specs/api-reference/openapi-document.json`, which git ignores. The
   document names each route once, at its `/api/v1` address. A published name the declaration no
   longer spells (an `operationId`, a component) is kept with `.withDocs({ operationId })` and
   `.meta({ id })` on the route's own schemas, never by editing output. What is committed is what
   is generated from it: the TypeScript, Python and Go clients and the docs site copy
   (`docs/api-reference/openapiLangWatch.json`, which Mintlify needs in the repository). `make
-  sync-all-openapi` regenerates all four, and the `openapi-clients` CI job fails on any diff.
+sync-all-openapi` regenerates all four, and the `openapi-clients` CI job fails on any diff.
 
 ---
 
@@ -2653,9 +2654,10 @@ the type test asserts (Alex, 2026-09-27).
 A policy reads no baseline and reports every finding. A ruled transition may hold a shrink-only list
 beside the enforcer's tests (`packages/architecture-enforcer/tests/baselines/`), keyed so that growth
 inside a key is refused (a count per key), with a test that also refuses a listed finding that is
-gone. Two exist: §5's peer cycles and §7's event-table access (Alex, 2026-09-29). A third is ruled:
-"framework packages depend on no module contract" (§10.1), baselined on today's edges and shrinking
-as UI tokens move the feature types out (Alex, 2026-10-01).
+gone. Two exist: §7's event-table access (Alex, 2026-09-29) and "framework packages depend on no
+module contract" (§10.1), baselined on today's edges and shrinking as UI tokens move the feature types
+out (Alex, 2026-10-01). §5's peer cycles held a third until it was deleted: every cycle is refused now
+(Alex, 2026-10-05).
 The `service-ceilings` policy is ported to a custom langwatch oxlint rule with the same exact limits
 (Alex, 2026-09-29).
 

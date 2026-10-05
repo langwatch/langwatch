@@ -71,13 +71,16 @@ function workspaceMembers(): Member[] {
 }
 
 /**
- * The packages that render React: a module's `browser` package, the browser application, the internal consoles (`apps/*-web`,
- * ADR-160) and the shared UI packages. Everything else is a contract, a process package or a tool.
+ * The packages that render React: a module's `browser` package, a module's `client` package (its
+ * typed hooks, tested with `renderHook`), the browser application, the internal consoles
+ * (`apps/*-web`, ADR-160) and the shared UI packages. Everything else is a contract, a process
+ * package or a tool.
  */
 function isWebPackage(dir: string): boolean {
   const leaf = dir.slice(dir.lastIndexOf("/") + 1);
   return (
     leaf === "browser" ||
+    /^(enterprise\/)?modules\/[^/]+\/client$/.test(dir) ||
     dir === "apps/ui" ||
     (dir.startsWith("apps/") && dir.endsWith("-web")) ||
     dir.startsWith("packages/")
@@ -132,11 +135,13 @@ describe("the real-browser test lane", () => {
     /** @scenario "A package declaring the browser lane is discovered by CI" */
     it("is discovered by the script CI runs, by its manifest alone", () => {
       // `run-package-suites.ts` reads `test:browser` off the manifest, so
-      // declaring the script IS being in CI. This asserts the two pilot
-      // packages are visible to that rule rather than to a list.
+      // declaring the script IS being in CI. This asserts the packages that
+      // declare it today are visible to that rule rather than to a list.
       expect(BROWSER_LANE.map((m) => m.dir)).toEqual([
         "modules/analytics/browser",
         "modules/experiment/browser",
+        "modules/project/browser",
+        "packages/design-system",
       ]);
     });
 
@@ -216,12 +221,17 @@ describe("the real-browser test lane", () => {
     it("keeps the jest-dom import, which only the browser lane supplies for itself", () => {
       // The matchers are built into `@vitest/browser`, not into vitest. Taking
       // the import out of a jsdom file removes the matchers outright, so the
-      // removal is scoped to the browser lane — and the packages running both
-      // lanes still declare the dependency for their jsdom half.
-      const stillDeclared = BROWSER_LANE.filter((m) =>
-        declaredDependencies(m.manifest).has("@testing-library/jest-dom"),
+      // removal is scoped to the browser lane; a package may resolve it from
+      // the root manifest, which declares it.
+      const rootDeclared = declaredDependencies(
+        JSON.parse(readFileSync(path.join(REPO_ROOT, "package.json"), "utf8")),
+      );
+      const undeclared = BROWSER_LANE.filter(
+        (m) =>
+          !declaredDependencies(m.manifest).has("@testing-library/jest-dom") &&
+          !rootDeclared.has("@testing-library/jest-dom"),
       ).map((m) => m.dir);
-      expect(stillDeclared).toEqual(BROWSER_LANE.map((m) => m.dir));
+      expect(undeclared).toEqual([]);
 
       const jsdomImporters = BROWSER_LANE.flatMap((m) =>
         globSync("**/*.{test,spec}.{ts,tsx}", {
