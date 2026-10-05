@@ -39,10 +39,8 @@ import type {
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
 
-import type {
-  GovernanceObjectStore,
-  IngestionPullDiagnosticsSink,
-} from "../app/governance.members.ts";
+import type { GovernanceObjectStore } from "../channels/object-store.channel.ts";
+import type { IngestionPullDiagnosticsSink } from "./ingestion-pull-log.service.ts";
 import { type S3PollingConfig, S3PollingPullerService } from "./s3-puller.service.ts";
 
 /**

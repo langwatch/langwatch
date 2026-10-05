@@ -5,12 +5,12 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
+import type { AgentSyncResult } from "../agent-discovery.service.ts";
 import type {
   IngestionPullListingOutcome,
   IngestionPullListingOutcomeChannel,
   IngestionPullListingRefusal,
-} from "../../app/governance.members.ts";
-import type { AgentSyncResult } from "../agent-discovery.service.ts";
+} from "../ingestion-pull-listing.service.ts";
 import { IngestionPullListingService } from "../ingestion-pull-listing.service.ts";
 import type { PeopleSyncResult } from "../person-listing.service.ts";
 

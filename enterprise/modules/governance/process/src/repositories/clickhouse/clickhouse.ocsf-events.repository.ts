@@ -8,8 +8,8 @@ import type {
   GovernanceOcsfEvent,
   GovernanceOcsfEventsReader,
   GovernanceOcsfEventWriter,
-} from "../../app/governance.members.ts";
-import type { GovernanceClickHouseTenantResolver } from "../governance.repositories.ts";
+  GovernanceClickHouseTenantResolver,
+} from "../governance.repositories.ts";
 
 /**
  * ClickHouseOcsfEventsRepository — read and write side of the

@@ -8,11 +8,9 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type {
-  GovernanceDiagnosticsSink,
-  QuarantineTenantResolver,
-} from "../app/governance.members.ts";
-import { silentGovernanceDiagnostics } from "../app/governance.members.ts";
+import type { GovernanceDiagnosticsSink } from "./governance-policy.service.ts";
+import { silentGovernanceDiagnostics } from "./governance-policy.service.ts";
+import type { QuarantineTenantResolver } from "./quarantine-tenant.service.ts";
 
 export class QuarantineFillEvaluatorService {
   private readonly tenant: QuarantineTenantResolver;

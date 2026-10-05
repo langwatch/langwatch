@@ -2,8 +2,8 @@
 
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
-import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import type { CopilotStudioPullerChannel } from "../copilot-studio.channel.ts";
+import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 /**
  * Microsoft Copilot Studio reference puller — built on top of the
  * generic HttpPollingPullerAdapter with the URL + auth shape locked

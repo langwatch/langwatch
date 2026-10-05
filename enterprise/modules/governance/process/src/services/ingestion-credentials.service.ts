@@ -1,4 +1,7 @@
-import type { GovernanceEncryptor } from "../app/governance.members.ts";
+export interface GovernanceEncryptor {
+  encrypt(plaintext: string): string;
+  decrypt(ciphertext: string): string;
+}
 
 const ENCRYPTED_PREFIX = "enc:v1:";
 

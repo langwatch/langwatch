@@ -12,7 +12,6 @@ import {
 } from "@langwatch/observability/metrics";
 import { Temporal } from "@langwatch/time";
 
-import type { CostRollupDayComparer, CostRollupDayLook } from "../app/governance.members.ts";
 import type { GovernanceCostChargeRepository } from "../repositories/governance-cost-charge.repository.ts";
 import type { GovernanceCostRollupRepository } from "../repositories/governance-cost-rollup.repository.ts";
 import {
@@ -21,6 +20,43 @@ import {
   deriveCostRollupCells,
 } from "../rules/cost-rollup-day-comparison.rules.ts";
 import { GOVERNANCE_COST_SOURCE } from "../rules/governance-cost-rollup-cell.rules.ts";
+
+/**
+ * What one look at one day's cost found. `reportDrift` rides on the look,
+ * not a day back, since a second call would re-compare and report figures
+ * this look never saw.
+ */
+export interface CostRollupDayLook {
+  /** Cells where the summary and the events state different money. */
+  mismatchedCells: number;
+  /**
+   * Cells whose summary row demonstrably has not folded every charge of the
+   * day. Non-empty is proof the summary is catching up; empty proves nothing.
+   */
+  cellsBehind: number;
+  /** How far the summary trails the events it is derived from. */
+  lagMs: number;
+  /**
+   * Counts and names this look's disagreement, once and for the record. Only
+   * a caller that has spent its whole retry ladder may call it; a look that
+   * found no disagreement is a no-op.
+   */
+  reportDrift(): void;
+}
+
+/**
+ * One look at one organization's day of pulled charges. It reports what it
+ * saw and judges nothing — a summary the fold is seconds behind on and a
+ * summary that is wrong are the same picture from one look.
+ */
+export interface CostRollupDayComparer {
+  /**
+   * The cost lane this comparer holds a day's charges against. Read by the
+   * check so every comparison names its lane without repeating a literal.
+   */
+  readonly costSource: string;
+  compareDay(params: { tenantId: string; day: string }): Promise<CostRollupDayLook>;
+}
 
 export const COST_ROLLUP_MISMATCH_METRIC_NAME = "langwatch_governance_cost_rollup_mismatch_total";
 export const COST_ROLLUP_LAG_METRIC_NAME = "langwatch_governance_cost_rollup_lag_seconds";

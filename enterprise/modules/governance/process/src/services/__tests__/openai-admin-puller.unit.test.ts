@@ -12,11 +12,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
-import {
-  type PulledUsageRateInput,
-  type GovernanceHttpClient,
-  type GovernanceHttpResponse,
-} from "../../app/governance.members.ts";
+import type {
+  GovernanceHttpClient,
+  GovernanceHttpResponse,
+} from "../../channels/governance-http.channel.ts";
+import type { PulledUsageRateInput } from "../../rules/pulled-usage-rate.rules.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));

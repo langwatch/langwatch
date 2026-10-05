@@ -10,9 +10,9 @@ describe("where an issued personal key tells its holder to send traffic", () => 
           gatewayPublicUrl: "https://gw.example",
           gatewayInternalUrl: undefined,
           gatewayLegacyUrl: "https://old.example",
+          isSaas: false,
           ingestRateLimitDisabled: false,
         },
-        isSaas: false,
       }),
     ).toBe("https://gw.example");
   });
@@ -24,9 +24,9 @@ describe("where an issued personal key tells its holder to send traffic", () => 
           gatewayPublicUrl: undefined,
           gatewayInternalUrl: undefined,
           gatewayLegacyUrl: "https://old.example",
+          isSaas: false,
           ingestRateLimitDisabled: false,
         },
-        isSaas: false,
       }),
     ).toBe("https://old.example");
   });
@@ -39,10 +39,10 @@ describe("where an issued personal key tells its holder to send traffic", () => 
       ingestRateLimitDisabled: false,
     };
 
-    expect(governanceGatewayBaseUrl({ config: unset, isSaas: true })).toBe(
+    expect(governanceGatewayBaseUrl({ config: { ...unset, isSaas: true } })).toBe(
       "https://gateway.langwatch.ai",
     );
-    expect(governanceGatewayBaseUrl({ config: unset, isSaas: false })).toBe(
+    expect(governanceGatewayBaseUrl({ config: { ...unset, isSaas: false } })).toBe(
       "http://localhost:5563",
     );
   });

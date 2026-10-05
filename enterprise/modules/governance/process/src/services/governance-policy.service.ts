@@ -5,10 +5,14 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { z } from "zod";
 
-import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
-import { silentGovernanceDiagnostics } from "../app/governance.members.ts";
 import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
 import { buildIngestKeyReceiverPolicies } from "../rules/ingest-key-provenance.rules.ts";
+
+export interface GovernanceDiagnosticsSink {
+  warn(message: string, context: Record<string, unknown>): void;
+}
+
+export const silentGovernanceDiagnostics: GovernanceDiagnosticsSink = { warn: () => {} };
 
 const UNASSIGNED_DEPARTMENT = "unassigned";
 const codingAssistantConfigSchema = z.looseObject({

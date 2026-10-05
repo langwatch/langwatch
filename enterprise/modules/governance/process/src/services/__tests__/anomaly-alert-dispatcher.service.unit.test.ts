@@ -2,10 +2,10 @@ import { createHmac } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  type AnomalyAlertHttpClient,
-  type AnomalyAlertHttpResponse,
-} from "../../app/governance.members.ts";
+import type {
+  AnomalyAlertHttpClient,
+  AnomalyAlertHttpResponse,
+} from "../../channels/anomaly-alert.channel.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
 
 type Call = {

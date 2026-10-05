@@ -9,8 +9,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { PulledUsageRateReader } from "../../app/governance.members.ts";
 import {
+  type PulledUsageRateReader,
   PulledUsagePricingService,
   type PulledUsagePriceInput,
 } from "../pulled-usage-pricing.service.ts";

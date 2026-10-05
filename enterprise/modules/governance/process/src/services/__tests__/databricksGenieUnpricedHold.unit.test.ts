@@ -17,7 +17,7 @@ import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GovernanceHttpClient } from "../../app/governance.members.ts";
+import type { GovernanceHttpClient } from "../../channels/governance-http.channel.ts";
 import type { SsrfSafeResponse } from "../../channels/http/http.governance-http.channel.ts";
 import {
   DatabricksGeniePullerService,

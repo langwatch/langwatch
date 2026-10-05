@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type {
-  AnomalyAlertHttpClient,
-  AnomalyAlertHttpResponse,
-} from "../../app/governance.members.ts";
+import type { AnomalyAlertHttpClient, AnomalyAlertHttpResponse } from "../anomaly-alert.channel.ts";
 import { ssrfSafeFetch } from "./http.governance-http.channel.ts";
 
 /** A rule's webhook destination is an admin-typed URL, so it is fenced as main's `ssrfSafeFetch` fenced it. */

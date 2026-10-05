@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 import { ClickHouseAnomalySpendRepository } from "../clickhouse/clickhouse.anomaly-spend.repository.ts";
 import {
@@ -27,7 +27,10 @@ export class LiveGovernanceRepositories {
     prisma,
     clickhouse,
     operatorReads,
-  }: Pick<ProcessMembers, "prisma" | "clickhouse"> &
+  }: Readonly<{
+    prisma: Parameters<typeof PostgresGovernanceRepositories.create>[0]["prisma"];
+    clickhouse: ClickHouseQueryClient;
+  }> &
     GovernanceOperatorReadsMember): GovernanceRepositories {
     return {
       ...PostgresGovernanceRepositories.create({ prisma }),

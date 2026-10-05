@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { GovernanceHttpClient, GovernanceHttpResponse } from "../../app/governance.members.ts";
+import type { GovernanceHttpClient, GovernanceHttpResponse } from "../governance-http.channel.ts";
 import {
   CLAUDE_COMPLIANCE_PULL_CONFIG,
   ClaudeComplianceReferencePullerAdapter,

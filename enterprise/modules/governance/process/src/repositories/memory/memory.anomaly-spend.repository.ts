@@ -7,7 +7,7 @@ import type {
   AnomalySpendSourceFilter,
   GovernanceKpiContribution,
   GovernanceKpiContributionWriter,
-} from "../../app/governance.members.ts";
+} from "../governance.repositories.ts";
 
 /**
  * The anomaly-spend twin: an append-only log of contributions, honest about

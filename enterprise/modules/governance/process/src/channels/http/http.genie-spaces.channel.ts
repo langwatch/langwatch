@@ -6,7 +6,6 @@
  * the scheduled sweep takes it with its own budget-aware page reader.
  */
 
-import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import {
   type AgentListing,
   agentsListed,
@@ -20,6 +19,7 @@ import {
   walkGenieSpaces,
 } from "../../rules/genie-spaces.rules.ts";
 import type { GenieSpacesChannel } from "../genie-spaces.channel.ts";
+import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 
 /**
  * Per-request bound for a listing done on demand. Shorter than the sweep's,

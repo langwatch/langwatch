@@ -5,7 +5,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 
-import type { GovernanceOcsfEventsReader } from "../app/governance.members.ts";
+import type { GovernanceOcsfEventsReader } from "../repositories/governance.repositories.ts";
 
 export class DefaultGovernanceOcsfExportService {
   private constructor(

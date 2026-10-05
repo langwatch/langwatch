@@ -39,7 +39,6 @@ import { createLogger } from "@langwatch/observability";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
-import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import {
   AZURE_AI_METER_CATEGORIES,
   AZURE_COST_API_VERSION,
@@ -72,6 +71,7 @@ import {
   seatsReadIsDue,
   seatsReportDay,
 } from "../../rules/microsoft-graph-seats.rules.ts";
+import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 export { copilotStudioDataversePullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import type { CopilotBotsChannel } from "../copilot-bots.channel.ts";
 import type { CopilotStudioDataversePullerChannel } from "../copilot-studio-dataverse.channel.ts";

@@ -9,11 +9,9 @@ import {
   type WebhookDestination,
 } from "@langwatch/enterprise-governance-contract";
 
-import type {
-  AnomalyAlertHttpClient,
-  GovernanceDiagnosticsSink,
-} from "../app/governance.members.ts";
-import { silentGovernanceDiagnostics } from "../app/governance.members.ts";
+import type { AnomalyAlertHttpClient } from "../channels/anomaly-alert.channel.ts";
+import type { GovernanceDiagnosticsSink } from "./governance-policy.service.ts";
+import { silentGovernanceDiagnostics } from "./governance-policy.service.ts";
 
 const DEFAULT_TIMEOUT_MS = 5_000;
 const DEFAULT_MAX_RETRIES = 2;

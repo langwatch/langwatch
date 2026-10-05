@@ -10,7 +10,9 @@
  */
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
-import type { CliAdminContactReader } from "../app/governance.members.ts";
+export interface CliAdminContactReader {
+  findAdminEmail(organizationId: string): Promise<string | null>;
+}
 
 /** The one organization operation this service needs, out of `OrganizationApi`'s whole surface. */
 type CliAdminContactOrganizations = Pick<OrganizationApi, "listMembers">;

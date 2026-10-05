@@ -6,11 +6,20 @@ import {
   type PlatformToolPolicyMap,
 } from "@langwatch/enterprise-governance-contract";
 
-import type {
-  CliAdminContactReader,
-  CliBudgetOverview,
-  CliBudgetOverviewReader,
-} from "../app/governance.members.ts";
+import type { CliAdminContactReader } from "./cli-admin-contact.service.ts";
+
+export type CliBudgetOverview = {
+  gatewayAccess: boolean;
+  budgets: {
+    window: string;
+    limitUsd: string;
+    spentUsd: string;
+  }[];
+};
+
+export interface CliBudgetOverviewReader {
+  overviewForUser(input: { userId: string; organizationId: string }): Promise<CliBudgetOverview>;
+}
 
 type AiToolCliCatalogReader = {
   resolveCliCatalogForUser(input: CliBootstrapInput): Promise<AiToolCliCatalog>;

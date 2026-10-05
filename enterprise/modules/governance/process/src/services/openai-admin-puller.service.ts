@@ -51,7 +51,10 @@ import { createLogger } from "@langwatch/observability";
 import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
-import type { GovernanceHttpClient, GovernanceHttpResponse } from "../app/governance.members.ts";
+import type {
+  GovernanceHttpClient,
+  GovernanceHttpResponse,
+} from "../channels/governance-http.channel.ts";
 import * as AdminUsageReportAdapter from "../rules/admin-usage-report.rules.ts";
 
 const logger = createLogger("langwatch:governance:openai-admin-puller");

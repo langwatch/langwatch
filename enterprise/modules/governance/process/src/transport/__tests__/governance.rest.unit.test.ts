@@ -41,9 +41,9 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { GovernanceModule } from "../../app/governance.app.ts";
-import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import type { NewIngestionTemplate } from "../../repositories/ingestion-template.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
+import type { GovernanceEncryptor } from "../../services/ingestion-credentials.service.ts";
 import { governanceRest, governanceRestCaller, governanceRestSurface } from "../governance.rest.ts";
 
 const PROJECT: ProjectIdentity = {
@@ -153,7 +153,6 @@ async function buildApi(
     },
     members: {
       encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
       rateLimiter: memoryRateLimiter(),
     },
     resources: new ResourceScope(),

@@ -2,24 +2,25 @@ import type {
   GovernanceIngestionSource,
   NormalizedPullEvent,
   PullResult,
+  PulledUsageObservedEventData,
 } from "@langwatch/enterprise-governance-contract";
-import { PROJECT_KIND } from "@langwatch/project-contract";
+import {
+  PROJECT_KIND,
+  type InternalProject,
+  type InternalProjectQuery,
+  type ProjectWithTeam,
+} from "@langwatch/project-contract";
 import { Temporal, toEpochMs } from "@langwatch/time";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 
 import type {
-  DiscoveredPeopleMatcher,
-  GovernanceProjectDirectory,
   GovernanceOcsfEventInput,
   GovernanceOcsfEventSink,
-  GovernanceTraceIngestionClient,
-  GovernanceTraceRequest,
-  IngestionPullDiagnosticsSink,
-  IngestionPullRunResult,
+} from "../repositories/governance.repositories.ts";
+import type {
   IngestionPullSourceReader,
-  PulledUsageDispatcher,
-  PulledUsageEntitlements,
-} from "../app/governance.members.ts";
-import type { IngestionSourceRepository } from "../repositories/ingestion-source.repository.ts";
+  IngestionSourceRepository,
+} from "../repositories/ingestion-source.repository.ts";
 import { azureBillSourceId } from "../rules/azure-bill-identity.rules.ts";
 import type {
   ConversationRoutingProfile,
@@ -34,9 +35,51 @@ import { pullReadThrough } from "../rules/pull-read-through.rules.ts";
 import type { DirectoryDepartmentSyncService } from "./directory-department-sync.service.ts";
 import type { ErasureSuppressionService } from "./erasure-suppression.service.ts";
 import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
+import type { IngestionPullDiagnosticsSink } from "./ingestion-pull-log.service.ts";
+import type { IngestionPullRunResult } from "./ingestion-pull.service.ts";
 import type { PersonDiscoveryService } from "./person-discovery.service.ts";
 import type { PulledUsageRecordService } from "./pulled-usage-record.service.ts";
 import type { PullerRegistryService } from "./puller-registry.service.ts";
+
+/** Main's shape: the mappers build the same OTLP request the trace door takes. */
+export type GovernanceTraceRequest = IExportTraceServiceRequest;
+
+export interface GovernanceTraceIngestionClient {
+  ingest(input: { projectId: string; request: GovernanceTraceRequest }): Promise<{
+    rejectedSpans: number;
+    ingestionFailures: number;
+    ingestionFailureMessage?: string;
+  }>;
+}
+
+export interface PulledUsageDispatcher {
+  recordPulledUsage(
+    input: PulledUsageObservedEventData & {
+      tenantId: string;
+      occurredAt: number;
+    },
+  ): Promise<void>;
+}
+
+export interface PulledUsageEntitlements {
+  isEnabled(organizationId: string): Promise<boolean>;
+}
+
+/** ADR-128 §12: the discovery feed's trigger for the identity match engine. */
+export interface DiscoveredPeopleMatcher {
+  runFor(input: { organizationId: string }): Promise<void>;
+}
+
+/**
+ * The two project reads Governance makes: the tenant a pull writes under,
+ * and the hidden per-organization project every receiver ensures. Stated
+ * here rather than taken off the project feature, so composing stays the process's job.
+ */
+export interface GovernanceProjectDirectory {
+  findWithTeam(id: string): Promise<ProjectWithTeam | null>;
+
+  ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
+}
 
 const OCSF_CLASS_API_ACTIVITY = 6003;
 const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;

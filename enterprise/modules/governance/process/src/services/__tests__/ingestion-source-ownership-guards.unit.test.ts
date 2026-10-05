@@ -14,19 +14,19 @@ import type {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type {
-  GovernanceDiagnosticsSink,
-  GovernanceEncryptor,
-  IngestionSourceEntitlements,
-  IngestionSourceLifecycleChannel,
-} from "../../app/governance.members.ts";
 import { MemoryProviderAccountChannel } from "../../channels/memory/memory.provider-account.channel.ts";
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
+import type { GovernanceDiagnosticsSink } from "../governance-policy.service.ts";
+import type { GovernanceEncryptor } from "../ingestion-credentials.service.ts";
 import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
 } from "../ingestion-source-secret.service.ts";
+import type {
+  IngestionSourceEntitlements,
+  IngestionSourceLifecycleChannel,
+} from "../ingestion-source.service.ts";
 import { IngestionSourceService } from "../ingestion-source.service.ts";
 import { PullDestinationService } from "../pull-destination.service.ts";
 

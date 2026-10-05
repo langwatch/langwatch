@@ -7,20 +7,24 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type {
-  GovernanceEncryptor,
   GovernanceHttpClient,
   GovernanceHttpResponse,
+} from "../../channels/governance-http.channel.ts";
+import type {
   GovernanceObjectStorageCredentials,
   GovernanceObjectStore,
+} from "../../channels/object-store.channel.ts";
+import type {
   GovernanceOcsfEventInput,
   GovernanceOcsfEventSink,
-  IngestionPullSourceReader,
-  PulledUsageEntitlements,
-  PulledUsageRateInput,
-} from "../../app/governance.members.ts";
-import { silentIngestionPullDiagnostics } from "../../app/governance.members.ts";
+} from "../../repositories/governance.repositories.ts";
+import type { IngestionPullSourceReader } from "../../repositories/ingestion-source.repository.ts";
 import { NO_SUPPRESSION } from "../../rules/erasure-suppression.rules.ts";
+import type { PulledUsageRateInput } from "../../rules/pulled-usage-rate.rules.ts";
+import type { GovernanceEncryptor } from "../../services/ingestion-credentials.service.ts";
 import { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
+import { silentIngestionPullDiagnostics } from "../../services/ingestion-pull-log.service.ts";
+import type { PulledUsageEntitlements } from "../../services/ingestion-pull-worker.service.ts";
 import { IngestionPullWorkerService } from "../../services/ingestion-pull-worker.service.ts";
 import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";

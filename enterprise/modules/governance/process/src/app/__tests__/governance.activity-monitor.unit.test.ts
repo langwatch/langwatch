@@ -31,8 +31,8 @@ import {
   MemoryActivityMonitorRepository,
 } from "../../repositories/memory/memory.activity-monitor.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
+import type { GovernanceEncryptor } from "../../services/ingestion-credentials.service.ts";
 import { GovernanceModule } from "../governance.app.ts";
-import type { GovernanceEncryptor } from "../governance.members.ts";
 
 const ADMIN = { id: "user-1" };
 
@@ -85,7 +85,6 @@ async function buildApp(
     },
     members: {
       encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
       rateLimiter: memoryRateLimiter(),
     },
     resources: new ResourceScope(),

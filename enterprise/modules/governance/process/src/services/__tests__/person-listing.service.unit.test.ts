@@ -5,10 +5,9 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type {
-  GovernanceEncryptor,
   GovernanceHttpClient,
   GovernanceHttpResponse,
-} from "../../app/governance.members.ts";
+} from "../../channels/governance-http.channel.ts";
 import { HttpAdminApiUsersChannel } from "../../channels/http/http.admin-api-users.channel.ts";
 import { HttpDatabricksScimUsersChannel } from "../../channels/http/http.databricks-scim-users.channel.ts";
 import { HttpMicrosoftDirectoryChannel } from "../../channels/http/http.microsoft-directory.channel.ts";
@@ -17,6 +16,7 @@ import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.g
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
 import { erasureDigest } from "../../rules/erasure-digest.rules.ts";
 import { ErasureSuppressionService } from "../erasure-suppression.service.ts";
+import type { GovernanceEncryptor } from "../ingestion-credentials.service.ts";
 import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import { PersonDiscoveryService } from "../person-discovery.service.ts";
 import { PersonListingService } from "../person-listing.service.ts";

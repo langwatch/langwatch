@@ -27,11 +27,8 @@ import { nowInstant } from "@langwatch/time";
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
 
-import type {
-  GovernanceHttpClient,
-  GovernanceHttpResponse,
-  IngestionPullDiagnosticsSink,
-} from "../../app/governance.members.ts";
+import type { IngestionPullDiagnosticsSink } from "../../services/ingestion-pull-log.service.ts";
+import type { GovernanceHttpClient, GovernanceHttpResponse } from "../governance-http.channel.ts";
 
 const TEMPLATE_PATTERN = /\$\{\{([\w.]+)\}\}/g;
 const RETRY_DELAYS_MS = [250, 500] as const;

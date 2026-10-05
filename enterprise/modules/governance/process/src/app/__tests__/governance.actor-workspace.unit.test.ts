@@ -30,8 +30,8 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
+import type { GovernanceEncryptor } from "../../services/ingestion-credentials.service.ts";
 import { GovernanceModule } from "../governance.app.ts";
 
 const ORGANIZATION_ID = "org-1";
@@ -111,7 +111,6 @@ async function buildApp(options: {
     },
     members: {
       encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
       rateLimiter: memoryRateLimiter(),
     },
     resources: new ResourceScope(),

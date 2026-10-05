@@ -10,11 +10,11 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createGovernanceProjectApi } from "../../__tests__/testing.ts";
-import type { GovernanceTraceSummary } from "../../app/governance.members.ts";
 import { MemoryAnomalySpendRepository } from "../../repositories/memory/memory.anomaly-spend.repository.ts";
 import { MemoryOcsfEventsRepository } from "../../repositories/memory/memory.ocsf-events.repository.ts";
 import { SpendSpikeAnomalyRepository } from "../../repositories/spend-spike-anomaly.repository.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
+import type { GovernanceTraceSummary } from "../governance-trace-facts.service.ts";
 import { GovernanceTraceFactsService } from "../governance-trace-facts.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "../spend-spike-anomaly-evaluator.service.ts";
 

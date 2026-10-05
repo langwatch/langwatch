@@ -7,7 +7,7 @@ import { createSsrfUrlValidator } from "@langwatch/egress";
 import type {
   GovernanceObjectStorageCredentials,
   GovernanceObjectStore,
-} from "../../app/governance.members.ts";
+} from "../object-store.channel.ts";
 
 const MAX_S3_FILES = 100;
 const MAX_S3_PAGES = 50;

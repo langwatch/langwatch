@@ -24,7 +24,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
-import type { PulledUsageRateReader } from "../../app/governance.members.ts";
+import type { PulledUsageRateReader } from "../pulled-usage-pricing.service.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 

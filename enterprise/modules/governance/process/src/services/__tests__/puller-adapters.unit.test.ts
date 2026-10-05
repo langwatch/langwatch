@@ -4,9 +4,9 @@ import { ZodError } from "zod";
 import type {
   GovernanceHttpClient,
   GovernanceHttpResponse,
-  GovernanceObjectStore,
-} from "../../app/governance.members.ts";
+} from "../../channels/governance-http.channel.ts";
 import { HttpPollingPullerAdapter } from "../../channels/http/http.polling.channel.ts";
+import type { GovernanceObjectStore } from "../../channels/object-store.channel.ts";
 import { S3PollingPullerService } from "../s3-puller.service.ts";
 
 const httpConfig = {

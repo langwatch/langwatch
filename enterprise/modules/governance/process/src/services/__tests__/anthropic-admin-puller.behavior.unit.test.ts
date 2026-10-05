@@ -16,11 +16,11 @@ import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
-import {
-  type PulledUsageRateInput,
-  type GovernanceHttpClient,
-  type GovernanceHttpResponse,
-} from "../../app/governance.members.ts";
+import type {
+  GovernanceHttpClient,
+  GovernanceHttpResponse,
+} from "../../channels/governance-http.channel.ts";
+import type { PulledUsageRateInput } from "../../rules/pulled-usage-rate.rules.ts";
 import { AnthropicAdminPullerService } from "../anthropic-admin-puller.service.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";

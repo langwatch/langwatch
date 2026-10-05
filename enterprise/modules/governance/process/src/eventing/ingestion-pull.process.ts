@@ -23,7 +23,6 @@ import type {
 } from "@langwatch/eventing";
 import { z } from "zod";
 
-import type { IngestionPullScheduler } from "../app/governance.members.ts";
 import { isInCooldown, providerWaitFrom } from "../rules/ingestion-pull-cooldown.rules.ts";
 import type { IngestionPullListingService } from "../services/ingestion-pull-listing.service.ts";
 import type { IngestionPullService } from "../services/ingestion-pull.service.ts";
@@ -39,6 +38,11 @@ import {
   ingestionPullListingIntentSchema,
   ingestionPullRunIntentSchema,
 } from "./ingestion-pull.intent.ts";
+
+/** UTC schedule calculation supplied by the worker composition root. */
+export interface IngestionPullScheduler {
+  nextRunAt(input: { cron: string; after: number }): number;
+}
 
 export const INGESTION_PULL_PROCESS_NAME = "ingestionPull" as const;
 export const INGESTION_PULL_STALE_RUN_MS = 30 * 60 * 1_000;

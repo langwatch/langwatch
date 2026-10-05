@@ -5,14 +5,61 @@ import {
 import { isDispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 
-import type {
-  IngestionPullMetricsSink,
-  IngestionPullOutcomeChannel,
-  IngestionPullRun,
-  IngestionPullRunResult,
-  IngestionPullRunner,
-} from "../app/governance.members.ts";
 import { providerWaitOnError } from "../rules/ingestion-pull-cooldown.rules.ts";
+import type { IngestionPullMetricsSink } from "./ingestion-pull-metrics.service.ts";
+
+/** One scheduled pull run, as the worker composition root hands it in. */
+export type IngestionPullRun = {
+  sourceId: string;
+  runId: string;
+  scheduledFor: number;
+  cursor: string | null;
+  /** The run this one takes over from, when that run outlived its allowance. */
+  abandonedRunId?: string;
+};
+
+export interface IngestionPullRunner {
+  run(input: { sourceId: string; cursor: string | null }): Promise<IngestionPullRunResult>;
+}
+
+/** What one run read; the optional fields stay absent until the runner reports them. */
+export type IngestionPullRunResult = {
+  nextCursor: string | null;
+  eventCount: number;
+  errorCount?: number;
+  completeness?: "complete" | "truncated";
+  unreadPage?: true;
+  readThroughAt?: number | null;
+};
+
+export interface IngestionPullOutcomeChannel {
+  completed(input: {
+    tenantId: string;
+    occurredAt: number;
+    sourceId: string;
+    runId: string;
+    scheduledFor: number;
+    nextCursor: string | null;
+    eventCount: number;
+    errorCount?: number;
+    completeness?: "complete" | "truncated";
+    unreadPage?: true;
+    readThroughAt?: number | null;
+  }): Promise<void>;
+
+  failed(input: {
+    tenantId: string;
+    occurredAt: number;
+    sourceId: string;
+    runId: string;
+    scheduledFor: number;
+    error: string;
+    errorCode: string;
+    retryable: false;
+    retryAfterMs?: number | null;
+    replacedByRunId?: string;
+  }): Promise<void>;
+}
 
 export const INGESTION_PULL_MAX_ATTEMPTS = 3;
 export const INGESTION_PULL_LEASE_DURATION_MS = 10 * 60 * 1000;

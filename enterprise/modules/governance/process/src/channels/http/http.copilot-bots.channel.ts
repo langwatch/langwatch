@@ -19,7 +19,6 @@
 
 import { z } from "zod";
 
-import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import {
   type AgentListing,
   type AgentListingRefusal,
@@ -35,6 +34,7 @@ import {
   isEnvironmentOrigin,
 } from "../../rules/dataverse-environment-service.rules.ts";
 import type { CopilotBotsChannel, CopilotBotsRead } from "../copilot-bots.channel.ts";
+import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 

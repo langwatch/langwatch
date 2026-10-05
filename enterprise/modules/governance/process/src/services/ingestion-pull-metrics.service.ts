@@ -7,7 +7,10 @@ import {
   type HistogramHandle,
 } from "@langwatch/observability/metrics";
 
-import type { IngestionPullMetricsSink } from "../app/governance.members.ts";
+export interface IngestionPullMetricsSink {
+  count(outcome: "completed" | "failed_retryable" | "failed_final"): void;
+  observeDuration(durationMs: number): void;
+}
 
 export const INGESTION_PULL_TOTAL_METRIC_NAME = "ingestion_pull_total";
 export const INGESTION_PULL_DURATION_METRIC_NAME = "ingestion_pull_duration_milliseconds";

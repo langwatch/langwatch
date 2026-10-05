@@ -18,27 +18,29 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  type IngestionPullMetricsSink,
-  type IngestionPullOutcomeChannel,
-  type IngestionPullRunner,
-  type IngestionPullScheduler,
-  type PulledUsageLedgerRepository,
-  type PulledUsageLedgerRow,
-} from "../../app/governance.members.ts";
-import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusEventingProjection,
 } from "../../eventing/ingestion-pull-run-status-eventing.projection.ts";
 import { IngestionPullEventingAdapter } from "../../eventing/ingestion-pull.pipeline.ts";
 import {
+  type IngestionPullScheduler,
   INGESTION_PULL_PROCESS_NAME,
   type IngestionPullProcessState,
   IngestionPullProcess,
 } from "../../eventing/ingestion-pull.process.ts";
 import { PulledUsageLedgerIntent } from "../../eventing/pulled-usage-ledger.intent.ts";
 import { PulledUsageEventingAdapter } from "../../eventing/pulled-usage.pipeline.ts";
+import type {
+  PulledUsageLedgerRepository,
+  PulledUsageLedgerRow,
+} from "../../repositories/pulled-usage-ledger.repository.ts";
 import { IngestionPullListingService } from "../ingestion-pull-listing.service.ts";
-import { IngestionPullService } from "../ingestion-pull.service.ts";
+import type { IngestionPullMetricsSink } from "../ingestion-pull-metrics.service.ts";
+import {
+  type IngestionPullOutcomeChannel,
+  type IngestionPullRunner,
+  IngestionPullService,
+} from "../ingestion-pull.service.ts";
 
 class FixedSchedule implements IngestionPullScheduler {
   nextRunAt(input: { cron: string; after: number }): number {

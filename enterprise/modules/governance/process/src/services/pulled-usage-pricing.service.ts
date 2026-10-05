@@ -7,7 +7,14 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
-import type { PulledUsageRateReader } from "../app/governance.members.ts";
+import type { PulledUsageRateInput } from "../rules/pulled-usage-rate.rules.ts";
+
+export interface PulledUsageRateReader {
+  rate(input: PulledUsageRateInput): {
+    costNanoUsd: number;
+    rateVersion: string;
+  };
+}
 
 export type PulledUsageQuantities = {
   tokensInput: number;

@@ -3,8 +3,8 @@
 import { IngestionSourceNotFoundError } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
+import type { GovernanceEncryptor } from "../ingestion-credentials.service.ts";
 import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import { SourceCredentialAccessService } from "../source-credential-access.service.ts";
 

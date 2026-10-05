@@ -7,7 +7,7 @@ import { PROJECT_KIND, type InternalProject, type ProjectApi } from "@langwatch/
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import type { GovernanceClickHouseResolver } from "../app/governance.members.ts";
+import type { GovernanceClickHouseResolver } from "../repositories/clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 import {
   PrismaDepartmentRepository,
   type DepartmentDatabase,

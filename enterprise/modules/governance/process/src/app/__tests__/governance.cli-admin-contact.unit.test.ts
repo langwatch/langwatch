@@ -10,8 +10,8 @@ import { describe, expect, it } from "vitest";
 
 import { createSupportContactOrganizations } from "../../__tests__/testing.ts";
 import { OrganizationSupportContactRepository } from "../../repositories/organization-support-contact.repository.ts";
+import type { CliAdminContactReader } from "../../services/cli-admin-contact.service.ts";
 import { OrganizationSupportContactService } from "../../services/organization-support-contact.service.ts";
-import type { CliAdminContactReader } from "../governance.members.ts";
 
 /** One organization's admin memberships, their addresses, and its override. */
 class StubSupportContacts extends OrganizationSupportContactRepository {

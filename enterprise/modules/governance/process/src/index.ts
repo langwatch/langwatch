@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-export type { PostgresGovernanceServices } from "./app/governance-policy-composition.build.ts";
 export type { DepartmentService } from "./services/department.service.ts";
 export type { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 
@@ -21,7 +20,6 @@ export type { GovernanceAppDependencies } from "./app/governance.app.ts";
 
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
-export type * from "./app/governance.members.ts";
 export type * from "./repositories/ai-tool-catalog.repository.ts";
 export type * from "./repositories/anomaly-rule.repository.ts";
 export type * from "./repositories/department.repository.ts";
@@ -47,21 +45,6 @@ export {
 export { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
 export { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process.ts";
 
-/**
- * The ingestion pull worker, composed over the ports a process can answer. The
- * pullers, the registry and the credential, pricing and usage-record services
- * behind it stay private to this feature server.
- */
-export {
-  createDepartmentDirectory,
-  createIngestionPullEventing,
-  createIngestionPullExecution,
-  createIngestionPullLifecycle,
-  createGovernanceServices,
-  createIngestionPullSources,
-  createPulledUsageEventing,
-  findAgentsListings,
-} from "./governance.module.ts";
 export type { AgentsListingSummary } from "./rules/agents-listing-outcome.rules.ts";
 export type {
   AgentsListingOutcome,

@@ -16,19 +16,19 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
-import type {
-  GovernanceDiagnosticsSink,
-  GovernanceEncryptor,
-  IngestionSourceEntitlements,
-  IngestionSourceLifecycleChannel,
-} from "../app/governance.members.ts";
 import { MemoryProviderAccountChannel } from "../channels/memory/memory.provider-account.channel.ts";
 import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
+import type { GovernanceDiagnosticsSink } from "../services/governance-policy.service.ts";
+import type { GovernanceEncryptor } from "../services/ingestion-credentials.service.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
 } from "../services/ingestion-source-secret.service.ts";
+import type {
+  IngestionSourceEntitlements,
+  IngestionSourceLifecycleChannel,
+} from "../services/ingestion-source.service.ts";
 import { IngestionSourceService } from "../services/ingestion-source.service.ts";
 import { PullDestinationService } from "../services/pull-destination.service.ts";
 

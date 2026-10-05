@@ -28,8 +28,8 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
+import type { GovernanceEncryptor } from "../../services/ingestion-credentials.service.ts";
 import { GovernanceModule } from "../governance.app.ts";
-import type { GovernanceEncryptor } from "../governance.members.ts";
 
 const ADMIN = { id: "user-1" };
 
@@ -78,7 +78,6 @@ async function buildApp(planType: string) {
     },
     members: {
       encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
       rateLimiter: memoryRateLimiter(),
     },
     resources: new ResourceScope(),

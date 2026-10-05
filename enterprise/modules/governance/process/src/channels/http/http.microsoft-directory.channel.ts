@@ -6,7 +6,6 @@
  * from in here; the walk hands back what happened.
  */
 
-import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import {
   DIRECTORY_USERS_FIRST_PAGE,
   type DirectoryUser,
@@ -16,6 +15,7 @@ import {
 import type { DiscoveredPersonRecord, PeopleListing } from "../../rules/people-listing.rules.ts";
 import { peopleListed, peopleRefused } from "../../rules/people-listing.rules.ts";
 import { refusalFromStatus, refusalFromThrown } from "../../rules/provider-listing.rules.ts";
+import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 import type {
   MicrosoftDirectoryChannel,
   MicrosoftDirectoryRead,

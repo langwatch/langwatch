@@ -72,7 +72,7 @@ import { createLogger } from "@langwatch/observability";
 import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
-import type { GovernanceHttpClient } from "../app/governance.members.ts";
+import type { GovernanceHttpClient } from "../channels/governance-http.channel.ts";
 import { GENIE_SPACES_PATH, walkGenieSpaces } from "../rules/genie-spaces.rules.ts";
 import type { GenieSpace } from "../rules/genie-spaces.rules.ts";
 import { TERMINAL_MESSAGE_STATUSES } from "../rules/genie-trace-mapper-service.rules.ts";

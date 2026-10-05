@@ -12,7 +12,7 @@ import type {
   SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
 
-import type { ActivityMonitorRepository } from "../../app/governance.members.ts";
+import type { ActivityMonitorRepository } from "../activity-monitor.repository.ts";
 
 type SourceDataCoverage = Awaited<ReturnType<ActivityMonitorRepository["sourceDataCoverage"]>>;
 

@@ -24,14 +24,14 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
-import type {
-  PulledUsageLedgerRepository,
-  PulledUsageLedgerRow,
-} from "../app/governance.members.ts";
 import {
   PulledUsageLedgerIntent,
   type WritePulledUsagePayload,
 } from "../eventing/pulled-usage-ledger.intent.ts";
+import type {
+  PulledUsageLedgerRepository,
+  PulledUsageLedgerRow,
+} from "../repositories/pulled-usage-ledger.repository.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;

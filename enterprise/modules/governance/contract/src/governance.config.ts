@@ -10,6 +10,7 @@ import {
   gatewayInternalUrl,
   gatewayLegacyUrl,
   gatewayPublicUrl,
+  isSaas,
   type ConfigOf,
 } from "@langwatch/config";
 import { resolveGatewayBaseUrl } from "@langwatch/config/public-app-config/projection";
@@ -31,6 +32,8 @@ export const governanceConfig = Config.define((c) => ({
   gatewayPublicUrl,
   gatewayInternalUrl,
   gatewayLegacyUrl,
+  /** The hosted product, whose default gateway is the SaaS one rather than the local one. */
+  isSaas,
   /** Main's `LW_INGEST_RATE_LIMIT_DISABLED=1`: tests and dev switch the push receivers' throttle off. */
   ingestRateLimitDisabled: c.env(
     "LW_INGEST_RATE_LIMIT_DISABLED",
@@ -45,14 +48,12 @@ export type GovernanceConfig = ConfigOf<typeof governanceConfig>;
 /** Main's precedence: the public URL, the legacy base URL, then the SaaS or local default. */
 export function governanceGatewayBaseUrl({
   config,
-  isSaas,
 }: {
   config: GovernanceConfig | undefined;
-  isSaas: boolean;
 }): string {
   return resolveGatewayBaseUrl({
     LW_GATEWAY_PUBLIC_URL: config?.gatewayPublicUrl,
     LW_GATEWAY_BASE_URL: config?.gatewayLegacyUrl,
-    IS_SAAS: isSaas,
+    IS_SAAS: config?.isSaas ?? false,
   });
 }

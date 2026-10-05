@@ -5,10 +5,9 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type {
-  GovernanceEncryptor,
   GovernanceHttpClient,
   GovernanceHttpResponse,
-} from "../../app/governance.members.ts";
+} from "../../channels/governance-http.channel.ts";
 import { HttpCopilotBotsChannel } from "../../channels/http/http.copilot-bots.channel.ts";
 import { HttpGenieSpacesChannel } from "../../channels/http/http.genie-spaces.channel.ts";
 import { HttpProviderSignInChannel } from "../../channels/http/http.provider-sign-in.channel.ts";
@@ -16,6 +15,7 @@ import { MemoryDiscoveredAgentRepository } from "../../repositories/memory/memor
 import { MemoryDiscoveredPeopleStore } from "../../repositories/memory/memory.discovered-people.store.ts";
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
 import { AgentDiscoveryService } from "../agent-discovery.service.ts";
+import type { GovernanceEncryptor } from "../ingestion-credentials.service.ts";
 import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import { SourceCredentialAccessService } from "../source-credential-access.service.ts";
 

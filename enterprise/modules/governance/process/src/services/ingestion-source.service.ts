@@ -14,11 +14,6 @@ import {
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
 
-import type {
-  GovernanceDiagnosticsSink,
-  IngestionSourceEntitlements,
-  IngestionSourceLifecycleChannel,
-} from "../app/governance.members.ts";
 import type { ProviderAccountChannel } from "../channels/provider-account.channel.ts";
 import type {
   IngestionSourceClaim,
@@ -44,10 +39,19 @@ import {
   PROVIDER_ACCOUNT_UNCONFIRMED,
   readsProviderAccount,
 } from "../rules/provider-account-ownership.rules.ts";
+import type { GovernanceDiagnosticsSink } from "./governance-policy.service.ts";
 import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
 import type { IngestionSecretService } from "./ingestion-source-secret.service.ts";
 import { IngestionSourceValidationService } from "./ingestion-source-validation.service.ts";
 import type { PullDestinationService } from "./pull-destination.service.ts";
+
+export interface IngestionSourceEntitlements {
+  hasEnterprisePlan(organizationId: string): Promise<boolean>;
+}
+
+export interface IngestionSourceLifecycleChannel {
+  sync(source: GovernanceIngestionSource): Promise<void>;
+}
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 

@@ -169,6 +169,7 @@ import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
+import type { GovernanceHttpClient } from "../channels/governance-http.channel.ts";
 import { governanceListingChannels } from "../channels/governance-listing-channels.registry.ts";
 import { HttpAnomalyAlertChannel } from "../channels/http/http.anomaly-alert.channel.ts";
 import { ClaudeComplianceReferencePullerAdapter } from "../channels/http/http.claude-compliance.channel.ts";
@@ -245,11 +246,13 @@ import { GovernanceTraceFactsService } from "../services/governance-trace-facts.
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
+import type { GovernanceEncryptor } from "../services/ingestion-credentials.service.ts";
 import { IngestionPullLifecycleService } from "../services/ingestion-pull-lifecycle.service.ts";
 import { IngestionPullListingService } from "../services/ingestion-pull-listing.service.ts";
 import { IngestionPullLogService } from "../services/ingestion-pull-log.service.ts";
 import { IngestionPullMetricsService } from "../services/ingestion-pull-metrics.service.ts";
 import { IngestionPullWorkerService } from "../services/ingestion-pull-worker.service.ts";
+import type { PulledUsageDispatcher } from "../services/ingestion-pull-worker.service.ts";
 import { IngestionPullService } from "../services/ingestion-pull.service.ts";
 import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
 import { IngestionSourceReadService } from "../services/ingestion-source-read.service.ts";
@@ -283,11 +286,6 @@ import {
   type SpendSpikeEvaluationSummary,
 } from "../services/spend-spike-anomaly-evaluator.service.ts";
 import { SuppressionSnapshotService } from "../services/suppression-snapshot.service.ts";
-import type {
-  GovernanceEncryptor,
-  GovernanceHttpClient,
-  PulledUsageDispatcher,
-} from "./governance.members.ts";
 
 const logger = createLogger("langwatch:governance");
 
@@ -433,7 +431,6 @@ type GovernanceSetup = Readonly<{
   secrets: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["secrets"];
   members: Readonly<{
     encryption: GovernanceEncryptor;
-    isSaas: boolean;
     /** The process's own fact, absent where the deployment named no `BASE_HOST`. */
     publicBaseUrl?: string | undefined;
   }> &
@@ -443,7 +440,7 @@ type GovernanceSetup = Readonly<{
 
 export class GovernanceModule implements GovernanceRestApi {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
-  static readonly reads = ["encryption", "isSaas", "publicBaseUrl", "rateLimiter"] as const;
+  static readonly reads = ["encryption", "publicBaseUrl", "rateLimiter"] as const;
   /**
    * The peer modules this application reads. A peer is never a member:
    * the process resolves each token and hands the app the peer's own API, so
@@ -524,7 +521,7 @@ export class GovernanceModule implements GovernanceRestApi {
       repositories,
       erasureSuppression,
       encryption: members.encryption,
-      gatewayBaseUrl: governanceGatewayBaseUrl({ config, isSaas: members.isSaas }),
+      gatewayBaseUrl: governanceGatewayBaseUrl({ config }),
       publicBaseUrl: members.publicBaseUrl,
       rateLimiter: members.rateLimiter,
       ingestRateLimitDisabled: config?.ingestRateLimitDisabled ?? false,

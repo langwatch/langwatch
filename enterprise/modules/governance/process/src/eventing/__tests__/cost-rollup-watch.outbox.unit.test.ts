@@ -21,8 +21,11 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { CostRollupDayComparer, CostRollupDayLook } from "../../app/governance.members.ts";
 import { MemoryGovernanceCostChargeRepository } from "../../repositories/memory/memory.governance-cost-charge.repository.ts";
+import type {
+  CostRollupDayComparer,
+  CostRollupDayLook,
+} from "../../services/cost-rollup-day-comparer.service.ts";
 import {
   COST_ROLLUP_MISMATCH_METRIC_NAME,
   CostRollupDayComparerService,

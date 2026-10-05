@@ -10,12 +10,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  GovernanceDiagnosticsSink,
-  IngestionSourceEntitlements,
-  IngestionSourceLifecycleChannel,
-  GovernanceEncryptor,
-} from "../../app/governance.members.ts";
 import { MemoryProviderAccountChannel } from "../../channels/memory/memory.provider-account.channel.ts";
 import {
   IngestionSourceRepository,
@@ -23,11 +17,17 @@ import {
   type CursorPinnedUpdate,
   type UpdateIngestionSourceRecord,
 } from "../../repositories/ingestion-source.repository.ts";
+import type { GovernanceDiagnosticsSink } from "../governance-policy.service.ts";
+import type { GovernanceEncryptor } from "../ingestion-credentials.service.ts";
 import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
 } from "../ingestion-source-secret.service.ts";
+import type {
+  IngestionSourceEntitlements,
+  IngestionSourceLifecycleChannel,
+} from "../ingestion-source.service.ts";
 import { IngestionSourceService } from "../ingestion-source.service.ts";
 import { PullDestinationService } from "../pull-destination.service.ts";
 

@@ -14,27 +14,33 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type Instant, Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import type {
+  GovernanceOcsfEventSink,
+  GovernanceOcsfEventInput,
+} from "../../repositories/governance.repositories.ts";
+import type {
+  IngestionPullSourceReader,
+  UnpricedUsageWindow,
+} from "../../repositories/ingestion-source.repository.ts";
+import type { ErasureSuppressionCheck } from "../../rules/erasure-suppression.rules.ts";
 import {
   type GovernanceEncryptor,
-  type GovernanceOcsfEventSink,
+  IngestionCredentialsService,
+} from "../ingestion-credentials.service.ts";
+import type { IngestionPullDiagnosticsSink } from "../ingestion-pull-log.service.ts";
+import {
   type GovernanceTraceIngestionClient,
   type GovernanceTraceRequest,
-  type GovernanceOcsfEventInput,
-  type IngestionPullDiagnosticsSink,
-  type IngestionPullSourceReader,
   type PulledUsageDispatcher,
   type PulledUsageEntitlements,
-  type PulledUsageRateReader,
-} from "../../app/governance.members.ts";
-import type { UnpricedUsageWindow } from "../../repositories/ingestion-source.repository.ts";
-import type { ErasureSuppressionCheck } from "../../rules/erasure-suppression.rules.ts";
-import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
-import {
   IngestionPullDeadlineExceededError,
   IngestionPullWorkerConfiguration,
   IngestionPullWorkerService,
 } from "../ingestion-pull-worker.service.ts";
-import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
+import {
+  type PulledUsageRateReader,
+  PulledUsagePricingService,
+} from "../pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 import { PullerRegistryService } from "../puller-registry.service.ts";
 

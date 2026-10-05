@@ -12,7 +12,14 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type ZodRawShape, z } from "zod";
 
-import type { GovernanceMcpPermissionProbe } from "../app/governance.members.ts";
+/** Whether the caller holds a permission on an organization, from the process's own AuthZ graph. */
+export interface GovernanceMcpPermissionProbe {
+  holdsOrganizationPermission(input: {
+    userId: string;
+    organizationId: string;
+    permission: AuthzPermission;
+  }): Promise<boolean>;
+}
 
 type ToolResult = Promise<{ content: { type: "text"; text: string }[] }>;
 

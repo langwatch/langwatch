@@ -29,10 +29,10 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { governanceProcessModule } from "../../governance.module.ts";
+import type { GovernanceEncryptor } from "../../services/ingestion-credentials.service.ts";
 import { governanceCliRest } from "../../transport/governance-cli.rest.ts";
 import { governanceIngestRest } from "../../transport/governance-ingest.rest.ts";
 import { governanceRest } from "../../transport/governance.rest.ts";
-import type { GovernanceEncryptor } from "../governance.members.ts";
 
 const MAIN_CLI_ROUTES = [
   "GET /api/auth/cli/budget/status",
@@ -76,7 +76,6 @@ async function boot(rest: RestHost) {
     .expose(() => ({ hosts: { rest, trpc: { mount: () => ({}) } }, serve: () => undefined }))
     .withMembers({
       encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
       publicBaseUrl: "https://app.test",
       rateLimiter: memoryRateLimiter(),
     })
