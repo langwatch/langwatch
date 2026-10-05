@@ -44,12 +44,14 @@ function planSourceFor(licenseKey: string | null): LicensePlanSourceService {
 describe("given the plan a signed licence entitles an organization to", () => {
   describe("when the organization activated no licence", () => {
     /** @scenario "A deployment that never had a license stays uncapped" */
+    /** @scenario An unlicensed self-hosted deployment stays unlimited */
     /** @scenario "An unlicensed deployment runs on the Open Source plan" */
     it("answers the unlimited baseline on both readings, so nothing narrows an unlicensed deployment", async () => {
       const plans = planSourceFor(null);
 
       await expect(plans.getActivePlan("org-1")).resolves.toBe(UNLIMITED_PLAN);
       await expect(plans.getSelfHostedPlan("org-1")).resolves.toBe(UNLIMITED_PLAN);
+      expect(UNLIMITED_PLAN.maxMembers).toBe(Number.MAX_SAFE_INTEGER);
     });
   });
 
@@ -73,6 +75,7 @@ describe("given the plan a signed licence entitles an organization to", () => {
   describe("when the stored licence was tampered with", () => {
     /** @scenario "A license we did not sign is still not a license" */
     /** @scenario "An unreadable license leaves the deployment on the Open Source plan" */
+    /** @scenario An unlicensed self-hosted deployment stays unlimited */
     it("answers the unlimited baseline rather than the plan the payload claims", async () => {
       const plans = planSourceFor(TAMPERED_LICENSE_KEY);
 

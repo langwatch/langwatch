@@ -201,6 +201,7 @@ describe("switching a hosted service", () => {
     expect(row?.servicesDisabled).toEqual(["instant_evals"]);
   });
 
+  /** @scenario Switching a service off is an admin decision that is recorded */
   it("records a refusal rather than a row when a service is switched off", async () => {
     const { service, organizations } = install({ license: licenseNaming(["instant_evals"]) });
 

@@ -4,9 +4,9 @@
  * reader over every failed mutation, and that reader opens the upgrade modal.
  */
 
-import { installedModuleFailures } from "@langwatch/browser/application";
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
+import { installedModuleFailures } from "@langwatch/browser/application";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { licensingWeb } from "../../../../licensing.web.ts";
@@ -26,6 +26,7 @@ describe("Feature: Upgrade modal when a call is refused by the licence", () => {
     expect(installedModuleFailures([licensingWeb])).toEqual([reportLicenseFailure]);
   });
 
+  /** @scenario A refused call at a seat limit opens the upgrade modal */
   it("A refused call at a seat limit opens the upgrade modal", () => {
     const error = failedCall({
       data: {
@@ -46,6 +47,7 @@ describe("Feature: Upgrade modal when a call is refused by the licence", () => {
     expect(isHandledByGlobalHandler(error)).toBe(true);
   });
 
+  /** @scenario A refused call on a Lite Member seat opens the restriction modal */
   it("A refused call on a Lite Member seat opens the restriction modal", () => {
     const error = failedCall({
       data: {
@@ -63,6 +65,7 @@ describe("Feature: Upgrade modal when a call is refused by the licence", () => {
     expect(isHandledByGlobalHandler(error)).toBe(true);
   });
 
+  /** @scenario A refusal the licence does not explain is left to the screen */
   it("A refusal the licence does not explain is left to the screen", () => {
     const error = failedCall({
       data: { code: "FORBIDDEN", error: { code: "permission_denied" } },

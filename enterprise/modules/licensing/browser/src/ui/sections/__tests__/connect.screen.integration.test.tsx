@@ -5,7 +5,8 @@
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ConnectStatus } from "@langwatch/enterprise-licensing-contract";
-import { cleanup, screen } from "@testing-library/react";
+import { act, cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -18,15 +19,22 @@ import ConnectScreen from "../connect.screen.tsx";
 
 const answer: { status: ConnectStatus | undefined } = { status: undefined };
 const mutation = { mutate: vi.fn(), isPending: false };
+const refetch = vi.fn();
+const capSaved: { onSuccess?: () => void } = {};
 
 vi.mock("../../../behavior/connect-api.ts", () => ({
   connectApi: {
     connect: {
       status: {
-        useQuery: () => ({ isLoading: false, error: null, data: answer.status, refetch: vi.fn() }),
+        useQuery: () => ({ isLoading: false, error: null, data: answer.status, refetch }),
       },
       setService: { useMutation: () => mutation },
-      setCap: { useMutation: () => mutation },
+      setCap: {
+        useMutation: (options: { onSuccess?: () => void }) => {
+          capSaved.onSuccess = options.onSuccess;
+          return mutation;
+        },
+      },
     },
   },
 }));
@@ -72,16 +80,51 @@ function connected(overrides: Partial<Extract<ConnectStatus, { deployment: "on" 
   } satisfies ConnectStatus;
 }
 
-function renderScreen({ status, admin = true }: { status: ConnectStatus; admin?: boolean }) {
-  answer.status = status;
+function screenFor({ admin }: { admin: boolean }) {
   const Wrapper = ({ children }: { children: ReactNode }) => (
     <LicensingHostProvider value={new TestHost(admin)}>{children}</LicensingHostProvider>
   );
-  renderWithDesignSystem(
+  return (
     <Wrapper>
       <ConnectScreen />
-    </Wrapper>,
+    </Wrapper>
   );
+}
+
+function renderScreen({ status, admin = true }: { status: ConnectStatus; admin?: boolean }) {
+  answer.status = status;
+  return renderWithDesignSystem(screenFor({ admin }));
+}
+
+function budgetOf({ capUsd, spentUsd }: { capUsd: number; spentUsd: number }) {
+  return {
+    id: "budget-1",
+    scope: "organization",
+    window: "month",
+    capUsd,
+    spentUsd,
+    remainingUsd: capUsd - spentUsd,
+    onBreach: "block",
+    periodStartedAt: "2026-09-01T00:00:00.000Z",
+    isContract: true,
+  };
+}
+
+function usageOf({ capUsd, spendAvailable = true }: { capUsd: number; spendAvailable?: boolean }) {
+  const budget = budgetOf({ capUsd, spentUsd: 120 });
+  return {
+    services: ["instant_evals"],
+    spendAvailable,
+    readAt: "2026-09-22T00:00:00.000Z",
+    contract: {
+      ...budget,
+      commitUsd: 500,
+      maximumCapUsd: 1000,
+      overageEnabled: false,
+      termEndsAt: null,
+    },
+    budgets: [budget],
+  };
 }
 
 function switchOf(service: string): HTMLInputElement {
@@ -90,7 +133,11 @@ function switchOf(service: string): HTMLInputElement {
   return input;
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  mutation.mutate.mockClear();
+  refetch.mockReset();
+});
 
 describe("ConnectScreen", () => {
   describe("given a licensed install with Connect on", () => {
@@ -166,6 +213,54 @@ describe("ConnectScreen", () => {
       renderScreen({ status: { deployment: "off" } });
       expect(screen.getByTestId("connect-deployment-off")).toBeDefined();
       expect(screen.getByText(/LANGWATCH_CONNECT_DISABLED/)).toBeDefined();
+    });
+  });
+  describe("given a licensed install whose hosted usage route cannot report spend", () => {
+    /** @scenario "The page says when spend cannot be read" */
+    it("says spend is not available right now and still shows the cap", () => {
+      renderScreen({
+        status: connected({ usage: usageOf({ capUsd: 500, spendAvailable: false }) }),
+      });
+
+      expect(screen.getAllByText("Spend is not available right now")).toHaveLength(2);
+      expect(screen.queryByText("120.00 USD")).toBeNull();
+      expect(screen.getByText("500.00 USD")).toBeDefined();
+    });
+  });
+
+  describe("given an admin of a licensed install with a contract budget", () => {
+    /** @scenario "An admin changes the cap" */
+    it("sends the cap typed in and shows the cap the refreshed status carries", async () => {
+      const user = userEvent.setup();
+      const view = renderScreen({ status: connected({ usage: usageOf({ capUsd: 500 }) }) });
+
+      const field = screen.getByTestId("connect-cap-input");
+      await user.clear(field);
+      await user.type(field, "400");
+      await user.click(screen.getByTestId("connect-cap-save"));
+
+      expect(mutation.mutate).toHaveBeenCalledWith({ organizationId: "org-1", capUsd: 400 });
+
+      refetch.mockImplementation(() => {
+        answer.status = connected({ usage: usageOf({ capUsd: 400 }) });
+        view.rerender(screenFor({ admin: true }));
+      });
+      act(() => capSaved.onSuccess?.());
+
+      expect(refetch).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("400.00 USD")).toBeDefined();
+      expect(screen.queryByText("500.00 USD")).toBeNull();
+    });
+  });
+
+  describe("given an organization with no license", () => {
+    /** @scenario "The page sends an organization with no license to the license page" */
+    it("says hosted services need a license and links to the license page", () => {
+      renderScreen({ status: connected({ licensed: false, enabledServices: [], usage: null }) });
+
+      expect(screen.getByText("Hosted services need a license")).toBeDefined();
+      const link = screen.getByRole("link", { name: "Open the License page" });
+      expect(link.getAttribute("href")).toBe("/settings/license");
     });
   });
 });
