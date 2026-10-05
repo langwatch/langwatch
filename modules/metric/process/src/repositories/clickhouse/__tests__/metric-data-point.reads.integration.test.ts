@@ -92,6 +92,13 @@ describe("given metric rows stored in ClickHouse", () => {
       values: [
         usageRow({ PointId: "1".repeat(64) }),
         usageRow({ PointId: "2".repeat(64), SeriesId: SERIES_B, CanonicalSourceBytes: 50 }),
+        // The first point accepted a second time: a second ledger row for one PointId.
+        usageRow({
+          PointId: "1".repeat(64),
+          AcceptedAt: "2026-01-12 08:00:00.000",
+          AcceptedHour: "2026-01-12 08:00:00",
+          DedupVersion: 2,
+        }),
         // Accepted before the window: billed in an earlier one, so not counted here.
         usageRow({ PointId: "3".repeat(64), AcceptedAt: "2025-12-20 09:00:00.000" }),
       ],
@@ -121,7 +128,7 @@ describe("given metric rows stored in ClickHouse", () => {
 
   describe("when the usage estimates are read for a window", () => {
     /** @scenario "The usage estimate read runs against ClickHouse" */
-    it("returns the points first accepted inside the window", async () => {
+    it("counts each point first accepted inside the window once", async () => {
       const result = await repository().queryUsageEstimates({
         organizationId: ORGANIZATION,
         from: Temporal.Instant.from("2026-01-01T00:00:00Z"),
@@ -137,6 +144,19 @@ describe("given metric rows stored in ClickHouse", () => {
           canonicalRetainedBytes: 150,
         }),
       ]);
+    });
+  });
+
+  describe("when series totals are read by an attribute value no series carries", () => {
+    it("returns no series", async () => {
+      const result = await repository().findSeriesTotalsByPointAttribute({
+        tenantId: TENANT,
+        attributeKey: "team",
+        attributeValue: "gamma",
+        fromMs: Date.parse("2026-01-01T00:00:00Z"),
+      });
+
+      expect(result).toEqual([]);
     });
   });
 

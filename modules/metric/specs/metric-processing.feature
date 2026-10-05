@@ -50,13 +50,14 @@ Feature: Canonical OTLP metric processing
     Then the point and its metric projections remain durable
     And no Trace correlation is requested
 
-  @integration
+  @regression @integration
   Scenario: The usage estimate read runs against ClickHouse
     Given accepted metric points in the usage ledger of an organisation
+    And one of those points was accepted twice
     When the usage estimates are read for a window grouped by organisation
-    Then the accepted points, active series and retained bytes of that window are returned
+    Then each point is counted once, with the active series and retained bytes of that window
 
-  @integration
+  @regression @integration
   Scenario: Series totals are read by a point attribute
     Given two metric series, one of which carries the attribute value asked for
     When the series totals are read by that attribute
