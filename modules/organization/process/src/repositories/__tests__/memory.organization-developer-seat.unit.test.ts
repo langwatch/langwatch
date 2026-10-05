@@ -85,6 +85,8 @@ describe("the memory twins on a Developer seat", () => {
     const repository = MemoryOrganizationMembershipRepository.create({ memory });
 
     await repository.updateMemberRole({
+      caller: { type: "system" },
+      currentUserId: null,
       organizationId: ACME,
       userId: "mia",
       role: OrganizationUserRole.DEVELOPER,

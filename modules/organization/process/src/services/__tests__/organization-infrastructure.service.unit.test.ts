@@ -50,8 +50,12 @@ class StubRepository extends OrganizationRepository {
   guidedOnboarding: GuidedOnboardingRecord = { state: { paths: [], donePaths: [] }, variant: null };
   storedSettings: StoredOrganizationSettings | null = null;
 
-  async getJoinSetting(): Promise<{ domainJoin: "request"; joinDomains: string[] }> {
-    return { domainJoin: "request", joinDomains: [] };
+  async getJoinSetting(): Promise<{
+    domainJoin: "request";
+    joinDomains: string[];
+    joinerRole: "MEMBER";
+  }> {
+    return { domainJoin: "request", joinDomains: [], joinerRole: "MEMBER" };
   }
 
   async saveJoinSetting(): Promise<void> {}

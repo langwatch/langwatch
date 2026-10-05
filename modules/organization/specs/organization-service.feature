@@ -119,6 +119,13 @@ Feature: Shared organization service
     And no composition root describes any of those formats
 
   @unit
+  Scenario: Ensuring a personal workspace leaves an existing membership as it was
+    Given a person who is already an administrator of the organization
+    When their personal workspace is ensured
+    Then they still hold exactly one membership in the organization
+    And that membership is still Administrator
+
+  @unit
   Scenario: A shared team is born with packaged identifiers
     When the organization service creates a shared team
     Then the feature package mints the team identifier and its role binding

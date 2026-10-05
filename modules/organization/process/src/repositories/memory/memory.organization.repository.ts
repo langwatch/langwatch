@@ -313,14 +313,21 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       createdAt: now,
       personalFeatures: null,
     });
-    this.memory.organizationUsers.push({
-      userId: input.workspace.userId,
-      organizationId: input.workspace.organizationId,
-      role: "MEMBER",
-      disabledAt: null,
-      createdAt: now,
-      updatedAt: now,
-    });
+    const alreadyMember = this.memory.organizationUsers.some(
+      (row) =>
+        row.userId === input.workspace.userId &&
+        row.organizationId === input.workspace.organizationId,
+    );
+    if (!alreadyMember) {
+      this.memory.organizationUsers.push({
+        userId: input.workspace.userId,
+        organizationId: input.workspace.organizationId,
+        role: "MEMBER",
+        disabledAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
 
     const created = this.findWorkspace(input.workspace);
     if (!created) throw new Error("personal workspace vanished after being written");

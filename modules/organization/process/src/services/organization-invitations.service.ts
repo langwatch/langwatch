@@ -38,7 +38,7 @@ export type OrganizationInvitationsCreateInput = Readonly<{
     email: string;
     teamIds?: string;
     teams?: readonly Readonly<{ teamId: string; role: string; customRoleId?: string }>[];
-    role: "ADMIN" | "MEMBER" | "EXTERNAL";
+    role: OrganizationUserRole;
   }>[];
   /**
    * Chosen by the transport that asked, never by the composition: a batch naming a team

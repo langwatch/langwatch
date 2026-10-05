@@ -76,6 +76,8 @@ describe("given an administrator saving the joining setting", () => {
       next: "off" as const,
       previousDomains: [],
       nextDomains: [],
+      previousJoinerRole: "MEMBER" as const,
+      nextJoinerRole: "MEMBER" as const,
     }));
     const door = OrganizationJoinDoorService.create({
       joinRequests: createApiFixture<OrganizationJoinRequests>({ setJoining }),
@@ -95,6 +97,8 @@ describe("given an administrator saving the joining setting", () => {
       next: "off",
       previousDomains: [],
       nextDomains: [],
+      previousJoinerRole: "MEMBER",
+      nextJoinerRole: "MEMBER",
     });
   });
 });
