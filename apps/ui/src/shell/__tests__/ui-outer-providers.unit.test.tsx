@@ -1,5 +1,5 @@
-import { useChakraContext } from "@langwatch/design-system/primitives";
 import { createUiOuterProvider } from "@langwatch/browser/outer-providers";
+import { useChakraContext } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";

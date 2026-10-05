@@ -3,8 +3,8 @@
  * the dataset editor.
  */
 
-import { SelectDatasetDrawerToken, UploadCsvDrawerToken } from "@langwatch/dataset-contract";
 import { defineBrowserModule } from "@langwatch/browser";
+import { SelectDatasetDrawerToken, UploadCsvDrawerToken } from "@langwatch/dataset-contract";
 
 export const datasetWeb = defineBrowserModule("dataset")
   .withHosts({

@@ -265,14 +265,12 @@ export function EvaluationManualIntegration({
                 isCreating={minting.isMinting}
                 scopeNote={minting.scopeNote}
                 onCreate={() =>
-                  void minting
-                    .mint()
-                    .catch((error: unknown) =>
-                      showErrorToast({
-                        error,
-                        fallbackTitle: "Couldn't create the personal access token",
-                      }),
-                    )
+                  void minting.mint().catch((error: unknown) =>
+                    showErrorToast({
+                      error,
+                      fallbackTitle: "Couldn't create the personal access token",
+                    }),
+                  )
                 }
               />
             )}

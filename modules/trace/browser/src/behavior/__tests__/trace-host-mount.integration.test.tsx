@@ -149,7 +149,6 @@ describe("TraceHostMount", () => {
 
       expect(screen.getByLabelText("first message")).toHaveTextContent("true");
     });
-
   });
 
   describe("when the organization turned presence off", () => {

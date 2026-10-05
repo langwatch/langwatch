@@ -127,7 +127,11 @@ export class McpSessionService {
 
     const previous = session.apiKey;
     session.apiKey = caller.apiKey;
-    void this.removeRecord({ transport: input.transport, sessionId: input.sessionId, apiKey: previous })
+    void this.removeRecord({
+      transport: input.transport,
+      sessionId: input.sessionId,
+      apiKey: previous,
+    })
       .then(() =>
         this.storeRecord({
           transport: input.transport,

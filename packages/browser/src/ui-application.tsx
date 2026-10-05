@@ -14,6 +14,7 @@ import {
   type UiPageLoaderRegistry,
 } from "./ui-feature-install.ts";
 import { createUiFeatureShell } from "./ui-feature-shell.tsx";
+import type { UiFailureInterceptor } from "./ui-feature.ts";
 import { createUiInnerProvider, type UiInnerProviderInstall } from "./ui-inner-providers.tsx";
 import { createUiModuleHostStack } from "./ui-module-hosts.tsx";
 import {
@@ -24,7 +25,6 @@ import {
 import { createUiRootLayout } from "./ui-root-layout.tsx";
 import type { UiRouteDescriptor, UiShellLayout } from "./ui-route-descriptor.ts";
 import { createUiRouteObjects } from "./ui-route-objects.tsx";
-import type { UiFailureInterceptor } from "./ui-feature.ts";
 import type { SupplyModule } from "./web-module.ts";
 
 export type UiApplicationInstall = {

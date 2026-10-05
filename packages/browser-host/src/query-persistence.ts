@@ -532,20 +532,18 @@ export function persistUiQueries({
     query.queryHash !== sessionHash && plan.persisted.has(procedurePathOf(query.queryKey) ?? "");
   const restoredAt = restoredAtOf(queryClient);
   let stopped = false;
-  const stopMirroring = queryClient
-    .getQueryCache()
-    .subscribe((event) =>
-      mirrorQuery({
-        event,
-        isPersisted,
-        plan,
-        servedSchemaHashFor,
-        restoredAt,
-        versions,
-        store,
-        userId,
-      }),
-    );
+  const stopMirroring = queryClient.getQueryCache().subscribe((event) =>
+    mirrorQuery({
+      event,
+      isPersisted,
+      plan,
+      servedSchemaHashFor,
+      restoredAt,
+      versions,
+      store,
+      userId,
+    }),
+  );
   const unsubscribe = () => {
     stopped = true;
     stopMirroring();

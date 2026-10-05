@@ -23,9 +23,7 @@ function inputOf(url: URL): ProcedureInput {
 export function answeringTransport(answer: ProcedureAnswer): UiFeatureApiTransport {
   const fetch: typeof globalThis.fetch = async (request) => {
     const url = new URL(request instanceof Request ? request.url : String(request));
-    const path = decodeURIComponent(
-      url.pathname.slice(new URL(TEST_ENDPOINT).pathname.length + 1),
-    );
+    const path = decodeURIComponent(url.pathname.slice(new URL(TEST_ENDPOINT).pathname.length + 1));
     const data = await answer(path, inputOf(url));
     return new Response(JSON.stringify({ result: { data } }), {
       headers: { "content-type": "application/json" },

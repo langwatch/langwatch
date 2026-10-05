@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { registerRoutePolicy } from "@langwatch/api";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { initConfig, tryGetConfig } from "@langwatch/mcp-server/config";
 import { classifyClient, createLogger, endpointClassOf } from "@langwatch/observability";
@@ -30,7 +31,6 @@ import { McpSessionService } from "./mcp-session.service.ts";
 import { McpSseTransportService } from "./mcp-sse-transport.service.ts";
 import { McpStreamableTransportService } from "./mcp-streamable-transport.service.ts";
 import type { ProjectMcpProjectLookupService } from "./project-mcp-project-lookup.service.ts";
-import { registerRoutePolicy } from "@langwatch/api";
 
 const logger = createLogger("langwatch:mcp");
 

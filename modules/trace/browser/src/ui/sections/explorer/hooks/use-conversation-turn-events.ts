@@ -47,7 +47,8 @@ export function useConversationTurnEvents(turns: TraceListItem[]): TraceListItem
       // Backed by the same project-protected read as the turns themselves, so
       // a share grant never opens it.
       enabled,
-      placeholderData: keepPreviousData,    },
+      placeholderData: keepPreviousData,
+    },
   );
 
   // `placeholderData: keepPreviousData` hands back the previous thread's

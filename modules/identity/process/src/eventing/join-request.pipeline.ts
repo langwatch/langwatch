@@ -203,7 +203,8 @@ export function composeJoinRequestNotifications(options: {
 
 export const joinRequestEventing = defineEventingModule({
   pipeline: JOIN_REQUEST_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<IdentityRepositories, IdentityModule>) => app.joinRequestPipeline(),
+  build: ({ app }: EventingSetup<IdentityRepositories, IdentityModule>) =>
+    app.joinRequestPipeline(),
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: JOIN_REQUEST_PIPELINE_NAME, commands }),
 });

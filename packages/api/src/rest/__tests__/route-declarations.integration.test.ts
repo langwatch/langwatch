@@ -10,9 +10,9 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { createErrorHandler, EndpointWithdrawnError } from "../../errors.ts";
+import type { RestAuditRow, RestIdentity } from "../../hosting/api-door.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime, type RestRuntimeMembers } from "../runtime.ts";
-import type { RestAuditRow, RestIdentity } from "../../hosting/api-door.ts";
 
 const VERSION = "2026-09-10";
 

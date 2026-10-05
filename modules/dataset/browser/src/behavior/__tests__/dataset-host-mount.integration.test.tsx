@@ -11,13 +11,13 @@ import {
   createUiScopeHost,
   type UiScopeHost,
 } from "@langwatch/browser-host/use-organization-team-project";
+import { installedModuleHostMounts } from "@langwatch/browser/module-hosts";
 // @vitest-environment jsdom
 /**
  * Dataset's Replicate dialog offers only projects the reader may create datasets in.
  * Spec: specs/datasets/datasets-list-page.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { installedModuleHostMounts } from "@langwatch/browser/module-hosts";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentType, ReactNode } from "react";

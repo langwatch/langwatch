@@ -19,7 +19,11 @@ const NODE_BUILTIN_SPECIFIERS = new Set(
 const BROWSER_REACHABLE_PACKAGE = /-(?:contract|browser)$/;
 
 /** Trusted portable by construction (React, browser-host only) — still walked here to prove it. */
-const ALWAYS_CHECKED_PACKAGES = new Set(["@langwatch/design-system", "@langwatch/browser-host", "@langwatch/browser"]);
+const ALWAYS_CHECKED_PACKAGES = new Set([
+  "@langwatch/design-system",
+  "@langwatch/browser-host",
+  "@langwatch/browser",
+]);
 
 function browserReachableRoots(
   resolver: WorkspaceModuleResolver,

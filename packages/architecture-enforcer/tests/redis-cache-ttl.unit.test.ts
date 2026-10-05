@@ -15,7 +15,8 @@ const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..
 const WRITE_METHODS =
   "set|setex|psetex|setnx|getset|hset|hsetnx|hmset|mset|msetnx|incr|incrby|incrbyfloat|decr|decrby|hincrby|hincrbyfloat|sadd|zadd|lpush|rpush|append|setrange|pfadd|eval|evalsha|multi|pipeline";
 /** A name declared with a Redis client type, so the check never depends on what it is called. */
-const CLIENT_DECLARATION = /(#?[A-Za-z_$][\w$]*)\??\s*:\s*[^=;{}()]*?(?:\w*Redis(?:Connection)?\b|\bCluster\b|\["redis"\])/g;
+const CLIENT_DECLARATION =
+  /(#?[A-Za-z_$][\w$]*)\??\s*:\s*[^=;{}()]*?(?:\w*Redis(?:Connection)?\b|\bCluster\b|\["redis"\])/g;
 const EXPIRY_OPTION = /["'](?:EX|PX|EXAT|PXAT)["']/;
 const SCRIPT_COMMAND = /redis\.call\(\s*["'](\w+)["']/gi;
 const SCRIPT_NON_WRITES = new Set(["GET", "DEL", "UNLINK", "EXISTS", "TTL", "PTTL"]);
@@ -23,7 +24,12 @@ const SCRIPT_NON_WRITES = new Set(["GET", "DEL", "UNLINK", "EXISTS", "TTL", "PTT
 const cacheRepositories = (): string[] =>
   execFileSync(
     "git",
-    ["ls-files", "--", "*/redis.*cache*.repository.ts", "*/redis.better-auth-secondary-storage.repository.ts"],
+    [
+      "ls-files",
+      "--",
+      "*/redis.*cache*.repository.ts",
+      "*/redis.better-auth-secondary-storage.repository.ts",
+    ],
     {
       cwd: REPO_ROOT,
       encoding: "utf8",
@@ -52,9 +58,13 @@ function expiresInTheSameCommand(source: string, method: string, open: number): 
   }
   if (method === "eval" || method === "evalsha") {
     const script = scriptOf(source, args);
-    const commands = [...script.matchAll(SCRIPT_COMMAND)].map(([, name = ""]) => name.toUpperCase());
+    const commands = [...script.matchAll(SCRIPT_COMMAND)].map(([, name = ""]) =>
+      name.toUpperCase(),
+    );
     const writes = commands.some((name) => !SCRIPT_NON_WRITES.has(name));
-    return !writes || commands.some((name) => name.endsWith("EXPIRE")) || /'(?:EX|PX)'/.test(script);
+    return (
+      !writes || commands.some((name) => name.endsWith("EXPIRE")) || /'(?:EX|PX)'/.test(script)
+    );
   }
   return false;
 }
@@ -62,7 +72,8 @@ function expiresInTheSameCommand(source: string, method: string, open: number): 
 /** The script an eval runs: inline, or the constant its first argument names. */
 function scriptOf(source: string, args: string): string {
   const name = /^\s*([A-Za-z_$][\w$]*)\s*,/.exec(args)?.[1];
-  const constant = name && new RegExp(`const\\s+${name}\\s*=\\s*([\`'"])([\\s\\S]*?)\\1`).exec(source);
+  const constant =
+    name && new RegExp(`const\\s+${name}\\s*=\\s*([\`'"])([\\s\\S]*?)\\1`).exec(source);
   return constant ? (constant[2] ?? "") : args;
 }
 

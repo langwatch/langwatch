@@ -27,8 +27,8 @@ const restErrorLogger = createLogger("langwatch:api:rest");
 const restDeprecationLog: RestDeprecationLog = {
   deprecatedRouteCalled: (route) => restErrorLogger.warn(route, "Deprecated REST route called"),
 };
-import { SessionKeyIdentity } from "./session-key-identity.ts";
 import type { RestAuditSink, RestIdentity } from "../hosting/api-door.ts";
+import { SessionKeyIdentity } from "./session-key-identity.ts";
 
 /** Every credential kind a family may name, except the three a module binds for itself. */
 export type RestIdentities = Readonly<

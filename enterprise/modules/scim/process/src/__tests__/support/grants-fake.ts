@@ -12,7 +12,15 @@ type AttachBindingsInput = Parameters<AuthzGrantsService["attachBindings"]>[0];
 
 type ListedGrantFields = Pick<
   AuthzAccessBinding,
-  "id" | "organizationId" | "userId" | "groupId" | "apiKeyId" | "scopeType" | "scopeId" | "role" | "customRoleId"
+  | "id"
+  | "organizationId"
+  | "userId"
+  | "groupId"
+  | "apiKeyId"
+  | "scopeType"
+  | "scopeId"
+  | "role"
+  | "customRoleId"
 >;
 
 /** A grant row as the authz listings answer it, undecorated. */
@@ -78,7 +86,10 @@ export class GrantsFake extends AuthzGrantsService {
     async (_input: { organizationId: string; userId: string }): Promise<AuthzAccessBinding[]> => [],
   );
   readonly listGroupBindings = vi.fn(
-    async (_input: { organizationId: string; groupId: string }): Promise<AuthzAccessBinding[]> => [],
+    async (_input: {
+      organizationId: string;
+      groupId: string;
+    }): Promise<AuthzAccessBinding[]> => [],
   );
   readonly listUserAndGroupBindings = vi.fn(
     async (_input: {

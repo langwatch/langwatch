@@ -146,7 +146,11 @@ export class ScimGrantsService {
     groupIds: readonly string[];
   }): Promise<string[]> {
     if (groupIds.length === 0) return [];
-    const bindings = await this.grants.listUserAndGroupBindings({ organizationId, userId, groupIds });
+    const bindings = await this.grants.listUserAndGroupBindings({
+      organizationId,
+      userId,
+      groupIds,
+    });
     return bindings
       .filter(
         (binding) =>

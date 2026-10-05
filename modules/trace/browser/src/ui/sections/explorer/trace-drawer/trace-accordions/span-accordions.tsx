@@ -11,8 +11,8 @@ import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
 
-import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
+import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import {
   logEventTone,
   summarizeLogEvent,

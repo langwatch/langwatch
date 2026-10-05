@@ -1,3 +1,4 @@
+import type { RestCaller } from "@langwatch/api/hosting";
 /** @vitest-environment node */
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -5,7 +6,6 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { workflowStudioRest, workflowStudioSession } from "../workflow-studio.rest.ts";
-import type { RestCaller } from "@langwatch/api/hosting";
 
 const signedIn: RestCaller = { actor: { type: "user", id: "user_1" }, scope: null };
 

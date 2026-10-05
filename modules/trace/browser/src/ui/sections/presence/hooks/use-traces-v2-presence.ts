@@ -1,12 +1,12 @@
 import type { PresenceLocation } from "@langwatch/presence-contract";
 import { useMemo } from "react";
 
-import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import {
   pickMostVisibleSection,
   useSectionTrackerStore,
 } from "../../../../behavior/presence/section-tracker-store.ts";
 import { usePresenceFeatureEnabled } from "../../../../behavior/presence/use-presence-feature-enabled.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { usePresence } from "./use-presence.ts";
 

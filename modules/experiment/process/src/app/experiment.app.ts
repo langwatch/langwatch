@@ -706,7 +706,10 @@ export class ExperimentModule implements ExperimentApi {
     input: Readonly<{ projectId: string; slug: string; version: number }>,
     by: ExperimentCaller,
   ): Promise<WorkbenchSaveResult> {
-    return this.#workbenchVersions.restoreBySlug({ ...input, actor: ExperimentModule.actorFor(by) });
+    return this.#workbenchVersions.restoreBySlug({
+      ...input,
+      actor: ExperimentModule.actorFor(by),
+    });
   }
 
   /** `GET /:slug/workbench-state`'s answer, `fields=version` leaving out the setup. */

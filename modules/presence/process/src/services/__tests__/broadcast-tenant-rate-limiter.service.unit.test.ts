@@ -135,7 +135,10 @@ describe("RedisBroadcastRepository", () => {
       throw new Error("message listener was not registered");
     const hint = JSON.stringify({ path: "organization.getScopeGraph" });
     messageListener("eventing:read_invalidated", JSON.stringify({ tenantId: "acme", event: hint }));
-    messageListener("broadcast:read_invalidated", JSON.stringify({ tenantId: "acme", event: hint }));
+    messageListener(
+      "broadcast:read_invalidated",
+      JSON.stringify({ tenantId: "acme", event: hint }),
+    );
 
     expect(acme).toEqual([{ event: hint, timestamp: expect.any(Number) }]);
     expect(globex).toHaveLength(0);

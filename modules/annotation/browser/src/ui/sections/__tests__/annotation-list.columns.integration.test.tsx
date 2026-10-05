@@ -310,9 +310,7 @@ describe("given the annotations list shows rows", () => {
 
     fireEvent.click(screen.getByText("the question"));
 
-    expect(host.navigations).toEqual([
-      "/test-project/annotations/my-queue?queue-item=item-1",
-    ]);
+    expect(host.navigations).toEqual(["/test-project/annotations/my-queue?queue-item=item-1"]);
   });
 
   /** @scenario "Row navigation follows review state" */

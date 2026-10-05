@@ -34,7 +34,9 @@ class ComposedDirectoryApp extends DirectoryApp {
   }
 }
 
-const directoryProcessModule = defineProcessModule("annotation").withApi(ComposedDirectoryApp).build();
+const directoryProcessModule = defineProcessModule("annotation")
+  .withApi(ComposedDirectoryApp)
+  .build();
 const directoryApis = [
   { protocol: "rest", router: (host: string) => ({ host }) },
   { protocol: "trpc", router: (host: string) => ({ host }) },

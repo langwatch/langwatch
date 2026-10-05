@@ -40,10 +40,24 @@ export {
   type ProviderInvoice,
 } from "./channels/connected-invoicing.channel.ts";
 export { connectedInvoicingChannels } from "./channels/connected-invoicing-channels.registry.ts";
-export type { ConnectedBillingAccountRecord, ConnectedCreditGrantRecord, ConnectedInvoiceRecord, ConnectedSeatChangeRecord, PendingRenewal } from "./repositories/connected-billing.repository.ts";
+export type {
+  ConnectedBillingAccountRecord,
+  ConnectedCreditGrantRecord,
+  ConnectedInvoiceRecord,
+  ConnectedSeatChangeRecord,
+  PendingRenewal,
+} from "./repositories/connected-billing.repository.ts";
 export type { ConnectedBillingDatabase } from "./repositories/prisma/prisma.connected-billing.repository.ts";
 export type { ConnectedBillingTerms } from "./services/connected-billing.service.ts";
-export type { CommitDrawdown, ConnectedCustomer, ConnectedStatement, ConnectedStatementSources, MonthlyStatementRunSummary, StatementSeats, StatementSpendLine } from "./services/connected-monthly-statement.service.ts";
+export type {
+  CommitDrawdown,
+  ConnectedCustomer,
+  ConnectedStatement,
+  ConnectedStatementSources,
+  MonthlyStatementRunSummary,
+  StatementSeats,
+  StatementSpendLine,
+} from "./services/connected-monthly-statement.service.ts";
 export { ConnectedStatementMailChannel } from "./channels/connected-statement-mail.channel.ts";
 export { connectedStatementMailChannels } from "./channels/connected-statement-mail-channels.registry.ts";
 export type { BillableEventsWindow } from "./repositories/billable-events.repository.ts";

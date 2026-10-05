@@ -50,8 +50,7 @@ export const ATTRIBUTION_FIELD_TO_PROPERTY = {
   referrer: "referrer",
 } as const satisfies Record<AttributionField, string>;
 
-export type AttributionProperty =
-  (typeof ATTRIBUTION_FIELD_TO_PROPERTY)[AttributionField];
+export type AttributionProperty = (typeof ATTRIBUTION_FIELD_TO_PROPERTY)[AttributionField];
 
 /**
  * Converts attribution fields to analytics event properties. Unset and empty

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { RestIdentity } from "@langwatch/api/hosting";
 /**
  * The SCIM feature's application: what its four doors call.
  *
@@ -112,7 +113,6 @@ import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { ScimSyncLifecycleService } from "../services/scim-sync-lifecycle.service.ts";
 import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { ScimTokenMintService } from "../services/scim-token-mint.service.ts";
-import type { RestIdentity } from "@langwatch/api/hosting";
 
 type ScimSetup = FeatureSetup<
   typeof ScimModule.dependencies,

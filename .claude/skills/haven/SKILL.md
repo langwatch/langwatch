@@ -18,14 +18,14 @@ Run it from the workspace root. `make haven <sub>` forwards to the CLI (`dev/hav
 
 ## As an agent
 
-| Do | Command |
-| --- | --- |
-| Start without a log view that never returns | `haven up --agent -d` |
-| One-shot health of every stack | `haven status --agent` (`--json` for a machine) |
-| Read a service's log | `haven logs api --since 10m --agent` |
-| Only warnings and worse | `haven logs api --level warn --agent` |
-| Last distinct failures, grouped | `haven errors --agent` |
-| Recent root spans of this stack | `haven traces --json` |
+| Do                                          | Command                                         |
+| ------------------------------------------- | ----------------------------------------------- |
+| Start without a log view that never returns | `haven up --agent -d`                           |
+| One-shot health of every stack              | `haven status --agent` (`--json` for a machine) |
+| Read a service's log                        | `haven logs api --since 10m --agent`            |
+| Only warnings and worse                     | `haven logs api --level warn --agent`           |
+| Last distinct failures, grouped             | `haven errors --agent`                          |
+| Recent root spans of this stack             | `haven traces --json`                           |
 
 - Bare `haven up` without a TTY never returns and dies with your shell. Always `-d`.
 - `--agent` (or `HAVEN_AGENT=1`) makes output plain: no colour, no redraws.
@@ -78,18 +78,18 @@ not.
 
 ## Other commands you will want
 
-| Need | Command |
-| --- | --- |
-| Stop this stack, keep databases | `haven down` |
-| Everything off, daemon and proxy too | `haven down --all` |
-| Drop a stack's databases | `haven destroy <slug>` (needs `--yes` as an agent) |
-| Reset or reseed this stack's data | `haven db reset [preset]`, `haven db seed [preset]` |
-| Add or drop a service, sticky | `haven up +langy`, `haven up -mail` |
-| Evaluators (monitors, evaluations) | `haven up +langevals` |
-| Zero-cost model answers | `haven up +llm` |
-| Try a PR in its own worktree | `haven pr <number>` |
-| Hold Vite reloads during an agent turn | `haven hmr on --ttl 60s`, `haven hmr off` |
-| Run a heavy command under the machine slot | `haven run`, `haven slot run -- <cmd>` |
+| Need                                       | Command                                             |
+| ------------------------------------------ | --------------------------------------------------- |
+| Stop this stack, keep databases            | `haven down`                                        |
+| Everything off, daemon and proxy too       | `haven down --all`                                  |
+| Drop a stack's databases                   | `haven destroy <slug>` (needs `--yes` as an agent)  |
+| Reset or reseed this stack's data          | `haven db reset [preset]`, `haven db seed [preset]` |
+| Add or drop a service, sticky              | `haven up +langy`, `haven up -mail`                 |
+| Evaluators (monitors, evaluations)         | `haven up +langevals`                               |
+| Zero-cost model answers                    | `haven up +llm`                                     |
+| Try a PR in its own worktree               | `haven pr <number>`                                 |
+| Hold Vite reloads during an agent turn     | `haven hmr on --ttl 60s`, `haven hmr off`           |
+| Run a heavy command under the machine slot | `haven run`, `haven slot run -- <cmd>`              |
 
 Seed presets are in `haven help db` (`demo`, `onboarding`, `post-onboarding` and more).
 

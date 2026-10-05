@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { LuFileOutput, LuPencil } from "react-icons/lu";
 
 import { useAnnotationSessionStore } from "../../../../../behavior/annotation-session.store.ts";
-import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
+import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import {
   buildTraceEditPatch,
   summarizeTraceEdit,

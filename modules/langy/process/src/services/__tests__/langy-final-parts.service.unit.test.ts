@@ -1,5 +1,6 @@
-import { LangyFinalPartsService } from "#services/langy-final-parts.service";
 import { describe, expect, it } from "vitest";
+
+import { LangyFinalPartsService } from "#services/langy-final-parts.service";
 
 const buildFinalAssistantParts = (input: Parameters<LangyFinalPartsService["build"]>[0]) =>
   LangyFinalPartsService.create().build(input);

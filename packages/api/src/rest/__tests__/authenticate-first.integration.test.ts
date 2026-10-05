@@ -18,11 +18,11 @@ import {
   ProjectInvalidCredentialsError,
   ProjectMissingCredentialsError,
 } from "../../errors.ts";
+import type { RestCaller } from "../../hosting/api-door.ts";
+import { SessionReader } from "../../hosting/session-reader.ts";
 import { BrowserSessionIdentity } from "../browser-session.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
-import { SessionReader } from "../../hosting/session-reader.ts";
-import type { RestCaller } from "../../hosting/api-door.ts";
 
 const VERSION = "2026-09-08";
 const KEY = "Bearer the-key";

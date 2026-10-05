@@ -90,8 +90,7 @@ export function EventSourcingLayout({
  * seeing it. Zero IS shown on the Dead Letters page itself (ops-dashboard.md).
  */
 function DeadLetterBadge() {
-  const counts = api.ops.listDeadLetterCounts.useQuery(undefined, {
-  });
+  const counts = api.ops.listDeadLetterCounts.useQuery(undefined, {});
   const total = (counts.data ?? []).reduce((sum, row) => sum + row.count, 0);
   if (total === 0) return null;
   return (

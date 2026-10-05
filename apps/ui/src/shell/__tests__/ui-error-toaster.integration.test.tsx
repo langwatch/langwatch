@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
+import { UiErrorToaster } from "@langwatch/browser/error-toaster";
 /**
  * The application's error toast: the close button every toast carries, plus
  * the docs page and error id a failure gets through `renderMeta`.
@@ -8,7 +9,6 @@ import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { toaster } from "@langwatch/design-system/toaster";
-import { UiErrorToaster } from "@langwatch/browser/error-toaster";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

@@ -4,8 +4,8 @@
  * surfaces evaluator, langy and trace mount today.
  */
 
-import { modelProviderTrpc } from "@langwatch/model-provider-contract";
 import { defineBrowserModule } from "@langwatch/browser";
+import { modelProviderTrpc } from "@langwatch/model-provider-contract";
 
 import { modelProviderApi } from "./behavior/model-provider-api.ts";
 import { reportModelFailure } from "./ui/sections/model-failure-interceptor/index.ts";

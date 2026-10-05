@@ -1,7 +1,11 @@
 import { defineProcessModule } from "@langwatch/process";
 import type { Cluster, Redis } from "ioredis";
 
-import { PresenceModule, type PresenceBroadcast, type PresenceEmitter } from "./app/presence.app.ts";
+import {
+  PresenceModule,
+  type PresenceBroadcast,
+  type PresenceEmitter,
+} from "./app/presence.app.ts";
 import { presenceRepositories } from "./repositories/presence-repositories.registry.ts";
 import { RedisBroadcastRepository } from "./repositories/redis/redis.broadcast.repository.ts";
 import { BroadcastTenantRateLimiterService } from "./services/broadcast-tenant-rate-limiter.service.ts";

@@ -1,10 +1,10 @@
+import { isInternalSecretValid } from "../access-policy.ts";
 import {
   SurfaceBlankSecretError,
   SurfaceUnconfiguredError,
   SurfaceUnverifiedError,
 } from "../errors.ts";
 import type { RestCaller, RestIdentity } from "../hosting/api-door.ts";
-import { isInternalSecretValid } from "../access-policy.ts";
 
 export class BearerIdentity implements RestIdentity {
   readonly #name: string;

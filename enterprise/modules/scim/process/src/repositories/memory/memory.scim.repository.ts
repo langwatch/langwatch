@@ -270,7 +270,10 @@ export class MemoryScimRepository extends ScimRepository {
     this.memberships.splice(index, 1);
   };
 
-  async findDirectoryGroupIds(input: { organizationId: string; userId: string }): Promise<string[]> {
+  async findDirectoryGroupIds(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]> {
     return this.groups
       .filter((group) => group.organizationId === input.organizationId && group.scimSource !== null)
       .map((group) => group.id)

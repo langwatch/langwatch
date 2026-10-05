@@ -1,7 +1,4 @@
-export {
-  analyticsProcessModule,
-  createAnalyticsComparisonWindow,
-} from "./analytics.module.ts";
+export { analyticsProcessModule, createAnalyticsComparisonWindow } from "./analytics.module.ts";
 
 /** The transport declarations a process mounts, and the doors they open on. */
 export {

@@ -373,7 +373,10 @@ export class PrismaScimRepository extends ScimRepository {
       where: { userId_organizationId: input },
     });
   };
-  async findDirectoryGroupIds(input: { organizationId: string; userId: string }): Promise<string[]> {
+  async findDirectoryGroupIds(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]> {
     const groups = await this.prisma.group.findMany({
       where: {
         organizationId: input.organizationId,

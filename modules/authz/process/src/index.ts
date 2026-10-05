@@ -7,7 +7,10 @@ export {
   type PostgresAuthzAdapterOptions,
   type PostgresAuthzBuild,
 } from "./app/authz-composition.build.ts";
-export type { AuthzGrantPipelineDatabase, PostgresAuthzPipelineOptions } from "./app/authz-composition.build.ts";
+export type {
+  AuthzGrantPipelineDatabase,
+  PostgresAuthzPipelineOptions,
+} from "./app/authz-composition.build.ts";
 export {
   AuthzCommandDispatcherService,
   type AuthzGrantsCommandSenders,

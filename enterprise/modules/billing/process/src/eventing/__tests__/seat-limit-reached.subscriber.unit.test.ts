@@ -29,7 +29,12 @@ describe("billing's seat-limit-reached subscriber", () => {
         max: 5,
         occurredAt: Date.UTC(2026, 8, 28, 12),
       }),
-      { tenantId: createTenantId("org_acme"), aggregateId: "org_acme", occurredAt: 1_000, eventId: "evt_1" },
+      {
+        tenantId: createTenantId("org_acme"),
+        aggregateId: "org_acme",
+        occurredAt: 1_000,
+        eventId: "evt_1",
+      },
     );
 
     expect(subscriber.eventType).toBe(SEAT_LIMIT_REACHED_EVENT_TYPE);

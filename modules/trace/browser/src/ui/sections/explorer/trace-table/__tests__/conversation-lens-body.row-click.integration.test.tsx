@@ -8,11 +8,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
-import { getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
+import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import "@testing-library/jest-dom/vitest";
 
-import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import { setTraceTableScrollElement } from "../../../../../behavior/explorer/trace-table/scroll-context.ts";
+import { getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { type LensConfig } from "../../../../../behavior/view.slice.ts";
 import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload.ts";
 import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload.ts";

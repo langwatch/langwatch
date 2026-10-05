@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { anyAuthenticated } from "../../access/access.ts";
 import { OrganizationInvalidCredentialsError } from "../../errors.ts";
+import type { RestAuditRow } from "../../hosting/api-door.ts";
 import { redactAuditArgs } from "../../trpc/audit.ts";
 import { MANAGEMENT_API_VERSION } from "../addressing.ts";
 import { BearerIdentity } from "../bearer-identity.ts";
@@ -11,7 +12,6 @@ import { CliTokenIdentity, type CliTokenPresented } from "../cli-token-identity.
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
 import { bindRestCredential } from "../request.ts";
-import type { RestAuditRow } from "../../hosting/api-door.ts";
 
 const NOW = Date.parse("2026-09-25T12:00:00Z");
 

@@ -1,8 +1,5 @@
 import { newAuthzGrantId } from "@langwatch/authz-contract";
-import {
-  AuthzCommandDispatcherService,
-  PostgresAuthzAdapter,
-} from "@langwatch/authz-process";
+import { AuthzCommandDispatcherService, PostgresAuthzAdapter } from "@langwatch/authz-process";
 import {
   createEventingGroupQueueFactory,
   EventSourcing,

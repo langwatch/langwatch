@@ -29,6 +29,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z, ZodIssue, ZodSchema } from "zod";
 
 import { RESOLVED_ERROR, type ResolvedError } from "../errors.ts";
+import type { RestIdentity } from "../hosting/api-door.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
 import type { RestDoorCredential } from "./declaration.ts";
@@ -40,7 +41,6 @@ import {
   type Declined,
   type ServiceContext,
 } from "./response.ts";
-import type { RestIdentity } from "../hosting/api-door.ts";
 
 // Validation: install the hook so failures reach the route's onError (ADR-045).
 

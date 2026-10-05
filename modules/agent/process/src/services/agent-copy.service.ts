@@ -147,7 +147,10 @@ export class AgentCopyService {
 
   async syncFromSource(input: AgentReferenceInput): Promise<AgentSyncFromSource> {
     const source = await this.getSourceOfCopy(input);
-    const current = await this.#repository.getById({ id: input.agentId, projectId: input.projectId });
+    const current = await this.#repository.getById({
+      id: input.agentId,
+      projectId: input.projectId,
+    });
     await this.#repository.updateNameAndConfig({
       id: input.agentId,
       projectId: input.projectId,

@@ -10,10 +10,10 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { createErrorHandler } from "../../errors.ts";
+import { allRegisteredRoutes } from "../../route-registry.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
 import { assertEveryRouteDeclared, undeclaredRoutes } from "../security.ts";
-import { allRegisteredRoutes } from "../../route-registry.ts";
 
 const SecretApi = moduleApi<{ getById(input: { id: string }): Promise<{ id: string }> }>("secret");
 

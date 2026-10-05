@@ -237,4 +237,3 @@ function mount(overrides: Overrides) {
     fetch: () => hono.fetch(new Request(`http://api.test${USAGE_PATH}`)),
   };
 }
-

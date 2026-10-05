@@ -369,7 +369,11 @@ export class AutomationModule implements AutomationApi {
         repositories: setup.repositories,
         config: setup.config,
       });
-      automation.#settlement = AutomationModule.#composeSettlement(setup, infrastructure, automation);
+      automation.#settlement = AutomationModule.#composeSettlement(
+        setup,
+        infrastructure,
+        automation,
+      );
       automation.#reportDispatcher = createAutomationReportDispatcher({
         repositories: setup.repositories,
         projects: setup.dependencies.projects,

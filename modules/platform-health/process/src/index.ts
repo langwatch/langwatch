@@ -5,7 +5,12 @@ export type {
   SubsystemProbeOutcome,
   SubsystemProbeReason,
 } from "./services/subsystem-probe.service.ts";
-export type { SubsystemProbe, SubsystemProbeCredential, SubsystemProbeResult, SubsystemProbeRunner } from "./services/subsystem-probe-run.service.ts";
+export type {
+  SubsystemProbe,
+  SubsystemProbeCredential,
+  SubsystemProbeResult,
+  SubsystemProbeRunner,
+} from "./services/subsystem-probe-run.service.ts";
 export {
   platformHealthAuthorization,
   platformHealthRest,

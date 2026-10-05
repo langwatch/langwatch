@@ -34,10 +34,7 @@ import { credentialsSecret, Secret, sessionSecret } from "@langwatch/secrets";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
 import { installErrorHtml, installSuccessHtml } from "../rules/github-install-response.rules.ts";
 import { parsePullRequestEvent } from "../rules/github-pull-request-event.rules.ts";
-import type {
-  GithubWebhookDelivery,
-  GithubWebhookReceipt,
-} from "../rules/github-webhook.rules.ts";
+import type { GithubWebhookDelivery, GithubWebhookReceipt } from "../rules/github-webhook.rules.ts";
 import { GithubAppTokenService } from "../services/github-app-token.service.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
 import type { BranchMappingRequest } from "../services/github-branch-demand.service.ts";

@@ -1,4 +1,5 @@
 import { ProjectMissingCredentialsError } from "@langwatch/api";
+import type { RestIdentity } from "@langwatch/api/hosting";
 import { BearerIdentity, RestHost } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
@@ -14,7 +15,6 @@ import { describe, expect, it } from "vitest";
 
 import { storedObjectProcessModule } from "../../stored-object.module.ts";
 import { storedObjectFileRest } from "../stored-object-file.rest.ts";
-import type { RestIdentity } from "@langwatch/api/hosting";
 
 const PROJECT = "project_1";
 const OBJECT_ID = "so_absent";

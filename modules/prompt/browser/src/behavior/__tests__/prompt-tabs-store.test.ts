@@ -458,7 +458,9 @@ describe("DraggableTabsBrowserStore", () => {
             currentValues: {
               configId: "prompt-1",
               handle: "greeter",
-              version: { configData: { messages: [{ role: "system", content: "system-said-this" }] } },
+              version: {
+                configData: { messages: [{ role: "system", content: "system-said-this" }] },
+              },
             },
           },
           meta: { title: "greeter", versionNumber: 3, scope: "PROJECT" },
@@ -591,7 +593,9 @@ describe("DraggableTabsBrowserStore", () => {
       store.getState().addTab({
         data: createTabData({ form: { currentValues: { configId: "prompt-1" } } }),
       });
-      expect(localStorage.getItem(`${TEST_PROJECT_ID}:draggable-tabs-browser-store`)).not.toBeNull();
+      expect(
+        localStorage.getItem(`${TEST_PROJECT_ID}:draggable-tabs-browser-store`),
+      ).not.toBeNull();
 
       store.getState().reset();
 

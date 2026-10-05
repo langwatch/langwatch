@@ -4,10 +4,10 @@ import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useDismissTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
+import { useDismissTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../model/explorer/onboarding/spotlights/spotlights.ts";
 import { LensNamePopover } from "../../../elements/explorer/toolbar/lens-name-popover.tsx";
 import { useIsNewAccount } from "../hooks/use-is-new-account.ts";

@@ -48,7 +48,9 @@ function makeRepository(name: string, isSystemManaged = false): ApiKeyRepository
       .fn<ApiKeyRepository["findByIdInOrganization"]>()
       .mockResolvedValue(row),
     update: vi.fn<ApiKeyRepository["update"]>().mockResolvedValue(row),
-    revoke: vi.fn<ApiKeyRepository["revoke"]>().mockResolvedValue({ ...row, revokedAt: new Date() }),
+    revoke: vi
+      .fn<ApiKeyRepository["revoke"]>()
+      .mockResolvedValue({ ...row, revokedAt: new Date() }),
   });
 }
 

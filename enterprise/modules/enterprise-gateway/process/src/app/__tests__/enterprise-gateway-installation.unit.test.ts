@@ -36,10 +36,9 @@ function boot() {
 describe("enterprise gateway installation", () => {
   /** @scenario "The enterprise gateway serves routing policies and personal virtual keys" */
   it("serves routingPolicy and personalVirtualKeys", () => {
-    expect(enterpriseGatewayProcessModule.transports.map((transport) => transport.namespace)).toEqual([
-      "routingPolicy",
-      "personalVirtualKeys",
-    ]);
+    expect(
+      enterpriseGatewayProcessModule.transports.map((transport) => transport.namespace),
+    ).toEqual(["routingPolicy", "personalVirtualKeys"]);
   });
 
   /** @scenario "The enterprise gateway boots over memory stores and answers from its own routing policies" */

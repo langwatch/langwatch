@@ -59,8 +59,8 @@ vi.mock("../../../../errors/index.ts", () => ({
   showErrorToast: (...args: unknown[]) => showErrorToast(...args),
 }));
 
-import { useAnnotationSessionStore } from "../../../../../../behavior/annotation-session.store.ts";
 import { openTraceDrawerAt } from "../../../../../../__tests__/window-location-router.ts";
+import { useAnnotationSessionStore } from "../../../../../../behavior/annotation-session.store.ts";
 import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
 import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
 import { EditModeBar } from "../edit-mode-bar.tsx";

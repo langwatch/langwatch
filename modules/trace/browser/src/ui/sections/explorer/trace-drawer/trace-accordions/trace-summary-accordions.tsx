@@ -12,9 +12,9 @@ import {
 import { type ReactNode, useMemo, useRef } from "react";
 import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
 
-import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
+import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { rankedErrorSpans } from "../../../../../model/explorer/error-spans.ts";
 import { countFlatLeaves } from "../../../../../model/explorer/trace-drawer/trace-accordions/utils.ts";

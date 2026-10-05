@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { AuthzAccessBinding } from "@langwatch/authz-contract";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GrantsFake, listedGrant } from "../../__tests__/support/grants-fake.ts";
 import { type DesiredScimGrant, ScimGrantsService } from "../scim-grants.service.ts";

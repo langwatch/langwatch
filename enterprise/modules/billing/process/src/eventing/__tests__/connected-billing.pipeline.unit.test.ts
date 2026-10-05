@@ -41,7 +41,9 @@ function wakeAt({ at, lastTickAt }: { at: number; lastTickAt: number | null }) {
 
 describe("given the connected billing tick's eventing declaration", () => {
   it("carries the daily tick onto the installable module", () => {
-    expect(billingProcessModule.eventing?.pipeline.split(", ")).toContain(CONNECTED_BILLING_PIPELINE_NAME);
+    expect(billingProcessModule.eventing?.pipeline.split(", ")).toContain(
+      CONNECTED_BILLING_PIPELINE_NAME,
+    );
     expect(connectedBillingEventing.pipeline).toBe(CONNECTED_BILLING_PIPELINE_NAME);
   });
 

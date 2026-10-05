@@ -4,6 +4,7 @@
  */
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AnnotationApi, AnnotationQueueDetail } from "@langwatch/annotation-contract";
+import { SessionReader } from "@langwatch/api/hosting";
 import { TrpcHost } from "@langwatch/api/trpc";
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { Dataset, DatasetApi } from "@langwatch/dataset-contract";
@@ -22,7 +23,6 @@ import { describe, expect, it } from "vitest";
 
 import { auditLogProcessModule } from "../../audit-log.module.ts";
 import { homeTrpcTransport } from "../home.trpc.ts";
-import { SessionReader } from "@langwatch/api/hosting";
 
 const ACTOR = { id: "user-1" };
 const PROJECT_ID = "project_1";

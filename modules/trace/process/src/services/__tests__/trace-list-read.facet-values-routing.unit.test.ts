@@ -61,12 +61,14 @@ describe("TraceListService facet-value routing", () => {
     it("rejects keys outside the attribute-key whitelist", async () => {
       const { repository, service } = makeService();
 
-      await expect(service.getFacetValues(params("event.attribute.bad'key"))).rejects.toMatchObject({
-        code: "validation_error",
-        reasons: [
-          expect.objectContaining({ message: expect.stringMatching(/Invalid attribute key/) }),
-        ],
-      });
+      await expect(service.getFacetValues(params("event.attribute.bad'key"))).rejects.toMatchObject(
+        {
+          code: "validation_error",
+          reasons: [
+            expect.objectContaining({ message: expect.stringMatching(/Invalid attribute key/) }),
+          ],
+        },
+      );
       expect(repository.findEventAttributeValues).not.toHaveBeenCalled();
     });
   });

@@ -174,7 +174,12 @@ export class EntitlementModule implements EntitlementApiContract {
     this.#requestBoundOverrides = config.requestBounds ?? {};
   }
 
-  static create({ repositories, members, dependencies, config }: EntitlementSetup): EntitlementModule {
+  static create({
+    repositories,
+    members,
+    dependencies,
+    config,
+  }: EntitlementSetup): EntitlementModule {
     const infrastructure = buildEntitlementInfrastructure({
       logger: members.logger,
       isSaas: members.isSaas,

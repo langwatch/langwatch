@@ -365,7 +365,8 @@ function memoryHolderFixture(): HolderFixture {
     outsider: async () => id("user"),
     team: async (memberIds) => {
       const teamId = id("team");
-      for (const userId of memberIds) memory.teamMemberships.push({ organizationId, teamId, userId });
+      for (const userId of memberIds)
+        memory.teamMemberships.push({ organizationId, teamId, userId });
       return teamId;
     },
     grant: async ({ principal, roleKey, revoked = false }) => {
@@ -473,59 +474,76 @@ describe.each(holderBackends)("given a role's holders on the $name backend", (ba
       .map((principal) => `${principal.type}:${principal.id}`)
       .toSorted();
 
-  describe.skipIf(backend.skip)("when the role is granted directly, to a group and to a team", () => {
-    it("reads each live principal of that role, and none revoked or of another role", async () => {
-      const fixture = await open();
-      const { member, team, grant } = fixture;
-      const ada = await member();
-      const teamId = await team([ada]);
-      await grant({ principal: { type: "user", id: ada }, roleKey: "custom:role_r" });
-      await grant({ principal: { type: "group", id: "group_eng" }, roleKey: "custom:role_r" });
-      await grant({ principal: { type: "team", id: teamId }, roleKey: "custom:role_r" });
-      await grant({ principal: { type: "apiKey", id: "key_1" }, roleKey: "custom:role_r" });
-      await grant({ principal: { type: "user", id: "user_gone" }, roleKey: "custom:role_r", revoked: true });
-      await grant({ principal: { type: "user", id: "user_other" }, roleKey: "custom:role_r2" });
+  describe.skipIf(backend.skip)(
+    "when the role is granted directly, to a group and to a team",
+    () => {
+      it("reads each live principal of that role, and none revoked or of another role", async () => {
+        const fixture = await open();
+        const { member, team, grant } = fixture;
+        const ada = await member();
+        const teamId = await team([ada]);
+        await grant({ principal: { type: "user", id: ada }, roleKey: "custom:role_r" });
+        await grant({ principal: { type: "group", id: "group_eng" }, roleKey: "custom:role_r" });
+        await grant({ principal: { type: "team", id: teamId }, roleKey: "custom:role_r" });
+        await grant({ principal: { type: "apiKey", id: "key_1" }, roleKey: "custom:role_r" });
+        await grant({
+          principal: { type: "user", id: "user_gone" },
+          roleKey: "custom:role_r",
+          revoked: true,
+        });
+        await grant({ principal: { type: "user", id: "user_other" }, roleKey: "custom:role_r2" });
 
-      await expect(holdersOf(fixture, { roleId: "role_r" })).resolves.toEqual(
-        ["apiKey:key_1", "group:group_eng", `team:${teamId}`, `user:${ada}`].toSorted(),
-      );
-    });
+        await expect(holdersOf(fixture, { roleId: "role_r" })).resolves.toEqual(
+          ["apiKey:key_1", "group:group_eng", `team:${teamId}`, `user:${ada}`].toSorted(),
+        );
+      });
 
-    it("reads a principal granted the role more than once only once", async () => {
-      const fixture = await open();
-      const ada = await fixture.member();
-      await fixture.grant({ principal: { type: "user", id: ada }, roleKey: "custom:role_r" });
-      await fixture.grant({ principal: { type: "user", id: ada }, roleKey: "custom:role_r" });
+      it("reads a principal granted the role more than once only once", async () => {
+        const fixture = await open();
+        const ada = await fixture.member();
+        await fixture.grant({ principal: { type: "user", id: ada }, roleKey: "custom:role_r" });
+        await fixture.grant({ principal: { type: "user", id: ada }, roleKey: "custom:role_r" });
 
-      await expect(holdersOf(fixture, { roleId: "role_r" })).resolves.toEqual([`user:${ada}`]);
-    });
+        await expect(holdersOf(fixture, { roleId: "role_r" })).resolves.toEqual([`user:${ada}`]);
+      });
 
-    it("counts the limit in distinct principals, not grant rows", async () => {
-      const fixture = await open();
-      for (const userId of ["user_a", "user_a", "user_a", "user_b", "user_c"]) {
-        await fixture.grant({ principal: { type: "user", id: userId }, roleKey: "custom:role_r" });
-      }
+      it("counts the limit in distinct principals, not grant rows", async () => {
+        const fixture = await open();
+        for (const userId of ["user_a", "user_a", "user_a", "user_b", "user_c"]) {
+          await fixture.grant({
+            principal: { type: "user", id: userId },
+            roleKey: "custom:role_r",
+          });
+        }
 
-      const capped = await holdersOf(fixture, { roleId: "role_r", limit: 2 });
+        const capped = await holdersOf(fixture, { roleId: "role_r", limit: 2 });
 
-      expect(capped).toHaveLength(2);
-      expect(new Set(capped).size).toBe(2);
-      await expect(holdersOf(fixture, { roleId: "role_r", limit: 3 })).resolves.toEqual(["user:user_a", "user:user_b", "user:user_c"]);
-    });
-  });
+        expect(capped).toHaveLength(2);
+        expect(new Set(capped).size).toBe(2);
+        await expect(holdersOf(fixture, { roleId: "role_r", limit: 3 })).resolves.toEqual([
+          "user:user_a",
+          "user:user_b",
+          "user:user_c",
+        ]);
+      });
+    },
+  );
 
-  describe.skipIf(backend.skip)("when a team holds members and someone outside the organization", () => {
-    it("reads only the team's current organization members", async () => {
-      const { member, outsider, team, bindings, organizationId } = await open();
-      const ada = await member();
-      const bo = await member();
-      const stranger = await outsider();
-      const teamId = await team([ada, stranger]);
-      await team([bo]);
+  describe.skipIf(backend.skip)(
+    "when a team holds members and someone outside the organization",
+    () => {
+      it("reads only the team's current organization members", async () => {
+        const { member, outsider, team, bindings, organizationId } = await open();
+        const ada = await member();
+        const bo = await member();
+        const stranger = await outsider();
+        const teamId = await team([ada, stranger]);
+        await team([bo]);
 
-      await expect(bindings.findTeamMembers({ organizationId, teamIds: [teamId] })).resolves.toEqual([
-        { teamId, userId: ada },
-      ]);
-    });
-  });
+        await expect(
+          bindings.findTeamMembers({ organizationId, teamIds: [teamId] }),
+        ).resolves.toEqual([{ teamId, userId: ada }]);
+      });
+    },
+  );
 });

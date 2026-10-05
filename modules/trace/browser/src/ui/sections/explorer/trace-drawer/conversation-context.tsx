@@ -20,9 +20,9 @@ import {
 } from "react-icons/lu";
 
 import { getDrawerDensityTokens, useDensityStore } from "../../../../behavior/density.store.ts";
-import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { formatPreview } from "../../../../behavior/preview-formatter.ts";
 import { useDisplayRoleVisuals } from "../../../../behavior/scenario-role.store.tsx";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
 import type { ConversationTurn } from "../../../../model/explorer/conversation-turn.ts";
 import { RedactedInline } from "../../redacted-field.tsx";

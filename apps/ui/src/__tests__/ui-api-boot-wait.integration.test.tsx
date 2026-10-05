@@ -4,8 +4,8 @@
  * Spec: specs/ui/api-boot-wait.feature
  */
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createTRPCUntypedClient, type TRPCLink } from "@trpc/client";
 import { observable } from "@trpc/server/observable";
@@ -35,10 +35,10 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { useUiApiWait, UI_API_WAIT_HINT_AFTER_MS } from "@langwatch/browser-host/navigation";
 import type * as navigationModule from "@langwatch/browser-host/navigation";
-import type { UiScopeOrganization, UiScopeTeam } from "@langwatch/organization-contract";
 import { UiApiWaitingScreen, UI_API_DEV_COMMAND } from "@langwatch/browser/api-waiting-screen";
 import { createUiFeatureShell } from "@langwatch/browser/feature-shell";
 import type { UiFeatureApiTransport } from "@langwatch/browser/transport";
+import type { UiScopeOrganization, UiScopeTeam } from "@langwatch/organization-contract";
 
 import { loadUiRootCapabilities } from "../shell/ui-root-capabilities";
 

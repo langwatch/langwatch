@@ -84,7 +84,9 @@ describe("given modules that declare one-shot work", () => {
   describe("when a module declared something that is not a task", () => {
     /** @scenario "A module that declared something other than a task is named" */
     it("refuses, naming the module that declared it", async () => {
-      const wrong = defineProcessModule("dataset").withApi(DatasetModule).withTasks({ notATask: true });
+      const wrong = defineProcessModule("dataset")
+        .withApi(DatasetModule)
+        .withTasks({ notATask: true });
       const runtime = await createApp({ role: "tasks" }).withModules([wrong]).boot();
 
       expect(() => runtime.tasks(isNamedTask)).toThrowError(RoleContributionError);

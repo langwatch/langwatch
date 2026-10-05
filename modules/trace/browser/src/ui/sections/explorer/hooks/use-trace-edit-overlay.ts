@@ -1,8 +1,8 @@
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 
-import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { api } from "../../../../behavior/trace-api.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useTraceEditStore } from "../../../../behavior/trace-edit.store.ts";
 import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 

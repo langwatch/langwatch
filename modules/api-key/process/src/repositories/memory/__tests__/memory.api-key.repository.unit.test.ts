@@ -154,7 +154,9 @@ describe("given the memory API-key repository", () => {
       const minted = await keys.create(
         record({ name: WORKFLOW_RUN_API_KEY_NAME, expiresAt: past, isSystemManaged: true }),
       );
-      const customers = await keys.create(record({ name: WORKFLOW_RUN_API_KEY_NAME, expiresAt: past }));
+      const customers = await keys.create(
+        record({ name: WORKFLOW_RUN_API_KEY_NAME, expiresAt: past }),
+      );
 
       const swept = await keys.revokeExpiredByName({
         name: WORKFLOW_RUN_API_KEY_NAME,

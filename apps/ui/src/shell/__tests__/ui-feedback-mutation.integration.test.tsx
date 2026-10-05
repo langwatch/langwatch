@@ -10,9 +10,9 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { UiErrorToaster } from "@langwatch/browser/error-toaster";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { toaster } from "@langwatch/design-system/toaster";
-import { UiErrorToaster } from "@langwatch/browser/error-toaster";
 import { QueryClient, QueryClientProvider, useMutation } from "@tanstack/react-query";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";

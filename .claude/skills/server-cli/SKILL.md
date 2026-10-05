@@ -17,12 +17,12 @@ Entry: `apps/server/src/cli.ts` (commander). The published bin is `langwatch-ser
 
 ## Commands
 
-| Command | Does |
-| --- | --- |
-| `langwatch-server` or `start` (default) | installs missing predeps, scaffolds `.env`, starts every service, opens the browser |
-| `doctor` | reports which predeps and services are installed and the resolved ports; changes nothing |
-| `install` | installs predeps and services without starting anything |
-| `reset` | deletes `~/.langwatch` (binaries, data, env) so the next run is a clean install |
+| Command                                 | Does                                                                                     |
+| --------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `langwatch-server` or `start` (default) | installs missing predeps, scaffolds `.env`, starts every service, opens the browser      |
+| `doctor`                                | reports which predeps and services are installed and the resolved ports; changes nothing |
+| `install`                               | installs predeps and services without starting anything                                  |
+| `reset`                                 | deletes `~/.langwatch` (binaries, data, env) so the next run is a clean install          |
 
 `start` flags: `--port-base <n>` (first port slot, default 5560), `-y/--yes`,
 `--no-open`, `--dry-run` (print ports and paths, do nothing). Confirm any other flag with

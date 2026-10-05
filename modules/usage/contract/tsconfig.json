@@ -4,15 +4,11 @@
     "rootDir": "src",
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "lib": [
-      "es2023"
-    ],
+    "lib": ["es2023"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true
   },
-  "include": [
-    "src/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
   "references": [
     {
       "path": "tsconfig.build.json"

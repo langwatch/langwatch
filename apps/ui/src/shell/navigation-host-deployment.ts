@@ -4,8 +4,8 @@
  * a browser package decoding the shell's meta tag a fourth time.
  */
 
-import type { NavigationDeployment } from "@langwatch/navigation-browser/navigation";
 import { readPublicAppConfig } from "@langwatch/browser/public-config";
+import type { NavigationDeployment } from "@langwatch/navigation-browser/navigation";
 
 import { parseUiFeatureConfig } from "../ui-feature-config";
 

@@ -25,8 +25,6 @@ import {
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 
-import type { VizTab } from "../../../../model/trace-drawer-params.ts";
-import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useVizHeight } from "../../../../behavior/explorer/trace-drawer/use-viz-height.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 // PeerCursorOverlay used to wrap just the viz pane (scoped to the
@@ -38,6 +36,8 @@ import {
   selectPeersMatching,
   usePresenceStore,
 } from "../../../../behavior/presence/presence-store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import type { VizTab } from "../../../../model/trace-drawer-params.ts";
 import { SequenceSkeleton } from "../../../blocks/sequence/sequence-skeleton.tsx";
 import { TopologySkeleton } from "../../../blocks/sequence/topology-skeleton.tsx";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";

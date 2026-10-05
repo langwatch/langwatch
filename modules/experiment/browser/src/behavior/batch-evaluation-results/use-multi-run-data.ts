@@ -56,35 +56,35 @@ export const useMultiRunData = ({
   // and enable/disable based on whether we have that many runs
   const run0 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[0] ?? "" },
-    { enabled: enabled && !!runIds[0]},
+    { enabled: enabled && !!runIds[0] },
   );
   const run1 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[1] ?? "" },
-    { enabled: enabled && !!runIds[1]},
+    { enabled: enabled && !!runIds[1] },
   );
   const run2 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[2] ?? "" },
-    { enabled: enabled && !!runIds[2]},
+    { enabled: enabled && !!runIds[2] },
   );
   const run3 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[3] ?? "" },
-    { enabled: enabled && !!runIds[3]},
+    { enabled: enabled && !!runIds[3] },
   );
   const run4 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[4] ?? "" },
-    { enabled: enabled && !!runIds[4]},
+    { enabled: enabled && !!runIds[4] },
   );
   const run5 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[5] ?? "" },
-    { enabled: enabled && !!runIds[5]},
+    { enabled: enabled && !!runIds[5] },
   );
   const run6 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[6] ?? "" },
-    { enabled: enabled && !!runIds[6]},
+    { enabled: enabled && !!runIds[6] },
   );
   const run7 = experimentApi.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[7] ?? "" },
-    { enabled: enabled && !!runIds[7]},
+    { enabled: enabled && !!runIds[7] },
   );
 
   const runs: RunWithColor[] = useMemo(() => {

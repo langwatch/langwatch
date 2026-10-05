@@ -97,7 +97,9 @@ describe("given an address that names the trace drawer", () => {
       const { result } = mountOn(OPEN);
       expect(result.current.expectedSpanCount).toBe(42);
 
-      act(() => setWindowAddress({ url: `${PATH}?drawer.open=traceV2Details&drawer.traceId=trace-2` }));
+      act(() =>
+        setWindowAddress({ url: `${PATH}?drawer.open=traceV2Details&drawer.traceId=trace-2` }),
+      );
       expect(result.current.expectedSpanCount).toBeNull();
     });
   });

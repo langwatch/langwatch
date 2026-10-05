@@ -16,7 +16,8 @@ const HEADINGS: Record<TabId, { title: string; description: string }> = {
   },
   objects: {
     title: "Objects",
-    description: "What the stack has stored: search by key, filter by bucket, open one to preview it.",
+    description:
+      "What the stack has stored: search by key, filter by bucket, open one to preview it.",
   },
   requests: {
     title: "Requests",
@@ -52,25 +53,25 @@ export const StorageConsole = () => {
       }
     >
       <Section title={HEADINGS[tab].title} description={HEADINGS[tab].description}>
-      {tab === "buckets" ? (
-        <BucketsTab
-          buckets={buckets.data ?? []}
-          objects={objects.data ?? []}
-          onOpen={(name) => {
-            setBucket(name);
-            open("objects");
-          }}
-        />
-      ) : null}
-      {tab === "objects" ? (
-        <ObjectsTab
-          objects={objects.data ?? []}
-          buckets={bucketNames}
-          bucket={bucket}
-          onBucket={setBucket}
-        />
-      ) : null}
-      {tab === "requests" ? <RequestsTab requests={requests.data ?? []} /> : null}
+        {tab === "buckets" ? (
+          <BucketsTab
+            buckets={buckets.data ?? []}
+            objects={objects.data ?? []}
+            onOpen={(name) => {
+              setBucket(name);
+              open("objects");
+            }}
+          />
+        ) : null}
+        {tab === "objects" ? (
+          <ObjectsTab
+            objects={objects.data ?? []}
+            buckets={bucketNames}
+            bucket={bucket}
+            onBucket={setBucket}
+          />
+        ) : null}
+        {tab === "requests" ? <RequestsTab requests={requests.data ?? []} /> : null}
       </Section>
     </SimConsole>
   );

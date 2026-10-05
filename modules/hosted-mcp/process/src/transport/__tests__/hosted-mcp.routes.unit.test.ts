@@ -1,3 +1,4 @@
+import { getRoutePolicy } from "@langwatch/api";
 /**
  * @vitest-environment node
  */
@@ -13,7 +14,6 @@ import type {
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
-import { getRoutePolicy } from "@langwatch/api";
 
 class NoProjects implements Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey"> {
   resolveLiveProjectByApiKey(): Promise<McpLiveProjectLookup> {

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
-import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { api } from "../../../../behavior/trace-api.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { applyOverlayToSpanDetail } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
 import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay.ts";
 import { useTraceQueryArgs } from "./use-trace-query-args.ts";

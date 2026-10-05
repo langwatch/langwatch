@@ -2,10 +2,10 @@ import { HandledError } from "@langwatch/handled-error";
 
 import type { Authorize } from "../access/access.ts";
 import { SurfaceUnverifiedError } from "../errors.ts";
-import { recordBrowserCaller } from "./credential.ts";
-import type { SessionReader } from "../hosting/session-reader.ts";
 import type { RestCaller, RestIdentity } from "../hosting/api-door.ts";
+import type { SessionReader } from "../hosting/session-reader.ts";
 import { BrowserOriginGuard } from "../policy/browser-origin.ts";
+import { recordBrowserCaller } from "./credential.ts";
 
 export class BrowserOriginRefusedError extends HandledError {
   constructor() {

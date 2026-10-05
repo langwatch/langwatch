@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 
-import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { api } from "../../../../behavior/trace-api.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 /**

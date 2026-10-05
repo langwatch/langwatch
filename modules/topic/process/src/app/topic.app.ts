@@ -39,7 +39,12 @@ export interface TopicClusteringScheduleReader {
   findNextWakeAt(input: { projectId: string }): Promise<Instant | null>;
 }
 
-type TopicSetup = FeatureSetup<typeof TopicModule.dependencies, never, undefined, TopicRepositories>;
+type TopicSetup = FeatureSetup<
+  typeof TopicModule.dependencies,
+  never,
+  undefined,
+  TopicRepositories
+>;
 
 export class TopicModule implements TopicApi {
   static readonly contract = TopicApiToken;
