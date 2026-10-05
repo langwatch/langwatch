@@ -5,7 +5,9 @@ on:
     # ready_for_review is NOT a default activity type, and the two heaviest
     # jobs below skip on a draft. Without it, taking a PR out of draft fires
     # no event at all and they would never get their non-draft run.
-    types: [opened, synchronize, reopened, ready_for_review]
+    # `labeled` fires for every label; a run starts only for `ci:full`, which
+    # also lifts the draft gate. Any other label is skipped by the gates below.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths:
       - "charts/langwatch/**"
       - "charts/clickhouse-serverless/**"
@@ -77,14 +79,16 @@ on:
 
   workflow_dispatch:
     # Allow running kind e2e legs on demand against draft branches.
-    # Skipped on draft PRs by the if: conditions at ~line 226 and ~270.
+    # Skipped on draft PRs unless labelled `ci:full` (the `if:` of behavioral and e2e).
 # The e2e jobs here are the most expensive in the repo — `e2e: infra` runs to
 # 697s and `e2e: overlays` to 348s — and without a group every push to a chart
 # PR left its predecessors running to completion alongside it. Same rule as
 # langwatch-app-ci: supersede on a PR branch, never on main, because every
 # commit that lands on main has to keep its own validation.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # A label event for any label but `ci:full` gets its own group, so it neither
+  # cancels a running full run nor is cancelled by one.
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name != 'ci:full') && format('label-{0}', github.run_id) || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
@@ -103,6 +107,8 @@ jobs:
   # next four.
   render:
     name: "render + assertions"
+    # Skipped for a label event other than `ci:full`, like every job here.
+    if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -302,9 +308,12 @@ jobs:
   # every behavioral guarantee while CI stays green.
   behavioral:
     name: "behavioral (rendered-output assertions)"
-    # Skipped on a draft, like the e2e legs below. This workflow has no
-    # `changes` gate to read `heavy` from, so the draft check is inline.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # Skipped on a draft, like the e2e legs below, unless the PR is labelled
+    # `ci:full`. No `changes` gate to read `heavy` from, so the check is inline.
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false
+       || contains(github.event.pull_request.labels.*.name, 'ci:full'))
+      && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -352,7 +361,10 @@ jobs:
     # draft via detect-changes' `heavy` output; this one has no gate job to
     # read it from, which left it the last heavy thing running on a version
     # bump.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false
+       || contains(github.event.pull_request.labels.*.name, 'ci:full'))
+      && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
     runs-on: ubuntu-latest
     needs: render
     strategy:
