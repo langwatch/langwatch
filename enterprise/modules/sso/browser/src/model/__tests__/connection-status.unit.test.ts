@@ -10,6 +10,7 @@ import { connectionProtocolName, connectionStatusChipFor } from "../connection-s
  */
 describe("the connection status chip", () => {
   describe("given every state a connection can rest in", () => {
+    /** @scenario "Every state a connection can be in has customer words" */
     it("answers each one in words that are not the state's own name", () => {
       for (const state of SSO_CONNECTION_STATES) {
         const chip = connectionStatusChipFor({ state });
