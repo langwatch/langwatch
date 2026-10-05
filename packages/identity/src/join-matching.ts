@@ -1,4 +1,5 @@
 import { identifierDomain, normalizeIdentifierValue } from "./identifier";
+import type { JoinRequestOrigin } from "./join-request";
 
 /**
  * Which organizations will take an address (ADR-117, D12). One question, and
@@ -85,7 +86,7 @@ export function seatForJoiner({
   origin,
   joinerRole,
 }: {
-  origin: "web" | "cli";
+  origin: JoinRequestOrigin;
   joinerRole: JoinerRole;
 }): JoinerRole {
   return origin === "cli" ? "DEVELOPER" : joinerRole;
