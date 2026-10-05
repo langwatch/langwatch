@@ -10,7 +10,9 @@
  * - GET  /mcp          — Streamable HTTP polling
  * - DELETE /mcp        — Close session
  * - GET  /mcp/health   — Health check (no auth)
- * - GET  /sse          — SSE transport stream
+ * - GET  /sse          — SSE transport stream, for a GET with no mcp-session-id
+ * - POST /sse, DELETE /sse, and GET /sse with an mcp-session-id — Streamable
+ *   HTTP, served exactly as on /mcp, for clients given the /sse URL
  * - POST /messages, /sse/messages — SSE transport client messages
  * - GET  /.well-known/oauth-protected-resource[/mcp|/sse] — RFC 9728 metadata
  * - GET  /.well-known/oauth-authorization-server[/mcp|/sse] — OAuth metadata
@@ -1609,6 +1611,36 @@ export function createMcpHandler(): McpHandler {
     }
   }
 
+  /**
+   * Serves a Streamable HTTP request by method. /mcp is the transport's
+   * endpoint, and /sse routes here too, because a client given the /sse URL
+   * may speak only Streamable HTTP: Claude Desktop's connector posts
+   * initialize to the URL it was given, and a 405 there ends the connection.
+   */
+  async function handleStreamableHttp({
+    req,
+    res,
+    method,
+  }: {
+    req: IncomingMessage;
+    res: ServerResponse;
+    method: string;
+  }): Promise<void> {
+    switch (method) {
+      case "POST":
+        await handleMcpPost(req, res);
+        break;
+      case "GET":
+        await handleMcpGet(req, res);
+        break;
+      case "DELETE":
+        await handleMcpDelete(req, res);
+        break;
+      default:
+        sendJson(res, 405, { error: "Method not allowed" });
+    }
+  }
+
   // -------------------------------------------------------------------------
   // SSE transport handlers (ChatGPT, etc.)
   // -------------------------------------------------------------------------
@@ -1958,25 +1990,16 @@ export function createMcpHandler(): McpHandler {
           }
           break;
         case "/mcp":
-          switch (method) {
-            case "POST":
-              await handleMcpPost(req, res);
-              break;
-            case "GET":
-              await handleMcpGet(req, res);
-              break;
-            case "DELETE":
-              await handleMcpDelete(req, res);
-              break;
-            default:
-              sendJson(res, 405, { error: "Method not allowed" });
-          }
+          await handleStreamableHttp({ req, res, method });
           break;
         case "/sse":
-          if (method === "GET") {
+          // A GET with no session id is how the older SSE transport connects.
+          // Anything else here comes from a Streamable HTTP client that was
+          // given this URL, and is served exactly as /mcp serves it.
+          if (method === "GET" && !req.headers["mcp-session-id"]) {
             await handleSseConnect(req, res);
           } else {
-            sendJson(res, 405, { error: "Method not allowed" });
+            await handleStreamableHttp({ req, res, method });
           }
           break;
         case "/messages":

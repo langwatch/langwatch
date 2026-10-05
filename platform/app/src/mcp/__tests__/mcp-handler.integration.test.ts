@@ -9,6 +9,8 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   afterAll,
   afterEach,
@@ -302,6 +304,33 @@ async function sendRequest({
       return JSON.parse(rawBody);
     },
   };
+}
+
+/** The Accept header a Streamable HTTP client sends with every POST. */
+const STREAMABLE_ACCEPT = "application/json, text/event-stream";
+
+function baseUrlOf(server: Server): string {
+  const addr = server.address();
+  const port = typeof addr === "object" && addr ? addr.port : 0;
+  return `http://127.0.0.1:${port}`;
+}
+
+/**
+ * Reads a streamed body until `marker` appears or the stream ends, and
+ * returns the text read so far. An SSE stream never ends on its own, so the
+ * caller aborts the request once it has what it needs.
+ */
+async function readStreamUntil(res: Response, marker: string): Promise<string> {
+  const reader = res.body?.getReader();
+  if (!reader) return "";
+  const decoder = new TextDecoder();
+  let text = "";
+  while (!text.includes(marker)) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    text += decoder.decode(value, { stream: true });
+  }
+  return text;
 }
 
 // ---------------------------------------------------------------------------
@@ -1767,6 +1796,229 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       // Clean up the SSE connection
       abortController.abort();
+    });
+  });
+
+  // --- Streamable HTTP clients given the /sse URL ---
+  //
+  // The setup guide used to hand /sse to every remote client. A client that
+  // speaks only Streamable HTTP posts initialize to the URL it was given and
+  // has no older transport to fall back to, so /sse has to serve it exactly
+  // as /mcp does, while a GET with no session id still opens the older SSE
+  // transport.
+
+  describe("given a client was given the /sse URL", () => {
+    beforeEach(() => {
+      handler.clearRateLimiters();
+    });
+
+    describe("when it posts a Streamable HTTP initialize to /sse", () => {
+      /** @scenario A Streamable HTTP initialize posted to /sse is answered as it is on /mcp */
+      it("answers 200 with a session id and the initialize result /mcp returns", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+        const onMcp = await sendRequest({
+          server,
+          body: mcpInitializeBody(),
+          headers: { authorization: `Bearer ${VALID_API_KEY}` },
+        });
+        const onSse = await sendRequest({
+          server,
+          path: "/sse",
+          body: mcpInitializeBody(),
+          headers: {
+            authorization: `Bearer ${VALID_API_KEY}`,
+            accept: STREAMABLE_ACCEPT,
+          },
+        });
+
+        expect(onMcp.status).toBe(200);
+        expect(onSse.status).toBe(200);
+        expect(onSse.headers["mcp-session-id"]).toBeDefined();
+        expect(onSse.headers["access-control-allow-origin"]).toBe(
+          onMcp.headers["access-control-allow-origin"],
+        );
+        const sseResult = (onSse.json() as { result?: unknown }).result;
+        expect(sseResult).toBeDefined();
+        expect(sseResult).toEqual(
+          (onMcp.json() as { result?: unknown }).result,
+        );
+      });
+    });
+
+    describe("when it posts an initialize to /sse without credentials", () => {
+      /** @scenario An initialize posted to /sse without credentials is challenged as it is on /mcp */
+      it("answers 401 with the WWW-Authenticate challenge /mcp sends", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+        const onMcp = await sendRequest({ server, body: mcpInitializeBody() });
+        const onSse = await sendRequest({
+          server,
+          path: "/sse",
+          body: mcpInitializeBody(),
+          headers: { accept: STREAMABLE_ACCEPT },
+        });
+
+        expect(onMcp.status).toBe(401);
+        expect(onSse.status).toBe(401);
+        expect(onSse.headers["www-authenticate"]).toContain(
+          "/.well-known/oauth-protected-resource",
+        );
+        expect(onSse.headers["www-authenticate"]).toBe(
+          onMcp.headers["www-authenticate"],
+        );
+      });
+    });
+
+    describe("when it opens /sse with GET and no session id", () => {
+      /** @scenario Opening /sse with GET still starts the older SSE transport */
+      it("streams an endpoint event naming /messages with a session id first", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+        const abort = new AbortController();
+        try {
+          const res = await fetch(`${baseUrlOf(server)}/sse`, {
+            method: "GET",
+            headers: { authorization: `Bearer ${VALID_API_KEY}` },
+            signal: abort.signal,
+          });
+
+          expect(res.status).toBe(200);
+          expect(res.headers.get("content-type")).toContain(
+            "text/event-stream",
+          );
+          const streamed = await readStreamUntil(res, "\n\n");
+          expect(streamed).toMatch(
+            /^event: endpoint\ndata: \/messages\?sessionId=\S+\n\n/,
+          );
+        } finally {
+          abort.abort();
+        }
+      });
+    });
+
+    describe("when a session it opened on /sse reopens its stream with GET on /sse", () => {
+      /** @scenario A Streamable HTTP session opened on /sse reopens its stream on /sse */
+      it("serves that session's event stream and opens no SSE transport session", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+        const init = await sendRequest({
+          server,
+          path: "/sse",
+          body: mcpInitializeBody(),
+          headers: {
+            authorization: `Bearer ${VALID_API_KEY}`,
+            accept: STREAMABLE_ACCEPT,
+          },
+        });
+        expect(init.status).toBe(200);
+        const sessionId = init.headers["mcp-session-id"]!;
+        mockRedis.set.mockClear();
+
+        const abort = new AbortController();
+        try {
+          const res = await fetch(`${baseUrlOf(server)}/sse`, {
+            method: "GET",
+            headers: {
+              accept: "text/event-stream",
+              authorization: `Bearer ${VALID_API_KEY}`,
+              "mcp-session-id": sessionId,
+            },
+            signal: abort.signal,
+          });
+
+          // A served stream never ends on its own, so the body is left
+          // unread and torn down by the abort below.
+          expect(res.status).toBe(200);
+          expect(res.headers.get("content-type")).toContain(
+            "text/event-stream",
+          );
+          expect(res.headers.get("mcp-session-id")).toBe(sessionId);
+        } finally {
+          abort.abort();
+        }
+
+        // The older transport records its session before it answers, so a
+        // GET routed there would already have written this key.
+        const sseSessionKeys = mockRedis.set.mock.calls
+          .map(([key]) => String(key))
+          .filter((key) => key.startsWith("mcp:sse:session:"));
+        expect(sseSessionKeys).toEqual([]);
+      });
+    });
+
+    describe("when a session it opened on /sse is closed with DELETE on /sse", () => {
+      /** @scenario A Streamable HTTP session opened on /sse is closed with DELETE on /sse */
+      it("closes the session, so a later request is refused as expired", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+        const init = await sendRequest({
+          server,
+          path: "/sse",
+          body: mcpInitializeBody(),
+          headers: {
+            authorization: `Bearer ${VALID_API_KEY}`,
+            accept: STREAMABLE_ACCEPT,
+          },
+        });
+        expect(init.status).toBe(200);
+        const sessionHeaders = {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": init.headers["mcp-session-id"]!,
+        };
+
+        const closed = await sendRequest({
+          server,
+          method: "DELETE",
+          path: "/sse",
+          headers: sessionHeaders,
+        });
+        expect(closed.status).toBe(200);
+        expect(closed.json()).toEqual({ status: "session closed" });
+
+        const later = await sendRequest({
+          server,
+          path: "/sse",
+          body: { jsonrpc: "2.0", id: 2, method: "tools/list" },
+          headers: { ...sessionHeaders, accept: STREAMABLE_ACCEPT },
+        });
+        expect(later.status).toBe(401);
+        expect(later.json()).toEqual({ error: "Session expired or not found" });
+      });
+    });
+
+    describe("when a Streamable HTTP MCP client is configured with the /sse URL", () => {
+      /** @scenario A Streamable HTTP client given the /sse URL connects and lists the tools */
+      it("connects and lists the LangWatch tools", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+        const transport = new StreamableHTTPClientTransport(
+          new URL(`${baseUrlOf(server)}/sse`),
+          {
+            requestInit: {
+              headers: { authorization: `Bearer ${VALID_API_KEY}` },
+            },
+          },
+        );
+        const client = new Client({
+          name: "streamable-client-given-sse",
+          version: "1.0.0",
+        });
+
+        try {
+          await client.connect(transport);
+          const { tools } = await client.listTools();
+          const toolNames = tools.map((tool) => tool.name);
+
+          expect(toolNames).toContain("search_traces");
+          expect(toolNames).toContain("fetch_langwatch_docs");
+
+          // Before close: close aborts the signal the DELETE is sent with.
+          await transport.terminateSession();
+        } finally {
+          await client.close();
+        }
+      });
     });
   });
 });
