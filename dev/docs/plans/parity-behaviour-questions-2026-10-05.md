@@ -160,3 +160,13 @@ Date: 2026-10-05. Branch: feat/strict-feature-layout-v0. Each row stays unbound 
 | An endpoint's middleware array cannot displace its declared check; a registered policy that promises an unenforced permission fails the build | no endpoint middleware array, no policy-versus-config check: stale                                 |
 | Every route still admits the roles that could already reach it; one refusal renders one body whichever half answers it                        | the per-route registry audit and the security middleware no longer exist: stale                    |
 | The signed-out tRPC surface keys on the resolved address                                                                                      | only the host's resolved address is tested; the throttle and its wiring together are not (unbound) |
+
+## Authz
+
+| Scenario                                                                                                   | Product does                                                                                                             |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| org-access-cluster: one row per holder; identical grants summarised; the scope filter carries real numbers | one row per grant, no gathering, no summary, no counts (implement, or @unimplemented?)                                   |
+| Reading the assignments does not depend on a second answer                                                 | a failed read says only "Couldn't load who has access." with no trace to quote                                           |
+| A scope is named in full ("Team Platform")                                                                 | renders "Team · Platform" (bound on intent)                                                                              |
+| credential-arbitration (48, 60, 67, 76, 91)                                                                | the dual-auth byte-endpoint middleware is gone; only arbitrateClaims' own unit test calls it (build, or @unimplemented?) |
+| A process with no dispatch composes no AuthZ service                                                       | authz boots with no eventing and names no missing Group Queue                                                            |
