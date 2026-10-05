@@ -1,9 +1,8 @@
 /**
  * `OrganizationInvitationsService` maps `InviteService`'s method names onto
- * the port the door reads; the app still refuses a role it composed none for.
+ * the port the door reads.
  * @see specs/organizations/organization-members-rest-api.feature
  */
-import type { AuthzApi } from "@langwatch/authz-contract";
 import { InviteNotFoundError, type OrganizationInvite } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
@@ -30,8 +29,6 @@ import { OrganizationInvitationsService } from "../../services/organization-invi
 import type { OrganizationLifecycleNoticeService } from "../../services/organization-lifecycle-notice.service.ts";
 import type { OrganizationSignals } from "../../services/organization-signals.service.ts";
 import { SeatLimitNoticeService } from "../../services/seat-limit-notice.service.ts";
-import { type ServerOrganizationAppDependencies } from "../organization.app.ts";
-import { organizationAppForTesting } from "./support/organization-app-for-testing.ts";
 
 const ORGANIZATION_ID = "org-1";
 const BASE_HOST = "https://app.langwatch.test";
@@ -333,32 +330,6 @@ describe("given a batch naming only teams the organization has", () => {
 
       expect(created.invites).toHaveLength(1);
       expect(created.invites[0]!.invite.email).toBe("good@acme.test");
-    });
-  });
-});
-
-describe("given a deployment that composed no invitation service", () => {
-  describe("when an admin asks to create invitations", () => {
-    /**
-     * @scenario "A deployment with no invitation service refuses by name"
-     * @scenario "A capability the deployment does not hold refuses by name"
-     */
-    it("refuses with the named capability error rather than crashing", async () => {
-      const app = organizationAppForTesting({
-        dependencies: {
-          organizations: createApiFixture<ServerOrganizationAppDependencies["organizations"]>(),
-          membership: createApiFixture<ServerOrganizationAppDependencies["membership"]>(),
-          projects: createApiFixture<ServerOrganizationAppDependencies["projects"]>(),
-          permissions: createApiFixture<AuthzApi>({}),
-        },
-      });
-
-      await expect(
-        app.createInvitations(
-          { organizationId: ORGANIZATION_ID, validation: "strict", invites: [] },
-          { id: "user-1" },
-        ),
-      ).rejects.toMatchObject({ code: "service_unavailable" });
     });
   });
 });

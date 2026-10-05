@@ -13,18 +13,11 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { organizationAppForTesting } from "../../app/__tests__/support/organization-app-for-testing.ts";
-import { MemoryGroupRepository } from "../../repositories/memory/memory.group.repository.ts";
-import { MemoryOrganizationMembershipRepository } from "../../repositories/memory/memory.organization-membership.repository.ts";
-import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
-import { MemoryOrganizationRepository } from "../../repositories/memory/memory.organization.repository.ts";
-import { MemoryTeamRepository } from "../../repositories/memory/memory.team.repository.ts";
-import { GroupIdentityService } from "../../services/group-identity.service.ts";
-import { OrganizationMembershipService } from "../../services/organization-membership.service.ts";
-import type { OrganizationPromptSeed } from "../../services/organization-prompt-seed.service.ts";
-import { OrganizationService } from "../../services/organization.service.ts";
-import { PersonalWorkspaceIdentityService } from "../../services/personal-workspace-identity.service.ts";
-import { TeamIdentityService } from "../../services/team-identity.service.ts";
+import {
+  organizationModuleSetup,
+  type OrganizationModuleSetup,
+} from "../../app/__tests__/support/organization-module-setup.ts";
+import { OrganizationModule } from "../../app/organization.app.ts";
 import { organizationsProvisioningRest } from "../organizations.rest.ts";
 import { TestAuthzApi } from "./support/test-authz-api.ts";
 
@@ -37,47 +30,13 @@ const onError = createCanonicalFamilyErrorHandler({
 });
 
 /**
- * The application as `OrganizationModule` is wired at boot, over empty in-memory
- * repositories. `failKeys` makes the bootstrap key's creation refuse, `n` times.
+ * The application `OrganizationModule.create` builds over the empty memory tier of its own
+ * registry. `failKeys` makes the bootstrap key's creation refuse, `n` times.
  */
-function application({ failKeys = 0 }: { failKeys?: number } = {}) {
+async function application({ failKeys = 0 }: { failKeys?: number } = {}) {
   const keyRequests: unknown[] = [];
-  const memory = MemoryOrganizationDatabase.create();
   const permissions = TestAuthzApi.create({ people: [] });
   let keyFailuresLeft = failKeys;
-
-  const prompts: OrganizationPromptSeed = {
-    seedTagsForOrganization: async () => {},
-    reportCompensationFailure: () => {},
-  };
-
-  const organizations = OrganizationService.create({
-    repository: MemoryOrganizationRepository.create({ memory }),
-    teams: MemoryTeamRepository.create({ memory }),
-    groups: MemoryGroupRepository.create({ memory }),
-    identities: PersonalWorkspaceIdentityService.create(),
-    teamIdentities: TeamIdentityService.create(),
-    groupIdentities: GroupIdentityService.create(),
-    authz: permissions,
-    grants: permissions,
-  });
-
-  const membership = OrganizationMembershipService.create({
-    repository: MemoryOrganizationMembershipRepository.create({ memory }),
-    prompts,
-    seats: {
-      checkLimit: () => Promise.reject(new Error("seat limits are not reached")),
-      assertRoleChangeAllowed: () => Promise.reject(new Error("seat limits are not reached")),
-    },
-    sessions: { revokeAllBrowserSessions: async () => {} },
-    grantCache: { invalidateOrganization: async () => {} },
-    testArrivals: { standingFor: async () => ({ testing: false }) as const },
-    ceiling: { assertWithinCaller: async () => {} },
-    admissions: {
-      attachBindings: () => Promise.reject(new Error("no admission expected")),
-      completeAdmission: () => Promise.reject(new Error("no admission expected")),
-    },
-  });
 
   const apiKeys = createApiFixture<ApiKeyApi>(
     {
@@ -93,21 +52,23 @@ function application({ failKeys = 0 }: { failKeys?: number } = {}) {
     "ApiKeyApi",
   );
 
-  const app = organizationAppForTesting({
-    dependencies: {
-      organizations,
-      membership,
-      projects: createApiFixture({}, "ProjectApi"),
-      permissions,
-      apiKeys,
-    },
-  });
+  const setup = organizationModuleSetup({ permissions, apiKeys });
+  const app = await OrganizationModule.create(setup);
 
-  return { app, memory, keyRequests };
+  return { app, repositories: setup.repositories, permissions, keyRequests };
+}
+
+/** The slugs of every organization the registry holds. */
+async function storedSlugs(
+  repositories: OrganizationModuleSetup["repositories"],
+  permissions: TestAuthzApi,
+): Promise<string[]> {
+  const summaries = await repositories.membership(permissions).findAllProvisioningSummaries();
+  return summaries.map((summary) => summary.slug);
 }
 
 /** The family mounted as the instance administrator's own door: a key, and no tenant. */
-function mountProvisioning(app: ReturnType<typeof application>["app"]) {
+function mountProvisioning(app: OrganizationModule) {
   const runtime = createRestRuntime({
     identity: {
       identify: ({ request }) => {
@@ -157,7 +118,7 @@ describe("given an instance administrator and an instance with no organizations"
   describe("when an organization is created with a slug outside the documented shape", () => {
     /** @scenario "A slug outside the documented shape is refused" */
     it("refuses with 422 and creates no organization", async () => {
-      const { app, memory } = application();
+      const { app, repositories, permissions } = await application();
       const { send } = mountProvisioning(app);
 
       const response = await send("/api/organizations", {
@@ -166,14 +127,14 @@ describe("given an instance administrator and an instance with no organizations"
       });
 
       expect(response.status).toBe(422);
-      expect(memory.organizations.size).toBe(0);
+      expect(await storedSlugs(repositories, permissions)).toEqual([]);
     });
   });
 
   describe("when an organization is created with a name and a slug", () => {
     /** @scenario "An instance administrator creates an organization with a bootstrap key" */
     it("answers 201 with its id, name, slug and an admin key whose binding is the new organization", async () => {
-      const { app, keyRequests } = application();
+      const { app, keyRequests } = await application();
       const { send } = mountProvisioning(app);
 
       const response = await send("/api/organizations", {
@@ -198,7 +159,7 @@ describe("given an instance administrator and an instance with no organizations"
   describe("when the organization's bootstrap key cannot be created", () => {
     /** @scenario "A failed bootstrap key leaves no organization behind" */
     it("fails, leaves no organization with that slug, and lets the slug be provisioned again", async () => {
-      const { app, memory } = application({ failKeys: 1 });
+      const { app, repositories, permissions } = await application({ failKeys: 1 });
       const { send } = mountProvisioning(app);
 
       const failed = await send("/api/organizations", {
@@ -207,7 +168,7 @@ describe("given an instance administrator and an instance with no organizations"
       });
 
       expect(failed.status).toBeGreaterThanOrEqual(500);
-      expect([...memory.organizations.values()].filter((row) => row.slug === "acme")).toEqual([]);
+      expect(await storedSlugs(repositories, permissions)).not.toContain("acme");
 
       const retried = await send("/api/organizations", {
         method: "POST",
@@ -215,16 +176,14 @@ describe("given an instance administrator and an instance with no organizations"
       });
 
       expect(retried.status).toBe(201);
-      expect([...memory.organizations.values()].filter((row) => row.slug === "acme")).toHaveLength(
-        1,
-      );
+      expect(await storedSlugs(repositories, permissions)).toEqual(["acme"]);
     });
   });
 });
 
 describe("given an organization created with the instance administrator's key", () => {
   async function created() {
-    const { app } = application();
+    const { app } = await application();
     const mounted = mountProvisioning(app);
     const response = await mounted.send("/api/organizations", {
       method: "POST",

@@ -8,73 +8,83 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { type ServerOrganizationAppDependencies } from "../organization.app.ts";
-import { organizationAppForTesting } from "./support/organization-app-for-testing.ts";
+import { TestAuthzApi } from "../../transport/__tests__/support/test-authz-api.ts";
+import { OrganizationModule } from "../organization.app.ts";
+import { organizationModuleSetup } from "./support/organization-module-setup.ts";
 
 const ORGANIZATION_ID = "org-1";
-const TEAM = {
-  id: "team-1",
-  name: "Engineering",
-  slug: "engineering",
-  organizationId: ORGANIZATION_ID,
-  isPersonal: false,
-  ownerUserId: null,
-  archivedAt: null,
-  createdAt: new Date("2026-01-01T00:00:00.000Z"),
-  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
-};
-const CALLER: OrganizationCaller = { id: "user-1", name: "Sam", email: "sam@acme.test" };
+const TEAM_ID = "team-1";
+const CALLER: OrganizationCaller = { id: "user-1", email: "sam@acme.test" };
+const COLLEAGUE_ID = "u1";
 
-function application() {
-  const writes = {
-    updateTeamWithMembers: vi.fn(async () => undefined),
-    getAuditLogs: vi.fn(async () => ({ auditLogs: [], totalCount: 0 })),
-  };
-
-  const organizations = {
-    getTeamById: vi.fn(async () => TEAM),
-    updateTeamWithMembers: writes.updateTeamWithMembers,
-    getOrganizationIdByTeamId: vi.fn(async () => ORGANIZATION_ID),
-  };
-
-  const membership = {
-    getAuditLogs: writes.getAuditLogs,
-    findUserOrgRoleByTeamId: vi.fn(async () => "MEMBER" as const),
-  };
-
-  const app = organizationAppForTesting({
-    dependencies: {
-      organizations:
-        createApiFixture<ServerOrganizationAppDependencies["organizations"]>(organizations),
-      membership: createApiFixture<ServerOrganizationAppDependencies["membership"]>(membership),
-      projects: createApiFixture<ServerOrganizationAppDependencies["projects"]>(),
-      permissions: createApiFixture<AuthzApi>({ hasPermission: vi.fn(async () => true) }),
+/** The application over memory repositories holding one organization, its team and two members. */
+async function application() {
+  const ledger = TestAuthzApi.create({
+    people: [
+      { id: CALLER.id, name: "Sam", email: "sam@acme.test" },
+      { id: COLLEAGUE_ID, name: "Ana", email: "ana@acme.test" },
+    ],
+  });
+  // The caller holds everything the change confers, so the grant ceiling lets it through.
+  const permissions = createApiFixture<AuthzApi>(
+    {
+      listScopeBindings: (args) => ledger.listScopeBindings(args),
+      attachBindings: (args) => ledger.attachBindings(args),
+      revokeBindings: (args) => ledger.revokeBindings(args),
+      findPermissionsBeyondCaller: async () => [],
     },
+    "AuthzApi",
+  );
+  const setup = organizationModuleSetup({ permissions });
+  const membership = setup.repositories.membership(permissions);
+  await membership.createAndAssign({
+    userId: CALLER.id,
+    orgId: ORGANIZATION_ID,
+    orgName: "ACME",
+    orgSlug: "acme",
+    teamId: TEAM_ID,
+    teamSlug: "engineering",
+    pricingModel: "SEAT_EVENT",
+  });
+  await membership.createMembership({
+    organizationId: ORGANIZATION_ID,
+    userId: COLLEAGUE_ID,
+    pendingAdmissionId: "admission-1",
+    via: "invite",
+  });
+  ledger.seedTeamBinding({
+    id: "binding-caller",
+    organizationId: ORGANIZATION_ID,
+    teamId: TEAM_ID,
+    userId: CALLER.id,
+    role: "ADMIN",
   });
 
-  return { app, ...writes };
+  return { app: await OrganizationModule.create(setup), ledger };
 }
 
 describe("given a team member list that names only built-in roles", () => {
   describe("when the team settings form is saved", () => {
     /** @scenario "Non-enterprise org can update team members with built-in roles" */
     it("writes the change and attributes it to the caller", async () => {
-      const { app, updateTeamWithMembers } = application();
+      const { app, ledger } = await application();
 
       await app.updateTeamMembers(
-        { teamId: TEAM.id, name: "Engineering", members: [{ userId: "u1", role: "ADMIN" }] },
+        {
+          teamId: TEAM_ID,
+          name: "Engineering",
+          members: [
+            { userId: CALLER.id, role: "ADMIN" },
+            { userId: COLLEAGUE_ID, role: "MEMBER" },
+          ],
+        },
         CALLER,
       );
 
-      expect(updateTeamWithMembers).toHaveBeenCalledWith({
-        teamId: TEAM.id,
-        name: "Engineering",
-        members: [{ userId: "u1", role: "ADMIN" }],
-        caller: { type: "user", id: CALLER.id },
-        actor: { type: "user", id: CALLER.id },
-      });
+      expect(ledger.teamMemberIds(TEAM_ID)).toEqual([CALLER.id, COLLEAGUE_ID]);
+      expect(ledger.attachCallers).toEqual([{ type: "user", id: CALLER.id }]);
     });
   });
 });
@@ -83,13 +93,11 @@ describe("given the audit trail is read", () => {
   describe("when the trail is read", () => {
     /** @scenario "Enterprise org can access audit logs" */
     it("answers with the trail", async () => {
-      const { app, getAuditLogs } = application();
+      const { app } = await application();
 
       await expect(
         app.readAuditLogs({ organizationId: ORGANIZATION_ID, pageOffset: 0, pageSize: 50 }, CALLER),
       ).resolves.toEqual({ auditLogs: [], totalCount: 0 });
-
-      expect(getAuditLogs).toHaveBeenCalled();
     });
   });
 });

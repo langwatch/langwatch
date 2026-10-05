@@ -176,10 +176,7 @@ import type {
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 import { OrganizationPromptSeedService } from "../services/organization-prompt-seed.service.ts";
 import type { OrganizationPromptSeed } from "../services/organization-prompt-seed.service.ts";
-import {
-  OrganizationScopeGraphService,
-  type OrganizationScopeGraphReader,
-} from "../services/organization-scope-graph.service.ts";
+import { OrganizationScopeGraphService } from "../services/organization-scope-graph.service.ts";
 import { OrganizationSeatLicenseService } from "../services/organization-seat-license.service.ts";
 import type {
   OrganizationSeatLicense,
@@ -190,10 +187,7 @@ import type { OrganizationSignals } from "../services/organization-signals.servi
 import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
 import type { OrganizationDemoProject } from "../services/organization-visibility.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
-import {
-  PersonalTeamScopeService,
-  type PersonalTeamScopeReader,
-} from "../services/personal-team-scope.service.ts";
+import { PersonalTeamScopeService } from "../services/personal-team-scope.service.ts";
 import { PersonalWorkspaceDiagnosticsService } from "../services/personal-workspace-diagnostics.service.ts";
 import type { PersonalWorkspaceDiagnostics } from "../services/personal-workspace-diagnostics.service.ts";
 import { PersonalWorkspaceIdentityService } from "../services/personal-workspace-identity.service.ts";
@@ -462,88 +456,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         const verified = await setup.dependencies.identity.verifiedEmailsOf({ userId });
         return verified.kind === "resolved" ? verified.emails.map((email) => email.value) : [];
       },
-    });
-
-    return application;
-  }
-
-  /**
-   * Test-only construction over stub services, wired the way `create` wires
-   * a booted one (door services close over the application). Every collaborator is
-   * supplied: a suite names what it leaves unconfigured.
-   */
-  static createForTesting(setup: {
-    dependencies: Omit<ServerOrganizationAppDependencies, "groups"> & {
-      groups?: OrganizationGroupService;
-    };
-    infrastructure: OrganizationInfrastructure;
-    /** Defaults to a reader that finds no personal team in any scope. */
-    personalTeamScope?: PersonalTeamScopeReader;
-    /** Defaults to a reader that finds no organizations. */
-    scopeGraph?: OrganizationScopeGraphReader;
-    memberProvenance: MemberProvenanceService;
-  }): OrganizationModule {
-    const { groups, ...dependencies } = setup.dependencies;
-    const application = new OrganizationModule({
-      ...dependencies,
-      groups:
-        groups ??
-        OrganizationGroupScopeService.create({
-          organizations: dependencies.organizations,
-          projects: dependencies.projects,
-        }),
-    });
-    const { infrastructure } = setup;
-
-    application.#infrastructure = infrastructure;
-    application.#licenseLimits = LicenseLimitService.create({
-      seats: infrastructure.seats,
-      notices: infrastructure.seatLimits,
-    });
-    application.#memberProvenance = setup.memberProvenance;
-    application.#visibility = OrganizationVisibilityService.create({
-      reader: {
-        getAllForUser: (input) => dependencies.membership.getAllForUser(input),
-        findOrganizationWithMembers: (input) =>
-          dependencies.membership.findOrganizationWithMembers(input),
-        findMemberById: (input) => dependencies.membership.findMemberById(input),
-      },
-      permissions: dependencies.permissions,
-      demoProject: infrastructure.demoProject,
-    });
-    application.#scopeGraph = OrganizationScopeGraphService.create({
-      reader: setup.scopeGraph ?? { findScopeGraphForUser: async () => [] },
-      permissions: dependencies.permissions,
-    });
-    application.#personalTeamScope = PersonalTeamScopeService.create(
-      setup.personalTeamScope ?? {
-        findPersonalTeamsInScopes: async () => [],
-        findForeignPersonalTeamsInScopes: async () => [],
-      },
-    );
-    application.#invitationDoor = infrastructure.invitations
-      ? OrganizationInvitationDoorService.create({
-          invitations: infrastructure.invitations,
-          joinRequests: infrastructure.joinRequests,
-          signals: infrastructure.signals,
-          lifecycle: infrastructure.lifecycle,
-          creationThrottle: infrastructure.inviteCreationThrottle,
-          ceiling: OrganizationGrantCeilingService.create(dependencies.permissions),
-          ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
-        })
-      : null;
-    application.#joinDoor = infrastructure.joinRequests
-      ? OrganizationJoinDoorService.create({
-          joinRequests: infrastructure.joinRequests,
-          directory: infrastructure.directory,
-        })
-      : null;
-    application.#initialization = OrganizationInitializationService.create({
-      ceremony: infrastructure.ceremony,
-      signals: infrastructure.signals,
-      lifecycle: infrastructure.lifecycle,
-      createAndAssign: (input, by) => application.createAndAssign(input, by),
-      ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });
 
     return application;

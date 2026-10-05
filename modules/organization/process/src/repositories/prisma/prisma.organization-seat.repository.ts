@@ -84,11 +84,11 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   private async getMemberClassificationContext(
     organizationId: string,
   ): Promise<MemberClassificationContext> {
-    // Disabled memberships are out of the seat pool by definition: they hold
-    // no access, so billing for them would be charging for a locked door.
+    // A disabled membership and a deactivated person hold no access, so they
+    // hold no seat: billing for them would be charging for a locked door.
     // See seat-reconciliation.feature.
     const users = await this.prisma.organizationUser.findMany({
-      where: { organizationId, disabledAt: null },
+      where: { organizationId, disabledAt: null, user: { deactivatedAt: null } },
       select: { userId: true, role: true },
     });
 

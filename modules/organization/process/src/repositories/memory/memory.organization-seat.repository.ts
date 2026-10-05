@@ -76,11 +76,12 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
       if (role?.organizationId !== organizationId) return undefined;
       return permissionsSchema.safeParse(role.permissions).data ?? [];
     };
-    // Disabled memberships hold no access and hold no seat (seat-reconciliation.feature).
+    // Disabled memberships and deactivated people hold no seat (seat-reconciliation.feature).
     const memberSeats = this.memory.organizationUsers.filter(
       (member) =>
         member.organizationId === organizationId &&
         member.disabledAt === null &&
+        (this.memory.users.get(member.userId)?.deactivatedAt ?? null) === null &&
         predicate(member.role, this.#memberPermissions(member, permissionsOf)),
     ).length;
     const now = nowInstant();

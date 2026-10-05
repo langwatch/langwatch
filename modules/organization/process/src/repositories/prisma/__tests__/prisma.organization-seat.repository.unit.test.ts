@@ -118,8 +118,27 @@ describe("PrismaOrganizationSeatRepository", () => {
       await repository.getMemberCount(organizationId);
 
       expect(mockPrisma.organizationUser.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { organizationId, disabledAt: null } }),
+        expect.objectContaining({
+          where: expect.objectContaining({ organizationId, disabledAt: null }),
+        }),
       );
+    });
+
+    /** @scenario "A deactivated person does not hold a seat" */
+    it("reads only members whose person is not deactivated, beside the disabled filter", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      await repository.getMemberCount(organizationId);
+      await repository.getMembersLiteCount(organizationId);
+      await repository.getMembersDeveloperCount(organizationId);
+
+      expect(mockPrisma.organizationUser.findMany).toHaveBeenCalledTimes(3);
+      for (const [query] of mockPrisma.organizationUser.findMany.mock.calls) {
+        expect(query).toMatchObject({
+          where: { organizationId, disabledAt: null, user: { deactivatedAt: null } },
+        });
+      }
     });
 
     /** @scenario Pending invites count toward total member limit */
