@@ -112,7 +112,7 @@ you do not own. Current list:
 
 - §3.2/§5 put the module class in `<f>.module.ts`; no `<f>.module.ts` holds it yet and all 62 classes sit in
   `app/<f>.app.ts`, which the grammar accepts; §16 has no row yet (awaiting a ruling; counted 2026-10-05).
-- `useReleaseFlag` (§3.4, §10.1) is the target; code spells `useFeatureFlag` (54 files), no §16 row.
+- `useReleaseFlag` (§3.4, §10.1) is the target; code spells `useFeatureFlag` (deleted, §15; 54 files), no §16 row.
 - `requestDelivery` (ADR-167, §9) has no code hits and no §16 row naming today's spelling.
 - §8/§17's guard rules that accept a justified disable are not built yet: `defineRule({ escape })` exists,
   but no rule opts in, so today every `langwatch/*` disable is refused (2026-10-05).

@@ -889,8 +889,8 @@ a reason for more container.
 A factory under `repositories/` or `services/` that assembles collaborators is
 composition in the wrong folder: it moves into `create()`, and another process
 reaches the module through its API, never through its factories (2026-09-23).
-So are `*-composition.build.ts` and `*.members.ts` beside the module class: store wiring moves into
-the registries, the rest into `create()` (Alex, 2026-10-01).
+So are `*-composition.build.ts` and `*.members.ts` beside the module class, deleted (§15): store wiring
+moves into the registries, the rest into `create()` (Alex, 2026-10-01).
 
 The `processModules` list is generated from `modules/catalogue.json`
 (`pnpm generate:modules` writes one list into each app: process halves into `api`, `worker` and `tasks`, browser halves into `ui`). **Installing a
@@ -2055,16 +2055,16 @@ invented:
   not one — it is an invitation to declare something that will never be read.
   Counted across `defineBrowserModule`'s ten module-facing slots:
 
-  | slot                         | declarers | consumer                             |
-  | ---------------------------- | --------- | ------------------------------------ |
-  | `withScreens`                | 33        | `installedModuleScreens`             |
-  | `withDrawers`                | 11        | `installedDrawerLoaders`             |
-  | `withConfig`                 | 1         | yes                                  |
-  | `withApi`                    | 1 of 33   | `installedModuleApis`                |
-  | `withCapabilities`           | 6         | `declared(name)` (`declarations.ts`) |
-  | `withFailureInterceptors`    | 1         | `installedModuleFailures`            |
-  | `withFlags` · `withCommands` | **0**     | **none**                             |
-  | `publishSurfaces`            | 13        | **none — superseded, below**         |
+  | slot                         | declarers | consumer                                   |
+  | ---------------------------- | --------- | ------------------------------------------ |
+  | `withScreens`                | 33        | `installedModuleScreens`                   |
+  | `withDrawers`                | 11        | `installedDrawerLoaders`                   |
+  | `withConfig`                 | 1         | yes                                        |
+  | `withApi`                    | 1 of 33   | `installedModuleApis`                      |
+  | `withCapabilities`           | 6         | `declared(name)`, both deleted since (§15) |
+  | `withFailureInterceptors`    | 1         | `installedModuleFailures`                  |
+  | `withFlags` · `withCommands` | **0**     | **none**                                   |
+  | `publishSurfaces`            | 13        | **none — superseded, below**               |
 
   Only the last row is builder surface that does nothing, and only it is
   deleted. The three above it are the opposite case and stay: their consumers
@@ -2556,8 +2556,10 @@ ranks candidate tests for every unbound scenario; Sonnet lanes then verify and b
 tests only where nothing fits (Alex, 2026-10-05).
 The "New Experiment" button stays solid primary; its e2e expectation is updated (Alex, 2026-10-05).
 
-The installation test boots the installed list over memory members, with no server
-(`apps/api/src/__tests__/api-installation.fixture.ts`; the worker and tasks have the same):
+The installation test boots the installed list over memory stores, with no server
+(`apps/api/src/__tests__/api-installation.fixture.ts`; the worker and tasks have the same). Its
+`members` line and `storesBackedMembers` are deleted (§15) conversion debt the fixture still carries
+until the no-members migration lands (§16); do not copy them into a new test:
 
 ```ts
 const runtime = await bootInstalledProcess({
@@ -2746,9 +2748,10 @@ the type test asserts (Alex, 2026-09-27).
 A policy reads no baseline and reports every finding. A ruled transition may hold a shrink-only list
 beside the enforcer's tests (`packages/architecture-enforcer/tests/baselines/`), keyed so that growth
 inside a key is refused (a count per key), with a test that also refuses a listed finding that is
-gone. Two exist: §7's event-table access (Alex, 2026-09-29) and "framework packages depend on no
+gone. Three exist: §7's event-table access (Alex, 2026-09-29); "framework packages depend on no
 module contract" (§10.1), baselined on today's edges and shrinking as UI tokens move the feature types
-out (Alex, 2026-10-01). §5's peer cycles held a third until it was deleted: every cycle is refused now
+out (Alex, 2026-10-01); and §15's per-spelling count of deleted spellings in code
+(`deleted-spellings.json`, 2026-10-05). §5's peer cycles held a third until it was deleted: every cycle is refused now
 (Alex, 2026-10-05).
 The `service-ceilings` policy is ported to a custom langwatch oxlint rule with the same exact limits
 (Alex, 2026-09-29).
