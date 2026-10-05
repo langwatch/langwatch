@@ -17,7 +17,7 @@ import {
   instantiateRepositories,
   selectedRepositoryOwnership,
 } from "../src/repository-registry.ts";
-import { memberSourceOf } from "./member-source.ts";
+import { liveMemberSourceOf, memberSourceOf } from "./member-source.ts";
 
 type Repositories = Readonly<{ value: { read(): string } }>;
 let liveCreates = 0;
@@ -172,7 +172,7 @@ describe("given a module that declares both repository tiers", () => {
       memoryCreates = 0;
       const runtime = await createApp({
         role: "api",
-        members: memberSourceOf({ prisma: { prefix: "postgres" } }),
+        members: liveMemberSourceOf({ prisma: { prefix: "postgres" } }),
       })
         .withModules([feature])
         .boot();
@@ -188,7 +188,7 @@ describe("given a module that declares both repository tiers", () => {
       const runtime = await createApp({
         role: "api",
         config: { agent: { prefix: "config" } },
-        members: memberSourceOf({ suffix: "infra", prisma: { prefix: "database" } }),
+        members: liveMemberSourceOf({ suffix: "infra", prisma: { prefix: "database" } }),
       })
         .withModules([configuredFeature])
         .boot();
@@ -232,7 +232,7 @@ describe("given a module that declares both repository tiers", () => {
     /** @scenario "A store with no address refuses at boot" */
     it("refuses naming the module and the member, before any factory runs", async () => {
       liveCreates = 0;
-      const booting = createApp({ role: "api", members: memberSourceOf({}) })
+      const booting = createApp({ role: "api", members: liveMemberSourceOf({}) })
         .withModules([feature])
         .boot();
 
@@ -244,7 +244,7 @@ describe("given a module that declares both repository tiers", () => {
     it("refuses rather than falling back to the memory tier", async () => {
       memoryCreates = 0;
       await expect(
-        createApp({ role: "api", members: memberSourceOf({}) })
+        createApp({ role: "api", members: liveMemberSourceOf({}) })
           .withModules([feature])
           .boot(),
       ).rejects.toBeInstanceOf(MissingMemberError);
@@ -254,6 +254,7 @@ describe("given a module that declares both repository tiers", () => {
 
     it("refuses a member the source names but cannot build", async () => {
       const unbuildable: MemberSource<{ prisma: { prefix: string } }> = {
+        tier: "live",
         order: ["prisma"],
         read: () => {
           throw new Error('This process has no "prisma" member.');
@@ -277,7 +278,7 @@ describe("given a module that declares both repository tiers", () => {
         .build();
 
       await expect(
-        createApp({ role: "api", members: memberSourceOf({}) })
+        createApp({ role: "api", members: liveMemberSourceOf({}) })
           .withModules([duplicateFeature, conflictingFeature])
           .boot(),
       ).rejects.toThrow(RepositoryOwnershipConflictError);
@@ -288,7 +289,7 @@ describe("given a module that declares both repository tiers", () => {
       duplicateCreates = 0;
 
       await expect(
-        createApp({ role: "api", members: memberSourceOf({}) })
+        createApp({ role: "api", members: liveMemberSourceOf({}) })
           .withModules([duplicateFeature, canonicalPrismaFeature])
           .boot(),
       ).rejects.toBeInstanceOf(RepositoryOwnershipConflictError);

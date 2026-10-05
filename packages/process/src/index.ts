@@ -18,6 +18,7 @@ export {
   FeatureSecretsUnavailableError,
   MissingProviderError,
   RoleContributionError,
+  StoreTierUnstatedError,
 } from "./boot-errors.ts";
 export {
   buildClaimedMembers,

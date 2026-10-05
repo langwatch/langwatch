@@ -17,6 +17,7 @@ import {
   DuplicateProviderError,
   MissingProviderError,
   RoleContributionError,
+  StoreTierUnstatedError,
 } from "./boot-errors.ts";
 /** Declares, constructs and starts the process graph; see ADR-133. */
 import type {
@@ -260,9 +261,12 @@ interface ProcessProvision {
   readonly instance: unknown;
 }
 
+/** A feature as installed, before boot checks a tier was stated for it. */
+type CollectedFeature = Omit<DeclaredFeature, "tier"> & Readonly<{ tier: Tier | undefined }>;
+
 /** What a builder collects, shared when one is re-parameterised by its doors. */
 interface BuilderState<Rest, Trpc> {
-  readonly features: DeclaredFeature[];
+  readonly features: CollectedFeature[];
   readonly services: RuntimeService[];
   /** Peers the process hands in itself, rather than by installing their module. */
   readonly provisions: ProcessProvision[];
@@ -372,7 +376,7 @@ export class ApplicationBuilder<
       providers: declaration.providers,
       contributesWorkerWork: declaration.contributesWorkerWork,
       requiredMembers: declaration.members ?? [],
-      tier: declaration.tier ?? "live",
+      tier: declaration.tier ?? this.source.tier,
       workers: declaration.workers ?? [],
       tasks: declaration.tasks ?? [],
       eventing: declaration.eventing,
@@ -430,7 +434,8 @@ export class ApplicationBuilder<
     const role = this.role;
     const config = this.config;
 
-    const declarations = this.state.features;
+    // A missing tier refuses first, by module, before anything reads a tier or opens a client.
+    const declarations = this.state.features.map(statedTier);
     // Everything readable off the declarations alone comes first, so a graph
     // that cannot be built is refused before this process opens one client.
     // Table ownership is the first of them: two modules writing the same rows
@@ -720,6 +725,14 @@ function eventingMemberFor<Members>(
   } catch {
     return {};
   }
+}
+
+/** A module with repositories boots only on a stated tier; nothing picks one for it (§7). */
+function statedTier(feature: CollectedFeature): DeclaredFeature {
+  if (feature.tier !== void 0) return { ...feature, tier: feature.tier };
+  if (feature.repositoryRegistry !== void 0) throw new StoreTierUnstatedError(feature.name);
+  // No registry reads the tier, so a module without one never needs it stated.
+  return { ...feature, tier: "live" };
 }
 
 function claimedBy(declaration: DeclaredFeature): readonly string[] {

@@ -231,3 +231,14 @@ describe("given the members with no client behind them", () => {
     });
   });
 });
+
+describe("given a process that builds its stores from config", () => {
+  describe("when boot reads the member source", () => {
+    /** @scenario "Opened stores state the live tier" */
+    it("states the live tier, so boot never assumes one", () => {
+      const members = buildProcessStores({ config: config() }).members;
+
+      expect(members.tier).toBe("live");
+    });
+  });
+});

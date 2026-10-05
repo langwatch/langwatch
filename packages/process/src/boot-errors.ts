@@ -79,3 +79,15 @@ export class FeatureApiUnavailableError extends Error {
     this.name = "FeatureApiUnavailableError";
   }
 }
+
+/** A module with repositories booted where neither its stores nor its caller stated a tier (§7). */
+export class StoreTierUnstatedError extends Error {
+  constructor(readonly module: string) {
+    super(
+      `Module "${module}" declares repositories, and this process stated no store tier. ` +
+        "Open the live stores, or ask for memory explicitly in a test or dev harness " +
+        "(memoryStores() or withMemoryRepositories(...)); no tier is ever assumed.",
+    );
+    this.name = "StoreTierUnstatedError";
+  }
+}

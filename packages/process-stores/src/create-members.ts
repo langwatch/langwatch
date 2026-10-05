@@ -57,6 +57,8 @@ export class MemberSuppliedUndefinedError extends Error {
  * under something not yet open.
  */
 export interface MemberSource<Members> {
+  /** The store tier these members belong to; boot selects every registry from it (§7). */
+  readonly tier?: "live" | "memory";
   readonly order: readonly (keyof Members & string)[];
   /** Builds the member, or refuses naming it. Repeated reads answer once. */
   read<Name extends keyof Members & string>(name: Name): Members[Name];
@@ -268,6 +270,8 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
   };
 
   const source: ProcessMemberSource = {
+    // Real clients: the one place the live tier is stated, so boot never assumes it.
+    tier: "live",
     order: MEMBER_NAMES,
     read,
     async close(): Promise<void> {

@@ -200,6 +200,8 @@ export class ProcessServer implements ProcessBoot {
         members: {
           ...storesBackedMembers(
             {
+              // The opened stores state their tier; boot selects every registry from it (§7).
+              ...(opened.tier === void 0 ? {} : { tier: opened.tier }),
               order: MEMBER_NAMES,
               read(name) {
                 const member = MEMBER_NAMES.find((candidate) => candidate === name);

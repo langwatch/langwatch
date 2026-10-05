@@ -77,15 +77,9 @@ export class ApiProcessContainer extends ProcessContainer {
     if (!this.#transports)
       throw new Error("surface must be selected with exposeTransports before boot.");
     const selected = this.#transports.selected;
-    for (const module of this.modules) {
-      for (const transport of module.transports ?? []) {
-        if (!surfaceOpened(selected, transport.protocol))
-          throw new Error(`${module.name} needs surface.${transport.protocol}.`);
-      }
-    }
     return this.runtime.boot({
       role: "api",
-      modules: this.modules,
+      modules: this.modules.map((module) => withOpenedSurfaces(module, selected)),
       pipelines: new ProducerPipelines().produce(),
       members: this.members,
       transports: this.#transports,
@@ -122,6 +116,20 @@ export class TasksProcessContainer extends ProcessContainer {
       members: this.members,
     });
   }
+}
+
+/**
+ * A module installs whatever surfaces this process selected; a transport for one it did
+ * not select is skipped, never refused (§4 D3).
+ */
+function withOpenedSurfaces(
+  module: ProcessModule,
+  selected: TransportSelection["selected"],
+): ProcessModule {
+  const transports = module.transports ?? [];
+  const opened = transports.filter((transport) => surfaceOpened(selected, transport.protocol));
+  if (opened.length === transports.length) return module;
+  return { ...module, transports: opened };
 }
 
 /** A socket rides the process's one upgrade router, which every api process opens. */
