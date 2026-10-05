@@ -136,6 +136,7 @@ export class Experiment {
   private readonly apiKey: string;
   private readonly logger: Logger;
   private readonly concurrency: number;
+  private readonly datasetId: string | undefined;
 
   private initialized = false;
   private createdAtMs: number;
@@ -183,6 +184,7 @@ export class Experiment {
       logger: Logger;
       runId?: string;
       concurrency?: number;
+      datasetId?: string;
     }
   ) {
     this.name = name;
@@ -193,6 +195,7 @@ export class Experiment {
     this.apiKey = options.apiKey;
     this.logger = options.logger;
     this.concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
+    this.datasetId = options.datasetId;
     this.createdAtMs = Date.now();
   }
 
@@ -237,6 +240,9 @@ export class Experiment {
           experiment_name: this.name,
           experiment_slug: this.experimentSlug,
           experiment_type: "BATCH_EVALUATION_V2",
+          ...(this.datasetId !== undefined
+            ? { dataset_id: this.datasetId }
+            : {}),
         }),
       });
 

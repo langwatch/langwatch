@@ -2090,6 +2090,7 @@ model Dataset {
   archivedAt       DateTime?
   datasetRecords   DatasetRecord[]
   batchEvaluations BatchEvaluation[]
+  experiments      Experiment[]
   mapping          Json?
   useS3            Boolean           @default(false)
   s3RecordCount    Int?
@@ -2529,10 +2530,20 @@ model Experiment {
   // stored one is refused before anything is written. Existing rows read 0.
   workbenchVersion Int @default(0)
 
+  // The dataset an SDK-driven experiment (no Optimization Studio workflow) ran
+  // against, set via `experiments.init(slug, { datasetId })` or the
+  // `/api/evaluations/batch/log_results` `dataset_id`/`dataset_slug` fields.
+  // A workflow-backed experiment still carries its dataset through the DSL's
+  // entry node instead; this column is the fallback the list reads when there
+  // is no workflow to ask (issue #6411).
+  datasetId        String?
+  dataset          Dataset?          @relation(fields: [datasetId], references: [id])
+
   @@unique([projectId, slug])
   @@index([projectId])
   @@index([workflowId])
   @@index([projectId, archivedAt])
+  @@index([datasetId])
 }
 
 // One snapshot of an experiment's workbench state, at one version.

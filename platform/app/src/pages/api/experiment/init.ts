@@ -13,6 +13,7 @@ import {
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { DatasetService } from "~/server/datasets/dataset.service";
 import { prisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
@@ -32,6 +33,14 @@ const dspyInitParamsSchema = z
     ]),
     experiment_name: z.string().optional(),
     workflowId: z.string().optional(),
+    /**
+     * The LangWatch-managed dataset this experiment ran against (issue
+     * #6411), so the experiments list can show it even when there is no
+     * Optimization Studio workflow to read it from. `dataset_id` wins when
+     * both are sent.
+     */
+    dataset_id: z.string().optional(),
+    dataset_slug: z.string().optional(),
   })
   .refine((data) => {
     if (!data.experiment_id && !data.experiment_slug) {
@@ -105,6 +114,8 @@ export default async function handler(
     experiment_type: params.experiment_type,
     experiment_name: params.experiment_name,
     workflowId: params.workflowId,
+    dataset_id: params.dataset_id,
+    dataset_slug: params.dataset_slug,
   });
 
   // Late markUsed: response has been fully built, the API key was genuinely used
@@ -127,6 +138,8 @@ export const findOrCreateExperiment = async ({
   experiment_type,
   experiment_name,
   workflowId,
+  dataset_id,
+  dataset_slug,
 }: {
   project: Project;
   experiment_id?: string | null;
@@ -134,9 +147,23 @@ export const findOrCreateExperiment = async ({
   experiment_type: ExperimentType;
   experiment_name?: string;
   workflowId?: string;
+  /** The LangWatch-managed dataset this experiment ran against (issue #6411). */
+  dataset_id?: string | null;
+  dataset_slug?: string | null;
 }) => {
   let experiment: Experiment | null = null;
   const experiments = ExperimentService.create({ prisma });
+
+  // Resolved once, scoped to the project either way, and reused by both the
+  // create and the update branch below.
+  let resolvedDatasetId: string | undefined;
+  if (dataset_id || dataset_slug) {
+    const dataset = await DatasetService.create(prisma).getBySlugOrId({
+      slugOrId: (dataset_id ?? dataset_slug) as string,
+      projectId: project.id,
+    });
+    resolvedDatasetId = dataset.id;
+  }
 
   if (experiment_id) {
     experiment = await experiments.findById({
@@ -174,13 +201,18 @@ export const findOrCreateExperiment = async ({
         projectId: project.id,
         type: experiment_type,
         workflowId: workflowId,
+        datasetId: resolvedDatasetId,
       },
     });
   } else if (experiment) {
-    if (!!experiment_name || !!workflowId) {
+    if (!!experiment_name || !!workflowId || !!resolvedDatasetId) {
       await prisma.experiment.update({
         where: { id: experiment.id, projectId: project.id },
-        data: { name: experiment_name, workflowId: workflowId },
+        data: {
+          name: experiment_name,
+          workflowId: workflowId,
+          ...(resolvedDatasetId ? { datasetId: resolvedDatasetId } : {}),
+        },
       });
     }
   } else {

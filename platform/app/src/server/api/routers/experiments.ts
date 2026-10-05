@@ -44,6 +44,7 @@ import {
   createTRPCRouter,
   protectedProcedure,
 } from "../trpc";
+import { getExperimentDatasetId } from "./experiments.utils";
 import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
@@ -643,18 +644,8 @@ export const experimentsRouter = createTRPCRouter({
         pageOffset + pageSize,
       );
 
-      const getDatasetId = (dsl: JsonValue | undefined) => {
-        return (
-          (dsl as Workflow | undefined)?.nodes.find(
-            (node) => node.type === "entry",
-          ) as Node<Entry>
-        )?.data.dataset?.id;
-      };
-
       const datasetIds = experiments
-        .map((experiment) => {
-          return getDatasetId(experiment.workflow?.currentVersion?.dsl);
-        })
+        .map((experiment) => getExperimentDatasetId(experiment))
         .filter(Boolean) as string[];
 
       const datasetsById = Object.fromEntries(
@@ -697,10 +688,7 @@ export const experimentsRouter = createTRPCRouter({
                 timestamps: latestRun?.timestamps,
               },
             },
-            dataset:
-              datasetsById[
-                getDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""
-              ],
+            dataset: datasetsById[getExperimentDatasetId(experiment) ?? ""],
             updatedAt:
               latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
           };
