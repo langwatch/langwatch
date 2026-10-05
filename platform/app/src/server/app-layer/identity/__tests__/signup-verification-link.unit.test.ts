@@ -46,9 +46,17 @@ describe("buildSignUpVerificationUrl()", () => {
       for (const callbackUrl of [
         "https://evil.example/steal",
         "//evil.example/steal",
+        // Browsers read a backslash after the slash as a second slash.
+        "/\\evil.example",
+        "/\\/evil.example",
+        // Control characters some agents strip before resolving.
+        "/\t/evil.example",
+        "/\r\n/evil.example",
+        "/\0/evil.example",
         "javascript:alert(1)",
         "cli/auth",
         "",
+        `/${"a".repeat(2048)}`,
       ]) {
         const url = new URL(
           buildSignUpVerificationUrl({ token: "tok_1", callbackUrl }),

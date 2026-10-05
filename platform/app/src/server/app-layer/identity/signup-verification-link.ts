@@ -1,4 +1,5 @@
 import { env } from "~/env.mjs";
+import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 
 /**
  * The link a sign-up confirmation email carries. It returns to the sign-up
@@ -32,14 +33,14 @@ export function buildSignUpVerificationUrl({
 }
 
 /**
- * A continuation that stays on this site: an absolute path, not a
- * protocol-relative `//host` and not a scheme. The same test the welcome
- * screen applies to `return_to` before it follows it.
+ * A continuation that stays on this site. The same rule the client applies
+ * before it follows a `return_to`: one leading slash, no `//` or `/\` that a
+ * browser would read as another host, no control characters, bounded length.
+ * Anyone can ask for a sign-up mail to any address, so what this keeps is
+ * what a stranger can make LangWatch mail to a victim.
  */
 export function sameSiteContinuation(
   callbackUrl: string | undefined,
 ): string | null {
-  if (!callbackUrl) return null;
-  if (!callbackUrl.startsWith("/") || callbackUrl.startsWith("//")) return null;
-  return callbackUrl;
+  return getSafeReturnToPath(callbackUrl);
 }
