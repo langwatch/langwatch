@@ -586,6 +586,47 @@ describe("given one chunk carrying two series staggered in time", () => {
 });
 
 describe("given points ensured for the tenant's organization", () => {
+  describe("when one of an organization's points is accepted a second time", () => {
+    const dedupTenantId = `${tag}-dedup-project`;
+    const dedupOrganizationId = `${tag}-dedup-org`;
+    const ledgerPoint = (timeUnixMs: number, accepted = acceptedAt) =>
+      point({
+        tenantId: dedupTenantId,
+        organizationId: dedupOrganizationId,
+        seriesId: "8".repeat(64),
+        timeUnixMs,
+        valueDouble: 1,
+        acceptedAt: accepted,
+      });
+
+    beforeAll(async () => {
+      await repo.ensureDataPoints({
+        points: [ledgerPoint(bucket0 + 1_000), ledgerPoint(bucket0 + 2_000)],
+      });
+      // The same PointId again, accepted a second later: a second ledger row.
+      await repo.ensureDataPoints({
+        points: [ledgerPoint(bucket0 + 1_000, acceptedAt + 1_000)],
+      });
+    }, 30_000);
+
+    it("counts that point once", async () => {
+      const estimates = await repo.queryUsageEstimates({
+        organizationId: dedupOrganizationId,
+        tenantId: dedupTenantId,
+        from: new Date(acceptedAt - 60 * 60_000),
+        to: new Date(acceptedAt + 60 * 60_000),
+        groupBy: "organization",
+      });
+
+      expect(estimates).toHaveLength(1);
+      expect(estimates[0]).toMatchObject({
+        organizationId: dedupOrganizationId,
+        acceptedPoints: 2,
+        uniqueActiveSeries: 1,
+      });
+    });
+  });
+
   describe("when usage estimates are read for a window holding them", () => {
     it("counts each accepted point once for the organization", async () => {
       const estimates = await repo.queryUsageEstimates({

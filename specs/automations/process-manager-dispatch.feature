@@ -39,7 +39,7 @@ Feature: Automation dispatch on the process-manager substrate
     Then the evaluation post-fold subscriber records the trigger match on the automations pipeline
     And the trace-pipeline subscriber leaves that automation to the evaluation pipeline
 
-  @integration
+  @regression @integration
   Scenario: An evaluation-filtered automation is confirmed at dispatch
     Given an active automation whose condition reads an evaluation verdict
     And the trace's evaluation runs are stored
