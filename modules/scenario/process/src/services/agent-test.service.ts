@@ -213,7 +213,9 @@ export class AgentTestService {
       return this.#sendConnectedTurn(input);
     }
 
-    const prefetch = await AgentTestPrefetchService.create().prefetch({
+    const prefetch = await AgentTestPrefetchService.create({
+      workflows: this.options.workflows,
+    }).prefetch({
       context: {
         projectId: input.projectId,
         scenarioId: AGENT_TEST_SCENARIO_ID,
@@ -243,7 +245,7 @@ export class AgentTestService {
       job: {
         kind: "agent-test-turn",
         adapterData: prefetch.data.adapterData,
-        nlpServiceUrl: prefetch.data.nlpServiceUrl,
+        executeSyncRoute: prefetch.data.executeSyncRoute,
         parameters: input.params ?? {},
         message: input.message,
         timeoutMs: this.options.maxCallTimeoutMs,
@@ -311,7 +313,9 @@ export class AgentTestService {
     const batchRunId = generateBatchRunId();
     const setId = getAgentTestSetId(input.projectId);
 
-    const prefetch = await AgentTestPrefetchService.create().prefetch({
+    const prefetch = await AgentTestPrefetchService.create({
+      workflows: this.options.workflows,
+    }).prefetch({
       context: {
         projectId: input.projectId,
         scenarioId: AGENT_TEST_SCENARIO_ID,

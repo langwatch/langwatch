@@ -64,6 +64,7 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
@@ -79,6 +80,7 @@ import { agentPlatformUrl } from "../rules/agent-platform-url.rules.ts";
 import { agentWithResolvedFields, declaredAgentParameters } from "../rules/agent-view.rules.ts";
 import { AgentCopyService } from "../services/agent-copy.service.ts";
 import { AgentHttpSecretsService } from "../services/agent-http-secrets.service.ts";
+import { AgentVoiceReleaseService } from "../services/agent-voice-release.service.ts";
 import { AgentService } from "../services/agent.service.ts";
 import {
   ConnectedAgentPresenceService,
@@ -121,6 +123,8 @@ export class AgentModule implements AgentApi {
   static readonly dependencies = {
     apiKeys: ApiKeyApi,
     auditLog: AuditLogApi,
+    /** Voice agents are written only where `release_voice_agents_enabled` is on (AC29). */
+    featureFlags: FeatureFlagApi,
     permissions: AuthzApi,
     projects: ProjectApi,
     scenarios: ScenarioApi,
@@ -136,6 +140,7 @@ export class AgentModule implements AgentApi {
   readonly #agents: AgentService;
   readonly #presence = ConnectedAgentPresenceService.create();
   readonly #copies: AgentCopyService;
+  readonly #voiceRelease: AgentVoiceReleaseService;
   readonly #connected: ConnectedAgentService | undefined;
   readonly #httpTesting: HttpAgentTestService;
   readonly #httpSecrets: AgentHttpSecretsService;
@@ -153,9 +158,14 @@ export class AgentModule implements AgentApi {
       secrets: dependencies.secrets,
       agents: this.#agents,
     });
+    this.#voiceRelease = AgentVoiceReleaseService.create({
+      featureFlags: dependencies.featureFlags,
+      projects: dependencies.projects,
+    });
     this.#copies = AgentCopyService.create({
       repository: repositories.agents,
       workflows: dependencies.workflows,
+      voiceRelease: this.#voiceRelease,
     });
     this.#publicBaseUrl = members.publicBaseUrl ?? "";
     this.#auditLog = dependencies.auditLog;
@@ -220,10 +230,17 @@ export class AgentModule implements AgentApi {
   }
 
   async create(input: CreateAgentCommand): Promise<AgentWithFields> {
+    await this.#voiceRelease.assertWritable({ type: input.type, projectIds: [input.projectId] });
     return this.#withFields(await this.#agents.create(await this.#httpSecrets.forCreate(input)));
   }
 
   async update(input: UpdateAgentCommand): Promise<AgentWithFields> {
+    // A config-only save of a stored voice agent names no type, so the stored row is asked too.
+    const type =
+      input.type === "voice"
+        ? input.type
+        : (await this.#agents.getById({ id: input.id, projectId: input.projectId })).type;
+    await this.#voiceRelease.assertWritable({ type, projectIds: [input.projectId] });
     return this.#withFields(await this.#agents.update(await this.#httpSecrets.forUpdate(input)));
   }
 

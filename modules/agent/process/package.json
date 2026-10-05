@@ -33,6 +33,7 @@
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",

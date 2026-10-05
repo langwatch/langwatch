@@ -44,7 +44,7 @@ const job = AgentTestTurnJobSchema.parse({
     agentId: "agent_voice",
     voiceTarget: { transport: "elevenlabs_convai", agentId: "el_1", credential: null },
   },
-  nlpServiceUrl: "http://langwatch_nlp:5561",
+  executeSyncRoute: { mode: "direct", nlpServiceUrl: "http://langwatch_nlp:5561" },
   message: "ping",
   timeoutMs: 1_000,
   nlpTimeouts: {},

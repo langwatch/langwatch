@@ -46,6 +46,20 @@ export class AgentTestRefusedError extends HandledError {
   }
 }
 
+/** Voice agents are behind the project's release flag (AC29); a write that would leave one in a
+ * project with the flag off is refused, as the run dialog and the drawer refuse it. */
+export class VoiceAgentsDisabledError extends HandledError {
+  declare readonly code: "voice_agents_disabled";
+
+  constructor() {
+    super("voice_agents_disabled", "Voice agents are not enabled for this project", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "VoiceAgentsDisabledError";
+  }
+}
+
 /** Stored credentials stay at the address they were saved for: a test call, a run or an update
  * that would carry them elsewhere is refused, and the credential is re-entered for the new one. */
 export class AgentStoredCredentialsDestinationError extends HandledError {

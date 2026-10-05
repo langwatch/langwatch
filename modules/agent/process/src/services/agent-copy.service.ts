@@ -18,28 +18,44 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import type { AgentRepository, AgentCopyRecord } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
 import { configForCopy } from "../rules/agent-secrets.rules.ts";
+import type { AgentVoiceReleaseService } from "./agent-voice-release.service.ts";
 
 export class AgentCopyService {
   #repository: AgentRepository;
   #workflows: WorkflowApi;
+  #voiceRelease: AgentVoiceReleaseService;
   #logger: Logger;
 
-  private constructor(repository: AgentRepository, workflows: WorkflowApi, logger: Logger) {
+  private constructor({
+    repository,
+    workflows,
+    voiceRelease,
+    logger,
+  }: {
+    repository: AgentRepository;
+    workflows: WorkflowApi;
+    voiceRelease: AgentVoiceReleaseService;
+    logger: Logger;
+  }) {
     this.#repository = repository;
     this.#workflows = workflows;
+    this.#voiceRelease = voiceRelease;
     this.#logger = logger;
   }
 
   static create({
     repository,
     workflows,
+    voiceRelease,
     logger = createLogger("langwatch:agent:copy"),
   }: {
     repository: AgentRepository;
     workflows: WorkflowApi;
+    /** A voice source lands in no receiving project whose voice flag is off. */
+    voiceRelease: AgentVoiceReleaseService;
     logger?: Logger;
   }): AgentCopyService {
-    return new AgentCopyService(repository, workflows, logger);
+    return new AgentCopyService({ repository, workflows, voiceRelease, logger });
   }
 
   getCopies(input: {
@@ -61,6 +77,10 @@ export class AgentCopyService {
       projectId: input.sourceProjectId,
     });
     if (source.type === "connected") throw new AgentRegisterOnlyError();
+    await this.#voiceRelease.assertWritable({
+      type: source.type,
+      projectIds: [input.targetProjectId],
+    });
 
     const [sourceWorkflowId] = findLinkedWorkflowIds(source);
     let workflowId: string | undefined;
@@ -121,6 +141,10 @@ export class AgentCopyService {
       ? copies.filter((copy) => input.copyIds?.includes(copy.id))
       : copies;
     if (selected.length === 0) throw new AgentCopySelectionError(input.sourceAgentId);
+    await this.#voiceRelease.assertWritable({
+      type: source.type,
+      projectIds: selected.map((copy) => copy.projectId),
+    });
 
     for (const copy of selected) {
       const current = await this.#repository.getByIdIncludingArchived({
@@ -147,6 +171,7 @@ export class AgentCopyService {
 
   async syncFromSource(input: AgentReferenceInput): Promise<AgentSyncFromSource> {
     const source = await this.getSourceOfCopy(input);
+    await this.#voiceRelease.assertWritable({ type: source.type, projectIds: [input.projectId] });
     const current = await this.#repository.getById({
       id: input.agentId,
       projectId: input.projectId,

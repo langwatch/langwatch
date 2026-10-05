@@ -127,6 +127,7 @@ beforeEach(() => {
     data: {
       adapterData: {},
       nlpServiceUrl: "http://langwatch_nlp:5561",
+      executeSyncRoute: { mode: "relay", relayBaseUrl: "http://app:5560" },
       scenario: { labels: ["agent-test"] },
     },
     telemetry: { endpoint: "http://app:5560", apiKey: "sk-lw-project" },
@@ -267,7 +268,7 @@ describe("AgentTestService.sendTurn", () => {
       expect(result).toEqual({ output: "pong", durationMs: 12, instance: null });
     });
 
-    it("runs the turn in a child with the project's telemetry and only usable deadlines", async () => {
+    it("runs the turn in a child along the prefetched route, with the project's telemetry and only usable deadlines", async () => {
       runTurn.mockResolvedValue({ success: true, output: "pong", durationMs: 12 });
       const { service } = serviceFor({});
 
@@ -277,7 +278,7 @@ describe("AgentTestService.sendTurn", () => {
         job: {
           kind: "agent-test-turn",
           adapterData: {},
-          nlpServiceUrl: "http://langwatch_nlp:5561",
+          executeSyncRoute: { mode: "relay", relayBaseUrl: "http://app:5560" },
           parameters: {},
           message: "ping",
           timeoutMs: 300_000,

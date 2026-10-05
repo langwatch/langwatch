@@ -1,4 +1,5 @@
 import type { AuditLogApi, AuditLogHistoryEntry } from "@langwatch/audit-log-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -8,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
 import { AgentCopyService } from "../../services/agent-copy.service.ts";
+import { AgentVoiceReleaseService } from "../../services/agent-voice-release.service.ts";
 import { agentWorkflowCopyFixture, createAgentAppFixture } from "./agent.fixture.ts";
 
 const reference = { id: "agent_1", projectId: "project_1" };
@@ -316,6 +318,10 @@ describe("AgentModule workflow and audit ownership", () => {
     const repositories = MemoryAgentRepositories.create();
     const { logger, lines } = createTestLogger();
     const copies = AgentCopyService.create({
+      voiceRelease: AgentVoiceReleaseService.create({
+        featureFlags: createApiFixture<FeatureFlagApi>(),
+        projects: createApiFixture<ProjectApi>(),
+      }),
       repository: repositories.agents,
       workflows: createApiFixture<WorkflowApi>({
         copy: async () => agentWorkflowCopyFixture(),

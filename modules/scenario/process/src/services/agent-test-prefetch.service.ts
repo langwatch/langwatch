@@ -7,6 +7,7 @@
 import {
   AGENT_TEST_USER_MESSAGE,
   agentTestScenarioConfig,
+  type ExecuteSyncRoute,
   type ScenarioChildEnvironment,
   type ScenarioExecutionPrefetchInput,
   type ScenarioExecutionPrefetchResult,
@@ -14,7 +15,9 @@ import {
   type TargetAdapterData,
   type TargetConfig,
 } from "@langwatch/scenario-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import { resolveExecuteSyncRoute } from "../rules/execute-sync-route.rules.ts";
 import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefetcher.service.ts";
 
 /** The project fields the run reads, or why they could not be read. */
@@ -41,6 +44,13 @@ export interface AgentTestReads {
   runKey: (adapter: TargetAdapterData) => Promise<string>;
 }
 
+/** A prefetch whose job always names the route a code or workflow turn posts along. */
+export type AgentTestPrefetchResult =
+  | Exclude<ScenarioExecutionPrefetchResult, { success: true }>
+  | (Extract<ScenarioExecutionPrefetchResult, { success: true }> & {
+      data: { executeSyncRoute: ExecuteSyncRoute };
+    });
+
 /** The label of the agent kind a target names, for the not-found message. */
 function targetLabel(target: TargetConfig): string {
   switch (target.type) {
@@ -59,11 +69,15 @@ function targetLabel(target: TargetConfig): string {
 
 /** Reads what an agent test run needs before its child starts. */
 export class AgentTestPrefetchService {
-  static create(): AgentTestPrefetchService {
-    return new AgentTestPrefetchService();
+  static create({
+    workflows,
+  }: {
+    workflows: Pick<WorkflowApi, "hasPerProjectEngines">;
+  }): AgentTestPrefetchService {
+    return new AgentTestPrefetchService(workflows);
   }
 
-  private constructor() {}
+  private constructor(private readonly workflows: Pick<WorkflowApi, "hasPerProjectEngines">) {}
 
   async prefetch({
     context,
@@ -77,11 +91,18 @@ export class AgentTestPrefetchService {
     reads: AgentTestReads;
     config: ScenarioExecutionPrefetchConfig;
     onChildEnvReady?: (environment: ScenarioChildEnvironment) => void;
-  }): Promise<ScenarioExecutionPrefetchResult> {
+  }): Promise<AgentTestPrefetchResult> {
     if (target.type === "prompt") {
       return {
         success: false,
         error: "A prompt cannot be tested this way; run a scenario against it",
+      };
+    }
+
+    if (target.type === "voice") {
+      return {
+        success: false,
+        error: "Voice agents are tested by talking to them or by running a scenario",
       };
     }
 
@@ -127,6 +148,12 @@ export class AgentTestPrefetchService {
         parameters: {},
         adapterData: adapterResult,
         nlpServiceUrl: config.nlpServiceUrl,
+        executeSyncRoute: resolveExecuteSyncRoute({
+          perProjectEngines: this.workflows.hasPerProjectEngines(),
+          langwatchEndpoint: config.langwatchEndpoint,
+          baseHost: config.publicBaseUrl ?? "",
+          nlpServiceUrl: config.nlpServiceUrl,
+        }),
         target,
         script: { kind: "agent_test", userMessage: AGENT_TEST_USER_MESSAGE },
       },

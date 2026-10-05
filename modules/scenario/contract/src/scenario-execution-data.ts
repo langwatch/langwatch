@@ -485,7 +485,8 @@ export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;
 export const AgentTestTurnJobSchema = z.object({
   kind: z.literal("agent-test-turn"),
   adapterData: TargetAdapterDataSchema,
-  nlpServiceUrl: z.string(),
+  /** Where a code or workflow agent's turn posts, chosen by the same rule as a simulation's. */
+  executeSyncRoute: ExecuteSyncRouteSchema,
   parameters: runParameterValuesSchema.default({}),
   message: z.string(),
   /** The call-budget ceiling the turn answers inside (ADR-128). */

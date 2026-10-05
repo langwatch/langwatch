@@ -29,6 +29,8 @@ Feature: A scenario turn runs on the project's own engine without the credential
     #   apps/scenario-child/src/__tests__/execute-sync-relay-errors.unit.test.ts
     #   modules/scenario/process/src/__tests__/child-environment-no-lambda-credential.unit.test.ts
     #   modules/workflow/process/src/transport/__tests__/workflow-execute-sync.rest.integration.test.ts
+    #   modules/scenario/process/src/__tests__/agent-test.service.unit.test.ts
+    #   apps/scenario-child/src/services/__tests__/agent-test-turn-route.unit.test.ts
 
   Rule: The parent chooses the route and the child obeys it
 
@@ -197,11 +199,21 @@ Feature: A scenario turn runs on the project's own engine without the credential
         | a connection that is never made    | fetch     | network     |
         | its own deadline passing           | timeout   | timeout     |
 
-  Rule: A caller already inside the control plane does not relay to itself
+  Rule: The agent-test turn takes the same route as every other turn
+
+    The agent test's one turn runs in a scenario child like a simulation turn,
+    so it obeys the same route: the any-project engine credential never leaves
+    the control plane, and a self-hosted deployment still posts directly.
 
     @unit
-    Scenario: The agent-test turn reaches the engine directly
-      Given an agent test, which runs in the control plane rather than a child
-      When it sends its one turn
-      Then it reaches the engine the way the control plane always does
-      And it does not post to the relay route
+    Scenario: The agent-test turn takes the same route as every other turn
+      Given the deployment is configured with per-project engines
+      When an agent test sends its one turn to a code or workflow agent
+      Then the turn's job is routed through the control plane
+      And the child posts the turn to the relay with the project's own key
+
+    @unit
+    Scenario: A self-hosted agent-test turn posts to the engine directly
+      Given the deployment has no per-project engines
+      When an agent test sends its one turn to a code or workflow agent
+      Then the turn's job is routed straight to the engine
