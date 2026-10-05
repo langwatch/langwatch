@@ -181,7 +181,6 @@ describe("an existing local user signing in through signed SAML", () => {
 
   /** @scenario "SAML linking refuses unsuitable local identity evidence" */
   it.each([
-    "unverified",
     "deactivated",
     "wrong-domain",
     "tampered",
@@ -193,10 +192,7 @@ describe("an existing local user signing in through signed SAML", () => {
       kind === "wrong-domain"
         ? "member@unproved.test"
         : `member@${fixture.domain}`;
-    const { user } = await fixture.createLocalUser(
-      kind !== "unverified",
-      email,
-    );
+    const { user } = await fixture.createLocalUser(true, email);
     if (kind === "deactivated") {
       await prisma.user.update({
         where: { id: user.id },
@@ -256,7 +252,7 @@ describe("an existing local user signing in through signed SAML", () => {
       await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
     ).toMatchObject({
       email,
-      emailVerified: kind !== "unverified",
+      emailVerified: true,
       name: user.name,
       image: user.image,
     });

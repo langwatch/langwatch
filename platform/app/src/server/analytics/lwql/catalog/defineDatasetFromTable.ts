@@ -681,7 +681,7 @@ export interface DatasetOverride {
  * migrations (`lwqlCatalogCollision.unit.test.ts`).
  *
  * Because it is required, the renames are kept (not removed) — each override
- * picks a clear caller-facing name (`automation_audit` → `automation_events`,
+ * picks a clear caller-facing name (`suite_runs` → `test_suite_runs`,
  * `coding_agent_trace_sessions` → `coding_trace_sessions`, …) rather than a
  * mechanical `_v` suffix: a readable name is better UX than the table name plus
  * a marker, and these names are already bound in the feature file, docs and the

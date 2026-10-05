@@ -90,6 +90,7 @@ function healthyDeps(overrides: Partial<CheckupDeps> = {}): CheckupDeps {
     email: {
       provider: "smtp",
       smtpConfigured: true,
+      smtpSendsCredentials: true,
       verifySmtp: async () => undefined,
     },
     modelProviders: async () => [
@@ -439,6 +440,32 @@ describe("CheckupService", () => {
     });
   });
 
+  describe("when the deployment sets LANGWATCH_CONNECT_DISABLED and the reach checks are asked for", () => {
+    /** @scenario "Connect switched off by the deployment probes no LangWatch host" */
+    it("opens no connection and names the variable", async () => {
+      const reach = vi.fn(async () => undefined);
+      const { rows } = await new CheckupService(
+        healthyDeps({
+          reach,
+          connect: async () => ({
+            ...CONNECTED,
+            deployment: "off",
+            licensed: false,
+            entitledServices: null,
+            lastSyncAt: null,
+          }),
+        }),
+      ).explicit({ checks: ["reach_connect_host", "reach_gateway_host"] });
+
+      expect(reach).not.toHaveBeenCalled();
+      for (const id of ["reach_connect_host", "reach_gateway_host"] as const) {
+        const verdict = rowOf(rows, id);
+        expect(verdict.outcome).toBe("unchecked");
+        expect(verdict.detail).toContain("LANGWATCH_CONNECT_DISABLED");
+      }
+    });
+  });
+
   describe("when the model provider test budget is used up", () => {
     /** @scenario "The model provider test respects the organization's egress budget" */
     it("leaves the row not checked and names when to try again", async () => {
@@ -461,6 +488,40 @@ describe("CheckupService", () => {
       expect(verdict.outcome).toBe("unchecked");
       expect(verdict.detail).toContain("42 seconds");
       expect(testModelProvider).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the SMTP relay accepts the connection", () => {
+    const smtpRow = async (smtpSendsCredentials: boolean) => {
+      const { rows } = await new CheckupService(
+        healthyDeps({
+          email: {
+            provider: "smtp",
+            smtpConfigured: true,
+            smtpSendsCredentials,
+            verifySmtp: async () => undefined,
+          },
+        }),
+      ).explicit({ checks: ["smtp_verify"] });
+      return rowOf(rows, "smtp_verify");
+    };
+
+    /** @scenario "The SMTP check mentions credentials only when it sent some" */
+    it("names the credentials when an SMTP user is configured", async () => {
+      const verdict = await smtpRow(true);
+
+      expect(verdict.outcome).toBe("verified");
+      expect(verdict.detail).toBe(
+        "The SMTP server accepted a connection and the credentials.",
+      );
+    });
+
+    /** @scenario "The SMTP check mentions credentials only when it sent some" */
+    it("mentions no credentials when no SMTP user is configured", async () => {
+      const verdict = await smtpRow(false);
+
+      expect(verdict.outcome).toBe("verified");
+      expect(verdict.detail).toBe("The SMTP server accepted a connection.");
     });
   });
 

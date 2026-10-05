@@ -31,6 +31,20 @@ When something is worth watching past a single question, ask Langy to set up an 
 - "Create a trigger that flags any trace where the answer-correctness eval fails."
 - "Watch my daily token spend and tell me if it jumps."
 
-Langy sets these up with `langwatch monitor create` and `langwatch trigger create`, so the alert or automation lives in your project like any other, not inside the chat. You change or remove it the same way you would one you made yourself.
+Langy sets these up with the `langwatch` CLI, so the alert or automation lives in your project like any other, not inside the chat. You change or remove it the same way you would one you made yourself:
+
+- A **latency, cost or volume alert** is a graph alert: it needs a custom graph of the metric (`langwatch graph create`, or one you already have) and an alert on one of that graph's series (`langwatch trigger create --custom-graph-id --graph-alert`). For "p95 latency on the checkout agent above 8s", that is a graph of `performance.completion_time` at p95 filtered to the checkout agent, and an alert like this:
+
+  ```bash
+  langwatch trigger create "Checkout p95 latency" \
+    --action SEND_SLACK_MESSAGE --slack-connection <connectionId> --slack-channel C0123456789 \
+    --custom-graph-id <graphId> --alert-type WARNING \
+    --graph-alert '{"seriesName":"0/performance.completion_time/p95","operator":"gt","threshold":8000,"timePeriod":15}'
+  ```
+
+  The threshold is in milliseconds, and `timePeriod` is the window in minutes. The Slack connection is one listed under **Settings → Integrations → Slack**; a webhook connection needs no `--slack-channel`.
+- A **per-trace automation**, such as flagging every trace where an evaluation fails, is `langwatch trigger create --filters`, keyed by the id of the monitor that runs the evaluation. If no monitor runs it yet, Langy adds one with `langwatch monitor create`.
+
+The [Triggers API](/api-reference/triggers/overview) has every option.
 
 <Note>These are things you ask Langy to do, on the window and metric you name. Langy analyzes your traces and sets up monitors when you ask; it does not watch and act on its own.</Note>

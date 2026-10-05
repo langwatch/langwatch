@@ -894,4 +894,37 @@ describe("POST /search with a trace filter", () => {
       expect(mockGetAllTracesForProject).not.toHaveBeenCalled();
     });
   });
+
+  describe("when a legacy filter that needs an evaluator key is sent as a flat list", () => {
+    it("answers 422 naming the filter, rather than matching nothing", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filters: { "evaluations.passed": ["false"] },
+      });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as {
+        error: string;
+        fields: string[];
+        reasons: { meta: { type: string; message: string } }[];
+      };
+      expect(body.error).toBe("validation_error");
+      expect(body.fields).toEqual(["filters.evaluations.passed"]);
+      expect(body.reasons[0]?.meta.type).toBe("filter_key_required");
+      expect(body.reasons[0]?.meta.message).toContain("evaluatorVerdict:fail");
+      expect(mockGetAllTracesForProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a legacy filter that needs no key is sent as a flat list", () => {
+    it("searches with it", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filters: { "traces.error": ["true"] },
+      });
+      expect(res.status).toBe(200);
+      expect(mockGetAllTracesForProject).toHaveBeenCalled();
+    });
+  });
 });

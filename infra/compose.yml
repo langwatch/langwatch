@@ -68,8 +68,10 @@ services:
     image: langwatch/langwatch_nlp:latest
     env_file:
       - platform/app/.env
-    ports:
-      - "5561:5561"
+    # No host port - accessed via docker network as "langwatch_nlp:5561".
+    # The app and workers dial it there, so nothing needed the host binding,
+    # and this engine runs workflow nodes for whichever project the request
+    # body names.
     restart: always
     pull_policy: always
     environment:

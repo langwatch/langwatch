@@ -2,7 +2,7 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
@@ -54,8 +54,7 @@ export const createGraphCommand = async (
     });
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "create graph" });
+      await failSpinnerFromResponse({ spinner, response, action: "create graph" });
       process.exit(1);
     }
 

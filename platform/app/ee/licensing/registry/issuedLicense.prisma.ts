@@ -3,8 +3,10 @@
  * in `./composition.ts`.
  */
 
+import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import type {
   CustomerOrganizationPort,
@@ -178,6 +180,7 @@ export class PrismaCustomerOrganizations implements CustomerOrganizationPort {
   }): Promise<{ id: string; name: string }> {
     return this.prisma.organization.create({
       data: {
+        id: generate(KSUID_RESOURCES.ORGANIZATION).toString(),
         name,
         slug: `${slugify(name) || "customer"}-${nanoid(6).toLowerCase()}`,
         selfHostedCustomer: true,

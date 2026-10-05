@@ -13,11 +13,23 @@ import {
   isSupportChatAvailable,
   toggleSupportChat,
 } from "~/utils/crispBubblePolicy";
+import { docsUrl } from "~/utils/docsUrl";
 
-/** Why an Instant Eval did not start, and what the popover says about it. */
+/**
+ * Why an Instant Eval did not start, and what the popover says about it.
+ *
+ * `opt_in`, `ask_admin` and `unreleased` are the same refusal, an
+ * organization Instant Evals are not on for, told to three readers: a member
+ * who may manage a self-serve organization is offered the switch, a member
+ * who may not is told where the text would go and to ask an organization
+ * admin, and an enterprise organization or a self-hosted install is offered a
+ * word with us.
+ */
 export type InstantEvalRefusal =
   | { kind: "budget" }
   | { kind: "model" }
+  | { kind: "opt_in" }
+  | { kind: "ask_admin" }
   | { kind: "unreleased" };
 
 /** Where a paid plan is picked, which is what lifts the free budget. */
@@ -33,23 +45,45 @@ export const MODEL_PROVIDERS_HREF = "/settings/model-providers";
 export const CONTACT_US_HREF =
   "mailto:support@langwatch.ai?subject=Please%20enable%20Instant%20Evals";
 
+/** The docs paragraph that says where the judged text goes. */
+export const WHERE_THE_TEXT_GOES_HREF = docsUrl(
+  "/features/instant-evals/limits-and-cost#where-the-judged-text-goes",
+);
+
 interface InstantEvalRefusalPopoverProps {
   refusal: InstantEvalRefusal | null;
   /**
    * Closing, by the X, a click outside or the secondary button: for budget
-   * and model refusals the phrase search then runs; for an unreleased
-   * project there is no sentence to fall back to, so this only closes the
-   * popover.
+   * and model refusals the phrase search then runs; for an organization
+   * Instant Evals are not on for there is no sentence to fall back to, so
+   * this only closes the popover.
    */
   onClose: () => void;
+  /**
+   * The organization's switch. Pressed by the `opt_in` popover only, and
+   * required all the same: an Enable button whose click did nothing would
+   * be the one refusal the popover cannot explain.
+   */
+  onEnable: () => void;
+  isEnabling: boolean;
   children: React.ReactElement;
 }
 
-/** The popover's words, exported so the copy is pinned by a test. */
+/**
+ * The popover's words, exported so the copy is pinned by a test. An action
+ * with an `href` is a link; one without is the organization's switch, a
+ * button; no action at all leaves only the quieter link and the dismissal,
+ * for the reader who may do nothing here but read. The render branches on
+ * that rather than on the refusal kind.
+ */
 export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
   title: string;
   body: string;
-  action: { label: string; href: string };
+  /** A phrase set in bold where it first appears in the body. */
+  emphasis?: string;
+  action?: { label: string; href?: string };
+  /** A second, quieter link beside the action, when the copy has one. */
+  more?: { label: string; href: string };
   dismiss: string;
 } {
   const what =
@@ -64,32 +98,82 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
     };
   }
   if (refusal.kind === "model") {
+    // The deployment has no judge, or its judge is down. The reader's own
+    // model settings cannot fix either, so the way out is a word with us.
     return {
-      title: "Configure a model to judge results",
-      body: `${what} Configure a model to run it. ${meanwhile}`,
-      action: { label: "Configure a model", href: MODEL_PROVIDERS_HREF },
+      title: "Instant Evals can't run right now",
+      body: `${meanwhile} If it keeps happening, contact us.`,
+      action: { label: "Contact us", href: CONTACT_US_HREF },
       dismiss: "Skip",
+    };
+  }
+  const whereItGoes =
+    "Instant Evals send the text of your traces and your question to the model that judges them, under a data processing agreement. It is never used to train the model.";
+  if (refusal.kind === "opt_in") {
+    return {
+      title: "Turn on Instant Evals for your organization",
+      body: `${whereItGoes} Enable turns this on for every project in your organization.`,
+      action: { label: "Enable" },
+      more: { label: "Read more", href: WHERE_THE_TEXT_GOES_HREF },
+      dismiss: "Not now",
+    };
+  }
+  if (refusal.kind === "ask_admin") {
+    return {
+      title: "Instant Evals aren't turned on for your organization yet",
+      body: `${whereItGoes} Ask an organization admin to turn it on for every project in your organization.`,
+      more: { label: "Read more", href: WHERE_THE_TEXT_GOES_HREF },
+      dismiss: "Not now",
     };
   }
   return {
     title: "Instant Evals aren't enabled for this project yet",
     body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
+    emphasis: "Instant Evals",
     action: { label: "Contact us", href: CONTACT_US_HREF },
     dismiss: "Not now",
   };
+}
+
+/** The body, with its emphasis phrase in bold where it first appears. */
+function EmphasizedBody({
+  body,
+  emphasis,
+}: {
+  body: string;
+  emphasis?: string;
+}) {
+  const at = emphasis ? body.indexOf(emphasis) : -1;
+  if (!emphasis || at < 0) return <>{body}</>;
+  return (
+    <>
+      {body.slice(0, at)}
+      <Text as="strong" fontWeight="semibold" color="fg">
+        {emphasis}
+      </Text>
+      {body.slice(at + emphasis.length)}
+    </>
+  );
 }
 
 /**
  * The refusal an Instant Eval met, anchored to the search bar: what the eval
  * would have found here, why it did not run, and the one thing that lifts
  * it. Closable every way. A spent budget or a missing judge falls back to
- * the phrase search, so neither is ever an error state on the page; a
- * project without Instant Evals has no phrase to fall back to, so this is
- * also that project's advertisement for the feature, and closing it just
+ * the phrase search, so neither is ever an error state on the page; an
+ * organization Instant Evals are not on for has no phrase to fall back to,
+ * so this is also its advertisement for the feature, and closing it just
  * leaves the typed chip where the reader put it.
  *
+ * The `opt_in` popover is the explanation the organization reads before it
+ * switches Instant Evals on: where the judged text goes, under what
+ * agreement, and that it is never trained on. "Enable" throws the switch;
+ * "Read more" opens the docs paragraph that says the same at length. The
+ * `ask_admin` popover is the same explanation for a member who may not
+ * throw the switch, with no button the server would refuse.
+ *
  * "Contact us" on the unreleased popover opens the support chat when one is
- * available, and falls back to a mailto link otherwise — the copy names
+ * available, and falls back to a mailto link otherwise: the copy names
  * neither route, so it reads the same either way.
  *
  * Spec: specs/traces-v2/instant-eval-search.feature ("A refusal is a
@@ -97,10 +181,13 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
  */
 export const InstantEvalRefusalPopover: React.FC<
   InstantEvalRefusalPopoverProps
-> = ({ refusal, onClose, children }) => {
+> = ({ refusal, onClose, onEnable, isEnabling, children }) => {
   const copy = refusal ? instantEvalRefusalCopy(refusal) : null;
+  const action = copy?.action;
   const useSupportChat =
-    refusal?.kind === "unreleased" && isSupportChatAvailable();
+    action?.href === CONTACT_US_HREF && isSupportChatAvailable();
+  const actionHref = action?.href;
+  const isSwitch = action !== undefined && actionHref === undefined;
   return (
     <PopoverRoot
       open={refusal !== null}
@@ -137,23 +224,25 @@ export const InstantEvalRefusalPopover: React.FC<
                 </Text>
               </HStack>
               <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-                {copy.body}
+                <EmphasizedBody body={copy.body} emphasis={copy.emphasis} />
               </Text>
               <HStack gap={2}>
-                {useSupportChat ? (
+                {action && (isSwitch || useSupportChat) && (
                   <Button
                     size="xs"
                     flex={1}
                     bg="orange.solid"
                     color="white"
                     _hover={{ bg: "orange.fg" }}
-                    onClick={toggleSupportChat}
+                    onClick={isSwitch ? onEnable : toggleSupportChat}
+                    loading={isSwitch && isEnabling}
                   >
-                    {copy.action.label}
+                    {action.label}
                   </Button>
-                ) : (
+                )}
+                {action && actionHref !== undefined && !useSupportChat && (
                   <NextLink
-                    href={copy.action.href}
+                    href={actionHref}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ display: "block", flex: 1 }}
@@ -165,7 +254,18 @@ export const InstantEvalRefusalPopover: React.FC<
                       color="white"
                       _hover={{ bg: "orange.fg" }}
                     >
-                      {copy.action.label}
+                      {action.label}
+                    </Button>
+                  </NextLink>
+                )}
+                {copy.more && (
+                  <NextLink
+                    href={copy.more.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button size="xs" variant="outline">
+                      {copy.more.label}
                     </Button>
                   </NextLink>
                 )}

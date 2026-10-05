@@ -18,6 +18,11 @@ export type SessionEventLike = {
   [key: string]: unknown;
 };
 
+/** A session event field read as a number, or 0 when it is not one. */
+function numberField(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 type ContentBlock = { type?: string; text?: string };
 
 /** Concatenate the text blocks of a tool result content array. */
@@ -83,6 +88,12 @@ export function settledToolOutput(result: unknown): string {
 
 export class TurnEventMapper {
   private readonly toolInputs = new Map<string, unknown>();
+  // A text block ended and no tool has started since. The next text delta
+  // opens a new block of the same paragraph run (GPT-5 on the Responses API
+  // sends a commentary message and a final one), so it gets a paragraph
+  // break instead of running into the previous sentence.
+  private textBlockEnded = false;
+  private textInBlock = false;
 
   constructor(private readonly turnId: string) {}
 
@@ -93,7 +104,15 @@ export class TurnEventMapper {
           | { type?: string; delta?: string }
           | undefined;
         if (delta?.type === "text_delta" && typeof delta.delta === "string" && delta.delta !== "") {
-          return [{ type: "delta", turnId: this.turnId, text: boundText({ text: delta.delta }) }];
+          const text = this.textBlockEnded ? `\n\n${delta.delta}` : delta.delta;
+          this.textBlockEnded = false;
+          this.textInBlock = true;
+          return [{ type: "delta", turnId: this.turnId, text: boundText({ text }) }];
+        }
+        if (delta?.type === "text_end") {
+          if (this.textInBlock) this.textBlockEnded = true;
+          this.textInBlock = false;
+          return [];
         }
         if (
           delta?.type === "thinking_delta" &&
@@ -105,6 +124,8 @@ export class TurnEventMapper {
         return [];
       }
       case "tool_execution_start": {
+        this.textBlockEnded = false;
+        this.textInBlock = false;
         const id = String(event.toolCallId ?? "");
         const name = String(event.toolName ?? "");
         this.toolInputs.set(id, event.args);
@@ -156,6 +177,21 @@ export class TurnEventMapper {
         }
         return events;
       }
+      case "auto_retry_start":
+        return [
+          {
+            type: "retrying",
+            turnId: this.turnId,
+            attempt: numberField(event.attempt),
+            maxAttempts: numberField(event.maxAttempts),
+            delayMs: numberField(event.delayMs),
+          },
+        ];
+      case "auto_retry_end":
+        // Every end clears the retry line: an answered call, the last retry
+        // failing or a stop during the wait. The error terminal that follows a
+        // failed end does not clear the status on its own.
+        return [{ type: "retry_settled", turnId: this.turnId }];
       default:
         return [];
     }

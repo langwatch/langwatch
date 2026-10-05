@@ -58,6 +58,7 @@ import {
   bucketScopeIdFor,
   PROVIDER_BUCKET_SEPARATOR,
 } from "./budgetResolution.service";
+import { settleBefore } from "./settleBefore";
 import { parseSummedNanoUsd } from "./spendEvents.clickhouse.repository";
 import { nanoUsdToDecimalString } from "./wireMoney";
 
@@ -1045,11 +1046,33 @@ export class GatewayBudgetClickHouseRepository {
     budgets: GatewayBudget[] | BudgetSpendTarget[],
     now: Date = new Date(),
   ): Promise<ScopeSpend[]> {
-    return this.getSpendForTargetsAcrossTenants(
+    return this.readTargetSpend({
       tenantIds,
-      toSpendTargets(budgets, now),
+      targets: toSpendTargets(budgets, now),
       now,
-    );
+    });
+  }
+
+  /**
+   * The same read as {@link getSpendForBudgetsAcrossTenants}, abandoned
+   * (retries included) when `signal` aborts.
+   */
+  async getSpendForBudgetsAcrossTenantsUntil({
+    tenantIds,
+    budgets,
+    signal,
+  }: {
+    tenantIds: string[];
+    budgets: GatewayBudget[] | BudgetSpendTarget[];
+    signal: AbortSignal;
+  }): Promise<ScopeSpend[]> {
+    const now = new Date();
+    return this.readTargetSpend({
+      tenantIds,
+      targets: toSpendTargets(budgets, now),
+      now,
+      signal,
+    });
   }
 
   /**
@@ -1067,13 +1090,31 @@ export class GatewayBudgetClickHouseRepository {
     targets: BudgetSpendTarget[],
     now: Date = new Date(),
   ): Promise<ScopeSpend[]> {
+    return this.readTargetSpend({ tenantIds, targets, now });
+  }
+
+  private async readTargetSpend({
+    tenantIds,
+    targets,
+    now,
+    signal,
+  }: {
+    tenantIds: string[];
+    targets: BudgetSpendTarget[];
+    now: Date;
+    signal?: AbortSignal;
+  }): Promise<ScopeSpend[]> {
     if (targets.length === 0 || tenantIds.length === 0) return [];
 
     // Two reads, because a target whose boundary has moved cannot be
     // answered from the rollup: the rollup's buckets are keyed by calendar
     // PeriodStart and pre-aggregate the whole bucket, so a floor sitting
     // inside one is unanswerable there.
-    const spends = await this.readFlooredTargetSpend(tenantIds, targets);
+    const spends = await this.readFlooredTargetSpend({
+      tenantIds,
+      targets,
+      signal,
+    });
     for (const [window, targetsForWindow] of targetsByWindow(targets)) {
       spends.push(
         ...(await this.readRollupTargetSpend({
@@ -1081,6 +1122,7 @@ export class GatewayBudgetClickHouseRepository {
           window,
           targets: targetsForWindow,
           now,
+          signal,
         })),
       );
     }
@@ -1106,10 +1148,15 @@ export class GatewayBudgetClickHouseRepository {
    * successful requests only. An anchored budget lives here permanently:
    * its periods never coincide with the calendar ones the rollup keys on.
    */
-  private async readFlooredTargetSpend(
-    tenantIds: string[],
-    targets: BudgetSpendTarget[],
-  ): Promise<ScopeSpend[]> {
+  private async readFlooredTargetSpend({
+    tenantIds,
+    targets,
+    signal,
+  }: {
+    tenantIds: string[];
+    targets: BudgetSpendTarget[];
+    signal?: AbortSignal;
+  }): Promise<ScopeSpend[]> {
     const floored = targets.filter((t) => t.periodFloorMs !== undefined);
     if (floored.length === 0) return [];
 
@@ -1139,8 +1186,11 @@ export class GatewayBudgetClickHouseRepository {
           earliestFloor: earliestFloorMs,
         },
         format: "JSONEachRow",
+        ...(signal && { abort_signal: signal }),
       });
-      const rows = (await result.json()) as Array<Record<string, string>>;
+      const rows = (await readRowsUntil({ result, signal })) as Array<
+        Record<string, string>
+      >;
       const row = rows[0] ?? {};
       return floored.map((t, i) => ({
         budgetId: t.budgetId,
@@ -1167,8 +1217,9 @@ export class GatewayBudgetClickHouseRepository {
     window: GatewayBudgetWindow;
     targets: BudgetSpendTarget[];
     now: Date;
+    signal?: AbortSignal;
   }): Promise<ScopeSpend[]> {
-    const { tenantIds, window, targets, now } = args;
+    const { tenantIds, window, targets, now, signal } = args;
     const scopeFilter = rollupScopeFilter(targets);
     try {
       // Any tenant resolves the client: the query hits
@@ -1196,8 +1247,12 @@ export class GatewayBudgetClickHouseRepository {
           periodStart: currentPeriodStart(window, now).getTime(),
         },
         format: "JSONEachRow",
+        ...(signal && { abort_signal: signal }),
       });
-      const rows = (await result.json()) as RollupScopeRow[];
+      const rows = (await readRowsUntil({
+        result,
+        signal,
+      })) as RollupScopeRow[];
       return targets.map((t) => ({
         budgetId: t.budgetId,
         scope: t.scope,
@@ -1557,4 +1612,27 @@ function scopeToClickHouse(scope: GatewayBudgetScopeType): string {
 
 function windowToClickHouse(window: GatewayBudgetWindow): string {
   return window.toString();
+}
+
+/**
+ * Reads a result set's rows, closing its response stream when `signal`
+ * aborts: the driver drops the caller's signal once headers arrive, so a
+ * stalled body would otherwise outlive the deadline.
+ */
+async function readRowsUntil({
+  result,
+  signal,
+}: {
+  result: { json: () => Promise<unknown>; close?: () => void };
+  signal?: AbortSignal;
+}): Promise<unknown> {
+  if (!signal) return result.json();
+  signal.throwIfAborted();
+  const onAbort = () => result.close?.();
+  signal.addEventListener("abort", onAbort, { once: true });
+  try {
+    return await settleBefore({ work: result.json(), signal });
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
 }

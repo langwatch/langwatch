@@ -634,6 +634,7 @@ function canaryResultToResponse({
     {
       status: "unhealthy",
       reason: result.reason,
+      ...(result.cause && { cause: result.cause }),
       scenarioRunId: result.scenarioRunId,
       durationMs: result.durationMs,
     },
@@ -726,6 +727,7 @@ function langyCanaryResultToResponse({
     {
       status: "unhealthy",
       reason: result.reason,
+      ...(result.cause && { cause: result.cause }),
       conversationId,
       turnId,
       durationMs,

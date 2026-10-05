@@ -349,7 +349,7 @@ export const useDrawerParams = () => {
  * query that actually carries `drawer.` params — everything else stays in the
  * fragment, where its owner reads it from.
  */
-function splitAsPath(asPath: string): {
+export function splitAsPath(asPath: string): {
   path: string;
   queryString: string;
   hash: string;

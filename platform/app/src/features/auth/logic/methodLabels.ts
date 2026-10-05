@@ -31,7 +31,12 @@ const SINGLE_SIGN_ON = "single sign-on";
 export function signInMethodLabel(method: SignInMethod): string {
   if (method.kind === "password") return "email and password";
   if (method.kind === "passkey") return "a passkey";
-  return FEDERATED_METHOD_LABELS[method.id] ?? SINGLE_SIGN_ON;
+  return federatedProviderLabel(method.id);
+}
+
+/** What a federated provider id is called on screen. */
+export function federatedProviderLabel(providerId: string): string {
+  return FEDERATED_METHOD_LABELS[providerId] ?? SINGLE_SIGN_ON;
 }
 
 /** The button a method gets in the picker. */
