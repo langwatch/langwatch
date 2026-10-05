@@ -3,6 +3,7 @@
  * statement calling one of our app functions names a deployment gap, never an
  * unknown error. Driven through a stubbed driver; the claim is the mapping.
  * @see specs/lwql/app-functions.feature
+ * @see specs/analytics/dashboard-widget-resilience.feature
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -68,6 +69,41 @@ describe("given a statement that calls no app function", () => {
       const refusal = await refusalOf("SELECT toBool(1) AS flag FROM analytics.traces");
 
       expect(refusal.code).not.toBe("lwql_app_function_unavailable");
+    });
+  });
+});
+
+describe("given the LangWatchQL identity is running as many statements as it may", () => {
+  describe("when the server refuses one more", () => {
+    /** @scenario "A busy query service is a named, retryable refusal" */
+    it("refuses with lwql_busy, a retryable platform fault, rather than an unknown error", async () => {
+      queryMock.mockRejectedValueOnce(
+        Object.assign(
+          new Error(
+            "Code: 202. DB::Exception: Too many simultaneous queries for user lwql_reader. Current: 10, maximum: 10. (TOO_MANY_SIMULTANEOUS_QUERIES)",
+          ),
+          { code: "202", type: "TOO_MANY_SIMULTANEOUS_QUERIES" },
+        ),
+      );
+
+      const refusal = await executor
+        .execute({ sql: "SELECT 1", tenantCapability: "tenant-a" })
+        .then(
+          () => ({}),
+          (error: { code?: string; fault?: string; httpStatus?: number; retryable?: boolean }) => ({
+            code: error.code,
+            fault: error.fault,
+            httpStatus: error.httpStatus,
+            retryable: error.retryable,
+          }),
+        );
+
+      expect(refusal).toEqual({
+        code: "lwql_busy",
+        fault: "platform",
+        httpStatus: 503,
+        retryable: true,
+      });
     });
   });
 });

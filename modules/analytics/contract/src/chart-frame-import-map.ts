@@ -149,7 +149,6 @@ function toDataModuleUrl(source: string): string {
   return "data:text/javascript;charset=utf-8," + encodeURIComponent(source);
 }
 
-/** The module one global is served as: itself as default, its members by name. */
 export function buildGlobalModuleSource(globalName: ChartFrameGlobal): string {
   const names = CHART_FRAME_GLOBAL_EXPORTS[globalName].join(", ");
   return `const m = window.${globalName};\nexport default m;\nexport const { ${names} } = m;`;
@@ -177,7 +176,6 @@ export function buildJsxRuntimeModuleSource(globalName: string): string {
   );
 }
 
-/** Specifier to module URL, for every built-in the frame satisfies itself. */
 export function buildChartFrameImportMap(): { imports: Record<string, string> } {
   const imports: Record<string, string> = {};
   for (const [specifier, globalName] of Object.entries(SPECIFIER_GLOBALS)) {

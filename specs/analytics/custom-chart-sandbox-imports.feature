@@ -69,8 +69,9 @@ Feature: Custom chart widgets import any module and run under their own CSP
 
   @unit
   Scenario: Built-in modules resolve to the frame's own instance
-    When a widget imports "react", "react-dom", "react-dom/client", "recharts" or "@langwatch/charts"
-    Then the specifier is left unchanged so the import map serves the frame's UMD global
+    When the specifier resolver reads "react", "react-dom", "react-dom/client", "recharts" or "@langwatch/charts"
+    Then it leaves the specifier unchanged rather than sending it to esm.sh
+    And the import map, or the compiled import rewritten after it, serves the frame's UMD global
 
   # WebKit and Firefox ignore an import map that arrives after any module load
   # has started, and a proxy in front of the app may inject a module script
