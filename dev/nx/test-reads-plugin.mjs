@@ -98,6 +98,9 @@ export const reads = {
     "packages/architecture-enforcer/oxlint.architecture.jsonc",
   ],
   "@langwatch/usage-process": ["docs/pricing.mdx", "docs/pricing/billable-events.mdx"],
+  "@langwatch/instant-eval-process": ["docs/pricing.mdx"],
+  "@langwatch/langyworker": ["skills/guided-onboarding/SKILL.mdx"],
+  "@langwatch/visual-diff-runner": ["tools/visualdiff/config.go"],
   "@langwatch/experiment-browser": [
     "services/langevals/evaluators/langevals/langevals_langevals/select_best_compare.py",
   ],

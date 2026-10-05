@@ -1421,7 +1421,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
         const answer = await post({ sql });
 
         expect(answer.status, sql).toBe(400);
-        expect(json(answer).error.code, sql).toBe("lwql_not_permitted");
+        expect(json(answer).code, sql).toBe("lwql_not_permitted");
       }
     });
   });

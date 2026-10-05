@@ -837,19 +837,8 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
       "the gated set a caller without content permission gets is not the catalog's content columns",
     ).toEqual([...withoutContent]);
     expect(withoutContent).toContain("CapturedInput");
-
-    // Every gate the catalog names is one the canonical policy defines.
-    const canonicalGates = new Set(["input", "output", "costs"]);
-    for (const view of LWQL_VIEW_CATALOG) {
-      for (const column of view.columns) {
-        for (const gate of column.gates) {
-          expect(
-            canonicalGates.has(gate),
-            `${view.name}.${column.name} names a gate the visibility policy does not define`,
-          ).toBe(true);
-        }
-      }
-    }
+    // That every gate the catalog names is one the policy defines is proved by
+    // rules/__tests__/lwql-gate.rules.unit.test.ts.
 
     const policy = {
       allowedTables: catalogShapes.allowedTables({
