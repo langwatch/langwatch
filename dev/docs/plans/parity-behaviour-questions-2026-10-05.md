@@ -78,3 +78,40 @@ Date: 2026-10-05. Branch: feat/strict-feature-layout-v0. Each row stays unbound 
 | Row | Scenario says               | Product does  |
 | --- | --------------------------- | ------------- |
 | 10  | setupState lists six fields | returns seven |
+
+## API keys
+
+| Row    | Scenario says                                                     | Product does                                                           |
+| ------ | ----------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| 6      | minting answers id, name, masked hint, grants, created and expiry | id, name and createdAt (pinned by the tRPC test)                       |
+| 12     | a "Project key (legacy)" row is listed and can only be revoked    | ADR-002 and the screen test: the legacy key cannot be found            |
+| 19     | a new key expires in 90 days unless never is chosen               | the drawer defaults to "No expiration"                                 |
+| 20     | a key row offers Revoke and nothing else                          | Edit and Revoke                                                        |
+| 26     | the mint dialog greys out roles beyond the reader                 | the drawer has no role chooser                                         |
+| 28, 29 | an "I've stored this key" checkbox gates Done                     | a "Token Created" panel with .env, Bearer, Basic and assistant tabs    |
+| 33     | audit actions api-key.created / api-key.revoked with the key id   | apiKey.create / apiKey.revoke; the mint entry carries name and keyType |
+| 42     | the family serves two screens                                     | it registers four                                                      |
+
+## Analytics
+
+| Row  | Scenario says                                         | Product does                                                                                                        |
+| ---- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 1-15 | the LWQL workbench screen (period_start / period_end) | the workbench was removed (9d192f6f29); reserved names are dashboard_context_period_start / _end: retire or rewrite |
+| 34   | react-vega is pinned, recorded in the PR              | the package pins vega, vega-lite, vega-embed; no react-vega                                                         |
+
+## Organization
+
+| Row    | Scenario says                                                              | Product does                                                                            |
+| ------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 12     | a group scope outside the organization answers 400                         | GroupScopeNotInOrganizationError declares 422                                           |
+| 27     | a deactivated person does not take a seat                                  | the seat count filters only `disabledAt` and never `user.deactivatedAt` (likely defect) |
+| 14, 15 | a directory with no product never reads "SCIM"; group grants stay editable | SourceBadge shows "SCIM"; group detail never says grants stay editable                  |
+| 9-11   | refused as FORBIDDEN                                                       | the enterprise gate answers `enterprise_plan_required` (bound; wording)                 |
+
+## Scenario, second pass
+
+| Ref                                          | Scenario says                                             | Product does                                                                 |
+| -------------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| suites-page-metrics-display.feature:16       | the pill clock shows average agent latency; cost "$0.024" | total duration; "$0.0240"                                                    |
+| suite-bugfixes-1956.feature:44               | Run Again stays on the standalone run page                | no standalone run page; Run Again navigates to /simulations?pendingBatch=... |
+| real-time-run-updates.feature:60/66/72/80/86 | adaptive polling                                          | no refetchInterval; a test asserts no timer                                  |
