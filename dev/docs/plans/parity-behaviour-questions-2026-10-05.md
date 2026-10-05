@@ -115,3 +115,19 @@ Date: 2026-10-05. Branch: feat/strict-feature-layout-v0. Each row stays unbound 
 | suites-page-metrics-display.feature:16       | the pill clock shows average agent latency; cost "$0.024" | total duration; "$0.0240"                                                    |
 | suite-bugfixes-1956.feature:44               | Run Again stays on the standalone run page                | no standalone run page; Run Again navigates to /simulations?pendingBatch=... |
 | real-time-run-updates.feature:60/66/72/80/86 | adaptive polling                                          | no refetchInterval; a test asserts no timer                                  |
+
+## Licensing
+
+| Scenario                                                 | Product does                                                                                                       |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| A cap above the contract maximum is shown on the field   | the page never renders the maximum; the catalogue copy for connect_budget_above_contract_maximum carries no number |
+| The page shows a refusal in place of the hosted services | the screen forwards the code to host.describeFailure; the meaning text lives outside licensing                     |
+
+## Ops
+
+| Scenario                                                                                                 | Product does                                                                                    |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| The operator dashboard reads the snapshot the writer publishes (the API never claims the writer's lease) | the api role runs the queue-metrics writer and contends for the lease                           |
+| A process with no snapshot store / no queue Redis says so by name                                        | ops takes `members.redis` as required: boot refusal, or degrade?                                |
+| The worker starts all three loops / shutdown stops every loop                                            | three scheduled process managers plus one resource-owned writer (wording)                       |
+| rbac scenarios naming resolveOpsScope and checkOpsPermission                                             | those functions no longer exist; bound to operatorScope / getScope behaviour, wording to update |
