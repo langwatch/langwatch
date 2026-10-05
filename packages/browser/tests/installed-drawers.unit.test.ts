@@ -32,6 +32,7 @@ describe("installed drawers", () => {
     await expect(loaders.traceDetails?.()).resolves.toBe(traceDrawer);
   });
 
+  /** @scenario Two features serving the same drawer name are refused by name */
   it("refuses two modules claiming one drawer name, naming both", () => {
     const rival = defineBrowserModule("scenario").withDrawers({
       traceDetails: { load: () => Promise.resolve({ default: () => null }) },

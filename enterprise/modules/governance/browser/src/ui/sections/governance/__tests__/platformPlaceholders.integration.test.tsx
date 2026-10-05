@@ -12,7 +12,7 @@ import {
   type LangySliceSurface,
 } from "@langwatch/langy-contract";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -117,6 +117,29 @@ describe("the Insights screen on first open", () => {
     await userEvent.click(screen.getByRole("button", { name: "Open Langy" }));
 
     expect(langy.getState().isOpen).toBe(true);
+  });
+
+  /** @scenario "The Setup drawer keeps its edits for the sitting and never claims to save" */
+  it("keeps a saved schedule on reopening and raises no confirmation", async () => {
+    const host = fakeGovernanceHost({
+      enabledFlags: FLAGS,
+      permissions: ["organization:view", "governance:view"],
+    });
+    const { container } = renderWithGovernanceHost(<InsightsScreen />, { host });
+
+    await userEvent.click(screen.getByRole("button", { name: "Set up data" }));
+    const at = () => document.body.querySelector<HTMLInputElement>('input[type="time"]');
+    expect(at()?.value).toBe("07:00");
+    fireEvent.change(at() as HTMLInputElement, { target: { value: "09:30" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(screen.queryByText("Set up Insights")).not.toBeInTheDocument());
+    expect(host.recording.successes).toEqual([]);
+    expect(host.recording.failures).toEqual([]);
+    expect(container.textContent ?? "").not.toMatch(/\b(saved|stored)\b/i);
+
+    await userEvent.click(screen.getByRole("button", { name: "Set up data" }));
+    expect(at()?.value).toBe("09:30");
   });
 });
 

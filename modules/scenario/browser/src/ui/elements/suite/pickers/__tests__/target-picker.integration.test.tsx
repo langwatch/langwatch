@@ -51,6 +51,17 @@ function SuiteFormTargets() {
 afterEach(cleanup);
 
 describe("<TargetPicker/> in the suite form", () => {
+  describe("when the target picker is viewed", () => {
+    /** @scenario "Target picker displays Select All and Clear buttons" */
+    it("offers Select All and Clear beside the selected count", () => {
+      renderWithDesignSystem(<SuiteFormTargets />);
+
+      expect(screen.getByText("0 of 5 selected")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Select All" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
+    });
+  });
+
   describe("when no targets are selected and Select All is clicked", () => {
     /** @scenario "Clicking Select All selects all targets" */
     it("selects all 5 targets and counts them in the footer", async () => {

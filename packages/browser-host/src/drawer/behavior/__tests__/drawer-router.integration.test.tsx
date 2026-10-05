@@ -189,3 +189,37 @@ describe("given an address with a query key that only starts with drawer", () =>
     });
   });
 });
+
+describe("given an address carrying the parameters of a previously opened drawer", () => {
+  describe("when a different drawer is opened for another agent", () => {
+    /** @scenario "A stale editor address is cleared before a new one is written" */
+    it("leaves only the new drawer's parameters and the reader's other query parameters", async () => {
+      const start =
+        "/acme/agents?view=grid&drawer.open=agentHttpEditor&drawer.agentId=agent_old&drawer.tab=headers";
+      window.history.replaceState(null, "", start);
+      let drawers: ReturnType<typeof useDrawer> | undefined;
+      function Host() {
+        drawers = useDrawer();
+        return <Probe />;
+      }
+      render(
+        <MemoryRouter initialEntries={[start]}>
+          <Host />
+        </MemoryRouter>,
+      );
+
+      await act(async () =>
+        drawers?.openDrawer("agentCodeEditor", { urlParams: { agentId: "agent_new" } }),
+      );
+
+      const address = screen.getByTestId("address").textContent ?? "";
+      const params = new URLSearchParams(address.replace(/^\?/, ""));
+      expect(params.get("drawer.open")).toBe("agentCodeEditor");
+      expect(params.get("drawer.agentId")).toBe("agent_new");
+      expect(params.getAll("drawer.agentId")).toEqual(["agent_new"]);
+      expect(params.get("view")).toBe("grid");
+      expect(params.has("drawer.tab")).toBe(false);
+      expect(address).not.toContain("agent_old");
+    });
+  });
+});
