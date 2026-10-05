@@ -246,4 +246,84 @@ describe("streamTurnEntries", () => {
       expect(release).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("when a reconnect finds the turn settled but no terminal on the live edge", () => {
+    /** @scenario "Stream A synthesizes the terminal a reconnect missed once the turn has settled" */
+    it("yields the synthesized end and closes", async () => {
+      const live = createLiveEdge();
+      const release = vi.fn();
+
+      const { received, done } = pump(
+        tailService.streamTurnEntries({
+          ...CONVERSATION,
+          buffer: createBuffer({ tail: [{ type: "delta", text: "partial" }], live }),
+          readHealth: async () => ({ isStale: true, terminal: { type: "end" } }),
+          signal: new AbortController().signal,
+          release,
+          pollMs,
+          delay: immediately,
+        }),
+      );
+
+      await done;
+      expect(received).toEqual([{ type: "delta", text: "partial" }, { type: "end" }]);
+      expect(release).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "Stream A synthesizes the terminal a reconnect missed once the turn has settled" */
+    it("carries the failure when the settled turn failed", async () => {
+      const live = createLiveEdge();
+      const failure: LangyStreamEntry = { type: "error", error: "model_unavailable" };
+
+      const { received, done } = pump(
+        tailService.streamTurnEntries({
+          ...CONVERSATION,
+          buffer: createBuffer({ live }),
+          readHealth: async () => ({ isStale: true, terminal: failure }),
+          signal: new AbortController().signal,
+          release: () => undefined,
+          pollMs,
+          delay: immediately,
+        }),
+      );
+
+      await done;
+      expect(received).toEqual([failure]);
+    });
+  });
+
+  describe("when the durable fold still reports the turn in flight", () => {
+    /** @scenario "Stream A stays patient while a turn is still live or cold-starting" */
+    it("keeps following and synthesizes no terminal while the turn is quiet", async () => {
+      const live = createLiveEdge();
+      const release = vi.fn();
+      let polls = 0;
+
+      const { received, done } = pump(
+        tailService.streamTurnEntries({
+          ...CONVERSATION,
+          buffer: createBuffer({ live }),
+          readHealth: async () => {
+            polls += 1;
+            return { isStale: false, terminal: null };
+          },
+          signal: new AbortController().signal,
+          release,
+          pollMs,
+          delay: immediately,
+        }),
+      );
+
+      await vi.waitFor(() => expect(polls).toBeGreaterThan(20));
+      expect(received).toEqual([]);
+      expect(release).not.toHaveBeenCalled();
+
+      live.push({ type: "delta", text: "first token" });
+      await vi.waitFor(() => expect(received).toEqual([{ type: "delta", text: "first token" }]));
+
+      live.push({ type: "end" });
+      await done;
+      expect(received).toEqual([{ type: "delta", text: "first token" }, { type: "end" }]);
+    });
+  });
 });

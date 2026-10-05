@@ -326,4 +326,39 @@ describe("agent turn liveness subscriber", () => {
       expect(JSON.parse((failure as { error: string }).error).code).toBe("langy_worker_stopped");
     });
   });
+
+  describe("when the timer fires after the turn it was armed for is no longer the running one", () => {
+    const stoodDown = (deps: ReturnType<typeof makeDeps>) => {
+      expect(deps.failTurn.failTurn).not.toHaveBeenCalled();
+      expect(deps.buffer.markError).not.toHaveBeenCalled();
+      expect(deps.worker.dispatch).not.toHaveBeenCalled();
+      expect(deps.buffer.liveness).not.toHaveBeenCalled();
+    };
+
+    /** @scenario "The liveness timer stands down when the turn already completed" */
+    it("re-reads the conversation and, finding it idle, does nothing", async () => {
+      const deps = makeDeps({
+        conversation: makeRecord({
+          status: LANGY_CONVERSATION_STATUS.IDLE,
+          currentTurnId: null,
+        }),
+      });
+      const subscriber = createAgentTurnLivenessSubscriber(deps);
+
+      await expect(subscriber.handle(makeEvent(), context)).resolves.toBeUndefined();
+
+      expect(deps.conversations.getById).toHaveBeenCalledTimes(1);
+      stoodDown(deps);
+    });
+
+    /** @scenario "The liveness timer stands down when a newer turn superseded the armed one" */
+    it("leaves the newer turn running and does not fail the old one", async () => {
+      const deps = makeDeps({ conversation: makeRecord({ currentTurnId: "turn_2" }) });
+      const subscriber = createAgentTurnLivenessSubscriber(deps);
+
+      await expect(subscriber.handle(makeEvent(), context)).resolves.toBeUndefined();
+
+      stoodDown(deps);
+    });
+  });
 });

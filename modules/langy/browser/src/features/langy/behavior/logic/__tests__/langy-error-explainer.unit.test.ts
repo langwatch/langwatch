@@ -592,6 +592,7 @@ describe("explainLangyError", () => {
   });
 
   describe("given the worker stopped mid-reply", () => {
+    /** @scenario "The worker stops mid-reply and Langy shows a final, specific error" */
     it("names the stop specifically and offers a manual retry", () => {
       const presentation = explainLangyError(
         domain({ code: "langy_worker_stopped", httpStatus: 503 }),

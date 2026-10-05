@@ -257,7 +257,10 @@ describe("LangyTurnRelayAdapter", () => {
       });
     });
 
-    /** @scenario "A heartbeat still counts when the revival record cannot be reached" */
+    /**
+     * @scenario "A heartbeat still counts when the revival record cannot be reached"
+     * @scenario "A revival record that already aged out is not recreated"
+     */
     it("still counts the heartbeat when the handoff store refuses", async () => {
       const refreshHandoffTtl = vi.fn(async () => {
         throw new Error("redis unavailable");
@@ -985,7 +988,10 @@ describe("LangyTurnRelayAdapter", () => {
       );
     });
 
-    /** @scenario "A live-watched failure shows the same card a reload shows" */
+    /**
+     * @scenario "A live-watched failure shows the same card a reload shows"
+     * @scenario "A handled stream error renders a useful explanation, not a raw string"
+     */
     it("marks the stream error with the CLASSIFIED domain error, not the raw prose", async () => {
       const { relay, buffer, conversations } = makeRelay();
       const out = await relay.handle(

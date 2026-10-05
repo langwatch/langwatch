@@ -43,6 +43,40 @@ function makeRedis(): { redis: LangyStreamRedis; entries: RecordedEntry[] } {
   return { redis, entries };
 }
 
+/** A stream whose keys lapse on the (fake) clock, so a TTL that is not refreshed shows. */
+function makeExpiringRedis(): LangyStreamRedis {
+  const streams = new Map<string, [string, string[]][]>();
+  const expiresAt = new Map<string, number>();
+  let seq = 0;
+  const rowsOf = (key: string) => {
+    const at = expiresAt.get(key);
+    if (at !== undefined && at <= Date.now()) {
+      streams.delete(key);
+      expiresAt.delete(key);
+    }
+    return streams.get(key) ?? [];
+  };
+  return redisDouble({
+    xadd: async (...args: unknown[]) => {
+      const key = String(args[0]);
+      const rows = rowsOf(key);
+      const id = `1-${++seq}`;
+      rows.push([id, ["p", String(args[args.length - 1])]]);
+      streams.set(key, rows);
+      return id;
+    },
+    xrange: async (...args: unknown[]) => rowsOf(String(args[0])),
+    expire: async (...args: unknown[]) => {
+      const key = String(args[0]);
+      if (rowsOf(key).length === 0) return 0;
+      expiresAt.set(key, Date.now() + Number(args[1]) * 1000);
+      return 1;
+    },
+    set: async () => "OK",
+    get: async () => null,
+  });
+}
+
 const ids = { conversationId: "conv_1", turnId: "turn_1" };
 const deltas = (entries: RecordedEntry[]) => entries.filter((entry) => entry.type === "delta");
 const reasoning = (entries: RecordedEntry[]) =>
@@ -362,6 +396,45 @@ describe("LangyTokenBufferRedisRepository hybrid flush", () => {
         kind: "workbench.duplicateTarget",
         payload: { targetId: "t1" },
       });
+    });
+  });
+
+  describe("given a turn whose tool call outlasts the buffer's TTL", () => {
+    const ttlMs = LANGY_STREAMING.STREAM_TTL_SECONDS * 1000;
+    const uiAction = (actionId: string) => ({
+      ...ids,
+      actionId,
+      kind: "workbench.duplicateTarget",
+      payload: { targetId: "t1" },
+    });
+
+    /** @scenario "A turn that goes quiet inside one tool call keeps its live edge" */
+    it("replays the whole turn to a tab attaching after the wait, while the worker kept beating", async () => {
+      const buffer = LangyTokenBufferRedisRepository.create({ redis: makeExpiringRedis() });
+      await buffer.appendUiAction(uiAction("before_the_wait"));
+
+      for (let beat = 0; beat < 7; beat += 1) {
+        vi.advanceTimersByTime(ttlMs / 3);
+        await buffer.heartbeat(ids);
+      }
+      await buffer.appendUiAction(uiAction("after_the_wait"));
+
+      const { reads } = await buffer.readTail(ids);
+      expect(reads.map((read) => read.entry)).toEqual([
+        expect.objectContaining({ actionId: "before_the_wait" }),
+        expect.objectContaining({ actionId: "after_the_wait" }),
+      ]);
+    });
+
+    /** @scenario "A turn that goes quiet inside one tool call keeps its live edge" */
+    it("lets the buffer lapse when the worker stops beating", async () => {
+      const buffer = LangyTokenBufferRedisRepository.create({ redis: makeExpiringRedis() });
+      await buffer.appendUiAction(uiAction("before_the_wait"));
+
+      vi.advanceTimersByTime(ttlMs + 1_000);
+
+      const { reads } = await buffer.readTail(ids);
+      expect(reads).toEqual([]);
     });
   });
 });
