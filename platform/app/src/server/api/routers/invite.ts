@@ -356,10 +356,10 @@ export const inviteRouter = createTRPCRouter({
     }),
 
   /**
-   * Every invitation waiting for the signed-in user, on any installation
-   * (ADR-143 v6). The welcome screen leads with one of these before it offers
-   * to ask to join, so an administrator who already invited somebody is not
-   * asked the question twice.
+   * The oldest pending invitation on each address the signed-in user has
+   * proven, on any installation (ADR-143 v6). The welcome screen leads with
+   * one of these before it offers to ask to join, so an administrator who
+   * already invited somebody is not asked the question twice.
    *
    * VERIFIED addresses only, with no fall-back to an unproven session
    * address: the answer carries the invitation code, which is the secret from
