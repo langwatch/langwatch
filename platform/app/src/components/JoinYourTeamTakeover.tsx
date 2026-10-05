@@ -153,9 +153,11 @@ function useJoinTakeoverState({
   // An invitation outranks the door: an administrator chose a seat by
   // inviting, and admitting first would refuse the invitation afterwards
   // (members cannot accept one) and lose that choice. So admission waits for
-  // the invitation answer, and runs only when there is none.
+  // the invitation answer, and runs only when it came back empty. A failed
+  // read is not an empty one: it may be hiding the invitation, so the door
+  // stays shut and the screen beneath shows instead.
   const noInvitation =
-    !invitations.isPending && (invitations.data?.length ?? 0) === 0;
+    invitations.isSuccess && (invitations.data?.length ?? 0) === 0;
   const admitting = useAutomaticAdmission({
     admit: onboarding && noInvitation && offer.data?.outcome === "auto",
     origin,

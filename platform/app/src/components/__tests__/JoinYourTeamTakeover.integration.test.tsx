@@ -40,7 +40,13 @@ const {
 } = vi.hoisted(() => ({
   offerRef: { current: { data: undefined as unknown, isPending: false } },
   mineRef: { current: { data: [] as unknown[], isPending: false } },
-  invitationsRef: { current: { data: [] as unknown[], isPending: false } },
+  invitationsRef: {
+    current: {
+      data: [] as unknown[] | undefined,
+      isPending: false,
+      isSuccess: true,
+    },
+  },
   admitFailedRef: { current: false },
   dismissMock: vi.fn(),
   requestMock: vi.fn(),
@@ -164,7 +170,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   offerRef.current = { ...OFFERED };
   mineRef.current = { data: [], isPending: false };
-  invitationsRef.current = { data: [], isPending: false };
+  invitationsRef.current = { data: [], isPending: false, isSuccess: true };
   admitFailedRef.current = false;
 });
 
@@ -461,6 +467,7 @@ describe("given somebody an administrator already invited", () => {
       { inviteCode: "code_1", organizationName: "Acme", role: "DEVELOPER" },
     ],
     isPending: false,
+    isSuccess: true,
   };
 
   describe("when they reach the welcome screen", () => {
@@ -645,6 +652,7 @@ describe("given a sign-up the device page sent to the welcome screen", () => {
           { inviteCode: "code_1", organizationName: "Acme", role: "ADMIN" },
         ],
         isPending: false,
+        isSuccess: true,
       };
       renderTakeover();
 
@@ -673,10 +681,47 @@ describe("given a sign-up the device page sent to the welcome screen", () => {
         },
         isPending: false,
       };
-      invitationsRef.current = { data: undefined as never, isPending: true };
+      invitationsRef.current = {
+        data: undefined,
+        isPending: true,
+        isSuccess: false,
+      };
       renderTakeover();
 
       expect(admitMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The welcome screen honours an automatic door */
+    it("keeps the door shut when the invitation answer failed to come back", async () => {
+      offerRef.current = {
+        data: {
+          outcome: "auto",
+          organization: {
+            organizationId: "org_acme",
+            name: "Acme",
+            colleagueCount: 10,
+          },
+        },
+        isPending: false,
+      };
+      // A failed read is not an empty one: it may be hiding an invitation,
+      // and admitting now would make that invitation impossible to accept.
+      invitationsRef.current = {
+        data: undefined,
+        isPending: false,
+        isSuccess: false,
+      };
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover
+            currentOrganizationId={null}
+            fallback={<div data-testid="make-your-own" />}
+          />
+        </ChakraProvider>,
+      );
+
+      await waitFor(() => expect(admitMock).not.toHaveBeenCalled());
+      expect(screen.getByTestId("make-your-own")).toBeInTheDocument();
     });
 
     /** @scenario The welcome screen honours an automatic door */
