@@ -30,7 +30,7 @@ import {
 } from "@langwatch/egress";
 import { createLogger } from "@langwatch/observability";
 
-import type { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
+import { credentialsOf } from "../../rules/ingestion-credentials.rules.ts";
 import { ProviderAccountChannel } from "../provider-account.channel.ts";
 
 const logger = createLogger("langwatch:governance:provider-account-lookup");
@@ -52,18 +52,9 @@ async function ssrfSafeFetch(url: string, init: FencedFetchOptions) {
   });
 }
 
-/**
- * The administrator key on a config, whether it arrived fresh or sealed.
- *
- * An edit that does not resend the secret carries the stored envelope across,
- * so both shapes reach here and `decryptCredentials` already understands each.
- */
-function readAdminKey(
-  parserConfig: Record<string, unknown>,
-  credentials?: Pick<IngestionCredentialsService, "decrypt">,
-): string {
-  const raw = parserConfig.credentials;
-  const opened = credentials?.decrypt(raw) ?? (raw && typeof raw === "object" ? raw : {});
+/** The administrator key on a config, whether this save sent it or carried the stored one. */
+function readAdminKey(parserConfig: Record<string, unknown>): string {
+  const opened = credentialsOf(parserConfig.credentials);
   const token = "token" in opened ? opened.token : void 0;
   if (typeof token !== "string" || token.trim() === "") {
     throw new Error("no administrator key on this connection");
@@ -126,18 +117,12 @@ async function readOpenAiAccount(apiKey: string): Promise<string> {
  * or a response body, and losing the cause entirely is the other failure.
  */
 export class HttpProviderAccountChannel extends ProviderAccountChannel {
-  private constructor(
-    private readonly credentials: Pick<IngestionCredentialsService, "decrypt"> | undefined,
-  ) {
+  private constructor() {
     super();
   }
 
-  static create(
-    options: {
-      credentials?: Pick<IngestionCredentialsService, "decrypt">;
-    } = {},
-  ): HttpProviderAccountChannel {
-    return new HttpProviderAccountChannel(options.credentials);
+  static create(): HttpProviderAccountChannel {
+    return new HttpProviderAccountChannel();
   }
 
   async getAccountId({
@@ -148,7 +133,7 @@ export class HttpProviderAccountChannel extends ProviderAccountChannel {
     parserConfig: Record<string, unknown>;
   }): Promise<string> {
     try {
-      const apiKey = readAdminKey(parserConfig, this.credentials);
+      const apiKey = readAdminKey(parserConfig);
       if (sourceType === "anthropic_admin") {
         return await readAnthropicAccount(apiKey);
       }

@@ -5,8 +5,8 @@
  */
 import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 
+import type { GovernanceRateLimitRepository } from "../repositories/governance-rate-limit.repository.ts";
 import {
   extractClientIp,
   INGEST_RATE_LIMIT_MAX_REQUESTS,
@@ -23,8 +23,8 @@ export type GovernanceIngestAuthorization =
 
 export type GovernanceIngestAccessMembers = Readonly<{
   sources: Pick<IngestionSourceService, "findByIngestSecret">;
-  /** The process's counter the per-caller throttle is kept in. */
-  rateLimiter: RateLimiter;
+  /** The counter the per-caller throttle is kept in. */
+  rateLimits: GovernanceRateLimitRepository;
   /** Main's `LW_INGEST_RATE_LIMIT_DISABLED` opt-out: nothing is counted and nobody is shed. */
   rateLimitDisabled: boolean;
 }>;
@@ -69,7 +69,7 @@ export class GovernanceIngestAccessService implements GovernanceIngestAccessApi 
     if (this.members.rateLimitDisabled) return null;
 
     const ip = extractClientIp(headers);
-    const decision = await this.members.rateLimiter.check(`ingest:${ip}`, {
+    const decision = await this.members.rateLimits.check(`ingest:${ip}`, {
       requests: INGEST_RATE_LIMIT_MAX_REQUESTS,
       seconds: INGEST_RATE_LIMIT_WINDOW_SECONDS,
     });

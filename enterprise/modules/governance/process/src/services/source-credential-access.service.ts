@@ -3,13 +3,13 @@
 import { IngestionSourceNotFoundError } from "@langwatch/enterprise-governance-contract";
 
 import type { IngestionSourceRepository } from "../repositories/ingestion-source.repository.ts";
-import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
+import { credentialsOf } from "../rules/ingestion-credentials.rules.ts";
 
-/** Everything about the source except the seal; `credentials` is plaintext for the call only. */
+/** Everything about the source; `credentials` is the opened bag, for the call only. */
 export interface SourceCredentialContext {
   sourceId: string;
   sourceType: string;
-  /** `parserConfig` with the `credentials` key removed, so spreading it cannot leak the envelope. */
+  /** `parserConfig` with the `credentials` key removed, so spreading it cannot leak the secret. */
   config: Record<string, unknown>;
   credentials: Record<string, string>;
 }
@@ -20,21 +20,13 @@ export interface SourceCredentialContext {
  * checked; a person pressing a button has asked, where the scheduler skips a disabled source.
  */
 export class SourceCredentialAccessService {
-  private constructor(
-    private readonly deps: {
-      sources: IngestionSourceRepository;
-      credentials: IngestionCredentialsService;
-    },
-  ) {}
+  private constructor(private readonly deps: { sources: IngestionSourceRepository }) {}
 
-  static create(deps: {
-    sources: IngestionSourceRepository;
-    credentials: IngestionCredentialsService;
-  }): SourceCredentialAccessService {
+  static create(deps: { sources: IngestionSourceRepository }): SourceCredentialAccessService {
     return new SourceCredentialAccessService(deps);
   }
 
-  /** Another organization's source is a miss, refused before anything is decrypted. */
+  /** Another organization's source is a miss, refused before its credentials reach anyone. */
   async withSourceCredentials<T>({
     organizationId,
     ingestionSourceId,
@@ -49,12 +41,12 @@ export class SourceCredentialAccessService {
       throw new IngestionSourceNotFoundError(ingestionSourceId);
     }
 
-    const { credentials: sealed, ...config } = source.parserConfig;
+    const { credentials, ...config } = source.parserConfig;
     return use({
       sourceId: source.id,
       sourceType: source.sourceType,
       config,
-      credentials: this.deps.credentials.decrypt(sealed),
+      credentials: credentialsOf(credentials),
     });
   }
 }

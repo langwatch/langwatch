@@ -17,14 +17,12 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** The pulled-usage pipeline per role: the worker hosts main's cost rollup fold, the api constructs none. */
-import { memoryRateLimiter } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import type { GovernanceEncryptor } from "../../services/ingestion-credentials.service.ts";
 import { GovernanceModule } from "../governance.app.ts";
 
 function buildApp() {
@@ -49,10 +47,6 @@ function buildApp() {
       auditLog: createApiFixture<AuditLogApi>(),
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
-    },
-    members: {
-      encryption: createApiFixture<GovernanceEncryptor>(),
-      rateLimiter: memoryRateLimiter(),
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

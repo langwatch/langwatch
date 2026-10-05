@@ -11,6 +11,7 @@ describe("where an issued personal key tells its holder to send traffic", () => 
           gatewayInternalUrl: undefined,
           gatewayLegacyUrl: "https://old.example",
           isSaas: false,
+          publicBaseUrl: undefined,
           ingestRateLimitDisabled: false,
         },
       }),
@@ -25,6 +26,7 @@ describe("where an issued personal key tells its holder to send traffic", () => 
           gatewayInternalUrl: undefined,
           gatewayLegacyUrl: "https://old.example",
           isSaas: false,
+          publicBaseUrl: undefined,
           ingestRateLimitDisabled: false,
         },
       }),
@@ -36,6 +38,7 @@ describe("where an issued personal key tells its holder to send traffic", () => 
       gatewayPublicUrl: undefined,
       gatewayInternalUrl: undefined,
       gatewayLegacyUrl: undefined,
+      publicBaseUrl: undefined,
       ingestRateLimitDisabled: false,
     };
 

@@ -5,6 +5,9 @@
  * The report-kind pin under genuine concurrency: a pull run's cursor write is
  * held open until the pinned write is parked on its row lock, then commits.
  */
+import { randomBytes } from "node:crypto";
+
+import { aesEncryption } from "@langwatch/process-stores";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -55,9 +58,10 @@ describe.skipIf(!databaseUrl)("PrismaIngestionSourceRepository.updateIfCursorUnc
           return "pulled";
         },
         second: async () => {
-          const updated = await PrismaIngestionSourceRepository.create(
-            prisma,
-          ).updateIfCursorUnchanged({
+          const updated = await PrismaIngestionSourceRepository.create({
+            database: prisma,
+            cipher: aesEncryption(randomBytes(32)),
+          }).updateIfCursorUnchanged({
             id: sourceId,
             cursor: null,
             update: { parserConfig: { report: "cost" } },

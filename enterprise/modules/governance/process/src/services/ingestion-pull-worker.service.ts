@@ -31,10 +31,10 @@ import * as CopilotStudioTraceMapperService from "../rules/copilot-studio-trace-
 import { partitionSuppressedEvents } from "../rules/erasure-suppression.rules.ts";
 import { GENIE_ROUTING_PROFILE } from "../rules/genie-trace-mapper-service.rules.ts";
 import * as GenieTraceMapperService from "../rules/genie-trace-mapper-service.rules.ts";
+import { credentialsOf } from "../rules/ingestion-credentials.rules.ts";
 import { pullReadThrough } from "../rules/pull-read-through.rules.ts";
 import type { DirectoryDepartmentSyncService } from "./directory-department-sync.service.ts";
 import type { ErasureSuppressionService } from "./erasure-suppression.service.ts";
-import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
 import type { IngestionPullDiagnosticsSink } from "./ingestion-pull-log.service.ts";
 import type { IngestionPullRunResult } from "./ingestion-pull.service.ts";
 import type { PersonDiscoveryService } from "./person-discovery.service.ts";
@@ -134,7 +134,6 @@ export class IngestionPullWorkerConfiguration {
 export class IngestionPullWorkerService {
   private readonly sources: IngestionPullSourceReader;
   private readonly registry: PullerRegistryService;
-  private readonly credentials: IngestionCredentialsService;
   private readonly projects: GovernanceProjectDirectory;
   private readonly sink: GovernanceOcsfEventSink;
   private readonly usageEntitlement: PulledUsageEntitlements;
@@ -152,7 +151,6 @@ export class IngestionPullWorkerService {
   private constructor({
     sources,
     registry,
-    credentials,
     projects,
     sink,
     usageEntitlement,
@@ -169,7 +167,6 @@ export class IngestionPullWorkerService {
   }: {
     sources: IngestionPullSourceReader;
     registry: PullerRegistryService;
-    credentials: IngestionCredentialsService;
     projects: GovernanceProjectDirectory;
     sink: GovernanceOcsfEventSink;
     usageEntitlement: PulledUsageEntitlements;
@@ -186,7 +183,6 @@ export class IngestionPullWorkerService {
   }) {
     this.sources = sources;
     this.registry = registry;
-    this.credentials = credentials;
     this.projects = projects;
     this.sink = sink;
     this.usageEntitlement = usageEntitlement;
@@ -205,7 +201,6 @@ export class IngestionPullWorkerService {
   static create(options: {
     sources: IngestionPullSourceReader;
     registry: PullerRegistryService;
-    credentials: IngestionCredentialsService;
     projects: GovernanceProjectDirectory;
     sink: GovernanceOcsfEventSink;
     usageEntitlement: PulledUsageEntitlements;
@@ -223,7 +218,6 @@ export class IngestionPullWorkerService {
     return new IngestionPullWorkerService({
       sources: options.sources,
       registry: options.registry,
-      credentials: options.credentials,
       projects: options.projects,
       sink: options.sink,
       usageEntitlement: options.usageEntitlement,
@@ -282,7 +276,7 @@ export class IngestionPullWorkerService {
         adapter.runOnce(
           {
             cursor: input.cursor,
-            credentials: this.credentials.decrypt(pullConfig.credentials),
+            credentials: credentialsOf(pullConfig.credentials),
             context: {
               organizationId: source.organizationId,
               ingestionSourceId: source.id,

@@ -17,6 +17,7 @@ import type { DiscoveredPersonRepository } from "./discovered-person.repository.
 import type { ErasedIdentifierSuppressionRepository } from "./erased-identifier-suppression.repository.ts";
 import type { GovernanceCostChargeRepository } from "./governance-cost-charge.repository.ts";
 import type { GovernanceCostRollupRepository } from "./governance-cost-rollup.repository.ts";
+import type { GovernanceRateLimitRepository } from "./governance-rate-limit.repository.ts";
 import type { GovernanceSetupStateRepository } from "./governance-setup-state.repository.ts";
 import type { GovernanceTenantHistoryRepository } from "./governance-tenant-history.repository.ts";
 import type { IdentityMatchSuggestionRepository } from "./identity-match-suggestion.repository.ts";
@@ -146,6 +147,8 @@ export interface GovernanceRepositories {
   /** The per-charge record the drift check holds the rollup against. */
   readonly costCharges: GovernanceCostChargeRepository;
   readonly ocsfEvents: GovernanceClickHouseRepositories["ocsfEvents"];
+  /** The push receivers' per-caller throttle. */
+  readonly rateLimits: GovernanceRateLimitRepository;
   /** The `governance_kpis` rows the spend-spike evaluator reads and the trace pull writes. */
   readonly anomalySpend: GovernanceClickHouseRepositories["anomalySpend"];
   readonly rollupErasure: RollupErasureRepository;

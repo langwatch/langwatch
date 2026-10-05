@@ -164,7 +164,6 @@ import {
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
@@ -245,8 +244,6 @@ import { DefaultGovernanceSetupStateService } from "../services/governance-setup
 import { GovernanceTraceFactsService } from "../services/governance-trace-facts.service.ts";
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
-import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
-import type { GovernanceEncryptor } from "../services/ingestion-credentials.service.ts";
 import { IngestionPullLifecycleService } from "../services/ingestion-pull-lifecycle.service.ts";
 import { IngestionPullListingService } from "../services/ingestion-pull-listing.service.ts";
 import { IngestionPullLogService } from "../services/ingestion-pull-log.service.ts";
@@ -419,7 +416,7 @@ export interface GovernanceAppDependencies {
   permissions: Pick<AuthzService, "getDecision">;
 }
 
-/** How a process installs this application: its peers, its members, its repositories. */
+/** How a process installs this application: its peers, its config, its secrets, its repositories. */
 type GovernanceSetup = Readonly<{
   dependencies: FeatureSetup<
     typeof GovernanceModule.dependencies,
@@ -429,18 +426,11 @@ type GovernanceSetup = Readonly<{
   config: GovernanceConfig | undefined;
   resources: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["resources"];
   secrets: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["secrets"];
-  members: Readonly<{
-    encryption: GovernanceEncryptor;
-    /** The process's own fact, absent where the deployment named no `BASE_HOST`. */
-    publicBaseUrl?: string | undefined;
-  }> &
-    Readonly<{ rateLimiter: RateLimiter }>;
   repositories: GovernanceRepositories;
 }>;
 
 export class GovernanceModule implements GovernanceRestApi {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
-  static readonly reads = ["encryption", "publicBaseUrl", "rateLimiter"] as const;
   /**
    * The peer modules this application reads. A peer is never a member:
    * the process resolves each token and hands the app the peer's own API, so
@@ -472,7 +462,6 @@ export class GovernanceModule implements GovernanceRestApi {
 
   static async create({
     config,
-    members,
     dependencies,
     repositories,
     secrets,
@@ -520,10 +509,8 @@ export class GovernanceModule implements GovernanceRestApi {
       },
       repositories,
       erasureSuppression,
-      encryption: members.encryption,
       gatewayBaseUrl: governanceGatewayBaseUrl({ config }),
-      publicBaseUrl: members.publicBaseUrl,
-      rateLimiter: members.rateLimiter,
+      publicBaseUrl: config?.publicBaseUrl,
       ingestRateLimitDisabled: config?.ingestRateLimitDisabled ?? false,
     });
   }
@@ -534,10 +521,8 @@ export class GovernanceModule implements GovernanceRestApi {
     dependencies,
     repositories,
     erasureSuppression,
-    encryption,
     gatewayBaseUrl,
     publicBaseUrl,
-    rateLimiter,
     ingestRateLimitDisabled,
   }: {
     ottl: GovernanceOttlGateway;
@@ -545,15 +530,12 @@ export class GovernanceModule implements GovernanceRestApi {
     dependencies: GovernanceAppDependencies;
     repositories: GovernanceRepositories;
     erasureSuppression: ErasureSuppressionService;
-    encryption: GovernanceEncryptor;
     gatewayBaseUrl: string;
     publicBaseUrl: string | undefined;
-    rateLimiter: RateLimiter;
     ingestRateLimitDisabled: boolean;
   }) {
     this.dependencies = dependencies;
     this.repositories = repositories;
-    this.encryption = encryption;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
     this.activityMonitor = ActivityMonitorService.create({
       repository: repositories.activityMonitor,
@@ -728,7 +710,6 @@ export class GovernanceModule implements GovernanceRestApi {
         disable: (input) => this.ingestionPullSender("disable").send(input),
       },
     });
-    const ingestionCredentials = IngestionCredentialsService.create(encryption);
     this.ingestionSources = IngestionSourceService.create({
       repository: repositories.ingestionSources,
       projects: dependencies.projects,
@@ -739,10 +720,9 @@ export class GovernanceModule implements GovernanceRestApi {
           ),
       },
       lifecycle: { sync: (source) => this.pullLifecycle.sync(toPullLifecycleSource(source)) },
-      credentials: ingestionCredentials,
       secrets: ingestionSecrets,
       destinations: PullDestinationService.create(),
-      providerAccounts: HttpProviderAccountChannel.create({ credentials: ingestionCredentials }),
+      providerAccounts: HttpProviderAccountChannel.create(),
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
     this.ottl = ottl;
@@ -751,10 +731,9 @@ export class GovernanceModule implements GovernanceRestApi {
       pullRuns: repositories.ingestionPullRuns,
       projects: dependencies.projects,
     });
-    // Stored credentials seal under the process's CREDENTIALS_SECRET, the key main sealed them with.
+    // The source store opens stored credentials under CREDENTIALS_SECRET, the key main sealed them with.
     const sourceCredentials = SourceCredentialAccessService.create({
       sources: repositories.ingestionSources,
-      credentials: IngestionCredentialsService.create(encryption),
     });
     const http: GovernanceHttpClient = { fetch: ssrfSafeFetch };
     this.http = http;
@@ -844,7 +823,7 @@ export class GovernanceModule implements GovernanceRestApi {
     this.ingestService = GovernanceIngestService.create({
       access: GovernanceIngestAccessService.create({
         sources: this.ingestionSources,
-        rateLimiter,
+        rateLimits: repositories.rateLimits,
         rateLimitDisabled: ingestRateLimitDisabled,
       }),
       receiver: GovernanceIngestReceiverService.create({
@@ -901,7 +880,6 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly identityMatches: IdentityMatchService;
   private readonly identityMatchSuggestions: IdentityMatchSuggestionService;
   private readonly repositories: GovernanceRepositories;
-  private readonly encryption: GovernanceEncryptor;
   private readonly http: GovernanceHttpClient;
   private ingestionPullCommands: EventingSenders | undefined;
   private pulledUsageCommands: EventingSenders | undefined;
@@ -1049,7 +1027,6 @@ export class GovernanceModule implements GovernanceRestApi {
     const worker = IngestionPullWorkerService.create({
       sources: repositories.ingestionSources,
       registry: pullers,
-      credentials: IngestionCredentialsService.create(this.encryption),
       projects: dependencies.projects,
       sink: repositories.ocsfEvents,
       usageEntitlement: {

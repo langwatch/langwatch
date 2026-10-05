@@ -1,5 +1,3 @@
-import { Buffer } from "node:buffer";
-
 import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
 import type {
   InternalProject,
@@ -18,8 +16,6 @@ import {
   type UpdateIngestionSourceRecord,
 } from "../../repositories/ingestion-source.repository.ts";
 import type { GovernanceDiagnosticsSink } from "../governance-policy.service.ts";
-import type { GovernanceEncryptor } from "../ingestion-credentials.service.ts";
-import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
@@ -131,14 +127,6 @@ class FakeEntitlements implements IngestionSourceEntitlements {
 class FakeLifecycle implements IngestionSourceLifecycleChannel {
   sync = vi.fn(async () => undefined);
 }
-class FakeEncryption implements GovernanceEncryptor {
-  encrypt(value: string): string {
-    return Buffer.from(value).toString("base64url");
-  }
-  decrypt(value: string): string {
-    return Buffer.from(value, "base64url").toString();
-  }
-}
 class FakeDiagnostics implements GovernanceDiagnosticsSink {
   warn = vi.fn();
 }
@@ -153,7 +141,6 @@ function harness() {
     projects,
     entitlements,
     lifecycle,
-    credentials: IngestionCredentialsService.create(new FakeEncryption()),
     secrets: IngestionSecretService.create(
       IngestionSecretConfiguration.create({ pepper: "pepper" }),
       { random: () => new Uint8Array(32).fill(7) },
@@ -167,7 +154,7 @@ function harness() {
 }
 
 describe("IngestionSourceService", () => {
-  it("encrypts credentials before persistence and returns a one-time secret", async () => {
+  it("hands typed credentials to the store, which seals them, and returns a one-time secret", async () => {
     const { service, repository } = harness();
     const result = await service.createSource({
       organizationId: "org-1",
@@ -178,12 +165,7 @@ describe("IngestionSourceService", () => {
     });
 
     expect(result.ingestSecret).toMatch(/^lw_is_/);
-    expect(repository.createInput?.parserConfig.credentials).toEqual(
-      expect.stringMatching(/^enc:v1:/),
-    );
-    expect(repository.createInput?.parserConfig).not.toEqual(
-      expect.objectContaining({ credentials: { token: "secret" } }),
-    );
+    expect(repository.createInput?.parserConfig.credentials).toEqual({ token: "secret" });
   });
 
   /** @scenario "Saving without touching the secret keeps the existing credential" */
@@ -191,7 +173,7 @@ describe("IngestionSourceService", () => {
     const { service, repository } = harness();
     repository.row = source({
       parserConfig: {
-        credentials: "enc:v1:c2VjcmV0",
+        credentials: { token: "secret" },
         _rotation: { priorHash: "old", expiresAt: NOW + 1_000 },
         visible: "old",
       },
@@ -204,16 +186,16 @@ describe("IngestionSourceService", () => {
     });
 
     expect(repository.updateInput?.parserConfig).toMatchObject({
-      credentials: "enc:v1:c2VjcmV0",
+      credentials: { token: "secret" },
       _rotation: { priorHash: "old", expiresAt: NOW + 1_000 },
       visible: "new",
     });
   });
 
   /** @scenario "Entering a new secret replaces the stored one" */
-  it("encrypts a freshly typed credential on the edit path, not only on create", async () => {
+  it("writes a freshly typed credential in place of the stored one on the edit path", async () => {
     const { service, repository } = harness();
-    repository.row = source({ parserConfig: { credentials: "enc:v1:c2VjcmV0" } });
+    repository.row = source({ parserConfig: { credentials: { token: "sk-ant-admin-old" } } });
 
     await service.updateSource({
       id: "source-1",
@@ -221,12 +203,9 @@ describe("IngestionSourceService", () => {
       parserConfig: { credentials: { token: "sk-ant-admin-new" } },
     });
 
-    expect(repository.updateInput?.parserConfig?.credentials).toEqual(
-      expect.stringMatching(/^enc:v1:/),
-    );
-    expect(repository.updateInput?.parserConfig).not.toEqual(
-      expect.objectContaining({ credentials: { token: "sk-ant-admin-new" } }),
-    );
+    expect(repository.updateInput?.parserConfig?.credentials).toEqual({
+      token: "sk-ant-admin-new",
+    });
   });
 
   /** @scenario "A stored envelope is never sent back to the server" */
@@ -282,7 +261,7 @@ describe("IngestionSourceService", () => {
       parserConfig: {
         adapter: "databricks_genie",
         workspaceUrl: "https://adb-1.7.azuredatabricks.net",
-        credentials: "enc:v1:aaaa:bbbb:cccc",
+        credentials: { token: "dapi-stored" },
         _rotation: rotation,
       },
     });
@@ -298,7 +277,7 @@ describe("IngestionSourceService", () => {
     });
 
     expect(repository.updateInput?.parserConfig).toMatchObject({
-      credentials: "enc:v1:aaaa:bbbb:cccc",
+      credentials: { token: "dapi-stored" },
       _rotation: rotation,
     });
   });

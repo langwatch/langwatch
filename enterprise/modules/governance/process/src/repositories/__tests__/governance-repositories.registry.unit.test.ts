@@ -81,6 +81,21 @@ describe("given the memory-backed governance repositories", () => {
     });
   });
 
+  describe("when one caller outruns the ingest throttle's window", () => {
+    it("allows the window's requests and refuses the next with a retry time", async () => {
+      const { rateLimits } = memoryTier();
+      const limit = { requests: 2, seconds: 60 };
+
+      await expect(rateLimits.check("ingest:1.2.3.4", limit)).resolves.toEqual({ allowed: true });
+      await expect(rateLimits.check("ingest:1.2.3.4", limit)).resolves.toEqual({ allowed: true });
+      await expect(rateLimits.check("ingest:5.6.7.8", limit)).resolves.toEqual({ allowed: true });
+      const refused = await rateLimits.check("ingest:1.2.3.4", limit);
+
+      expect(refused.allowed).toBe(false);
+      expect(refused.retryAfterSeconds).toBeGreaterThan(0);
+    });
+  });
+
   describe("when the postgres tier is selected without its store", () => {
     it("refuses the selection by naming the members it needs", () => {
       expect(() =>

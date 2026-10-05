@@ -33,6 +33,7 @@ import {
   extractClaimedEnvironment,
   findEnvironmentClaimComplaints,
 } from "../rules/environment-ownership.rules.ts";
+import { credentialsAsSent, isSealedCredentials } from "../rules/ingestion-credentials.rules.ts";
 import {
   findProviderAccountClaimComplaints,
   hasAdminCredentials,
@@ -40,7 +41,6 @@ import {
   readsProviderAccount,
 } from "../rules/provider-account-ownership.rules.ts";
 import type { GovernanceDiagnosticsSink } from "./governance-policy.service.ts";
-import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
 import type { IngestionSecretService } from "./ingestion-source-secret.service.ts";
 import { IngestionSourceValidationService } from "./ingestion-source-validation.service.ts";
 import type { PullDestinationService } from "./pull-destination.service.ts";
@@ -65,7 +65,6 @@ export class IngestionSourceService {
   private readonly projects: IngestionSourceProjects;
   private readonly entitlements: IngestionSourceEntitlements;
   private readonly lifecycle: IngestionSourceLifecycleChannel;
-  private readonly credentials: IngestionCredentialsService;
   private readonly secrets: IngestionSecretService;
   private readonly destinations: PullDestinationService;
   private readonly providerAccounts: ProviderAccountChannel;
@@ -78,7 +77,6 @@ export class IngestionSourceService {
     projects,
     entitlements,
     lifecycle,
-    credentials,
     secrets,
     destinations,
     providerAccounts,
@@ -90,7 +88,6 @@ export class IngestionSourceService {
     projects: IngestionSourceProjects;
     entitlements: IngestionSourceEntitlements;
     lifecycle: IngestionSourceLifecycleChannel;
-    credentials: IngestionCredentialsService;
     secrets: IngestionSecretService;
     destinations: PullDestinationService;
     providerAccounts: ProviderAccountChannel;
@@ -102,7 +99,6 @@ export class IngestionSourceService {
     this.projects = projects;
     this.entitlements = entitlements;
     this.lifecycle = lifecycle;
-    this.credentials = credentials;
     this.secrets = secrets;
     this.destinations = destinations;
     this.providerAccounts = providerAccounts;
@@ -116,7 +112,6 @@ export class IngestionSourceService {
     projects: IngestionSourceProjects;
     entitlements: IngestionSourceEntitlements;
     lifecycle: IngestionSourceLifecycleChannel;
-    credentials: IngestionCredentialsService;
     secrets: IngestionSecretService;
     destinations: PullDestinationService;
     providerAccounts: ProviderAccountChannel;
@@ -128,7 +123,6 @@ export class IngestionSourceService {
       projects: options.projects,
       entitlements: options.entitlements,
       lifecycle: options.lifecycle,
-      credentials: options.credentials,
       secrets: options.secrets,
       destinations: options.destinations,
       providerAccounts: options.providerAccounts,
@@ -270,6 +264,7 @@ export class IngestionSourceService {
         sourceType: existing.sourceType,
         parserConfig: incoming,
         existing,
+        resentCredentials: input.parserConfig.credentials !== undefined,
       });
       if (providerAccountId !== undefined) {
         update.providerAccountId = providerAccountId;
@@ -310,11 +305,14 @@ export class IngestionSourceService {
     sourceType,
     parserConfig,
     existing,
+    resentCredentials = false,
   }: {
     organizationId: string;
     sourceType: string;
     parserConfig: Record<string, unknown>;
     existing?: GovernanceIngestionSource;
+    /** Whether this edit sent credentials of its own rather than carrying the stored ones. */
+    resentCredentials?: boolean;
   }): Promise<{ providerAccountId?: string }> {
     const sourceId = existing?.id;
     let claims: Promise<IngestionSourceClaim[]> | undefined;
@@ -323,7 +321,7 @@ export class IngestionSourceService {
     if (extractClaimedSubscription(parserConfig) !== null) {
       refuseOnComplaint(
         findAzureBillCredentialComplaints({
-          parserConfig,
+          parserConfig: credentialsAsSent({ parserConfig, existing, resentCredentials }),
           storedParserConfig: existing?.parserConfig,
         }),
       );
@@ -385,7 +383,7 @@ export class IngestionSourceService {
     return { providerAccountId };
   }
 
-  /** Seal the credentials once the server-owned Azure billing identity is settled. */
+  /** The config to store, its server-owned Azure billing identity settled; the store seals it. */
   private async prepareParserConfig({
     organizationId,
     parserConfig,
@@ -408,7 +406,7 @@ export class IngestionSourceService {
     };
     refuseOnComplaint(findAzureBillHistoryComplaints(identity));
 
-    return this.credentials.encryptParserConfig(withAzureBillIdentity(identity));
+    return withAzureBillIdentity(identity);
   }
 
   /** The fields whose only rule is that they were supplied. */
@@ -475,7 +473,7 @@ export class IngestionSourceService {
     incoming: GovernanceIngestionSource["parserConfig"];
   }): GovernanceIngestionSource["parserConfig"] {
     const merged = { ...incoming };
-    if (this.credentials.isEncrypted(merged.credentials)) {
+    if (isSealedCredentials(merged.credentials)) {
       const message =
         "Credentials cannot be submitted in their stored form. Re-enter the secret to change " +
         "this source, or omit it to keep the current one.";
@@ -510,13 +508,13 @@ export class IngestionSourceService {
     }
 
     const ingestSecret = this.secrets.generate();
-    const parserConfig = this.credentials.encryptParserConfig({
+    const parserConfig = {
       ...existing.parserConfig,
       _rotation: {
         priorHash: existing.ingestSecretHash,
         expiresAt: this.now() + ROTATION_GRACE_MS,
       },
-    })!;
+    };
     const source = await this.repository.update(existing.id, {
       ingestSecretHash: this.secrets.hash(ingestSecret),
       parserConfig,

@@ -21,14 +21,12 @@ import { ScopedSecrets } from "@langwatch/secrets";
  * The console's anomaly-rule ops over memory rows: main's Enterprise gate is a
  * per-organization refusal here, and a bad config reads as main's handled complaint.
  */
-import { memoryRateLimiter } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import type { GovernanceEncryptor } from "../../services/ingestion-credentials.service.ts";
 import { GovernanceModule } from "../governance.app.ts";
 
 const ADMIN = { id: "user-1" };
@@ -75,10 +73,6 @@ async function buildApp(planType: string) {
       auditLog: createApiFixture<AuditLogApi>(),
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
-    },
-    members: {
-      encryption: createApiFixture<GovernanceEncryptor>(),
-      rateLimiter: memoryRateLimiter(),
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

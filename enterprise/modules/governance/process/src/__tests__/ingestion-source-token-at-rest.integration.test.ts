@@ -1,10 +1,10 @@
 /**
  * @vitest-environment node
  */
-import { Buffer } from "node:buffer";
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { aesEncryption } from "@langwatch/process-stores";
 import type {
   InternalProject,
   InternalProjectQuery,
@@ -19,8 +19,6 @@ import { createGovernanceTestConnection } from "../app/__tests__/governance-data
 import { MemoryProviderAccountChannel } from "../channels/memory/memory.provider-account.channel.ts";
 import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
 import type { GovernanceDiagnosticsSink } from "../services/governance-policy.service.ts";
-import type { GovernanceEncryptor } from "../services/ingestion-credentials.service.ts";
-import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
@@ -36,28 +34,8 @@ const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATAB
 const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
-// A real, reversible cipher (AES-256-GCM) — not an identity or base64 fake —
-// so the stored ciphertext actually looks nothing like the plaintext.
-class AesEncryption implements GovernanceEncryptor {
-  private readonly key = randomBytes(32);
-
-  encrypt(plaintext: string): string {
-    const iv = randomBytes(12);
-    const cipher = createCipheriv("aes-256-gcm", this.key, iv);
-    const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-    return Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString("base64url");
-  }
-
-  decrypt(ciphertext: string): string {
-    const raw = Buffer.from(ciphertext, "base64url");
-    const iv = raw.subarray(0, 12);
-    const authTag = raw.subarray(12, 28);
-    const encrypted = raw.subarray(28);
-    const decipher = createDecipheriv("aes-256-gcm", this.key, iv);
-    decipher.setAuthTag(authTag);
-    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
-  }
-}
+// The process cipher itself (AES-256-GCM): the stored ciphertext looks nothing like the plaintext.
+const cipher = aesEncryption(randomBytes(32));
 
 class NoopEntitlements implements IngestionSourceEntitlements {
   async hasEnterprisePlan(): Promise<boolean> {
@@ -78,7 +56,7 @@ describe.skipIf(!databaseUrl)("IngestionSourceService token-at-rest", () => {
 
   const service = () =>
     IngestionSourceService.create({
-      repository: PrismaIngestionSourceRepository.create(prisma),
+      repository: PrismaIngestionSourceRepository.create({ database: prisma, cipher }),
       projects: createApiFixture<ProjectApi>(
         {
           ensureInternal: async (_input: InternalProjectQuery): Promise<InternalProject> => ({
@@ -95,7 +73,6 @@ describe.skipIf(!databaseUrl)("IngestionSourceService token-at-rest", () => {
       ),
       entitlements: new NoopEntitlements(),
       lifecycle: new NoopLifecycle(),
-      credentials: IngestionCredentialsService.create(new AesEncryption()),
       secrets: IngestionSecretService.create(
         IngestionSecretConfiguration.create({ pepper: "pepper" }),
         { random: () => new Uint8Array(32).fill(7) },

@@ -28,14 +28,6 @@ vi.mock("@langwatch/egress", () => ({
   fetchValidatedDestination: (url: string, init: unknown) => fetchStub(url, init),
 }));
 
-// A reversible stand-in for the shared AES helper, so the sealed-envelope case
-// below can be built here without an app key. The real crypto is covered by
-// `ingestionCredentials.unit.test.ts`.
-vi.mock("~/utils/encryption", () => ({
-  encrypt: (text: string) => `cipher(${text})`,
-  decrypt: (blob: string) => blob.slice("cipher(".length, -1),
-}));
-
 import { HttpProviderAccountChannel } from "../http/http.provider-account.channel.ts";
 
 const lookUpProviderAccount = (input: {
@@ -103,22 +95,32 @@ describe("given a connection saved through the composer, which writes the admini
   });
 });
 
-describe("given an edit that did not resend the secret, so the stored envelope was carried across", () => {
+describe("given an edit that did not resend the secret, so the stored key was carried across", () => {
   describe("when the account is looked up", () => {
-    it("opens the envelope and sends the same key", async () => {
+    it("sends the key the store opened", async () => {
       fetchStub.mockReset();
       fetchStub.mockResolvedValue(providerResponding({ json: { id: "org_example_0001" } }));
-      const sealed = { report: "cost", credentials: "sealed-admin-key" };
-      const channel = HttpProviderAccountChannel.create({
-        credentials: { decrypt: () => ({ token: ADMIN_KEY }) },
-      });
 
-      await channel.getAccountId({
+      await lookUpProviderAccount({
         sourceType: "anthropic_admin",
-        parserConfig: sealed,
+        parserConfig: { report: "cost", credentials: { token: ADMIN_KEY } },
       });
 
       expect(requestHeaders()["x-api-key"]).toBe(ADMIN_KEY);
+    });
+  });
+
+  describe("when the store could not open the stored key", () => {
+    it("refuses before anything is sent to the provider", async () => {
+      fetchStub.mockReset();
+
+      await expect(
+        lookUpProviderAccount({
+          sourceType: "anthropic_admin",
+          parserConfig: { report: "cost", credentials: "enc:v1:aa:bb:cc" },
+        }),
+      ).rejects.toThrow(/could not be opened/);
+      expect(fetchStub).not.toHaveBeenCalled();
     });
   });
 });

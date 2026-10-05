@@ -16,8 +16,6 @@ import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.g
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
 import { erasureDigest } from "../../rules/erasure-digest.rules.ts";
 import { ErasureSuppressionService } from "../erasure-suppression.service.ts";
-import type { GovernanceEncryptor } from "../ingestion-credentials.service.ts";
-import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import { PersonDiscoveryService } from "../person-discovery.service.ts";
 import { PersonListingService } from "../person-listing.service.ts";
 import { SourceCredentialAccessService } from "../source-credential-access.service.ts";
@@ -38,15 +36,6 @@ const GENIE_SIGN_IN_CONFIG = {
   workspaceUrl: "https://example.cloud.databricks.com",
   credentials: { clientId: "id", clientSecret: "secret" },
 };
-
-class ReversibleEncryption implements GovernanceEncryptor {
-  encrypt(value: string): string {
-    return Buffer.from(value).toString("base64url");
-  }
-  decrypt(value: string): string {
-    return Buffer.from(value, "base64url").toString();
-  }
-}
 
 type SourceType = Parameters<MemoryIngestionSourceRepository["create"]>[0]["sourceType"];
 
@@ -87,7 +76,6 @@ async function buildWorld({
   const http = new ScriptedHttp(script);
   const repositories = MemoryGovernanceRepositories.create();
   const sources = MemoryIngestionSourceRepository.create();
-  const credentials = IngestionCredentialsService.create(new ReversibleEncryption());
   const source = await sources.create({
     organizationId: ORG,
     teamId: null,
@@ -96,7 +84,7 @@ async function buildWorld({
     name: "Source",
     description: null,
     ingestSecretHash: "hash",
-    parserConfig: credentials.encryptParserConfig(parserConfig),
+    parserConfig: parserConfig,
     pullSchedule: null,
     status: "awaiting_first_event",
     createdById: "user_1",
@@ -112,7 +100,7 @@ async function buildWorld({
   });
   const logger = createTestLogger().logger;
   const service = PersonListingService.create({
-    sourceCredentials: SourceCredentialAccessService.create({ sources, credentials }),
+    sourceCredentials: SourceCredentialAccessService.create({ sources }),
     suppression: ErasureSuppressionService.create({
       suppressions: repositories.erasedIdentifierSuppressions,
       snapshot: repositories.suppressionSnapshot,

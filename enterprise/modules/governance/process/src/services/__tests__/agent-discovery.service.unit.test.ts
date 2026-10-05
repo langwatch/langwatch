@@ -15,22 +15,11 @@ import { MemoryDiscoveredAgentRepository } from "../../repositories/memory/memor
 import { MemoryDiscoveredPeopleStore } from "../../repositories/memory/memory.discovered-people.store.ts";
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
 import { AgentDiscoveryService } from "../agent-discovery.service.ts";
-import type { GovernanceEncryptor } from "../ingestion-credentials.service.ts";
-import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import { SourceCredentialAccessService } from "../source-credential-access.service.ts";
 
 const ORG = "org_agent_sync";
 const NOW = Temporal.Instant.from("2026-09-09T00:00:00.000Z");
 const WORKSPACE = "https://adb-1.azuredatabricks.net";
-
-class ReversibleEncryption implements GovernanceEncryptor {
-  encrypt(value: string): string {
-    return Buffer.from(value).toString("base64url");
-  }
-  decrypt(value: string): string {
-    return Buffer.from(value, "base64url").toString();
-  }
-}
 
 type SourceType = Parameters<MemoryIngestionSourceRepository["create"]>[0]["sourceType"];
 
@@ -75,7 +64,6 @@ async function buildWorld({
   const http = new ScriptedHttp(script);
   const store = MemoryDiscoveredPeopleStore.create();
   const sources = MemoryIngestionSourceRepository.create();
-  const credentials = IngestionCredentialsService.create(new ReversibleEncryption());
   const source = await sources.create({
     organizationId: ORG,
     teamId: null,
@@ -84,7 +72,7 @@ async function buildWorld({
     name: "Genie",
     description: null,
     ingestSecretHash: "hash",
-    parserConfig: credentials.encryptParserConfig(parserConfig),
+    parserConfig: parserConfig,
     pullSchedule: null,
     status: "awaiting_first_event",
     createdById: "user_1",
@@ -92,7 +80,7 @@ async function buildWorld({
   });
   const service = AgentDiscoveryService.create({
     agents: MemoryDiscoveredAgentRepository.create(store),
-    sourceCredentials: SourceCredentialAccessService.create({ sources, credentials }),
+    sourceCredentials: SourceCredentialAccessService.create({ sources }),
     signIn: HttpProviderSignInChannel.create({ http }),
     genieSpaces: HttpGenieSpacesChannel.create({ http }),
     copilotBots: HttpCopilotBotsChannel.create({ http }),

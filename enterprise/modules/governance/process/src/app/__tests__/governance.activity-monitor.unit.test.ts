@@ -20,7 +20,6 @@ import { ScopedSecrets } from "@langwatch/secrets";
  * The activity monitor's reads over the memory twin: main's Enterprise gate is a
  * per-organization refusal here, and an Enterprise organization reads its dashboard.
  */
-import { memoryRateLimiter } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -31,7 +30,6 @@ import {
   MemoryActivityMonitorRepository,
 } from "../../repositories/memory/memory.activity-monitor.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import type { GovernanceEncryptor } from "../../services/ingestion-credentials.service.ts";
 import { GovernanceModule } from "../governance.app.ts";
 
 const ADMIN = { id: "user-1" };
@@ -82,10 +80,6 @@ async function buildApp(
       auditLog: createApiFixture<AuditLogApi>(),
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
-    },
-    members: {
-      encryption: createApiFixture<GovernanceEncryptor>(),
-      rateLimiter: memoryRateLimiter(),
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

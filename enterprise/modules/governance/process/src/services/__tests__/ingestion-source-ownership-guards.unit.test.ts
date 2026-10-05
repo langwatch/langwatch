@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Buffer } from "node:buffer";
-
 import type {
   CreateGovernanceIngestionSourceCommand,
   GovernanceIngestionSourceType,
@@ -17,8 +15,6 @@ import { describe, expect, it } from "vitest";
 import { MemoryProviderAccountChannel } from "../../channels/memory/memory.provider-account.channel.ts";
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
 import type { GovernanceDiagnosticsSink } from "../governance-policy.service.ts";
-import type { GovernanceEncryptor } from "../ingestion-credentials.service.ts";
-import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
@@ -38,15 +34,6 @@ const OTHER_ACCOUNT = "org_test_anthropic_0002";
 const FIRST_KEY = "sk-ant-admin-FIRSTKEY-0000000000";
 const SECOND_KEY = "sk-ant-admin-SECONDKEY-000000000";
 const UNKNOWN_KEY = "sk-ant-admin-UNKNOWN-00000000000";
-
-class Base64Encryption implements GovernanceEncryptor {
-  encrypt(value: string): string {
-    return Buffer.from(value).toString("base64url");
-  }
-  decrypt(value: string): string {
-    return Buffer.from(value, "base64url").toString();
-  }
-}
 
 function governanceProjects(): ProjectApi {
   return createApiFixture<ProjectApi>(
@@ -81,18 +68,15 @@ class NoDiagnostics implements GovernanceDiagnosticsSink {
 }
 
 function harness() {
-  const credentials = IngestionCredentialsService.create(new Base64Encryption());
   const repository = MemoryIngestionSourceRepository.create();
   const providerAccounts = MemoryProviderAccountChannel.create({
     accountsByKey: { [FIRST_KEY]: ACCOUNT, [SECOND_KEY]: ACCOUNT, "sk-other": OTHER_ACCOUNT },
-    credentials,
   });
   const service = IngestionSourceService.create({
     repository,
     projects: governanceProjects(),
     entitlements: new Enterprise(),
     lifecycle: new NoLifecycle(),
-    credentials,
     secrets: IngestionSecretService.create(
       IngestionSecretConfiguration.create({ pepper: "pepper" }),
     ),

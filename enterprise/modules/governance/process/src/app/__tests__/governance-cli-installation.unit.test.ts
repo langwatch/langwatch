@@ -22,14 +22,12 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  */
-import { memoryRateLimiter } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { governanceProcessModule } from "../../governance.module.ts";
-import type { GovernanceEncryptor } from "../../services/ingestion-credentials.service.ts";
 import { governanceCliRest } from "../../transport/governance-cli.rest.ts";
 import { governanceIngestRest } from "../../transport/governance-ingest.rest.ts";
 import { governanceRest } from "../../transport/governance.rest.ts";
@@ -74,11 +72,6 @@ async function boot(rest: RestHost) {
     .withModules([governanceProcessModule])
     .withStores(memoryStores())
     .expose(() => ({ hosts: { rest, trpc: { mount: () => ({}) } }, serve: () => undefined }))
-    .withMembers({
-      encryption: createApiFixture<GovernanceEncryptor>(),
-      publicBaseUrl: "https://app.test",
-      rateLimiter: memoryRateLimiter(),
-    })
     .provide({
       agent: createApiFixture<AgentApi>(),
       project: createApiFixture<ProjectApi>(),

@@ -6,9 +6,7 @@ import type {
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { memoryRateLimiter } from "@langwatch/test-harness";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * `/api/ingest`: the gate every push-mode receiver shares, the origin metadata
@@ -19,6 +17,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryOttlTransformChannel } from "../../channels/memory/memory.ottl-transform.channel.ts";
+import type { GovernanceRateLimitRepository } from "../../repositories/governance-rate-limit.repository.ts";
+import { MemoryGovernanceRateLimitRepository } from "../../repositories/memory/memory.governance-rate-limit.repository.ts";
 import { CanonicalCostExtractorService } from "../../services/canonical-cost-extractor.service.ts";
 import { GovernanceIngestAccessService } from "../../services/governance-ingest-access.service.ts";
 import { GovernanceIngestPrincipalService } from "../../services/governance-ingest-principal.service.ts";
@@ -66,7 +66,7 @@ const renderHandled: RestErrorHandler = (error) =>
 
 type World = {
   source?: GovernanceIngestionSource | null;
-  rateLimiter?: RateLimiter;
+  rateLimits?: GovernanceRateLimitRepository;
   rateLimitDisabled?: boolean;
   traceCollection?: GovernanceIngestTraceCollection;
   logCollection?: GovernanceIngestLogCollectionChannel;
@@ -87,7 +87,7 @@ function mountIngest(world: World = {}) {
   const ingest = GovernanceIngestService.create({
     access: GovernanceIngestAccessService.create({
       sources: { findByIngestSecret },
-      rateLimiter: world.rateLimiter ?? memoryRateLimiter(),
+      rateLimits: world.rateLimits ?? MemoryGovernanceRateLimitRepository.create(),
       rateLimitDisabled: world.rateLimitDisabled ?? false,
     }),
     receiver: GovernanceIngestReceiverService.create({
@@ -207,7 +207,7 @@ describe("the ingestion-source receivers", () => {
   describe("when the per-caller throttle refuses", () => {
     it("sheds at the edge with Retry-After, before the secret lookup", async () => {
       const api = mountIngest({
-        rateLimiter: { check: async () => ({ allowed: false, retryAfterSeconds: 30 }) },
+        rateLimits: { check: async () => ({ allowed: false, retryAfterSeconds: 30 }) },
       });
 
       const response = await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody);
@@ -221,7 +221,7 @@ describe("the ingestion-source receivers", () => {
   describe("given the deployment switched the throttle off", () => {
     it("lets a caller the limiter would refuse through to its source", async () => {
       const api = mountIngest({
-        rateLimiter: { check: async () => ({ allowed: false, retryAfterSeconds: 30 }) },
+        rateLimits: { check: async () => ({ allowed: false, retryAfterSeconds: 30 }) },
         rateLimitDisabled: true,
       });
 

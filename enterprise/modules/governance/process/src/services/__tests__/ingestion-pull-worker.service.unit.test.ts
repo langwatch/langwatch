@@ -23,10 +23,6 @@ import type {
   UnpricedUsageWindow,
 } from "../../repositories/ingestion-source.repository.ts";
 import type { ErasureSuppressionCheck } from "../../rules/erasure-suppression.rules.ts";
-import {
-  type GovernanceEncryptor,
-  IngestionCredentialsService,
-} from "../ingestion-credentials.service.ts";
 import type { IngestionPullDiagnosticsSink } from "../ingestion-pull-log.service.ts";
 import {
   type GovernanceTraceIngestionClient,
@@ -163,15 +159,6 @@ class FakeTraceIngestion implements GovernanceTraceIngestionClient {
   }));
 }
 
-class IdentityEncryption implements GovernanceEncryptor {
-  encrypt(value: string): string {
-    return value;
-  }
-  decrypt(value: string): string {
-    return value;
-  }
-}
-
 class FakeRates implements PulledUsageRateReader {
   rate(): { costNanoUsd: number; rateVersion: string } {
     return { costNanoUsd: 0, rateVersion: "test" };
@@ -219,7 +206,6 @@ function worker(input: {
   const service = IngestionPullWorkerService.create({
     sources: new FakeSources(input.source === undefined ? ingestionSource() : input.source),
     registry,
-    credentials: IngestionCredentialsService.create(new IdentityEncryption()),
     projects: fakeProjects(input.traceDestination),
     sink,
     usageEntitlement: entitlement,

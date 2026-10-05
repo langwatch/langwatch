@@ -21,8 +21,6 @@ import type {
 import type { IngestionPullSourceReader } from "../../repositories/ingestion-source.repository.ts";
 import { NO_SUPPRESSION } from "../../rules/erasure-suppression.rules.ts";
 import type { PulledUsageRateInput } from "../../rules/pulled-usage-rate.rules.ts";
-import type { GovernanceEncryptor } from "../../services/ingestion-credentials.service.ts";
-import { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
 import { silentIngestionPullDiagnostics } from "../../services/ingestion-pull-log.service.ts";
 import type { PulledUsageEntitlements } from "../../services/ingestion-pull-worker.service.ts";
 import { IngestionPullWorkerService } from "../../services/ingestion-pull-worker.service.ts";
@@ -183,18 +181,9 @@ export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWo
     },
     "ProjectApi",
   );
-  const encryption: GovernanceEncryptor = {
-    encrypt(value: string): string {
-      return value;
-    },
-    decrypt(value: string): string {
-      return value;
-    },
-  };
   return IngestionPullWorkerService.create({
     sources: new TestSource(async () => doubles.source),
     registry,
-    credentials: IngestionCredentialsService.create(encryption),
     projects,
     sink: new TestSink(doubles.insertEvent),
     usageEntitlement: new TestEntitlement(doubles.usageEnabled),

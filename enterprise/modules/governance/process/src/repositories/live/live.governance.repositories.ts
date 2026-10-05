@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { Encryption, RateLimiter } from "@langwatch/process-stores";
 
 import { ClickHouseAnomalySpendRepository } from "../clickhouse/clickhouse.anomaly-spend.repository.ts";
 import {
@@ -18,22 +19,35 @@ import {
   type GovernanceOperatorReadsMember,
   PrismaSuppressionSnapshotRepository,
 } from "../prisma/prisma.suppression-snapshot.repository.ts";
+import { RedisGovernanceRateLimitRepository } from "../redis/redis.governance-rate-limit.repository.ts";
 
 /** Governance's live stores: its rows in Prisma; in ClickHouse, OCSF events, KPI rows and the rollups an erasure rewrites. */
 export class LiveGovernanceRepositories {
-  static readonly requires = ["prisma", "clickhouse", "operatorReads"] as const;
+  static readonly requires = [
+    "prisma",
+    "clickhouse",
+    "operatorReads",
+    "encryption",
+    "rateLimiter",
+  ] as const;
 
   static create({
     prisma,
     clickhouse,
     operatorReads,
+    encryption,
+    rateLimiter,
   }: Readonly<{
     prisma: Parameters<typeof PostgresGovernanceRepositories.create>[0]["prisma"];
     clickhouse: ClickHouseQueryClient;
+    /** The process cipher the ingestion-source store seals credentials with (CREDENTIALS_SECRET). */
+    encryption: Encryption;
+    rateLimiter: RateLimiter;
   }> &
     GovernanceOperatorReadsMember): GovernanceRepositories {
     return {
-      ...PostgresGovernanceRepositories.create({ prisma }),
+      ...PostgresGovernanceRepositories.create({ prisma, encryption }),
+      rateLimits: RedisGovernanceRateLimitRepository.create(rateLimiter),
       suppressionSnapshot: PrismaSuppressionSnapshotRepository.create({ operatorReads }),
       activityMonitor: PrismaActivityMonitorRepository.create({
         prisma,
