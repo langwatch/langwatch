@@ -1,3 +1,4 @@
+import { explainAnyError, UNKNOWN_ERROR_PRESENTATION } from "@langwatch/handled-error/presentation";
 import {
   emptyMfaEnrollment,
   IDENTIFIER_ATTACHED_EVENT_TYPE,
@@ -864,6 +865,28 @@ describe("detachIdentifier strands guard", () => {
       });
       // Refused before any fact exists, so the passkey still signs them in.
       expect(heads.heads.get(USER)?.identifiers.idf_passkey?.state).toBe("VERIFIED");
+    });
+  });
+
+  describe("when the only other way in is a passkey and single sign-on is being unlinked", () => {
+    /** @scenario "A passkey on its own does not make unlinking safe" */
+    it("refuses in words registered for the code, because no message could reach them", async () => {
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(
+          fact({ identifierId: "idf_sso", provider: "oidc", connectionId: "ssoc_acme" }),
+          fact({ identifierId: "idf_passkey", provider: "passkey", value: "cred_a", domain: null }),
+        ),
+      );
+
+      const refusal = await detach(heads, "idf_sso").catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({ code: "identity_detach_strands_user" });
+      const copy = explainAnyError(refusal);
+      expect(copy.isRegistered).toBe(true);
+      expect(copy.title).not.toBe(UNKNOWN_ERROR_PRESENTATION.title);
+      expect(heads.heads.get(USER)?.identifiers.idf_sso?.state).toBe("VERIFIED");
     });
   });
 

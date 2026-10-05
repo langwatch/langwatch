@@ -157,8 +157,9 @@ describe("the SSO callback's linking decision", () => {
     });
 
     /** @scenario "An unverified orphan is never auto-linked" */
+    /** @scenario "The evidence rule also guards a method added to an established account" */
     it("refuses the same way when the IdP itself asserts nothing verified", async () => {
-      const { service, proposals } = build({ byEmail: [candidate()] });
+      const { service, directory, proposals } = build({ byEmail: [candidate()] });
 
       await expect(service.complete({ ...ASSERTION, emailVerified: false })).rejects.toMatchObject({
         code: "identity_link_proposed",
@@ -167,6 +168,7 @@ describe("the SSO callback's linking decision", () => {
       expect(proposals.proposeLink).toHaveBeenCalledWith(
         expect.objectContaining({ reason: "unverified_orphan" }),
       );
+      expect(directory.linkProviderAccount).not.toHaveBeenCalled();
     });
   });
 

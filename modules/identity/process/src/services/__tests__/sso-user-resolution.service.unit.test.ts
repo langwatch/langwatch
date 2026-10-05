@@ -457,6 +457,7 @@ describe("given a password account whose address was never confirmed", () => {
 describe("given a password account whose address is confirmed", () => {
   describe("when the provider sends no email_verified and the connection proved the domain", () => {
     /** @scenario "A confirmed password account links when the provider sends no email_verified" */
+    /** @scenario "An identity provider that asserts nothing refuses nothing" */
     it("links the existing account", async () => {
       const { service } = createWorld({ owners: [], proved: true, confirmed: true });
 
@@ -492,4 +493,53 @@ describe("given a password account whose address is confirmed", () => {
       await expect(service.resolveUser(assertion())).resolves.toEqual({ action: "continue" });
     });
   });
+});
+
+describe("given a verified local account and a managed SAML connection", () => {
+  const SAML_ASSERTION = assertion({
+    protocol: "saml",
+    emailVerified: false,
+    emailVerification: "unasserted",
+  });
+
+  it("links the account and leaves its profile and verification alone", async () => {
+    const { store, service } = createWorld({ owners: [], proved: true, confirmed: true });
+    const before = structuredClone(store.users.get(USER_ID));
+
+    await expect(service.resolveUser(SAML_ASSERTION)).resolves.toEqual(LINKED);
+
+    expect(store.users.get(USER_ID)).toEqual(before);
+  });
+
+  it.each(["inactive", "deactivated", "address-held", "subject-held"] as const)(
+    "binds nothing and changes nothing for an account that is %s",
+    async (kind) => {
+      const { store, service } = createWorld({
+        owners: kind === "inactive" ? [CONNECTION_ID] : [],
+        proved: true,
+        confirmed: true,
+        inactive: kind === "inactive",
+      });
+      if (kind === "deactivated") store.deactivatedUsers.add(USER_ID);
+      if (kind === "address-held" || kind === "subject-held") {
+        store.identifiers.set(
+          "identifier_other",
+          identifier({
+            identifierId: "identifier_other",
+            userId: "user_other",
+            state: "VERIFIED",
+            value: kind === "address-held" ? EMAIL : `other@${DOMAIN}`,
+            ...(kind === "subject-held" ? { issuer: ISSUER, providerAccountId: SUBJECT } : {}),
+          }),
+        );
+      }
+      const before = structuredClone(store.users.get(USER_ID));
+
+      const outcome = await service.resolveUser(SAML_ASSERTION);
+
+      expect(outcome.action).toBe("reject");
+      expect(store.accounts.get(USER_ID) ?? []).toEqual([]);
+      expect(store.users.get(USER_ID)).toEqual(before);
+    },
+  );
 });

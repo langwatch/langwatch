@@ -131,3 +131,21 @@ describe("given an administrator reading a connection's history", () => {
     });
   });
 });
+
+describe("given an administrator who renamed the connection", () => {
+  /** @scenario "The rename is on the connection's own history" */
+  it("says what the connection was renamed to", async () => {
+    const { service } = serviceOver([
+      entry({
+        eventId: "evt_renamed",
+        type: "lw.identity.connection_renamed",
+        name: "Acme Okta",
+      }),
+    ]);
+
+    const history = await service.getHistory({ organizationId: ACME, connectionId: CONNECTION });
+
+    expect(history).toHaveLength(1);
+    expect(history[0]?.summary).toBe('The connection was renamed to "Acme Okta"');
+  });
+});

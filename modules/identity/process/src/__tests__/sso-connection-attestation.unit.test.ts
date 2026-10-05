@@ -228,6 +228,7 @@ describe("operator attestation", () => {
     });
 
     /** @scenario "An attestation stands until somebody decides otherwise" */
+    /** @scenario "Nothing schedules a re-check, and an expiry never un-proves a domain" */
     it("still verifies and still routes a year later, with nothing asking again", async () => {
       await run(() =>
         guards.attestDomain({ ...identity, ...EVIDENCE, actor: OLIVE, domain: "acme.com" }),
@@ -284,6 +285,7 @@ describe("operator attestation", () => {
     });
 
     /** @scenario "A disputed attested domain is answered by suspending, not by expiring" */
+    /** @scenario "Nothing schedules a re-check, and an expiry never un-proves a domain" */
     it("stops routing the moment an operator suspends, with the whole story readable", async () => {
       const attested = await run(() =>
         guards.attestDomain({ ...identity, ...EVIDENCE, actor: OLIVE, domain: "acme.com" }),

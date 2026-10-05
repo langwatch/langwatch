@@ -4,9 +4,11 @@ import type {
   RecordedAuditLogEntry,
 } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import { explainAnyError, UNKNOWN_ERROR_PRESENTATION } from "@langwatch/handled-error/presentation";
 import {
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
+  VERIFICATION_REQUESTED_EVENT_TYPE,
   emptySsoConnection,
   type IdentifierFact,
   type IdentityHistoryEntry,
@@ -700,6 +702,45 @@ describe("identity lookup, detaching a sign-in method", () => {
       heads.getActiveIdentifierByValue({ normalizedValue: "sam@acme.com" }),
     ).resolves.toEqual({ userId: USER, identifierId: "idf_work" });
   });
+
+  /** @scenario "Detaching somebody's last way in is refused" */
+  it("refuses olive's detachment of their only working method, in words registered for the code", async () => {
+    const heads = new InMemoryHeads();
+    heads.heads.set(USER, headsWith(fact({ identifierId: "idf_work", value: "sam@acme.com" })));
+    const ledger = new RecordingLedger();
+    const identity = IdentityService.create(
+      IdentityGuardsService.create({
+        heads,
+        users: new InMemoryUsers(),
+        reservations: new InMemoryReservations(),
+        identifiers: CryptoIdentifierIdentityService.create(),
+      }),
+      ledger,
+    );
+    const lookup = IdentityLookupService.create({
+      reads,
+      history: new EmptyIdentityHistory(),
+      router: { route: async () => CONNECTED_ROUTE },
+      identity: () => identity,
+      links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
+      sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({}),
+      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
+      authorization: new StubPlatformOperators([OLIVE.userId]),
+      auditLog,
+      rateLimiter: noopRateLimiter(),
+    });
+
+    const refusal = await lookup
+      .detachLookupMethod({ userId: USER, identifierId: "idf_work", operator: OLIVE })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "identity_detach_strands_user" });
+    const copy = explainAnyError(refusal);
+    expect(copy.isRegistered).toBe(true);
+    expect(copy.title).not.toBe(UNKNOWN_ERROR_PRESENTATION.title);
+    expect(ledger.commits).toHaveLength(0);
+    expect(heads.heads.get(USER)?.identifiers.idf_work?.state).toBe("VERIFIED");
+  });
 });
 
 describe("identity lookup, the claims queue and how long a claim waited", () => {
@@ -745,5 +786,38 @@ describe("identity lookup, the claims queue and how long a claim waited", () => 
     expect(decided.domainClaims).toEqual([
       expect.objectContaining({ domain: "older.example", state: "APPROVED", waitedMs: 3_000 }),
     ]);
+  });
+
+  /** @scenario "The operator queue lists disputes and nothing else" */
+  it("lists the disputed claim and leaves the one waiting for its own record to the customer", async () => {
+    store.ssoConnections.set(
+      "disputed",
+      claimedAt({ connectionId: "disputed", claimedAtMs: 4_000 }),
+    );
+    store.ssoConnections.set(
+      "own",
+      reduceSsoConnection({
+        state: { ...emptySsoConnection({ connectionId: "own" }), organizationId: "org_own" },
+        fact: {
+          type: VERIFICATION_REQUESTED_EVENT_TYPE,
+          data: {
+            connectionId: "own",
+            domain: "own.example",
+            method: "dns-txt",
+            tokenHash: "sha256:fingerprint",
+            expiresAtMs: null,
+            actor: ANA,
+            source: "self-serve",
+          },
+          occurredAt: 3_000,
+        },
+      }),
+    );
+    store.organizationNames.set("org_disputed", "Disputed Co");
+    store.organizationNames.set("org_own", "Own Co");
+
+    const queue = await service.findDomainClaimQueue({ operator: OLIVE });
+
+    expect(queue.map((claim) => claim.domain)).toEqual(["disputed.example"]);
   });
 });

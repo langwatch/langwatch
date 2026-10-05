@@ -1237,12 +1237,14 @@ describe("the atomic passkey-delete adapter boundary", () => {
     expect(remove).toHaveBeenCalledWith({ passkeyId: "passkey-1" });
   });
 
+  /** @scenario "The passkey removal route refuses the last way in the same way" */
   it("surfaces the serialization loser in better-auth's last-way-in vocabulary", async () => {
     const stack = identityStack({
       passkeyRemoval: {
         deleteIfAnotherWayInRemains: async () => "would_strand_user",
       },
     });
+    stack.db.passkey?.push({ id: "passkey-last", userId: "user-1" });
     const context = await stack.auth.$context;
 
     await expect(
@@ -1251,6 +1253,7 @@ describe("the atomic passkey-delete adapter boundary", () => {
         where: [{ field: "id", value: "passkey-last" }],
       }),
     ).rejects.toMatchObject({ body: { code: "LAST_WAY_IN" } });
+    expect(stack.db.passkey?.map((row) => row.id)).toEqual(["passkey-last"]);
   });
 
   it("fails closed when a single passkey delete is not one exact id equality", async () => {
