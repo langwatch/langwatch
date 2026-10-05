@@ -100,10 +100,9 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
   }
 
   const commands = EventingTraceProcessingAdapter.create();
-  // One trace's annotation set, so one lane: on per-command groups a remove
-  // could apply before the add it undoes and leave the id searchable.
-  const annotationLane = () => ({ serializeByAggregate: true });
 
+  // The annotation commands share one trace's lane via serializeByAggregate:
+  // on per-command groups a remove could apply before the add it undoes.
   return definePipeline({
     name: TRACE_PROCESSING_PIPELINE_NAME,
     aggregate: defineAggregate({
@@ -166,9 +165,15 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
       coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
     })
     .withCommand("resolveOrigin", EventingTraceOriginAdapter)
-    .withCommand("addAnnotation", commands.addAnnotationCommand, annotationLane())
-    .withCommand("removeAnnotation", commands.removeAnnotationCommand, annotationLane())
-    .withCommand("bulkSyncAnnotations", commands.bulkSyncAnnotationsCommand, annotationLane())
+    .withCommand("addAnnotation", commands.addAnnotationCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("removeAnnotation", commands.removeAnnotationCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("bulkSyncAnnotations", commands.bulkSyncAnnotationsCommand, {
+      serializeByAggregate: true,
+    })
     .withCommand("changeTraceName", commands.changeTraceNameCommand);
 }
 

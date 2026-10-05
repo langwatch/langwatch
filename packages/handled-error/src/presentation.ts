@@ -309,10 +309,6 @@ const label = (map: Record<string, string>, key: string): string | undefined => 
 
 const presentations = {
   // ---- traces & spans ----
-  annotation_not_found: {
-    title: "Annotation not found",
-    describe: () => "It may have been deleted. Reload to see the current list.",
-  },
   trace_not_found: {
     title: "Trace not found",
     describe: () =>
@@ -3877,6 +3873,10 @@ const presentations = {
   },
 
   // ---- annotations & review queues ----
+  annotation_not_found: {
+    title: "Annotation not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
   annotation_annotator_reference_invalid: {
     // `meta.annotator` is the raw reference the caller sent, which is an id
     // with a prefix on it — nothing a reader recognises, so it stays out of
