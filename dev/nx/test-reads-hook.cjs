@@ -37,6 +37,7 @@ const note = ({ target, base = process.cwd() }) => {
     return;
   }
   if (!absolute.startsWith(root + path.sep)) return;
+  if (absolute === __filename) return;
   if (absolute === packageRoot || absolute.startsWith(packageRoot + path.sep)) return;
   const relative = path.relative(root, absolute);
   if (ignored.test(relative) || relative === last) return;

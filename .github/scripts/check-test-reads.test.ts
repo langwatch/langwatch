@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -155,5 +156,48 @@ void describe("given uncovered reads", () => {
       ],
     });
     assert.equal(row, '"@fix/app": ["docs/**/*", "docs/guides/**/*", "apps/worker/**/*"],');
+  });
+});
+
+void describe("given the hook loaded into a test worker", () => {
+  const root = resolve(import.meta.dirname, "../..");
+  const hook = join(root, "dev/nx/test-reads-hook.cjs");
+  const run = (script: string) => {
+    const out = mkdtempSync(join(tmpdir(), "hook-reads-"));
+    spawnSync(process.execPath, ["--require", hook, "-e", script], {
+      cwd: join(root, "packages/csv"),
+      env: {
+        ...process.env,
+        TEST_READS_OUT: out,
+        VITEST_WORKER_ID: "1",
+        npm_package_name: "@fix/app",
+        npm_lifecycle_event: "test",
+      },
+    });
+    return readdirSync(out)
+      .flatMap((file) => readFileSync(join(out, file), "utf8").split("\n"))
+      .filter((line) => line !== "");
+  };
+
+  void it("records a read outside the package", () => {
+    assert.deepEqual(run('require("node:fs").statSync("../../package.json")'), ["package.json"]);
+  });
+
+  void it("never records its own file", () => {
+    assert.deepEqual(run(`require("node:fs").statSync(${JSON.stringify(hook)})`), []);
+  });
+});
+
+void describe("given the declared reads table", () => {
+  void it("names each package once, since a repeated key silently replaces the first", () => {
+    const source = readFileSync(
+      join(import.meta.dirname, "../../dev/nx/test-reads-plugin.mjs"),
+      "utf8",
+    );
+    const keys = [...source.matchAll(/^ {2}"?([@\w/-]+)"?: \[/gm)].map((match) => match[1]);
+    assert.deepEqual(
+      keys.filter((key, index) => keys.indexOf(key) !== index),
+      [],
+    );
   });
 });
