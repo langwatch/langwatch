@@ -45,3 +45,10 @@ Date: 2026-10-05. Branch: feat/strict-feature-layout-v0. Each row stays unbound 
 | 93     | activation refused when the deployment has no password door         | guard checks only hasLiveBinding                                                          |
 | 94     | a break-glass grant held by someone with no password does not count | live bindings counted whatever the holder has                                             |
 | 70, 73 | SAML resolver checks the proved domain; repeat sign-in continues    | domain gate is upstream; repeat sign-in answers "link"                                    |
+
+## Langy, second pass
+
+| Row | Scenario says | Product does |
+| --- | --- | --- |
+| 128 | the traceback stays reachable behind the disclosure | `LangyToolErrorCard` renders the reference only when `presentation.code` is set, so a bare traceback has no "Show details" and is unreachable (likely defect) |
+| 68 | a trace search card links "Open in Traces" | the action reads "View in Trace Explorer" (wording) |
