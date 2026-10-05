@@ -53,6 +53,7 @@
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
+    "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@slack/webhook": "catalog:",
