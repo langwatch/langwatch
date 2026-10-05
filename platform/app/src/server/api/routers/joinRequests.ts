@@ -15,6 +15,13 @@ import {
 } from "~/server/app-layer/identity/runtime";
 
 /**
+ * Where a request is made (ADR-143 v6), as the browser asserts it. Trusted
+ * because it can only LOWER the seat: `cli` lands a Developer, `web` the
+ * joiner seat, and an older client that names nothing is a web one.
+ */
+const joinOriginInput = z.enum(JOIN_REQUEST_ORIGINS).default("web");
+
+/**
  * Joining an organization (D12, ADR-117): the lookup, the ask, the two admin
  * answers, and the setting behind them.
  *
@@ -37,13 +44,6 @@ import {
  * the same permission that gates inviting, because approving a request and
  * sending an invitation are the same authority.
  */
-/**
- * Where a request is made (ADR-143 v6), as the browser asserts it. Trusted
- * because it can only LOWER the seat: `cli` lands a Developer, `web` the
- * joiner seat, and an older client that names nothing is a web one.
- */
-const joinOriginInput = z.enum(JOIN_REQUEST_ORIGINS).default("web");
-
 export const joinRequestsRouter = createTRPCRouter({
   /**
    * Which organizations are open to one of the caller's own verified
