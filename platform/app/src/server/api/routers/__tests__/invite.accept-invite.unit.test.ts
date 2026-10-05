@@ -59,6 +59,7 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
 // legacy session-email comparison — the default here so the pre-identifier
 // tests exercise exactly the legacy branch.
 const verifiedEmailsOfMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
+const provenAddressesMock = vi.hoisted(() => vi.fn().mockResolvedValue([]));
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   // Read at module load by the better-auth request hooks on this router's
   // import graph (GAC-09). Locks nobody: these suites assert nothing about
@@ -71,6 +72,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   }),
   clearSignUpConfirmationPending: async () => void 0,
   identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
+  provenAddresses: () => ({ addressesOf: provenAddressesMock }),
   // The credential boundary asks this before it lets a password through; no
   // organization routes this suite's addresses.
   addressRoutesToConnection: async () => false,
@@ -383,12 +385,11 @@ describe("invite.acceptInvite", () => {
  */
 describe("invite.pendingForMe", () => {
   let findFirstMock: ReturnType<typeof vi.fn>;
-  let findUserMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     findFirstMock = vi.fn().mockResolvedValue(null);
-    findUserMock = vi.fn().mockResolvedValue(null);
+    provenAddressesMock.mockResolvedValue([]);
   });
 
   function createCaller(email = "sam@acme.com") {
@@ -401,7 +402,6 @@ describe("invite.pendingForMe", () => {
     (ctx as any).prisma = {
       $connect: vi.fn(),
       organizationInvite: { findFirst: findFirstMock },
-      user: { findUnique: findUserMock },
     };
     return inviteRouter.createCaller(ctx);
   }
@@ -409,39 +409,18 @@ describe("invite.pendingForMe", () => {
   describe("when the session address has an invitation but is not yet proved", () => {
     /** @scenario An invitation is only offered to somebody who proved the address */
     it("answers nothing and asks the database nothing", async () => {
-      // Not on identifiers at all, and the legacy column is not verified
-      // either: the only address known is the session's, unproven.
-      verifiedEmailsOfMock.mockResolvedValueOnce(null);
-      findUserMock.mockResolvedValueOnce({
-        email: "sam@acme.com",
-        emailVerified: false,
-      });
+      // The only address known is the session's, and it is not proven.
+      provenAddressesMock.mockResolvedValueOnce([]);
 
       await expect(createCaller().pendingForMe({})).resolves.toEqual([]);
 
+      expect(provenAddressesMock).toHaveBeenCalledWith({ userId: "user-1" });
       expect(findFirstMock).not.toHaveBeenCalled();
-    });
-
-    /** @scenario An account not yet on identifiers is matched on its verified legacy address */
-    it("reads the legacy verified address for somebody not on identifiers yet, as the join door does", async () => {
-      verifiedEmailsOfMock.mockResolvedValueOnce(null);
-      findUserMock.mockResolvedValueOnce({
-        email: "sam@acme.com",
-        emailVerified: true,
-      });
-
-      await createCaller("sam@acme.com").pendingForMe({});
-
-      expect(findUserMock).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: "user-1" } }),
-      );
-      const where = findFirstMock.mock.calls[0]?.[0]?.where;
-      expect(JSON.stringify(where)).toContain("sam@acme.com");
     });
 
     /** @scenario An invitation is only offered to somebody who proved the address */
     it("asks only about the proved addresses, never the session's", async () => {
-      verifiedEmailsOfMock.mockResolvedValueOnce([{ value: "ana@acme.com" }]);
+      provenAddressesMock.mockResolvedValueOnce(["ana@acme.com"]);
 
       await createCaller("sam@acme.com").pendingForMe({});
 

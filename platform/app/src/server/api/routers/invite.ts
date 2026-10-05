@@ -11,10 +11,10 @@ import {
 } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { provenAddressesOf } from "~/server/app-layer/identity/proven-addresses";
 import {
   identityEmail,
   joinRequestsService,
+  provenAddresses,
   signUpPolicy,
 } from "~/server/app-layer/identity/runtime";
 import type { Session } from "~/server/auth";
@@ -377,8 +377,7 @@ export const inviteRouter = createTRPCRouter({
     })
     .query(async ({ ctx }) =>
       InviteService.create(ctx.prisma).findPendingForAddresses({
-        addresses: await provenAddressesOf({
-          prisma: ctx.prisma,
+        addresses: await provenAddresses().addressesOf({
           userId: ctx.session.user.id,
         }),
       }),

@@ -8,10 +8,11 @@ import {
   seatForJoiner,
 } from "@langwatch/identity";
 import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { provenAddressesOf } from "~/server/app-layer/identity/proven-addresses";
-import { joinRequestsService } from "~/server/app-layer/identity/runtime";
+import {
+  joinRequestsService,
+  provenAddresses,
+} from "~/server/app-layer/identity/runtime";
 
 /**
  * Where a request is made (ADR-143 v6), as the browser asserts it. Trusted
@@ -59,7 +60,6 @@ export const joinRequestsRouter = createTRPCRouter({
     })
     .query(async ({ ctx }): Promise<JoinLookupDecision> => {
       const verifiedEmail = await verifiedEmailFor({
-        prisma: ctx.prisma,
         userId: ctx.session.user.id,
       });
       return joinRequestsService().lookup({
@@ -82,7 +82,6 @@ export const joinRequestsRouter = createTRPCRouter({
     })
     .query(async ({ ctx }): Promise<JoinLookupDecision> => {
       const verifiedEmail = await verifiedEmailFor({
-        prisma: ctx.prisma,
         userId: ctx.session.user.id,
       });
       return joinRequestsService().offerForSignedInUser({
@@ -100,7 +99,6 @@ export const joinRequestsRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx }) => {
       const verifiedEmail = await verifiedEmailFor({
-        prisma: ctx.prisma,
         userId: ctx.session.user.id,
       });
       await joinRequestsService().dismissOffer({
@@ -126,7 +124,6 @@ export const joinRequestsRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const verifiedEmail = await verifiedEmailFor({
-        prisma: ctx.prisma,
         userId: ctx.session.user.id,
       });
       const joined = await joinRequestsService().joinAutomaticallyIfAdmitted({
@@ -168,7 +165,6 @@ export const joinRequestsRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const verifiedEmail = await verifiedEmailFor({
-        prisma: ctx.prisma,
         userId: ctx.session.user.id,
       });
       return joinRequestsService().request({
@@ -378,18 +374,16 @@ export const JOIN_SETTING_AUDIT_ACTION = "organization.joining.changed";
  * The caller's own verified address, and the reason every procedure above
  * starts here.
  *
- * The first of the list `provenAddressesOf` reads, which is the one rule the
+ * The first of the list `provenAddresses()` reads, which is the one rule the
  * invitation lookup applies to the same person: identifiers first, else the
  * legacy `User.email` column only where better-auth has marked it verified.
  * An unverified address answers null, and every caller treats that as the
  * universal nothing.
  */
 async function verifiedEmailFor({
-  prisma,
   userId,
 }: {
-  prisma: PrismaClient;
   userId: string;
 }): Promise<string | null> {
-  return (await provenAddressesOf({ prisma, userId }))[0] ?? null;
+  return (await provenAddresses().addressesOf({ userId }))[0] ?? null;
 }

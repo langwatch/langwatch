@@ -17,6 +17,7 @@ const hasOrganizationPermission = vi.fn();
 const auditLogMock = vi.fn(async () => undefined);
 const setJoiningMock = vi.fn();
 const verifiedEmailsOfMock = vi.fn();
+const provenAddressesMock = vi.fn();
 const findUserMock = vi.fn();
 const findUsersMock = vi.fn();
 const lookupMock = vi.fn();
@@ -96,6 +97,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   sessionCallbackEvidence: () => ({}),
   mfaCeremonies: () => ({}),
   identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
+  provenAddresses: () => ({ addressesOf: provenAddressesMock }),
   joinRequestsService: () => ({
     setJoining: setJoiningMock,
     lookup: lookupMock,
@@ -137,6 +139,7 @@ beforeEach(() => {
     nextDomains: ["acme.com"],
   });
   verifiedEmailsOfMock.mockResolvedValue(null);
+  provenAddressesMock.mockResolvedValue([]);
   findUserMock.mockResolvedValue(null);
   findUsersMock.mockResolvedValue([]);
   lookupMock.mockResolvedValue({ outcome: "none" });
@@ -154,7 +157,7 @@ describe("given a request made from the terminal", () => {
   describe("when the welcome screen asks to join on the device page's behalf", () => {
     /** @scenario A request made from the terminal lands as a Developer when approved */
     it("hands the origin to the service", async () => {
-      verifiedEmailsOfMock.mockResolvedValue([{ value: "ana@acme.com" }]);
+      provenAddressesMock.mockResolvedValue(["ana@acme.com"]);
 
       await caller().request({ organizationId: "org_acme", origin: "cli" });
 
@@ -165,7 +168,7 @@ describe("given a request made from the terminal", () => {
 
     /** @scenario A request made on the web keeps the organisation's joiner seat */
     it("reads an older client that names no origin as a web one", async () => {
-      verifiedEmailsOfMock.mockResolvedValue([{ value: "ana@acme.com" }]);
+      provenAddressesMock.mockResolvedValue(["ana@acme.com"]);
 
       await caller().request({ organizationId: "org_acme" });
 
@@ -176,7 +179,7 @@ describe("given a request made from the terminal", () => {
 
     /** @scenario The welcome screen honours an automatic door */
     it("hands the origin to the automatic door too", async () => {
-      verifiedEmailsOfMock.mockResolvedValue([{ value: "ana@acme.com" }]);
+      provenAddressesMock.mockResolvedValue(["ana@acme.com"]);
 
       await caller().admitAutomatically({ origin: "cli" });
 
@@ -222,31 +225,10 @@ describe("given a request made from the terminal", () => {
   });
 });
 
-describe("given the caller's verified-address projection", () => {
-  describe("when it is present but empty", () => {
-    it("does not fall back to the legacy user email", async () => {
-      verifiedEmailsOfMock.mockResolvedValue([]);
-      findUserMock.mockResolvedValue({
-        email: "sam@acme.com",
-        emailVerified: true,
-      });
-
-      await caller().lookup();
-
-      expect(findUserMock).not.toHaveBeenCalled();
-      expect(lookupMock).toHaveBeenCalledWith({
-        userId: "user_ana",
-        verifiedEmail: null,
-      });
-    });
-  });
-
-  describe("when the projection has not reached this legacy user", () => {
-    it("falls back only to a database-verified email", async () => {
-      findUserMock.mockResolvedValue({
-        email: "ana@acme.com",
-        emailVerified: true,
-      });
+describe("given the addresses the caller has proven", () => {
+  describe("when the list holds an address", () => {
+    it("hands the first one to the lookup as the verified address", async () => {
+      provenAddressesMock.mockResolvedValue(["ana@acme.com", "ana@other.com"]);
 
       await caller().lookup();
 
@@ -255,14 +237,19 @@ describe("given the caller's verified-address projection", () => {
         verifiedEmail: "ana@acme.com",
       });
     });
+  });
 
-    it("passes a null verified email when the database email is unverified", async () => {
+  describe("when the list is empty", () => {
+    it("passes a null verified address and reads the user row itself not at all", async () => {
+      provenAddressesMock.mockResolvedValue([]);
       findUserMock.mockResolvedValue({
         email: "ana@acme.com",
-        emailVerified: false,
+        emailVerified: true,
       });
 
       await expect(caller().lookup()).resolves.toEqual({ outcome: "none" });
+
+      expect(findUserMock).not.toHaveBeenCalled();
       expect(lookupMock).toHaveBeenCalledWith({
         userId: "user_ana",
         verifiedEmail: null,

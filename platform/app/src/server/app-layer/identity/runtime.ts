@@ -203,6 +203,7 @@ import {
   PrismaSessionFactors,
 } from "./organization-mfa-adapters";
 import { PriorSessionService } from "./prior-session.service";
+import { ProvenAddressesService } from "./proven-addresses.service";
 import { pinnedFetch, systemHostResolver } from "./public-egress";
 import { PrismaCredentialAccountRepository } from "./repositories/credential-account.prisma.repository";
 import { PrismaIdentityAccountsRepository } from "./repositories/identity-accounts.prisma.repository";
@@ -342,6 +343,21 @@ const identityEmailService = new IdentityEmailService(identityHeads, isLatched);
 
 export function identityEmail(): IdentityEmailService {
   return identityEmailService;
+}
+
+/**
+ * The addresses a person has proven, identifiers first and the verified
+ * legacy column behind them: one rule for the join door and the invitation
+ * lookup, composed once over the same two reads.
+ */
+const provenAddressesService = new ProvenAddressesService({
+  verifiedEmailsOf: (args) => identityEmailService.verifiedEmailsOf(args),
+  findVerifiedLegacyEmail: (args) =>
+    identityUsers.findVerifiedLegacyEmail(args),
+});
+
+export function provenAddresses(): ProvenAddressesService {
+  return provenAddressesService;
 }
 
 /**
