@@ -9,7 +9,6 @@ import type { NavigationShellReadyState } from "../../behavior/use-navigation-sh
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { isProjectScopedProduct, type ProductId } from "../../model/products.ts";
-import { LogoIcon } from "../elements/logo-icon.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { SideMenuDensityProvider } from "../elements/side-menu-density.tsx";
 import { AppHeaderUserMenu } from "./app-header-user-menu.tsx";

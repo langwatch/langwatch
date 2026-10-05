@@ -350,8 +350,13 @@ export class DashboardService {
     // `layout` is this method's grouping, not a field of the create input: the
     // schema is strict and flattens the grid onto the row, so spreading
     // `input` whole would offer it the `layout` key it refuses.
-    const { layout: requestedLayout, viewer, ...withoutLayout } = input;
-    const parsed = graphCreateInputSchema.parse({ ...withoutLayout, ...requestedLayout });
+    // An empty `dashboardId` places the graph on no dashboard, as main's `&&` did.
+    const { layout: requestedLayout, viewer, dashboardId, ...withoutLayout } = input;
+    const parsed = graphCreateInputSchema.parse({
+      ...withoutLayout,
+      ...requestedLayout,
+      ...(dashboardId ? { dashboardId } : {}),
+    });
 
     if (parsed.dashboardId !== undefined) {
       await this.#writable({

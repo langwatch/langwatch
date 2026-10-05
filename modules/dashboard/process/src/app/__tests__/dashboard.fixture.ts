@@ -5,16 +5,17 @@ import type {
   LangWatchQLQueryResult,
   LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
 import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
-import { DashboardApp } from "../dashboard.app.ts";
+import { DashboardModule } from "../dashboard.app.ts";
 import type { DashboardAudience } from "../dashboard.members.ts";
 
 /** Everything visible: the caller the gates are measured against. */

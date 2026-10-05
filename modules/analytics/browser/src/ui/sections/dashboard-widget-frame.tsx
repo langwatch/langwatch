@@ -4,8 +4,6 @@
  * row IS the widget, so the dashboard's list query already has it live.
  */
 
-import { Box, Text } from "@chakra-ui/react";
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
 import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { useColorMode } from "@langwatch/design-system/color-mode";
@@ -38,7 +36,7 @@ export interface DashboardWidgetFrameProps {
 
 /** A widget over the page's period selector, as the analytics dashboard draws it. */
 export function DashboardWidgetFrame(props: DashboardWidgetFrameProps) {
-  const { period } = usePeriodSelector();
+  const { period } = useAnalyticsPeriod();
 
   // Epoch milliseconds, not the `Instant` objects `useAnalyticsPeriod` hands
   // back: two `Instant`s for the same instant are never `Object.is`-equal, so a

@@ -30,7 +30,8 @@ type AlertActionParams = {
   timePeriod: number;
 };
 
-export const graphTrpcTransport = defineTrpcRouter(DashboardApi, graphTrpc)
+export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof graphTrpc> =
+  defineTrpcRouter(DashboardApi, graphTrpc)
   .procedure("create")
   .withPermission("analytics:create")
   .handle(async ({ app, input, actor }) =>
@@ -39,14 +40,14 @@ export const graphTrpcTransport = defineTrpcRouter(DashboardApi, graphTrpc)
         projectId: input.projectId,
         viewer: { userId: actor.id },
         name: input.name,
-        graph: JSON.parse(input.graph) as Record<string, unknown>,
+        graph: graphPayload.parse(JSON.parse(input.graph)),
         filters: input.filterParams?.filters ?? {},
         ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
         layout: {
-          gridColumn: input.gridColumn ?? 0,
+          ...(input.gridColumn === undefined ? {} : { gridColumn: input.gridColumn }),
           ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
-          colSpan: input.colSpan ?? 1,
-          rowSpan: input.rowSpan ?? 1,
+          ...(input.colSpan === undefined ? {} : { colSpan: input.colSpan }),
+          ...(input.rowSpan === undefined ? {} : { rowSpan: input.rowSpan }),
         },
       }),
     ),
@@ -70,16 +71,13 @@ export const graphTrpcTransport = defineTrpcRouter(DashboardApi, graphTrpc)
       triggers.flatMap((trigger) =>
         trigger.customGraphId === null ? [] : [[trigger.customGraphId, trigger] as const],
       ),
-    )
+    );
 
-    .procedure("getAll")
-    .withPermission("analytics:view")
-    .handle(async ({ app, input }) => {
-      const { projectId, dashboardId } = input;
-      const graphs = await app.listGraphs({
-        projectId,
-        ...(dashboardId === undefined ? {} : { dashboardId }),
-      });
+    return graphs.map((graph) => ({
+      ...legacyGraph(graph),
+      trigger: triggerByGraphId.get(graph.id) ?? null,
+    }));
+  })
 
   .procedure("delete")
   .withPermission("analytics:delete")
@@ -102,11 +100,10 @@ export const graphTrpcTransport = defineTrpcRouter(DashboardApi, graphTrpc)
       viewer: { userId: actor.id },
     });
 
-    .procedure("delete")
-    .withPermission("analytics:delete")
-    .handle(async ({ app, input }) =>
-      legacyGraph(await app.deleteGraph({ projectId: input.projectId, graphId: input.id })),
-    )
+    const trigger = await app.findAlertForGraph({
+      customGraphId: input.id,
+      projectId: input.projectId,
+    });
 
     const filters = knownFilters(graph.filters);
 
@@ -126,7 +123,7 @@ export const graphTrpcTransport = defineTrpcRouter(DashboardApi, graphTrpc)
         viewer: { userId: actor.id },
         graphId: input.graphId,
         name: input.name,
-        graph: JSON.parse(input.graph) as Record<string, unknown>,
+        graph: graphPayload.parse(JSON.parse(input.graph)),
         filters: input.filterParams?.filters ?? {},
       }),
     ),

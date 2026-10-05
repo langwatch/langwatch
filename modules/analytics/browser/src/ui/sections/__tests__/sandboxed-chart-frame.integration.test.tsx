@@ -29,7 +29,7 @@ const dashboardContext = {
 };
 
 const ui = (code: string, theme: "light" | "dark" = "light") => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <SandboxedChartFrame
       code={code}
       executeQuery={vi.fn()}

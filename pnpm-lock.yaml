@@ -6878,9 +6878,6 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -6914,7 +6911,10 @@ importers:
     devDependencies:
       '@langwatch/analytics-process':
         specifier: workspace:*
-        version: link:../../../packages/api-fixture
+        version: link:../../analytics/process
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness

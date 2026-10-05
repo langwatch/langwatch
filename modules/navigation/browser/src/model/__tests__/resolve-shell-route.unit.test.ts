@@ -66,6 +66,20 @@ describe("resolveShellRoute", () => {
     });
   });
 
+  describe("given the last workspace was my personal one", () => {
+    /** @scenario A sticky personal workspace does not follow me onto an org-wide page */
+    it.each(["/gateway/virtual-keys", "/governance/people"])(
+      "keeps %s on the organization scope its address asks for",
+      (pathname) => {
+        const route = resolve(pathname, { isPersonalScope: true });
+
+        expect(route.isPersonalScopeRoute).toBe(false);
+        expect(route.isOrgScopeRoute).toBe(true);
+        expect(route.activeProductId).not.toBe("me");
+      },
+    );
+  });
+
   describe("given the settings detour", () => {
     /**
      * Two specs name the same detour from different angles — the ops feature

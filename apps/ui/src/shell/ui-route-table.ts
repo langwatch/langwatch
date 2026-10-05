@@ -277,158 +277,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
                 path: "/:project/studio/:workflow",
                 page: "pages/[project]/studio/[workflow]",
               },
-              renameParams: { t: "drawer.t" },
-            },
-          },
-
-          // Legacy /messages paths. The legacy Traces page is gone; these are
-          // redirects only, so old bookmarks and notification links keep working.
-          {
-            // The bare legacy index keeps every filter and date range the saved
-            // link carried; the Trace Explorer ignores what it does not know.
-            path: "/:project/messages",
-            redirect: { from: "/:project/messages", to: "/:project/traces" },
-          },
-          {
-            path: "/:project/messages/:trace",
-            redirect: {
-              from: "/:project/messages/:trace",
-              to: "/:project/traces",
-              pinParams: {
-                "drawer.open": "traceV2Details",
-                "drawer.traceId": ":trace",
-              },
-            },
-          },
-          {
-            // The legacy tab has no Trace Explorer equivalent, so it is dropped.
-            path: "/:project/messages/:trace/:openTab",
-            redirect: {
-              from: "/:project/messages/:trace/:openTab",
-              to: "/:project/traces",
-              pinParams: {
-                "drawer.open": "traceV2Details",
-                "drawer.traceId": ":trace",
-              },
-            },
-          },
-          {
-            path: "/:project/messages/:trace/:openTab/:span",
-            redirect: {
-              from: "/:project/messages/:trace/:openTab/:span",
-              to: "/:project/traces",
-              pinParams: {
-                "drawer.open": "traceV2Details",
-                "drawer.traceId": ":trace",
-                "drawer.span": ":span",
-              },
-            },
-          },
-          {
-            path: "/:project/setup",
-            page: "pages/[project]/setup",
-          },
-          {
-            path: "/:project/workflows",
-            page: "pages/[project]/workflows",
-          },
-          {
-            path: "/:project/chat/:workflow",
-            page: "pages/[project]/chat/[workflow]",
-          },
-          {
-            path: "/:project/studio/:workflow",
-            page: "pages/[project]/studio/[workflow]",
-          },
-
-          // Analytics
-          {
-            path: "/:project/analytics",
-            page: "pages/[project]/analytics/index",
-          },
-          {
-            path: "/:project/analytics/evaluations",
-            page: "pages/[project]/analytics/evaluations",
-          },
-          {
-            path: "/:project/analytics/metrics",
-            page: "pages/[project]/analytics/metrics",
-          },
-          {
-            path: "/:project/analytics/reports",
-            page: "pages/[project]/analytics/reports",
-          },
-          {
-            path: "/:project/analytics/topics",
-            page: "pages/[project]/analytics/topics",
-          },
-          {
-            path: "/:project/analytics/users",
-            page: "pages/[project]/analytics/users",
-          },
-          {
-            path: "/:project/analytics/query",
-            page: "pages/[project]/analytics/query",
-          },
-          {
-            path: "/:project/analytics/custom",
-            page: "pages/[project]/analytics/custom/index",
-          },
-          {
-            path: "/:project/analytics/custom/:id",
-            page: "pages/[project]/analytics/custom/[id]",
-          },
-
-          // Dashboards v1 (behind release_dashboards; the screens gate themselves)
-          {
-            path: "/:project/dashboards",
-            page: "pages/[project]/dashboards/index",
-          },
-          {
-            path: "/:project/dashboards/:dashboardId",
-            page: "pages/[project]/dashboards/[dashboardId]",
-          },
-
-          // Experiments
-          {
-            path: "/:project/experiments",
-            page: "pages/[project]/experiments/index",
-          },
-          {
-            path: "/:project/experiments/workbench",
-            page: "pages/[project]/experiments/workbench/index",
-          },
-          {
-            path: "/:project/experiments/workbench/:slug",
-            page: "pages/[project]/experiments/workbench/[slug]",
-          },
-          {
-            path: "/:project/experiments/:experiment",
-            page: "pages/[project]/experiments/[experiment]",
-          },
-
-          // Agent Testing (catch-all, behind release_ui_agent_testing_v2_enabled)
-          {
-            path: "/:project/agent-testing",
-            page: "pages/[project]/agent-testing/[[...path]]",
-          },
-          {
-            path: "/:project/agent-testing/*",
-            page: "pages/[project]/agent-testing/[[...path]]",
-          },
-
-          // Simulations (catch-all)
-          {
-            path: "/:project/simulations/scenarios",
-            page: "pages/[project]/simulations/scenarios/index",
-          },
-          {
-            path: "/:project/simulations/*",
-            page: "pages/[project]/simulations/[[...path]]",
-          },
-          {
-            path: "/:project/simulations",
-            page: "pages/[project]/simulations/[[...path]]",
+            ],
           },
         ],
       },
@@ -966,6 +815,16 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
               {
                 path: "/:project/analytics/custom/:id",
                 page: "pages/[project]/analytics/custom/[id]",
+              },
+
+              // Dashboards v1 (behind release_dashboards; the screens gate themselves)
+              {
+                path: "/:project/dashboards",
+                page: "pages/[project]/dashboards/index",
+              },
+              {
+                path: "/:project/dashboards/:dashboardId",
+                page: "pages/[project]/dashboards/[dashboardId]",
               },
 
               // Experiments

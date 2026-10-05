@@ -165,6 +165,11 @@ class StubOrganizationService extends OrganizationServiceContract {
     (input: { organizationId: string; userId: string }) => Promise<string[]>
   >(async () => []);
 
+  readonly staffedTeams: {
+    input: Parameters<OrganizationApi["createTeamWithMembers"]>[0];
+    by: Parameters<OrganizationApi["createTeamWithMembers"]>[1];
+  }[] = [];
+
   getOrganizationMembers(): Promise<string[]> {
     return Promise.resolve([]);
   }
@@ -387,6 +392,7 @@ const createService = (
       createTeam: (input) => organizations.createTeam(input),
       addTeamMember: (input) => organizations.addTeamMember(input),
       findMemberTeamIds: (input) => organizations.findMemberTeamIds(input),
+      createTeamWithMembers: (input, by) => organizations.staffNewTeam(input, by),
       getTeam: async (input) => {
         const team = await organizations.findActiveTeam(input);
         if (!team) throw new TeamNotFoundError(input.teamId);

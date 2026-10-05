@@ -6,7 +6,8 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DashboardApi, dashboardTrpc } from "@langwatch/dashboard-contract";
 
-export const dashboardTrpcTransport = defineTrpcRouter(DashboardApi, dashboardTrpc)
+export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof dashboardTrpc> =
+  defineTrpcRouter(DashboardApi, dashboardTrpc)
   .procedure("getAll")
   .withPermission("analytics:view")
   .handle(async ({ app, input, actor }) => {
