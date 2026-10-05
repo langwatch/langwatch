@@ -168,7 +168,6 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
   const deployment = useUiDeployment();
   const uiScope = useUiScope();
   const activeScope = uiScope.activeScope();
-  const scopeHost = uiScope.scopeHost();
   const { openDrawer, closeDrawer } = useDrawer();
   const graph = useOrganizationGraph({
     organizationId: activeScope.organizationId ?? void 0,
@@ -210,10 +209,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
         },
         organization: graph.organization,
         hasPermission: (permission) => session.hasPermission(permission),
-        hasOrganizationPermission: (permission) =>
-          scopeHost
-            ? scopeHost.hasOrganizationPermission(permission)
-            : session.hasPermission(permission),
+        hasOrganizationPermission: (permission) => session.hasOrganizationPermission(permission),
         actor: sessionActor ?? void 0,
         activeProject: graph.activeProject?.project,
         isEnterprise: facts.isEnterprise,
@@ -236,7 +232,6 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
       activeScope.projectId,
       graph,
       session,
-      scopeHost,
       sessionActor,
       facts.isEnterprise,
       facts.isPlanLoading,

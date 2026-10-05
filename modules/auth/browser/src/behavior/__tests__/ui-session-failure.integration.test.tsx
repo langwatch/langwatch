@@ -115,6 +115,7 @@ function SessionProbe({
     transport: instantTransport,
     session: reading,
     scope: RESOLVED_SCOPE,
+    isPublicRoute: false,
   });
   return (
     <div>

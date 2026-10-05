@@ -131,6 +131,14 @@ export class BrowserUiSession extends UiSession {
     return permissionSatisfiedBy({ granted, requested: permission });
   }
 
+  /** Organization grants only: a project grant never answers for its organization. */
+  override hasOrganizationPermission(permission: string): boolean {
+    if ("snapshot" in this.state) {
+      return this.state.snapshot.permissions.canInOrganization(permission);
+    }
+    return super.hasOrganizationPermission(permission);
+  }
+
   isSettled(): boolean {
     if ("snapshot" in this.state) {
       const { session, scope, permissions } = this.state.snapshot;
@@ -230,10 +238,13 @@ export function useBrowserUiSession({
   transport,
   session,
   scope,
+  isPublicRoute,
 }: {
   transport: UiFeatureApiTransport;
   session: UiSessionReading;
   scope: UiActiveScopeReading;
+  /** The address renders without a session: no grant is read, none is held. */
+  isPublicRoute: boolean;
 }): BrowserUiSession {
   const [flagRequests] = useState(() => new UiFeatureFlagRequests());
   const userId = session.user?.id;
@@ -245,12 +256,14 @@ export function useBrowserUiSession({
     projectId,
     organizationId,
     userId,
+    isPublicRoute,
   });
   const organizationPermissions = useUiEffectivePermissions({
     transport,
     projectId: void 0,
     organizationId,
     userId,
+    isPublicRoute,
   });
 
   const requestedFlags = useSyncExternalStore(
@@ -274,11 +287,24 @@ export function useBrowserUiSession({
   const snapshot: UiSessionSnapshot = {
     session,
     scope,
-    permissions: readPermissions(scope.status, permissions, organizationPermissions),
+    permissions: isPublicRoute
+      ? NO_PERMISSIONS_ON_A_PUBLIC_PAGE
+      : readPermissions(scope.status, permissions, organizationPermissions),
   };
 
   return BrowserUiSession.create({ snapshot, flags, askFlag, refresh });
 }
+
+/**
+ * A public page (the shared trace) holds no permission, signed in or not, as on
+ * main: a cached grant for the shared project must not answer there either.
+ */
+const NO_PERMISSIONS_ON_A_PUBLIC_PAGE: UiSessionSnapshot["permissions"] = {
+  status: "ready",
+  isLoading: false,
+  can: () => false,
+  canInOrganization: () => false,
+};
 
 function readSession(query: UseQueryResult<UiSessionResponse>): UiSessionReading {
   if (query.isLoading) return { status: "loading", user: null };

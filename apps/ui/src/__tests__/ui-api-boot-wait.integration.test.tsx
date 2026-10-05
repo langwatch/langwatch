@@ -192,6 +192,7 @@ function renderShell({
         transport: mounted,
         session: sessionReading,
         scope: scopeReading.scope,
+        isPublicRoute: root.scope.isUiPublicRoute(path),
       });
       return {
         session,

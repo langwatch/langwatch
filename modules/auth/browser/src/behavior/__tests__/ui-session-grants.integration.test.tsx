@@ -57,7 +57,7 @@ function GrantProbe({
   transport: UiFeatureApiTransport;
   scope: UiActiveScopeReading;
 }) {
-  const session = useBrowserUiSession({ transport, session: JANE, scope });
+  const session = useBrowserUiSession({ transport, session: JANE, scope, isPublicRoute: false });
   const { permissions } = session.snapshot();
   return (
     <div>

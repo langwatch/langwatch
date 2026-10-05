@@ -160,13 +160,21 @@ export type UiActor = {
 };
 
 /**
- * Who is here and what they may do — `hasPermission` and `isFeatureEnabled`
- * answer synchronously and fail closed, so a loading screen renders the same
- * as a "no" screen. Where they are is `UiScope`, a capability of its own.
+ * Who is here and what they may do — `hasPermission`, `hasOrganizationPermission`
+ * and `isFeatureEnabled` answer synchronously and fail closed, so a loading screen
+ * renders the same as a "no" screen. Where they are is `UiScope`, a capability of its own.
  */
 export abstract class UiSession {
   abstract currentUser(): UiActor | null;
   abstract hasPermission(permission: string): boolean;
+
+  /**
+   * Whether the reader holds a permission in the active organization, apart
+   * from any project grant. Ports that cannot answer it fail by name.
+   */
+  hasOrganizationPermission(_permission: string): boolean {
+    throw new UiCapabilityUnavailableError("session organization permission");
+  }
 
   /**
    * Whether the answers above have arrived — a guard needs the
@@ -216,6 +224,10 @@ class UnavailableUiSession extends UiSession {
   }
 
   hasPermission(): never {
+    throw new UiCapabilityUnavailableError("session");
+  }
+
+  override hasOrganizationPermission(): never {
     throw new UiCapabilityUnavailableError("session");
   }
 

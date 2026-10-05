@@ -35,12 +35,15 @@ export function useUiEffectivePermissions({
   projectId,
   organizationId,
   userId,
+  isPublicRoute,
 }: {
   transport: UiFeatureApiTransport;
   projectId: string | undefined;
   organizationId: string | undefined;
   /** Keeps a previous user's cached grants from reaching the next user. */
   userId: string | undefined;
+  /** A public page holds no grant, so none is asked for there. */
+  isPublicRoute: boolean;
 }): UseQueryResult<UiEffectivePermissionsRead> {
   const input = {
     ...(projectId ? { projectId } : {}),
@@ -56,7 +59,7 @@ export function useUiEffectivePermissions({
         UI_EFFECTIVE_PERMISSIONS_PROCEDURE,
         input,
       ) as Promise<UiEffectivePermissionsRead>,
-    enabled: !!userId && (!!projectId || !!organizationId),
+    enabled: !isPublicRoute && !!userId && (!!projectId || !!organizationId),
     staleTime: GRANTS_STALE_TIME_MS,
   });
 }
