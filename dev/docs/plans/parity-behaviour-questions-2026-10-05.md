@@ -206,3 +206,11 @@ Date: 2026-10-05. Branch: feat/strict-feature-layout-v0. Each row stays unbound 
 | sso-idp-termination :566 (the screen says SSO needs Enterprise and offers no refused control)    | no plan copy; controls render and refuse with enterprise_plan_required                                 |
 | enterprise-application-slot :34, :41, :68                                                        | the eight-member "Enterprise application slot" API no longer exists (@unimplemented or delete)         |
 | sso-idp-termination :150, :156, :163 (SAML signing certificate)                                  | no assertion-signing harness exists anywhere (needs one)                                               |
+
+## Onboarding
+
+| Scenario                                                                                    | Product does                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| guided-tour.feature 281, 287, 298, 306 (the gateway tour's create, reveal and record steps) | nothing calls useRegisterTourActions or onboarding.recordVirtualKeyReveal; the gateway key screens carry none of the tour targets (lost in the restructure? likely defect) |
+| langy-guided-onboarding.feature 190, 204 (the brief is settled on the server)               | settleGuidedKickoffParts has three copies (onboarding, langy browser, apps/ui shell) and no product caller; the turn preparation does not settle it                        |
+| api-keys-v2.feature 118 (setup screens offer "Create a key")                                | onboarding says "Create a personal access token"                                                                                                                           |
