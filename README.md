@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://langwatch.ai"><img src=".github/readme/cover.jpg" alt="LangWatch: Open-Source Agent Observability &amp; Evals for AI Platform teams" width="100%"></a>
+  <a href="https://langwatch.ai"><img src=".github/readme/cover.jpg" alt="LangWatch: Agent Observability &amp; Evals for AI Platform teams" width="100%"></a>
 </p>
 
 LangWatch is the open-source platform for AI in production: trace, test, route and govern every LLM call in your company, from the agents you build to the coding assistants your engineers use. LangWatch is Apache 2.0. [View docs](https://langwatch.ai/docs/introduction).
