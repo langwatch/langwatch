@@ -1,0 +1,12 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch();
+const context = await browser.newContext({ storageState: "/tmp/proof-8296/auth.json", viewport: { width: 1440, height: 1200 } });
+const page = await context.newPage();
+page.on("console", (m) => { if (m.type() === "error") console.log("console", m.text().slice(0, 400)); });
+page.on("pageerror", (e) => console.log("pageerror", String(e).slice(0, 400)));
+page.on("response", async (r) => { if (r.url().includes("lwql.query")) { const t = await r.text().catch(() => ""); console.log("lwql", r.status(), t.slice(0, 500)); } });
+await page.goto("http://localhost:5570/local-dev-project/analytics-v2", { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(20000);
+const f = page.frames().find((x) => x !== page.mainFrame());
+console.log("frame body", (await f.locator("body").innerText()).slice(0, 300));
+await browser.close();

@@ -1,0 +1,12 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch();
+const context = await browser.newContext({ storageState: "/tmp/proof-8296/auth.json", viewport: { width: 1440, height: 900 } });
+const page = await context.newPage();
+await page.goto("http://localhost:5570/local-dev-project/analytics-v2", { waitUntil: "domcontentloaded" });
+await page.waitForTimeout(15000);
+const disabled = await page.locator('[data-testid="analytics-v2-lwql-disabled"]').count();
+const cards = await page.locator('[data-testid^="analytics-v2-widget-"]').count();
+console.log("disabled message:", disabled, "cards:", cards);
+if (disabled) console.log("text:", await page.locator('[data-testid="analytics-v2-lwql-disabled"]').innerText());
+await page.screenshot({ path: "/tmp/proof-8296/ac9-lwql-disabled.png" });
+await browser.close();
