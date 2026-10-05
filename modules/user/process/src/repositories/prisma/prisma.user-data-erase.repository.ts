@@ -22,7 +22,7 @@ type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClie
  * by design — the one place in the product that discovers and removes a single user's data
  * across every organization they touched, across ~25 tables no single feature's port fronts.
  */
-export type GdprUserDataEraseDatabase = {
+type GdprUserDataEraseDatabase = {
   user: Delegate<"user", "findUnique" | "delete">;
   organization: Delegate<"organization", "findMany" | "deleteMany">;
   organizationUser: Delegate<"organizationUser", "count" | "deleteMany" | "groupBy">;

@@ -8,13 +8,14 @@ import {
   GovernanceRestApi,
   type PersonalUsageRollup,
 } from "@langwatch/enterprise-governance-contract";
-import { GatewayApi } from "@langwatch/gateway-contract";
+import { GatewayApi, type GatewayBudgetCheckResult } from "@langwatch/gateway-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   IdentityVerificationExpiredError,
   describePasswordProblem,
   routesToOrganizationConnection,
 } from "@langwatch/identity-contract";
+import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi, SignUpRestrictedError } from "@langwatch/organization-contract";
@@ -25,10 +26,9 @@ import type {
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
-import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
+import { PROJECT_KIND, ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import type {
   ChangeOwnPasswordInput,
   CreateCredentialUserInput,
@@ -81,6 +81,7 @@ import type {
   UserUsageCount,
   UserAvatarRestParams,
   UserAvatarUrl,
+  UserServerConfig,
 } from "@langwatch/user-contract";
 import {
   EmailAlreadyRegisteredError,
@@ -102,24 +103,25 @@ import {
   UserRegistrationNotAvailableError,
   UserSignupThrottledError,
   UserApi,
+  userConfig,
 } from "@langwatch/user-contract";
 
+import { userBudgetRequestMailChannels } from "../channels/user-budget-request-mail-channels.registry.ts";
+import type { UserBudgetRequestMailChannel } from "../channels/user-budget-request-mail.channel.ts";
+import type { UserRateLimitRepository } from "../repositories/user-rate-limit.repository.ts";
 import type { UserRepositories } from "../repositories/user.repositories.ts";
 import { changeTargetsBrokeredPassword } from "../rules/password-change-target.rules.ts";
 import { isServableUserAvatar, type ServableUserAvatar } from "../rules/user-avatar-read.rules.ts";
 import { UserAccountService } from "../services/user-account.service.ts";
+import { UserAvatarObjectService } from "../services/user-avatar-object.service.ts";
 import {
   UserLifecycleNoticeService,
   type UserLifecycleSenders,
 } from "../services/user-lifecycle-notice.service.ts";
+import { UserOrganizationDirectoryService } from "../services/user-organization-directory.service.ts";
+import { type UserPasswordHasher, UserPasswordService } from "../services/user-password.service.ts";
 import { UserCredentialService } from "../services/user-signin-credential.service.ts";
 import { UserService } from "../services/user.service.ts";
-import { buildUserInfrastructure } from "./user-composition.build.ts";
-import type {
-  UserBudgetDecision,
-  UserBudgetScopeDecision,
-  UserInfrastructure,
-} from "./user.members.ts";
 
 const logger = createLogger("langwatch:user-app");
 
@@ -149,33 +151,46 @@ const CREDENTIAL_ISSUER = "local:credential";
 interface UserAppDependencies {
   auth: AuthApiContract;
   authz: AuthzApi;
+  /** The default routing policy and personal keys behind /me. */
+  enterpriseGateway: Pick<
+    EnterpriseGatewayApi,
+    "findDefaultRoutingPolicies" | "personalVirtualKeyList"
+  >;
+  /** The budget pre-check the /me banner runs at a projected cost of zero. */
+  gateway: Pick<GatewayApi, "checkBudget">;
   governance: Pick<
     GovernanceRestApi,
-    "personalUsageDashboard" | "personalBudgetOverview" | "cliBootstrap"
+    "personalUsageDashboard" | "personalBudgetOverview" | "cliBootstrap" | "personalUsage"
   >;
   organizations: OrganizationApi;
   projects: ProjectApi;
+  /** Where avatar bytes are kept, as user-owned objects in a personal project. */
+  storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById" | "getReadUrlForPurpose">;
 }
 
-/** `PASSKEYS_ENABLED` has one owner, `auth`, so this module asks that peer
- * rather than redeclaring it; `publicBaseUrl` is the process's own. */
-type UserMembers = MembersRead<readonly ["prisma", "redis"]> &
-  Readonly<{ publicBaseUrl: string | undefined }>;
-
-/** The two flagged facts above, resolved once and threaded where `config` used to travel. */
+/** `PASSKEYS_ENABLED` is auth's, asked of that peer; the base URL is user's config leaf. */
 export type UserFacts = Readonly<{ passkeysEnabled: boolean; baseUrl: string | null }>;
 
 type UserSetup = FeatureSetup<
   typeof UserModule.dependencies,
-  UserMembers,
-  undefined,
+  never,
+  UserServerConfig,
   UserRepositories
 >;
 
+/** What `createForTesting` builds the module from; clock and hasher default to the real ones. */
+type UserTestSetup = Readonly<{
+  repositories: UserRepositories;
+  dependencies: UserAppDependencies;
+  facts: UserFacts;
+  budgetRequests: UserBudgetRequestMailChannel;
+  passwords?: UserPasswordHasher;
+  now?: () => Instant;
+}>;
+
 export class UserModule implements UserApi {
   static readonly contract = UserApi;
-  /** `publicBaseUrl` is named raw: the process answers it, no store does. */
-  static readonly reads = ["prisma", "redis", "publicBaseUrl"] as const;
+  static readonly config = userConfig;
   static readonly dependencies: {
     auth: typeof AuthApi;
     authz: typeof AuthzApi;
@@ -199,81 +214,74 @@ export class UserModule implements UserApi {
   };
 
   static create(setup: UserSetup): UserModule {
-    const members = buildUserInfrastructure({
-      prisma: setup.members.prisma,
-      redis: setup.members.redis,
-      organizations: setup.dependencies.organizations,
-      enterpriseGateway: setup.dependencies.enterpriseGateway,
-      gateway: setup.dependencies.gateway,
-      auth: setup.dependencies.auth,
-      projects: setup.dependencies.projects,
-      governance: setup.dependencies.governance,
-      mail: { send: (content) => setup.dependencies.notifications.sendEmail(content) },
-      publicBaseUrl: setup.members.publicBaseUrl,
-      storedObjects: setup.dependencies.storedObjects,
-    });
+    const mailer: MailSender = {
+      send: (content) => setup.dependencies.notifications.sendEmail(content),
+    };
 
     return UserModule.#build({
-      members,
       dependencies: setup.dependencies,
       repositories: setup.repositories,
+      budgetRequests: userBudgetRequestMailChannels.ses.create({
+        mailer,
+        baseUrl: setup.config.publicBaseUrl,
+      }),
       facts: {
         // Stored now, asked on first read: a peer API refuses during construction.
         get passkeysEnabled() {
           return setup.dependencies.auth.offersPasskeys();
         },
-        baseUrl: setup.members.publicBaseUrl ?? null,
+        baseUrl: setup.config.publicBaseUrl ?? null,
       },
     });
   }
 
   /**
-   * The application over hand-supplied members, for a suite exercising the App
-   * directly rather than through a booted process. Nothing here builds them —
-   * the caller supplies the whole record, unlike `create`.
+   * The application over a test's own repositories, peers and mail channel, for a suite
+   * exercising it directly rather than through a booted process.
    */
-  static createForTesting(setup: {
-    repositories: UserRepositories;
-    dependencies: UserAppDependencies;
-    members: UserInfrastructure;
-    facts: UserFacts;
-  }): UserModule {
+  static createForTesting(setup: UserTestSetup): UserModule {
     return UserModule.#build(setup);
   }
 
   static #build({
-    members,
     dependencies,
     repositories,
     facts,
-  }: {
-    members: UserInfrastructure;
-    dependencies: UserAppDependencies;
-    repositories: UserRepositories;
-    facts: UserFacts;
-  }): UserModule {
-    const now = members.now;
+    budgetRequests,
+    passwords = UserPasswordService.create(),
+    now = nowInstant,
+  }: UserTestSetup): UserModule {
     const lifecycle = UserLifecycleNoticeService.create();
+    const avatarObjects = UserAvatarObjectService.create({
+      storedObjects: dependencies.storedObjects,
+    });
 
     return new UserModule({
       users: UserService.create({
         repository: repositories.users,
         organizations: dependencies.organizations,
         auth: dependencies.auth,
-        avatarStorage: members.avatarStorage,
+        avatarStorage: avatarObjects,
         credentialIssuer: CREDENTIAL_ISSUER,
-        ...(now ? { now } : {}),
+        now,
         platformOperators: dependencies.authz,
         lifecycle,
-        cliCredentials: members.cliCredentials,
       }),
       lifecycle,
       credentials: UserCredentialService.create({
         repository: repositories.credentials,
-        passwords: members.passwords,
+        passwords,
       }),
+      directory: UserOrganizationDirectoryService.create({
+        directory: repositories.organizationDirectory,
+        organizations: dependencies.organizations,
+      }),
+      avatarObjects,
+      rateLimits: repositories.rateLimits,
+      budgetRequests,
+      passwords,
+      now,
       dependencies,
-      members,
       facts,
     });
   }
@@ -283,31 +291,39 @@ export class UserModule implements UserApi {
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
-  readonly #members: UserInfrastructure;
+  readonly #directory: UserOrganizationDirectoryService;
+  readonly #avatarObjects: UserAvatarObjectService;
+  readonly #rateLimits: UserRateLimitRepository;
+  readonly #budgetRequests: UserBudgetRequestMailChannel;
+  readonly #passwords: UserPasswordHasher;
+  readonly #now: () => Instant;
   readonly #facts: UserFacts;
 
-  private constructor({
-    users,
-    lifecycle,
-    credentials,
-    dependencies,
-    members,
-    facts,
-  }: {
+  private constructor(input: {
     users: UserService;
     lifecycle: UserLifecycleNoticeService;
     credentials: UserCredentialService;
+    directory: UserOrganizationDirectoryService;
+    avatarObjects: UserAvatarObjectService;
+    rateLimits: UserRateLimitRepository;
+    budgetRequests: UserBudgetRequestMailChannel;
+    passwords: UserPasswordHasher;
+    now: () => Instant;
     dependencies: UserAppDependencies;
-    members: UserInfrastructure;
     facts: UserFacts;
   }) {
-    this.#users = users;
-    this.#lifecycle = lifecycle;
-    this.#credentials = credentials;
-    this.#account = UserAccountService.create(dependencies);
-    this.#peers = dependencies;
-    this.#members = members;
-    this.#facts = facts;
+    this.#users = input.users;
+    this.#lifecycle = input.lifecycle;
+    this.#credentials = input.credentials;
+    this.#account = UserAccountService.create(input.dependencies);
+    this.#peers = input.dependencies;
+    this.#directory = input.directory;
+    this.#avatarObjects = input.avatarObjects;
+    this.#rateLimits = input.rateLimits;
+    this.#budgetRequests = input.budgetRequests;
+    this.#passwords = input.passwords;
+    this.#now = input.now;
+    this.#facts = input.facts;
   }
 
   /** Resolves the caller allowed to read a personal workspace. */
@@ -476,13 +492,13 @@ export class UserModule implements UserApi {
     const account = {
       name: input.name,
       email,
-      passwordHash: await this.#members.passwords.hash({ password: input.password }),
+      passwordHash: await this.#passwords.hash({ password: input.password }),
     };
     const created = addressConfirmed
       ? await this.#users.createConfirmedCredentialUser(account)
       : await this.#users.createCredentialUser(account);
 
-    this.#members.analytics.trackServerEvent({ userId: created.id, event: "signed_up" });
+    await this.#lifecycle.registered({ userId: created.id, at: this.#now() });
 
     return created;
   }
@@ -547,7 +563,7 @@ export class UserModule implements UserApi {
 
     const result = await this.#users.setFirstPassword({
       id: input.userId,
-      passwordHash: await this.#members.passwords.hash({ password: input.password }),
+      passwordHash: await this.#passwords.hash({ password: input.password }),
     });
 
     if (result === "already_set") throw new UserPasswordAlreadySetError();
@@ -791,7 +807,7 @@ export class UserModule implements UserApi {
    * name the personal workspace the same way.
    */
   async setOwnAvatar(input: SetOwnAvatarInput): Promise<UserAvatarResult> {
-    const allowance = await this.#members.rateLimit({
+    const allowance = await this.#rateLimits.check({
       key: `user.setAvatar:${input.userId}`,
       ...AVATAR_UPLOAD_BUDGET,
     });
@@ -857,7 +873,7 @@ export class UserModule implements UserApi {
       displayName: profile?.name ?? null,
       displayEmail: profile?.email ?? null,
     });
-    const policy = await this.#members.gateway.findDefaultRoutingPolicy({
+    const [policy] = await this.#peers.enterpriseGateway.findDefaultRoutingPolicies({
       organizationId,
       personalTeamId: workspace.team.id,
     });
@@ -884,7 +900,7 @@ export class UserModule implements UserApi {
 
     if (!workspace) return { status: "ok" };
 
-    const keys = await this.#members.gateway.listPersonalVirtualKeys({
+    const keys = await this.#peers.enterpriseGateway.personalVirtualKeyList({
       userId,
       organizationId,
     });
@@ -892,7 +908,7 @@ export class UserModule implements UserApi {
     // that matches no key-scoped budget keeps them on the principal scope,
     // which is what `principalUserId` resolves regardless.
     const virtualKeyId = keys[0]?.id ?? `_ingestion_:user:${userId}`;
-    const decision = await this.#members.gateway.checkBudget({
+    const decision = await this.#peers.gateway.checkBudget({
       organizationId,
       teamId: workspace.team.id,
       projectId: workspace.project.id,
@@ -911,7 +927,7 @@ export class UserModule implements UserApi {
       limitUsd: topScope.limitUsd,
       period: topScope.window.toLowerCase(),
       ...this.#requestIncreaseUrl(topScope),
-      adminEmail: await this.#members.organizations.findSupportContact({ organizationId }),
+      adminEmail: await this.#directory.findSupportContact({ organizationId }),
     };
   }
 
@@ -923,16 +939,16 @@ export class UserModule implements UserApi {
   async requestBudgetIncrease(
     input: UserApiRequestBudgetIncreaseInput & { userId: string },
   ): Promise<UserBudgetIncreaseRequested> {
-    const to = await this.#members.organizations.getBudgetIncreaseRecipient({
+    const to = await this.#directory.getBudgetIncreaseRecipient({
       organizationId: input.organizationId,
     });
     const [organizationName, requester] = await Promise.all([
-      this.#members.organizations.findName({ organizationId: input.organizationId }),
+      this.#directory.findName({ organizationId: input.organizationId }),
       this.#users.findById({ id: input.userId }),
     ]);
 
     try {
-      await this.#members.budgetRequests.sendBudgetIncreaseRequest({
+      await this.#budgetRequests.sendBudgetIncreaseRequest({
         to,
         requesterEmail: requester?.email ?? "",
         ...(requester?.name ? { requesterName: requester.name } : {}),
@@ -971,7 +987,7 @@ export class UserModule implements UserApi {
   }): Promise<UserHomePagePickerState> {
     const [lastHomePath, firstProjectSlug] = await Promise.all([
       this.#users.findLastHomePath({ id: userId }),
-      this.#members.organizations.findFirstProjectSlug({ organizationId, userId }),
+      this.#directory.findFirstProjectSlug({ organizationId, userId }),
     ]);
 
     return { lastHomePath, firstProjectSlug };
@@ -1037,10 +1053,13 @@ export class UserModule implements UserApi {
       (credential.kind === "legacyProjectKey" ? null : credential.organizationId) ??
       (await this.#account.findOrganizationIdByTeamId({ teamId: project.teamId }));
     const tenant = organizationId
-      ? await this.#members.governanceProjects.findGovernanceProject({ organizationId })
+      ? await this.#peers.projects.findInternal({
+          organizationId,
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        })
       : null;
 
-    return this.#members.personalUsage.personalUsage({
+    return this.#peers.governance.personalUsage({
       personalProjectId: project.id,
       userId: ownerUserId,
       ...(tenant ? { ingestionTenantId: tenant.id } : {}),
@@ -1081,7 +1100,7 @@ export class UserModule implements UserApi {
    * earn one refusal, so the route never confirms an id exists.
    */
   async getAvatarBytes(input: { projectId: string; id: string }): Promise<ServableUserAvatar> {
-    const read = await this.#members.avatarObjects.findById(input);
+    const read = await this.#avatarObjects.findById(input);
     if (!isServableUserAvatar(read)) throw new UserAvatarNotFoundError(input.id);
 
     return read;
@@ -1089,7 +1108,7 @@ export class UserModule implements UserApi {
 
   /** The signed URL any signed-in person renders an uploaded avatar from. */
   getAvatarUrl(input: UserAvatarRestParams): Promise<UserAvatarUrl> {
-    return this.#members.avatarObjects.getReadUrl({
+    return this.#avatarObjects.getReadUrl({
       projectId: input.projectId,
       id: input.userAvatarId,
     });
@@ -1098,9 +1117,7 @@ export class UserModule implements UserApi {
   // -- private -------------------------------------------------------------
 
   #nowMs(): number {
-    const now = this.#members.now;
-
-    return (now ? now() : nowInstant()).epochMilliseconds;
+    return this.#now().epochMilliseconds;
   }
 
   async #meter({
@@ -1112,7 +1129,7 @@ export class UserModule implements UserApi {
     budget: { windowSeconds: number; max: number };
     refuse: () => Error;
   }): Promise<void> {
-    const allowance = await this.#members.rateLimit({ key, ...budget });
+    const allowance = await this.#rateLimits.check({ key, ...budget });
 
     if (!allowance.allowed) throw refuse();
   }
@@ -1197,15 +1214,20 @@ export class UserModule implements UserApi {
   }
 }
 
+/** One budget the gateway weighed, as the banner and the chip read it. */
+type BudgetScope =
+  | GatewayBudgetCheckResult["scopes"][number]
+  | GatewayBudgetCheckResult["blockedBy"][number];
+
 /** One weighed budget, with the percentage the chip renders. */
-type WeighedBudgetScope = UserBudgetScopeDecision & { pctUsed: number };
+type WeighedBudgetScope = BudgetScope & { pctUsed: number };
 
 /**
  * The budget the banner and the chip speak about: the blocking one where the gateway
  * named one, else the fullest. `blockedBy` carries the same scopes without the derived
  * percentage, so it's weighed the same way rather than tested for the field.
  */
-function findTopBudgetScope(decision: UserBudgetDecision): WeighedBudgetScope | undefined {
+function findTopBudgetScope(decision: GatewayBudgetCheckResult): WeighedBudgetScope | undefined {
   const blocking = decision.blockedBy[0];
 
   if (blocking) return weigh(blocking);
@@ -1213,7 +1235,7 @@ function findTopBudgetScope(decision: UserBudgetDecision): WeighedBudgetScope | 
   return decision.scopes.map(weigh).toSorted((a, b) => b.pctUsed - a.pctUsed)[0];
 }
 
-function weigh(scope: UserBudgetScopeDecision): WeighedBudgetScope {
+function weigh(scope: BudgetScope): WeighedBudgetScope {
   return { ...scope, pctUsed: percentUsed(scope.spentUsd, scope.limitUsd) };
 }
 

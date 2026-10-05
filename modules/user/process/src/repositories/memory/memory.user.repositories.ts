@@ -1,4 +1,7 @@
 import type { UserRepositories } from "../user.repositories.ts";
+import { MemoryGdprUserDataEraseRepository } from "./memory.user-data-erase.repository.ts";
+import { MemoryUserOrganizationDirectoryRepository } from "./memory.user-organization-directory.repository.ts";
+import { MemoryUserRateLimitRepository } from "./memory.user-rate-limit.repository.ts";
 import { MemoryUserCredentialRepository } from "./memory.user-signin-credential.repository.ts";
 import { MemoryUserDatabase } from "./memory.user.database.ts";
 import { MemoryUserRepository } from "./memory.user.repository.ts";
@@ -12,6 +15,9 @@ export class MemoryUserRepositories {
     return {
       users: MemoryUserRepository.create({ database }),
       credentials: MemoryUserCredentialRepository.create({ database }),
+      rateLimits: MemoryUserRateLimitRepository.create(),
+      organizationDirectory: MemoryUserOrganizationDirectoryRepository.create(),
+      dataErase: MemoryGdprUserDataEraseRepository.create({ database }),
     };
   }
 }

@@ -1,6 +1,8 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { RoutingDecision } from "@langwatch/identity-contract";
 import {
   type OrganizationApi,
@@ -9,16 +11,18 @@ import {
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { type StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { vi } from "vitest";
 
+import { MemoryUserBudgetRequestMailChannel } from "../../channels/memory/memory.user-budget-request-mail.channel.ts";
+import type { UserBudgetRequestMailChannel } from "../../channels/user-budget-request-mail.channel.ts";
 import type { RecordUserLifecycleCommandData } from "../../eventing/user-lifecycle.events.ts";
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
 import type { UserRepositories } from "../../repositories/user.repositories.ts";
 import type { UserLifecycleSenders } from "../../services/user-lifecycle-notice.service.ts";
 import { UserModule, type UserFacts } from "../user.app.ts";
-import type { UserAvatarStorage, UserInfrastructure } from "../user.members.ts";
 
 /** The issuer this deployment stores its credential account rows under. */
 export const TEST_CREDENTIAL_ISSUER = "local:credential";
@@ -44,6 +48,7 @@ export function createUserTestAuth(
   return Object.assign(createApiFixture<AuthApi>(), {
     revokeOtherBrowserSessions: vi.fn(async () => undefined),
     revokeAllBrowserSessions: vi.fn(async () => undefined),
+    revokeCliTokens: vi.fn(async () => ({ revokedCount: 0 })),
     resolveAuthProvider: vi.fn(async () => provider),
     issuesOwnPasswords: vi.fn(() => issuesOwnPasswords),
     assertSignUpOrigin: vi.fn(async () => undefined),
@@ -90,8 +95,10 @@ export function createUserTestAuthorization(operators: ReadonlySet<string> = new
 
 /** user_lifecycle's senders, recording each fact rather than appending it. */
 export function createUserTestLifecycle() {
-  const recorded: { type: "deactivated" | "reactivated"; data: RecordUserLifecycleCommandData }[] =
-    [];
+  const recorded: {
+    type: "deactivated" | "reactivated" | "registered";
+    data: RecordUserLifecycleCommandData;
+  }[] = [];
   const senders: UserLifecycleSenders = {
     recordUserDeactivated: {
       send: async (data) => {
@@ -101,6 +108,11 @@ export function createUserTestLifecycle() {
     recordUserReactivated: {
       send: async (data) => {
         recorded.push({ type: "reactivated", data });
+      },
+    },
+    recordUserRegistered: {
+      send: async (data) => {
+        recorded.push({ type: "registered", data });
       },
     },
   };
@@ -132,20 +144,53 @@ export function createUserTestOrganizations(projectId = "project-1") {
   });
 }
 
-/** The avatar bytes, kept in the test rather than in an object store. */
-export class TestUserAvatarStorage implements UserAvatarStorage {
-  readonly stored: { projectId: string; userId: string }[] = [];
+/** Stored objects as a test keeps them: each upload answers the next id, reads find nothing. */
+export function createUserTestStoredObjects() {
+  let uploads = 0;
 
-  async store(input: {
-    projectId: string;
-    userId: string;
-    mediaType: string;
-    bytes: Uint8Array;
-  }): Promise<{ id: string }> {
-    this.stored.push({ projectId: input.projectId, userId: input.userId });
+  return createApiFixture<StoredObjectApi>({
+    storeFromBytes: vi.fn<StoredObjectApi["storeFromBytes"]>(async (input) => {
+      uploads += 1;
 
-    return { id: `object-${this.stored.length}` };
-  }
+      return {
+        reference: {
+          projectId: input.projectId,
+          id: `object-${uploads}`,
+          sha256: "a".repeat(64),
+          byteLength: 0,
+          filename: input.filename,
+          mediaType: input.mediaType,
+          audience: input.audience,
+        },
+        isDuplicate: false,
+      };
+    }),
+    readById: vi.fn(async () => {
+      throw new StoredObjectNotFoundError();
+    }),
+    getReadUrlForPurpose: vi.fn(async () => ({
+      url: "/api/stored-objects/avatar/content?sig=test",
+    })),
+  });
+}
+
+/** The gateway peers behind /me: no default policy, no personal key, every budget allowed. */
+export function createUserTestGateways() {
+  return {
+    enterpriseGateway: createApiFixture<EnterpriseGatewayApi>({
+      findDefaultRoutingPolicies: vi.fn(async () => []),
+      personalVirtualKeyList: vi.fn(async () => []),
+    }),
+    gateway: createApiFixture<GatewayApi>({
+      checkBudget: vi.fn(async () => ({
+        decision: "allow" as const,
+        warnings: [],
+        blockReason: null,
+        scopes: [],
+        blockedBy: [],
+      })),
+    }),
+  };
 }
 
 /** A reversible stand-in for bcrypt, so a hash is recognisable in assertions. */
@@ -162,81 +207,42 @@ export class TestPasswordHasher {
 /** The deployment a suite runs against: no passkeys, no public base URL. */
 export const TEST_USER_CONFIG: UserFacts = { passkeysEnabled: false, baseUrl: null };
 
-/**
- * What the process still hands this module, as a test supplies it: budgets
- * nobody has spent, and every capability the account doors reach recorded
- * rather than performed.
- */
-export function createUserTestInfrastructure(
-  overrides: Partial<UserInfrastructure> = {},
-): UserInfrastructure {
-  return {
-    avatarStorage: new TestUserAvatarStorage(),
-    passwords: new TestPasswordHasher(),
-    rateLimit: vi.fn(async () => ({ allowed: true, resetAt: 0 })),
-    analytics: { trackServerEvent: vi.fn() },
-    cliCredentials: { revokeForUser: vi.fn(async () => undefined) },
-    organizations: {
-      findSupportContact: vi.fn(async () => null),
-      getBudgetIncreaseRecipient: vi.fn(async () => "admin@example.com"),
-      findName: vi.fn(async () => null),
-      findFirstProjectSlug: vi.fn(async () => null),
-    },
-    governanceProjects: { findGovernanceProject: vi.fn(async () => null) },
-    gateway: {
-      findDefaultRoutingPolicy: vi.fn(async () => null),
-      listPersonalVirtualKeys: vi.fn(async () => []),
-      checkBudget: vi.fn(async () => ({ decision: "allow", scopes: [], blockedBy: [] })),
-    },
-    budgetRequests: { sendBudgetIncreaseRequest: vi.fn(async () => undefined) },
-    personalUsage: {
-      personalUsage: vi.fn(async () => ({
-        summary: {
-          spentUsd: 0,
-          billedUsd: 0,
-          requests: 0,
-          promptTokens: 0,
-          completionTokens: 0,
-          mostUsedModel: null,
-        },
-        dailyBuckets: [],
-        breakdownByModel: [],
-      })),
-    },
-    avatarObjects: {
-      findById: vi.fn(async () => null),
-      getReadUrl: vi.fn(async () => ({ url: "/api/stored-objects/avatar/content?sig=test" })),
-    },
-    ...overrides,
-  };
-}
-
-/** The whole application over memory repositories and a test's own process. */
+/** The whole application over memory repositories, recorded mail and a test's own peers. */
 export function createUserTestApp(
   input: Readonly<{
     repositories?: UserRepositories;
-    members?: Partial<UserInfrastructure>;
     dependencies?: Partial<{
       auth: AuthApi;
       authz: AuthzApi;
+      enterpriseGateway: EnterpriseGatewayApi;
+      gateway: GatewayApi;
       governance: GovernanceRestApi;
       organizations: OrganizationApi;
       projects: ProjectApi;
+      storedObjects: StoredObjectApi;
     }>;
     facts?: UserFacts;
     lifecycle?: UserLifecycleSenders;
+    budgetRequests?: UserBudgetRequestMailChannel;
+    now?: () => Instant;
   }> = {},
 ): UserModule {
+  const gateways = createUserTestGateways();
   const app = UserModule.createForTesting({
     repositories: input.repositories ?? MemoryUserRepositories.create(),
-    members: createUserTestInfrastructure(input.members ?? {}),
     facts: input.facts ?? TEST_USER_CONFIG,
+    budgetRequests: input.budgetRequests ?? MemoryUserBudgetRequestMailChannel.create(),
+    passwords: new TestPasswordHasher(),
+    ...(input.now ? { now: input.now } : {}),
     dependencies: {
       auth: input.dependencies?.auth ?? createUserTestAuth(),
       authz: input.dependencies?.authz ?? createUserTestAuthorization(),
+      enterpriseGateway: input.dependencies?.enterpriseGateway ?? gateways.enterpriseGateway,
+      gateway: input.dependencies?.gateway ?? gateways.gateway,
       governance: input.dependencies?.governance ?? createApiFixture<GovernanceRestApi>(),
       organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),
       projects: input.dependencies?.projects ?? createUserTestProjects(),
+      storedObjects: input.dependencies?.storedObjects ?? createUserTestStoredObjects(),
     },
   });
   app.connectLifecycle(input.lifecycle ?? createUserTestLifecycle().senders);

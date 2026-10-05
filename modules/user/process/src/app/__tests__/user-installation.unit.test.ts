@@ -12,38 +12,17 @@ import type {
   OrganizationSettings,
   PersonalWorkspace,
 } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { UserApi } from "@langwatch/user-contract";
 import { hash } from "bcrypt";
 import { describe, expect, it, vi } from "vitest";
 
 import { userProcessModule } from "../../user.module.ts";
 import { createUserTestAuth, createUserTestOrganizations } from "./user.fixture.ts";
-
-/**
- * The narrow slice of a generated Prisma client the organization directory
- * reads, faked so the installation test can boot `UserModule` without a real
- * database; every read here answers "not found".
- */
-function fakeUserPrisma(): PrismaClient {
-  return prismaDouble({
-    organizationUser: { findFirst: async () => null },
-    organization: { findUnique: async () => null },
-    project: { findFirst: async () => null },
-  });
-}
-
-/** The fixed-window counter's own three calls, faked to always allow. */
-function fakeUserRedis(): RedisConnection {
-  return redisDouble({ incr: async () => 1, expire: async () => 1, ttl: async () => -1 });
-}
 
 function process(
   role: "api" | "worker",
@@ -55,13 +34,9 @@ function process(
   }> = {},
 ) {
   return createApp({ role })
-    .withModules([withMemoryRepositories(userProcessModule)])
-    .withMembers({
-      passkeysEnabled: false,
-      publicBaseUrl: undefined,
-    })
-    .withRelational(fakeUserPrisma())
-    .withKeyvalue(fakeUserRedis())
+    .withModules([userProcessModule])
+    .withStores(memoryStores())
+    .withConfig({ user: { publicBaseUrl: undefined } })
     .provide({
       auth: createUserTestAuth(),
       authz: peers.authz ?? createApiFixture<AuthzApi>(),

@@ -16,7 +16,9 @@ export const userProcessModule = defineProcessModule("user")
   .withApi(UserModule)
   .withTransports(meRest, userAvatarRest, userTrpcTransport)
   .withEventing(userLifecycleEventing)
-  .withTasks(({ members }) => [createGdprUserDataEraseRunner({ database: members.prisma })])
+  .withTasks(({ repositories }) => [
+    createGdprUserDataEraseRunner({ repository: repositories.dataErase }),
+  ])
   // The credential whole rather than in pieces: a personal-usage answer is
   // refused for a key that is not the asking member's own, and the door's
   // answer is the only place that can be read from.

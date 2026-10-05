@@ -69,6 +69,28 @@ Feature: Canonical user lifecycle
     Then each fact carries the operator as its actor, in the grants ledger's shape
     And a fact recorded before actors existed still reads, with no actor
 
+  # Product analytics belong to nurturing (CLAUDE.md rule 7): user records the fact, and
+  # nurturing derives the signed_up milestone from it.
+  @unit
+  Scenario: A self-service registration is recorded as user's fact
+    Given the auth provider is email
+    When a registration succeeds through the register route
+    Then exactly one "lw.user.registered" fact is recorded for the created user id
+    And the fact is keyed by the user alone, so a redelivery records nothing new
+
+  @unit
+  Scenario: A refused registration records no registered fact
+    Given the auth provider is email
+    And a user already exists with that email
+    When the registration is attempted
+    Then no "lw.user.registered" fact is recorded
+
+  @unit
+  Scenario: A registration stands even when user's registered fact cannot be sent
+    Given user's lifecycle fact cannot be sent
+    When a registration succeeds through the register route
+    Then the account is created and the registration answers it
+
   Scenario: Changing an email refreshes authenticated identity
     When an authorized transport changes a user's normalized email through the User service
     Then the profile is updated

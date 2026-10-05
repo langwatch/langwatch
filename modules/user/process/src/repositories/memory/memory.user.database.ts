@@ -77,6 +77,15 @@ export class MemoryUserDatabase {
     this.#users.set(row.id, row);
   }
 
+  /** Drops the user with every account and passkey it holds, as the erasure does. */
+  deleteUser(id: string): void {
+    this.#users.delete(id);
+    for (const account of this.accountsOf(id)) this.#accounts.delete(account.id);
+    for (const [passkeyId, passkey] of this.#passkeys) {
+      if (passkey.userId === id) this.#passkeys.delete(passkeyId);
+    }
+  }
+
   accountsOf(userId: string): MemoryUserAccountRow[] {
     return [...this.#accounts.values()].filter((row) => row.userId === userId);
   }

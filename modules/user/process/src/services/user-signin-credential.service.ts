@@ -6,8 +6,8 @@ import type {
   UserPasswordRotationOutcome,
 } from "@langwatch/user-contract";
 
-import type { UserPasswordHasher } from "../app/user.members.ts";
 import type { UserCredentialRepository } from "../repositories/user-signin-credential.repository.ts";
+import type { UserPasswordHasher } from "./user-password.service.ts";
 
 /**
  * The credential half of a person's account: the password they sign in with, and the list of

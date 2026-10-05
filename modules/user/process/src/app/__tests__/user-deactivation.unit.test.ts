@@ -9,14 +9,13 @@ import {
   UserLastPlatformOperatorError,
   userLifecycleEventDataSchema,
 } from "@langwatch/user-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { UserLifecycleSenders } from "../../services/user-lifecycle-notice.service.ts";
 import {
   createUserTestApp,
   createUserTestAuth,
   createUserTestAuthorization,
-  createUserTestInfrastructure,
   createUserTestLifecycle,
 } from "./user.fixture.ts";
 
@@ -39,14 +38,11 @@ describe("user.deactivate", () => {
       auth.revokeAllBrowserSessions.mockImplementation(async () => {
         reached.push("revokeAllBrowserSessions");
       });
-      const members = createUserTestInfrastructure({
-        cliCredentials: {
-          revokeForUser: vi.fn(async () => {
-            reached.push("revokeCliTokensForUser");
-          }),
-        },
+      auth.revokeCliTokens.mockImplementation(async () => {
+        reached.push("revokeCliTokensForUser");
+        return { revokedCount: 0 };
       });
-      const app = createUserTestApp({ members, dependencies: { auth } });
+      const app = createUserTestApp({ dependencies: { auth } });
       const created = await account(app);
 
       await app.deactivateAccount({
@@ -217,23 +213,18 @@ describe("user.deactivate", () => {
     /** @scenario "Deactivating a user invalidates every session family" */
     it("ends their browser sessions and CLI tokens on that door too", async () => {
       const auth = createUserTestAuth();
-      const revokeForUser = vi.fn(async () => undefined);
-      const app = createUserTestApp({
-        dependencies: { auth },
-        members: { cliCredentials: { revokeForUser } },
-      });
+      const app = createUserTestApp({ dependencies: { auth } });
       const created = await account(app);
 
       await app.deactivate({ id: created.id, actor: { type: "system", id: null } });
 
       expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: created.id });
-      expect(revokeForUser).toHaveBeenCalledWith({ userId: created.id });
+      expect(auth.revokeCliTokens).toHaveBeenCalledWith({ userId: created.id });
     });
 
     /** @scenario "Deactivation ends access even when user's fact cannot be sent" */
     it("has ended their sessions and CLI tokens before the fact fails", async () => {
       const auth = createUserTestAuth();
-      const revokeForUser = vi.fn(async () => undefined);
       const failing: UserLifecycleSenders = {
         recordUserDeactivated: {
           send: async () => {
@@ -241,10 +232,10 @@ describe("user.deactivate", () => {
           },
         },
         recordUserReactivated: { send: async () => undefined },
+        recordUserRegistered: { send: async () => undefined },
       };
       const app = createUserTestApp({
         dependencies: { auth },
-        members: { cliCredentials: { revokeForUser } },
         lifecycle: failing,
       });
       const created = await account(app);
@@ -254,7 +245,7 @@ describe("user.deactivate", () => {
       ).rejects.toThrow("event store unavailable");
 
       expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: created.id });
-      expect(revokeForUser).toHaveBeenCalledWith({ userId: created.id });
+      expect(auth.revokeCliTokens).toHaveBeenCalledWith({ userId: created.id });
     });
   });
 

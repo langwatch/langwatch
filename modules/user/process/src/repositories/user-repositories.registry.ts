@@ -1,9 +1,9 @@
 import { defineRepositories } from "@langwatch/process";
 
+import { LiveUserRepositories } from "./live/live.user.repositories.ts";
 import { MemoryUserRepositories } from "./memory/memory.user.repositories.ts";
-import { PostgresUserRepositories } from "./prisma/prisma.user.repositories.ts";
 
 export const userRepositories = defineRepositories({
-  live: PostgresUserRepositories,
+  live: LiveUserRepositories,
   memory: MemoryUserRepositories,
 });

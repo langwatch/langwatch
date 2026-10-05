@@ -48,8 +48,8 @@ import {
   type UserUsageCount,
 } from "@langwatch/user-contract";
 
-import type { UserAvatarStorage, UserCliCredentials } from "../app/user.members.ts";
 import type { UserRepository } from "../repositories/user.repository.ts";
+import type { UserAvatarStorage } from "./user-avatar-object.service.ts";
 import { UserAvatarCodecService } from "./user-avatar.service.ts";
 import type { UserLifecycleNoticeService } from "./user-lifecycle-notice.service.ts";
 
@@ -66,7 +66,6 @@ export class UserService {
   private readonly now: () => Instant;
   private readonly platformOperators: PlatformOperatorList;
   private readonly lifecycle: UserLifecycleNoticeService;
-  private readonly cliCredentials: UserCliCredentials;
 
   private constructor({
     repository,
@@ -77,7 +76,6 @@ export class UserService {
     now,
     platformOperators,
     lifecycle,
-    cliCredentials,
   }: {
     repository: UserRepository;
     organizations: OrganizationApi;
@@ -87,7 +85,6 @@ export class UserService {
     now: () => Instant;
     platformOperators: PlatformOperatorList;
     lifecycle: UserLifecycleNoticeService;
-    cliCredentials: UserCliCredentials;
   }) {
     this.repository = repository;
     this.organizations = organizations;
@@ -97,7 +94,6 @@ export class UserService {
     this.now = now;
     this.platformOperators = platformOperators;
     this.lifecycle = lifecycle;
-    this.cliCredentials = cliCredentials;
   }
 
   static create(options: {
@@ -109,7 +105,6 @@ export class UserService {
     now?: () => Instant;
     platformOperators: PlatformOperatorList;
     lifecycle: UserLifecycleNoticeService;
-    cliCredentials: UserCliCredentials;
   }): UserService {
     return new UserService({
       repository: options.repository,
@@ -120,7 +115,6 @@ export class UserService {
       now: options.now ?? nowInstant,
       platformOperators: options.platformOperators,
       lifecycle: options.lifecycle,
-      cliCredentials: options.cliCredentials,
     });
   }
 
@@ -366,7 +360,7 @@ export class UserService {
     const at = await this.repository.readClock();
     const user = await this.writeDeactivation({ id: parsed.id, at });
     await this.auth.revokeAllBrowserSessions({ userId: parsed.id });
-    await this.cliCredentials.revokeForUser({ userId: parsed.id });
+    await this.auth.revokeCliTokens({ userId: parsed.id });
     await this.lifecycle.deactivated({ userId: parsed.id, actor: parsed.actor, at });
 
     return user;

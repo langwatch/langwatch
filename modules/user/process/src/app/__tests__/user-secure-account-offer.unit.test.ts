@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemoryUserCredentialRepository } from "../../repositories/memory/memory.user-signin-credential.repository.ts";
 import { MemoryUserDatabase } from "../../repositories/memory/memory.user.database.ts";
+import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
 import { MemoryUserRepository } from "../../repositories/memory/memory.user.repository.ts";
 import { createUserTestApp, createUserTestAuth } from "./user.fixture.ts";
 
@@ -55,10 +56,14 @@ async function offerFor({
     getSignedInWith: vi.fn(async () => signedInWith),
   });
   const app = createUserTestApp({
-    repositories: { users, credentials: MemoryUserCredentialRepository.create({ database }) },
+    repositories: {
+      ...MemoryUserRepositories.create(),
+      users,
+      credentials: MemoryUserCredentialRepository.create({ database }),
+    },
     dependencies: { auth },
     facts: { passkeysEnabled: passkeys, baseUrl: null },
-    members: { now: () => fromDate(NOW) },
+    now: () => fromDate(NOW),
   });
 
   return { offer: await app.getPasskeyOffer({ id, sessionId: "session-1" }), auth };

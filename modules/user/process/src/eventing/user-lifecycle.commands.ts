@@ -5,15 +5,18 @@ import {
   USER_DEACTIVATED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
   USER_REACTIVATED_EVENT_TYPE,
+  USER_REGISTERED_EVENT_TYPE,
 } from "@langwatch/user-contract";
 
 import {
   RECORD_USER_DEACTIVATED_COMMAND_TYPE,
   RECORD_USER_REACTIVATED_COMMAND_TYPE,
+  RECORD_USER_REGISTERED_COMMAND_TYPE,
   type RecordUserLifecycleCommandData,
   recordUserLifecycleCommandDataSchema,
   type UserDeactivatedEvent,
   type UserReactivatedEvent,
+  type UserRegisteredEvent,
 } from "./user-lifecycle.events.ts";
 
 function spanAttributes(
@@ -87,6 +90,41 @@ export class RecordUserReactivatedCommand implements CommandHandler<
         metadata: {},
         occurredAt: data.occurredAt,
         idempotencyKey: `${data.userId}:reactivated:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordUserLifecycleCommandData): string {
+    return payload.userId;
+  }
+
+  static getSpanAttributes = spanAttributes;
+}
+
+/** Records that somebody registered their own account; once per user, however redelivered. */
+export class RecordUserRegisteredCommand implements CommandHandler<
+  Command<RecordUserLifecycleCommandData>,
+  UserRegisteredEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_USER_REGISTERED_COMMAND_TYPE,
+    recordUserLifecycleCommandDataSchema,
+    "Record that a user registered an account",
+  );
+
+  async handle(command: Command<RecordUserLifecycleCommandData>): Promise<UserRegisteredEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<UserRegisteredEvent>({
+        aggregateType: USER_AGGREGATE_TYPE,
+        aggregateId: data.userId,
+        tenantId: createTenantId(command.tenantId),
+        type: USER_REGISTERED_EVENT_TYPE,
+        version: USER_LIFECYCLE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.userId}:registered`,
       }),
     ];
   }

@@ -1,6 +1,7 @@
 export * from "./user.ts";
 export * from "./user.api.ts";
 export * from "./user-code-access.ts";
+export * from "./user.config.ts";
 export * from "./user.errors.ts";
 export * from "./user.events.ts";
 export * from "./user.responses.ts";

@@ -8,23 +8,20 @@ import type {
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import {
   type InternalProject,
   PROJECT_KIND,
   type ProjectApi,
   type ProjectIdentity,
 } from "@langwatch/project-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 /**
  * @vitest-environment node
  * CLI token revocation, the governance project and `/api/me/usage`, through the installed app.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -71,25 +68,9 @@ function process(
   peers: Readonly<{ auth?: AuthApi; governance?: GovernanceRestApi; project?: ProjectApi }>,
 ) {
   return createApp({ role })
-    .withModules([withMemoryRepositories(userProcessModule)])
-    .withMembers({
-      passkeysEnabled: false,
-      publicBaseUrl: undefined,
-    })
-    .withRelational(
-      prismaDouble({
-        organizationUser: { findFirst: async () => null },
-        organization: { findUnique: async () => null },
-        project: { findFirst: async () => null },
-      }) satisfies PrismaClient,
-    )
-    .withKeyvalue(
-      redisDouble({
-        incr: async () => 1,
-        expire: async () => 1,
-        ttl: async () => -1,
-      }) satisfies RedisConnection,
-    )
+    .withModules([userProcessModule])
+    .withStores(memoryStores())
+    .withConfig({ user: { publicBaseUrl: undefined } })
     .withEventing(
       new EventSourcing({ enabled: false, processStore: InMemoryProcessStore.createForTesting() }),
     )

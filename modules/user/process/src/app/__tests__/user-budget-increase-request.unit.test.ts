@@ -6,10 +6,12 @@
  */
 import type { EmailContent, MailSender } from "@langwatch/mail";
 import { UserBudgetRequestNotDeliveredError } from "@langwatch/user-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { budgetRequestMailer } from "../user-composition.build.ts";
-import { createUserTestApp, createUserTestInfrastructure } from "./user.fixture.ts";
+import { SesUserBudgetRequestMailChannel } from "../../channels/ses/ses.user-budget-request-mail.channel.ts";
+import { MemoryUserOrganizationDirectoryRepository } from "../../repositories/memory/memory.user-organization-directory.repository.ts";
+import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
+import { createUserTestApp } from "./user.fixture.ts";
 
 class RecordingMailer implements MailSender {
   readonly sent: EmailContent[] = [];
@@ -35,15 +37,19 @@ async function requestIncrease(input: {
   request?: Partial<typeof REQUEST>;
 }) {
   const mail = new RecordingMailer();
-  const members = createUserTestInfrastructure({
-    budgetRequests: budgetRequestMailer({ mail, publicBaseUrl: input.publicBaseUrl }),
-    organizations: {
-      ...createUserTestInfrastructure().organizations,
-      getBudgetIncreaseRecipient: vi.fn(async () => "admin@acme.test"),
-      findName: vi.fn(async () => input.organizationName),
+  const organizationDirectory = MemoryUserOrganizationDirectoryRepository.create({
+    [REQUEST.organizationId]: {
+      firstAdminEmail: "admin@acme.test",
+      ...(input.organizationName === null ? {} : { name: input.organizationName }),
     },
   });
-  const app = createUserTestApp({ members });
+  const app = createUserTestApp({
+    repositories: { ...MemoryUserRepositories.create(), organizationDirectory },
+    budgetRequests: SesUserBudgetRequestMailChannel.create({
+      mailer: mail,
+      baseUrl: input.publicBaseUrl,
+    }),
+  });
   const requester = await app.createCredentialUser({
     name: "Jane Developer",
     email: "jane@acme.test",

@@ -8,8 +8,8 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type { UserAvatarStorage } from "../../app/user.members.ts";
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
+import type { UserAvatarStorage } from "../user-avatar-object.service.ts";
 import { UserLifecycleNoticeService } from "../user-lifecycle-notice.service.ts";
 import { UserService } from "../user.service.ts";
 
@@ -20,12 +20,12 @@ function lifecyclePeers() {
   lifecycle.connect({
     recordUserDeactivated: { send: async () => undefined },
     recordUserReactivated: { send: async () => undefined },
+    recordUserRegistered: { send: async () => undefined },
   });
 
   return {
     platformOperators: createApiFixture<AuthzApi>({ listPlatformOperators: async () => [] }),
     lifecycle,
-    cliCredentials: { revokeForUser: async () => undefined },
   };
 }
 
