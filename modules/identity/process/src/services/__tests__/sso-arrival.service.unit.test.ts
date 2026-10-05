@@ -68,18 +68,25 @@ function connection(over: Partial<SsoConnectionState> = {}): SsoConnectionState 
 }
 
 type MembershipWrite = () => Promise<"created" | "already-present">;
+type JoinerSeat = "MEMBER" | "DEVELOPER";
 
 function serviceOver({
   row,
   member = false,
   pendingInvite = null,
   membership = async () => "created",
+  joinerSeat = "MEMBER",
+  existingSeat,
   pendingAdmission = null,
 }: {
   row: SsoConnectionState | null;
   member?: boolean;
   pendingInvite?: { inviteId: string } | null;
   membership?: MembershipWrite;
+  /** The seat the organization hands to joiners (ADR-171). */
+  joinerSeat?: JoinerSeat;
+  /** The seat a row that was already there holds, when the write collides. */
+  existingSeat?: JoinerSeat;
   pendingAdmission?: AuthzPendingAdmission | null;
 }) {
   let pending = pendingAdmission;
@@ -88,9 +95,15 @@ function serviceOver({
     const outcome = await membership();
     if (outcome === "created") {
       isMember.mockResolvedValue(true);
-      pending = { grantId: "rb_admission", occurredAtMs: 1_756_000_000_000, state: "pending" };
+      // A Developer gets no grant, so nothing is pending for them.
+      if (joinerSeat === "MEMBER") {
+        pending = { grantId: "rb_admission", occurredAtMs: 1_756_000_000_000, state: "pending" };
+      }
     }
-    return outcome;
+    return {
+      outcome,
+      seat: outcome === "already-present" ? (existingSeat ?? joinerSeat) : joinerSeat,
+    };
   });
   const readPendingAdmission = vi.fn(async () =>
     pending ? { pending: true as const, admission: { ...pending } } : { pending: false as const },
@@ -545,6 +558,66 @@ describe("administrator notices after an automatic admission", () => {
 
     expect(parts.completeAdmission).toHaveBeenCalledOnce();
     expect(parts.joinedAutomatically).toHaveBeenCalledOnce();
+  });
+});
+
+describe("given a connection that admits, on an organization whose joiner seat is Developer", () => {
+  /** @scenario The joiner seat setting lands SSO joiners as Developers */
+  it("tells the admins and announces the signup without attaching any grant", async () => {
+    const parts = serviceOver({
+      row: connection({ arrivalPolicy: "admit" }),
+      joinerSeat: "DEVELOPER",
+    });
+
+    await admit(parts);
+
+    expect(parts.attachBindings).not.toHaveBeenCalled();
+    expect(parts.joinedAutomatically).toHaveBeenCalledWith({
+      organizationId: ORG.id,
+      requesterUserId: USER.id,
+      domain: "acme.com",
+    });
+    expect(parts.announceSignup).toHaveBeenCalledWith({
+      userName: USER.name,
+      userEmail: USER.email,
+      organizationName: ORG.name,
+    });
+    expect(parts.startNurturing).toHaveBeenCalledTimes(1);
+  });
+
+  it("still resumes a Full member's pending grant when their row was already there", async () => {
+    const parts = serviceOver({
+      row: connection({ arrivalPolicy: "admit" }),
+      joinerSeat: "DEVELOPER",
+      existingSeat: "MEMBER",
+      membership: async () => "already-present",
+      pendingAdmission: {
+        grantId: "rb_admission",
+        occurredAtMs: 1_756_000_000_000,
+        state: "pending",
+      },
+    });
+
+    await admit(parts);
+
+    expect(parts.attachBindings).toHaveBeenCalledTimes(1);
+    expect(parts.joinedAutomatically).toHaveBeenCalledWith(
+      expect.objectContaining({ admissionId: "rb_admission" }),
+    );
+  });
+
+  it("announces nothing when a concurrent callback already created the row", async () => {
+    const parts = serviceOver({
+      row: connection({ arrivalPolicy: "admit" }),
+      joinerSeat: "DEVELOPER",
+      membership: async () => "already-present",
+    });
+
+    await admit(parts);
+
+    expect(parts.joinedAutomatically).not.toHaveBeenCalled();
+    expect(parts.announceSignup).not.toHaveBeenCalled();
+    expect(parts.attachBindings).not.toHaveBeenCalled();
   });
 });
 

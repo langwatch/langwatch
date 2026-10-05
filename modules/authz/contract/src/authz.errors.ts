@@ -5,6 +5,7 @@ export const AUTHZ_PROBLEM_CODES = [
   "validation_error",
   "permission_denied",
   "lite_member_restricted",
+  "developer_seat_restricted",
   "project_permission_denied",
   "grant_validation_failed",
   "role_binding_already_exists",
@@ -19,6 +20,7 @@ export const AUTHZ_PROBLEM_CODES = [
   "org_exclusive_permission_scope",
   "personal_workspace_not_managed_here",
   "lite_member_viewer_only",
+  "developer_seat_no_shared_access",
   "offboard_incomplete",
   "authz_ledger_unavailable",
 ] as const;
@@ -212,6 +214,24 @@ export class AuthzLiteMemberViewerOnlyError extends HandledError {
       fault: "customer",
     });
     this.name = "AuthzLiteMemberViewerOnlyError";
+  }
+}
+
+/** A Developer seat (ADR-171) was given a role outside its own personal team. */
+export class AuthzDeveloperSeatNoSharedAccessError extends HandledError {
+  declare readonly code: "developer_seat_no_shared_access";
+
+  constructor(scopeName?: string | null) {
+    super(
+      "developer_seat_no_shared_access",
+      "A Developer seat holds no role outside its own personal project.",
+      {
+        meta: scopeName ? { scopeName } : {},
+        httpStatus: 409,
+        fault: "customer",
+      },
+    );
+    this.name = "AuthzDeveloperSeatNoSharedAccessError";
   }
 }
 

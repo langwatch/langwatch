@@ -5,13 +5,16 @@ import {
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
   CustomRoleNotAssignableError,
+  DEVELOPER_ADMISSION_AUDIT_ACTION,
   MemberNotFoundError,
   OrganizationNotFoundError,
   OrganizationSlugTakenError,
   OrganizationUserRole,
   TeamNotFoundError,
+  type DeveloperAdmission,
   type Organization,
   type OrganizationFounding,
+  type OrganizationMembershipWrite,
   type OrganizationIntent,
   type TeamUserRole,
   type User,
@@ -567,21 +570,49 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
-  }): Promise<"created" | "already-present"> {
-    const { organizationId, userId, pendingAdmissionId } = input;
-    if (this.membershipRow({ organizationId, userId })) return "already-present";
+    admission: DeveloperAdmission;
+  }): Promise<OrganizationMembershipWrite> {
+    const { organizationId, userId, pendingAdmissionId, admission } = input;
+    const existing = this.membershipRow({ organizationId, userId });
+    if (existing) {
+      const seat =
+        existing.role === OrganizationUserRole.DEVELOPER
+          ? OrganizationUserRole.DEVELOPER
+          : OrganizationUserRole.MEMBER;
+      return { outcome: "already-present", seat };
+    }
 
+    const seat = this.memory.organizations.get(organizationId)?.joinerRole ?? "MEMBER";
     const now = nowInstant();
     this.memory.organizationUsers.push({
       userId,
       organizationId,
-      role: OrganizationUserRole.MEMBER,
+      role: seat,
       disabledAt: null,
       createdAt: now,
       updatedAt: now,
-      pendingSsoGrantId: pendingAdmissionId,
+      pendingSsoGrantId: seat === OrganizationUserRole.MEMBER ? pendingAdmissionId : null,
     });
-    return "created";
+    if (seat === OrganizationUserRole.DEVELOPER) {
+      this.memory.auditLogs.push({
+        id: `audit_${this.memory.auditLogs.length + 1}`,
+        createdAt: now,
+        userId,
+        organizationId,
+        projectId: null,
+        action: DEVELOPER_ADMISSION_AUDIT_ACTION,
+        payload: null,
+        ipAddress: null,
+        userAgent: null,
+        error: null,
+        args: { seat, via: admission.via, joinRequestId: admission.joinRequestId ?? null },
+        targetKind: null,
+        targetId: null,
+        before: null,
+        after: null,
+      });
+    }
+    return { outcome: "created", seat };
   }
 
   async deleteMember(input: DeleteMemberInput): Promise<void> {
@@ -713,12 +744,32 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       teamUser.customRoleId = update.customRoleId ?? null;
       teamUser.updatedAt = nowInstant();
     }
+    this.dropSharedTeamRowsForSeat({ organizationId, userId, role });
 
     if (this.activeAdminCount(organizationId, { includeDisabled: true }) === 0) {
       throw new CannotDemoteLastAdminError();
     }
 
     return { teamsLeftWithoutAdmin };
+  }
+
+  /** A Developer holds nothing shared (ADR-171): their rows on shared teams go. */
+  private dropSharedTeamRowsForSeat({
+    organizationId,
+    userId,
+    role,
+  }: {
+    organizationId: string;
+    userId: string;
+    role: OrganizationUserRole;
+  }): void {
+    if (role !== OrganizationUserRole.DEVELOPER) return;
+    const kept = this.memory.teamUsers.filter((row) => {
+      const team = this.memory.teams.get(row.teamId);
+      const shared = team?.organizationId === organizationId && !team.isPersonal;
+      return !(shared && row.userId === userId);
+    });
+    this.memory.teamUsers.splice(0, this.memory.teamUsers.length, ...kept);
   }
 
   async updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void> {

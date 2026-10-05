@@ -10,6 +10,7 @@ import {
   organizationAdmitsDomain,
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
+  readJoinerRole,
   resolveJoinLookup,
 } from "../join-matching.ts";
 
@@ -437,6 +438,23 @@ describe("given the pure helpers the rules are built from", () => {
       // the company, who is exactly the person able to tell a colleague from
       // whoever now owns a domain this company let go.
       expect(organizationAdmitsDomain({ organization: automatic, domain: "acme.com" })).toBe(true);
+    });
+  });
+});
+
+describe("readJoinerRole()", () => {
+  describe("when the stored seat is one a joiner may land on", () => {
+    it("returns it", () => {
+      expect(readJoinerRole("DEVELOPER")).toBe("DEVELOPER");
+      expect(readJoinerRole("MEMBER")).toBe("MEMBER");
+    });
+  });
+
+  describe("when the stored seat is missing or not a joiner seat", () => {
+    it("falls back to a Member seat", () => {
+      expect(readJoinerRole(null)).toBe("MEMBER");
+      expect(readJoinerRole(void 0)).toBe("MEMBER");
+      expect(readJoinerRole("ADMIN")).toBe("MEMBER");
     });
   });
 });

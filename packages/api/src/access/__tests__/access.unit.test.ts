@@ -25,6 +25,7 @@ const reviewer: Caller = { actor: { type: "user", id: "reviewer-1" } };
 const denials: AccessDenial = {
   membershipDisabled: () => new Error("membership disabled"),
   liteMemberRestricted: (resource) => new Error(`lite member: ${resource}`),
+  developerSeatRestricted: (resource) => new Error(`developer seat: ${resource}`),
 };
 
 function authorize(

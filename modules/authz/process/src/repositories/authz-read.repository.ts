@@ -7,8 +7,11 @@ import type { ShareableResourceKind } from "@langwatch/authorization";
 import type { AuthzPrincipalRef, CollectedBinding } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
-/** OrganizationUser.role, or null when no membership row exists. */
-export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL";
+/**
+ * OrganizationUser.role, or null when no membership row exists. DEVELOPER is
+ * the seat ADR-171 adds: a personal team and nothing shared.
+ */
+export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
 
 /**
  * OrganizationUser row: role + disabled flag. Both are facts; collector
@@ -56,7 +59,7 @@ type FindManyDelegate = {
  * but generated client types and values never cross this package boundary.
  */
 export type AuthzDatabase = Readonly<{
-  organizationUser: FindFirstDelegate;
+  organizationUser: FindFirstDelegate & FindManyDelegate;
   roleBinding: FindManyDelegate;
   teamUser: FindManyDelegate;
   customRole: FindManyDelegate;

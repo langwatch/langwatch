@@ -60,14 +60,18 @@ export class ApiKeyGrantPolicyService {
 
   async isOrgAdmin(input: { userId: string; organizationId: string }): Promise<boolean> {
     const bindings = await this.options.authz.listUserBindings(input);
-
-    return bindings.some(
+    const holdsAdminRow = bindings.some(
       (binding) =>
         isLive(binding) &&
         binding.scopeType === "ORGANIZATION" &&
         binding.scopeId === input.organizationId &&
         binding.role === "ADMIN",
     );
+    if (!holdsAdminRow) return false;
+
+    // A stored row is not the whole answer: a Developer seat (ADR-171) is granted nothing by an
+    // organization row, admin least of all, so the engine is asked whether the row still counts.
+    return this.options.authz.hasPermission({ ...input, permission: "organization:manage" });
   }
 
   async isOrgAdminApiKey(input: { apiKeyId: string; organizationId: string }): Promise<boolean> {

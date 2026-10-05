@@ -147,14 +147,20 @@ export function findResourceGrantStep({
   };
 }
 
+/**
+ * The seat itself is the reason, when it is one. A Lite Member or a Developer
+ * (ADR-171) is a member with a ceiling, and naming the ceiling is what lets
+ * the person act on it: ask for a different seat, not for a binding.
+ */
 function unreachedDenialReason({
-  liteMember,
+  organizationRole,
   hadAnyPath,
 }: {
-  liteMember: boolean;
+  organizationRole: CollectedGrants["organizationRole"];
   hadAnyPath: boolean;
-}): "lite-member-restricted" | "no-binding" | "no-membership" {
-  if (liteMember) return "lite-member-restricted";
+}): "lite-member-restricted" | "developer-restricted" | "no-binding" | "no-membership" {
+  if (organizationRole === "EXTERNAL") return "lite-member-restricted";
+  if (organizationRole === "DEVELOPER") return "developer-restricted";
   return hadAnyPath ? "no-binding" : "no-membership";
 }
 
@@ -174,7 +180,7 @@ export function denyStep({ grants, chainBindings, base }: DecideContext): AuthzD
     ...base,
     allowed: false,
     denialReason: unreachedDenialReason({
-      liteMember: grants.organizationRole === "EXTERNAL",
+      organizationRole: grants.organizationRole,
       hadAnyPath,
     }),
   };

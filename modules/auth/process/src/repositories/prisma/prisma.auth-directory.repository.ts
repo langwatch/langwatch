@@ -65,6 +65,20 @@ export class PrismaAuthDirectoryRepository {
     return membership !== null;
   }
 
+  async holdsDeveloperSeat({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const membership = await this.database.organizationUser.findFirst({
+      where: { userId, organizationId },
+      select: { role: true },
+    });
+    return membership?.role === "DEVELOPER";
+  }
+
   async getLiveProject({
     projectId,
     organizationId,

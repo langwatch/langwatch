@@ -587,6 +587,7 @@ export const prismaModelFieldCatalogue = {
     "ssoDomain",
     "ssoProvider",
     "domainJoin",
+    "joinerRole",
     "joinDomains",
     "presenceEnabled",
     "traceSharingEnabled",

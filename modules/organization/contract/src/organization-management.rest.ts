@@ -129,19 +129,35 @@ export const organizationManagementRestInviteSchema = z.object({
 export const organizationManagementRestCreateInvitesSchema = z.object({
   invites: z
     .array(
-      z.object({
-        email: z.string().trim().min(1).email(),
-        role: organizationApiMemberRoleSchema,
-        teams: z
-          .array(
-            z.object({
-              teamId: z.string().min(1),
-              role: teamUserRoleSchema,
-              customRoleId: z.string().min(1).optional(),
-            }),
-          )
-          .min(1),
-      }),
+      z
+        .object({
+          email: z.string().trim().min(1).email(),
+          role: organizationApiMemberRoleSchema,
+          // Every seat but Developer is invited onto at least one team; a
+          // Developer (ADR-171) is invited onto none, and naming one is refused
+          // by the service with the seat's own code, not as a shape error.
+          teams: z
+            .array(
+              z.object({
+                teamId: z.string().min(1),
+                role: teamUserRoleSchema,
+                customRoleId: z.string().min(1).optional(),
+              }),
+            )
+            .optional(),
+        })
+        .superRefine((invite, ctx) => {
+          if (invite.role !== "DEVELOPER" && !invite.teams?.length) {
+            ctx.addIssue({
+              code: "too_small",
+              minimum: 1,
+              origin: "array",
+              inclusive: true,
+              path: ["teams"],
+              message: "Array must contain at least 1 element(s)",
+            });
+          }
+        }),
     )
     .min(1)
     .max(50),

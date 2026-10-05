@@ -29,6 +29,8 @@ import type {
   groupTrpc,
   licenseEnforcementTrpc,
   JoinRequestAutomaticJoins,
+  JoinRequestJoinerRole,
+  JoinRequestJoining,
   JoinRequestMine,
   JoinRequestPending,
   OrganizationDirectoryCounts,
@@ -383,6 +385,7 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
             activePlan: { type: string };
             membersCount: number;
             membersLiteCount: number;
+            membersDeveloperCount: number;
           };
         };
       };
@@ -568,7 +571,7 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
       joining: {
         query: {
           input: { organizationId: string };
-          output: { domainJoin: DomainJoinSetting; joinDomains: string[] };
+          output: JoinRequestJoining;
         };
       };
       setJoining: {
@@ -577,6 +580,8 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
             organizationId: string;
             domainJoin: DomainJoinSetting;
             domains: string[];
+            /** Left out when the seat control is hidden: the seat in force stays. */
+            joinerRole?: JoinRequestJoinerRole;
           };
           output: { next: DomainJoinSetting };
         };

@@ -14,8 +14,9 @@ import { useReachableProducts } from "../use-reachable-products.ts";
 const ORGANIZATION = { id: "org_1", name: "Acme", teams: [] };
 const ON = { enabled: true, isLoading: false };
 
-function hostWithEveryFlagOn() {
+function hostWithEveryFlagOn({ organizationRole }: { organizationRole?: string } = {}) {
   return StubNavigationHost.create({
+    organizationRole,
     organization: ORGANIZATION,
     organizations: [ORGANIZATION],
     permissions: ["virtualKeys:view", "governance:view"],
@@ -59,6 +60,17 @@ describe("useReachableProducts", () => {
       expect(result.current.reachableProducts).toEqual([]);
       expect(result.current.isLoading).toBe(false);
       expect(featureFlag).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the reader holds the Developer seat", () => {
+    /** @scenario A Developer is offered the Me product and nothing organisation-wide */
+    it("offers Me and LLM Ops and no organization-wide product, whatever the flags say", () => {
+      const { result } = renderHook(() => useReachableProducts(), {
+        wrapper: wrapperFor(hostWithEveryFlagOn({ organizationRole: "DEVELOPER" })),
+      });
+
+      expect(result.current.reachableProducts).toEqual(["me", "llm-ops"]);
     });
   });
 });

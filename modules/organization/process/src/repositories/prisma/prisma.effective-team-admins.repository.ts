@@ -1,5 +1,5 @@
 import { GrantScopeTier } from "@langwatch/authz-contract";
-import { TeamUserRole } from "@langwatch/organization-contract";
+import { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 
 /**
@@ -9,6 +9,19 @@ import type { Prisma } from "@langwatch/prisma-client/generated";
  */
 
 type TxClient = Prisma.TransactionClient;
+
+/**
+ * A group member who holds anything through the group: a member of the organization on any
+ * seat but Developer. A Developer gets nothing through a group (ADR-171), so one in an admin
+ * group administers nothing and is never the admin a team is said to be left with.
+ */
+function seatHoldingGroupAccess(organizationId: string) {
+  return {
+    orgMemberships: {
+      some: { organizationId, role: { not: OrganizationUserRole.DEVELOPER } },
+    },
+  };
+}
 
 /**
  * The principals holding a team's ADMIN bindings, split by kind. The one read every admin
@@ -62,16 +75,18 @@ export class PrismaEffectiveTeamAdminsRepository {
    */
   private async groupMemberUserIds({
     tx,
+    organizationId,
     groupIds,
   }: {
     tx: TxClient;
+    organizationId: string;
     groupIds: string[];
   }): Promise<string[]> {
     if (groupIds.length === 0) {
       return [];
     }
     const memberships = await tx.groupMembership.findMany({
-      where: { groupId: { in: groupIds } },
+      where: { groupId: { in: groupIds }, user: seatHoldingGroupAccess(organizationId) },
       select: { userId: true },
     });
 
@@ -94,7 +109,7 @@ export class PrismaEffectiveTeamAdminsRepository {
     });
 
     const userIds = new Set<string>(directUserIds);
-    for (const id of await this.groupMemberUserIds({ tx, groupIds })) {
+    for (const id of await this.groupMemberUserIds({ tx, organizationId, groupIds })) {
       userIds.add(id);
     }
 
@@ -123,7 +138,7 @@ export class PrismaEffectiveTeamAdminsRepository {
       organizationId,
       teamId,
     });
-    for (const id of await this.groupMemberUserIds({ tx, groupIds })) {
+    for (const id of await this.groupMemberUserIds({ tx, organizationId, groupIds })) {
       userIds.add(id);
     }
 
@@ -151,7 +166,7 @@ export class PrismaEffectiveTeamAdminsRepository {
     }
 
     const count = await tx.groupMembership.count({
-      where: { userId, groupId: { in: groupIds } },
+      where: { userId, groupId: { in: groupIds }, user: seatHoldingGroupAccess(organizationId) },
     });
 
     return count > 0;

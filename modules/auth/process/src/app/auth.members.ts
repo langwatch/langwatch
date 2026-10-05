@@ -24,6 +24,9 @@ export abstract class AuthDirectory {
     organizationId: string;
   }): Promise<boolean>;
 
+  /** Whether the person holds a Developer seat (ADR-171): a personal project, nothing shared. */
+  abstract holdsDeveloperSeat(params: { userId: string; organizationId: string }): Promise<boolean>;
+
   /** An unarchived project of the organization; throws `ProjectNotFoundError`. */
   abstract getLiveProject(params: {
     projectId: string;

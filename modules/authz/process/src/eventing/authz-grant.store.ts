@@ -503,20 +503,22 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     const revokedAtMs = this.now();
     const batchId = this.options.newCommandId?.() ?? newCommandId();
     const senders = (await this.commands()).commands;
-    await Promise.all(
-      bindingIds.map((grantId) => {
-        const command: RevokeGrantCommandData & { tenantId: string } = {
-          tenantId: organizationId,
-          organizationId,
-          commandId: `${batchId}:${grantId}`,
-          grantId,
-          actor,
-          occurredAtMs: revokedAtMs,
-        };
-        if (reason) command.reason = reason;
-        return senders.revokeGrant.send(command);
-      }),
-    );
+    // One send at a time, not a Promise.all. In memory mode a send resolves
+    // once its job ran, and that job waits on projection jobs sent to the same
+    // queue: a batch as wide as the queue's concurrency fills every slot. A
+    // move to the Developer seat (ADR-171) revokes that many rows routinely.
+    for (const grantId of bindingIds) {
+      const command: RevokeGrantCommandData & { tenantId: string } = {
+        tenantId: organizationId,
+        organizationId,
+        commandId: `${batchId}:${grantId}`,
+        grantId,
+        actor,
+        occurredAtMs: revokedAtMs,
+      };
+      if (reason) command.reason = reason;
+      await senders.revokeGrant.send(command);
+    }
     await this.options.revocation.enforceGrantRevocation({
       organizationId,
       grantIds: bindingIds,

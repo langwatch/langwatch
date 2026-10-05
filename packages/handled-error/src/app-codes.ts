@@ -216,6 +216,8 @@ export const APP_ERROR_CODES = [
   "demo_bot_declined",
   "department_assignment_target_not_found",
   "department_not_found",
+  "developer_seat_no_shared_access",
+  "developer_seat_restricted",
   "dspy_step_not_found",
   "duplicate_invite",
   "email_already_registered",

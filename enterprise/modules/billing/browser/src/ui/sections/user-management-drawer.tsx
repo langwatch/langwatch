@@ -17,7 +17,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import type { MemberType } from "@langwatch/enterprise-licensing-contract";
+import type { MemberType } from "@langwatch/entitlement-contract";
 import { nowInstant } from "@langwatch/time";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -44,6 +44,16 @@ function invalidEmailErrors(plannedUsers: PlannedUser[]): Record<string, string>
   }
   return errors;
 }
+
+/**
+ * One badge per seat. A Developer is neither a Full seat nor a capped Lite seat, so it is named
+ * as its own thing here as everywhere else.
+ */
+const SEAT_BADGE: Record<MemberType, { tone: string; label: string }> = {
+  FullMember: { tone: "blue", label: "Full Member" },
+  LiteMember: { tone: "yellow", label: "Lite Member" },
+  Developer: { tone: "teal", label: "Developer" },
+};
 
 export function UserManagementDrawer({
   open,
@@ -325,11 +335,8 @@ function CurrentMembersSection({
                   </Text>
                 </Box>
                 <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
-                  <Badge
-                    colorPalette={user.memberType === "FullMember" ? "blue" : "yellow"}
-                    variant="outline"
-                  >
-                    {user.memberType === "FullMember" ? "Full Member" : "Lite Member"}
+                  <Badge colorPalette={SEAT_BADGE[user.memberType].tone} variant="outline">
+                    {SEAT_BADGE[user.memberType].label}
                   </Badge>
                 </Box>
               </Box>
@@ -350,11 +357,8 @@ function CurrentMembersSection({
                   </Text>
                 </Box>
                 <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
-                  <Badge
-                    colorPalette={invite.memberType === "FullMember" ? "blue" : "yellow"}
-                    variant="outline"
-                  >
-                    {invite.memberType === "FullMember" ? "Full Member" : "Lite Member"}
+                  <Badge colorPalette={SEAT_BADGE[invite.memberType].tone} variant="outline">
+                    {SEAT_BADGE[invite.memberType].label}
                   </Badge>
                 </Box>
               </Box>

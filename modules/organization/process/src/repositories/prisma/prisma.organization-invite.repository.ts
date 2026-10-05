@@ -1,10 +1,15 @@
 import type { GrantScopeTier } from "@langwatch/authz-contract";
-import { InviteNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
+import {
+  DEVELOPER_ADMISSION_AUDIT_ACTION,
+  InviteNotFoundError,
+  OrganizationNotFoundError,
+  OrganizationUserRole,
+} from "@langwatch/organization-contract";
 import type {
+  DeveloperAdmissionVia,
   Organization,
   OrganizationInvite,
   OrganizationUser,
-  OrganizationUserRole,
 } from "@langwatch/organization-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
@@ -397,6 +402,32 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     await this.prisma.organizationUser.createMany({
       data: [{ userId, organizationId, role }],
       skipDuplicates: true,
+    });
+  }
+
+  async recordDeveloperAdmission({
+    userId,
+    organizationId,
+    inviteId,
+    actorUserId,
+  }: {
+    userId: string;
+    organizationId: string;
+    inviteId: string;
+    actorUserId: string | null;
+  }): Promise<void> {
+    await this.prisma.auditLog.create({
+      data: {
+        action: DEVELOPER_ADMISSION_AUDIT_ACTION,
+        userId,
+        actorUserId,
+        organizationId,
+        metadata: {
+          seat: OrganizationUserRole.DEVELOPER,
+          inviteId,
+          via: "invite" satisfies DeveloperAdmissionVia,
+        },
+      },
     });
   }
 

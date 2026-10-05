@@ -5,6 +5,7 @@
  * not message text which can change silently.
  */
 import {
+  DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   PermissionDeniedError,
   ProjectPermissionDeniedError,
@@ -22,6 +23,11 @@ describe("isPermissionDenial", () => {
 
     it("recognises a lite-member restriction", () => {
       expect(isPermissionDenial(new LiteMemberRestrictedError("traces"))).toBe(true);
+    });
+
+    /** @scenario A Developer never sees a shared project */
+    it("recognises a Developer seat restriction", () => {
+      expect(isPermissionDenial(new DeveloperSeatRestrictedError("traces"))).toBe(true);
     });
 
     // The ADR-092 engine denies with its own code. A route migrated to

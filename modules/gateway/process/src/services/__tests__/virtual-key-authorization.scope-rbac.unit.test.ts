@@ -390,4 +390,22 @@ describe("which keys a caller sees", () => {
     expect(sut.isVisibleToMembership(membership, [ML_PROD])).toBe(false);
     expect(sut.isVisibleToMembership(membership, [DEMO])).toBe(true);
   });
+
+  /** @scenario A Developer never sees the organisation's gateway keys */
+  it("hides organization-scoped keys from a Developer and a Lite Member, who share in nothing", async () => {
+    for (const role of ["DEVELOPER", "EXTERNAL"]) {
+      const sut = service(new AcmeDirectory({ role, teamIds: [] }));
+      const membership = await sut.loadMembershipSet({ organizationId: "acme", userId: "dev" });
+
+      expect(membership.isOrgMember).toBe(false);
+      expect(sut.isVisibleToMembership(membership, vkOrg)).toBe(false);
+    }
+  });
+
+  it("shows organization-scoped keys to a Full member through membership alone", async () => {
+    const sut = service(new AcmeDirectory({ role: "MEMBER", teamIds: [] }));
+    const membership = await sut.loadMembershipSet({ organizationId: "acme", userId: "olive" });
+
+    expect(sut.isVisibleToMembership(membership, vkOrg)).toBe(true);
+  });
 });

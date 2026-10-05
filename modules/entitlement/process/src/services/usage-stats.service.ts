@@ -176,6 +176,7 @@ export class UsageStatsService {
       maxMonthlyUsageLimit,
       membersCount: seats.fullMembers,
       membersLiteCount: seats.liteMembers,
+      membersDeveloperCount: seats.developers,
       messageLimitInfo,
       usageUnit,
     };

@@ -12,6 +12,8 @@ import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
 
 type Fakes = {
   can?: boolean;
+  /** What the engine answers for `organization:manage`; granted when unset. */
+  managesOrganization?: boolean;
   allow?: (permission: string) => boolean;
   permissionsAsked?: string[];
   userBindings?: { scopeType: string; scopeId: string; role: string; expiresAt?: Date | null }[];
@@ -28,7 +30,8 @@ function policyWith(fakes: Fakes = {}) {
   const calls: Record<string, unknown>[] = [];
   const service = ApiKeyGrantPolicyService.create({
     authz: {
-      hasPermission: async () => true,
+      hasPermission: async (input: { permission: string }) =>
+        input.permission !== "organization:manage" || (fakes.managesOrganization ?? true),
       can: async (input: { permission: string; principal: unknown }) => {
         calls.push({ method: "can", permission: input.permission, principal: input.principal });
         return fakes.allow?.(input.permission) ?? fakes.can ?? true;
@@ -519,6 +522,20 @@ describe("ApiKeyGrantPolicyService", () => {
               expiresAt: new Date("2020-01-01T00:00:00.000Z"),
             },
           ],
+        });
+
+        await expect(service.isOrgAdmin({ userId: "user-1", organizationId: ORG })).resolves.toBe(
+          false,
+        );
+      });
+    });
+
+    describe("given an organization admin row the engine no longer honours", () => {
+      /** @scenario A Developer works inside their own project */
+      it("does not count it, as for a Developer seat", async () => {
+        const { service } = policyWith({
+          userBindings: [{ scopeType: "ORGANIZATION", scopeId: ORG, role: "ADMIN" }],
+          managesOrganization: false,
         });
 
         await expect(service.isOrgAdmin({ userId: "user-1", organizationId: ORG })).resolves.toBe(

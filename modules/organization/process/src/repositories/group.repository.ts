@@ -18,6 +18,10 @@ export abstract class GroupRepository {
     groupId: string;
     organizationId: string;
   }): Promise<OrganizationGroupMember[]>;
+  /**
+   * The members each group reaches access through: organization members on any seat but
+   * Developer, who gets nothing through a group (ADR-171).
+   */
   abstract findMembersForGroups(input: {
     groupIds: string[];
     organizationId: string;

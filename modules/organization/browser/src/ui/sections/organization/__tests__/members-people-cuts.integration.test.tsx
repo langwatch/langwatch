@@ -64,7 +64,7 @@ vi.mock("../../../../behavior/use-join-requests.ts", () => ({
     approve: vi.fn(),
     reject: vi.fn(),
     automaticJoins: [],
-    joining: { domainJoin: "off", joinDomains: [] },
+    joining: { domainJoin: "off", joinDomains: [], joinerRole: "MEMBER" },
     savingJoining: false,
     setJoining: vi.fn(),
   }),

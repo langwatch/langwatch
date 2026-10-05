@@ -6,12 +6,90 @@ import {
   getAutoCorrectedTeamRoleForOrganizationRole,
   getDefaultTeamRoleForOrganizationRole,
   getOrganizationRoleLabel,
+  holdsOrganizationBinding,
+  holdsSharedAccess,
   isBindingRoleAllowedForOrganizationRole,
   isTeamRoleAllowedForOrganizationRole,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
 } from "../member-role-constraints.rules.ts";
 
 describe("memberRoleConstraints", () => {
+  describe("given the translation between the two role enums", () => {
+    describe("when the seat is Developer", () => {
+      /** Invariant (ADR-171): an ORGANIZATION-scoped ADMIN binding opens every project. */
+      it("never maps to Admin", () => {
+        expect(ORGANIZATION_TO_TEAM_ROLE_MAP[OrganizationUserRole.DEVELOPER]).not.toBe(
+          TeamUserRole.ADMIN,
+        );
+      });
+    });
+  });
+
+  describe("holdsOrganizationBinding()", () => {
+    describe("when the seat is a Full seat", () => {
+      it("returns true", () => {
+        expect(holdsOrganizationBinding(OrganizationUserRole.ADMIN)).toBe(true);
+        expect(holdsOrganizationBinding(OrganizationUserRole.MEMBER)).toBe(true);
+      });
+    });
+
+    describe("when the seat is Lite or Developer", () => {
+      it("returns false", () => {
+        expect(holdsOrganizationBinding(OrganizationUserRole.EXTERNAL)).toBe(false);
+        expect(holdsOrganizationBinding(OrganizationUserRole.DEVELOPER)).toBe(false);
+      });
+    });
+  });
+
+  describe("holdsSharedAccess()", () => {
+    describe("when the seat is Developer", () => {
+      it("returns false", () => {
+        expect(holdsSharedAccess(OrganizationUserRole.DEVELOPER)).toBe(false);
+      });
+    });
+
+    describe("when the seat is any other seat", () => {
+      it("returns true", () => {
+        expect(holdsSharedAccess(OrganizationUserRole.ADMIN)).toBe(true);
+        expect(holdsSharedAccess(OrganizationUserRole.MEMBER)).toBe(true);
+        expect(holdsSharedAccess(OrganizationUserRole.EXTERNAL)).toBe(true);
+      });
+    });
+  });
+
+  describe("when the seat is Developer", () => {
+    /** @scenario A Developer cannot be given a role on a shared team */
+    it("allows no team role at all, whatever the role", () => {
+      const teamRoles: TeamRoleValue[] = [
+        TeamUserRole.ADMIN,
+        TeamUserRole.MEMBER,
+        TeamUserRole.VIEWER,
+        "custom:cr-1",
+      ];
+      for (const teamRole of teamRoles) {
+        expect(
+          isTeamRoleAllowedForOrganizationRole({
+            organizationRole: OrganizationUserRole.DEVELOPER,
+            teamRole,
+          }),
+        ).toBe(false);
+        expect(
+          isBindingRoleAllowedForOrganizationRole({
+            organizationRole: OrganizationUserRole.DEVELOPER,
+            role: teamRole,
+          }),
+        ).toBe(false);
+      }
+    });
+  });
+
   describe("getOrganizationRoleLabel()", () => {
+    describe("when role is DEVELOPER", () => {
+      it("returns Developer", () => {
+        expect(getOrganizationRoleLabel(OrganizationUserRole.DEVELOPER)).toBe("Developer");
+      });
+    });
+
     describe("when role is ADMIN", () => {
       it("returns Organization Admin", () => {
         expect(getOrganizationRoleLabel(OrganizationUserRole.ADMIN)).toBe("Organization Admin");

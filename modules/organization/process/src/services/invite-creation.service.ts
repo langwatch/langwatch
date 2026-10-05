@@ -8,6 +8,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   AlreadyOrganizationMemberError,
+  DeveloperSeatNoSharedAccessError,
   DuplicateInviteError,
   LiteMemberViewerOnlyError,
   MemberSeatLimitReachedError,
@@ -34,6 +35,7 @@ import {
 } from "../rules/invite-contracts.rules.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
 import { classifyInvitesByMemberType } from "../rules/invite-memberships.rules.ts";
+import { holdsSharedAccess } from "../rules/member-role-constraints.rules.ts";
 import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
 
 const logger = createLogger("langwatch:invites");
@@ -141,8 +143,14 @@ export class InviteCreationService {
         isViewOnlyCustomRole: (permissions) => this.deps.seats.isViewOnlyCustomRole(permissions),
       });
 
+    // A pool is checked only when the batch adds to it. An organization already
+    // over one limit can still invite into the other pools, and a batch of
+    // Developers, which no plan limit applies to (ADR-171), is never refused.
     if (!subscriptionLimits.overrideAddingLimitations) {
-      if (currentFullMembers + newFullMembers > subscriptionLimits.maxMembers) {
+      if (
+        newFullMembers > 0 &&
+        currentFullMembers + newFullMembers > subscriptionLimits.maxMembers
+      ) {
         throw new MemberSeatLimitReachedError({
           meta: {
             limitType: "members",
@@ -152,7 +160,10 @@ export class InviteCreationService {
         });
       }
 
-      if (currentMembersLite + newLiteMembers > subscriptionLimits.maxMembersLite) {
+      if (
+        newLiteMembers > 0 &&
+        currentMembersLite + newLiteMembers > subscriptionLimits.maxMembersLite
+      ) {
         throw new MemberSeatLimitReachedError({
           meta: {
             limitType: "membersLite",
@@ -166,7 +177,8 @@ export class InviteCreationService {
 
   /**
    * A Lite Member seat allows only the Viewer team role, and a custom role needs a full seat, so
-   * an invitation can't promise more. Refused here, where the admin can act on it.
+   * an invitation can't promise more. A Developer seat (ADR-171) is invited onto no team at
+   * all. Refused here, where the admin can act on it.
    */
   assertAssignmentsWithinInvitedSeat({
     role,
@@ -175,6 +187,11 @@ export class InviteCreationService {
     role: OrganizationUserRole;
     teamAssignments?: TeamAssignmentInput[];
   }): void {
+    if (!holdsSharedAccess(role)) {
+      if ((teamAssignments ?? []).length > 0) throw new DeveloperSeatNoSharedAccessError();
+      return;
+    }
+
     if (role !== OrganizationUserRole.EXTERNAL) {
       return;
     }

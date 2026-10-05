@@ -66,6 +66,7 @@ function installed() {
     denials: {
       membershipDisabled: () => new Error("membership disabled"),
       liteMemberRestricted: () => new Error("lite member"),
+      developerSeatRestricted: () => new Error("developer seat"),
     },
     audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
     errors: {

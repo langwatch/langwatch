@@ -5,6 +5,7 @@ import {
 } from "@langwatch/onboarding-contract";
 import {
   joinRequestApiDomainJoinSchema,
+  joinRequestJoinerRoleSchema,
   type JoinRequestJoining,
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
@@ -79,14 +80,16 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }): Promise<JoinRequestJoining> {
     const row = await this.database.organization.findUnique({
       where: { id: organizationId },
-      select: { domainJoin: true, joinDomains: true },
+      select: { domainJoin: true, joinDomains: true, joinerRole: true },
     });
     if (!row) throw new OrganizationNotFoundError();
 
     const domainJoin = joinRequestApiDomainJoinSchema.safeParse(row.domainJoin);
+    const joinerRole = joinRequestJoinerRoleSchema.safeParse(row.joinerRole);
     return {
       domainJoin: domainJoin.success ? domainJoin.data : "request",
       joinDomains: row.joinDomains,
+      joinerRole: joinerRole.success ? joinerRole.data : "MEMBER",
     };
   }
 
@@ -148,7 +151,11 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }): Promise<void> {
     await this.database.organization.update({
       where: { id: organizationId },
-      data: { domainJoin: setting.domainJoin, joinDomains: setting.joinDomains },
+      data: {
+        domainJoin: setting.domainJoin,
+        joinDomains: setting.joinDomains,
+        joinerRole: setting.joinerRole,
+      },
     });
   }
 

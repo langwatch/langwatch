@@ -230,6 +230,7 @@ export interface OrganizationJoinRequests {
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      joinerRole?: JoinRequestJoining["joinerRole"];
       actorUserId: string;
     }>,
   ): Promise<
@@ -238,6 +239,8 @@ export interface OrganizationJoinRequests {
       next: JoinRequestJoining["domainJoin"];
       previousDomains: readonly string[];
       nextDomains: readonly string[];
+      previousJoinerRole: JoinRequestJoining["joinerRole"];
+      nextJoinerRole: JoinRequestJoining["joinerRole"];
     }>
   >;
   /** A formal invitation ANSWERS the same person's open request. */
@@ -271,7 +274,7 @@ export type OrganizationInvitationsCreateInput = Readonly<{
     email: string;
     teamIds?: string;
     teams?: readonly Readonly<{ teamId: string; role: string; customRoleId?: string }>[];
-    role: "ADMIN" | "MEMBER" | "EXTERNAL";
+    role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
   }>[];
   /**
    * Chosen by the transport that asked, never by the composition: a batch naming a team

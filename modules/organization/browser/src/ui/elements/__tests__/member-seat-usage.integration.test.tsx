@@ -28,7 +28,11 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
 
 const { mockUsageData } = vi.hoisted(() => ({
   mockUsageData: {
-    current: null as { membersCount: number; membersLiteCount: number } | null,
+    current: null as {
+      membersCount: number;
+      membersLiteCount: number;
+      membersDeveloperCount: number;
+    } | null,
   },
 }));
 
@@ -66,7 +70,7 @@ describe("given an organization with a seat allowance of each kind", () => {
   describe("when an admin opens the member list", () => {
     /** @scenario The member list shows how many seats of each kind are in use */
     it("shows the full member seats in use against what the plan covers", async () => {
-      mockUsageData.current = { membersCount: 12, membersLiteCount: 1 };
+      mockUsageData.current = { membersCount: 12, membersLiteCount: 1, membersDeveloperCount: 0 };
 
       renderSeatUsage({ maxMembers: 15, maxMembersLite: 3 });
 
@@ -75,11 +79,24 @@ describe("given an organization with a seat allowance of each kind", () => {
 
     /** @scenario The member list shows how many seats of each kind are in use */
     it("shows the Lite Member seats the same way", async () => {
-      mockUsageData.current = { membersCount: 12, membersLiteCount: 1 };
+      mockUsageData.current = { membersCount: 12, membersLiteCount: 1, membersDeveloperCount: 0 };
 
       renderSeatUsage({ maxMembers: 15, maxMembersLite: 3 });
 
       expect(await screen.findByText("membersLite: 1 / 3")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the organization holds Developer seats", () => {
+    /** @scenario Developers are counted and never capped */
+    it("shows the Developer seats with no limit beside them", async () => {
+      mockUsageData.current = { membersCount: 5, membersLiteCount: 5, membersDeveloperCount: 10 };
+
+      renderSeatUsage({ maxMembers: 5, maxMembersLite: 5 });
+
+      expect(await screen.findByText("Developers: 10 / none")).toBeInTheDocument();
+      expect(screen.getByText("members: 5 / 5")).toBeInTheDocument();
+      expect(screen.getByText("membersLite: 5 / 5")).toBeInTheDocument();
     });
   });
 

@@ -5,7 +5,10 @@ import type { TrpcProcedureFactory, TrpcProcedureRequest } from "@langwatch/api/
  * @see specs/organizations/organization-members-rest-api.feature
  */
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
-import { TeamNotInOrganizationError } from "@langwatch/organization-contract";
+import {
+  organizationManagementRestCreateInvitesSchema,
+  TeamNotInOrganizationError,
+} from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { inviteTrpcTransport } from "../invite.trpc.ts";
@@ -189,6 +192,35 @@ describe("given the browser's invite form over tRPC", () => {
         ...TRPC_INPUT,
         validation: "lenient",
       });
+    });
+  });
+});
+
+describe("given the management REST door and the Developer seat", () => {
+  describe("when a batch names a Developer with no team", () => {
+    /** @scenario The management API accepts the Developer seat */
+    it("parses, and asks the application for that seat with no team", async () => {
+      const input = organizationManagementRestCreateInvitesSchema.parse({
+        invites: [{ email: "dev@acme.test", role: "DEVELOPER" }],
+      });
+      const app = recordingApp();
+
+      await answerRest(app, input);
+
+      expect(app.createInvitations.mock.calls[0]?.[0]).toMatchObject({
+        invites: [{ email: "dev@acme.test", role: "DEVELOPER", teams: [] }],
+      });
+    });
+  });
+
+  describe("when a batch names a Member with no team", () => {
+    it("is still refused as a shape error on teams", () => {
+      const parsed = organizationManagementRestCreateInvitesSchema.safeParse({
+        invites: [{ email: "member@acme.test", role: "MEMBER" }],
+      });
+
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues[0]?.path).toEqual(["invites", 0, "teams"]);
     });
   });
 });

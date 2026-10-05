@@ -146,6 +146,7 @@ function harness() {
     denials: {
       membershipDisabled: () => new Error("membership disabled"),
       liteMemberRestricted: () => new Error("lite member"),
+      developerSeatRestricted: () => new Error("developer seat"),
     },
     audit: {
       record: async (entry) => {
@@ -594,6 +595,7 @@ function accountHarness({
     denials: {
       membershipDisabled: () => new Error("membership disabled"),
       liteMemberRestricted: () => new Error("lite member"),
+      developerSeatRestricted: () => new Error("developer seat"),
     },
     audit: {
       record: async (entry) => {
@@ -943,6 +945,7 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
       denials: {
         membershipDisabled: () => new Error("membership disabled"),
         liteMemberRestricted: () => new Error("lite member"),
+        developerSeatRestricted: () => new Error("developer seat"),
       },
       ...(holds ? { entitlements: { holds } } : {}),
       audit: {
@@ -1114,6 +1117,7 @@ describe("a procedure declared as minting a credential", () => {
         denials: {
           membershipDisabled: () => new Error("membership disabled"),
           liteMemberRestricted: () => new Error("lite member"),
+          developerSeatRestricted: () => new Error("developer seat"),
         },
         audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
         errors: {

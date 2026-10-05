@@ -31,26 +31,34 @@ export class PermissionDeniedError extends HandledError {
     };
     denialReason: AuthzDenialReason;
   }) {
-    super(
-      "permission_denied",
-      denialReason === "lite-member-restricted"
-        ? "This feature is not available for your account"
-        : `You do not have permission to access this ${scope.type}`,
-      {
-        httpStatus: 403,
-        meta: {
-          permission,
-          scopeType: scope.type,
-          denialReason,
-        },
+    super("permission_denied", denialMessage({ denialReason, scopeType: scope.type }), {
+      httpStatus: 403,
+      meta: {
+        permission,
+        scopeType: scope.type,
+        denialReason,
       },
-    );
+    });
     this.name = "PermissionDeniedError";
   }
 
   get denialReason(): AuthzDenialReason {
     return this.meta.denialReason as AuthzDenialReason;
   }
+}
+
+function denialMessage({
+  denialReason,
+  scopeType,
+}: {
+  denialReason: AuthzDenialReason;
+  scopeType: Exclude<ScopeTier, "platform">;
+}): string {
+  if (denialReason === "lite-member-restricted") {
+    return "This feature is not available for your account";
+  }
+  if (denialReason === "developer-restricted") return "This is outside your Developer seat";
+  return `You do not have permission to access this ${scopeType}`;
 }
 
 /** A named scope field had no usable id, so the client can correct its input. */
@@ -105,5 +113,22 @@ export class MembershipDisabledError extends HandledError {
       fault: "customer",
     });
     this.name = "MembershipDisabledError";
+  }
+}
+
+/**
+ * A Developer seat (ADR-171) asked for something outside its personal project.
+ * The seat is the reason, not a missing binding: no admin can grant a shared
+ * project to it, so the message names the seat rather than a role to ask for.
+ */
+export class DeveloperSeatRestrictedError extends HandledError {
+  declare readonly code: "developer_seat_restricted";
+
+  constructor(resource: string) {
+    super("developer_seat_restricted", "This is outside your Developer seat", {
+      meta: { resource },
+      httpStatus: 401,
+    });
+    this.name = "DeveloperSeatRestrictedError";
   }
 }

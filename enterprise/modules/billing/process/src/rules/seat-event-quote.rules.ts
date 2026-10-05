@@ -9,7 +9,7 @@ import type Stripe from "stripe";
 
 export type InviteInput = {
   email: string;
-  role: "ADMIN" | "MEMBER" | "EXTERNAL";
+  role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
   teamIds: string;
 };
 

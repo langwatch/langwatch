@@ -33,7 +33,10 @@ import {
 import { toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import { getDefaultTeamRoleForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
+import {
+  getDefaultTeamRoleForOrganizationRole,
+  holdsSharedAccess,
+} from "../rules/member-role-constraints.rules.ts";
 
 /** A wire date field the way every app answer carries it: an `Instant`, converted here once. */
 
@@ -110,6 +113,8 @@ type InviteWire = z.infer<typeof organizationManagementRestInviteSchema>;
  * comma-separated team ids that imply the organization role's default.
  */
 const inviteTeams = (invite: InviteRow) => {
+  // A Developer seat (ADR-171) is invited onto no team, whatever the row says.
+  if (!holdsSharedAccess(invite.role as OrganizationUserRole)) return [];
   if (Array.isArray(invite.teamAssignments)) {
     return z
       .array(organizationManagementRestStoredTeamAssignmentSchema.nullable().catch(null))
@@ -338,7 +343,7 @@ export const organizationManagementRest: Readonly<{
         invites: input.invites.map((invite) => ({
           email: invite.email,
           role: invite.role as OrganizationUserRole,
-          teams: invite.teams.map((team) => ({
+          teams: (invite.teams ?? []).map((team) => ({
             teamId: team.teamId,
             role: requestedTeamRole(team),
           })),

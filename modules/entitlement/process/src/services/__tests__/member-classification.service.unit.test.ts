@@ -466,3 +466,55 @@ describe("getRoleChangeType", () => {
     });
   });
 });
+
+describe("given a Developer seat (ADR-171)", () => {
+  describe("when it is classified", () => {
+    /** @scenario Developers are counted and never capped */
+    it("is a Developer whatever permissions are passed, and neither Full nor Lite", () => {
+      const { classifyMemberType, isDeveloper, isFullMember, isLiteMember } =
+        MemberClassificationService;
+      expect(classifyMemberType(OrganizationUserRole.DEVELOPER, void 0)).toBe("Developer");
+      expect(classifyMemberType(OrganizationUserRole.DEVELOPER, ["project:manage"])).toBe(
+        "Developer",
+      );
+      expect(isDeveloper(OrganizationUserRole.DEVELOPER, void 0)).toBe(true);
+      expect(isFullMember(OrganizationUserRole.DEVELOPER, void 0)).toBe(false);
+      expect(isLiteMember(OrganizationUserRole.DEVELOPER, void 0)).toBe(false);
+    });
+  });
+
+  describe("when a role change involves it", () => {
+    const change = (
+      oldRole: OrganizationUserRole,
+      newRole: OrganizationUserRole,
+    ): MemberClassificationService.RoleChangeType =>
+      MemberClassificationService.getRoleChangeType({
+        oldRole,
+        oldPermissions: void 0,
+        newRole,
+        newPermissions: void 0,
+      });
+
+    /** @scenario Developers are counted and never capped */
+    it("enters the unmetered Developer pool from either metered pool", () => {
+      expect(change(OrganizationUserRole.MEMBER, OrganizationUserRole.DEVELOPER)).toBe(
+        "to-developer",
+      );
+      expect(change(OrganizationUserRole.EXTERNAL, OrganizationUserRole.DEVELOPER)).toBe(
+        "to-developer",
+      );
+    });
+
+    it("enters the Full pool when a Developer becomes a Member", () => {
+      expect(change(OrganizationUserRole.DEVELOPER, OrganizationUserRole.MEMBER)).toBe(
+        "lite-to-full",
+      );
+    });
+
+    it("enters the Lite pool when a Developer becomes a Lite Member", () => {
+      expect(change(OrganizationUserRole.DEVELOPER, OrganizationUserRole.EXTERNAL)).toBe(
+        "full-to-lite",
+      );
+    });
+  });
+});

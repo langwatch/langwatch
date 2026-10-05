@@ -8,6 +8,13 @@ import { z } from "zod";
  */
 const domainJoinSettingSchema = z.enum(["off", "request", "auto"]);
 
+/**
+ * The seat a person admitted without an invitation lands on (ADR-171), the
+ * identity feature's `JOINER_ROLES` restated for the same reason as above.
+ */
+export const joinRequestJoinerRoleSchema = z.enum(["MEMBER", "DEVELOPER"]);
+export type JoinRequestJoinerRole = z.infer<typeof joinRequestJoinerRoleSchema>;
+
 /** One request this caller, or this organization's admins, are waiting on. */
 const waitingSinceSchema = z
   .object({
@@ -75,19 +82,31 @@ export const joinRequestPendingSchema = waitingSinceSchema
   .array();
 export type JoinRequestPending = z.infer<typeof joinRequestPendingSchema>;
 
-/** How colleagues on a matching domain currently get into this organization. */
+/**
+ * How colleagues on a matching domain currently get into this organization,
+ * and the seat they land on.
+ */
 export const joinRequestJoiningSchema = z
-  .object({ domainJoin: domainJoinSettingSchema, joinDomains: z.array(z.string()) })
+  .object({
+    domainJoin: domainJoinSettingSchema,
+    joinDomains: z.array(z.string()),
+    joinerRole: joinRequestJoinerRoleSchema,
+  })
   .strict();
 export type JoinRequestJoining = z.infer<typeof joinRequestJoiningSchema>;
 
-/** The setting changed; both values and both domain lists, as the audit row records them. */
+/**
+ * The setting changed; both values, both domain lists and both joiner seats,
+ * as the audit row records them.
+ */
 export const joinRequestJoiningChangedSchema = z
   .object({
     previous: domainJoinSettingSchema,
     next: domainJoinSettingSchema,
     previousDomains: z.array(z.string()),
     nextDomains: z.array(z.string()),
+    previousJoinerRole: joinRequestJoinerRoleSchema,
+    nextJoinerRole: joinRequestJoinerRoleSchema,
   })
   .strict();
 export type JoinRequestJoiningChanged = z.infer<typeof joinRequestJoiningChangedSchema>;

@@ -3946,6 +3946,15 @@
           "documentation": "How colleagues on a matching domain get in (D12, ADR-117):\n`off` (invisible to them entirely) | `request` (they ask, an admin\napproves) | `auto` (a verified colleague walks straight in).\n\n`request` is the default for a self-serve organization; `auto` is never\na default and never inferred - an administrator turns it on, names the\ndomain in `joinDomains` while doing it, and the licence gate holds that\nvalue while letting `request` through."
         },
         {
+          "name": "joinerRole",
+          "columnName": "joinerRole",
+          "type": "OrganizationUserRole",
+          "kind": "enum",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The organisation role handed to a person admitted without an invitation:\na self-service domain join (`domainJoin`) or an SSO-admitted login.\n`MEMBER` (default, a Full seat) or `DEVELOPER` (ADR-171). Set on the\norganisation settings page only; the join flow never asks, and an\ninvitation always names its own role."
+        },
+        {
           "name": "joinDomains",
           "columnName": "joinDomains",
           "type": "String",
@@ -24361,7 +24370,8 @@
       "values": [
         "ADMIN",
         "MEMBER",
-        "EXTERNAL"
+        "EXTERNAL",
+        "DEVELOPER"
       ]
     },
     {

@@ -17,7 +17,9 @@ import {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import {
+  type DeveloperAdmission,
   type OrganizationAdministrator,
+  type OrganizationMembershipWrite,
   type OrganizationIntent,
   type OrganizationFounding,
   type OrganizationUser,
@@ -567,25 +569,29 @@ export class OrganizationMembershipService {
     });
   }
 
-  /** Makes somebody a MEMBER, minting the grant intent an unfinished
-   *  admission is resumed from into the same row, in the ledger's own
-   *  scheme because the intent's identity is the ledger's (ADR-129). */
+  /** Makes somebody a member on the joiner seat, minting the grant intent an
+   *  unfinished admission is resumed from, in the ledger's own scheme
+   *  (ADR-129). A Developer gets no grant at all (ADR-171). */
   async createMembership({
     organizationId,
     userId,
     admittedBy,
+    admission,
   }: {
     organizationId: string;
     userId: string;
     admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
-  }): Promise<"created" | "already-present"> {
+    admission: DeveloperAdmission;
+  }): Promise<OrganizationMembershipWrite> {
     const grantId = newAuthzGrantId();
-    const outcome = await this.repo.createMembership({
+    const written = await this.repo.createMembership({
       organizationId,
       userId,
       pendingAdmissionId: grantId,
+      admission,
     });
-    if (outcome !== "created" || !admittedBy) return outcome;
+    if (written.outcome !== "created" || !admittedBy) return written;
+    if (written.seat === OrganizationUserRole.DEVELOPER) return written;
 
     // A join lands its grant here, audited to whoever admitted it: `join-request`
     // is deliberately auditable, so an automatic join reads like a clicked one.
@@ -609,7 +615,7 @@ export class OrganizationMembershipService {
       requireProjection: true,
     });
     await this.dependencies.admissions.completeAdmission({ organizationId, userId, grantId });
-    return outcome;
+    return written;
   }
 
   /** Refuses when taking this member out would leave the organization with no

@@ -944,6 +944,21 @@ async function approveProject({
     );
   }
 
+  // ADR-171: a Developer seat works in its own personal project only. The probe below would
+  // refuse a shared project anyway; this names the seat, so the person is told what to pick
+  // instead of being told they lack a role nobody can grant them.
+  const ownsPersonalProject = project.isPersonal && project.ownerUserId === person.id;
+  if (
+    !ownsPersonalProject &&
+    (await flow.directory().holdsDeveloperSeat({ userId: person.id, organizationId }))
+  ) {
+    throw refused(
+      "developer_seat_personal_only",
+      "A Developer seat works in its own personal project only. Pick your personal workspace.",
+      400,
+    );
+  }
+
   if (!(await flow.canViewProject({ userId: person.id, projectId: project.id }))) {
     throw refused("forbidden", "You do not have access to this project.", 403);
   }

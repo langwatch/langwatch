@@ -55,7 +55,7 @@ function serviceOn(plan: Plan, count: UsageCount = 4_200): UsageStatsService {
   return UsageStatsService.create({
     membership: new StubMembership(),
     seats: createApiFixture<Pick<OrganizationApi, "countMemberSeats">>({
-      countMemberSeats: async () => ({ fullMembers: 3, liteMembers: 1 }),
+      countMemberSeats: async () => ({ fullMembers: 3, liteMembers: 1, developers: 0 }),
     }),
     counter: new StubCounter(count),
     plans,

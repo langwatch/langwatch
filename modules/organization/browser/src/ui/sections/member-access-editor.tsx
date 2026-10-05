@@ -215,14 +215,23 @@ export function MemberAccessEditor({
               editor.setPendingGrantAdditions((prev) => prev.filter((_, j) => j !== index))
             }
           />
-          <GrantInputRow
-            ref={editor.grantInputRef}
-            organizationId={organizationId}
-            onAdd={editor.stageAddition}
-            onReadyChange={editor.setHasDraftGrant}
-            organizationRole={editor.pendingRole}
-            buttonLabel="Assign role"
-          />
+          {/* A Developer seat can be given no shared access at all, so there is no row to
+              add: the seat is the whole answer. */}
+          {editor.pendingRole === OrganizationUserRole.DEVELOPER ? (
+            <Text fontSize="xs" color="fg.muted" data-testid="developer-no-access">
+              A Developer seat works in its own project only. Move them to a Member seat to give
+              them access to a team or project.
+            </Text>
+          ) : (
+            <GrantInputRow
+              ref={editor.grantInputRef}
+              organizationId={organizationId}
+              onAdd={editor.stageAddition}
+              onReadyChange={editor.setHasDraftGrant}
+              organizationRole={editor.pendingRole}
+              buttonLabel="Assign role"
+            />
+          )}
         </Box>
       )}
 
@@ -511,6 +520,12 @@ function useMemberAccessEditor({
   };
 
   useEffect(() => {
+    // A Developer seat holds nothing shared: every staged row goes, the way the save
+    // deletes every stored one.
+    if (pendingRole === OrganizationUserRole.DEVELOPER) {
+      setPendingGrantAdditions([]);
+      return;
+    }
     if (pendingRole !== OrganizationUserRole.EXTERNAL) return;
     setPendingGrantAdditions(stagedRowsForLiteSeat);
   }, [pendingRole]);

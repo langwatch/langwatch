@@ -106,14 +106,16 @@ export interface Authorize {
 }
 
 /**
- * The two refusals whose concrete error class is the process's to choose: both
- * carry product copy and codes a client renders.
+ * The refusals whose concrete error class is the process's to choose: each
+ * carries product copy and a code a client renders.
  */
 export interface AccessDenial {
   /** The membership exists but an admin disabled it, so it grants nothing. */
   membershipDisabled(): Error;
   /** The organization role does not reach this feature at all. */
   liteMemberRestricted(resource: string): Error;
+  /** A Developer seat (ADR-171) reached outside its own personal project. */
+  developerSeatRestricted(resource: string): Error;
 }
 
 /** What the handler is handed beside its input. */
@@ -650,6 +652,9 @@ function denied({
   // constant.
   if (denials && decision.organizationRole === "EXTERNAL") {
     return denials.liteMemberRestricted(permission.split(":")[0] ?? "unknown");
+  }
+  if (denials && decision.organizationRole === "DEVELOPER") {
+    return denials.developerSeatRestricted(permission.split(":")[0] ?? "unknown");
   }
 
   return new PermissionDeniedError({

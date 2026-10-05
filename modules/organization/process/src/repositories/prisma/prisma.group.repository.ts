@@ -2,6 +2,7 @@ import {
   GroupMemberAlreadyAddedError,
   GroupMembershipNotFoundError,
   GroupNotFoundError,
+  OrganizationUserRole,
   ScimManagedGroupError,
   type OrganizationGroup,
   type OrganizationGroupMember,
@@ -140,8 +141,15 @@ export class PrismaGroupRepository extends GroupRepository {
       where: {
         groupId: { in: input.groupIds },
         group: { organizationId: input.organizationId },
+        // A Developer seat gets nothing through a group (ADR-171), so one sitting in a
+        // team-bound group is neither a member the listing shows nor an admin.
         user: {
-          orgMemberships: { some: { organizationId: input.organizationId } },
+          orgMemberships: {
+            some: {
+              organizationId: input.organizationId,
+              role: { not: OrganizationUserRole.DEVELOPER },
+            },
+          },
         },
       },
       select: {

@@ -19,7 +19,12 @@ import { ErrorBoundary } from "react-error-boundary";
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { type NavigationTeam, useNavigationHost } from "../../model/navigation-host.ts";
 import { planManagementHref } from "../../model/plan-management-href.ts";
-import { isPathUnder } from "../../model/products.ts";
+import {
+  isPathUnder,
+  productById,
+  productFromPathname,
+  seatReachesProduct,
+} from "../../model/products.ts";
 import { isResolverAddress } from "../../model/resolve-shell-route.ts";
 import { cloudAdminGroup, instanceGroup } from "../../model/settings-menu.ts";
 import { AdminViewingAsBanner } from "../blocks/admin-viewing-as-banner.tsx";
@@ -78,6 +83,69 @@ function readerMayOpenThePage({
   // The same predicate the host's own ambient team resolution prefers on, so
   // the team the application picks and the one the chrome draws cannot diverge.
   return !!team && !!userId && (team.members ?? []).some((member) => member.userId === userId);
+}
+
+/**
+ * The seat gate on top of the permission gate: a Developer holds a member's grants inside
+ * their own project, so the permission alone would let them onto an organisation-wide
+ * product. A page that belongs to no product is not seat-gated here.
+ */
+function seatMayOpenThePage({
+  pathname,
+  organizationRole,
+}: {
+  pathname: string;
+  organizationRole: string | undefined;
+}): boolean {
+  const productId = productFromPathname(pathname);
+  if (!productId) return true;
+  return seatReachesProduct({ product: productById(productId), organizationRole });
+}
+
+function SeatRestrictedNotice() {
+  return (
+    <Alert.Root
+      status="warning"
+      width="full"
+      marginX={4}
+      marginTop={3}
+      maxWidth="calc(100% - 22px)"
+    >
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>Access Restricted</Alert.Title>
+        <Text>
+          You don't have permission to view this page. A Developer seat works in its own project
+          only. Ask your administrator to move you to a Member seat.
+        </Text>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
+function TeamAccessRefusal() {
+  return (
+    <Alert.Root
+      status="warning"
+      width="full"
+      marginX={4}
+      marginTop={3}
+      maxWidth="calc(100% - 22px)"
+    >
+      <Alert.Indicator />
+      <Alert.Content>
+        <HStack width="full" gap={4}>
+          <Text flex={1}>
+            You are not part of any team in this organization. Ask your administrator to add you, or{" "}
+            <NavigationLink href="/" textDecoration="underline">
+              go back to your home page
+            </NavigationLink>
+            .
+          </Text>
+        </HStack>
+      </Alert.Content>
+    </Alert.Root>
+  );
 }
 
 const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items];
@@ -207,42 +275,21 @@ export const ShellPageBody = ({
     organizationRole,
   });
 
+  const seatOpensPage = seatMayOpenThePage({ pathname, organizationRole });
+
   // A refusal is drawn only from an answered organization read, so the body renders
   // while it is out; `flex: 1` + `minHeight: 0` keep a `height="full"` page inside.
-  const body =
-    userIsPartOfTeam || isOrganizationLoading ? (
-      <Box flex="1" minHeight={0} width="full" display="flex" flexDirection="column">
-        <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[pathname]}>
-          <PageMeasure pathname={pathname}>{children}</PageMeasure>
-        </ErrorBoundary>
-      </Box>
-    ) : (
-      (host.teamAccessWaiting({
-        organizationName: organization?.name ?? "your organization",
-      }) ?? (
-        <Alert.Root
-          status="warning"
-          width="full"
-          marginX={4}
-          marginTop={3}
-          maxWidth="calc(100% - 22px)"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <HStack width="full" gap={4}>
-              <Text flex={1}>
-                You are not part of any team in this organization. Ask your administrator to add
-                you, or{" "}
-                <NavigationLink href="/" textDecoration="underline">
-                  go back to your home page
-                </NavigationLink>
-                .
-              </Text>
-            </HStack>
-          </Alert.Content>
-        </Alert.Root>
-      ))
-    );
+  const pageBody = (
+    <Box flex="1" minHeight={0} width="full" display="flex" flexDirection="column">
+      <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[pathname]}>
+        <PageMeasure pathname={pathname}>{children}</PageMeasure>
+      </ErrorBoundary>
+    </Box>
+  );
+  const teamRefusal = host.teamAccessWaiting({
+    organizationName: organization?.name ?? "your organization",
+  }) ?? <TeamAccessRefusal />;
+  const body = userIsPartOfTeam || isOrganizationLoading ? pageBody : teamRefusal;
 
   return (
     <VStack width="full" gap={0} {...props}>
@@ -364,7 +411,7 @@ export const ShellPageBody = ({
       {host.organizationMfaGate({
         organizationId: organization?.id,
         isPersonalScope: isPersonalScopeRoute,
-        body,
+        body: seatOpensPage ? body : <SeatRestrictedNotice />,
       })}
     </VStack>
   );

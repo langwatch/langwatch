@@ -3,7 +3,7 @@
  * label; server copy decides billing.
  */
 
-import type { MemberType } from "@langwatch/enterprise-licensing-contract";
+import type { MemberType } from "@langwatch/entitlement-contract";
 
 import { OrganizationUserRole } from "./prisma-types.ts";
 
@@ -29,6 +29,11 @@ export function classifyMemberType(
   role: OrganizationUserRole,
   permissions: string[] | undefined,
 ): MemberType {
+  // A Developer seat is its own kind: counted, never metered
+  if (role === OrganizationUserRole.DEVELOPER) {
+    return "Developer";
+  }
+
   // ADMIN or MEMBER roles are always FullMember
   if (role === OrganizationUserRole.ADMIN || role === OrganizationUserRole.MEMBER) {
     return "FullMember";

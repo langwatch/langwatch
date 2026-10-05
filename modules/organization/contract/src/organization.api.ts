@@ -51,7 +51,9 @@ import type {
 import type {
   Organization,
   CustomRole,
+  DeveloperAdmission,
   OrganizationUser,
+  OrganizationMembershipWrite,
   OrganizationUserRole,
   ProjectRow,
   Team,
@@ -172,7 +174,12 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
 export type OrganizationInviteValidation = "strict" | "lenient";
 
 /** An organization's seats: full and lite members, live invitations included. */
-export type OrganizationMemberSeats = Readonly<{ fullMembers: number; liteMembers: number }>;
+/** The seats an organization holds: Full and Lite are metered; Developer (ADR-171) is not. */
+export type OrganizationMemberSeats = Readonly<{
+  fullMembers: number;
+  liteMembers: number;
+  developers: number;
+}>;
 
 /** One invitation batch as a transport asks for it, with the mode it chose. */
 export type OrganizationApiCreateInvitationsInput = OrganizationApiCreateInvitesInput &
@@ -368,17 +375,18 @@ export interface OrganizationApi {
     }>,
   ): Promise<AuthzAccessBreakdownOutput>;
   /**
-   * Makes somebody a MEMBER (ADR-129). With `admittedBy` the grant lands now,
-   * audited to that actor; without it an SSO arrival resumes the admission.
-   * `"already-present"` when a concurrent callback or a retry made the row.
+   * Makes somebody a member on the organization's joiner seat (ADR-129, ADR-171). With
+   * `admittedBy` a Full member's grant lands now; without it an SSO arrival resumes the
+   * admission. A Developer gets no grant: the row is audited with `via` instead.
    */
   createMembership(
     input: Readonly<{
       organizationId: string;
       userId: string;
       admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
+      admission: DeveloperAdmission;
     }>,
-  ): Promise<"created" | "already-present">;
+  ): Promise<OrganizationMembershipWrite>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,
@@ -780,6 +788,7 @@ export interface OrganizationApi {
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      joinerRole?: JoinRequestJoining["joinerRole"];
       actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged>;

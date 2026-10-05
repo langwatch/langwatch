@@ -90,6 +90,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     return {
       domainJoin: organization.domainJoin ?? "request",
       joinDomains: [...(organization.joinDomains ?? [])],
+      joinerRole: organization.joinerRole ?? "MEMBER",
     };
   }
 
@@ -141,6 +142,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     const organization = this.requireOrganization(organizationId);
     organization.domainJoin = setting.domainJoin;
     organization.joinDomains = [...setting.joinDomains];
+    organization.joinerRole = setting.joinerRole;
   }
 
   async getGuidedOnboarding({

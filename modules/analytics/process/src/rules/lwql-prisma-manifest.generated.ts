@@ -354,6 +354,7 @@ export interface LwqlPrismaRows {
     readonly ssoDomain: "String?";
     readonly ssoProvider: "String?";
     readonly domainJoin: "String";
+    readonly joinerRole: "OrganizationUserRole";
     readonly joinDomains: "String[]";
     readonly presenceEnabled: "Boolean";
     readonly traceSharingEnabled: "Boolean";

@@ -9,6 +9,8 @@ import {
   JoinPolicyNotLicensedError,
   normalizeDomain,
   type DomainJoinSetting,
+  type JoinerRole,
+  type JoiningSetting,
   type JoinSettingChange,
 } from "@langwatch/identity-contract";
 
@@ -37,15 +39,19 @@ export class JoinDomainSettingService {
     organizationId,
     domainJoin,
     domains,
+    joinerRole,
     actorUserId,
   }: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     domains: readonly string[];
+    /** The seat newcomers receive (ADR-171). Left out, the saved one stands. */
+    joinerRole?: JoinerRole;
     actorUserId: string;
   }): Promise<JoinSettingChange> {
     const current = await this.deps.settings.read({ organizationId });
     const normalized = domains.map(normalizeDomain).filter(Boolean);
+    const nextJoinerRole = joinerRole ?? current.joinerRole;
 
     if (
       this.opensTheDoorWider({
@@ -60,33 +66,26 @@ export class JoinDomainSettingService {
     }
 
     if (domainJoin === "auto") {
-      if (!(await this.deps.autoJoinLicensed())) {
-        throw new JoinAutoNotLicensedError(
-          `organization ${organizationId} cannot enable automatic joining without a genuine license`,
-        );
-      }
-
-      if (normalized.length === 0) {
-        throw new JoinAutoDomainUnprovenError(
-          "automatic joining needs a company domain to be named",
-        );
-      }
-
-      for (const domain of normalized) {
-        await this.guards.assertDomainProven({ organizationId, domain });
-      }
+      await this.assertAutomaticJoinAllowed({ organizationId, domains: normalized });
     }
 
     // Turning automatic joining off clears the domains it named: a setting
     // flipped back on later must name them again, deliberately.
     const nextDomains = domainJoin === "auto" ? normalized : [];
-    await this.deps.settings.write({ organizationId, domainJoin, joinDomains: nextDomains });
+    await this.deps.settings.write({
+      organizationId,
+      domainJoin,
+      joinDomains: nextDomains,
+      joinerRole: nextJoinerRole,
+    });
 
     const change: JoinSettingChange = {
       previous: current.domainJoin,
       next: domainJoin,
       previousDomains: current.joinDomains,
       nextDomains,
+      previousJoinerRole: current.joinerRole,
+      nextJoinerRole,
     };
     // Awaited: a setting that decides who may walk in unapproved is the change
     // a customer comes to the audit page for, so the row lands before "saved".
@@ -96,12 +95,34 @@ export class JoinDomainSettingService {
   }
 
   /** How this organization has set joining, for the settings card. */
-  async readJoining({
+  async readJoining({ organizationId }: { organizationId: string }): Promise<JoiningSetting> {
+    return this.deps.settings.read({ organizationId });
+  }
+
+  /**
+   * What automatic joining needs before it may be switched on: a genuine
+   * licence, at least one domain, and every named domain proven.
+   */
+  private async assertAutomaticJoinAllowed({
     organizationId,
+    domains,
   }: {
     organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }> {
-    return this.deps.settings.read({ organizationId });
+    domains: readonly string[];
+  }): Promise<void> {
+    if (!(await this.deps.autoJoinLicensed())) {
+      throw new JoinAutoNotLicensedError(
+        `organization ${organizationId} cannot enable automatic joining without a genuine license`,
+      );
+    }
+
+    if (domains.length === 0) {
+      throw new JoinAutoDomainUnprovenError("automatic joining needs a company domain to be named");
+    }
+
+    for (const domain of domains) {
+      await this.guards.assertDomainProven({ organizationId, domain });
+    }
   }
 
   /**

@@ -29,7 +29,10 @@ import type {
   OrganizationSignals,
 } from "../app/organization.members.ts";
 import { grantCallerOf } from "../rules/grant-caller.rules.ts";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
+import {
+  holdsSharedAccess,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "../rules/member-role-constraints.rules.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import type { InviteCreationThrottleService } from "./invite-creation-throttle.service.ts";
 import type {
@@ -377,6 +380,9 @@ function intendedGrants(
     teams?: OrganizationApiCreateInvitationsInput["invites"][number]["teams"];
   }>,
 ): OrganizationIntendedGrant[] {
+  // A Developer seat (ADR-171) is granted nothing at all: no organization
+  // grant and no team, so there is nothing to hold against the caller.
+  if (!holdsSharedAccess(invite.role)) return [];
   const organizationGrant: OrganizationIntendedGrant = {
     role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
     scopeType: "ORGANIZATION",

@@ -47,7 +47,12 @@ import type {
 } from "./facts.ts";
 import type { IdentityEmailResolution } from "./identity-email.service.ts";
 import type { VerifiedUserDomain } from "./identity-lookup.ts";
-import type { DomainJoinSetting, JoinLookupDecision, JoinOffer } from "./join-matching.ts";
+import type {
+  DomainJoinSetting,
+  JoinerRole,
+  JoinLookupDecision,
+  JoinOffer,
+} from "./join-matching.ts";
 import type {
   ApproveJoinCommandData,
   ExpireJoinCommandData,
@@ -611,12 +616,24 @@ export interface JoinAdmissionsApi {
   }): Promise<IdentityDomainAdmission[]>;
 }
 
-/** Both values and both domain lists of a saved joining setting, for its audit row. */
+/**
+ * Both values, both domain lists and both joiner seats (ADR-171) of a saved
+ * joining setting, for its audit row.
+ */
 export interface JoinSettingChange {
   previous: DomainJoinSetting;
   next: DomainJoinSetting;
   previousDomains: readonly string[];
   nextDomains: readonly string[];
+  previousJoinerRole: JoinerRole;
+  nextJoinerRole: JoinerRole;
+}
+
+/** How an organization has set joining, and the seat a joiner lands on. */
+export interface JoiningSetting {
+  domainJoin: DomainJoinSetting;
+  joinDomains: string[];
+  joinerRole: JoinerRole;
 }
 
 /**
@@ -661,11 +678,11 @@ export interface JoinRequestsApi {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     domains: readonly string[];
+    /** The seat newcomers receive (ADR-171). Left out, the saved one stands. */
+    joinerRole?: JoinerRole;
     actorUserId: string;
   }): Promise<JoinSettingChange>;
-  readJoining(args: {
-    organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }>;
+  readJoining(args: { organizationId: string }): Promise<JoiningSetting>;
   pendingForOrganization(args: { organizationId: string }): Promise<JoinRequestAggregateState[]>;
   automaticJoinsForOrganization(args: {
     organizationId: string;

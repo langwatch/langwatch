@@ -138,6 +138,7 @@ export const joinRequestTrpcTransport: TrpcRouterDeclaration<
       organizationId: input.organizationId,
       domainJoin: input.domainJoin,
       domains: input.domains,
+      ...(input.joinerRole ? { joinerRole: input.joinerRole } : {}),
       actorUserId: actor.id,
     }),
   )

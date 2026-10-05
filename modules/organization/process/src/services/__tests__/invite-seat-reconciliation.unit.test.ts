@@ -103,3 +103,20 @@ describe("given disabling members has brought the organization within its 10-sea
     });
   });
 });
+
+describe("given a plan whose Full and Lite seats are all in use", () => {
+  describe("when an admin invites a batch of Developers", () => {
+    /** @scenario An administrator invites a Developer while the plan is at its seat cap */
+    /** @scenario Developers are counted and never capped */
+    it("admits the batch, since no plan limit applies to the Developer seat", async () => {
+      const { service } = buildService({ maxMembers: 5, currentFullMembers: 5 });
+
+      await expect(
+        service.checkLicenseLimits({
+          organizationId: "org-123",
+          newInvites: Array.from({ length: 10 }, () => ({ role: "DEVELOPER" as const })),
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+});

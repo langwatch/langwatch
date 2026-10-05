@@ -84,6 +84,9 @@ export function extractLiteMemberRestrictionInfo(error: unknown): LiteMemberRest
   // `kind` is the deprecated pre-`HandledError` discriminant, read as a
   // fallback so this resolves across the transition (see SerializedHandledError).
   const handledCode = handledError?.code ?? handledError?.kind;
+  // Only the Lite seat opens the upgrade modal: a Lite Member can be moved to a Full seat and the
+  // modal sells that. A Developer denial (`developer_seat_restricted`) has no seat to upgrade into
+  // from the modal, so it stays on the generic path and shows its registry copy.
   if (handledCode !== "lite_member_restricted") return null;
 
   return { resource: handledError?.meta?.resource };

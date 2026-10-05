@@ -72855,7 +72855,8 @@
                             "enum": [
                               "ADMIN",
                               "MEMBER",
-                              "EXTERNAL"
+                              "EXTERNAL",
+                              "DEVELOPER"
                             ]
                           },
                           "disabled": {
@@ -73003,7 +73004,8 @@
                       "enum": [
                         "ADMIN",
                         "MEMBER",
-                        "EXTERNAL"
+                        "EXTERNAL",
+                        "DEVELOPER"
                       ]
                     },
                     "disabled": {
@@ -73162,7 +73164,8 @@
                       "enum": [
                         "ADMIN",
                         "MEMBER",
-                        "EXTERNAL"
+                        "EXTERNAL",
+                        "DEVELOPER"
                       ]
                     },
                     "disabled": {
@@ -73289,7 +73292,8 @@
                     "enum": [
                       "ADMIN",
                       "MEMBER",
-                      "EXTERNAL"
+                      "EXTERNAL",
+                      "DEVELOPER"
                     ]
                   },
                   "disabled": {
@@ -73611,7 +73615,8 @@
                             "enum": [
                               "ADMIN",
                               "MEMBER",
-                              "EXTERNAL"
+                              "EXTERNAL",
+                              "DEVELOPER"
                             ]
                           },
                           "status": {
@@ -73734,7 +73739,8 @@
                             "enum": [
                               "ADMIN",
                               "MEMBER",
-                              "EXTERNAL"
+                              "EXTERNAL",
+                              "DEVELOPER"
                             ]
                           },
                           "status": {
@@ -73859,11 +73865,11 @@
                           "enum": [
                             "ADMIN",
                             "MEMBER",
-                            "EXTERNAL"
+                            "EXTERNAL",
+                            "DEVELOPER"
                           ]
                         },
                         "teams": {
-                          "minItems": 1,
                           "type": "array",
                           "items": {
                             "type": "object",
@@ -73895,8 +73901,7 @@
                       },
                       "required": [
                         "email",
-                        "role",
-                        "teams"
+                        "role"
                       ]
                     }
                   }

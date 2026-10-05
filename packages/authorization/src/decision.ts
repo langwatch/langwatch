@@ -7,7 +7,11 @@ import { z } from "zod";
 import { authzPermissionSchema } from "./registry.ts";
 import { declaredScopeIdSchema } from "./scope-tiers.ts";
 
-export const organizationRoleSchema = z.enum(["ADMIN", "MEMBER", "EXTERNAL"]);
+/**
+ * OrganizationUser.role. DEVELOPER (ADR-171) is a seat that holds its personal
+ * team and nothing shared; `bindingGrants` caps it the way it caps EXTERNAL.
+ */
+export const organizationRoleSchema = z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]);
 export type OrganizationRole = z.infer<typeof organizationRoleSchema>;
 export const OrganizationUserRole = organizationRoleSchema.enum;
 export type OrganizationUserRole = OrganizationRole;
@@ -17,6 +21,8 @@ export const authzDenialReasonSchema = z.enum([
   "membership-disabled",
   "no-binding",
   "lite-member-restricted",
+  /** A Developer seat (ADR-171) asked for something outside its personal team. */
+  "developer-restricted",
   "owner-ceiling",
 ]);
 export type AuthzDenialReason = z.infer<typeof authzDenialReasonSchema>;

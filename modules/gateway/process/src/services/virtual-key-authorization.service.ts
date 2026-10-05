@@ -79,11 +79,25 @@ function permissionDenied(permission: AuthzPermission, scope: Scope | undefined)
 }
 
 /**
+ * Whether a seat takes part in the organization's shared gateway keys. The seat is the gate
+ * because neither restricted seat holds a binding at the organization scope, so no permission
+ * check can tell them apart from a Full member who lacks `virtualKeys:view` there.
+ */
+function seatSharesOrganizationKeys(role: string): boolean {
+  return role !== "DEVELOPER" && role !== "EXTERNAL";
+}
+
+/**
  * Scopes a user reaches by membership within one org. List and read visibility is membership-based
  * rather than permission-based: a key is visible when one of its scopes intersects this set, so a
  * plain org member sees org-scoped keys and a team member sees that team's but not a sibling's.
  */
 export type MembershipSet = {
+  /**
+   * Holds an active seat that shares in the org's keys: a Full seat or an administrator. A Lite
+   * Member sees no gateway page and a Developer (ADR-171) nothing shared, so neither sees an
+   * organization-scoped key through membership alone.
+   */
   isOrgMember: boolean;
   /**
    * Caller is an org-level admin, so visibility short-circuits to everything in the org: real org
@@ -368,7 +382,7 @@ export class VirtualKeyAuthorizationService {
         : [];
 
     return {
-      isOrgMember: organizationRole !== null,
+      isOrgMember: organizationRole !== null && seatSharesOrganizationKeys(organizationRole.role),
       isOrgAdmin: organizationRole?.role === "ADMIN",
       teamIds,
       projectIds: new Set(projectIds),

@@ -87,6 +87,52 @@ describe("given the organization read has answered", () => {
   });
 });
 
+describe("given a Developer who holds the page's permission in their own project", () => {
+  const organization = { id: "org_1", name: "Acme", teams: [] };
+
+  describe("when the page belongs to an organization-wide product", () => {
+    /** @scenario A Developer cannot open an organisation-wide product by address */
+    it("refuses the page", () => {
+      renderBody({
+        pathname: "/gateway/virtual-keys",
+        isLoading: false,
+        organization,
+        organizationRole: "DEVELOPER",
+      });
+
+      expect(screen.getByText(/don't have permission/)).toBeInTheDocument();
+      expect(screen.queryByText("Private project content")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the page belongs to their own Me workspace", () => {
+    /** @scenario A Developer cannot open an organisation-wide product by address */
+    it("opens the page", () => {
+      renderBody({
+        pathname: "/me/sessions",
+        isLoading: false,
+        organization,
+        organizationRole: "DEVELOPER",
+      });
+
+      expect(screen.getByText("Private project content")).toBeInTheDocument();
+    });
+  });
+
+  describe("when a Full member opens the same organization-wide page", () => {
+    it("opens it, because the seat gate is for the Developer seat only", () => {
+      renderBody({
+        pathname: "/gateway/virtual-keys",
+        isLoading: false,
+        organization,
+        organizationRole: "ADMIN",
+      });
+
+      expect(screen.getByText("Private project content")).toBeInTheDocument();
+    });
+  });
+});
+
 describe("given the join offer drawn over the page", () => {
   function joinOfferAskedWith(readings: StubNavigationReadings) {
     const host = StubNavigationHost.create({

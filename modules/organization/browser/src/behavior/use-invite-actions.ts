@@ -16,6 +16,14 @@ type SeatDecision =
   | { kind: "upgrade" };
 
 /**
+ * A Developer seat sits in neither metered pool, so it trips neither the full-member check nor
+ * the lite one.
+ */
+function isFullSeat(role: OrganizationUserRole): boolean {
+  return role === OrganizationUserRole.ADMIN || role === OrganizationUserRole.MEMBER;
+}
+
+/**
  * Whether new full members fit the seat limit, and if not, whether the plan expands in place.
  * Limits not loaded yet proceed optimistically; the server is the final guard.
  */
@@ -30,9 +38,7 @@ function seatDecision({
   activePlanSource?: "license" | "subscription" | "free";
   pricingModel?: string;
 }): SeatDecision {
-  const newFullMembers = invites.filter(
-    (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
-  ).length;
+  const newFullMembers = invites.filter((invite) => isFullSeat(invite.orgRole)).length;
   if (newFullMembers === 0 || !limitInfo) return { kind: "proceed" };
   const newSeats = limitInfo.current + newFullMembers;
   if (newSeats <= limitInfo.max) return { kind: "proceed" };

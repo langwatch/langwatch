@@ -19,6 +19,7 @@ import {
 describe("given a pending invitation for the member role naming one team", () => {
   describe("when the invitee accepts it", () => {
     /** @scenario "Accepting an invitation grants exactly the role the invitation named" */
+    /** @scenario The joiner seat setting never applies to invitations */
     it.concurrent("grants the organization role and the named team role, and nothing wider", async () => {
       const invites = new FakeOrganizationInviteRepository();
       const grants = new FakeAuthzGrantsService();
@@ -67,6 +68,39 @@ describe("given a pending invitation for the member role naming one team", () =>
         expect(bindings).toHaveLength(1);
         expect(bindings[0]).toMatchObject({ scopeType: "TEAM", scopeId: "team-1", role: "VIEWER" });
       });
+    });
+  });
+});
+
+describe("given a pending invitation for a Developer seat", () => {
+  describe("when the invitee accepts it", () => {
+    /** @scenario An administrator invites a Developer while the plan is at its seat cap */
+    it.concurrent("grants nothing shared, and audits the admission once", async () => {
+      const invites = new FakeOrganizationInviteRepository();
+      const grants = new FakeAuthzGrantsService();
+      const invite = makeInvite({
+        id: "invite-developer",
+        role: "DEVELOPER",
+        teamIds: "team-1",
+        requestedBy: "user-inviter",
+      });
+      invites.seedInvite(invite);
+      const service = InviteAcceptanceService.create(makeInviteDeps({ invites, grants }));
+
+      await service.applyInvite({ userId: "user-invitee", invite });
+
+      expect(invites.hasMembershipState({ userId: "user-invitee", organizationId: "org-1" })).toBe(
+        true,
+      );
+      expect(grants.bindingsFor("user-invitee")).toEqual([]);
+      expect(invites.developerAdmissions).toEqual([
+        {
+          userId: "user-invitee",
+          organizationId: "org-1",
+          inviteId: "invite-developer",
+          actorUserId: "user-inviter",
+        },
+      ]);
     });
   });
 });

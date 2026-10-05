@@ -24,6 +24,7 @@ import type {
 import {
   AuditTrailDeniedError,
   isOrganizationApiCustomRole,
+  DeveloperSeatNoSharedAccessError,
   LiteMemberViewerOnlyError,
   OrganizationApi,
   OrganizationCapabilityUnavailableError,
@@ -119,6 +120,8 @@ import {
   type OrganizationServerConfig,
   type PendingInvitationForCaller,
   type SignUpVerdict,
+  type DeveloperAdmission,
+  type OrganizationMembershipWrite,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -944,8 +947,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       organizationId: string;
       userId: string;
       admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
+      admission: DeveloperAdmission;
     }>,
-  ): Promise<"created" | "already-present"> {
+  ): Promise<OrganizationMembershipWrite> {
     return this.#dependencies.membership.createMembership(input);
   }
 
@@ -1587,11 +1591,12 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   async countMemberSeats(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationMemberSeats> {
-    const [fullMembers, liteMembers] = await Promise.all([
+    const [fullMembers, liteMembers, developers] = await Promise.all([
       this.#members.seatCounts.getMemberCount(input.organizationId),
       this.#members.seatCounts.getMembersLiteCount(input.organizationId),
+      this.#members.seatCounts.getMembersDeveloperCount(input.organizationId),
     ]);
-    return { fullMembers, liteMembers };
+    return { fullMembers, liteMembers, developers };
   }
 
   /** organization_seat_limit: organization records the fact, billing subscribes (§9). */
@@ -1946,6 +1951,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      joinerRole?: JoinRequestJoining["joinerRole"];
       actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged> {
@@ -2015,9 +2021,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   }
 
   /**
-   * A Lite Member seat allows the Viewer team role only, and moving one off
-   * Viewer costs a full seat. Both are asked here, in that order, because the
-   * first is a rule and the second is a licence.
+   * A Lite Member seat allows the Viewer team role only, and moving one off Viewer costs a
+   * full seat: a rule, then a licence, in that order. A Developer seat (ADR-171) holds no
+   * shared team role at all.
    */
   async #assertBuiltInTeamRoleAllowed(params: {
     organizationId: string;
@@ -2029,6 +2035,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       teamId: input.teamId,
     });
 
+    if (organizationRole === "DEVELOPER") throw new DeveloperSeatNoSharedAccessError();
     if (organizationRole !== "EXTERNAL") return;
 
     if (

@@ -1,4 +1,4 @@
-import type { MemberType } from "@langwatch/enterprise-licensing-contract";
+import type { MemberType } from "@langwatch/entitlement-contract";
 import { nowInstant } from "@langwatch/time";
 import type { Dispatch, SetStateAction } from "react";
 

@@ -68,6 +68,22 @@ export const PRODUCTS: readonly ProductDefinition[] = [
   },
 ];
 
+/**
+ * Whether a seat may open a product at all, before any flag or permission is asked. Permission
+ * gates alone do not keep a Developer out of an organisation-wide product: they are read on the
+ * project in view, where a Developer holds what a member holds.
+ */
+export function seatReachesProduct({
+  product,
+  organizationRole,
+}: {
+  product: Pick<ProductDefinition, "scopeKind">;
+  organizationRole: string | null | undefined;
+}): boolean {
+  if (organizationRole !== "DEVELOPER") return true;
+  return product.scopeKind !== "organization";
+}
+
 export function productById(id: ProductId): ProductDefinition {
   const product = PRODUCTS.find((candidate) => candidate.id === id);
   if (!product) throw new Error(`Unknown product id "${id}"`);

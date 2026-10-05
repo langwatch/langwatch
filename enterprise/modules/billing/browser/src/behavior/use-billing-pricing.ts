@@ -1,4 +1,4 @@
-import type { MemberType } from "@langwatch/enterprise-licensing-contract";
+import type { MemberType } from "@langwatch/entitlement-contract";
 
 import { type BillingInterval, type Currency, formatPrice } from "../model/billing-plans.ts";
 import { countFullMembers } from "../model/subscription-types.ts";

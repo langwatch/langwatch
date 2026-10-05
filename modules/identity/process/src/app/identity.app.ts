@@ -250,7 +250,8 @@ type IdentityPipelineBuilders = {
 function arrivalMemberships(organizations: OrganizationApi): SsoArrivalMemberships {
   return {
     isMember: (args) => organizations.isMember(args),
-    createMembership: (args) => organizations.createMembership(args),
+    createMembership: (args) =>
+      organizations.createMembership({ ...args, admission: { via: "sso" } }),
     applyPendingInvite: (args) => organizations.applyPendingInvite(args),
     /** Absent for an organization deleted between the decision and the join,
      *  which admits nobody. */
@@ -334,7 +335,13 @@ function joinMemberships(organizations: OrganizationApi): JoinMembership {
     isMember: (args) => organizations.isMember(args),
     memberOrganizationIds: (args) => organizations.memberOrganizationIds(args),
     // The approving admin, or the policy that approved: the grant is audited to them.
-    attachDefaultMembership: async ({ userId, organizationId, commandId, approvedByUserId }) => {
+    attachDefaultMembership: async ({
+      userId,
+      organizationId,
+      joinRequestId,
+      commandId,
+      approvedByUserId,
+    }) => {
       await organizations.createMembership({
         userId,
         organizationId,
@@ -343,6 +350,12 @@ function joinMemberships(organizations: OrganizationApi): JoinMembership {
             ? { type: "user", id: approvedByUserId }
             : { type: "system", id: SYSTEM_ACTORS.joinRequests },
           commandId,
+        },
+        // A Developer joiner (ADR-171) holds no grant to audit, so the row is.
+        admission: {
+          via: approvedByUserId ? "join-request-approved" : "domain-join",
+          joinRequestId,
+          actorUserId: approvedByUserId,
         },
       });
     },
@@ -353,8 +366,11 @@ function joinMemberships(organizations: OrganizationApi): JoinMembership {
 function joinSettings(organizations: OrganizationApi): JoinSetting {
   return {
     read: (args) => organizations.getJoinSetting(args),
-    write: ({ organizationId, domainJoin, joinDomains }) =>
-      organizations.saveJoinSetting({ organizationId, setting: { domainJoin, joinDomains } }),
+    write: ({ organizationId, domainJoin, joinDomains, joinerRole }) =>
+      organizations.saveJoinSetting({
+        organizationId,
+        setting: { domainJoin, joinDomains, joinerRole },
+      }),
   };
 }
 
@@ -379,6 +395,8 @@ function joinSettingAudit(auditLog: AuditLogApi): JoinSettingAudit {
           to: change.next,
           fromDomains: [...change.previousDomains],
           toDomains: [...change.nextDomains],
+          fromJoinerRole: change.previousJoinerRole,
+          toJoinerRole: change.nextJoinerRole,
         },
         targetKind: "organization",
         targetId: organizationId,

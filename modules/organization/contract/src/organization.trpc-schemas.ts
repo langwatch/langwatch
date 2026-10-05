@@ -20,7 +20,7 @@ export type OrganizationApiMemberScope = z.infer<typeof organizationApiMemberSco
  * contract cannot depend on the generated Prisma client — `team.ts`'s roles
  * are restated the same way.
  */
-export const organizationApiMemberRoleSchema = z.enum(["ADMIN", "MEMBER", "EXTERNAL"]);
+export const organizationApiMemberRoleSchema = z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]);
 export type OrganizationApiMemberRole = z.infer<typeof organizationApiMemberRoleSchema>;
 
 export const organizationApiCustomTeamRoleSchema = z

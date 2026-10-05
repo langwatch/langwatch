@@ -3,10 +3,12 @@
 import type { AuthzCustomRole, AuthzGrantCaller, GrantScopeTier } from "@langwatch/authz-contract";
 import type {
   CustomRole,
+  DeveloperAdmission,
   EnrichedAuditLog as ContractEnrichedAuditLog,
   Organization,
   OrganizationFounding,
   OrganizationIntent,
+  OrganizationMembershipWrite,
   OrganizationUser,
   OrganizationUserRole,
   PricingModel,
@@ -422,15 +424,16 @@ export abstract class OrganizationMembershipRepository {
   }) => Promise<MemberTeamBinding[]>;
 
   /**
-   * Makes somebody a MEMBER, carrying the grant intent an unfinished
-   * admission is resumed from (ADR-129). A row that is already there is
-   * `"already-present"` — a concurrent callback or a retry, not a failure.
+   * Makes somebody a member on the organization's joiner seat (ADR-171). A Full member
+   * carries the grant intent an unfinished admission resumes from (ADR-129); a Developer
+   * carries none and is audited instead. A row already there answers with ITS seat.
    */
   abstract createMembership: (input: {
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
-  }) => Promise<"created" | "already-present">;
+    admission: DeveloperAdmission;
+  }) => Promise<OrganizationMembershipWrite>;
 
   abstract deleteMember: (input: DeleteMemberInput) => Promise<void>;
 

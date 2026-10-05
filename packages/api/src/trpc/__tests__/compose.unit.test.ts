@@ -209,7 +209,11 @@ function unusedPorts(): TrpcRuntimeMembers<object> {
   return {
     identity: { caller: unreachable },
     authorization: { forRequest: unreachable },
-    denials: { membershipDisabled: unreachable, liteMemberRestricted: unreachable },
+    denials: {
+      membershipDisabled: unreachable,
+      liteMemberRestricted: unreachable,
+      developerSeatRestricted: unreachable,
+    },
     audit: { record: unreachable, redact: unreachable, exempt: unreachable },
     errors: { report: unreachable, asError: unreachable, translate: unreachable },
   };

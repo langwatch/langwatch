@@ -100,3 +100,37 @@ describe("given an invitation for a Lite Member seat", () => {
     });
   });
 });
+
+describe("given an invitation for a Developer seat", () => {
+  describe("when it names a team", () => {
+    /** @scenario A Developer cannot be given a role on a shared team */
+    it("refuses it naming the seat, and writes no invite", async () => {
+      const { service, createPendingInvite } = serviceWithInviteWriter();
+
+      await expect(
+        service.createAdminInviteRecord({
+          email: "new@example.com",
+          role: "DEVELOPER",
+          organizationId: ORGANIZATION_ID,
+          teamIds: "team-1",
+          teamAssignments: [{ teamId: "team-1", role: "VIEWER" }],
+        }),
+      ).rejects.toMatchObject({ code: "developer_seat_no_shared_access" });
+
+      expect(createPendingInvite).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a stored one that names teams is accepted", () => {
+    /** @scenario An administrator invites a Developer while the plan is at its seat cap */
+    it("grants no team at all, whatever the row promised", () => {
+      expect(
+        resolveInviteTeamMemberships({
+          role: "DEVELOPER",
+          teamIds: "team-1",
+          teamAssignments: [{ teamId: "team-2", role: "ADMIN" }],
+        }),
+      ).toEqual([]);
+    });
+  });
+});

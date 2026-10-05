@@ -132,6 +132,16 @@ export abstract class OrganizationInviteRepository {
     organizationId: string;
     role: OrganizationUserRole;
   }): Promise<void>;
+  /**
+   * The audit row a Developer admission writes (ADR-171): no grant reaches the
+   * audit page for one, so the accepted invitation records the admission.
+   */
+  abstract recordDeveloperAdmission(input: {
+    userId: string;
+    organizationId: string;
+    inviteId: string;
+    actorUserId: string | null;
+  }): Promise<void>;
   /** Throws `InviteNotFoundError`. */
   abstract getInviteStatus(input: { inviteId: string }): Promise<{ status: string }>;
   abstract hasMembership(input: { userId: string; organizationId: string }): Promise<boolean>;

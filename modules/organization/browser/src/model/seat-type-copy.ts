@@ -13,5 +13,14 @@ export const SEAT_TYPE_COPY = {
     "Add a team, or this person will not see anything. A lite member reaches " +
     "only the projects their teams give them, so one with no team can sign in " +
     "and do no more. You can add a team later from the members list.",
+  /** A Developer seat is counted but has no plan limit, so it has no limit type to name it. */
+  developerSeatsLabel: "Developers",
+  developerShortDescription: "Works in a project of their own, sees nothing shared",
+  developerExplanation:
+    "A developer gets a personal project and everything a member can do inside " +
+    "it: send traces from the CLI, run queries and evaluations, manage its keys. " +
+    "They cannot open or be added to any shared project or team, and they are " +
+    "never counted against your member seats. Move them to a Member seat if " +
+    "they need shared projects.",
   seatTypesDocPath: "/ai-governance/roles-and-permissions#seats",
 };

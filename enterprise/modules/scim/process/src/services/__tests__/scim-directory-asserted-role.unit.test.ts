@@ -196,6 +196,47 @@ describe("the membership role a SCIM push writes", () => {
     });
   });
 
+  describe("given the previous write path and a person on a Developer seat", () => {
+    /** @scenario Directory sync leaves a Developer alone */
+    it("asserts no organization grant for them, and leaves the row as it is", async () => {
+      const repository = scimRepositoryFixture({
+        findMembership: vi.fn(async () => ({
+          userId: "user-1",
+          organizationId: "org-1",
+          role: "DEVELOPER",
+          user: person,
+        })),
+        // The row is already there, so the insert collides and is let be.
+        addMembership: vi.fn(async () => {
+          throw Object.assign(new Error("duplicate"), { code: "P2002" });
+        }),
+      });
+      const writer = new GrantsFake();
+      writer.listUserBindings.mockResolvedValue([
+        listedGrant({
+          id: "org-grant",
+          organizationId: "org-1",
+          userId: "user-1",
+          groupId: null,
+          apiKeyId: null,
+          scopeType: "ORGANIZATION",
+          scopeId: "org-1",
+          role: "MEMBER",
+          customRoleId: null,
+        }),
+      ]);
+
+      await push(serviceOver({ repository, writer, provenOffboarding: false }));
+
+      // The organization-wide grant a Full member holds is converged away, not
+      // restated: the desired set for a Developer is empty.
+      expect(writer.attachBindings).not.toHaveBeenCalled();
+      expect(writer.revokeBindings).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-1", bindingIds: ["org-grant"] }),
+      );
+    });
+  });
+
   describe("given the mapping cannot be read", () => {
     it("writes no membership and fails the push when the grant listing fails", async () => {
       const { repository } = scimGroupsOf(["scim-group"]);

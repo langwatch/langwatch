@@ -10,6 +10,12 @@ export interface JoinedOrganization {
   name: string;
 }
 
+/** What a membership write answered: whether the row is new, and its seat (ADR-171). */
+export interface SsoMembershipWrite {
+  outcome: "created" | "already-present";
+  seat: "MEMBER" | "DEVELOPER";
+}
+
 /**
  * The membership half of an arrival, answered by the app from the
  * organization peer's `*Api` token (ADR-129). Identity never writes an
@@ -17,12 +23,12 @@ export interface JoinedOrganization {
  */
 export interface SsoArrivalMemberships {
   isMember(args: { organizationId: string; userId: string }): Promise<boolean>;
-  /** Makes them a MEMBER, carrying the grant intent an unfinished admission
-   *  is resumed from. `"already-present"` is a retry, not a failure. */
-  createMembership(args: {
-    organizationId: string;
-    userId: string;
-  }): Promise<"created" | "already-present">;
+  /**
+   * Makes them a member on the organization's joiner seat (ADR-171): a Full
+   * member carrying the grant intent an unfinished admission is resumed from,
+   * or a Developer with no grant at all. `"already-present"` is a retry.
+   */
+  createMembership(args: { organizationId: string; userId: string }): Promise<SsoMembershipWrite>;
   /**
    * Applies the PENDING invitation this address already holds, as ONE
    * decision: an invitation that exists wins, and its role and team
@@ -57,12 +63,16 @@ export interface SsoArrivalSignupAnnouncement {
 }
 
 export interface SsoArrivalNotifications {
-  /** The durable notice an automatic admission owes the administrators. */
+  /**
+   * The durable notice an automatic admission owes the administrators.
+   * `admissionId` names the grant a Full member's admission attached; a
+   * Developer holds none (ADR-171), so the row alone is the admission.
+   */
   joinedAutomatically(args: {
     organizationId: string;
     requesterUserId: string;
     domain: string;
-    admissionId: string;
+    admissionId?: string;
   }): Promise<void>;
   /** Starts the nurturing sequence an automatically added member gets. */
   startNurturing(args: {

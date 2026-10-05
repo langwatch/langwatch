@@ -300,6 +300,78 @@ describe("authz engine decide()", () => {
     });
   });
 
+  describe("given a Developer seat (DEVELOPER org role)", () => {
+    /** @scenario A Developer works inside their own project */
+    it("grants through a direct binding on their own team", () => {
+      const grants = makeGrants({
+        organizationRole: "DEVELOPER",
+        bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM })],
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "traces:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
+      expect(
+        engine.decide({
+          grants,
+          permission: "datasets:manage",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
+    });
+
+    /** @scenario A Developer never sees a shared project */
+    it("gets nothing from an ORGANIZATION-scoped binding, even admin", () => {
+      const grants = makeGrants({
+        organizationRole: "DEVELOPER",
+        bindings: [binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG })],
+      });
+      const denied = engine.decide({
+        grants,
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(denied.allowed).toBe(false);
+      expect(denied.denialReason).toBe("developer-restricted");
+    });
+
+    /** @scenario A Developer never sees a shared project */
+    it("gets nothing from a group-delivered binding on a shared team", () => {
+      const grants = makeGrants({
+        organizationRole: "DEVELOPER",
+        bindings: [
+          binding({
+            roleKey: "member",
+            scopeType: "TEAM",
+            scopeId: TEAM,
+            viaGroupId: "group-9",
+          }),
+        ],
+      });
+      const denied = engine.decide({
+        grants,
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(denied.allowed).toBe(false);
+      expect(denied.denialReason).toBe("developer-restricted");
+    });
+
+    it("still receives the organization floor at organization scope", () => {
+      const grants = makeGrants({ organizationRole: "DEVELOPER" });
+      expect(
+        engine.decide({
+          grants,
+          permission: "organization:view",
+          scope: orgScope,
+        }).allowed,
+      ).toBe(true);
+    });
+  });
+
   describe("given an empty custom role", () => {
     it("denies instead of inheriting the viewer bag", () => {
       const grants = makeGrants({
@@ -627,6 +699,53 @@ describe("authz engine decideWithCeiling()", () => {
       });
       expect(decision.allowed).toBe(false);
       expect(decision.denialReason).toBe("owner-ceiling");
+    });
+  });
+
+  describe("given an owner moved onto a Developer seat", () => {
+    const PERSONAL_TEAM = "team-personal";
+    const PERSONAL_PROJECT = "proj-personal";
+    const personalProjectScope: AuthzScopeRef = {
+      type: "project",
+      id: PERSONAL_PROJECT,
+      teamId: PERSONAL_TEAM,
+      organizationId: ORG,
+    };
+    // What the downgrade leaves: the personal team row, and an organization row
+    // the seat never honours even if one survived.
+    const ownerGrants = makeGrants({
+      organizationRole: "DEVELOPER",
+      bindings: [
+        binding({ roleKey: "admin", scopeType: "TEAM", scopeId: PERSONAL_TEAM }),
+        binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG }),
+      ],
+    });
+
+    /** @scenario A key on a shared project stops working after downgrade */
+    it("refuses the owner's key on a shared project and honours it on the personal one", () => {
+      expect(
+        engine.decideWithCeiling({
+          keyGrants,
+          ownerGrants,
+          permission: "traces:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(false);
+
+      const personalKeyGrants = makeGrants({
+        principal: { type: "apiKey", id: "key-2" },
+        organizationRole: null,
+        isOrgMember: false,
+        bindings: [binding({ roleKey: "member", scopeType: "PROJECT", scopeId: PERSONAL_PROJECT })],
+      });
+      expect(
+        engine.decideWithCeiling({
+          keyGrants: personalKeyGrants,
+          ownerGrants,
+          permission: "traces:view",
+          scope: personalProjectScope,
+        }).allowed,
+      ).toBe(true);
     });
   });
 

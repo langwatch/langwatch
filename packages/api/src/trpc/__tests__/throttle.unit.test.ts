@@ -80,6 +80,7 @@ function harness({ policies }: { policies: Readonly<Record<string, TrpcThrottleP
     denials: {
       membershipDisabled: () => new Error("membership disabled"),
       liteMemberRestricted: () => new Error("lite member"),
+      developerSeatRestricted: () => new Error("developer seat"),
     },
     throttle,
     audit: {

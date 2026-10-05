@@ -3,7 +3,12 @@
  * often somebody may ask and look, how long a rejection holds them off, and the narrow
  * collaborator shapes the service is given rather than reaching for.
  */
-import { type DomainJoinSetting, type JoinSettingChange } from "@langwatch/identity-contract";
+import {
+  type DomainJoinSetting,
+  type JoinerRole,
+  type JoiningSetting,
+  type JoinSettingChange,
+} from "@langwatch/identity-contract";
 
 import type {
   JoinCandidateRepository,
@@ -86,15 +91,18 @@ export interface JoinOfferDismissals {
   dismiss(args: { userId: string; domain: string }): Promise<void>;
 }
 
-/** Whether this organization may change its joining setting, and to what. */
+/**
+ * Whether this organization may change its joining setting, and to what.
+ * `joinerRole` (ADR-171) is the seat a person admitted without an invitation
+ * receives; an invitation always names its own role and never reads it.
+ */
 export interface JoinSetting {
-  read(args: {
-    organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }>;
+  read(args: { organizationId: string }): Promise<JoiningSetting>;
   write: (args: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     joinDomains: string[];
+    joinerRole: JoinerRole;
   }) => Promise<void>;
 }
 

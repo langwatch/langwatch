@@ -8,7 +8,17 @@ import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } 
 import { builtinRoleGrants } from "./roles.ts";
 import { audienceMatches, bindingScopeCanGrantPermission } from "./scope.ts";
 
-export function bindingGrants({
+export function bindingGrants(args: {
+  binding: Pick<CollectedBinding, "roleKey" | "scopeType" | "viaGroupId">;
+  grants: CollectedGrants;
+  permission: string;
+}): boolean {
+  if (developerSeatRefuses(args)) return false;
+  return roleGrants(args);
+}
+
+/** Whether the binding's role carries the permission at the binding's scope. */
+function roleGrants({
   binding,
   grants,
   permission,
@@ -60,6 +70,22 @@ export function bindingGrants({
   }
 
   return builtinRoleGrants({ role: roleKey, permission });
+}
+
+/**
+ * ADR-171: a Developer holds its personal team and nothing shared. An ORGANIZATION binding
+ * and a group-delivered one are routes no row rule sees, so neither grants a Developer
+ * anything; a direct TEAM or PROJECT row grants normally.
+ */
+function developerSeatRefuses({
+  binding,
+  grants,
+}: {
+  binding: Pick<CollectedBinding, "scopeType" | "viaGroupId">;
+  grants: CollectedGrants;
+}): boolean {
+  if (grants.organizationRole !== "DEVELOPER") return false;
+  return binding.scopeType === "ORGANIZATION" || Boolean(binding.viaGroupId);
 }
 
 /**

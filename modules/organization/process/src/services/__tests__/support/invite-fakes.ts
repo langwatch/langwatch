@@ -261,6 +261,22 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
     this.memberships.add(`${userId}:${organizationId}`);
   }
 
+  readonly developerAdmissions: {
+    userId: string;
+    organizationId: string;
+    inviteId: string;
+    actorUserId: string | null;
+  }[] = [];
+
+  async recordDeveloperAdmission(input: {
+    userId: string;
+    organizationId: string;
+    inviteId: string;
+    actorUserId: string | null;
+  }): Promise<void> {
+    this.developerAdmissions.push(input);
+  }
+
   async getInviteStatus({ inviteId }: { inviteId: string }): Promise<{ status: string }> {
     const invite = this.invitesById.get(inviteId);
     if (!invite) throw new InviteNotFoundError();

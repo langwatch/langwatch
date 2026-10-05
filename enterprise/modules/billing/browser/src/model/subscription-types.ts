@@ -3,7 +3,7 @@
  */
 
 import { Currency as CurrencyValues } from "@langwatch/enterprise-billing-contract";
-import type { MemberType } from "@langwatch/enterprise-licensing-contract";
+import type { MemberType } from "@langwatch/entitlement-contract";
 import { z } from "zod";
 
 import type { Currency } from "./billing-plans.ts";

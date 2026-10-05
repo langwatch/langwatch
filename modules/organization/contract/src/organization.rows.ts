@@ -22,8 +22,43 @@ export const OrganizationUserRole = {
   ADMIN: "ADMIN",
   MEMBER: "MEMBER",
   EXTERNAL: "EXTERNAL",
+  /** A Developer seat (ADR-171): a personal project and nothing shared. */
+  DEVELOPER: "DEVELOPER",
 } as const;
 export type OrganizationUserRole = (typeof OrganizationUserRole)[keyof typeof OrganizationUserRole];
+
+/**
+ * The audit action a Developer admission writes (ADR-171). A Full member's
+ * admission reaches the audit page through the organisation-wide grant the
+ * ledger attaches; a Developer gets no grant, so the row itself is audited.
+ */
+export const DEVELOPER_ADMISSION_AUDIT_ACTION = "organization.member.admitted";
+
+/** The routes a Developer admission arrives by, recorded as `via` on its audit row. */
+export const DEVELOPER_ADMISSION_VIA = [
+  "domain-join",
+  "join-request-approved",
+  "sso",
+  "invite",
+] as const;
+export type DeveloperAdmissionVia = (typeof DEVELOPER_ADMISSION_VIA)[number];
+
+/** How a membership created without an invitation arrived, for a Developer's audit row. */
+export type DeveloperAdmission = Readonly<{
+  via: DeveloperAdmissionVia;
+  joinRequestId?: string;
+  /** The administrator who approved it; absent when a policy or a sign-in did. */
+  actorUserId?: string | null;
+}>;
+
+/** The seat a membership created without an invitation lands on (ADR-171). */
+export type OrganizationJoinerSeat = "MEMBER" | "DEVELOPER";
+
+/** What creating a membership answered: whether the row is new, and its seat. */
+export type OrganizationMembershipWrite = Readonly<{
+  outcome: "created" | "already-present";
+  seat: OrganizationJoinerSeat;
+}>;
 
 export const TeamUserRole = {
   ADMIN: "ADMIN",

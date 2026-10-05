@@ -128,8 +128,40 @@ export class SsoArrivalService {
       return;
     }
 
-    await this.deps.memberships.createMembership({ organizationId: org.id, userId: user.id });
+    const written = await this.deps.memberships.createMembership({
+      organizationId: org.id,
+      userId: user.id,
+    });
+    if (written.seat === "DEVELOPER") {
+      await this.announceDeveloperAdmission({ user, org, domain, outcome: written.outcome });
+      return;
+    }
     await this.resumeAdmission({ user, organizationId: org.id, domain });
+  }
+
+  /**
+   * A Developer gets no grant (ADR-171), so there is no pending admission to
+   * resume and nothing for a retry to re-assert: the row is the admission.
+   * Only the arrival that created it announces it.
+   */
+  private async announceDeveloperAdmission({
+    user,
+    org,
+    domain,
+    outcome,
+  }: {
+    user: SsoArrivingUser;
+    org: JoinedOrganization;
+    domain: string;
+    outcome: "created" | "already-present";
+  }): Promise<void> {
+    if (outcome !== "created") return;
+    await this.deps.notifications?.joinedAutomatically({
+      organizationId: org.id,
+      requesterUserId: user.id,
+      domain,
+    });
+    this.announceAutoJoin({ user, org, inviteId: null });
   }
 
   /**
@@ -302,7 +334,7 @@ export class SsoArrivalService {
       { userId: user.id, organizationId: org.id, inviteId },
       inviteId
         ? "Applied pending invite on SSO signup"
-        : "Auto-added new user to SSO organization (default MEMBER)",
+        : "Auto-added new user to SSO organization on its joiner seat",
     );
 
     void this.deps.signups

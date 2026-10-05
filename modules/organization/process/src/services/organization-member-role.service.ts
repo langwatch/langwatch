@@ -5,7 +5,7 @@
 import { GrantScopeTier, type AuthzGrantCaller } from "@langwatch/authz-contract";
 import {
   TeamRoleUpdateRejectedError,
-  OrganizationUserRole,
+  type OrganizationUserRole,
   type TeamUserRole,
   CannotDisableSelfError,
   MemberSeatLimitReachedError,
@@ -24,7 +24,10 @@ import type {
   UpdateMemberRoleResult,
 } from "../repositories/organization-membership.repository.ts";
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
+import {
+  holdsOrganizationBinding,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "../rules/member-role-constraints.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import {
   EffectiveTeamRoleUpdatesService,
@@ -395,7 +398,10 @@ export class OrganizationMemberRoleService {
    */
 }
 
-/** The grants a member-role change writes: the organization role (none if EXTERNAL), then teams. */
+/**
+ * The grants a member-role change writes: the organization role (none for a Lite Member or a
+ * Developer, ADR-171), then teams.
+ */
 function intendedRoleChangeGrants({
   organizationId,
   role,
@@ -406,7 +412,7 @@ function intendedRoleChangeGrants({
   effectiveTeamRoleUpdates: EffectiveTeamRoleUpdate[];
 }): OrganizationIntendedGrant[] {
   return [
-    ...(role === OrganizationUserRole.EXTERNAL
+    ...(!holdsOrganizationBinding(role)
       ? []
       : [
           {

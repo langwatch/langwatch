@@ -108,7 +108,7 @@ vi.mock("../../../../behavior/use-join-requests.ts", () => ({
   useJoinRequests: () => ({
     requests: state.requests,
     answeringId: null,
-    joining: { domainJoin: "request", joinDomains: [] },
+    joining: { domainJoin: "request", joinDomains: [], joinerRole: "MEMBER" },
     savingJoining: false,
     setJoining: vi.fn(),
     approve: vi.fn(),

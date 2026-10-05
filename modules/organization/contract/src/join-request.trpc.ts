@@ -11,6 +11,7 @@ import {
   joinRequestAdmittedSchema,
   joinRequestAutomaticJoinsSchema,
   joinRequestFiledSchema,
+  joinRequestJoinerRoleSchema,
   joinRequestJoiningChangedSchema,
   joinRequestJoiningSchema,
   joinRequestMineSchema,
@@ -36,6 +37,9 @@ export const joinRequestApiSetJoiningInputSchema = z.object({
   organizationId: z.string().min(1),
   domainJoin: joinRequestApiDomainJoinSchema,
   domains: z.array(z.string().min(1)).default([]),
+  // The seat newcomers receive (ADR-171). Optional so an older client that
+  // only moves the door keeps the seat it saved.
+  joinerRole: joinRequestJoinerRoleSchema.optional(),
 });
 export type JoinRequestApiSetJoiningInput = z.infer<typeof joinRequestApiSetJoiningInputSchema>;
 

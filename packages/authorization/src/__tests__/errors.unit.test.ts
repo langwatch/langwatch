@@ -1,7 +1,43 @@
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
-import { BlankScopeIdError, LiteMemberRestrictedError } from "../errors.ts";
+import {
+  BlankScopeIdError,
+  DeveloperSeatRestrictedError,
+  LiteMemberRestrictedError,
+  PermissionDeniedError,
+} from "../errors.ts";
+
+describe("DeveloperSeatRestrictedError", () => {
+  /** @scenario A Developer never sees a shared project */
+  it("carries its own code, names the seat, and keeps the resource in meta", () => {
+    const error = new DeveloperSeatRestrictedError("traces");
+    expect(error.code).toBe("developer_seat_restricted");
+    expect(error.message).toBe("This is outside your Developer seat");
+    expect(error.httpStatus).toBe(401);
+    expect(error.meta).toEqual({ resource: "traces" });
+    expect(error.serialize()).toMatchObject({
+      code: "developer_seat_restricted",
+      meta: { resource: "traces" },
+      httpStatus: 401,
+    });
+  });
+});
+
+describe("PermissionDeniedError", () => {
+  describe("when the engine refused a Developer seat", () => {
+    it("names the seat rather than a permission to ask for", () => {
+      const error = new PermissionDeniedError({
+        permission: "traces:view",
+        scope: { type: "project", id: "project-1" },
+        denialReason: "developer-restricted",
+      });
+      expect(error.code).toBe("permission_denied");
+      expect(error.denialReason).toBe("developer-restricted");
+      expect(error.message).toBe("This is outside your Developer seat");
+    });
+  });
+});
 
 describe("LiteMemberRestrictedError", () => {
   describe("when constructed with a resource", () => {

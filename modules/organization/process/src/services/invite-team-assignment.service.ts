@@ -6,6 +6,7 @@ import { CustomRoleIdRequiredError } from "@langwatch/authz-contract";
 import type { OrganizationUserRole } from "@langwatch/organization-contract";
 import {
   CustomRoleNotAssignableError,
+  DeveloperSeatNoSharedAccessError,
   TeamNotInOrganizationError,
   TeamUserRole,
 } from "@langwatch/organization-contract";
@@ -19,7 +20,10 @@ import {
   type InviteTeamsResolution,
   type TeamAssignmentInput,
 } from "../rules/invite-contracts.rules.ts";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
+import {
+  holdsSharedAccess,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "../rules/member-role-constraints.rules.ts";
 
 export class InviteTeamAssignmentService {
   static create(deps: InviteServiceDependencies): InviteTeamAssignmentService {
@@ -60,6 +64,9 @@ export class InviteTeamAssignmentService {
     invite: CreateInvitesInviteInput;
     isStrict: boolean;
   }): Promise<InviteTeamsResolution> {
+    const seatOnly = this.resolveInviteTeamsForSeat(invite);
+    if (seatOnly) return seatOnly;
+
     if (invite.teams && invite.teams.length > 0) {
       return this.resolveExplicitInviteTeams({
         organizationId,
@@ -78,6 +85,21 @@ export class InviteTeamAssignmentService {
     }
 
     return { kind: "dropped" };
+  }
+
+  /**
+   * A Developer seat (ADR-171) is invited onto no team. One that names a team, in either
+   * request form, is refused with the seat's own code before the teams are read; one that
+   * names none resolves to an empty team list. Any other seat answers nothing here.
+   */
+  private resolveInviteTeamsForSeat(
+    invite: CreateInvitesInviteInput,
+  ): InviteTeamsResolution | null {
+    if (holdsSharedAccess(invite.role)) return null;
+    if ((invite.teams?.length ?? 0) > 0 || invite.teamIds?.trim()) {
+      throw new DeveloperSeatNoSharedAccessError();
+    }
+    return { kind: "teams", teamAssignments: [], teamIdsString: "" };
   }
 
   /**

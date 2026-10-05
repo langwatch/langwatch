@@ -1673,6 +1673,23 @@ const presentations = {
       return `A Lite Member seat allows the Viewer role only${scope}. Leave the role as Viewer, or move them to a full member seat to give them more.`;
     },
   },
+  developer_seat_no_shared_access: {
+    // Not a field to correct: the seat sets the ceiling. The scope can be a
+    // team, a project or the organization, so the copy names the seat.
+    title: "A Developer seat has no shared access",
+    describe: (error) => {
+      const scopeName = str(error, "scopeName", "");
+      const scope = scopeName ? ` on "${scopeName}"` : "";
+      return `A Developer seat works in its own project only, so no role can be given${scope}. Move them to a Member seat to give them shared access.`;
+    },
+  },
+  developer_seat_restricted: {
+    // A Developer seat reaches its own project only (ADR-171). No admin can
+    // grant a role here, so the copy names the seat rather than a permission.
+    title: "This is outside your Developer seat",
+    describe: () =>
+      "A Developer seat works in your own project only. Ask an admin for a Member seat if you need shared projects.",
+  },
   live_stream_cross_site_blocked: {
     // fault: customer. A live update channel is opened by the app itself; a
     // request that arrives from another site is either a stale bookmark or an

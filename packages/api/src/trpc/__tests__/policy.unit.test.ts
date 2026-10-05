@@ -71,6 +71,7 @@ function makePorts(
     denials: {
       membershipDisabled: () => new Error("membership disabled"),
       liteMemberRestricted: (resource: string) => new Error(`lite member: ${resource}`),
+      developerSeatRestricted: (resource: string) => new Error(`developer seat: ${resource}`),
     },
     decisions,
   };
@@ -250,6 +251,27 @@ describe("createDeclaredAuthzMiddlewares", () => {
         );
 
         expect((error.cause as Error).message).toContain("lite member");
+      });
+
+      /** @scenario A Developer never sees a shared project */
+      it("carries the Developer seat restriction for a DEVELOPER caller", async () => {
+        const ports = makePorts({
+          getDecision: vi
+            .fn()
+            .mockResolvedValue({ permitted: false, organizationRole: "DEVELOPER" }),
+        });
+
+        const checks = createDeclaredAuthzMiddlewares(ports);
+
+        const error = await rejection(() =>
+          checks.permission({ permission: "traces:view" })({
+            ctx: ctxFor(),
+            input: { teamId: "team-1" },
+            next: vi.fn(),
+          }),
+        );
+
+        expect((error.cause as Error).message).toBe("developer seat: traces");
       });
 
       /** @scenario "A denied request is never marked as checked" */
