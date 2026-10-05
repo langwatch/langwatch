@@ -5,14 +5,14 @@
  */
 
 import { computeBudgetPeriodFloorMs, effectiveBudgetPeriod } from "@langwatch/gateway-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal } from "@langwatch/time";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
+import { MemoryGatewayStore } from "../repositories/memory/memory.gateway.store.ts";
+import { memoryProjectWithTeam } from "./support/gateway-memory-seeds.fixture.ts";
+import { memoryGatewayService } from "./support/memory.gateway-service.ts";
 
 describe("computeBudgetPeriodFloorMs on an anchored budget", () => {
   const anchor = Temporal.Instant.from("2026-06-17T09:00:00.000Z");
@@ -184,89 +184,65 @@ describe("effectiveBudgetPeriod", () => {
 });
 
 describe("GatewayService.create with a cycle anchor", () => {
-  const REACHED_TRANSACTION = "REACHED_TRANSACTION";
-
-  function mockPrisma(): PrismaClient {
-    return prismaDouble({
-      organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
-      team: { findFirst: vi.fn().mockResolvedValue(null) },
-      project: {
-        findFirst: vi.fn().mockResolvedValue({ id: "project_1" }),
-        findMany: vi.fn().mockResolvedValue([]),
-      },
-      modelProvider: { findFirst: vi.fn().mockResolvedValue(null) },
-      // No active keys, the one shape the reach guard always allows, so
-      // these tests keep answering the anchor question rather than being
-      // answered by a later guard.
-      virtualKey: { findMany: vi.fn().mockResolvedValue([]) },
-      groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
-      // Reaching here means the anchor was accepted.
-      $transaction: vi.fn().mockRejectedValue(new Error(REACHED_TRANSACTION)),
+  function serviceOver() {
+    const store = MemoryGatewayStore.create();
+    const { service } = memoryGatewayService({
+      store,
+      projects: createApiFixture<ProjectApi>({
+        findWithTeam: async (id) =>
+          memoryProjectWithTeam({ projectId: id, teamId: "team_1", organizationId: "org_1" }),
+        // No active keys, the one shape the reach guard always allows, so these
+        // tests keep answering the anchor question rather than a later guard's.
+        listTraceDestinations: async () => [],
+      }),
     });
+    return { service, store };
   }
 
-  /**
-   * Composed the way `PrismaGatewayAdapter` composes it — see
-   * dev/docs/best_practices/service-repository-adapter-port.md.
-   */
-  function serviceOver(prisma: PrismaClient) {
-    return PrismaGatewayAdapter.create({
-      database: prisma,
-      organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
-      projects: {
-        findWithTeam: vi.fn().mockResolvedValue({
-          id: "project_1",
-          teamId: "team_1",
-          team: { organizationId: "org_1" },
-        }),
-        listTraceDestinations: vi.fn().mockResolvedValue([]),
-      } as never,
-      evaluators: {} as never,
-      monitors: {} as never,
-      changes: {} as never,
-      audit: {} as never,
-    }).build();
-  }
-
+  const cycleAnchorAt = Temporal.Instant.from("2026-06-17T09:00:00.000Z");
   const baseInput = {
     organizationId: "org_1",
     scope: { kind: "PROJECT" as const, projectId: "project_1" },
     name: "ACME monthly allowance",
     limitUsd: 100,
     actorUserId: "user_1",
-    cycleAnchorAt: Temporal.Instant.from("2026-06-17T09:00:00.000Z"),
+    cycleAnchorAt,
   };
 
   /** @scenario "A cycle anchor needs a cyclic window" */
   it("refuses an anchor on the two windows that do not cycle", async () => {
     for (const window of ["TOTAL", "MANUAL"] as const) {
-      const sut = serviceOver(mockPrisma());
+      const { service, store } = serviceOver();
       // The whole refusal contract, not just the code: the message is what
       // the REST body carries, the fault is what decides whether this is an
       // incident or routine, and meta.window is the caller's own value.
-      await expect(sut.create({ ...baseInput, window })).rejects.toMatchObject({
+      await expect(service.create({ ...baseInput, window })).rejects.toMatchObject({
         code: "gateway_budget_cycle_anchor_invalid",
         message: "That window does not cycle, so it cannot take a cycle anchor",
         fault: "customer",
         httpStatus: 400,
         meta: { window: window.toLowerCase() },
       });
+      expect(store.budgets.size).toBe(0);
     }
   });
 
   it("accepts an anchor on a cyclic window", async () => {
-    const sut = serviceOver(mockPrisma());
-    await expect(sut.create({ ...baseInput, window: "MONTH" })).rejects.toThrow(
-      REACHED_TRANSACTION,
-    );
+    const { service, store } = serviceOver();
+    const created = await service.create({ ...baseInput, window: "MONTH" });
+
+    expect(created.window).toBe("MONTH");
+    expect(created.cycleAnchorAt?.equals(cycleAnchorAt)).toBe(true);
+    expect(store.budgets.has(created.id)).toBe(true);
   });
 
   it("leaves the two non-cycling windows alone when no anchor is sent", async () => {
     for (const window of ["TOTAL", "MANUAL"] as const) {
-      const sut = serviceOver(mockPrisma());
-      await expect(sut.create({ ...baseInput, window, cycleAnchorAt: null })).rejects.toThrow(
-        REACHED_TRANSACTION,
-      );
+      const { service } = serviceOver();
+      const created = await service.create({ ...baseInput, window, cycleAnchorAt: null });
+
+      expect(created.window).toBe(window);
+      expect(created.cycleAnchorAt).toBeNull();
     }
   });
 });

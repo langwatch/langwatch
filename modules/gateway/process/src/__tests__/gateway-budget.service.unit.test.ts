@@ -1,98 +1,59 @@
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import type { GatewayBudget } from "@langwatch/gateway-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { Temporal, nowInstant, toDate } from "@langwatch/time";
-import { describe, expect, it, vi } from "vitest";
+import { nowInstant, Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
 
-import type {
-  GatewayBudgetSpendRepository,
-  LedgerEventRow,
-} from "../repositories/gateway-budget-spend.repository.ts";
-import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
+import {
+  MemoryGatewayStore,
+  memoryGatewayDecimal,
+  type MemoryGatewaySeed,
+} from "../repositories/memory/memory.gateway.store.ts";
+import {
+  memoryBudgetSeed,
+  memoryDebitSeed,
+  memoryVirtualKeySeed,
+} from "./support/gateway-memory-seeds.fixture.ts";
+import { memoryGatewayService } from "./support/memory.gateway-service.ts";
 
-function mockChRepoWithEvents(
-  events: (Partial<LedgerEventRow> & Pick<LedgerEventRow, "id">)[],
-): GatewayBudgetSpendRepository {
-  const fullEvents: LedgerEventRow[] = events.map((e) => ({
-    id: e.id,
-    budgetId: e.budgetId ?? "b_01",
-    virtualKeyId: e.virtualKeyId ?? "vk_test",
-    amountUsd: e.amountUsd ?? "0",
-    model: e.model ?? "gpt-5-mini",
-    providerSlot: e.providerSlot ?? null,
-    tokensInput: e.tokensInput ?? 0,
-    tokensOutput: e.tokensOutput ?? 0,
-    durationMs: e.durationMs ?? null,
-    status: e.status ?? "SUCCESS",
-    occurredAt: e.occurredAt ?? nowInstant(),
-  }));
-  return createApiFixture<GatewayBudgetSpendRepository>({
-    recentEventsForBudget: async () => fullEvents,
-    findSpendForBudgetsAcrossTenants: async () => [],
-  });
-}
+/** A budget and the spend its own bucket has seen this period, in USD. */
+type SeededBudget = { budget: GatewayBudget; spentUsd?: string };
 
-function stubBudget(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
-  return {
-    id: "b_01",
-    organizationId: "org_01",
-    scopeType: "PROJECT",
-    scopeId: "project_01",
-    name: "monthly",
-    description: null,
-    window: "MONTH",
-    onBreach: "BLOCK",
-    limitUsd: new Prisma.Decimal("100.00"),
-    spentUsd: new Prisma.Decimal("0.00"),
-    timezone: null,
-    resetsAt: toDate(Temporal.Instant.from("2099-01-01T00:00:00Z")),
-    currentPeriodStartedAt: toDate(nowInstant()),
-    lastResetAt: null,
-    archivedAt: null,
-    createdAt: toDate(nowInstant()),
-    updatedAt: toDate(nowInstant()),
-    createdById: "user_01",
-    ...overrides,
-  } as GatewayBudget;
-}
-
-function mockPrismaWithBudgets(budgets: GatewayBudget[]): PrismaClient {
-  return prismaDouble({
-    gatewayBudget: {
-      findMany: async () => budgets,
-    },
-    project: {
-      findMany: async () => [{ id: "project_01" }],
-    },
-    // The resolver reads the key's own team scopes so a team-scoped key
-    // reaches its team's budget. These checks pass the team directly, so
-    // the key contributes nothing extra.
-    virtualKeyScope: {
-      findMany: async () => [],
-    },
-  });
-}
-
-/**
- * Composed the way `PrismaGatewayAdapter` composes it — see
- * dev/docs/best_practices/service-repository-adapter-port.md.
- */
-function serviceOver(prisma: PrismaClient, spend?: GatewayBudgetSpendRepository) {
-  return PrismaGatewayAdapter.create({
-    database: prisma,
-    organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
-    projects: {
+/** The service over the memory registry with these budgets, their spend and rows others own. */
+async function serviceOver({
+  budgets = [],
+  seed = {},
+}: {
+  budgets?: SeededBudget[];
+  seed?: MemoryGatewaySeed;
+} = {}) {
+  const store = MemoryGatewayStore.create(seed);
+  for (const { budget } of budgets) store.budgets.set(budget.id, budget);
+  const { service, repositories } = memoryGatewayService({
+    store,
+    projects: createApiFixture<ProjectApi>({
       listIdsByOrganization: async () => ["project_01"],
-      listNamesByIds: async () => [{ id: "project_01", name: "Proj", slug: "proj" }],
+      listNamesByIds: async () => [
+        {
+          id: "project_01",
+          name: "Proj",
+          slug: "proj",
+          teamId: "team_01",
+          organizationId: "org_01",
+          isPersonal: false,
+          ownerUserId: null,
+        },
+      ],
       listTraceDestinations: async () => [],
-    } as never,
-    evaluators: {} as never,
-    monitors: {} as never,
-    changes: {} as never,
-    audit: {} as never,
-    ...(spend ? { budgetSpend: spend } : {}),
-  }).build();
+    }),
+  });
+  for (const { budget, spentUsd } of budgets) {
+    if (spentUsd === undefined) continue;
+    await repositories.budgetSpend.insertDebit([
+      memoryDebitSeed({ budget, amountUsd: spentUsd, gatewayRequestId: `req_${budget.id}` }),
+    ]);
+  }
+  return { service, repositories, store };
 }
 
 const baseCheck = {
@@ -108,19 +69,20 @@ describe("GatewayService.check", () => {
     describe("when the Gateway checks a request dispatched to another provider", () => {
       /** @scenario "Provider-filtered budgets only apply to their provider" */
       it("leaves that budget out of the scopes it answers with", async () => {
-        const filtered = stubBudget({ providerKey: "mp_openai" } as Partial<GatewayBudget>);
-        const sut = serviceOver(mockPrismaWithBudgets([filtered]));
+        const { service } = await serviceOver({
+          budgets: [{ budget: memoryBudgetSeed({ providerKey: "mp_openai" }) }],
+        });
 
-        const forItsOwnProvider = await sut.check({
+        const forItsOwnProvider = await service.check({
           ...baseCheck,
           projectedCostUsd: 1,
           providerKey: "mp_openai",
-        } as never);
-        const forAnother = await sut.check({
+        });
+        const forAnother = await service.check({
           ...baseCheck,
           projectedCostUsd: 1,
           providerKey: "mp_anthropic",
-        } as never);
+        });
 
         expect(forItsOwnProvider.scopes).toHaveLength(1);
         expect(forItsOwnProvider.scopes[0]).toMatchObject({ scopeId: "project_01" });
@@ -129,18 +91,20 @@ describe("GatewayService.check", () => {
 
       /** @scenario "Provider-filtered budgets only apply to their provider" */
       it("refuses to attribute a dispatch that named no provider to a filtered budget", async () => {
-        const sut = serviceOver(
-          mockPrismaWithBudgets([
-            stubBudget({ providerKey: "mp_openai" } as Partial<GatewayBudget>),
-            stubBudget({
-              id: "b_02",
-              providerKey: null,
-              limitUsd: new Prisma.Decimal("50.00"),
-            } as Partial<GatewayBudget>),
-          ]),
-        );
+        const { service } = await serviceOver({
+          budgets: [
+            { budget: memoryBudgetSeed({ providerKey: "mp_openai" }) },
+            {
+              budget: memoryBudgetSeed({
+                id: "b_02",
+                providerKey: null,
+                limitUsd: memoryGatewayDecimal("50.00"),
+              }),
+            },
+          ],
+        });
 
-        const result = await sut.check({ ...baseCheck, projectedCostUsd: 1 } as never);
+        const result = await service.check({ ...baseCheck, projectedCostUsd: 1 });
 
         // Only the unfiltered budget answers: attributing an unattributed
         // dispatch to the OpenAI-filtered one would be a guess.
@@ -152,9 +116,9 @@ describe("GatewayService.check", () => {
 
   describe("when no budgets are applicable", () => {
     it("returns allow with empty warnings / blockedBy", async () => {
-      const sut = serviceOver(mockPrismaWithBudgets([]));
+      const { service } = await serviceOver();
 
-      const result = await sut.check({ ...baseCheck, projectedCostUsd: 5 });
+      const result = await service.check({ ...baseCheck, projectedCostUsd: 5 });
 
       expect(result.decision).toBe("allow");
       expect(result.warnings).toEqual([]);
@@ -165,11 +129,11 @@ describe("GatewayService.check", () => {
 
   describe("when projected spend stays well under limit", () => {
     it("returns allow without warnings", async () => {
-      const sut = serviceOver(
-        mockPrismaWithBudgets([stubBudget({ spentUsd: new Prisma.Decimal("10.00") })]),
-      );
+      const { service } = await serviceOver({
+        budgets: [{ budget: memoryBudgetSeed(), spentUsd: "10.00" }],
+      });
 
-      const result = await sut.check({ ...baseCheck, projectedCostUsd: 5 });
+      const result = await service.check({ ...baseCheck, projectedCostUsd: 5 });
 
       expect(result.decision).toBe("allow");
     });
@@ -177,11 +141,11 @@ describe("GatewayService.check", () => {
 
   describe("when projected spend crosses the 80% threshold on a BLOCK budget", () => {
     it("returns soft_warn — warning but not blocked", async () => {
-      const sut = serviceOver(
-        mockPrismaWithBudgets([stubBudget({ spentUsd: new Prisma.Decimal("75.00") })]),
-      );
+      const { service } = await serviceOver({
+        budgets: [{ budget: memoryBudgetSeed(), spentUsd: "75.00" }],
+      });
 
-      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+      const result = await service.check({ ...baseCheck, projectedCostUsd: 10 });
 
       expect(result.decision).toBe("soft_warn");
       expect(result.warnings).toHaveLength(1);
@@ -192,11 +156,11 @@ describe("GatewayService.check", () => {
     /** @scenario Hard-block budget returns 402 when spent >= limit */
     /** @scenario "A projected request reaches a hard budget limit" */
     it("returns hard_block with a descriptive reason", async () => {
-      const sut = serviceOver(
-        mockPrismaWithBudgets([stubBudget({ spentUsd: new Prisma.Decimal("95.00") })]),
-      );
+      const { service } = await serviceOver({
+        budgets: [{ budget: memoryBudgetSeed(), spentUsd: "95.00" }],
+      });
 
-      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+      const result = await service.check({ ...baseCheck, projectedCostUsd: 10 });
 
       expect(result.decision).toBe("hard_block");
       expect(result.blockedBy).toHaveLength(1);
@@ -204,35 +168,28 @@ describe("GatewayService.check", () => {
     });
   });
 
-  // Regression (iter-111): after CH-ledger cutover, spentUsd is a dormant
-  // PG column. check() reads live spend into scopes[], but blockedBy[]
-  // used to still read stale spentUsd, understating reported spend.
-  describe("when CH rollup > 0 and legacy PG spentUsd is stale", () => {
-    it("reports blockedBy[].spentUsd from CH, not from the dormant PG column", async () => {
-      const budget = stubBudget({
-        id: "b_ch_sourced",
-        limitUsd: new Prisma.Decimal("100.00"),
-        spentUsd: new Prisma.Decimal("0.00"), // dormant post-cutover
-      });
-      const chRepoStub = createApiFixture<GatewayBudgetSpendRepository>({
-        findSpendForBudgetsAcrossTenants: async () => [
+  // Regression (iter-111): after the ledger cutover, spentUsd is a dormant
+  // column. check() read live spend into scopes[], but blockedBy[] used to
+  // still read the stale column, understating reported spend.
+  describe("when the ledger holds spend and the dormant spentUsd column reads zero", () => {
+    it("reports blockedBy[].spentUsd from the ledger, not from the dormant column", async () => {
+      const { service } = await serviceOver({
+        budgets: [
           {
-            budgetId: "b_ch_sourced",
-            scope: "PROJECT",
-            scopeId: "project_01",
-            spentNanoUsd: 95_000_000_000,
+            budget: memoryBudgetSeed({
+              id: "b_ledger_sourced",
+              spentUsd: memoryGatewayDecimal("0.00"),
+            }),
             spentUsd: "95",
           },
         ],
       });
 
-      const sut = serviceOver(mockPrismaWithBudgets([budget]), chRepoStub);
-
-      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+      const result = await service.check({ ...baseCheck, projectedCostUsd: 10 });
 
       expect(result.decision).toBe("hard_block");
       expect(result.blockedBy).toHaveLength(1);
-      // CH figure wins, not the zero from the dormant PG column.
+      // The ledger figure wins, not the zero from the dormant column.
       expect(result.blockedBy[0]!.spentUsd).toBe("95.000000");
       // And scopes[] must agree — same source of truth across both lists.
       const scopeLine = result.scopes.find(
@@ -245,16 +202,11 @@ describe("GatewayService.check", () => {
   describe("when a WARN budget crosses its limit", () => {
     /** @scenario Soft budget emits warning header but allows the call */
     it("warns but does not block", async () => {
-      const sut = serviceOver(
-        mockPrismaWithBudgets([
-          stubBudget({
-            onBreach: "WARN",
-            spentUsd: new Prisma.Decimal("95.00"),
-          }),
-        ]),
-      );
+      const { service } = await serviceOver({
+        budgets: [{ budget: memoryBudgetSeed({ onBreach: "WARN" }), spentUsd: "95.00" }],
+      });
 
-      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+      const result = await service.check({ ...baseCheck, projectedCostUsd: 10 });
 
       expect(result.decision).toBe("soft_warn");
       expect(result.blockedBy).toEqual([]);
@@ -265,24 +217,22 @@ describe("GatewayService.check", () => {
     /** @scenario Sum-of-breaches rule — any block-breach blocks */
     /** @scenario Most restrictive budget wins when multiple apply */
     it("still hard_blocks (sum-of-breaches semantics)", async () => {
-      const sut = serviceOver(
-        mockPrismaWithBudgets([
-          stubBudget({
-            id: "b_org",
-            scopeType: "ORGANIZATION",
-            scopeId: "org_01",
-            onBreach: "WARN",
-            spentUsd: new Prisma.Decimal("10.00"),
-          }),
-          stubBudget({
-            id: "b_project",
-            onBreach: "BLOCK",
-            spentUsd: new Prisma.Decimal("95.00"),
-          }),
-        ]),
-      );
+      const { service } = await serviceOver({
+        budgets: [
+          {
+            budget: memoryBudgetSeed({
+              id: "b_org",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_01",
+              onBreach: "WARN",
+            }),
+            spentUsd: "10.00",
+          },
+          { budget: memoryBudgetSeed({ id: "b_project", onBreach: "BLOCK" }), spentUsd: "95.00" },
+        ],
+      });
 
-      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+      const result = await service.check({ ...baseCheck, projectedCostUsd: 10 });
 
       expect(result.decision).toBe("hard_block");
       expect(result.blockedBy.map((b) => b.budgetId)).toContain("b_project");
@@ -291,24 +241,24 @@ describe("GatewayService.check", () => {
 
   describe("given the scopes payload (contract §4.4 for Checker.ApplyLive)", () => {
     it("echoes every applicable budget, not just warn/block ones", async () => {
-      const sut = serviceOver(
-        mockPrismaWithBudgets([
-          stubBudget({
-            id: "b_org",
-            scopeType: "ORGANIZATION",
-            scopeId: "org_01",
-            spentUsd: new Prisma.Decimal("10.00"),
-          }),
-          stubBudget({
-            id: "b_team",
-            scopeType: "TEAM",
-            scopeId: "team_01",
-            spentUsd: new Prisma.Decimal("50.00"),
-          }),
-        ]),
-      );
+      const { service } = await serviceOver({
+        budgets: [
+          {
+            budget: memoryBudgetSeed({
+              id: "b_org",
+              scopeType: "ORGANIZATION",
+              scopeId: "org_01",
+            }),
+            spentUsd: "10.00",
+          },
+          {
+            budget: memoryBudgetSeed({ id: "b_team", scopeType: "TEAM", scopeId: "team_01" }),
+            spentUsd: "50.00",
+          },
+        ],
+      });
 
-      const result = await sut.check({ ...baseCheck, projectedCostUsd: 1 });
+      const result = await service.check({ ...baseCheck, projectedCostUsd: 1 });
 
       expect(result.decision).toBe("allow");
       expect(result.scopes).toHaveLength(2);
@@ -318,122 +268,63 @@ describe("GatewayService.check", () => {
     });
 
     it("reports spent_usd as 0 for budgets whose window has rolled over", async () => {
-      const sut = serviceOver(
-        mockPrismaWithBudgets([
-          stubBudget({
-            spentUsd: new Prisma.Decimal("99.00"),
-            resetsAt: toDate(Temporal.Instant.from("2020-01-01T00:00:00Z")),
-          }),
-        ]),
-      );
+      const { service } = await rolledOverService();
 
-      const result = await sut.check({ ...baseCheck, projectedCostUsd: 1 });
+      const result = await service.check({ ...baseCheck, projectedCostUsd: 1 });
 
       expect(result.scopes[0]?.spentUsd).toBe("0.000000");
     });
   });
 
-  describe("when the stale spent_usd indicates the window has reset", () => {
+  describe("when the stored period has rolled over since the spend landed", () => {
     it("treats effective spent as 0 and allows the request", async () => {
-      const sut = serviceOver(
-        mockPrismaWithBudgets([
-          stubBudget({
-            spentUsd: new Prisma.Decimal("99.00"),
-            // resetsAt in the past → window has rolled over, stale spent is ignored.
-            resetsAt: toDate(Temporal.Instant.from("2020-01-01T00:00:00Z")),
-          }),
-        ]),
-      );
+      const { service } = await rolledOverService();
 
-      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+      const result = await service.check({ ...baseCheck, projectedCostUsd: 10 });
 
       expect(result.decision).toBe("allow");
     });
   });
 });
 
+/** A budget whose stored period ended in 2020, holding $99 of spend from a period now closed. */
+async function rolledOverService() {
+  const budget = memoryBudgetSeed({
+    currentPeriodStartedAt: Temporal.Instant.from("2019-12-01T00:00:00Z"),
+    resetsAt: Temporal.Instant.from("2020-01-01T00:00:00Z"),
+  });
+  const fixture = await serviceOver({ budgets: [{ budget }] });
+  await fixture.repositories.budgetSpend.insertDebit([
+    memoryDebitSeed({
+      budget,
+      amountUsd: "99.00",
+      gatewayRequestId: "req_last_period",
+      occurredAt: nowInstant().subtract({ hours: 24 * 40 }),
+    }),
+  ]);
+  return fixture;
+}
+
 /**
  * Scope-target resolution prism: each scope kind (org/team/project/
- * virtualKey/user) hits a different table and must resolve the right
- * shape and human-friendly name — all seven under one describe.
+ * virtualKey/user) resolves the right shape and human-friendly name.
  */
 describe("GatewayService.findDetailById", () => {
-  // Scope-target resolution goes through the shared batch resolver
-  // (scopeTargets.ts), which reads one findMany per scope kind. The row
-  // for the budget's own scope kind carries the budget's scopeId so the
-  // resolver can key it; every other kind resolves empty.
-  function mockPrismaWithDetail(
-    budget: GatewayBudget | null,
-    scopeRow: Record<string, unknown> | null,
-  ): PrismaClient {
-    const targetRows = budget && scopeRow ? [{ id: budget.scopeId, ...scopeRow }] : [];
-    const rowsFor = (kind: string) => (budget?.scopeType === kind ? targetRows : []);
-    return prismaDouble({
-      gatewayBudget: {
-        findFirst: vi.fn(async () => budget),
-      },
-      organization: {
-        findMany: vi.fn(async () => rowsFor("ORGANIZATION")),
-      },
-      team: {
-        findMany: vi.fn(async () => rowsFor("TEAM")),
-      },
-      project: {
-        // Serves three reads: the PROJECT scope-target lookup, the VK
-        // slug map, and the org-tenant fan-out for spend + ledger.
-        findMany: vi.fn(async () =>
-          budget?.scopeType === "PROJECT"
-            ? targetRows
-            : [{ id: "project_01", name: "Proj", slug: "proj" }],
-        ),
-      },
-      virtualKey: {
-        findUnique: vi.fn(async () => scopeRow),
-        // Two reads now resolve the VK: scopes for the slug map, then
-        // name/prefix for the scope-target resolver. Ledger VK-name join
-        // and scope-reach ask for neither, so they still see nothing.
-        findMany: vi.fn(
-          async (args?: { select?: { scopes?: unknown; displayPrefix?: unknown } | null }) => {
-            if (args?.select?.scopes) {
-              return rowsFor("VIRTUAL_KEY").map((r) => ({
-                ...r,
-                scopes: [{ scopeId: "project_01" }],
-              }));
-            }
-            return args?.select?.displayPrefix ? rowsFor("VIRTUAL_KEY") : [];
-          },
-        ),
-      },
-      virtualKeyScope: {
-        findFirst: vi.fn(async () => ({ scopeId: "project_01" })),
-        findMany: vi.fn(async () => []),
-      },
-      user: {
-        findMany: vi.fn(async () => rowsFor("PRINCIPAL")),
-      },
-      group: {
-        findMany: vi.fn(async () => rowsFor("GROUP")),
-      },
-    });
-  }
-
   describe("when the budget does not exist", () => {
     it("returns null", async () => {
-      const sut = serviceOver(mockPrismaWithDetail(null, null));
-      const detail = await sut.findDetailById({ id: "b_missing", organizationId: "org_01" });
+      const { service } = await serviceOver();
+      const detail = await service.findDetailById({ id: "b_missing", organizationId: "org_01" });
       expect(detail).toBeNull();
     });
   });
 
   describe("when scope is ORGANIZATION", () => {
     it("resolves the scope target to the org name/slug", async () => {
-      const sut = serviceOver(
-        mockPrismaWithDetail(stubBudget({ scopeType: "ORGANIZATION", scopeId: "org_01" }), {
-          name: "Acme Inc.",
-          slug: "acme",
-        }),
-      );
-      const detail = await sut.findDetailById({ id: "b_01", organizationId: "org_01" });
+      const { service } = await serviceOver({
+        budgets: [{ budget: memoryBudgetSeed({ scopeType: "ORGANIZATION", scopeId: "org_01" }) }],
+        seed: { organizations: [{ id: "org_01", name: "Acme Inc.", slug: "acme" }] },
+      });
+      const detail = await service.findDetailById({ id: "b_01", organizationId: "org_01" });
       expect(detail?.scopeTarget).toEqual({
         kind: "ORGANIZATION",
         id: "org_01",
@@ -447,13 +338,15 @@ describe("GatewayService.findDetailById", () => {
     it("includes the display prefix + project slug for linkback", async () => {
       // The VK's PROJECT scope points at project_01, whose slug comes
       // back from the batch resolver's slug map.
-      const sut = serviceOver(
-        mockPrismaWithDetail(stubBudget({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }), {
-          name: "prod-openai",
-          displayPrefix: "lw_live_abc",
-        }),
-      );
-      const detail = await sut.findDetailById({ id: "b_01", organizationId: "org_01" });
+      const { service, repositories } = await serviceOver({
+        budgets: [{ budget: memoryBudgetSeed({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }) }],
+      });
+      await repositories.virtualKeys.create({
+        ...memoryVirtualKeySeed({ id: "vk_01", name: "prod-openai", organizationId: "org_01" }),
+        displayPrefix: "lw_live_abc",
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_01" }],
+      });
+      const detail = await service.findDetailById({ id: "b_01", organizationId: "org_01" });
       expect(detail?.scopeTarget).toEqual({
         kind: "VIRTUAL_KEY",
         id: "vk_01",
@@ -465,45 +358,35 @@ describe("GatewayService.findDetailById", () => {
   });
 
   describe("when scope is PRINCIPAL", () => {
+    const principalBudget = [
+      { budget: memoryBudgetSeed({ scopeType: "PRINCIPAL", scopeId: "user_42" }) },
+    ];
+    const nameOf = async (users: MemoryGatewaySeed["users"]) => {
+      const { service } = await serviceOver({ budgets: principalBudget, seed: { users } });
+      return (await service.findDetailById({ id: "b_01", organizationId: "org_01" }))?.scopeTarget
+        .name;
+    };
+    const member = { id: "user_42", organizationIds: ["org_01"] };
+
     it("prefers user.name but falls back to email then id", async () => {
-      const sut1 = serviceOver(
-        mockPrismaWithDetail(stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }), {
-          name: "Alex Chen",
-          email: "alex@example.com",
-        }),
+      expect(await nameOf([{ ...member, name: "Alex Chen", email: "alex@example.com" }])).toBe(
+        "Alex Chen",
       );
-      expect(
-        (await sut1.findDetailById({ id: "b_01", organizationId: "org_01" }))?.scopeTarget.name,
-      ).toBe("Alex Chen");
-
-      const sut2 = serviceOver(
-        mockPrismaWithDetail(stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }), {
-          name: null,
-          email: "alex@example.com",
-        }),
+      expect(await nameOf([{ ...member, name: null, email: "alex@example.com" }])).toBe(
+        "alex@example.com",
       );
-      expect(
-        (await sut2.findDetailById({ id: "b_01", organizationId: "org_01" }))?.scopeTarget.name,
-      ).toBe("alex@example.com");
-
-      const sut3 = serviceOver(
-        mockPrismaWithDetail(stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }), null),
-      );
-      expect(
-        (await sut3.findDetailById({ id: "b_01", organizationId: "org_01" }))?.scopeTarget.name,
-      ).toBe("user_42");
+      expect(await nameOf([])).toBe("user_42");
     });
   });
 
   describe("when the target row has been deleted", () => {
     it("falls back to the raw scopeId instead of throwing", async () => {
-      // Scope FKs are ON DELETE CASCADE, but if the row is stale (null on
-      // lookup) the resolver must not null-pointer-crash. Detail page
-      // should still render.
-      const sut = serviceOver(
-        mockPrismaWithDetail(stubBudget({ scopeType: "TEAM", scopeId: "team_01" }), null),
-      );
-      const detail = await sut.findDetailById({ id: "b_01", organizationId: "org_01" });
+      // Scope FKs are ON DELETE CASCADE, but if the row is stale the
+      // resolver must not crash: the detail page should still render.
+      const { service } = await serviceOver({
+        budgets: [{ budget: memoryBudgetSeed({ scopeType: "TEAM", scopeId: "team_01" }) }],
+      });
+      const detail = await service.findDetailById({ id: "b_01", organizationId: "org_01" });
       expect(detail?.scopeTarget.name).toBe("team_01");
       expect(detail?.scopeTarget.secondary).toBeNull();
     });
@@ -511,12 +394,29 @@ describe("GatewayService.findDetailById", () => {
 
   describe("when joining the ledger", () => {
     it("returns the ledger rows limited to the last 20, ordered by occurredAt desc", async () => {
-      const sut = serviceOver(
-        mockPrismaWithDetail(stubBudget(), { name: "Proj", slug: "proj" }),
-        mockChRepoWithEvents([{ id: "l_01" }]),
+      const budget = memoryBudgetSeed();
+      const { service, repositories } = await serviceOver({ budgets: [{ budget }] });
+      const now = nowInstant();
+      for (let minutesAgo = 0; minutesAgo < 21; minutesAgo += 1) {
+        await repositories.budgetSpend.insertDebit([
+          memoryDebitSeed({
+            budget,
+            amountUsd: "0.01",
+            gatewayRequestId: `l_${minutesAgo.toString().padStart(2, "0")}`,
+            occurredAt: now.subtract({ minutes: minutesAgo }),
+          }),
+        ]);
+      }
+
+      const detail = await service.findDetailById({ id: "b_01", organizationId: "org_01" });
+
+      expect(detail?.recentLedger).toHaveLength(20);
+      expect(detail?.recentLedger.map((row) => row.id)).toEqual(
+        Array.from(
+          { length: 20 },
+          (_, minutesAgo) => `l_${minutesAgo.toString().padStart(2, "0")}`,
+        ),
       );
-      const detail = await sut.findDetailById({ id: "b_01", organizationId: "org_01" });
-      expect(detail?.recentLedger).toHaveLength(1);
     });
   });
 });

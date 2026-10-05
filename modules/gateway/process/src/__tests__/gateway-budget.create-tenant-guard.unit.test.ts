@@ -1,69 +1,48 @@
 /**
  * @see specs/security/api-endpoint-authorization.feature
- * Covers the TEAM/PROJECT cross-org guard on create(): scopeId is
- * request-supplied and the Team/Project FK is org-agnostic, so a caller
- * could otherwise target another tenant's team or project.
+ * Covers the TEAM/PROJECT cross-org guard on create(): scopeId is request-supplied and the
+ * Team/Project FK is org-agnostic, so a caller could otherwise target another tenant's rows.
  */
 
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
+import { MemoryGatewayStore } from "../repositories/memory/memory.gateway.store.ts";
+import { memoryProjectWithTeam } from "./support/gateway-memory-seeds.fixture.ts";
+import { memoryGatewayService } from "./support/memory.gateway-service.ts";
 
-const REACHED_TRANSACTION = "REACHED_TRANSACTION";
-
-function mockPrisma(overrides: { team?: unknown; project?: unknown }): PrismaClient {
-  return prismaDouble({
-    organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
-    team: { findFirst: vi.fn().mockResolvedValue(overrides.team ?? null) },
-    project: {
-      findFirst: vi.fn().mockResolvedValue(overrides.project ?? null),
-      findMany: vi.fn().mockResolvedValue([]),
-    },
-    // No active keys, which is the one shape the reach guard always lets
-    // through: an organization is allowed to write budgets before it has
-    // any keys, so this test still reaches the transaction on its own
-    // question rather than being answered by a different guard.
-    virtualKey: { findMany: vi.fn().mockResolvedValue([]) },
-    groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
-    // If control reaches here, the guard let the scope through.
-    $transaction: vi.fn().mockRejectedValue(new Error(REACHED_TRANSACTION)),
+/** The TEAM guard lives in the budget repository's create(); PROJECT lives in the service. */
+function serviceOver() {
+  const store = MemoryGatewayStore.create({
+    teams: [
+      { id: "team_ok", organizationId: "org_caller", name: "Ours", slug: "ours" },
+      { id: "team_other_org", organizationId: "org_other", name: "Theirs", slug: "theirs" },
+    ],
   });
-}
-
-/**
- * Composed like `PrismaGatewayAdapter` composes it — see
- * dev/docs/best_practices/service-repository-adapter-port.md. The TEAM
- * guard lives in the repository's create(); PROJECT lives in the service.
- */
-function serviceOver(prisma: PrismaClient, project: unknown) {
-  return PrismaGatewayAdapter.create({
-    database: prisma,
-    organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
-    projects: {
-      findWithTeam: vi
-        .fn()
-        .mockResolvedValue(
-          project
-            ? { id: "project_ok", teamId: "team_ok", team: { organizationId: "org_caller" } }
-            : null,
-        ),
-      listTraceDestinations: vi.fn().mockResolvedValue([]),
-    } as never,
-    evaluators: {} as never,
-    monitors: {} as never,
-    changes: {} as never,
-    audit: {} as never,
-  }).build();
+  const { service } = memoryGatewayService({
+    store,
+    projects: createApiFixture<ProjectApi>({
+      findWithTeam: async (id) =>
+        id === "project_other_org"
+          ? memoryProjectWithTeam({
+              projectId: id,
+              teamId: "team_other_org",
+              organizationId: "org_other",
+            })
+          : null,
+      // No active keys, the one shape the reach guard always lets through, so a
+      // TEAM budget answers this guard's question rather than a later one's.
+      listTraceDestinations: async () => [],
+    }),
+  });
+  return { service, store };
 }
 
 const baseInput = {
   organizationId: "org_caller",
   name: "Q budget",
-  window: "MONTH" as never,
+  window: "MONTH" as const,
   limitUsd: 100,
   actorUserId: "user_1",
 };
@@ -71,38 +50,45 @@ const baseInput = {
 describe("GatewayService.create cross-org scope guard", () => {
   describe("when a TEAM-scoped budget targets a team in another organization", () => {
     /** @scenario "A team or project budget scoped to another organization is rejected" */
-    it("rejects with a clear BAD_REQUEST", async () => {
-      const sut = serviceOver(mockPrisma({ team: null }), null);
+    it("rejects it as a scope outside the organization", async () => {
+      const { service, store } = serviceOver();
       await expect(
-        sut.create({
+        service.create({
           ...baseInput,
           scope: { kind: "TEAM", teamId: "team_other_org" },
         }),
-      ).rejects.toThrow(/does not belong to this organization/);
+      ).rejects.toMatchObject({ code: "gateway_scope_org_mismatch", httpStatus: 400 });
+      expect(store.budgets.size).toBe(0);
     });
   });
 
   describe("when a PROJECT-scoped budget targets a project in another organization", () => {
-    it("rejects with a clear BAD_REQUEST", async () => {
-      const sut = serviceOver(mockPrisma({ project: null }), null);
+    it("rejects it as a scope outside the organization", async () => {
+      const { service, store } = serviceOver();
       await expect(
-        sut.create({
+        service.create({
           ...baseInput,
           scope: { kind: "PROJECT", projectId: "project_other_org" },
         }),
-      ).rejects.toThrow(/does not belong to this organization/);
+      ).rejects.toMatchObject({ code: "gateway_scope_org_mismatch", httpStatus: 400 });
+      expect(store.budgets.size).toBe(0);
     });
   });
 
   describe("when the TEAM belongs to the caller's organization", () => {
-    it("passes the guard and proceeds to persist", async () => {
-      const sut = serviceOver(mockPrisma({ team: { id: "team_ok" } }), null);
-      await expect(
-        sut.create({
-          ...baseInput,
-          scope: { kind: "TEAM", teamId: "team_ok" },
-        }),
-      ).rejects.toThrow(REACHED_TRANSACTION); // got past the guard
+    it("passes the guard and persists the budget", async () => {
+      const { service, store } = serviceOver();
+      const created = await service.create({
+        ...baseInput,
+        scope: { kind: "TEAM", teamId: "team_ok" },
+      });
+
+      expect(created).toMatchObject({
+        organizationId: "org_caller",
+        scopeType: "TEAM",
+        scopeId: "team_ok",
+      });
+      expect(store.budgets.has(created.id)).toBe(true);
     });
   });
 });

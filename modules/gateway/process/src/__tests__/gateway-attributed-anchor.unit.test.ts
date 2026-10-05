@@ -1,49 +1,37 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { GatewayScopeOrgMismatchError } from "../index.ts";
-import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
+import { MemoryGatewayStore } from "../repositories/memory/memory.gateway.store.ts";
+import {
+  memoryProjectWithTeam,
+  memoryVirtualKeySeed,
+} from "./support/gateway-memory-seeds.fixture.ts";
+import { memoryGatewayService } from "./support/memory.gateway-service.ts";
 
 /**
- * The process's own composition, over the fake database.
- *
- * `GatewayService` no longer takes a `PrismaClient`: the anchor guards run
- * inside `PrismaGatewayBudgetRepository.create`, and the project anchor is
- * proved through the `ProjectApi` the service is built with. Building the
- * pair the way `PrismaGatewayAdapter` builds it is what keeps both halves of
- * the validation under test rather than only the half that stayed put.
+ * The process's own composition over the memory registry: the project anchor is proved through
+ * the `ProjectApi` the service is built with, the key anchor inside the budget repository.
  */
-function serviceWith(vkFound: boolean, projectFound: boolean) {
-  const prisma = {
-    virtualKey: {
-      findFirst: vi.fn().mockResolvedValue(vkFound ? { id: "vk_1", purpose: "USER" } : null),
-    },
-    project: {
-      findFirst: vi.fn().mockResolvedValue(projectFound ? { id: "proj_1" } : null),
-    },
-  } as never;
-  const projects = {
-    findWithTeam: vi
-      .fn()
-      .mockResolvedValue(
-        projectFound ? { id: "proj_1", teamId: "team_1", team: { organizationId: "org_1" } } : null,
-      ),
-  } as never;
-  return PrismaGatewayAdapter.create({
-    database: prisma,
-    organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
-    projects,
-    evaluators: {} as never,
-    monitors: {} as never,
-    changes: {} as never,
-    audit: {} as never,
-    // The ClickHouse repo's presence is what template creation requires;
-    // validation throws before any spend read, so a bare object suffices.
-    budgetSpend: {} as never,
-  }).build();
+async function serviceOver() {
+  const { service, repositories } = memoryGatewayService({
+    store: MemoryGatewayStore.create(),
+    projects: createApiFixture<ProjectApi>({
+      findWithTeam: async (id) =>
+        id === "proj_1"
+          ? memoryProjectWithTeam({ projectId: id, teamId: "team_1", organizationId: "org_1" })
+          : null,
+    }),
+  });
+  await repositories.virtualKeys.create(
+    memoryVirtualKeySeed({ id: "vk_1", name: "in-org", organizationId: "org_1" }),
+  );
+  await repositories.virtualKeys.create(
+    memoryVirtualKeySeed({ id: "vk_other_org", name: "elsewhere", organizationId: "org_other" }),
+  );
+  return service;
 }
 
 const base = {
@@ -54,18 +42,22 @@ const base = {
   actorUserId: "user_admin",
 };
 
+const mismatch = { code: "gateway_scope_org_mismatch" };
+
 describe("attributed-user anchor validation", () => {
   /** @scenario Templates anchor on virtual keys and projects only */
   it("requires exactly one in-org anchor", async () => {
+    const sut = await serviceOver();
+
     await expect(
-      serviceWith(false, false).create({
+      sut.create({
         ...base,
         scope: { kind: "ATTRIBUTED_USER" },
       }),
-    ).rejects.toBeInstanceOf(GatewayScopeOrgMismatchError);
+    ).rejects.toMatchObject(mismatch);
 
     await expect(
-      serviceWith(true, true).create({
+      sut.create({
         ...base,
         scope: {
           kind: "ATTRIBUTED_USER",
@@ -73,13 +65,13 @@ describe("attributed-user anchor validation", () => {
           anchorProjectId: "proj_1",
         },
       }),
-    ).rejects.toBeInstanceOf(GatewayScopeOrgMismatchError);
+    ).rejects.toMatchObject(mismatch);
 
     await expect(
-      serviceWith(false, false).create({
+      sut.create({
         ...base,
         scope: { kind: "ATTRIBUTED_USER", anchorVirtualKeyId: "vk_other_org" },
       }),
-    ).rejects.toBeInstanceOf(GatewayScopeOrgMismatchError);
+    ).rejects.toMatchObject(mismatch);
   });
 });
