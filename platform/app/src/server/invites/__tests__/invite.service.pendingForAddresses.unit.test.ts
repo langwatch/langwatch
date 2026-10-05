@@ -41,13 +41,19 @@ describe("InviteService.findPendingForAddresses()", () => {
       expect(pending).toEqual([
         { inviteCode: "code_1", organizationName: "Acme", role: "DEVELOPER" },
       ]);
-      // PENDING, unexpired, on one of the proven addresses, lowercased the
-      // way the invite was written.
+      // PENDING, unexpired, on one of the proven addresses, matched however
+      // the administrator capitalised it when inviting.
       expect(findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             status: "PENDING",
-            email: { in: ["sam@acme.com"] },
+            AND: expect.arrayContaining([
+              {
+                OR: [
+                  { email: { equals: "sam@acme.com", mode: "insensitive" } },
+                ],
+              },
+            ]),
           }),
         }),
       );

@@ -1132,17 +1132,6 @@ export class InviteService {
   }
 
   /**
-   * Pending and approval-waiting invites with the acceptance link each one
-   * carries. The link is included because a provisioning tool with no email
-   * provider configured has no other way to hand the invite to the person.
-   */
-  /**
-   * Outstanding invitations with their state visible (D11): expired and
-   * revoked rows are part of the answer now — an admin resends an EXPIRED
-   * one instead of wondering where it went. ACCEPTED rows are members, and
-   * PAYMENT_PENDING rides the checkout surface; neither belongs here.
-   */
-  /**
    * The invitations waiting for an account, by the addresses it has PROVED
    * (ADR-143 v6). What comes back includes the invitation code, which is the
    * secret from the mail, so the caller hands in verified addresses only and
@@ -1165,11 +1154,19 @@ export class InviteService {
     ].filter(Boolean);
     if (normalized.length === 0) return [];
 
+    // Invitations are stored as the administrator typed the address, so the
+    // match is case-insensitive like every other address lookup here.
     const invites = await this.prisma.organizationInvite.findMany({
       where: {
-        email: { in: normalized },
         status: "PENDING",
-        OR: [{ expiration: null }, { expiration: { gt: new Date() } }],
+        AND: [
+          {
+            OR: normalized.map((address) => ({
+              email: { equals: address, mode: "insensitive" as const },
+            })),
+          },
+          { OR: [{ expiration: null }, { expiration: { gt: new Date() } }] },
+        ],
       },
       select: {
         inviteCode: true,
@@ -1186,6 +1183,17 @@ export class InviteService {
     }));
   }
 
+  /**
+   * Pending and approval-waiting invites with the acceptance link each one
+   * carries. The link is included because a provisioning tool with no email
+   * provider configured has no other way to hand the invite to the person.
+   */
+  /**
+   * Outstanding invitations with their state visible (D11): expired and
+   * revoked rows are part of the answer now — an admin resends an EXPIRED
+   * one instead of wondering where it went. ACCEPTED rows are members, and
+   * PAYMENT_PENDING rides the checkout surface; neither belongs here.
+   */
   async listInvites({ organizationId }: { organizationId: string }): Promise<
     Array<
       OrganizationInvite & {

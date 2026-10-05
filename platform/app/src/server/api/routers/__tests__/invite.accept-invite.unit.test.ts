@@ -372,3 +372,57 @@ describe("invite.acceptInvite", () => {
     });
   });
 });
+
+/**
+ * The welcome screen's invitation offer (ADR-143 v6). What this hands back
+ * includes the invitation code, which is the secret from the mail, so only
+ * addresses the account has PROVED may be asked about. The session address
+ * is softer than that and is never used, not even as a fall-back.
+ *
+ * Spec: specs/identity/join-before-create.feature
+ */
+describe("invite.pendingForMe", () => {
+  let findManyMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    findManyMock = vi.fn().mockResolvedValue([]);
+  });
+
+  function createCaller(email = "sam@acme.com") {
+    const ctx = createInnerTRPCContext({
+      session: {
+        user: { id: "user-1", name: "Sam", email },
+        expires: "2099-01-01",
+      },
+    });
+    (ctx as any).prisma = {
+      $connect: vi.fn(),
+      organizationInvite: { findMany: findManyMock },
+    };
+    return inviteRouter.createCaller(ctx);
+  }
+
+  describe("when the session address has an invitation but is not yet proved", () => {
+    /** @scenario An invitation is only offered to somebody who proved the address */
+    it("answers nothing and asks the database nothing", async () => {
+      // Not on identifiers at all: the only address known is the session's.
+      verifiedEmailsOfMock.mockResolvedValueOnce(null);
+
+      await expect(createCaller().pendingForMe({})).resolves.toEqual([]);
+
+      expect(findManyMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario An invitation is only offered to somebody who proved the address */
+    it("asks only about the proved addresses, never the session's", async () => {
+      verifiedEmailsOfMock.mockResolvedValueOnce([{ value: "ana@acme.com" }]);
+
+      await createCaller("sam@acme.com").pendingForMe({});
+
+      const where = findManyMock.mock.calls[0]?.[0]?.where;
+      expect(JSON.stringify(where)).toContain("ana@acme.com");
+      expect(JSON.stringify(where)).not.toContain("sam@acme.com");
+    });
+  });
+});

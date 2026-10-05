@@ -355,14 +355,6 @@ export const inviteRouter = createTRPCRouter({
     }),
 
   /**
-   * The invitation waiting for the signed-in user, on an installation where
-   * accounts are created by invitation. A member who signed up from the
-   * sign-in screen rather than the invitation link belongs to no organization
-   * yet, and this is where they are sent instead of the screen that creates
-   * one. Only addresses the account has proven count, the same ones
-   * `acceptInvite` accepts.
-   */
-  /**
    * Every invitation waiting for the signed-in user, on any installation
    * (ADR-143 v6). The welcome screen leads with one of these before it offers
    * to ask to join, so an administrator who already invited somebody is not
@@ -388,6 +380,14 @@ export const inviteRouter = createTRPCRouter({
       });
     }),
 
+  /**
+   * The invitation waiting for the signed-in user, on an installation where
+   * accounts are created by invitation. A member who signed up from the
+   * sign-in screen rather than the invitation link belongs to no organization
+   * yet, and this is where they are sent instead of the screen that creates
+   * one. Only addresses the account has proven count, the same ones
+   * `acceptInvite` accepts.
+   */
   myPendingInvitation: protectedProcedure
     .input(z.object({}))
     .noPermission({
