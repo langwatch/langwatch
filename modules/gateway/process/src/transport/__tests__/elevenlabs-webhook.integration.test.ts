@@ -6,6 +6,7 @@
 import { createHmac } from "crypto";
 
 import { bindRestMiddleware, createRestRuntime, type MountableRestApp } from "@langwatch/api/rest";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import {
   ModelProviderNotFoundError,
   type ModelProviderApi,
@@ -27,7 +28,7 @@ import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis"
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { GatewayModule } from "../../app/gateway.app.ts";
+import type { GatewayModule } from "../../app/gateway.app.ts";
 import type { GatewaySpendConfirmation } from "../../app/gateway.members.ts";
 import type { ConfirmSpendCommandData } from "../../eventing/gateway-spend-commands.process.ts";
 import { gatewayProcessModule } from "../../gateway.module.ts";
@@ -164,8 +165,10 @@ async function mountWebhook(): Promise<MountableRestApp> {
       "api-key": peer("api key"),
     })
     .boot();
-  const gateway = runtime.module(gatewayProcessModule).provided;
-  if (!(gateway instanceof GatewayModule)) throw new Error("gateway installs as its own app");
+  // The runtime hands out the API reference; it forwards every method of the installed
+  // GatewayModule, so the spend pipeline's producer hook is reachable the way eventing reaches it.
+  const gateway = runtime.module(gatewayProcessModule).provided as GatewayApi &
+    Pick<GatewayModule, "connectSpend">;
   gateway.connectSpend({
     confirmSpend: {
       send: async (payload: unknown) => {

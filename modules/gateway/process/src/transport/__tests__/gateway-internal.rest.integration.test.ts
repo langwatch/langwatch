@@ -10,6 +10,7 @@ import type {
 } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi, type Mock } from "vitest";
 
@@ -208,8 +209,10 @@ describe("the gateway internal control plane", () => {
     /** @scenario "The ingest door accepts a drained batch and prices it on the way in" */
     it("accepts a drained batch and dispatches it priced", async () => {
       const commands = testSpendCommandSenders();
+      // The outcome names no virtual key, so the attribution join never asks the directory.
       const app = mountGatewayInternalRest({
         store: {} as GatewayInternalStoreRepository,
+        projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
         spend: { commands, rating: ModelCatalogGatewaySpendRatingService.create() },
       });
 

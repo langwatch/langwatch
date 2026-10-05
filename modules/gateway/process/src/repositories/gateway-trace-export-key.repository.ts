@@ -1,4 +1,7 @@
-/** The ownerless key one gateway trace project's spans are exported with; the token rests encrypted. */
+/**
+ * The ownerless key one gateway trace project's spans are exported with; the token rests
+ * encrypted.
+ */
 export type StoredGatewayTraceExportKey = Readonly<{
   projectId: string;
   apiKeyId: string;

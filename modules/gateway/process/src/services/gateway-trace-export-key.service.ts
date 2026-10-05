@@ -49,7 +49,8 @@ export class GatewayTraceExportKeyService {
       permissions: [...TRACE_EXPORT_PERMISSIONS],
       bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: input.projectId }],
     });
-    // ponytail: a pod losing a concurrent first mint leaves its key unused; a system revoke on ApiKeyApi would retire it.
+    // ponytail: a pod losing a concurrent first mint leaves its key unused;
+    // a system revoke on ApiKeyApi would retire it.
     const kept = await this.options.repository.saveFirst({
       projectId: input.projectId,
       apiKeyId: apiKey.id,
