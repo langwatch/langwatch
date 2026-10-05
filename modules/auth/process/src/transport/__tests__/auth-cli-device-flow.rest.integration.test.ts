@@ -42,6 +42,7 @@ const organizationKey = {
 
 describe("given a CLI starting a device login", () => {
   describe("when the browser approves it and the CLI polls", () => {
+    /** @scenario "an approval that is never exchanged mints nothing" */
     it("mints a session carrying the personal project and the scoped CLI key", async () => {
       const world = deviceFlowWorld();
       const api = mount(world);

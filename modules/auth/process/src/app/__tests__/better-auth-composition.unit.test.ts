@@ -123,6 +123,7 @@ async function appFor(
 }
 
 describe("given a deployment that named no browser-session identity", () => {
+  /** @scenario "A process that can compose no browser sessions says so, with the reason" */
   it("composes no instance and refuses the sign-in door by name", async () => {
     const app = await appFor();
 

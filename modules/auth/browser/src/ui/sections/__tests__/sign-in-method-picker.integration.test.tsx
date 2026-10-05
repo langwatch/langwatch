@@ -136,6 +136,7 @@ describe("given the alternative methods rail", () => {
 });
 
 describe("given a development deployment offering only google", () => {
+  /** @scenario "The sign-in screen offers only the configured providers in every environment" */
   it("offers only google", () => {
     renderWithDesignSystem(
       <WithTestAuthHost publicEnvironment={{ NODE_ENV: "development" }}>

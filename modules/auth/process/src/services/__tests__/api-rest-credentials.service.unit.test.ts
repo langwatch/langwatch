@@ -135,6 +135,20 @@ describe("the key door", () => {
     });
   });
 
+  describe("given an empty or whitespace-only Bearer token beside an X-Auth-Token", () => {
+    /** @scenario Empty or whitespace-only Bearer token does not poison X-Auth-Token fallback */
+    it.each(["Bearer ", "Bearer    ", "Bearer"])(
+      "falls through to the X-Auth-Token credential when Authorization is %j",
+      async (authorization) => {
+        const credential = await door.identifyKey({
+          request: request({ authorization, "x-auth-token": "legacy-key" }),
+        });
+
+        expect(credential.principal).toEqual({ kind: "project", projectId: "project-1" });
+      },
+    );
+  });
+
   describe("given an API key that resolves a project", () => {
     it("still reaches its organization, naming the project it resolved", async () => {
       const credential = await door.identifyKey({

@@ -146,6 +146,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
      * credential involved.
      */
     /** @scenario A passkey is never registered against an address that already has an account */
+    /** @scenario "An address whose account can be signed into is still refused" */
     it("refuses to start a ceremony for somebody else's address", async () => {
       findByEmail.mockResolvedValue({ id: "someone_else" });
 

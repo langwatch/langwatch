@@ -122,6 +122,7 @@ describe("better-auth secondary storage", () => {
     });
 
     /** @scenario "A dropped write does not fail the request that caused it" */
+    /** @scenario "A consumer degrades when the application has no Redis" */
     it("resolves rather than rejecting, so the caller degrades open", async () => {
       const store = createSecondaryStorage(null);
 
@@ -140,6 +141,7 @@ describe("better-auth secondary storage", () => {
     });
 
     /** @scenario "A deployment with no Redis drops writes the same way" */
+    /** @scenario "A consumer degrades when the application has no Redis" */
     it("degrades identically to a process holding no application", async () => {
       const composed = betterAuthTransportFor({}, { redis: null }).options.secondaryStorage;
       if (!composed) throw new Error("the transport composed no secondary storage to degrade");

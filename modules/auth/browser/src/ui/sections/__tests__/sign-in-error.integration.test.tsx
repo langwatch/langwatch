@@ -5,7 +5,7 @@ import { signInErrorMayCross } from "@langwatch/auth-contract";
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { WithTestAuthHost } from "../../../testing.tsx";
@@ -23,6 +23,10 @@ function renderError(error: string, extra: Record<string, string> = {}) {
   );
 }
 
+function CurrentPath() {
+  return <span data-testid="current-path">{useLocation().pathname}</span>;
+}
+
 afterEach(() => cleanup());
 
 describe("<SignInError/>", () => {
@@ -32,6 +36,8 @@ describe("<SignInError/>", () => {
       expect(screen.getByText("Account already exists")).toBeTruthy();
     });
 
+    /** @scenario "Recovery works the same when the org's required method is not yet known" */
+    /** @scenario "Recovery signs the user out of the identity provider before trying again" */
     it("recovers via a federated logout, not a bare bounce back to sign-in", () => {
       renderError("OAuthAccountNotLinked");
       const recovery = screen.getByRole("link", {
@@ -43,6 +49,7 @@ describe("<SignInError/>", () => {
       expect(recovery.getAttribute("href")).not.toContain("/auth/signin");
     });
 
+    /** @scenario "Recovery works the same when the org's required method is not yet known" */
     it("steers the user to sign out and use their original / SSO method", () => {
       renderError("OAuthAccountNotLinked");
       expect(screen.getByText(/provider didn't confirm the address/i)).toBeTruthy();
@@ -84,6 +91,30 @@ describe("<SignInError/>", () => {
       const back = screen.getByRole("link", { name: /back to settings/i });
       expect(back.getAttribute("href")).toBe("/settings/authentication");
     });
+  });
+});
+
+describe("given the user is on the 'account already exists' sign-in error page", () => {
+  /** @scenario "The error page does not auto-redirect back to the identity provider" */
+  it("stays on the page, leaving the sign-out as a link they choose to follow", async () => {
+    render(
+      <MemoryRouter initialEntries={["/auth/error?error=OAuthAccountNotLinked"]}>
+        <DesignSystemProvider forcedTheme="light">
+          <WithTestAuthHost
+            route={{ pathname: "/auth/error", query: { error: "OAuthAccountNotLinked" } }}
+          >
+            <CurrentPath />
+            <SignInError error="OAuthAccountNotLinked" />
+          </WithTestAuthHost>
+        </DesignSystemProvider>
+      </MemoryRouter>,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(screen.getByText("Account already exists")).toBeTruthy();
+    expect(screen.getByTestId("current-path").textContent).toBe("/auth/error");
+    expect(window.location.pathname).toBe("/");
   });
 });
 
