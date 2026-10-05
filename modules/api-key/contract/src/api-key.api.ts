@@ -1,6 +1,7 @@
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
+import type { CreateIngestionKeyInput } from "./api-key-rest.schemas.ts";
 import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
 import type { MintRunKeyInput } from "./api-key.run-key.ts";
 import type {
@@ -230,6 +231,8 @@ export interface ApiKeyApi {
     input: CreateApiKeyManagementInput,
     by: ApiKeyManagementCaller,
   ): Promise<{ token: string; apiKey: ApiKey; assignedToUserId: string | null }>;
+  /** A person's own ingestion key on their session's project; refuses a non-person, then shape. */
+  createIngestionKey(input: CreateIngestionKeyInput): Promise<{ token: string; apiKey: ApiKey }>;
   updateKey(input: UpdateApiKeyManagementInput, by: ApiKeyManagementCaller): Promise<ApiKey>;
   revokeKey(
     input: { organizationId: string; apiKeyId: string },

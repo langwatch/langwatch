@@ -1160,6 +1160,41 @@ describe("the api-keys REST family", () => {
     });
 
     /** @scenario An API key cannot mint an ingestion key */
+    it("refuses a non-person before it judges the shape", async () => {
+      const { send, create } = mountIngestion();
+
+      const response = await send("/api/api-keys/ingestion", {
+        method: "POST",
+        body: { ...INGESTION_SHAPE, keyType: "service" },
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "api_key_scope_violation",
+        message: "Only a person's sign-in session mints an ingestion key",
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The ingestion key route refuses any other shape */
+    it("names the shape when a person asks for another one", async () => {
+      const { send } = mountIngestion();
+
+      const response = await send("/api/api-keys/ingestion", {
+        method: "POST",
+        body: { ...INGESTION_SHAPE, keyType: "service" },
+        as: AS_SESSION,
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "api_key_scope_violation",
+        message:
+          "An ingestion key is personal, bound to this one project, and holds only ingestion",
+      });
+    });
+
+    /** @scenario An API key cannot mint an ingestion key */
     it("refuses a caller presenting an API key", async () => {
       const { send, create } = mountIngestion();
 

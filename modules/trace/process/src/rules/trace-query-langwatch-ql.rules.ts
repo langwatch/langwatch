@@ -9,6 +9,7 @@ import {
   type FieldHandler,
   FilterFieldUnknownError,
   FilterParseError,
+  FilterValueRefusedError,
   type LangWatchQLTraceFilter,
   type LangWatchQLTraceFilterValue,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -127,16 +128,6 @@ export const LANGWATCH_QL_TRACE_FILTER_EXPRESSIONS: Readonly<
   Record<string, LangWatchQLTraceFilterField>
 > = { ...STRING_FIELDS, ...NUMBER_FIELDS };
 
-/** A value the view cannot answer exactly: refused, never guessed at. */
-class LangWatchQLFilterRefusal extends Error {
-  constructor(
-    readonly field: string,
-    readonly reason: string,
-  ) {
-    super(reason);
-  }
-}
-
 /** `%`, `_` and `\` escaped so only the caller's `*` becomes a LIKE wildcard. */
 function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
@@ -178,8 +169,9 @@ export function compile({ filter }: { filter: string }): LangWatchQLTraceFilter 
         supportedFields: LANGWATCH_QL_TRACE_FILTER_FIELDS,
       };
     }
-    if (error instanceof LangWatchQLFilterRefusal) {
-      return { kind: "refused", field: error.field, reason: error.reason };
+    if (error instanceof FilterValueRefusedError) {
+      const field = typeof error.meta.field === "string" ? error.meta.field : "";
+      return { kind: "refused", field, reason: error.message };
     }
     throw error;
   }
@@ -216,10 +208,10 @@ function handlerFor(name: string): FieldHandler {
 function status(tag: TagToken, negated: boolean): string {
   const value = extractStringValue(tag).toLowerCase();
   if (value !== "error") {
-    throw new LangWatchQLFilterRefusal(
-      "status",
-      `A shorthand filter can only ask for status:error. Ask for "${value}" with a statement instead.`,
-    );
+    throw new FilterValueRefusedError({
+      field: "status",
+      reason: `A shorthand filter can only ask for status:error. Ask for "${value}" with a statement instead.`,
+    });
   }
   return wrap("ContainsErrorStatus = 1", negated);
 }

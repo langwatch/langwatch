@@ -84,6 +84,12 @@ const registry = {
   filter_field_unknown: {
     tips: ["Use one of the fields listed in meta.knownFields", "Field names are case-sensitive"],
   },
+  filter_value_refused: {
+    tips: [
+      "meta.field names the field whose value the shorthand filter cannot answer exactly",
+      "Ask for that value with a LangWatchQL statement instead",
+    ],
+  },
   lwql_unparseable: {
     tips: [
       "Read `meta.violations`; each entry carries the line and column the parser stopped at",

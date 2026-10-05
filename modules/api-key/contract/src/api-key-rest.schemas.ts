@@ -3,6 +3,7 @@
  * response shapes in `api-key.rest.ts` so one file states what the door accepts
  * and the other what it answers, and the published document derives both.
  */
+import { principalRefSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import { API_KEY_PERMISSION_MODES, refineRestrictedPermissions } from "./api-key.permissions.ts";
@@ -85,6 +86,15 @@ export const apiKeyRestCreateSchema = z
   )
   .superRefine(refineRestrictedPermissions);
 export type ApiKeyRestCreate = z.infer<typeof apiKeyRestCreateSchema>;
+
+/** A person's own ingestion key on their session's project; `principal` is who the session is. */
+export const createIngestionKeyInputSchema = z.object({
+  key: apiKeyRestCreateSchema,
+  principal: principalRefSchema.nullable(),
+  organizationId: z.string(),
+  projectId: z.string(),
+});
+export type CreateIngestionKeyInput = z.infer<typeof createIngestionKeyInputSchema>;
 
 export const apiKeyRestUpdateSchema = z
   .object({

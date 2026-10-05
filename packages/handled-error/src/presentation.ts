@@ -373,6 +373,13 @@ const presentations = {
       return field ? `There's no field called "${field}".` : "";
     },
   },
+  filter_value_refused: {
+    title: "This filter can't be answered here",
+    describe: (error) => {
+      const field = str(error, "field", "");
+      return field ? `Ask about "${field}" with a statement instead.` : "";
+    },
+  },
   lwql_unknown_identifier: {
     title: "This query names a column that doesn't exist",
     // The name is the whole value of this message, so it is quoted back when
