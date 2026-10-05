@@ -26,6 +26,7 @@ export const reads = {
     "docs/platform/**/*",
     "docs/pricing.mdx",
     "docs/self-hosting/connect.mdx",
+    "docs/features/instant-evals/limits-and-cost.mdx",
   ],
   "@langwatch/csv": sourceRoots,
   "@langwatch/scenario-contract": sourceRoots,
