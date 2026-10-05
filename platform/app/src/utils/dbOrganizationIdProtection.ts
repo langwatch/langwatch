@@ -310,9 +310,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // names belongs to exactly one organization.
     //
     // One read is bounded by subject rather than by tenant: the sign-up
-    // policy asks whether ONE address holds a pending invitation anywhere,
-    // which spans organizations by definition. Admitted for `findFirst` only,
-    // so it answers yes or no and never lists invitations.
+    // policy and the welcome screen ask whether ONE address the caller has
+    // proven holds a pending invitation anywhere, which spans organizations
+    // by definition. Admitted for `findFirst` only, one address per read, so
+    // it answers at most one row and never lists invitations.
     extraBound: ({ clause, action }) =>
       typeof clauseField(clause, "inviteCode") === "string" ||
       (action === "findFirst" && namesOneAddress(clauseField(clause, "email"))),
