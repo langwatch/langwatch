@@ -73,7 +73,6 @@ function fakePrisma(overrides: {
 async function gatewayAppStub(): Promise<GatewayModule> {
   return GatewayModule.create({
     dependencies: {
-      webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
       authz: peer("authz"),
       projects: projectsStub({}),

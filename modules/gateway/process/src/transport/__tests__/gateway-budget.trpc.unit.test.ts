@@ -128,7 +128,6 @@ const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 async function callerFor(budgets: Record<string, unknown>[]) {
   const app = await GatewayModule.create({
     dependencies: {
-      webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
       authz: peer("authz"),
       projects: projectsStub({

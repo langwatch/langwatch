@@ -27,6 +27,12 @@ import {
   type ProcessEventEnvelope,
 } from "@langwatch/eventing";
 import {
+  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+  GATEWAY_SPEND_FAILED_EVENT_TYPE,
+  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+} from "@langwatch/gateway-contract";
+import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaQueryGuard,
@@ -42,10 +48,6 @@ import { WebhookModule, type WebhookId, type WebhookSecret } from "../../app/web
 import { PrismaWebhookEndpointRepository } from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
 import type { WebhookEndpointRepository } from "../../repositories/webhook-endpoint.repository.ts";
 import {
-  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
-  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
-  GATEWAY_SPEND_FAILED_EVENT_TYPE,
-  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
   WEBHOOK_DELIVERY_PROCESS_NAME,
   type WebhookDeliveryState,
 } from "../../rules/webhook-delivery-contract.rules.ts";

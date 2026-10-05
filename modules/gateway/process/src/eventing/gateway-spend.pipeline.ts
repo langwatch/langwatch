@@ -11,7 +11,6 @@ import {
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type { WebhookApi } from "@langwatch/webhook-contract";
 
 import type { GatewayModule } from "../app/gateway.app.ts";
 import { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
@@ -25,10 +24,6 @@ import {
   SPEND_SETTLEMENT_PROCESS_NAME,
   spendSettlementPM,
 } from "./gateway-spend-settlement.process.ts";
-import {
-  GATEWAY_SPEND_WEBHOOK_SUBSCRIBER_NAME,
-  gatewaySpendWebhookSubscriber,
-} from "./gateway-spend-webhook.subscriber.ts";
 import {
   AdmitSpendCommand,
   ConfirmSpendCommand,
@@ -70,8 +65,6 @@ export interface EventingGatewaySpendAdapterOptions {
   cacheStore?: (
     inner: FoldProjectionStore<GatewaySpendState>,
   ) => FoldProjectionStore<GatewaySpendState>;
-  /** Webhook's own delivery op; each committed spend step is handed to it (WP-6c). */
-  webhookSpendDelivery?: Pick<WebhookApi, "requestGatewayEventDelivery">;
   /** The gateway's budget debits (`gatewayDebits`); absent without the
    *  ClickHouse spend path (the ledger is the only spend store). */
   gatewayDebits?: GatewaySpendProcessManagerMount;
@@ -123,12 +116,6 @@ export class EventingGatewaySpendAdapter {
       .withCommand("confirmSpend", ConfirmSpendCommand)
       .withCommand("failSpend", FailSpendCommand)
       .withCommand("settleSpend", SettleSpendCommand);
-    if (this.options.webhookSpendDelivery) {
-      pipeline = pipeline.withEventSubscriber(
-        GATEWAY_SPEND_WEBHOOK_SUBSCRIBER_NAME,
-        gatewaySpendWebhookSubscriber(this.options.webhookSpendDelivery),
-      );
-    }
     if (this.options.gatewayDebits) {
       pipeline = pipeline.withProcessManager(
         this.options.gatewayDebits.name,

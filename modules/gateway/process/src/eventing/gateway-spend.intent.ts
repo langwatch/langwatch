@@ -1,5 +1,11 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventSchema, EventUtils } from "@langwatch/eventing";
+import {
+  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+  GATEWAY_SPEND_FAILED_EVENT_TYPE,
+  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+} from "@langwatch/gateway-contract";
 import { z } from "zod";
 
 import {
@@ -12,12 +18,8 @@ import {
   FAIL_SPEND_COMMAND_TYPE,
   type FailSpendCommandData,
   failSpendCommandDataSchema,
-  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_AGGREGATE_TYPE,
-  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_EVENT_VERSION_LATEST,
-  GATEWAY_SPEND_FAILED_EVENT_TYPE,
-  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
   SETTLE_SPEND_COMMAND_TYPE,
   type SettleSpendCommandData,
   settleSpendCommandDataSchema,

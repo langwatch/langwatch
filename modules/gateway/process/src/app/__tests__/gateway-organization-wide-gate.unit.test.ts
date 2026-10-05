@@ -28,7 +28,6 @@ const reversible: Encryption = {
 function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayModule> {
   return GatewayModule.create({
     dependencies: {
-      webhooks: createApiFixture({}),
       entitlement: createApiFixture({}),
       authz: createApiFixture<AuthzApi>(authz),
       projects: createApiFixture({}),

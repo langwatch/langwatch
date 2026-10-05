@@ -7,13 +7,7 @@ export { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 export { agentCacheRest } from "./transport/agent-cache.rest.ts";
 export { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
 export { gatewaySpendBillingPlanGate, gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
-export type {
-  GatewaySpendApp,
-  GatewaySpendWebhookDelivery,
-  GatewaySpendWebhookEndpoint,
-  GatewaySpendWebhookEndpoints,
-  GatewaySpendWebhookEvents,
-} from "./services/gateway-spend-reconciliation.service.ts";
+export type { GatewaySpendApp } from "./services/gateway-spend-reconciliation.service.ts";
 export { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
 export { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
@@ -131,7 +125,10 @@ export type {
   ElevenLabsCredentialCollaborators,
   ElevenLabsWebhookSecret,
 } from "./services/gateway-elevenlabs-credential.service.ts";
-export type { GatewayRealtimeSessionCollaborators, ReserveInput } from "./services/gateway-realtime-session.service.ts";
+export type {
+  GatewayRealtimeSessionCollaborators,
+  ReserveInput,
+} from "./services/gateway-realtime-session.service.ts";
 export type { ReserveResult } from "./repositories/gateway-realtime-session.repository.ts";
 export type { GatewayJwtClaims, GatewayJwtSubject } from "./services/gateway-jwt.service.ts";
 export type { ElevenLabsCredentialReader } from "./services/gateway-realtime-session-reconciliation.service.ts";

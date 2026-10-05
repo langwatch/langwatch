@@ -100,7 +100,6 @@ function mountSpendFamily(spend: GatewaySpendApp) {
     answerSpendSummaries: (input) => answers.answerSpendSummaries(input),
     answerSpendEvents: (input) => answers.answerSpendEvents(input),
     answerEndUserSpend: (input) => answers.answerEndUserSpend(input),
-    answerSpendReplay: (input) => answers.answerSpendReplay(input),
   };
 
   return runtime.mount(gatewaySpendRest.router(), {
@@ -123,17 +122,10 @@ function buildApp(): void {
     projects: createTraceDestinationProjects(prisma),
     virtualKeys: PrismaGatewaySpendScopeRepository.create({ database: prisma }),
   });
-  const refuse = () => {
-    throw new Error("the replay path is not under test here");
-  };
   const spend: GatewaySpendApp = {
     getSpendEvents: () => GatewaySpendEventsService.create(repo),
     getBudgetSpend: () => budgets,
-    webhookEndpoints: () => ({ findDeliverable: refuse }),
-    webhookEvents: refuse,
-    webhookDelivery: refuse,
     spendEventEnvelope: testEnvelope,
-    endpointAcceptsEvent: () => true,
     settlementPolicy: () => FixedGatewaySettlementPolicyService.create(15 * 60_000),
     resolveSpendScope: (input) => {
       scope.clearCache();

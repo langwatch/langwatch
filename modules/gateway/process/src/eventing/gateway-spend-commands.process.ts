@@ -1,4 +1,10 @@
-import { spendUsageSchema } from "@langwatch/gateway-contract";
+import {
+  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+  GATEWAY_SPEND_FAILED_EVENT_TYPE,
+  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+  spendUsageSchema,
+} from "@langwatch/gateway-contract";
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
@@ -18,11 +24,6 @@ export const GATEWAY_SPEND_PROCESSING_COMMAND_TYPES = [
   FAIL_SPEND_COMMAND_TYPE,
   SETTLE_SPEND_COMMAND_TYPE,
 ] as const;
-
-export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as const;
-export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE = "lw.gateway.spend.confirmed" as const;
-export const GATEWAY_SPEND_FAILED_EVENT_TYPE = "lw.gateway.spend.failed" as const;
-export const GATEWAY_SPEND_SETTLED_EVENT_TYPE = "lw.gateway.spend.settled" as const;
 
 export const GATEWAY_SPEND_PROCESSING_EVENT_TYPES = [
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,

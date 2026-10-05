@@ -28,7 +28,6 @@ function gatewayApp({
 }): Promise<GatewayModule> {
   return GatewayModule.create({
     dependencies: {
-      webhooks: createApiFixture({}),
       entitlement: createApiFixture({}),
       authz: createApiFixture({}),
       projects: createApiFixture({}),

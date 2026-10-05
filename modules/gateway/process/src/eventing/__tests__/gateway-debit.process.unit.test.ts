@@ -1,8 +1,3 @@
-/**
- * The gateway-debits process joins an admission with its outcome into one
- * debit intent. Either may arrive first and either may carry the attribution;
- * whichever arrives second releases what the first stashed.
- */
 import {
   buildProcessDefinition,
   buildProcessManager,
@@ -12,6 +7,16 @@ import {
   type ProcessEventEnvelope,
   ProcessManagerService,
 } from "@langwatch/eventing";
+/**
+ * The gateway-debits process joins an admission with its outcome into one
+ * debit intent. Either may arrive first and either may carry the attribution;
+ * whichever arrives second releases what the first stashed.
+ */
+import {
+  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+  GATEWAY_SPEND_FAILED_EVENT_TYPE,
+} from "@langwatch/gateway-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { WriteGatewayDebitsPayload } from "../gateway-debit.intent.ts";
@@ -20,11 +25,6 @@ import {
   GatewayDebitProcess,
   gatewayDebitsStateSchema,
 } from "../gateway-debit.process.ts";
-import {
-  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
-  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
-  GATEWAY_SPEND_FAILED_EVENT_TYPE,
-} from "../gateway-spend-commands.process.ts";
 
 /** Handlers mint intents and return; only the outbox worker would reach the writer. */
 const unreachedWriter = {

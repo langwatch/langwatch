@@ -2,11 +2,13 @@ import type { Event, FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
-  GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
-  GATEWAY_SPEND_EVENT_VERSION_LATEST,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+} from "@langwatch/gateway-contract";
+import {
+  GATEWAY_SPEND_AGGREGATE_TYPE,
+  GATEWAY_SPEND_EVENT_VERSION_LATEST,
 } from "@langwatch/gateway-process";
 import type {
   GatewaySpendAdmittedEvent,

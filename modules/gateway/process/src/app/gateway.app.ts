@@ -48,8 +48,6 @@ import {
   type GatewayEndUserSpendResponse,
   type GatewaySpendEventsPage,
   type GatewaySpendEventsQuery,
-  type GatewaySpendReplayBody,
-  type GatewaySpendReplayResponse,
   type GatewaySpendSummariesPage,
   type GatewaySpendSummariesQuery,
   type GatewaySpendByRequestTypeQuery,
@@ -144,13 +142,10 @@ import { SecretApi } from "@langwatch/secret-contract";
 import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
-// The billing envelope and the subscription grammar are the webhook
-// platform's, and a reconciliation pull has to answer the same bytes a push
-// delivers, so both ARRIVE from that module rather than being restated here.
+// The billing envelope is the webhook platform's, and a reconciliation pull has
+// to answer the same bytes a push delivers, so it ARRIVES from that contract.
 import {
-  eventMatches,
   webhookEnvelopeFromSpendRow,
-  WebhookApi,
   type WebhookSpendEventRow,
 } from "@langwatch/webhook-contract";
 import type { z } from "zod";
@@ -687,7 +682,6 @@ function spendCommandRecord(command: string, payload: unknown): Record<string, u
 type GatewaySpendPipelineParts = Readonly<{
   ledger: GatewaySpendEventsRepository;
   commands: Record<string, GatewaySpendCommandSender | undefined>;
-  webhooks: Pick<WebhookApi, "requestGatewayEventDelivery">;
   openAdmissions: GatewayOpenAdmissionsRepository;
   settlementGraceMs: number;
   foldCache: GatewaySpendFoldCacheRepository;
@@ -708,7 +702,6 @@ type GatewaySpendDefinition = StaticPipelineDefinition<
  */
 export type GatewaySpendCollaborators = Readonly<{
   prisma: ProcessMembers["prisma"];
-  webhooks: WebhookApi;
   settlementGraceMs: number;
 }>;
 
@@ -740,12 +733,6 @@ type GatewaySetup = FeatureSetup<
 export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, GatewaySpendDoorApi {
   static readonly contract = GatewayApiToken;
   static readonly dependencies = {
-    /**
-     * The SAME outbound platform a live spend push is delivered through — the
-     * reconciliation pull and the push must not disagree about what a customer
-     * already received.
-     */
-    webhooks: WebhookApi,
     /**
      * Declared HERE though only the billing REST door ever asks it anything, so
      * a process with no plan store refuses at boot rather than answering every
@@ -932,7 +919,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       spendPipeline: {
         ledger: controlPlane.spendLedger,
         commands: spendCommands,
-        webhooks: setup.dependencies.webhooks,
         openAdmissions: controlPlane.openAdmissions,
         settlementGraceMs: graceMs,
         foldCache: RedisGatewaySpendFoldCacheRepository.create(setup.members.redis),
@@ -954,7 +940,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       },
       spend: {
         prisma: setup.members.prisma,
-        webhooks: setup.dependencies.webhooks,
         settlementGraceMs: graceMs,
       },
       budgetOverviewDeps: {
@@ -1061,7 +1046,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     const processing = EventingGatewaySpendAdapter.create({
       spendEvents: parts.ledger,
       cacheStore: (inner) => foldCache.cached(inner),
-      webhookSpendDelivery: parts.webhooks,
       gatewayDebits: debits
         ? {
             name: GATEWAY_DEBITS_PROCESS_NAME,
@@ -1077,14 +1061,9 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return processing.buildProcessing();
   }
 
-  /** governance_events_processing for this role: the worker also hands each fact to webhook. */
-  governanceEventsPipeline({
-    participation,
-  }: {
-    participation: EventingParticipation;
-  }): GatewayGovernanceEventsDefinition {
-    const webhooks = participation === "produce" ? void 0 : this.#spendPipeline?.webhooks;
-    return buildGatewayGovernanceEventsPipeline(webhooks ? { webhooks } : {});
+  /** governance_events_processing: the same commands in every role; webhook subscribes itself. */
+  governanceEventsPipeline(): GatewayGovernanceEventsDefinition {
+    return buildGatewayGovernanceEventsPipeline();
   }
 
   /** Binds the crossing and lifecycle senders the debit writer and key services record through. */
@@ -1228,13 +1207,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return this.#spendAnswers.answerEndUserSpend(input);
   }
 
-  answerSpendReplay(input: {
-    organizationId: string;
-    body: GatewaySpendReplayBody;
-  }): Promise<GatewaySpendReplayResponse> {
-    return this.#spendAnswers.answerSpendReplay(input);
-  }
-
   answerInternalResolveKey(
     input: GatewayInternalResolveKeyRequest,
   ): Promise<RestDeclaredResult<typeof gatewayInternalResolveKeyAnswers>> {
@@ -1350,40 +1322,9 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   // pull surface's envelope/subscription/settlement-grace format with a
   // different one than the push half already uses.
 
-  /** The endpoint registry a replay names its destination in. */
-  webhookEndpoints(): {
-    findDeliverable(input: {
-      organizationId: string;
-      endpointId: string;
-    }): Promise<{ id: string; enabledEvents: readonly string[] } | null>;
-  } {
-    const webhooks = this.#spendCollaborators.webhooks;
-
-    return { findDeliverable: (input) => webhooks.findDeliverable(input) };
-  }
-
-  /** The emitted-envelope log a replay walks, one page at a time. */
-  webhookEvents(): WebhookApi {
-    return this.#spendCollaborators.webhooks;
-  }
-
-  /**
-   * The live delivery path a replay appends to: the webhook platform's own
-   * `WebhookApi.appendReplayToEndpointStream`, reached through the same
-   * declared peer `webhookEvents()` above already uses.
-   */
-  webhookDelivery(): WebhookApi {
-    return this.#spendCollaborators.webhooks;
-  }
-
   /** One spend row rendered as the canonical billing envelope. */
   spendEventEnvelope(row: WebhookSpendEventRow): GatewaySpendEventEnvelope {
     return gatewaySpendEventEnvelopeSchema.parse(webhookEnvelopeFromSpendRow(row));
-  }
-
-  /** Whether an endpoint's subscriptions cover one event type. */
-  endpointAcceptsEvent(input: { enabledEvents: readonly string[]; eventType: string }): boolean {
-    return eventMatches(input.enabledEvents, input.eventType);
   }
 
   /** How long after a request an outcome may still arrive. */

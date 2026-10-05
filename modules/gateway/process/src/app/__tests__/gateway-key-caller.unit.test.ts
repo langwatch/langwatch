@@ -47,7 +47,6 @@ const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 async function gatewayApp(): Promise<GatewayModule> {
   return GatewayModule.create({
     dependencies: {
-      webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
       authz: createApiFixture<AuthzApi>({ hasApiKeyPermission, hasPermission }),
       projects: createApiFixture<ProjectApi>({ findOrganizationId, findIdentity: findProject }),

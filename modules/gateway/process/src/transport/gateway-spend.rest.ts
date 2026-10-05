@@ -14,10 +14,6 @@ import {
   gatewaySpendEventsQuerySchema,
   type GatewaySpendEventsPage,
   type GatewaySpendEventsQuery,
-  gatewaySpendReplayBodySchema,
-  gatewaySpendReplayResponseSchema,
-  type GatewaySpendReplayBody,
-  type GatewaySpendReplayResponse,
   gatewaySpendSummariesPageSchema,
   gatewaySpendSummariesQuerySchema,
   type GatewaySpendSummariesPage,
@@ -42,7 +38,7 @@ export const SPEND_SUMMARIES_DESCRIPTION =
 export const END_USER_SPEND_DESCRIPTION =
   "Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this end user, each with its limit and the spend against it. It is an empty array until such a budget template applies, never null.";
 
-/** What the four reconciliation routes reach: each route's parsed request in, its page out. */
+/** What the three reconciliation reads reach: each route's parsed request in, its page out. */
 export interface GatewaySpendDoorApi {
   answerSpendSummaries(
     input: Readonly<{ organizationId: string; query: GatewaySpendSummariesQuery }>,
@@ -53,9 +49,6 @@ export interface GatewaySpendDoorApi {
   answerEndUserSpend(
     input: Readonly<{ organizationId: string; query: GatewayEndUserSpendQuery }>,
   ): Promise<GatewayEndUserSpendResponse>;
-  answerSpendReplay(
-    input: Readonly<{ organizationId: string; body: GatewaySpendReplayBody }>,
-  ): Promise<GatewaySpendReplayResponse>;
 }
 
 export const GatewaySpendApi = moduleApi<GatewaySpendDoorApi>()("gateway");
@@ -71,17 +64,6 @@ export const gatewaySpendBillingPlanGate = defineRestMiddleware(
 );
 
 const spendResponses = canonicalBaseResponses;
-
-const REPLAY_DESCRIPTION =
-  "Re-delivers the window's spend envelopes to ONE endpoint through the " +
-  "normal delivery path (per-endpoint stream, retry ladder, delivery log), " +
-  "honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: " +
-  "your consumer's event-id dedup decides what a redelivery means. Mind your " +
-  "downstream billing system's finite dedup window (Metronome 34 days, " +
-  "Stripe 24h+): replaying older than that window can double-bill on your " +
-  "side, so prefer pull-and-diff for old ranges. The window is capped at 7 " +
-  "days and 10,000 envelopes per call; both caps are checked before any " +
-  "delivery is queued, so a refused replay ships nothing.";
 
 export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
   .withNamespace("gateway-spend")
@@ -139,22 +121,6 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
   })
   .handle(({ app, input, scope }) =>
     app.answerEndUserSpend({ organizationId: scope.id, query: input }),
-  )
-
-  .post("/api/gateway/v1/spend-events/replay", "replayGatewaySpendEvents")
-  .withInput(gatewaySpendReplayBodySchema)
-  .withPermission("gatewaySpend:manage")
-  .withOutput(gatewaySpendReplayResponseSchema)
-  .withMiddleware(gatewaySpendBillingPlanGate)
-  .withDocs({
-    operationId: "postApiGatewayV1SpendEventsReplay",
-    tags: ["Gateway Spend"],
-    summary: "Replay spend events to an endpoint",
-    description: REPLAY_DESCRIPTION,
-    responses: spendResponses,
-  })
-  .handle(({ app, input, scope }) =>
-    app.answerSpendReplay({ organizationId: scope.id, body: input }),
   )
 
   .build();

@@ -56,7 +56,6 @@ async function mount() {
   });
   const app = await GatewayModule.create({
     dependencies: {
-      webhooks: createApiFixture({}),
       entitlement: createApiFixture({}),
       authz: createApiFixture<AuthzApi>({}),
       projects: createApiFixture<ProjectApi>({

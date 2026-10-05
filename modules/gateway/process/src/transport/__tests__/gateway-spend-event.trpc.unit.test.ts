@@ -96,7 +96,6 @@ const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 async function gatewayAppStub(): Promise<GatewayModule> {
   return GatewayModule.create({
     dependencies: {
-      webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
       authz: peer("authz"),
       projects: projectsStub({ findOrganizationId: async () => "org_1" }),

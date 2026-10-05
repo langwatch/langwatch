@@ -1,25 +1,18 @@
 /**
- * The spend reconciliation reads and replay behind `/api/gateway/v1`: each route's parsed query
- * in, its page out. Refusals are the ones the routes always gave.
+ * The spend reconciliation reads behind `/api/gateway/v1`: each route's parsed query in, its
+ * page out. Refusals are the ones the routes always gave. The replay is webhook's.
  */
 import { BadRequestError } from "@langwatch/api/rest";
 import {
   GATEWAY_END_USER_SPEND_WINDOWS,
-  GATEWAY_SPEND_REPLAY_KSUID_RESOURCE,
-  GATEWAY_SPEND_REPLAY_MAX_ENVELOPES,
-  GATEWAY_SPEND_REPLAY_PAGE_SIZE,
   type GatewayEndUserSpendQuery,
   type GatewayEndUserSpendResponse,
-  type GatewaySpendEnvelope,
   type GatewaySpendEventEnvelope,
   type GatewaySpendEventsPage,
   type GatewaySpendEventsQuery,
-  type GatewaySpendReplayBody,
-  type GatewaySpendReplayResponse,
   type GatewaySpendSummariesPage,
   type GatewaySpendSummariesQuery,
 } from "@langwatch/gateway-contract";
-import { generate } from "@langwatch/ksuid";
 import { nowInstant, Temporal } from "@langwatch/time";
 
 import type { GatewayBudgetSpend, GatewaySettlementPolicy } from "../app/gateway.members.ts";
@@ -37,41 +30,6 @@ type SpendLedgerRow = Awaited<
   ReturnType<GatewaySpendEventsService["walkSpendEvents"]>
 >["rows"][number];
 
-/** A deliverable endpoint, reduced to what a replay reads off it. */
-export type GatewaySpendWebhookEndpoint = {
-  id: string;
-  enabledEvents: readonly string[];
-};
-
-/** The endpoint registry a replay names its destination in. */
-export type GatewaySpendWebhookEndpoints = {
-  findDeliverable(input: {
-    organizationId: string;
-    endpointId: string;
-  }): Promise<GatewaySpendWebhookEndpoint | null>;
-};
-
-/** The emitted-envelope log a replay walks, one page at a time. */
-export type GatewaySpendWebhookEvents = {
-  getEmittedEvents(input: {
-    organizationId: string;
-    fromMs: number;
-    toMs: number;
-    cursor: string | null;
-    limit: number;
-  }): Promise<{ events: GatewaySpendEnvelope[]; nextCursor: string | null }>;
-};
-
-/** The live delivery path a replay appends to. */
-export type GatewaySpendWebhookDelivery = {
-  appendReplayToEndpointStream(input: {
-    organizationId: string;
-    endpoint: GatewaySpendWebhookEndpoint;
-    envelope: GatewaySpendEnvelope;
-    replayId: string;
-  }): Promise<void>;
-};
-
 /** Postgres filters a spend read narrows by, before they resolve to ClickHouse ids. */
 export type GatewaySpendScopeQuery = {
   organizationId: string;
@@ -84,9 +42,7 @@ export type GatewaySpendScopeQuery = {
 export type GatewaySpendScope = { tenantIds: string[]; virtualKeyIds?: string[] };
 
 /**
- * The whole of what the four reconciliation routes ask the application for.
- * The webhook half stays structural (not importing `WebhookApi`) so the type
- * states what a route reads, not the whole platform surface it doesn't use.
+ * The whole of what the three reconciliation reads ask the application for.
  */
 export type GatewaySpendApp = Readonly<{
   /**
@@ -97,22 +53,12 @@ export type GatewaySpendApp = Readonly<{
   /** The budget ledger the per-end-user caps are read against. */
   getBudgetSpend(): GatewayBudgetSpend;
 
-  /** The endpoint registry a replay names its destination in. */
-  webhookEndpoints(): GatewaySpendWebhookEndpoints;
-  /** The emitted-envelope log a replay walks. */
-  webhookEvents(): GatewaySpendWebhookEvents;
-  /** The live delivery path a replay appends to. */
-  webhookDelivery(): GatewaySpendWebhookDelivery;
-
   /**
    * One spend row rendered as the canonical billing envelope. The wire format
    * is the webhook platform's, and the pull and the push must answer the same
    * bytes, so the mapping arrives rather than being restated here.
    */
   spendEventEnvelope(row: SpendLedgerRow): GatewaySpendEventEnvelope;
-
-  /** Selector grammar is the webhook platform's; a second reading here could disagree with push. */
-  endpointAcceptsEvent(input: { enabledEvents: readonly string[]; eventType: string }): boolean;
 
   /**
    * How long after a request an outcome may still arrive, which is what makes
@@ -133,102 +79,7 @@ export type GatewaySpendApp = Readonly<{
   }): Promise<GatewayEndUserCap[]>;
 }>;
 
-/** Refuses as soon as the cap is passed, BEFORE any envelope is queued: no partial ships. */
-async function assertReplayWindowWithinCap({
-  events,
-  endpoint,
-  accepts,
-  organizationId,
-  fromMs,
-  toMs,
-}: {
-  events: GatewaySpendWebhookEvents;
-  endpoint: GatewaySpendWebhookEndpoint;
-  accepts: GatewaySpendApp["endpointAcceptsEvent"];
-  organizationId: string;
-  fromMs: number;
-  toMs: number;
-}): Promise<void> {
-  let matching = 0;
-  let cursor: string | null = null;
-  do {
-    const page = await events.getEmittedEvents({
-      organizationId,
-      fromMs,
-      toMs,
-      cursor,
-      limit: GATEWAY_SPEND_REPLAY_PAGE_SIZE,
-    });
-    for (const envelope of page.events) {
-      if (!accepts({ enabledEvents: endpoint.enabledEvents, eventType: envelope.type })) {
-        continue;
-      }
-      matching++;
-      if (matching > GATEWAY_SPEND_REPLAY_MAX_ENVELOPES) {
-        throw new BadRequestError(
-          `the window holds more than ${GATEWAY_SPEND_REPLAY_MAX_ENVELOPES} envelopes; narrow it`,
-        );
-      }
-    }
-    cursor = page.nextCursor;
-  } while (cursor);
-}
-
-/**
- * Appends every matching envelope in the window to the endpoint's live
- * delivery stream, and answers how many shipped.
- */
-async function appendWindowToEndpointStream({
-  events,
-  endpoint,
-  delivery,
-  accepts,
-  organizationId,
-  fromMs,
-  toMs,
-  replayId,
-}: {
-  events: GatewaySpendWebhookEvents;
-  endpoint: GatewaySpendWebhookEndpoint;
-  delivery: GatewaySpendWebhookDelivery;
-  accepts: GatewaySpendApp["endpointAcceptsEvent"];
-  organizationId: string;
-  fromMs: number;
-  toMs: number;
-  replayId: string;
-}): Promise<number> {
-  let replayed = 0;
-  let cursor: string | null = null;
-  do {
-    const page = await events.getEmittedEvents({
-      organizationId,
-      fromMs,
-      toMs,
-      cursor,
-      limit: GATEWAY_SPEND_REPLAY_PAGE_SIZE,
-    });
-    const matching = page.events.filter((envelope) =>
-      accepts({ enabledEvents: endpoint.enabledEvents, eventType: envelope.type }),
-    );
-    // The preflight cleared this window, but folds landing between the two
-    // passes can still grow it. Ship up to the cap and stop there rather
-    // than error out: the response reports what actually went out.
-    const shippable = matching.slice(0, GATEWAY_SPEND_REPLAY_MAX_ENVELOPES - replayed);
-    for (const envelope of shippable) {
-      await delivery.appendReplayToEndpointStream({
-        organizationId,
-        endpoint,
-        envelope,
-        replayId,
-      });
-      replayed++;
-    }
-    cursor = shippable.length < matching.length ? null : page.nextCursor;
-  } while (cursor);
-  return replayed;
-}
-
-/** The four reconciliation routes' logic over what the application lends them. */
+/** The three reconciliation reads' logic over what the application lends them. */
 export class GatewaySpendReconciliationService {
   static create({
     collaborators,
@@ -408,66 +259,6 @@ export class GatewaySpendReconciliationService {
           image_count: rollup.imageCount,
         },
         caps,
-      },
-    };
-  }
-
-  /** Re-delivers a window's envelopes to one endpoint, refused whole when past the caps. */
-  async answerSpendReplay({
-    organizationId,
-    body,
-  }: {
-    organizationId: string;
-    body: GatewaySpendReplayBody;
-  }): Promise<GatewaySpendReplayResponse> {
-    const endpoint = await this.collaborators.webhookEndpoints().findDeliverable({
-      organizationId: organizationId,
-      endpointId: body.endpoint_id,
-    });
-    if (!endpoint) {
-      throw new BadRequestError("unknown or inactive endpoint for this organization");
-    }
-
-    const events = this.collaborators.webhookEvents();
-    const delivery = this.collaborators.webhookDelivery();
-
-    // One replay identity per call: it salts batch ids and inbox source
-    // ids so redelivered envelopes cannot collide with their historical
-    // batches; the ENVELOPE ids stay untouched.
-    await assertReplayWindowWithinCap({
-      events,
-      endpoint,
-      accepts: (input) => this.collaborators.endpointAcceptsEvent(input),
-      organizationId: organizationId,
-      fromMs: body.from,
-      toMs: body.to,
-    });
-
-    const replayId = generate(GATEWAY_SPEND_REPLAY_KSUID_RESOURCE).toString();
-    const replayed = await appendWindowToEndpointStream({
-      events,
-      endpoint,
-      delivery,
-      accepts: (input) => this.collaborators.endpointAcceptsEvent(input),
-      organizationId: organizationId,
-      fromMs: body.from,
-      toMs: body.to,
-      replayId,
-    });
-
-    return {
-      data: {
-        endpoint_id: endpoint.id,
-        replay_id: replayId,
-        replayed,
-        window: {
-          from: Temporal.Instant.fromEpochMilliseconds(body.from).toString({
-            smallestUnit: "millisecond",
-          }),
-          to: Temporal.Instant.fromEpochMilliseconds(body.to).toString({
-            smallestUnit: "millisecond",
-          }),
-        },
       },
     };
   }

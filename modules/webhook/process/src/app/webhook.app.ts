@@ -57,7 +57,9 @@ import { WebhookEventsService } from "../services/webhook-events.service.ts";
 import { WebhookGovernanceDeliveryService } from "../services/webhook-governance-delivery.service.ts";
 import { WebhookHealthService } from "../services/webhook-health.service.ts";
 import { WebhookRequestService } from "../services/webhook-request.service.ts";
+import { WebhookSpendReplayService } from "../services/webhook-spend-replay.service.ts";
 import { WebhookTestBoundsService } from "../services/webhook-test-bounds.service.ts";
+import type { WebhookSpendReplayDoorApi } from "../transport/webhook-spend-replay.rest.ts";
 
 /** Synthetic test-fire ids; sent once and never read back by kind. */
 const TEST_EVENT_KSUID_RESOURCE = "evttest";
@@ -169,7 +171,7 @@ type WebhookDeliveryParts = Readonly<{
   dispatch: () => WebhookDeliveryProcessDeps["dispatch"];
 }>;
 
-export class WebhookModule implements WebhookApiContract {
+export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoorApi {
   static readonly contract = WebhookApi;
   /** The entitlement peer this app's own plan gate reads (`WebhookAccessService`),
    *  and the project peer naming an organization's tenants for the events listing. */
@@ -264,6 +266,7 @@ export class WebhookModule implements WebhookApiContract {
     return buildWebhookDeliveryPipeline({
       deliveryProcess: WebhookDeliveryService.create(deps).processManager(),
       governanceProcess: WebhookGovernanceDeliveryService.create(deps).processManager(),
+      gatewayEvents: (request) => this.requestGatewayEventDelivery(request),
     });
   }
 
@@ -408,6 +411,10 @@ export class WebhookModule implements WebhookApiContract {
   };
   appendReplayToEndpointStream: WebhookApiContract["appendReplayToEndpointStream"] = (input) =>
     this.#requeue.appendReplay(input);
+
+  /** `POST /api/gateway/v1/spend-events/replay`, over this module's own endpoints and log. */
+  answerSpendReplay: WebhookSpendReplayDoorApi["answerSpendReplay"] = (input) =>
+    WebhookSpendReplayService.create(this).answerSpendReplay(input);
 
   get #endpointSaves(): WebhookEndpointService {
     return WebhookEndpointService.create({

@@ -1,10 +1,10 @@
+import { PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { PermissionDeniedError } from "@langwatch/authorization";
 /**
  * @vitest-environment node
  * @see modules/gateway/specs/gateway-virtual-key-impersonated-mint.feature
@@ -29,7 +29,6 @@ async function gatewayApp() {
   const hasPermission = vi.fn<AuthzApi["hasPermission"]>(async () => true);
   const app = await GatewayModule.create({
     dependencies: {
-      webhooks: createApiFixture({}),
       entitlement: createApiFixture({}),
       authz: createApiFixture<AuthzApi>({ hasPermission }),
       projects: createApiFixture({}),
