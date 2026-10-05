@@ -15,7 +15,6 @@
     "packages/browser-host -> @langwatch/scenario-contract": 1,
     "packages/browser-host -> @langwatch/trace-contract": 1,
     "packages/browser-host -> @langwatch/workflow-contract": 1,
-    "packages/clickhouse-client -> @langwatch/data-retention-contract": 1,
     "packages/clickhouse-migrations -> @langwatch/data-retention-contract": 1,
     "packages/group-queue -> @langwatch/stored-object-contract": 1,
     "packages/prisma-client -> @langwatch/api-key-contract": 1,
