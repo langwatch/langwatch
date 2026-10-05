@@ -1,13 +1,10 @@
-import { availableFilters, type FilterField } from "@langwatch/analytics-filters";
+import { availableFilters, isFilterField } from "@langwatch/analytics-filters";
 
 /** One id an evaluation condition selects results by, and where it sits. */
 export interface EvaluationFilterReference {
   field: string;
   id: string;
 }
-
-const isFilterField = (field: string): field is FilterField =>
-  Object.hasOwn(availableFilters, field);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);

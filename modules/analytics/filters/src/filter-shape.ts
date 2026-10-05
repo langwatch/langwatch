@@ -7,7 +7,8 @@ export interface UnkeyedFilterField {
   example: string;
 }
 
-const isFilterField = (field: string): field is FilterField =>
+/** Whether a name is a field of the filter registry; an own key, never a prototype member. */
+export const isFilterField = (field: string): field is FilterField =>
   Object.hasOwn(availableFilters, field);
 
 const definitionsOf = (field: string): FilterDefinition[] =>

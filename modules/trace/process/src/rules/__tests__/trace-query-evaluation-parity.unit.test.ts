@@ -571,6 +571,24 @@ const cases: Case[] = [
     expected: false,
   },
   {
+    name: "has:feedback matches a trace carrying a thumbs_up_down event",
+    query: "has:feedback",
+    trace: makeTrace({}, { events: [makeEvent({ name: "thumbs_up_down" })] }),
+    expected: true,
+  },
+  {
+    name: "none:feedback misses a trace carrying a thumbs_up_down event",
+    query: "none:feedback",
+    trace: makeTrace({}, { events: [makeEvent({ name: "thumbs_up_down" })] }),
+    expected: false,
+  },
+  {
+    name: "has:feedback misses a trace carrying only other events",
+    query: "has:feedback",
+    trace: makeTrace({}, { events: [makeEvent({ name: "page_view" })] }),
+    expected: false,
+  },
+  {
     name: "event name matches a loaded event",
     query: "event:user_feedback",
     trace: makeTrace({}, { events: [makeEvent({ name: "user_feedback" })] }),
@@ -700,6 +718,21 @@ describe("FieldDef SQL/read parity", () => {
         expect(compiled?.sql).toContain(def.expression);
       },
     );
+  });
+});
+
+describe("has:feedback", () => {
+  /** @scenario "`@has:feedback` shorthand" */
+  it("finds the thumbs_up_down event feedback lands as, in memory and in ClickHouse", () => {
+    const withFeedback = makeTrace({}, { events: [makeEvent({ name: "thumbs_up_down" })] });
+    expect(evaluateQueryInMemory("has:feedback", withFeedback)).toBe(true);
+
+    const compiled = translateFilter({
+      queryText: "has:feedback",
+      tenantId: "tenant-1",
+      timeRange: { from: 0, to: 1 },
+    });
+    expect(compiled?.sql).toContain("thumbs_up_down");
   });
 });
 

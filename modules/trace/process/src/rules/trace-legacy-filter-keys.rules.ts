@@ -1,5 +1,7 @@
 import { findUnkeyedFilterFields } from "@langwatch/analytics-filters";
 
+import { isRecord } from "./canonical-guard.rules.ts";
+
 /**
  * A keyed legacy filter sent without its key, which trace search compiles to a
  * condition matching nothing. Trace search only: analytics reads a flat
@@ -10,9 +12,6 @@ export interface UnkeyedLegacyFilter {
   message: string;
   received: unknown;
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 const SIMPLER = " The filter string is simpler:";
 
