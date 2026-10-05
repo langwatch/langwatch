@@ -376,7 +376,7 @@ function InvitationTakeover({
   return (
     <Takeover
       title={`You’re invited to join ${invitation.organizationName}`}
-      intro={`An administrator has already invited you, as a ${seat}.`}
+      intro={`An administrator has already invited you, with the ${seat} seat.`}
       testId="join-team-invitation"
     >
       <AuthPrimaryButton

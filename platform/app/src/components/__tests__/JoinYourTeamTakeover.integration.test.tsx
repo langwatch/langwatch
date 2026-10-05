@@ -493,6 +493,24 @@ describe("given somebody an administrator already invited", () => {
       ).not.toBeInTheDocument();
     });
 
+    /** @scenario A pending invitation is offered before asking to join */
+    it("names any seat without an article that only fits some of them", () => {
+      invitationsRef.current = {
+        data: [
+          { inviteCode: "code_1", organizationName: "Acme", role: "ADMIN" },
+        ],
+        isPending: false,
+        isSuccess: true,
+      };
+      renderTakeover();
+
+      expect(
+        screen.getByText(
+          "An administrator has already invited you, with the Admin seat.",
+        ),
+      ).toBeInTheDocument();
+    });
+
     /** @scenario A pending invitation leads even while a request to join is open */
     it("leads with the invitation over the request already waiting", () => {
       invitationsRef.current = { ...INVITED };
