@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 /** Pre-parsed per-project Lambda deployment; pure functions stay testable without env. */
 export const NLP_LAMBDA_CONFIG_ENV = "LANGWATCH_NLP_LAMBDA_CONFIG";
 
@@ -80,6 +82,23 @@ export function buildStudioLambdaEnvironment(config: StudioLambdaConfig): Record
     CACHE_BUCKET: config.cacheBucket,
     NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: String(config.codeBlockTimeoutSeconds),
   };
+}
+
+/**
+ * A digest of everything reconciliation pushes to a function: its environment,
+ * memory and timeout. A cached ARN resolved under another digest is stale.
+ */
+export function studioLambdaConfigFingerprint(config: StudioLambdaConfig): string {
+  const environment = Object.entries(buildStudioLambdaEnvironment(config)).toSorted(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  const desired = JSON.stringify({
+    environment,
+    memorySizeMb: NLP_LAMBDA_MEMORY_SIZE_MB,
+    timeoutSeconds: LAMBDA_INVOCATION_TIMEOUT_SECONDS,
+  });
+
+  return createHash("sha256").update(desired).digest("hex");
 }
 
 function positiveNumber(raw: unknown, fallback: number): number {

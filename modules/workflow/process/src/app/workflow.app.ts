@@ -21,7 +21,7 @@ import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { SecretApi } from "@langwatch/secret-contract";
-import { Secret } from "@langwatch/secrets";
+import { nlpInternalSecret, Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
   clearDsl,
@@ -114,7 +114,10 @@ import {
 } from "../repositories/workflow-repositories.registry.ts";
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 import { relayTurnCeilingMs } from "../rules/execute-sync-relay.rules.ts";
-import { buildStudioLambdaConfig } from "../rules/nlp-lambda-config.rules.ts";
+import {
+  buildStudioLambdaConfig,
+  studioLambdaConfigFingerprint,
+} from "../rules/nlp-lambda-config.rules.ts";
 import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
 import { dispatchKeyFloorMs } from "../rules/workflow-run-key.rules.ts";
 import {
@@ -375,12 +378,9 @@ export type WorkflowHostMembers = Omit<
   | "signals"
 >;
 
-/** The engine address, its code-block ceiling and the public origin are process facts. */
+/** The engine's code-block ceiling and the public origin are process facts. */
 type WorkflowProcessFacts = Readonly<{
-  nlpServiceUrl: string | undefined;
   nlpCodeBlockTimeoutSeconds: string | undefined;
-  /** The engine hop's shared credential, resolved by the process (ADR-132). */
-  nlpInternalSecret: string | undefined;
   publicBaseUrl: string | undefined;
 }>;
 
@@ -427,9 +427,11 @@ async function composeEngine(setup: WorkflowSetup): Promise<WorkflowEngine> {
     };
   }
 
-  if (named.data) return lambdaEngine({ fields: named.data, setup });
+  // The engine hop's shared credential (ADR-132); the process holds the same handle.
+  const internalSecret = await setup.secrets.into(nlpInternalSecret, (secret) => secret);
+  if (named.data) return lambdaEngine({ fields: named.data, setup, internalSecret });
 
-  const serviceUrl = setup.members.nlpServiceUrl;
+  const serviceUrl = setup.config.nlpServiceUrl;
   if (!serviceUrl) {
     return {
       stream: UnconfiguredWorkflowStudioStreamAdapter.create(),
@@ -437,8 +439,6 @@ async function composeEngine(setup: WorkflowSetup): Promise<WorkflowEngine> {
       perProjectEngines: false,
     };
   }
-
-  const internalSecret = setup.members.nlpInternalSecret;
 
   return {
     stream: HttpWorkflowStudioStreamAdapter.create({ serviceUrl, internalSecret }),
@@ -451,9 +451,11 @@ async function composeEngine(setup: WorkflowSetup): Promise<WorkflowEngine> {
 function lambdaEngine({
   fields,
   setup,
+  internalSecret,
 }: {
   fields: NlpLambdaFleetFields;
   setup: WorkflowSetup;
+  internalSecret: string | undefined;
 }): WorkflowEngine {
   const config = buildStudioLambdaConfig({
     fields: {
@@ -490,6 +492,7 @@ function lambdaEngine({
     cache: setup.repositories.nlpLambdaArns,
     resolver: AwsNlpLambdaArnResolverChannel.create({ lambda, logs, config, logger }),
     imageUri: config.imageUri,
+    configFingerprint: studioLambdaConfigFingerprint(config),
     logger,
   });
   const functions: NlpLambdaFunctionReader = {
@@ -497,7 +500,6 @@ function lambdaEngine({
   };
   const staging = setup.repositories.payloadStaging;
   const { stagingThresholdBytes, stagingTtlSeconds } = config;
-  const internalSecret = setup.members.nlpInternalSecret;
 
   return {
     stream: LambdaWorkflowStudioStreamChannel.create({
@@ -643,15 +645,12 @@ export class WorkflowModule implements WorkflowApi {
   };
   static readonly config = workflowConfig;
   /** `prisma` for `workflowRows`/`workflows`, via this module's `workflowRepositories`. */
-  static readonly reads = [
-    "prisma",
-    "nlpServiceUrl",
-    "nlpCodeBlockTimeoutSeconds",
-    "nlpInternalSecret",
-    "publicBaseUrl",
-  ] as const;
+  static readonly reads = ["prisma", "nlpCodeBlockTimeoutSeconds", "publicBaseUrl"] as const;
   static readonly repositories = workflowRepositories;
-  static readonly secrets = { nlpLambdaFleet: nlpLambdaFleetSecret } as const;
+  static readonly secrets = {
+    nlpLambdaFleet: nlpLambdaFleetSecret,
+    nlpInternal: nlpInternalSecret,
+  } as const;
 
   static async create(setup: WorkflowSetup): Promise<WorkflowModule> {
     const engine = await composeEngine(setup);

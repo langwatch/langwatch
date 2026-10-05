@@ -2,10 +2,18 @@
  * @vitest-environment node
  * @see specs/nlp-go/studio-lambda-cache.feature
  */
+import { GetFunctionCommand, UpdateFunctionConfigurationCommand } from "@aws-sdk/client-lambda";
 import { describe, expect, it, vi } from "vitest";
 
 import type { NlpLambdaArnCache } from "../../app/workflow.app.ts";
+import { AwsNlpLambdaArnResolverChannel } from "../../channels/aws.nlp-lambda-arn-resolver.channel.ts";
 import type { NlpLambdaArnResolver } from "../../channels/nlp-lambda.channel.ts";
+import {
+  buildStudioLambdaConfig,
+  buildStudioLambdaEnvironment,
+  studioLambdaConfigFingerprint,
+  type StudioLambdaConfig,
+} from "../../rules/nlp-lambda-config.rules.ts";
 import {
   NLP_LAMBDA_ARN_CACHE_TTL_SECONDS,
   NlpLambdaRuntimeService,
@@ -15,6 +23,7 @@ const IMAGE = "ecr/foo:v1";
 const NEXT_IMAGE = "ecr/foo:v2";
 const PROJECT = "projectA";
 const ARN = "arn:aws:lambda:eu-central-1:1:function:langwatch_nlp-projectA";
+const FINGERPRINT = "fingerprint-a";
 
 /** A store shared by every runtime built from it, as Redis is by every pod. */
 class SharedCache implements NlpLambdaArnCache {
@@ -51,12 +60,69 @@ function runtime(options: {
   cache: SharedCache;
   resolver: NlpLambdaArnResolver;
   imageUri?: string;
+  configFingerprint?: string;
 }) {
   return NlpLambdaRuntimeService.create({
     cache: options.cache,
     resolver: options.resolver,
     imageUri: options.imageUri ?? IMAGE,
+    configFingerprint: options.configFingerprint ?? FINGERPRINT,
   });
+}
+
+/** The studio deployment under one code-block ceiling, as the app assembles it. */
+function deploymentWithCeiling(seconds: string): StudioLambdaConfig {
+  return buildStudioLambdaConfig({
+    fields: {
+      region: "eu-central-1",
+      accessKeyId: "key",
+      secretAccessKey: "secret",
+      roleArn: "arn:aws:iam::1:role/nlp",
+      imageUri: IMAGE,
+      cacheBucket: "langwatch-nlp-cache",
+      subnetIds: ["subnet-1"],
+      securityGroupIds: ["sg-1"],
+    },
+    langwatchEndpoint: "https://app.test",
+    codeBlockTimeoutRawValue: seconds,
+    stagingThresholdBytesRawValue: undefined,
+    stagingTtlSecondsRawValue: undefined,
+  });
+}
+
+/** An account holding projectA's function as `deployed` configured it; records what is sent. */
+function awsAccount(deployed: StudioLambdaConfig) {
+  const sent: { name: string; input: Record<string, unknown> }[] = [];
+  const configuration = {
+    FunctionArn: ARN,
+    State: "Active",
+    LastUpdateStatus: "Successful",
+    MemorySize: 2048,
+    Timeout: 900,
+    Environment: { Variables: buildStudioLambdaEnvironment(deployed) },
+  };
+  const lambda = {
+    send: (command: { constructor: { name: string }; input: Record<string, unknown> }) => {
+      sent.push({ name: command.constructor.name, input: command.input });
+      if (command instanceof GetFunctionCommand) {
+        return Promise.resolve({ Configuration: configuration, Code: { ImageUri: IMAGE } });
+      }
+
+      return Promise.resolve(configuration);
+    },
+  } as never;
+  const logs = { send: () => Promise.resolve({}) } as never;
+
+  return {
+    sent,
+    resolverFor: (config: StudioLambdaConfig) =>
+      AwsNlpLambdaArnResolverChannel.create({
+        lambda,
+        logs,
+        config,
+        wait: () => Promise.resolve(),
+      }),
+  };
 }
 
 describe("the per-project NLP Lambda runtime", () => {
@@ -71,7 +137,11 @@ describe("the per-project NLP Lambda runtime", () => {
       expect(arn).toBe(ARN);
       const stored = cache.entries.get("lambda_arn:projectA");
       expect(stored?.ttlSeconds).toBe(NLP_LAMBDA_ARN_CACHE_TTL_SECONDS);
-      expect(JSON.parse(stored!.value)).toEqual({ arn: ARN, imageUri: IMAGE });
+      expect(JSON.parse(stored!.value)).toEqual({
+        arn: ARN,
+        imageUri: IMAGE,
+        configFingerprint: FINGERPRINT,
+      });
     });
 
     /** @scenario "A successful resolution is shared for ten minutes" */
@@ -236,7 +306,88 @@ describe("the per-project NLP Lambda runtime", () => {
       expect(JSON.parse(cache.entries.get("lambda_arn:projectA")!.value)).toEqual({
         arn: refreshedArn,
         imageUri: NEXT_IMAGE,
+        configFingerprint: FINGERPRINT,
       });
+    });
+  });
+
+  describe("when a rollout changes only the function's configuration", () => {
+    /** @scenario "A config-only rollout (timeout change, no new image) invalidates the cache and reconciles" */
+    it("drops the entry and reconciles the raised ceiling at once, under the same image", async () => {
+      const cache = new SharedCache();
+      const before = deploymentWithCeiling("120");
+      const after = deploymentWithCeiling("300");
+      const account = awsAccount(before);
+      await NlpLambdaRuntimeService.create({
+        cache,
+        resolver: account.resolverFor(before),
+        imageUri: IMAGE,
+        configFingerprint: studioLambdaConfigFingerprint(before),
+      }).resolveArn(PROJECT);
+      account.sent.length = 0;
+
+      const arn = await NlpLambdaRuntimeService.create({
+        cache,
+        resolver: account.resolverFor(after),
+        imageUri: IMAGE,
+        configFingerprint: studioLambdaConfigFingerprint(after),
+      }).resolveArn(PROJECT);
+
+      expect(arn).toBe(ARN);
+      expect(studioLambdaConfigFingerprint(after)).not.toBe(studioLambdaConfigFingerprint(before));
+      expect(cache.deleted).toEqual(["lambda_arn:projectA"]);
+      const update = account.sent.find(
+        (call) => call.name === UpdateFunctionConfigurationCommand.name,
+      );
+      expect(update?.input).toMatchObject({
+        Environment: { Variables: { NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS: "300" } },
+      });
+      expect(JSON.parse(cache.entries.get("lambda_arn:projectA")!.value)).toMatchObject({
+        imageUri: IMAGE,
+        configFingerprint: studioLambdaConfigFingerprint(after),
+      });
+    });
+
+    /** @scenario "A config-only rollout (timeout change, no new image) invalidates the cache and reconciles" */
+    it("reads an entry written before the fingerprint existed as a miss", async () => {
+      const cache = new SharedCache();
+      await cache.set({
+        key: "lambda_arn:projectA",
+        value: JSON.stringify({ arn: ARN, imageUri: IMAGE }),
+        ttlSeconds: 600,
+      });
+      const { resolver, resolve } = awsResolver();
+
+      await runtime({ cache, resolver }).resolveArn(PROJECT);
+
+      expect(resolve).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(cache.entries.get("lambda_arn:projectA")!.value)).toMatchObject({
+        configFingerprint: FINGERPRINT,
+      });
+    });
+  });
+
+  describe("when the configuration is unchanged", () => {
+    /** @scenario "An unchanged desired configuration keeps serving from cache, no spurious invalidation" */
+    it("derives the same fingerprint, so the cached ARN keeps serving", async () => {
+      const cache = new SharedCache();
+      const deployment = deploymentWithCeiling("120");
+      const account = awsAccount(deployment);
+      const engine = () =>
+        NlpLambdaRuntimeService.create({
+          cache,
+          resolver: account.resolverFor(deployment),
+          imageUri: IMAGE,
+          configFingerprint: studioLambdaConfigFingerprint(deploymentWithCeiling("120")),
+        });
+      await engine().resolveArn(PROJECT);
+      account.sent.length = 0;
+
+      const arn = await engine().resolveArn(PROJECT);
+
+      expect(arn).toBe(ARN);
+      expect(account.sent).toEqual([]);
+      expect(cache.deleted).toEqual([]);
     });
   });
 });

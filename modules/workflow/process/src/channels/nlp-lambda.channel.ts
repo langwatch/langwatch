@@ -9,6 +9,8 @@ export type NlpLambdaArnEntry = Readonly<{
   arn: string;
   /** The deployment image it was resolved under; a change invalidates it. */
   imageUri: string;
+  /** The function configuration it was reconciled to; a change invalidates it. */
+  configFingerprint: string;
 }>;
 
 /** The AWS flow that finds, creates or updates the project's function. */

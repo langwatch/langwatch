@@ -2,6 +2,7 @@ import {
   Config,
   langevalsStagingThresholdBytes,
   langevalsStagingTtlSeconds,
+  nlpServiceUrl,
   type ConfigOf,
 } from "@langwatch/config";
 import { z } from "zod";
@@ -72,6 +73,8 @@ export const { nlpFetchMaxTimeoutMs } = Config.define((c) => ({
 }));
 
 export const workflowConfig = Config.define(() => ({
+  /** The shared NLP engine's address; the process owner holds the same leaf. */
+  nlpServiceUrl,
   /** Above this many bytes a payload is staged rather than sent inline. */
   stagingThresholdBytes: langevalsStagingThresholdBytes,
   stagingTtlSeconds: langevalsStagingTtlSeconds,

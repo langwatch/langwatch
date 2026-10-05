@@ -43,8 +43,10 @@ function process_() {
     .withModules([withMemoryRepositories(workflowProcessModule)])
     .withConfig({
       workflow: {
+        nlpServiceUrl: undefined,
         stagingThresholdBytes: undefined,
         stagingTtlSeconds: 600,
+        relayTurnCeilingMs: undefined,
       },
     })
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
@@ -52,9 +54,7 @@ function process_() {
       encrypt: (value: string) => value,
       decrypt: (value: string) => value,
     })
-    .withMember("nlpServiceUrl", undefined)
     .withMember("nlpCodeBlockTimeoutSeconds", undefined)
-    .withMember("nlpInternalSecret", undefined)
     .withMember("publicBaseUrl", undefined)
     .provide({
       authz: createApiFixture({}, "AuthzApi"),

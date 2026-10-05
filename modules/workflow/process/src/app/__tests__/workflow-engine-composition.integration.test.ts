@@ -14,7 +14,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretApi } from "@langwatch/secret-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
+import { nlpInternalSecret, ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -26,9 +26,11 @@ import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 async function appAt({
   nlpServiceUrl,
+  internalSecret,
   repositories = MemoryWorkflowRepositories.create(),
 }: {
   nlpServiceUrl: string | undefined;
+  internalSecret?: string;
   repositories?: WorkflowRepositories;
 }): Promise<WorkflowModule> {
   const members = createWorkflowTestInfrastructure();
@@ -38,8 +40,6 @@ async function appAt({
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
       nlpCodeBlockTimeoutSeconds: void 0,
-      nlpInternalSecret: void 0,
-      nlpServiceUrl,
       publicBaseUrl: void 0,
     },
     dependencies: {
@@ -60,11 +60,15 @@ async function appAt({
       ),
     },
     config: {
+      nlpServiceUrl,
       stagingThresholdBytes: void 0,
       stagingTtlSeconds: 600,
+      relayTurnCeilingMs: void 0,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    secrets: new ScopedSecrets(async (handle, build) =>
+      build(handle === nlpInternalSecret ? internalSecret : undefined),
+    ),
     repositories,
   });
 }
@@ -140,6 +144,7 @@ describe("a process that names an engine address", () => {
     const answer = await (
       await appAt({
         nlpServiceUrl: "http://engine.test:5561",
+        internalSecret: "engine-hop-secret",
         repositories,
       })
     ).runSynchronous({ workflowId: "workflow_1", projectId: "project_1", inputs: {} });
@@ -147,7 +152,10 @@ describe("a process that names an engine address", () => {
     expect(answer).toMatchObject({ status: "success" });
     expect(fetchMock).toHaveBeenCalledWith(
       "http://engine.test:5561/go/studio/execute_sync",
-      expect.objectContaining({ method: "POST" }),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ "X-LangWatch-NLP-Secret": "engine-hop-secret" }),
+      }),
     );
   });
 });
