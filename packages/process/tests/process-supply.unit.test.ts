@@ -1,9 +1,10 @@
 import { SupplyToken, supplyToken } from "@langwatch/module";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { defineProcessModule } from "../src/feature-installer.ts";
 import { createApp as packageCreateApp } from "../src/index.ts";
 import { createApp } from "../src/process-supply.ts";
+import { Server } from "../src/server.ts";
 import {
   clock,
   clockModule,
@@ -161,6 +162,62 @@ describe("process supply", () => {
     // Composed at the one moment it can be: after every declaration mounted.
     expect(runtime.handler).toBe("served");
     await runtime.stop();
+  });
+
+  /** @scenario "One door carries every mounted transport" */
+  it("composes one handler for every mounted family and namespace, and the server hosts it once", async () => {
+    const manyTransports = defineProcessModule("annotation")
+      .withApi(ClockApp)
+      .withTransports(
+        { protocol: "rest", router: () => ({ family: "clock" }) },
+        { protocol: "rest", router: () => ({ family: "calendar" }) },
+        { protocol: "trpc", namespace: "clock", router: () => ({ procedure: "now" }) },
+        { protocol: "trpc", namespace: "calendar", router: () => ({ procedure: "today" }) },
+      );
+    const serve = vi.fn(
+      () =>
+        (
+          _request: unknown,
+          response: { writeHead(status: number): { end(body: string): void } },
+        ) => {
+          response.writeHead(200).end("one door");
+        },
+    );
+    const runtime = await createApp({ role: "api" })
+      .withModules([manyTransports])
+      .withClock(clock)
+      .expose(() => ({
+        hosts: { rest: { mount: (declaration: unknown) => declaration }, trpc: { mount: () => 0 } },
+        serve,
+      }))
+      .boot();
+    const start = vi.fn();
+    const server = Server.create({
+      name: "api",
+      logger: { info: vi.fn(), error: vi.fn() },
+      ownsProcess: false,
+    });
+    await server.serve({
+      name: "api",
+      start,
+      stop: () => runtime.stop(),
+      handler: runtime.handler,
+    });
+    const address = server.healthAddress;
+    if (address === null || typeof address === "string") throw new Error("no IP port");
+
+    const answers = await Promise.all(
+      ["/api/clock", "/api/trpc/calendar.today"].map((path) =>
+        fetch(`http://127.0.0.1:${address.port}${path}`).then((response) => response.text()),
+      ),
+    );
+    await server.close();
+
+    expect(runtime.transports.rest).toHaveLength(2);
+    expect(Object.keys(runtime.transports.trpc)).toEqual(["clock", "calendar"]);
+    expect(serve).toHaveBeenCalledOnce();
+    expect(start).toHaveBeenCalledOnce();
+    expect(answers).toEqual(["one door", "one door"]);
   });
 
   it("starts process services in declaration order and stops them in reverse", async () => {

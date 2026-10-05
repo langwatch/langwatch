@@ -62,6 +62,7 @@ function send({
 
 describe("the instance-admin family", () => {
   describe("given no key is set", () => {
+    /** @scenario "Organization provisioning is absent without an instance key" */
     it("answers 404 to a caller presenting nothing, before the body is validated", async () => {
       const { response, provision } = send({ token: void 0, isSaas: false });
       const answer = await response;
@@ -73,6 +74,7 @@ describe("the instance-admin family", () => {
   });
 
   describe("given a SaaS deployment", () => {
+    /** @scenario "Organization provisioning is absent on cloud deployments" */
     it("answers 404 even to the configured key", async () => {
       const { response, provision } = send({
         token: KEY,

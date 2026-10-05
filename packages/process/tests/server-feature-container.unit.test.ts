@@ -96,6 +96,28 @@ describe("the server feature container", () => {
     });
   });
 
+  /** @scenario "The provided app is the setup result" */
+  it("hands the setup's own app to the provider and the transport without constructing it again", async () => {
+    const app = { greeting: new Greeting("exact") };
+    const setup = vi.fn(() => app);
+    const declaration = serverFeature<object>("greeting")
+      .withSetup(setup)
+      .provides(GreetingApp)
+      .withTransport(({ provided }) => ({ received: provided }))
+      .withRest(({ transport }) => transport)
+      .build();
+
+    const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
+      .withModules([declaration])
+      .boot();
+
+    expect(runtime.module(declaration).provided).toBe(app);
+    expect(runtime.service(GreetingApp)).toBe(app);
+    expect(runtime.module(declaration).rest().received).toBe(app);
+    expect(setup).toHaveBeenCalledOnce();
+  });
+
+  /** @scenario "A feature cannot publish a second provider" */
   it("rejects a second provider instead of replacing the public app", () => {
     const declaration = serverFeature<TestMembers>("greeting")
       .withSetup(() => ({ greeting: new Greeting("one") }))
@@ -106,12 +128,14 @@ describe("the server feature container", () => {
     );
   });
 
+  /** @scenario "A task uses the app without starting transport or background work" */
   it("installs a task app without resolving or constructing role-only contributions", async () => {
     const transport = vi.fn();
     const worker = vi.fn();
+    const setup = vi.fn(() => ({ greeting: new Greeting("task") }));
     const declaration = serverFeature<TestMembers>("greeting")
       .withTransportDependencies({ directory: DirectoryApp })
-      .withSetup(() => ({ greeting: new Greeting("task") }))
+      .withSetup(setup)
       .provides(GreetingApp)
       .withTransport(transport)
       .withWorker(worker)
@@ -123,6 +147,7 @@ describe("the server feature container", () => {
     expect(runtime.service(GreetingApp)).toBe(runtime.module(declaration).provided);
     expect(runtime.service(GreetingApp).greeting.greet()).toBe("task hello");
     expect(() => runtime.module(declaration).worker()).toThrow(RoleContributionError);
+    expect(setup).toHaveBeenCalledOnce();
     expect(transport).not.toHaveBeenCalled();
     expect(worker).not.toHaveBeenCalled();
   });
@@ -225,6 +250,7 @@ describe("the server feature container", () => {
   });
 
   describe("when a role does not host a contribution", () => {
+    /** @scenario "One declaration contributes to API and worker roles" */
     it("selects API contributions from a shared API and worker declaration", async () => {
       const worker = vi.fn(() => ({ consumers: ["index-traces"] }));
       const declaration = serverFeature<TestMembers>("indexing")
@@ -334,7 +360,10 @@ describe("the server feature container", () => {
 });
 
 describe("runtime failure ownership", () => {
-  /** @scenario "A role reads only the declarations addressed to it" */
+  /**
+   * @scenario "A role reads only the declarations addressed to it"
+   * @scenario "One declaration contributes to API and worker roles"
+   */
   it("constructs a worker contribution once and rejects unavailable transports", async () => {
     const worker = vi.fn(() => ({ consumer: {} }));
     const feature = serverFeature<object>("jobs")
@@ -350,6 +379,7 @@ describe("runtime failure ownership", () => {
     expect(() => runtime.module(feature).rest()).toThrow(RoleContributionError);
   });
 
+  /** @scenario "Failed setup or transport assembly awaits all acquired resources" */
   it.each(["setup", "transport"])(
     "awaits current and prior cleanup after %s fails",
     async (phase) => {
@@ -390,6 +420,7 @@ describe("runtime failure ownership", () => {
     },
   );
 
+  /** @scenario "Failed setup or transport assembly awaits all acquired resources" */
   it("reports boot and cleanup failures while still closing earlier resources", async () => {
     const failure = new Error("setup");
     const cleanup = new Error("cleanup");
@@ -412,6 +443,7 @@ describe("runtime failure ownership", () => {
     expect(closed).toHaveBeenCalledOnce();
   });
 
+  /** @scenario "Failed start rolls back partial work and shutdown continues after failures" */
   it("serialises concurrent starts and stops and closes each resource once", async () => {
     const phases: string[] = [];
     const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
@@ -436,6 +468,7 @@ describe("runtime failure ownership", () => {
     await expect(runtime.start()).rejects.toThrow("stopped");
   });
 
+  /** @scenario "Failed start rolls back partial work and shutdown continues after failures" */
   it("rolls back a partial start in reverse order and preserves its failure", async () => {
     const phases: string[] = [];
     const failure = new Error("listener failed");
@@ -478,6 +511,7 @@ describe("runtime failure ownership", () => {
     ]);
   });
 
+  /** @scenario "Failed start rolls back partial work and shutdown continues after failures" */
   it("continues shutdown after service failures and aggregates them with resource failures", async () => {
     const stopped: string[] = [];
     const feature = serverFeature<object>("owned")

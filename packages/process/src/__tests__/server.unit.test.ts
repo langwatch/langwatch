@@ -44,7 +44,11 @@ function fetchFrom(server: Server, path: string, authorization?: string): Promis
 describe("Server", () => {
   describe("given a server with no health port configured", () => {
     describe("when it starts", () => {
-      /** @scenario "No health port is configured" */
+      /**
+       * @scenario "No health port is configured"
+       * @scenario "Default install — no metrics API key in production"
+       * @scenario "The liveness endpoint leaks no telemetry"
+       */
       it("answers /healthz on an ephemeral port without any component being hosted", async () => {
         const server = await startServer();
 
@@ -94,7 +98,10 @@ describe("Server", () => {
 
   describe("given an unregistered path", () => {
     describe("when it is requested", () => {
-      /** @scenario "An unrelated path is requested" */
+      /**
+       * @scenario "An unrelated path is requested"
+       * @scenario "An unrelated path is not served"
+       */
       it("answers 404", async () => {
         const server = await startServer();
 

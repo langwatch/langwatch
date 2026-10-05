@@ -35,6 +35,7 @@ interface OrganizationApi {
 const OrganizationApi = moduleApi<OrganizationApi>()("organization");
 
 describe("process-owned feature references", () => {
+  /** @scenario "Reciprocal API dependencies bind before readiness" */
   it("forwards through the bound app only after readiness", async () => {
     const apis = new LocalFeatureApis();
     apis.declare(OrganizationApi);
@@ -300,6 +301,7 @@ describe("feature APIs", () => {
     expect(events).toEqual([]);
   });
 
+  /** @scenario "Reciprocal API dependencies bind before readiness" */
   it.each(["api", "worker"] satisfies ServerRole[])(
     "binds mutual APIs once before returning the %s runtime",
     async (role) => {
@@ -330,6 +332,7 @@ describe("feature APIs", () => {
     ]);
   });
 
+  /** @scenario "Incomplete API bindings fail before publication" */
   it("rejects constructor access even when that peer was constructed earlier", async () => {
     const events: string[] = [];
     await expect(graph({ events, inspectPeer: true }).boot()).rejects.toBeInstanceOf(
@@ -378,6 +381,7 @@ describe("feature APIs", () => {
     await runtime.stop();
   });
 
+  /** @scenario "Client reflection cannot expose application internals" */
   it("does not expose implementation objects or evaluate implementation getters", async () => {
     const runtime = await graph({ events: [] }).boot();
     const api = runtime.service(ProjectApi);

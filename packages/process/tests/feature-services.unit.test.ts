@@ -109,6 +109,7 @@ function graph(harness: Harness, role: ServerRole = "api") {
 }
 
 describe("feature-owned runtime services", () => {
+  /** @scenario "Feature services start before hosts and drain before API bindings close" */
   it.each(["api", "worker"] as const)(
     "starts after boot and drains hosts before feature services in %s",
     async (role) => {
@@ -145,6 +146,7 @@ describe("feature-owned runtime services", () => {
     },
   );
 
+  /** @scenario "Unstarted services do not receive stop calls" */
   it("releases construction allocations on boot failure without starting or stopping inert services", async () => {
     const events: string[] = [];
     const failure = new Error("factory failed");
@@ -153,6 +155,7 @@ describe("feature-owned runtime services", () => {
     expect(events).toEqual(["connection:close"]);
   });
 
+  /** @scenario "Subscription readiness gates the API listener" */
   it("stops only the attempted feature service when its start fails", async () => {
     const events: string[] = [];
     const failure = new Error("subscription failed");
@@ -195,6 +198,7 @@ describe("feature-owned runtime services", () => {
     ]);
   });
 
+  /** @scenario "Unstarted services do not receive stop calls" */
   it("closes allocations without stopping inert services when stopped before start", async () => {
     const events: string[] = [];
     const runtime = await graph({ events }).boot();
@@ -247,6 +251,7 @@ describe("feature-owned runtime services", () => {
     ]);
   });
 
+  /** @scenario "Late service registration cannot escape lifecycle ownership" */
   it("seals service registration after install while allowing startup allocation ownership", async () => {
     let ownership: ResourceOwnership = new ResourceScope();
     const closeLateAllocation = vi.fn<() => void>();
@@ -267,5 +272,53 @@ describe("feature-owned runtime services", () => {
     ownership.own("allocated during startup", closeLateAllocation);
     await runtime.stop();
     expect(closeLateAllocation).toHaveBeenCalledOnce();
+  });
+
+  /** @scenario "Subscription readiness gates the API listener" */
+  it("does not start the host until the subscription has acknowledged", async () => {
+    const events: string[] = [];
+    let acknowledge = () => {};
+    const acknowledged = new Promise<void>((resolve) => {
+      acknowledge = resolve;
+    });
+    const hostStart = vi.fn<() => void>();
+    const runtime = await graph({ events, starting: () => acknowledged })
+      .withService({ name: "host", start: hostStart, stop: vi.fn<() => void>() })
+      .boot();
+
+    const starting = runtime.start();
+    await new Promise((resume) => setTimeout(resume, 10));
+    expect(events).toEqual(["subscription:start"]);
+    expect(hostStart).not.toHaveBeenCalled();
+
+    acknowledge();
+    await starting;
+    expect(hostStart).toHaveBeenCalledOnce();
+    await runtime.stop();
+  });
+
+  /** @scenario "Feature services start before hosts and drain before API bindings close" */
+  it("closes the API bindings before the construction resources", async () => {
+    const events: string[] = [];
+    let callApi = () => "unbound";
+    const runtime = await graph({
+      events,
+      capture: (resources) => {
+        resources.own("api probe", () => {
+          try {
+            callApi();
+            events.push("api open at resource close");
+          } catch {
+            events.push("api closed at resource close");
+          }
+        });
+      },
+    }).boot();
+    callApi = () => runtime.module(project).provided.name();
+
+    await runtime.stop();
+
+    expect(events).toContain("api closed at resource close");
+    expect(events).not.toContain("api open at resource close");
   });
 });
