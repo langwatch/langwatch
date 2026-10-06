@@ -10,6 +10,7 @@
  */
 import { TRPCError } from "@trpc/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { resolveLwqlQueryScope } from "~/app/api/query/[[...route]]/queryScope";
 import type { Project } from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
@@ -19,9 +20,11 @@ import {
   batchScopePermissions,
 } from "~/server/app-layer/authz/permission-adapters";
 import { resolveApiKeyPermissionProjectBatch } from "~/server/app-layer/authz/credential-permissions";
+import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import { createTestApp } from "~/server/app-layer/presets";
 import { getDataPrivacySnapshot } from "~/server/data-privacy/dataPrivacyPolicy.read";
 import { prisma } from "~/server/db";
+import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
 import {
   type AggregateFixture,
   realOrganizationService,
@@ -238,6 +241,60 @@ describe("Feature: only organisation admins open an aggregate project", () => {
           aggregate: true,
           shared: true,
         });
+      });
+    });
+  });
+
+  describe("given an API key reading across its organisation", () => {
+    const permissions = () => permissionsServiceFor(prisma);
+
+    const lwqlReadable = async (ownerUserId: string | null) => {
+      const key = await fixture.makeApiKey({ ownerUserId });
+      const { projects } = await resolveLwqlQueryScope({
+        principal: {
+          kind: "apiKey",
+          apiKeyId: key.id,
+          userId: ownerUserId,
+          organizationId: fixture.organizationId,
+        },
+        permissions: permissions(),
+        prisma,
+        protectionsFor: async () => ({}),
+      });
+      return projects.map((project) => project.id);
+    };
+
+    const callerScope = async (ownerUserId: string | null) => {
+      const key = await fixture.makeApiKey({ ownerUserId });
+      const { permittedProjectIds } = await resolveCallerProjectScope({
+        userId: ownerUserId,
+        organizationId: fixture.organizationId,
+        prisma,
+        apiKeyCeiling: {
+          apiKeyId: key.id,
+          cuts: (query) => permissions().apiKeyProjectCuts(query),
+        },
+      });
+      return permittedProjectIds;
+    };
+
+    describe("when LangWatchQL resolves the projects the key may read", () => {
+      it("leaves the aggregate out for a non-admin owner and a service key, and keeps it for an admin owner", async () => {
+        const toMember = await lwqlReadable(fixture.member.id);
+        expect(toMember).toContain(fixture.shared.id);
+        expect(toMember).not.toContain(aggregate.id);
+        expect(await lwqlReadable(null)).not.toContain(aggregate.id);
+        expect(await lwqlReadable(fixture.admin.id)).toContain(aggregate.id);
+      });
+    });
+
+    describe("when the caller's project scope is resolved", () => {
+      it("leaves the aggregate out for a non-admin owner and a service key, and keeps it for an admin owner", async () => {
+        const toMember = await callerScope(fixture.member.id);
+        expect(toMember).toContain(fixture.shared.id);
+        expect(toMember).not.toContain(aggregate.id);
+        expect(await callerScope(null)).not.toContain(aggregate.id);
+        expect(await callerScope(fixture.admin.id)).toContain(aggregate.id);
       });
     });
   });
