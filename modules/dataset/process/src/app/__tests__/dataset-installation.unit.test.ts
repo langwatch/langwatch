@@ -4,6 +4,7 @@
  * The dataset feature, booted the way a process boots it: over the memory
  * repositories, with the two peers it declares, in every role it serves.
  */
+import type { FeatureRestHost, FeatureTrpcHost } from "@langwatch/api";
 import { DatasetApi, DatasetNotFoundError } from "@langwatch/dataset-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -81,6 +82,40 @@ describe("dataset app installation", () => {
       ).rejects.toBeInstanceOf(DatasetNotFoundError);
     } finally {
       await Promise.all([first.stop(), second.stop()]);
+    }
+  });
+});
+
+describe("dataset transports installation", () => {
+  /** A door that keeps the app thunk each declaration was mounted with. */
+  const keepingApp: FeatureRestHost<{ app: () => unknown }> &
+    FeatureTrpcHost<{ app: () => unknown }> = { mount: (_declaration, app) => ({ app }) };
+
+  /** @scenario "Compatibility transports share one service" */
+  it("hands every REST and tRPC declaration the process's one Dataset service, on every request", async () => {
+    const runtime = await process("api")
+      .expose(() => ({ hosts: { rest: keepingApp, trpc: keepingApp }, serve: () => undefined }))
+      .boot();
+
+    try {
+      const shared = runtime.service(DatasetApi);
+      const mounted = [...runtime.transports.rest, ...Object.values(runtime.transports.trpc)];
+
+      expect(Object.keys(runtime.transports.trpc).toSorted()).toEqual([
+        "batchRecord",
+        "dataset",
+        "datasetRecord",
+      ]);
+      expect(runtime.transports.rest).toHaveLength(1);
+      for (const transport of mounted) {
+        const first = transport.app();
+        const second = transport.app();
+
+        expect(first).toBe(shared);
+        expect(second).toBe(shared);
+      }
+    } finally {
+      await runtime.stop();
     }
   });
 });

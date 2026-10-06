@@ -172,6 +172,7 @@ describe("DatasetChunkService", () => {
     });
 
     /** @scenario "Appending rows adds new data and preserves existing rows" */
+    /** @scenario "Upload storage remains an injected Dataset seam" */
     it("adds the new rows without disturbing the existing chunk", async () => {
       const dataset = readyDataset(oneChunk);
       const { chunks } = fakeRepository(dataset);

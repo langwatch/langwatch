@@ -206,6 +206,7 @@ describe("DatasetService", () => {
     expect(calls).toEqual(["read:dataset_1"]);
   });
 
+  /** @scenario "Upload storage remains an injected Dataset seam" */
   it("enqueues normalization after a stored-object import through the queue port", async () => {
     const { repository, records } = seeded();
     const queueCalls: { projectId: string; datasetId: string }[] = [];

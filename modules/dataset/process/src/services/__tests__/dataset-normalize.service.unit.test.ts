@@ -114,6 +114,7 @@ describe("DatasetNormalizeService", () => {
   describe("when the payload names a confirmed stored object", () => {
     /** @scenario "Datasets work on a minimal self-hosted install" */
     /** @scenario "A large file uploads on a self-hosted install with no object storage" */
+    /** @scenario "Upload storage remains an injected Dataset seam" */
     it("streams it from stored objects, prepares the rows and touches no staging key", async () => {
       const { storage, writeChunks, removeStagedUpload } = makeStorage();
       const { getById, storedObjects } = storedObjectsHolding('{"a":"1"}\n{"a":"2"}\n');
