@@ -102,11 +102,13 @@ function process(
       },
     })
 
-    .withMember("nodeEnvironment", undefined)
-    .withMember("isSaas", false)
-    .withMember("serviceVersion", "test")
-    .withMember("publicBaseUrl", undefined)
-    .withMember("processName", "langwatch-test")
+    .withMembers({
+      nodeEnvironment: undefined,
+      isSaas: false,
+      serviceVersion: "test",
+      publicBaseUrl: undefined,
+      processName: "langwatch-test",
+    })
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
     .withAnalytical(memberWithoutStore<ClickHouseQueryClient>())
     .withKeyvalue(memberWithoutStore<RedisConnection>(redisCommands))

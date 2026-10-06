@@ -375,38 +375,6 @@ export class ProcessSupply<
     });
   }
 
-  withMember<
-    const Name extends keyof RequiredMemberSet & string,
-    Value extends MemberValueFrom<RequiredMemberSet, Name>,
-  >(name: Name, value: Value) {
-    return new ProcessSupply<
-      Modules,
-      Merge<Members, Readonly<Record<Name, Value>>>,
-      Config,
-      Peers,
-      MissingFrom<
-        RequiredMemberSet,
-        RequiredConfigSet,
-        RequiredPeerSet,
-        InstalledPeerSet,
-        InstalledPeerSetInAnyBranch,
-        Merge<Members, Readonly<Record<Name, Value>>>,
-        Config,
-        Peers
-      >,
-      Rest,
-      Trpc,
-      RequiredMemberSet,
-      RequiredConfigSet,
-      RequiredPeerSet,
-      InstalledPeerSet,
-      InstalledPeerSetInAnyBranch
-    >({
-      ...this.#state,
-      members: { ...this.#state.members, [name]: value },
-    });
-  }
-
   withMembers<const Next extends Partial<RequiredMemberSet>>(
     members: Next & ValidateSupply<Next, RequiredMemberSet>,
   ) {
