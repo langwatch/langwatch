@@ -7,6 +7,7 @@ import { defineProcessModule, instantiateRepositories } from "@langwatch/process
  * behind these stays private — composition states substrates, never classes.
  */
 import { BillingModule } from "./app/billing.app.ts";
+import { composeHttpBillingStripe } from "./channels/http/http.billing-stripe.channels.ts";
 import { billingLifecycleEventing } from "./eventing/billing-lifecycle.pipeline.ts";
 import { billingReportingEventing } from "./eventing/billing-reporting.pipeline.ts";
 import { connectedBillingEventing } from "./eventing/connected-billing.pipeline.ts";
@@ -24,7 +25,7 @@ import {
   StripeUsageReportingBuilder,
   type UsageReportingService,
 } from "./services/usage-reporting.service.ts";
-import { StripePricesSyncTask } from "./tasks/stripe-prices-sync.task.ts";
+import { detectEnvironment, StripePricesSyncTask } from "./tasks/stripe-prices-sync.task.ts";
 import { billingStripeWebhookRest } from "./transport/billing-stripe-webhook.rest.ts";
 import { connectedBillingTrpcTransport } from "./transport/connected-billing.trpc.ts";
 import { currencyTrpcTransport } from "./transport/currency.trpc.ts";
@@ -46,9 +47,18 @@ export const billingProcessModule = defineProcessModule("billing")
   .withEventing(connectedBillingEventing)
   .withEventing(billingReportingEventing)
   .withEventing(billingLifecycleEventing)
-  .withTasks(async ({ secrets }) => [
+  .withTasks(async ({ secrets, config }) => [
     await secrets.into(BillingModule.secrets.stripeSecretKey, (secretKey) =>
-      StripePricesSyncTask.create({ secretKey: () => secretKey }),
+      StripePricesSyncTask.create({
+        source: () => {
+          if (!secretKey) return void 0;
+          const { prices, meters } = composeHttpBillingStripe({
+            secretKey,
+            nodeEnvironment: config.nodeEnvironment,
+          });
+          return { environment: detectEnvironment(secretKey), prices, meters };
+        },
+      }),
     ),
   ]);
 
@@ -83,5 +93,9 @@ export function createStripeUsageReporting(options: {
   secretKey: string | undefined;
   nodeEnvironment: string | undefined;
 }): UsageReportingService {
-  return StripeUsageReportingBuilder.create(options).build();
+  const { secretKey, nodeEnvironment } = options;
+  return StripeUsageReportingBuilder.create({
+    meters: secretKey ? composeHttpBillingStripe({ secretKey, nodeEnvironment }).meters : void 0,
+    nodeEnvironment,
+  }).build();
 }

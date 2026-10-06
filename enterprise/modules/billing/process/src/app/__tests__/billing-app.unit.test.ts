@@ -2,7 +2,6 @@ import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { ContractTerms } from "@langwatch/enterprise-licensing-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
-import type Stripe from "stripe";
 import { describe, expect, it } from "vitest";
 
 import { billingProcessModule } from "../../billing.module.ts";
@@ -10,6 +9,8 @@ import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.bi
 import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
 import { MemoryStripeCustomersChannel } from "../../channels/memory/memory.stripe-customers.channel.ts";
 import { MemoryStripeInvoicesChannel } from "../../channels/memory/memory.stripe-invoices.channel.ts";
+import { MemoryStripeMetersChannel } from "../../channels/memory/memory.stripe-meters.channel.ts";
+import { MemoryStripePricesChannel } from "../../channels/memory/memory.stripe-prices.channel.ts";
 import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
 import { MemoryStripeWebhooksChannel } from "../../channels/memory/memory.stripe-webhooks.channel.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
@@ -88,9 +89,11 @@ function stripeTwins({ webhookSecret }: { webhookSecret: string | undefined }) {
     customers: MemoryStripeCustomersChannel.create(),
     subscriptions: MemoryStripeSubscriptionsChannel.create(),
     invoices: MemoryStripeInvoicesChannel.create(),
+    prices: MemoryStripePricesChannel.create(),
+    meters: MemoryStripeMetersChannel.create(),
     connectedInvoicing: MemoryConnectedInvoicingChannel.create(),
   };
-  return { channels, client: createApiFixture<Stripe>({}, "Stripe SDK") };
+  return { channels };
 }
 
 function billingApp({

@@ -95,7 +95,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
         peers,
         usageReporting: () =>
           StripeUsageReportingBuilder.create({
-            secretKey: undefined,
+            meters: undefined,
             nodeEnvironment: "test",
           }).build(),
       });
@@ -125,7 +125,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
         peers,
         usageReporting: () =>
           StripeUsageReportingBuilder.create({
-            secretKey: undefined,
+            meters: undefined,
             nodeEnvironment: "test",
           }).build(),
       });
@@ -157,7 +157,7 @@ describe("the monthly billing roll-up's eventing declaration", () => {
         peers,
         usageReporting: () =>
           StripeUsageReportingBuilder.create({
-            secretKey: undefined,
+            meters: undefined,
             nodeEnvironment: "test",
           }).build(),
       }).reportingPipeline({ participation: "produce" });

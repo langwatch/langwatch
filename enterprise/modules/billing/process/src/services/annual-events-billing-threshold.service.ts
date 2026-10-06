@@ -2,7 +2,8 @@ import {
   isAnnualGrowthEventsPrice,
   type StripePriceMap,
 } from "@langwatch/enterprise-billing-contract";
-import type Stripe from "stripe";
+
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 
 /**
  * Amount of accrued metered usage (in the subscription currency's minor unit — 750.00 USD
@@ -10,6 +11,11 @@ import type Stripe from "stripe";
  * letting a year of event overage pile up into one renewal invoice.
  */
 export const ANNUAL_EVENTS_BILLING_THRESHOLD = 75_000;
+
+type ThresholdSubscriptions = Pick<
+  StripeSubscriptionsChannel,
+  "getSubscription" | "updateSubscription"
+>;
 
 type ThresholdResult = "applied" | "already_set" | "anchor_pinned" | "not_annual_events";
 
@@ -20,15 +26,15 @@ type ThresholdResult = "applied" | "already_set" | "anchor_pinned" | "not_annual
  */
 export class AnnualEventsBillingThresholdService {
   private constructor(
-    private readonly stripe: Stripe,
+    private readonly subscriptions: ThresholdSubscriptions,
     private readonly prices: StripePriceMap,
   ) {}
 
   static create(options: {
-    stripe: Stripe;
+    subscriptions: ThresholdSubscriptions;
     prices: StripePriceMap;
   }): AnnualEventsBillingThresholdService {
-    return new AnnualEventsBillingThresholdService(options.stripe, options.prices);
+    return new AnnualEventsBillingThresholdService(options.subscriptions, options.prices);
   }
 
   async apply({
@@ -38,7 +44,9 @@ export class AnnualEventsBillingThresholdService {
     stripeSubscriptionId: string;
     isDryRun?: boolean;
   }): Promise<ThresholdResult> {
-    const subscription = await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
+    const subscription = await this.subscriptions.getSubscription({
+      subscriptionId: stripeSubscriptionId,
+    });
 
     const hasAnnualEventsItem = (subscription.items?.data ?? []).some((item) =>
       isAnnualGrowthEventsPrice(item.price.id, this.prices),
@@ -58,10 +66,10 @@ export class AnnualEventsBillingThresholdService {
       // The amount was chosen deliberately — keep it. The anchor reset was
       // not: it would move the renewal date on every threshold invoice.
       if (!isDryRun) {
-        await this.stripe.subscriptions.update(stripeSubscriptionId, {
-          billing_thresholds: {
-            amount_gte: existingAmount,
-            reset_billing_cycle_anchor: false,
+        await this.subscriptions.updateSubscription({
+          subscriptionId: stripeSubscriptionId,
+          params: {
+            billing_thresholds: { amount_gte: existingAmount, reset_billing_cycle_anchor: false },
           },
         });
       }
@@ -70,12 +78,15 @@ export class AnnualEventsBillingThresholdService {
     }
 
     if (!isDryRun) {
-      await this.stripe.subscriptions.update(stripeSubscriptionId, {
-        billing_thresholds: {
-          amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
-          // The billing anniversary must never move — threshold invoices
-          // collect mid-cycle, the renewal date stays as sold.
-          reset_billing_cycle_anchor: false,
+      await this.subscriptions.updateSubscription({
+        subscriptionId: stripeSubscriptionId,
+        params: {
+          billing_thresholds: {
+            amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
+            // The billing anniversary must never move — threshold invoices
+            // collect mid-cycle, the renewal date stays as sold.
+            reset_billing_cycle_anchor: false,
+          },
         },
       });
     }

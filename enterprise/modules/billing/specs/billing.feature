@@ -144,3 +144,21 @@ Feature: Enterprise billing compatibility
     Then each tier answers that customer's four newest invoices, newest first
     And each tier answers an empty list for a customer with no invoices
     And each tier passes a refused listing through as the provider's own error
+
+  @unit
+  Scenario: Stripe prices page alike over the provider and its memory twin
+    Given the Stripe prices channel over the provider and over its memory twin, each holding three prices
+    When the prices are listed two to a page, the second page starting after the first page's last price
+    Then each tier answers two prices in billing's price shape and says more remain, then the third and says none remain
+    And each tier maps a product held as an object to its id and a one-time price to no recurrence
+    And each tier passes a refused listing through as the provider's own error
+
+  @unit
+  Scenario: Stripe usage meters record and summarise alike over the provider and its memory twin
+    Given the Stripe meters channel over the provider and over its memory twin, each holding two meters and one meter's summaries for a customer
+    When a meter event is recorded, the meters are listed one to a page, and a customer's summaries are read for a window
+    Then each tier records the event with its name, customer, value, identifier and timestamp
+    And each tier answers each meter with its event name and status, a page at a time
+    And each tier answers that customer's summarised values for the window and none for another customer
+    And each tier refuses a second event with the same identifier with resource_already_exists
+    And each tier passes a refused meter event through as the provider's own error

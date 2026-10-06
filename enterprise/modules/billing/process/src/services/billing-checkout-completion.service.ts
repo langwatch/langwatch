@@ -37,9 +37,10 @@ export type InviteApprover = {
 type BillingCheckoutCompletionOptions = {
   subscriptionRepository: BillingWebhookSubscriptionRepository;
   organizationRepository: BillingWebhookOrganizationRepository;
-  stripeSubscriptions: Pick<StripeSubscriptionsChannel, "getSubscription" | "cancelSubscription">;
-  /** Only the annual events billing threshold, until it moves onto a channel (Q69-4). */
-  stripe: Stripe;
+  stripeSubscriptions: Pick<
+    StripeSubscriptionsChannel,
+    "getSubscription" | "updateSubscription" | "cancelSubscription"
+  >;
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
   };
@@ -73,7 +74,7 @@ export class BillingCheckoutCompletionService {
     this.host = options.host;
     this.announcer = options.announcer;
     this.annualThreshold = AnnualEventsBillingThresholdService.create({
-      stripe: options.stripe,
+      subscriptions: options.stripeSubscriptions,
       prices: options.itemCalculator.prices,
     });
     this.lifecycle = BillingSubscriptionLifecycleService.create({

@@ -99,7 +99,6 @@ export class EEWebhookService implements WebhookService {
     subscriptionRepository,
     organizationRepository,
     stripeSubscriptions,
-    stripe,
     itemCalculator,
     inviteApprover,
     licensePurchaseHandler,
@@ -112,7 +111,6 @@ export class EEWebhookService implements WebhookService {
     subscriptionRepository: BillingWebhookSubscriptionRepository;
     organizationRepository: BillingWebhookOrganizationRepository;
     stripeSubscriptions: StripeSubscriptionsChannel;
-    stripe: Stripe;
     itemCalculator: ItemCalculator;
     inviteApprover?: InviteApprover;
     licensePurchaseHandler?: LicensePurchaseHandler;
@@ -136,7 +134,6 @@ export class EEWebhookService implements WebhookService {
       subscriptionRepository,
       organizationRepository,
       stripeSubscriptions,
-      stripe,
       itemCalculator,
       inviteApprover,
       host,
@@ -158,8 +155,6 @@ export class EEWebhookService implements WebhookService {
     subscriptionRepository: BillingWebhookSubscriptionRepository;
     organizationRepository: BillingWebhookOrganizationRepository;
     stripeSubscriptions: StripeSubscriptionsChannel;
-    /** Only the annual events billing threshold, until it moves onto a channel (Q69-4). */
-    stripe: Stripe;
     itemCalculator: ItemCalculator;
     inviteApprover?: InviteApprover;
     licensePurchaseHandler?: LicensePurchaseHandler;
