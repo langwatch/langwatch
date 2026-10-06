@@ -130,14 +130,14 @@ describe("OtlpLogReceiverService", () => {
   });
 
   describe("given a body that is not OTLP", () => {
-    it("answers 400, reports the failure and leaves the key unmarked", async () => {
+    it("answers 400, reports no exception and leaves the key unmarked", async () => {
       const { post, calls } = receiver();
 
       await expect(post("/api/otel/v1/logs", "{not json")).resolves.toEqual({
         status: 400,
         body: { error: "Failed to parse logs" },
       });
-      expect(calls).toEqual({ markedUsed: [], reported: 1, collectedFor: [] });
+      expect(calls).toEqual({ markedUsed: [], reported: 0, collectedFor: [] });
     });
   });
 

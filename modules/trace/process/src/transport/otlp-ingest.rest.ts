@@ -243,12 +243,22 @@ async function handleTracesRequest({
   }
 
   if (!parsed.ok) {
-    loggerTraces.error(
-      { error: parsed.error, projectId: project.id, customerTraceIds, ...otlpBodyForensics(body) },
+    // The client's fault (specs/otlp/client-parse-failures.feature): warn, no
+    // exception, span status left UNSET as for any customer fault (policy.ts).
+    span.setAttributes({
+      "langwatch.error.fault": "customer",
+      "langwatch.otel.parse_error": parsed.error,
+    });
+    loggerTraces.warn(
+      {
+        handledErrorFault: "customer",
+        error: parsed.error,
+        projectId: project.id,
+        customerTraceIds,
+        ...otlpBodyForensics(body),
+      },
       "error parsing traces",
     );
-    ports.otlpReportError(new Error(parsed.error), { projectId: project.id, customerTraceIds });
-    span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse traces" });
     return jsonAnswer({ error: "Failed to parse traces" }, 400);
   }
 
