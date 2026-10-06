@@ -88,3 +88,14 @@ export {
   PROCESS_RETENTION_SWEPT_ROWS_METRIC_NAME,
 } from "./maintenance/otel.retention-metrics.adapter.ts";
 export { toPgTimestampUtc } from "./adapters/postgres/pg-timestamp.ts";
+export {
+  EventLogRetention,
+  type EventLogRetentionClassification,
+  type EventLogRetentionClient,
+} from "./tables/event-log-retention.ts";
+export {
+  EVENT_TABLE_DECLARATIONS,
+  type EventTableDeclaration,
+  type EventTableExposedColumn,
+  type EventTableOmittedColumn,
+} from "./tables/event-table-declarations.ts";

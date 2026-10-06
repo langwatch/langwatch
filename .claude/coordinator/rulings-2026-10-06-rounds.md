@@ -152,3 +152,10 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Adopt gap (Auth 32, finalized users): the identifier backfill NEVER finalizes an account that is unconfirmed and never signed into, and a sweep un-finalizes any already finalized; adoption then covers everyone and the held auth wiring lands.
 - Trace filters (P8484-R3 seam): ANALYTICS lends a traceFilters browser-host capability that the shell installs (copyTargets precedent); no annotation -> analytics edge.
 - Walk size (annotations filtered list): KEEP 1000.
+
+## Round 21 (C, S3-BOOTSTRAP, S3-TIMINGS, S3-RETRY, held:64 (NEW_RULES_FROM))
+
+- Bootstrap (S3-BOOTSTRAP): LEDGER in its own Postgres schema so it can exist first (not the recommended schema-first)
+- Timings (S3-TIMINGS): KEEP the default timings
+- Retry (S3-RETRY): RE-runnable rule: a guard rule makes new migrations re-runnable, then the runner auto-resolves (not the recommended never-auto-resolve)
+- Old indexes (mig-guard): MARKER for this branch's earlier unmerged migrations

@@ -279,3 +279,24 @@ recommendation, and "default taken" if a lane proceeded on it.
 
 - tRPC masks no handled 5xx (no recommendation ruled; recorded, not changed): `createTrpcErrorFormatter` (`packages/api/src/trpc/runtime.ts:2054`) answers every HandledError with `message = code` and the full `serialize()` (code, meta, fault, reasons), so a `presumed_platform` or platform 5xx keeps its meta over tRPC while REST masks it (ruling 2026-10-05 "its body masked"). CH-1 therefore needed no tRPC change; whether tRPC should gain the REST mask (reading `isTransientRefusal` as the exemption) is a wire change needing a ruling.
 - jsonTextField import path for contracts (default taken, held for Alex): the helper is exported from the `@langwatch/api` root as the manifest says, and a `./json-text-field` subpath export is requested (precedent `./dates`, imported by `modules/langy/contract`) so dashboard's browser-loaded contract does not pull the server root into the bundle. Default taken, held for Alex.
+
+### r-eventing-surfaces
+
+- Read seat input (default taken, held for Alex): `getEvent` takes the full stream boundary `{ tenantId, aggregateType, aggregateId, eventId }` (the existing `EventStoreEventReadInput`), not the manifest's `{ tenantId, eventId }`: main's trace read keys on the whole stream, and `eventRepository.types.ts` forbids turning an event id into an unbounded lookup. Default taken, held for Alex.
+- How a module receives the seat (no recommendation ruled; recorded, not built): the seat rides on `EventSourcing.eventReadSeat`; handing it to a module (a `FeatureEventingSetup` field bound to the pipeline's aggregate, or the process passing it to trace's holder) is packages/process wiring and a module seam, left to `r-trace-event-read` with a ruling.
+- Retention operation reach (default taken, held for Alex): `EventLogRetention.create({ client, classification })` takes the caller's routed ClickHouse member and data-retention's classification as plain data, rather than being handed out through the eventing member. Default taken, held for Alex.
+- Empty retention category (default taken, held for Alex): a non-fallback category with no aggregate types now runs no statement; today's code would emit `AggregateType IN ()` and fail (unreachable with today's map). Default taken, held for Alex.
+
+### r-lend-record-client-role
+
+- Client and `@langwatch/browser`: record §2 still says the browser's wire lives in `@langwatch/browser` and only a `<name>-client` imports it, while round 4 (Q208 A) gives clients `@langwatch/api` and React and today's clients import `@langwatch/api/web`. The linters refuse `@langwatch/browser` in a client (as oxlint already did) and §2's wire sentence keeps its words; default taken, held for Alex.
+- Extension tokens: §10.1's "an extension token lives with the page that hosts it" now reads "owned by the module whose page hosts it, and lives in that module's client" (round 7b puts every lent token in its owner's client); default taken, held for Alex.
+- §7 system migrations: round 14 amends the lead to "the framework runs, ops reads and requests"; the older body ("ops composes ... the targeted run and the pass over its own SystemMigration* tables") is kept for the legacy pass until the upgrade framework replaces it; default taken, held for Alex.
+- A client depends only on its own contract (no peer contract, no other client), per round 6 "structural props, no new edges"; the manifest's "contracts" read as its own contract; default taken, held for Alex.
+
+### r-upgrade-runner
+
+- U2-LIVE hint shape: the runner publishes on `READ_HINT_BROADCAST_CHANNEL` with `tenantId` `platform:upgrade` and event `{ path: "upgrade.run", runId, phase, release, outcome }` (`@langwatch/upgrade/runner` `upgradeReadHintSchema`); the api relay, not the browser, maps it to the ops.upgrade.* reads, because their paths belong to ops; default taken, held for Alex.
+- U2-PHASES schema timing: today's applier applies Postgres and ClickHouse in one call, so a release's two schema phases share one start and finish and differ only in outcome; per-engine timing needs a per-engine applier; default taken, held for Alex.
+- S3-ROLLBACK "older image": a live presence row started after the last succeeded run that lacks a done background step NEWER than its own image (release build: a later release or unreleased; git build: unreleased only), so a step retired below the floor is never reopened; detection runs at each admit; reopen clears the step's checkpoint and writes the reason to last_error; default taken, held for Alex.
+- Lapsed gate, path to stop serving: ADR-173 names none. packages/upgrade exposes `UpgradeGate.serving()` and reports each change; how api and worker stop (readiness 503 needs `/readyz` to stop latching; a worker must also stop taking jobs; or a graceful shutdown) is a packages/process decision with no recommendation in the plan; held for Alex, no default taken.
