@@ -73,7 +73,7 @@ The unconditional repository cap is deliberately coarser than the offload (it tr
 
 ## References
 
-- Feature spec: `specs/evaluations/evaluation-payload-offload.feature`
+- Feature spec: `modules/evaluation/specs/evaluation-payload-offload.feature`
 - Offload service: `modules/evaluation/process/src/services/evaluation-inputs-offload.service.ts`
 - App infrastructure adapter: `platform/app/src/runtime/app/features/evaluation.ts`
 - Unconditional caps: `modules/evaluation/process/src/repositories/clickhouse/clickhouse-evaluation.repository.ts`
