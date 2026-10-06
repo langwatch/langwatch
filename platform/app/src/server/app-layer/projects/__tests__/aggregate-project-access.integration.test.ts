@@ -14,7 +14,13 @@ import type { Project } from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import {
+  batchProjectPermissions,
+  batchScopePermissions,
+} from "~/server/app-layer/authz/permission-adapters";
+import { resolveApiKeyPermissionProjectBatch } from "~/server/app-layer/authz/credential-permissions";
 import { createTestApp } from "~/server/app-layer/presets";
+import { getDataPrivacySnapshot } from "~/server/data-privacy/dataPrivacyPolicy.read";
 import { prisma } from "~/server/db";
 import {
   type AggregateFixture,
@@ -26,6 +32,11 @@ const callerFor = (userId: string) =>
   appRouter.createCaller(
     createInnerTRPCContext({ session: { user: { id: userId }, expires: "1" } }),
   );
+
+const sessionOf = (userId: string) => ({
+  prisma,
+  session: { user: { id: userId }, expires: "1" },
+});
 
 const listedProjectIds = async (userId: string, organizationId: string) => {
   const organizations = await callerFor(userId).organization.getAll({});
@@ -98,6 +109,135 @@ describe("Feature: only organisation admins open an aggregate project", () => {
 
         expect(ids).toContain(fixture.shared.id);
         expect(ids).not.toContain(aggregate.id);
+      });
+    });
+  });
+
+  describe("given a batched permission check that covers the aggregate", () => {
+    const scopeBatch = async (userId: string, permission: "project:view" | "project:update") => {
+      const { projects } = await batchScopePermissions(sessionOf(userId), {
+        organizationId: fixture.organizationId,
+        teamIds: [],
+        projectIds: [aggregate.id, fixture.shared.id],
+        projectTeamId: {
+          [aggregate.id]: fixture.team.id,
+          [fixture.shared.id]: fixture.team.id,
+        },
+        permission,
+      });
+      return {
+        aggregate: projects.get(aggregate.id),
+        shared: projects.get(fixture.shared.id),
+      };
+    };
+
+    describe("when the caller is a member who is not an admin", () => {
+      it("answers false for the aggregate and true for the ordinary project", async () => {
+        for (const permission of ["project:view", "project:update"] as const) {
+          expect(await scopeBatch(fixture.member.id, permission)).toEqual({
+            aggregate: false,
+            shared: true,
+          });
+        }
+      });
+
+      it("holds nothing on the aggregate through the single-project batch", async () => {
+        const held = (projectId: string) =>
+          batchProjectPermissions(sessionOf(fixture.member.id), {
+            organizationId: fixture.organizationId,
+            projectId,
+            teamId: fixture.team.id,
+            permissions: ["project:view", "traces:view"],
+          });
+
+        expect(await held(aggregate.id)).toEqual([]);
+        expect(await held(fixture.shared.id)).toEqual([
+          "project:view",
+          "traces:view",
+        ]);
+      });
+    });
+
+    describe("when a member who is not an admin opens the data privacy scope picker", () => {
+      it("offers the ordinary project and not the aggregate, which an admin is offered", async () => {
+        const offered = async (userId: string) =>
+          (
+            await getDataPrivacySnapshot(sessionOf(userId), {
+              projectId: fixture.shared.id,
+            })
+          ).available.projects.map((project) => project.id);
+
+        const toMember = await offered(fixture.member.id);
+        expect(toMember).toContain(fixture.shared.id);
+        expect(toMember).not.toContain(aggregate.id);
+        expect(await offered(fixture.admin.id)).toContain(aggregate.id);
+      });
+    });
+
+    describe("when a member who is not an admin asks what they may do on the aggregate", () => {
+      it("is told nothing, while the ordinary project and an admin keep their permissions", async () => {
+        const effective = async (userId: string, projectId: string) =>
+          (await callerFor(userId).authz.effectivePermissions({ projectId }))
+            .permissions;
+
+        expect(await effective(fixture.member.id, aggregate.id)).toEqual([]);
+        expect(await effective(fixture.member.id, fixture.shared.id)).toContain(
+          "project:view",
+        );
+        expect(await effective(fixture.admin.id, aggregate.id)).toContain(
+          "project:view",
+        );
+      });
+    });
+
+    describe("when the caller is an organisation admin", () => {
+      it("answers true for the aggregate", async () => {
+        for (const permission of ["project:view", "project:update"] as const) {
+          expect(await scopeBatch(fixture.admin.id, permission)).toEqual({
+            aggregate: true,
+            shared: true,
+          });
+        }
+      });
+    });
+
+    describe("when the caller is an API key", () => {
+      const keyBatch = async (ownerUserId: string | null) => {
+        const key = await fixture.makeApiKey({ ownerUserId });
+        const decisions = await resolveApiKeyPermissionProjectBatch({
+          prisma,
+          apiKeyId: key.id,
+          userId: ownerUserId,
+          organizationId: fixture.organizationId,
+          projects: [
+            { projectId: aggregate.id, teamId: fixture.team.id },
+            { projectId: fixture.shared.id, teamId: fixture.team.id },
+          ],
+          permissions: ["project:view"],
+        });
+        const projects = decisions.get("project:view");
+        return {
+          aggregate: projects?.get(aggregate.id),
+          shared: projects?.get(fixture.shared.id),
+        };
+      };
+
+      it("refuses the aggregate to a key whose owner is not an admin", async () => {
+        expect(await keyBatch(fixture.member.id)).toEqual({
+          aggregate: false,
+          shared: true,
+        });
+      });
+
+      it("refuses the aggregate to a service key with no owner", async () => {
+        expect((await keyBatch(null)).aggregate).toBe(false);
+      });
+
+      it("admits the aggregate to a key whose owner is an organisation admin", async () => {
+        expect(await keyBatch(fixture.admin.id)).toEqual({
+          aggregate: true,
+          shared: true,
+        });
       });
     });
   });

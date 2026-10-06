@@ -1,5 +1,11 @@
 import type { AuthzPermission, AuthzPrincipalRef } from "@langwatch/authz";
 import type { PrismaClient } from "~/generated/prisma/client";
+import {
+  aggregatesClosedTo,
+  closeProjects,
+  permittedIds,
+  projectKindReaderFor,
+} from "../permissions/aggregate-admin-gate";
 import { authzChecksFor } from "./checks";
 
 export type ScopeRef =
@@ -89,7 +95,7 @@ export async function resolveApiKeyPermissionProjectBatch({
   projects: ReadonlyArray<{ projectId: string; teamId: string }>;
   permissions: readonly AuthzPermission[];
 }): Promise<Map<AuthzPermission, Map<string, boolean>>> {
-  const { byPermission } = await authzChecksFor(
+  const { byPermission, ownerOrganizationRole } = await authzChecksFor(
     prisma,
   ).canBatchPermissionsByIds({
     principal: { type: "apiKey", id: apiKeyId },
@@ -98,10 +104,24 @@ export async function resolveApiKeyPermissionProjectBatch({
     teams: [],
     projects,
   });
+  const cuts = permissions.map(
+    (permission) =>
+      [
+        permission,
+        byPermission.get(permission)?.projects ?? new Map<string, boolean>(),
+      ] as const,
+  );
+  // ADR-144 decision 5: an aggregate is open only to an organisation admin,
+  // and a key acts with its owner's role (none for a service key).
+  const closed = await aggregatesClosedTo({
+    projectIds: permittedIds(...cuts.map(([, projects]) => projects)),
+    organizationRole: ownerOrganizationRole,
+    kinds: projectKindReaderFor(prisma),
+  });
   return new Map(
-    permissions.map((permission) => [
+    cuts.map(([permission, projects]) => [
       permission,
-      byPermission.get(permission)?.projects ?? new Map<string, boolean>(),
+      closeProjects(projects, closed),
     ]),
   );
 }

@@ -81,7 +81,10 @@ describe("given a trace destination", () => {
 });
 
 describe("given the permission gate on project decisions", () => {
-  const kinds = { kindOf: vi.fn(async () => AGGREGATE_PROJECT_KIND) };
+  const kinds = {
+    kindOf: vi.fn(async () => AGGREGATE_PROJECT_KIND),
+    kindsOf: vi.fn(async () => new Map<string, string>()),
+  };
 
   describe("when the engine admitted a non-admin to an aggregate", () => {
     it("turns the decision into a refusal and keeps the role for the denial copy", async () => {

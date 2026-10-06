@@ -18,7 +18,10 @@ import {
 } from "~/generated/prisma/client";
 import { authzChecksFor } from "~/server/app-layer/authz/checks";
 import {
+  aggregatesClosedTo,
   applyAggregateAdminGate,
+  closeProjects,
+  permittedIds,
   projectKindReaderFor,
 } from "~/server/app-layer/permissions/aggregate-admin-gate";
 import {
@@ -305,7 +308,7 @@ export async function batchProjectPermissions(
 ): Promise<Permission[]> {
   const userId = ctx.session?.user?.id;
   if (!userId) return [];
-  const { byPermission } = await authzChecksFor(
+  const { byPermission, organizationRole } = await authzChecksFor(
     ctx.prisma,
   ).canBatchPermissionsByIds({
     principal: { type: "user", id: userId },
@@ -314,10 +317,17 @@ export async function batchProjectPermissions(
     teams: [],
     projects: [{ projectId: args.projectId, teamId: args.teamId }],
   });
-  return args.permissions.filter(
+  const held = args.permissions.filter(
     (permission) =>
       byPermission.get(permission)?.projects.get(args.projectId) === true,
   );
+  if (held.length === 0) return held;
+  const closed = await aggregatesClosedTo({
+    projectIds: [args.projectId],
+    organizationRole,
+    kinds: projectKindReaderFor(ctx.prisma),
+  });
+  return closed.has(args.projectId) ? [] : held;
 }
 
 export async function batchTeamsPermissions(
@@ -377,7 +387,15 @@ export async function batchScopePermissions(
       teamId: args.projectTeamId[projectId],
     })),
   });
-  return { teams: decision.teams, projects: decision.projects };
+  const closed = await aggregatesClosedTo({
+    projectIds: permittedIds(decision.projects),
+    organizationRole: decision.organizationRole,
+    kinds: projectKindReaderFor(ctx.prisma),
+  });
+  return {
+    teams: decision.teams,
+    projects: closeProjects(decision.projects, closed),
+  };
 }
 
 /**

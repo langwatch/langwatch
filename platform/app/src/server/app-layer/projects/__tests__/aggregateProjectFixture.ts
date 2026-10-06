@@ -3,6 +3,8 @@
  * personal projects, an organisation admin, and a member who is not an admin,
  * with real grants so the permission engine decides as it does in production.
  */
+import { roleKeyForTeamRole } from "@langwatch/authz";
+import { grantFactToRow } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {
@@ -206,6 +208,51 @@ export async function seedAggregateOrganization(
         aggregateRule: { kind: "all-personal" },
       },
     });
+  /**
+   * An API key owned by `ownerUserId`, holding an ADMIN binding on the shared
+   * team (or no owner at all: a service key). The key's reach is capped by
+   * its owner's, so whatever it is refused below the team is the owner's.
+   */
+  const makeApiKey = async ({
+    ownerUserId,
+  }: {
+    ownerUserId: string | null;
+  }) => {
+    const key = await prisma.apiKey.create({
+      data: {
+        name: `key ${ns}`,
+        lookupId: `lookup-${nanoid(12)}`,
+        hashedSecret: `hashed-${nanoid(12)}`,
+        userId: ownerUserId,
+        organizationId,
+      },
+    });
+    const binding = await prisma.roleBinding.create({
+      data: {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId,
+        apiKeyId: key.id,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: team.id,
+      },
+    });
+    await prisma.grant.create({
+      data: grantFactToRow({
+        organizationId,
+        grant: {
+          grantId: binding.id,
+          principal: { type: "apiKey", id: key.id },
+          roleKey: roleKeyForTeamRole(TeamUserRole.ADMIN),
+          legacyRole: TeamUserRole.ADMIN,
+          scope: { type: RoleBindingScopeType.TEAM, id: team.id },
+          source: "grants-service",
+          occurredAtMs: binding.createdAt.getTime(),
+        },
+      }),
+    });
+    return key;
+  };
   const governance = await prisma.project.create({
     data: {
       name: `Governance ${ns}`,
@@ -234,10 +281,12 @@ export async function seedAggregateOrganization(
     makeUser,
     makeTeamProject,
     makeAggregate,
+    makeApiKey,
     cleanup: () =>
       cleanupTestRows(prisma, [
         ["grant", { organizationId }],
         ["roleBinding", { organizationId }],
+        ["apiKey", { organizationId }],
         ["teamUser", { team: { organizationId } }],
         ["project", { team: { organizationId } }],
         ["team", { organizationId }],

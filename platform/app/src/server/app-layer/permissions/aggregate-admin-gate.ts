@@ -16,6 +16,8 @@ import type { PermissionDecision } from "./permission-decision.repository";
 /** How the gate learns a project's kind. */
 export interface ProjectKindReader {
   kindOf(projectId: string): Promise<string | null>;
+  /** Many projects' kinds in one read; an unknown id is absent. */
+  kindsOf(projectIds: readonly string[]): Promise<Map<string, string>>;
 }
 
 const MAX_CACHED_KINDS = 10_000;
@@ -38,12 +40,36 @@ export class PrismaProjectKindReader implements ProjectKindReader {
       select: { kind: true },
     });
     if (!project) return null;
+    this.remember(projectId, project.kind);
+    return project.kind;
+  }
+
+  async kindsOf(projectIds: readonly string[]): Promise<Map<string, string>> {
+    const found = new Map<string, string>();
+    const missing: string[] = [];
+    for (const projectId of new Set(projectIds)) {
+      const cached = this.kinds.get(projectId);
+      if (cached !== undefined) found.set(projectId, cached);
+      else missing.push(projectId);
+    }
+    if (missing.length === 0) return found;
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: missing } },
+      select: { id: true, kind: true },
+    });
+    for (const { id, kind } of projects) {
+      this.remember(id, kind);
+      found.set(id, kind);
+    }
+    return found;
+  }
+
+  private remember(projectId: string, kind: string): void {
     if (this.kinds.size >= MAX_CACHED_KINDS) {
       const oldest = this.kinds.keys().next().value;
       if (oldest !== undefined) this.kinds.delete(oldest);
     }
-    this.kinds.set(projectId, project.kind);
-    return project.kind;
+    this.kinds.set(projectId, kind);
   }
 }
 
@@ -85,4 +111,64 @@ export async function applyAggregateAdminGate<
   });
   if (!violation) return decision;
   return { ...decision, permitted: false, denialReason: "no-binding" };
+}
+
+/**
+ * The batch form of the same rule: of these projects, the aggregates a caller
+ * with this organisation role may not open. Every batched permission answer
+ * (the scope pickers, Langy's held permissions, an API key's project cut)
+ * turns these to false, so a batch can never admit what a single check
+ * refuses. An admin gets the empty set without a read; anyone else pays one
+ * read of the kinds not yet cached.
+ *
+ * For an API key the role is its owner's, so a service key with no owner
+ * (role null) is never admitted.
+ */
+export async function aggregatesClosedTo({
+  projectIds,
+  organizationRole,
+  kinds,
+}: {
+  projectIds: readonly string[];
+  organizationRole: string | null | undefined;
+  kinds: ProjectKindReader;
+}): Promise<ReadonlySet<string>> {
+  if (organizationRole === "ADMIN" || projectIds.length === 0) {
+    return new Set();
+  }
+  const kindById = await kinds.kindsOf(projectIds);
+  return new Set(
+    projectIds.filter((projectId) =>
+      aggregateProjectRouteViolation({
+        kind: kindById.get(projectId),
+        organizationRole,
+      }),
+    ),
+  );
+}
+
+/** The project answers with every closed aggregate turned to false. */
+export function closeProjects(
+  projects: ReadonlyMap<string, boolean>,
+  closed: ReadonlySet<string>,
+): Map<string, boolean> {
+  return new Map(
+    [...projects].map(([projectId, permitted]) => [
+      projectId,
+      permitted && !closed.has(projectId),
+    ]),
+  );
+}
+
+/** The ids a batch answered true for, the only ones worth a kind read. */
+export function permittedIds(
+  ...maps: ReadonlyArray<ReadonlyMap<string, boolean> | undefined>
+): string[] {
+  const ids = new Set<string>();
+  for (const map of maps) {
+    for (const [projectId, permitted] of map ?? []) {
+      if (permitted) ids.add(projectId);
+    }
+  }
+  return [...ids];
 }
