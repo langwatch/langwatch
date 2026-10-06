@@ -9,12 +9,6 @@ import { TieredBlobStore } from "@langwatch/group-queue/operational";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
-import {
-  StoredObjectAzureDestination,
-  StoredObjectDestinationPolicyService,
-  StoredObjectProjectS3Config,
-  type StoredObjectProjectBucket,
-} from "#services/stored-object-destination-policy.service";
 import { StoredObjectStorageRegistryService } from "#services/stored-object-storage-registry.service";
 
 function requestUrl(input: RequestInfo | URL | undefined): string {
@@ -87,30 +81,6 @@ function azureOnlyRegistry(): StoredObjectStorageRegistryService {
   });
 }
 
-class NoPrivateBucket extends StoredObjectProjectS3Config {
-  async resolveBucket(): Promise<StoredObjectProjectBucket> {
-    return { kind: "platform" };
-  }
-}
-
-class ConfiguredAzure extends StoredObjectAzureDestination {
-  resolve() {
-    return { accountName: ACCOUNT, container: CONTAINER };
-  }
-}
-
-/** The one deployment both cases run on: azure selected, no S3 anywhere. */
-function azureOnlyPolicy(): StoredObjectDestinationPolicyService {
-  return StoredObjectDestinationPolicyService.create({
-    selection: {
-      backend: "azure",
-      localFilesystemRoot: "/var/lib/langwatch/objects",
-      azure: new ConfiguredAzure(),
-    },
-    projects: new NoPrivateBucket(),
-  });
-}
-
 beforeEach(() => {
   installBlobAccount();
 });
@@ -132,7 +102,11 @@ describe("given a deployment whose object storage is Azure Blob and nothing else
           delete: vi.fn(async () => undefined),
         },
         objectStoreFor: () => azureOnlyRegistry(),
-        resolveDestination: (projectId) => azureOnlyPolicy().resolve(projectId),
+        resolveDestination: async () => ({
+          kind: "azure",
+          accountName: ACCOUNT,
+          container: CONTAINER,
+        }),
         s3ThresholdBytes: threshold,
       });
       const body = Buffer.from("x".repeat(threshold * 4));
