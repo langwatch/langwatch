@@ -32,10 +32,19 @@ const tasks = new Map<string, () => Promise<TaskRun>>([
     async () => (await import("./system-migrations-pass.ts")).systemMigrationsPass,
   ],
   ["storage-seed", async () => (await import("./storage-seed/storage-seed.ts")).storageSeed],
+  [
+    "dashboards-demo-seed",
+    async () => (await import("./storage-seed/seed-dashboards-demo.ts")).seedDashboardsDemo,
+  ],
 ]);
 
 /** Tasks that never touch the migration database, so never wait on its advisory lock. */
-const LOCK_FREE_TASKS = new Set(["system-migrations-pass", "lwql-render-access-config"]);
+const LOCK_FREE_TASKS = new Set([
+  "system-migrations-pass",
+  "lwql-render-access-config",
+  // Minutes of HTTP to a running stack; its upserts need no lock against itself.
+  "dashboards-demo-seed",
+]);
 
 export async function runTasks(argv: readonly string[], input: TaskInput): Promise<void> {
   if (argv.length === 0 || argv.some((name) => !tasks.has(name))) {
