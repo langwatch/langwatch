@@ -39,7 +39,7 @@
     "useUiSlot / useUiSlots": 6,
     "withAnalytical": 7,
     "withKeyvalue": 9,
-    "withMember": 18,
+    "withMember": 6,
     "withMemoryRepositories": 62,
     "withPersistence": 1,
     "withProvided": 12,
