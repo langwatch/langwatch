@@ -36,21 +36,6 @@ export { createTenantId, TenantIdSchema } from "./domain/tenantId.ts";
 export type { Event, EventType, Projection } from "./domain/types.ts";
 export { EventMetadataBaseSchema, EventSchema, ProjectionSchema } from "./domain/types.ts";
 export type { ExecutionTarget, RetentionPolicy, RetentionPolicyResolver } from "./runtime.types.ts";
-export type {
-  EsKillSwitchKey,
-  KillSwitchComponent,
-  KillSwitchComponentSource,
-  KillSwitchComponentType,
-  KillSwitchDescriptor,
-  KillSwitchOptions,
-  KillSwitchQuery,
-} from "./kill-switch/index.ts";
-export {
-  generateKillSwitchKey,
-  isComponentKilled,
-  killSwitchDescriptorsFor,
-  KillSwitch,
-} from "./kill-switch/index.ts";
 export type { EventSourcingOptions } from "./eventSourcing.ts";
 // Runtime
 export { EventSourcing } from "./eventSourcing.ts";

@@ -23,10 +23,6 @@ const DEFAULT_DEJA_VIEW: OpsDejaViewProjection[] = [
 class FakeIntrospection implements OpsEventingIntrospection {
   dejaView: OpsDejaViewProjection[] = DEFAULT_DEJA_VIEW;
 
-  killSwitches(): never[] {
-    return [];
-  }
-
   projections(): OpsProjectionMetadata[] {
     const projection = (projectionName: string, aggregateType: string): OpsProjectionMetadata => ({
       projectionName,

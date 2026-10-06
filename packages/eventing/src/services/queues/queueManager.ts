@@ -13,7 +13,6 @@ import type {
 import type { AggregateType } from "../../domain/aggregateType.ts";
 import type { CommandType } from "../../domain/commandType.ts";
 import type { Event } from "../../domain/types.ts";
-import { type KillSwitch } from "../../kill-switch/index.ts";
 import type {
   DeduplicationConfig,
   DeduplicationStrategy,
@@ -226,7 +225,6 @@ export class QueueManager<EventType extends Event = Event> {
   private readonly logger: Logger;
   private readonly globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   private readonly globalJobRegistry?: Map<string, JobRegistryEntry>;
-  private readonly killSwitch?: KillSwitch;
   private readonly parseEvent: (value: unknown) => EventType;
   private readonly eventQueues = new Map<string, EventSourcedQueueProcessor<EventType>>();
   private readonly projectionSubscriberQueues = new Map<
@@ -249,7 +247,6 @@ export class QueueManager<EventType extends Event = Event> {
     pipelineName,
     globalQueue,
     globalJobRegistry,
-    killSwitch,
     parseEvent,
     logger = createLogger("langwatch:event-sourcing:queue-manager"),
   }: {
@@ -259,7 +256,6 @@ export class QueueManager<EventType extends Event = Event> {
     parseEvent: (value: unknown) => EventType;
     globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
     globalJobRegistry?: Map<string, JobRegistryEntry>;
-    killSwitch?: KillSwitch;
     logger?: Logger;
   }) {
     this.logger = logger;
@@ -267,7 +263,6 @@ export class QueueManager<EventType extends Event = Event> {
     this.pipelineName = pipelineName;
     this.globalQueue = globalQueue;
     this.globalJobRegistry = globalJobRegistry;
-    this.killSwitch = killSwitch;
     this.parseEvent = parseEvent;
   }
 
@@ -826,8 +821,6 @@ export class QueueManager<EventType extends Event = Event> {
       aggregateType: this.aggregateType,
       commandName: cmdEntry.commandName,
       pipelineName: this.pipelineName,
-      killSwitch: this.killSwitch,
-      killSwitchOptions: cmdEntry.options.killSwitch,
       logger,
     };
 

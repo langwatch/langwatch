@@ -63,6 +63,7 @@ import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import type { StorageStatsInstance } from "../services/storage-stats-collection.service.ts";
 import { SystemMigrationPassService } from "../services/system-migration-pass.service.ts";
 import type {
+  BugReportNotifier,
   OpsExplorers,
   OpsAppDependencies,
   OpsAppInfrastructure,
@@ -165,6 +166,7 @@ export function sharedStorageStatsInstance(
 
 /** Builds the {@link OpsAppInfrastructure} `OpsModule.create` composes over. */
 export function buildOpsInfrastructure(input: {
+  bugReportNotifier: BugReportNotifier;
   members: OpsProcessMembers;
   logger: Logger;
   config: OpsServerConfig;
@@ -272,12 +274,10 @@ export function buildOpsInfrastructure(input: {
         dependencies,
         passRequests,
       }),
-    // The bug-report intake's own flood bound and best-effort alert. This
-    // process has neither a dedicated limiter nor a notifier of its own for
-    // this endpoint yet, so it allows and answers silently rather than
-    // refusing to accept a report that already reached it.
+    // The intake's flood bound: this process has no dedicated limiter for this
+    // endpoint yet, so it allows rather than refuse a report that reached it.
     bugReportRateLimiter: { consume: () => Promise.resolve({ allowed: true }) },
-    bugReportNotifier: { notify: () => Promise.resolve() },
+    bugReportNotifier: input.bugReportNotifier,
     explainClients: explainRuntime,
     findOpsApiKey: () => config.apiKey ?? null,
     findProductAnalyticsTargets: () => {

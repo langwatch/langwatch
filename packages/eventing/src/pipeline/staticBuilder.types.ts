@@ -4,7 +4,6 @@ import type { SealedCommand } from "../commands/sealedCommand.ts";
 import type { AggregateDefinition } from "../domain/definitions.ts";
 import type { PipelineEventSchema } from "../domain/eventSchemas.ts";
 import type { Event, Projection } from "../domain/types.ts";
-import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 import type { FoldProjectionOptions } from "../projections/foldProjection.types.ts";
 import type { MapProjectionOptions } from "../projections/mapProjection.types.ts";
 import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
@@ -51,12 +50,6 @@ export interface CommandSerializationOptions<Payload> {
  * Options for configuring a command handler in a static pipeline definition.
  */
 export interface CommandHandlerOptions<Payload> extends CommandSerializationOptions<Payload> {
-  /**
-   * Operator stop for this component, resolved per tenant at dispatch time.
-   * Absent means the generated key; a `customKey` must also be what the
-   * descriptors advertise or the switch cannot be set.
-   */
-  killSwitch?: KillSwitchOptions;
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   makeJobId?: (payload: Payload) => string;

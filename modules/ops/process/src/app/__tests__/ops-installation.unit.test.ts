@@ -94,6 +94,7 @@ function process(
         },
         collectClickHouseBackupMetrics: true,
         productAnalytics: { key: undefined, host: undefined },
+        bugReportSlackChannel: undefined,
         cloudOps: cloud.asked ?? false,
         adminEmails: [],
         nodeEnvironment: undefined,

@@ -1,35 +1,18 @@
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { type FeatureFlagApi, listFeatureFlags } from "@langwatch/feature-flag-contract";
 /**
- * Operator writes reach explicit registry entries and the kill switches the
- * live pipeline graph advertises, and nothing else.
+ * Operator writes reach explicit registry entries and nothing else.
  * @see specs/ops/internal-feature-flags.feature
  */
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  OpsEventingIntrospection,
-  OpsKillSwitchDescriptor,
-  OpsModule,
-  OpsCapability,
-} from "../ops.app.ts";
+import type { OpsEventingIntrospection, OpsModule, OpsCapability } from "../ops.app.ts";
 import { createOpsTestApp } from "./ops.fixture.ts";
 
-const liveSwitch: OpsKillSwitchDescriptor = {
-  key: "es-trace-subscriber-evaluationTrigger-killswitch",
-  aggregateType: "trace",
-  componentType: "subscriber",
-  componentName: "evaluationTrigger",
-  pipelineName: "trace-processing",
-};
-
-class OneSwitchIntrospection implements OpsEventingIntrospection {
+class EmptyIntrospection implements OpsEventingIntrospection {
   projections() {
     return [];
-  }
-  killSwitches(): OpsKillSwitchDescriptor[] {
-    return [liveSwitch];
   }
   processManagers() {
     return [];
@@ -50,7 +33,7 @@ function buildApp(): { app: OpsModule; written: string[] } {
   const { app } = createOpsTestApp({
     featureFlags,
     members: {
-      eventingIntrospection: new OneSwitchIntrospection(),
+      eventingIntrospection: new EmptyIntrospection(),
     },
   });
 
@@ -63,7 +46,7 @@ describe("given an operator writing a feature flag", () => {
     const createCapability = vi.fn<() => OpsCapability>(() => createApiFixture<OpsCapability>());
     const { app } = createOpsTestApp({
       projects: createApiFixture<ProjectApi>({ searchByQuery }),
-      members: { createCapability, eventingIntrospection: new OneSwitchIntrospection() },
+      members: { createCapability, eventingIntrospection: new EmptyIntrospection() },
     });
     const query = { query: "support", organizationId: "organization-a", limit: 7 };
 
@@ -72,22 +55,23 @@ describe("given an operator writing a feature flag", () => {
     expect(searchByQuery).toHaveBeenCalledExactlyOnceWith(query);
   });
 
-  describe("when the key is a kill switch the live pipelines will read", () => {
+  describe("when the key is a registered flag", () => {
     it("stores the value", async () => {
       const { app, written } = buildApp();
+      const [flag] = listFeatureFlags();
 
       await app.setFeatureFlagEnabled({
-        key: liveSwitch.key,
+        key: flag!.key,
         enabled: true,
         lastEditedBy: "operator-1",
       });
 
-      expect(written).toEqual([liveSwitch.key]);
+      expect(written).toEqual([flag!.key]);
     });
   });
 
-  describe("when the key only looks like one", () => {
-    it("refuses the write rather than storing an orphan row", async () => {
+  describe("when the key is a generated event-sourcing kill switch", () => {
+    it("refuses the write because no component reads it", async () => {
       const { app, written } = buildApp();
 
       await expect(

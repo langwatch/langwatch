@@ -3,7 +3,6 @@ import type { createLogger } from "@langwatch/observability";
 import type { SealedCommand } from "../commands/sealedCommand.ts";
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event, EventOrderingStrategy } from "../domain/types.ts";
-import type { KillSwitch } from "../kill-switch/index.ts";
 import type { ProcessStore } from "../process-manager/stores/processStore.types.ts";
 import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
 import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck.ts";
@@ -132,8 +131,6 @@ export interface EventSourcingServiceOptions<
    */
   replayMarkerChecker?: ReplayMarkerChecker;
   retentionPolicyResolver?: RetentionPolicyResolver;
-  /** Per-tenant operator stop for this pipeline's components. */
-  killSwitch?: KillSwitch;
   /**
    * Process composition enables this for production workers and API processes.
    * It keeps an accidentally inline projection visible without Eventing reading

@@ -53,17 +53,6 @@ Feature: Internal feature flag system for system-level kill switches
 
   Rule: SYSTEM flags never reach PostHog
 
-    Scenario: hot-path event-sourcing kill switch resolves without a PostHog call
-      Given the registry has a SYSTEM-scoped flag for the trace-processing
-            projection kill switch
-      And no environment variable forces the flag on or off
-      And no row exists for the flag in the postgres flag store
-      When the trace-processing pipeline checks the kill switch for ten
-           thousand events
-      Then the resolved value matches the registry default for every check
-      And no request is made to PostHog
-      And the per-pod cache absorbs the bulk of those checks
-
     Scenario: SYSTEM flag flipped on in postgres takes effect cluster-wide within seconds
       Given an operator opens the Ops Feature Flags page
       And the operator toggles a SYSTEM kill switch from disabled to enabled

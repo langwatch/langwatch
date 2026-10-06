@@ -93,14 +93,6 @@ Feature: The record path reads through the peers trace was installed with
       When a span is folded through it
       Then every privacy and cost read names the tenant on the command
 
-  Rule: The kill switches stay readable
-
-    @unit
-    Scenario: The flag application is the one the process installed
-      Given a background process that booted its module graph
-      When the kill switch the event bus reads is resolved
-      Then it answers from the installed flag application rather than a second one
-
     @unit
     Scenario: The worker reads the same flag overrides the application reads
       Given a deployment that named a flag on its force-enable list

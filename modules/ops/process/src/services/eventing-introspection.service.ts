@@ -1,6 +1,5 @@
 import {
   type Event,
-  killSwitchDescriptorsFor,
   type Projection,
   projectionConsumes,
   type RegisteredCommand,
@@ -18,7 +17,6 @@ import {
   type OpsDejaViewFold,
   type OpsDejaViewProjection,
   type OpsProcessManagerMetadata,
-  type OpsKillSwitchDescriptor,
   type OpsProjectionMetadata,
 } from "../app/ops.app.ts";
 
@@ -46,12 +44,6 @@ export class EventingIntrospectionService implements OpsEventingIntrospection, O
       projections: this.projections(),
       eventSubscribers: this.definitions().flatMap((sealed) => sealed.open(eventSubscribersOf)),
     };
-  }
-
-  killSwitches(): OpsKillSwitchDescriptor[] {
-    return this.definitions().flatMap((sealed) =>
-      sealed.open((def) => killSwitchDescriptorsFor(def)),
-    );
   }
 
   processManagers(): OpsProcessManagerMetadata[] {

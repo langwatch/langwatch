@@ -4,7 +4,7 @@
  * eventing's store/queue factory and the process store a process-manager role supplies.
  */
 import type { PoolSizingInput } from "@langwatch/clickhouse-client";
-import type { EventingParticipation, ExecutionTarget, KillSwitch } from "@langwatch/eventing";
+import type { EventingParticipation, ExecutionTarget } from "@langwatch/eventing";
 import type { GroupQueuePolicy, GroupQueueStorage } from "@langwatch/group-queue";
 
 /** Postgres, as one guarded client per process. */
@@ -97,8 +97,6 @@ export interface EventingConfig {
   readonly processManagerMode?: "run" | "producer-only";
   /** Overrides the half this process's role would otherwise install. */
   readonly participation?: EventingParticipation;
-  /** Per-tenant operator stop for every component the pipelines mount. */
-  readonly killSwitch?: KillSwitch;
 }
 
 /** Where one S3 account's objects are written, and under whose credentials. */

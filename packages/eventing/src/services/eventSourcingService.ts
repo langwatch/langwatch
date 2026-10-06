@@ -85,7 +85,6 @@ export class EventSourcingService<
     executionTarget,
     replayMarkerChecker,
     retentionPolicyResolver,
-    killSwitch,
     parseEvent,
     warnWhenProjectionsRunInline = false,
   }: EventSourcingServiceOptions<EventType, ProjectionTypes>) {
@@ -119,7 +118,6 @@ export class EventSourcingService<
       pipelineName: this.pipelineName,
       globalQueue,
       globalJobRegistry,
-      killSwitch,
       parseEvent,
     });
 
@@ -131,7 +129,6 @@ export class EventSourcingService<
       executionTarget,
       replayMarkerChecker,
       retentionPolicyResolver,
-      killSwitch,
       aggregateHistory: async ({ tenantId, aggregateId, occurredAtMs }) => {
         const events = await eventStore.getEvents({
           aggregateId,
