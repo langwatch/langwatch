@@ -4,22 +4,38 @@
 -- carries no processName, so every manager's poller walked every manager's due
 -- rows. That index stays: retiring it is a later contract step.
 --
--- Built CONCURRENTLY so outbox writes (every intent a process manager commits)
--- never wait on the build. That only works because this file holds exactly ONE
--- statement: prisma migrate deploy sends the file as one simple query, which
--- Postgres runs as an implicit transaction block only when it holds several
--- statements, and CONCURRENTLY fails there with 25001. Add nothing else to
--- this file.
+-- IF NOT EXISTS is deliberate, as in 20260831120000_grant_role_key_live_index
+-- and 20260928120003_trigger_sent_history_index. Indexes on this table are
+-- ops-managed (the ProcessManagerOutbox schema comment and
+-- dev/docs/runbooks/process-manager-table-purge.md): a deployment with real
+-- traffic should build this ahead of the release, outside Prisma's
+-- transaction, where CONCURRENTLY can run:
+--   CREATE INDEX CONCURRENTLY IF NOT EXISTS "ProcessManagerOutbox_status_processName_nextAttemptAt_idx"
+--     ON "ProcessManagerOutbox" ("status", "processName", "nextAttemptAt");
+-- and this statement then becomes the no-op that records the same intent.
 --
--- The trap: a CONCURRENTLY build that FAILS leaves an INVALID index under this
--- name; IF NOT EXISTS then skips it on a re-run and the planner never uses it.
--- After a failed apply, check
+-- The trap in that path: a CREATE INDEX CONCURRENTLY that FAILS leaves an
+-- invalid index under this exact name, IF NOT EXISTS then skips, and the
+-- planner never uses an invalid index. Anyone taking the concurrent path must
+-- check
 --   SELECT indisvalid FROM pg_index WHERE indexrelid =
 --     '"ProcessManagerOutbox_status_processName_nextAttemptAt_idx"'::regclass;
--- and DROP INDEX CONCURRENTLY it before `prisma migrate resolve --rolled-back`.
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "ProcessManagerOutbox_status_processName_nextAttemptAt_idx"
+-- and DROP INDEX CONCURRENTLY before retrying.
+--
+-- LOCKING NOTE: left alone, the plain build takes a SHARE lock on
+-- "ProcessManagerOutbox" for its whole length. Reads keep working; writes
+-- wait - and every intent a process manager commits is an outbox insert, so
+-- while it builds, every process transition that emits an intent stalls. The
+-- retention sweep keeps the table bounded, so expect seconds rather than
+-- minutes, and plan the concurrent prebuild above for any install with real
+-- traffic. It is not mandatory because CONCURRENTLY cannot run inside the
+-- transaction Prisma wraps a migration in, and requiring the prebuild would
+-- fail this migration on every fresh install.
+CREATE INDEX IF NOT EXISTS "ProcessManagerOutbox_status_processName_nextAttemptAt_idx"
   ON "ProcessManagerOutbox" ("status", "processName", "nextAttemptAt");
 
 -- Down (manual rollback; uncomment and run). The index holds no row data of its
 -- own; the lease falls back to the (status, nextAttemptAt, leasedUntil) index.
+-- A plain DROP INDEX takes ACCESS EXCLUSIVE and blocks reads too; outside
+-- Prisma's transaction, DROP INDEX CONCURRENTLY does not block:
 -- DROP INDEX CONCURRENTLY IF EXISTS "ProcessManagerOutbox_status_processName_nextAttemptAt_idx";

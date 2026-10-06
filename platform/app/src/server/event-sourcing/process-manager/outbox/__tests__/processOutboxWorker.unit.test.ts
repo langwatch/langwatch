@@ -60,7 +60,8 @@ describe("ProcessOutboxWorker", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(runOnce).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(100);
+    // A failed drain made no progress, so the next poll waits twice as long.
+    await vi.advanceTimersByTimeAsync(200);
 
     expect(runOnce).toHaveBeenCalledTimes(2);
     // Warning, not error: the drain is retried on the next poll, and the very
@@ -83,7 +84,10 @@ describe("ProcessOutboxWorker", () => {
     });
     const runOnce = vi
       .fn()
-      .mockImplementationOnce(async () => blocked)
+      .mockImplementationOnce(async () => {
+        await blocked;
+        return busyReport();
+      })
       .mockResolvedValue(report());
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
@@ -95,9 +99,12 @@ describe("ProcessOutboxWorker", () => {
     await vi.advanceTimersByTimeAsync(500);
     expect(runOnce).toHaveBeenCalledTimes(1);
 
+    // The poll is armed only once the drain settles, never queued behind it.
     release();
     await blocked;
     await vi.advanceTimersByTimeAsync(0);
+    expect(runOnce).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(100);
     expect(runOnce).toHaveBeenCalledTimes(2);
     await worker.stop();
   });
@@ -152,12 +159,12 @@ describe("ProcessOutboxWorker", () => {
     worker.start();
     expect(runOnce).toHaveBeenCalledTimes(1);
 
-    // While the drain hangs, polls only set drainRequested.
+    // While the drain hangs, no poll is armed.
     await vi.advanceTimersByTimeAsync(900);
     expect(runOnce).toHaveBeenCalledTimes(1);
 
-    // Past the threshold the watchdog abandons the stuck drain and the next
-    // poll (or the pending notification) drains again.
+    // Past the threshold the watchdog abandons the stuck drain and arms the
+    // next poll (or runs the pending notification's drain).
     await vi.advanceTimersByTimeAsync(200);
     expect(runOnce.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(logger.error).toHaveBeenCalledOnce();
@@ -178,7 +185,7 @@ describe("ProcessOutboxWorker", () => {
     });
 
     worker.start();
-    // One drain abandoned per threshold, each replaced by the next poll,
+    // One drain abandoned per threshold, each replaced one poll later,
     // until five are retained and the worker refuses to retain a sixth.
     await vi.advanceTimersByTimeAsync(10_000);
 
@@ -235,7 +242,10 @@ describe("ProcessOutboxWorker", () => {
     });
     const runOnce = vi
       .fn()
-      .mockImplementationOnce(async () => blocked)
+      .mockImplementationOnce(async () => {
+        await blocked;
+        return busyReport();
+      })
       .mockResolvedValue(report());
     const worker = new ProcessOutboxWorker({
       dispatcher: { runOnce },
@@ -252,7 +262,7 @@ describe("ProcessOutboxWorker", () => {
 
     release();
     await blocked;
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(100);
     expect(runOnce).toHaveBeenCalledTimes(2);
     await worker.stop();
   });
@@ -266,20 +276,46 @@ describe("ProcessOutboxWorker", () => {
         dispatcher: { runOnce },
         logger: makeLogger(),
         intervalMs: 1_000,
-        maxIdleIntervalMs: 4_000,
+        maxIdleIntervalMs: 8_000,
       });
 
       worker.start();
       await vi.advanceTimersByTimeAsync(0);
       const pollTimes: number[] = [];
-      for (let elapsed = 0; elapsed < 20_000; elapsed += 250) {
+      for (let elapsed = 0; elapsed < 40_000; elapsed += 250) {
         const before = runOnce.mock.calls.length;
         await vi.advanceTimersByTimeAsync(250);
         if (runOnce.mock.calls.length > before) pollTimes.push(elapsed + 250);
       }
 
-      // Each poll is armed when it fires, so the doubling lands one poll late.
-      expect(pollTimes).toEqual([1_000, 3_000, 7_000, 11_000, 15_000, 19_000]);
+      // The start drain is empty too, so the first poll is already 2s out:
+      // gaps of 2s, 4s, then 8s at the ceiling.
+      expect(pollTimes).toEqual([2_000, 6_000, 14_000, 22_000, 30_000, 38_000]);
+      await worker.stop();
+    });
+
+    /** @scenario "An idle outbox worker backs off its recovery poll until notified" */
+    it("arms no poll behind a slow drain, so empty drains never run back to back", async () => {
+      vi.useFakeTimers();
+      const runOnce = vi.fn(
+        () =>
+          new Promise<ReturnType<typeof report>>((resolve) => {
+            setTimeout(() => resolve(report()), 2_500);
+          }),
+      );
+      const worker = new ProcessOutboxWorker({
+        dispatcher: { runOnce },
+        logger: makeLogger(),
+        intervalMs: 1_000,
+        maxIdleIntervalMs: 8_000,
+      });
+
+      worker.start();
+      // Drains start at 0s, 4.5s (2.5s + 2s) and 11s (7s + 4s); the third
+      // settles at 13.5s and arms the next poll 8s out.
+      await vi.advanceTimersByTimeAsync(14_000);
+
+      expect(runOnce).toHaveBeenCalledTimes(3);
       await worker.stop();
     });
 
@@ -319,20 +355,21 @@ describe("ProcessOutboxWorker", () => {
       });
 
       worker.start();
-      // Polls at 1s, 3s, 7s; the next is armed 8s out, for 15s.
-      await vi.advanceTimersByTimeAsync(7_000);
-      expect(runOnce).toHaveBeenCalledTimes(4);
+      // Polls at 2s and 6s; the next is armed 8s out, for 14s.
+      await vi.advanceTimersByTimeAsync(6_000);
+      expect(runOnce).toHaveBeenCalledTimes(3);
 
       runOnce.mockResolvedValueOnce(busyReport());
       await vi.advanceTimersByTimeAsync(8_000);
-      expect(runOnce).toHaveBeenCalledTimes(5);
+      expect(runOnce).toHaveBeenCalledTimes(4);
 
       await vi.advanceTimersByTimeAsync(1_000);
-      expect(runOnce).toHaveBeenCalledTimes(6);
+      expect(runOnce).toHaveBeenCalledTimes(5);
       await worker.stop();
     });
 
-    it("keeps polling at the base interval while drains fail", async () => {
+    /** @scenario "An idle outbox worker backs off its recovery poll until notified" */
+    it("backs off while drains fail, rather than polling at the base interval", async () => {
       vi.useFakeTimers();
       const runOnce = vi
         .fn()
@@ -341,12 +378,14 @@ describe("ProcessOutboxWorker", () => {
         dispatcher: { runOnce },
         logger: makeLogger(),
         intervalMs: 1_000,
+        maxIdleIntervalMs: 8_000,
       });
 
       worker.start();
-      await vi.advanceTimersByTimeAsync(5_000);
+      // Drains at 0s, 2s, 6s and 14s: a failure never resets the interval.
+      await vi.advanceTimersByTimeAsync(20_000);
 
-      expect(runOnce).toHaveBeenCalledTimes(6);
+      expect(runOnce).toHaveBeenCalledTimes(4);
       await worker.stop();
     });
 

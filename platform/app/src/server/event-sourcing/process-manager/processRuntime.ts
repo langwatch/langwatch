@@ -167,11 +167,6 @@ export function buildProcessDefinition(
   };
 }
 
-/**
- * Owns process managers mounted on event-sourced pipelines. A generated live
- * subscriber hands committed events straight to the transactional inbox; no
- * feed, fact port, or second delivery mechanism exists between them.
- */
 /** A commit that inserted no intent left nothing new to lease. */
 function insertedIntents(result: HandleResult): boolean {
   return (
@@ -179,6 +174,11 @@ function insertedIntents(result: HandleResult): boolean {
   );
 }
 
+/**
+ * Owns process managers mounted on event-sourced pipelines. A generated live
+ * subscriber hands committed events straight to the transactional inbox; no
+ * feed, fact port, or second delivery mechanism exists between them.
+ */
 export class ProcessRuntime {
   private readonly store: ProcessStore;
   private readonly logger: Logger;
