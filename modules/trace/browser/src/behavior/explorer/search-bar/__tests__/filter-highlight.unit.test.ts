@@ -789,3 +789,91 @@ describe("chipOverlayLabel", () => {
     });
   });
 });
+
+describe("buildDecorationPlan with an open quote", () => {
+  describe("given a quoted value still missing its closing quote", () => {
+    const tokenSlotsOf = (text: string) =>
+      buildDecorationPlan(text)
+        .slots.filter((s) => s.className.includes("filter-token"))
+        .map(({ from, to, className }) => ({ from, to, className }));
+
+    /** @scenario "An eval question still being typed is green from its opening quote" */
+    it("draws one eval chip over the whole question after every character", () => {
+      const query = 'eval:"the assistant refused to help"';
+      for (let length = 'eval:"'.length; length <= query.length; length++) {
+        const typed = query.slice(0, length);
+        expect(tokenSlotsOf(typed), typed).toEqual([
+          { from: 0, to: length, className: "filter-token filter-token-eval" },
+        ]);
+      }
+    });
+
+    /** @scenario "A quoted value still being typed is drawn as one chip" */
+    it("draws one chip over a plain field's value after every character", () => {
+      const query = 'errorMessage:"rate limit exc';
+      for (let length = 'errorMessage:"'.length; length <= query.length; length++) {
+        const typed = query.slice(0, length);
+        expect(tokenSlotsOf(typed), typed).toEqual([
+          { from: 0, to: length, className: "filter-token" },
+        ]);
+      }
+    });
+
+    /** @scenario "A quoted value still being typed is drawn as one chip" */
+    it("keeps the U+00A0 the editor writes for a space inside the chip", () => {
+      const typed = 'errorMessage:"rate\u00A0limit\u00A0';
+      expect(tokenSlotsOf(typed)).toEqual([
+        { from: 0, to: typed.length, className: "filter-token" },
+      ]);
+    });
+
+    /** @scenario "A quoted value still being typed is drawn as one chip" */
+    it("reads an escaped quote as part of the value", () => {
+      const typed = 'errorMessage:"said \\"no\\" and';
+      expect(tokenSlotsOf(typed)).toEqual([
+        { from: 0, to: typed.length, className: "filter-token" },
+      ]);
+    });
+
+    /** @scenario "A quoted value still being typed is drawn as one chip" */
+    it("draws a value opened with a single quote the same way", () => {
+      const typed = "errorMessage:'rate limit exc";
+      expect(tokenSlotsOf(typed)).toEqual([
+        { from: 0, to: typed.length, className: "filter-token" },
+      ]);
+    });
+
+    it("ends the fallback token's delete range where the chip ends", () => {
+      const typed = 'eval:"the assistant refused';
+      expect(buildDecorationPlan(typed).tokens).toEqual([
+        { start: 0, end: typed.length, field: "eval", value: null, kind: "fallback" },
+      ]);
+    });
+
+    /** @scenario "An apostrophe inside an open quoted value stays in the chip" */
+    it("keeps an apostrophe inside the chip", () => {
+      const typed = "errorMessage:\"the model didn't answ";
+      expect(tokenSlotsOf(typed)).toEqual([
+        { from: 0, to: typed.length, className: "filter-token" },
+      ]);
+    });
+
+    /** @scenario "A term after a closed quote is its own chip while its quote is open" */
+    it("draws the closed term and the open term as two chips", () => {
+      const closed = 'errorMessage:"rate limit"';
+      const typed = `${closed} model:"gpt 5`;
+      expect(tokenSlotsOf(typed)).toEqual([
+        { from: 0, to: closed.length, className: "filter-token" },
+        { from: closed.length + 1, to: typed.length, className: "filter-token" },
+      ]);
+    });
+
+    /** @scenario "A term after a closed quote is its own chip while its quote is open" */
+    it("draws no operator keyword inside the open value", () => {
+      const slots = buildDecorationPlan('status:error AND eval:"cats AND dogs OR').slots;
+      expect(slots.filter((s) => s.className.includes("filter-keyword"))).toEqual([
+        { from: 13, to: 16, className: "filter-keyword filter-keyword-and" },
+      ]);
+    });
+  });
+});
