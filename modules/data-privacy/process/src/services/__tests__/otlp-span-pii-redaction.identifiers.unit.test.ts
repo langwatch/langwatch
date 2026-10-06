@@ -134,6 +134,20 @@ describe("given a strict tenant and an attribute that is an opaque identifier", 
     expect(attr(span, "trace_id")).toBe(DECIMAL_TRACE_ADDRESS);
   });
 
+  /** @scenario "Caller metadata keeps a reserved trace identifier through the REST collector rewrite" */
+  it.each(["langwatch.metadata.", "langwatch.trace.", "metadata."])(
+    "keeps a decimal trace identifier written under the %s namespace as sent",
+    async (namespace) => {
+      const harness = makeService("strict");
+      const span = spanWith({ [`${namespace}trace_id`]: DECIMAL_TRACE_ADDRESS });
+
+      await ingest(harness, span, "STRICT");
+
+      expect(harness.submitted()).not.toContain(DECIMAL_TRACE_ADDRESS);
+      expect(attr(span, `${namespace}trace_id`)).toBe(DECIMAL_TRACE_ADDRESS);
+    },
+  );
+
   /** @scenario "A corpus of opaque identifiers is never sent for analysis" */
   it("sends none of a corpus of hex identifiers, dashed uuids and prefixed ULIDs", async () => {
     const harness = makeService("strict");

@@ -176,6 +176,16 @@ describe("the governanceCost tRPC namespace", () => {
     await expect(caller.summary({ organizationId: "org_1" })).resolves.toEqual(SUMMARY);
   });
 
+  /** @scenario "A cost-only viewer sees provider costs inside the billed card" */
+  it("hands a caller holding only governanceCost:view the billed total and each provider's figure", async () => {
+    const { caller } = mount({ permits: (permission) => permission === "governanceCost:view" });
+
+    const summary = await caller.summary({ organizationId: "org_1" });
+
+    expect(summary.billed).toEqual(SUMMARY.billed);
+    expect(summary.providers.map((provider) => provider.provider)).toEqual(["openai"]);
+  });
+
   /** @scenario "Viewing requires the organization-scoped governance cost permission" */
   it("refuses every cost read to a member without governanceCost:view on the organization", async () => {
     const { caller, calls, asked } = mount({ permits: () => false });

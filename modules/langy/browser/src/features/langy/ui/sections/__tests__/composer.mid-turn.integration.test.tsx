@@ -23,7 +23,9 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
 }
 
 vi.mock("../../elements/langy-model-pill.tsx", () => ({
-  LangyModelPill: () => <div data-testid="model-pill" />,
+  LangyModelPill: ({ disabledReason }: { disabledReason?: string }) => (
+    <div data-testid="model-pill" data-disabled-reason={disabledReason} />
+  ),
 }));
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
@@ -70,6 +72,15 @@ describe("given a Langy turn is in flight", () => {
 
       expect(screen.getByPlaceholderText(MID_TURN_PLACEHOLDER)).toBeTruthy();
       expect(screen.queryByPlaceholderText(IDLE_PLACEHOLDER)).toBeNull();
+    });
+
+    it("tells the model pill the lock is the turn, so it can say so on hover", () => {
+      useLangyStore.setState({ turnPhase: "active" });
+      renderComposer(() => {});
+
+      expect(screen.getByTestId("model-pill").getAttribute("data-disabled-reason")).toBe(
+        "turn-active",
+      );
     });
 
     /** @scenario The message field says the same while the turn is stopping */
