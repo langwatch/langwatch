@@ -37,9 +37,9 @@ environment, so the journey adds one through `/settings/model-providers`.
 cd dev/tests/agentic-e2e
 docker compose up -d
 
-# 2. Run database migrations (first time only)
+# 2. Run the upgrade (first time, and after pulling new migrations)
 cd ../../..
-pnpm prisma:migrate
+pnpm start:prepare:db
 
 # 3. Start the app (from the repository root)
 PORT=5570 pnpm dev
@@ -265,7 +265,7 @@ Reset the test database:
 ```bash
 docker compose down -v
 docker compose up -d
-cd ../../.. && pnpm prisma:migrate
+cd ../../.. && pnpm start:prepare:db
 ```
 
 ## For AI Agents

@@ -1313,9 +1313,9 @@ the tier the value states: opened stores state `live`, `memoryStores()` states `
 repositories whose tier nobody stated refuses boot by name (Alex, 2026-10-05). Production and dev open
 live stores; a test or dev harness hands `memoryStores()` directly and never touches env.
 
-**Migrations are not the api's job.** They are tasks —
-`pnpm --filter @langwatch/tasks task prisma-migrate clickhouse-migrate` — run
-before serve by the start script and the deploy pipeline. Prisma migrations
+**Migrations are not the api's job.** They run through `pnpm task upgrade` (apps/api
+`start:prepare:db`: upgrade, then the system-migrations pass), before serve, from every entry
+point (ADR-173). Prisma migrations
 live with the schema; ClickHouse migrations are goose SQL files. A serving
 process holding DDL locks is how deploys die. Because they run before any module boots, apps/tasks'
 migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27), and

@@ -12,26 +12,28 @@ description: "How to upgrade LangWatch to the latest version"
 
 ## Automatic identity and access migration
 
-Identity and access migrations run automatically during startup, organization
-by organization. A tenant whose authorization, identifier, and existing SSO
-data migrate cleanly is switched over. No preparatory release or manual
-migration pass is required.
+Identity and access migrations run automatically after each upgrade,
+organization by organization: the preparation step runs them right after
+`pnpm task upgrade`, and the workers run them again every hour. A tenant whose
+authorization, identifier, and existing SSO data migrate cleanly is switched
+over. No preparatory release or manual migration pass is required.
 
 A tenant whose historical data disagrees with the migrated result is **held**
 on its existing legacy sign-in path: the migration leaves that tenant's data
 untouched, and the app still starts and serves it as before. A tenant whose
 migration throws is **parked** the same way, also without blocking startup.
 
-Both are retried automatically. The next restart re-drives them from the
-start of its own preflight, and an operator can also trigger a pass, or
-target one organization, without waiting for a restart. See
+Both are retried automatically. The next upgrade and the workers' hourly pass
+re-drive them, and an operator can also trigger a pass, or target one
+organization, without waiting. See
 [Check the migration results](#check-the-migration-results) below.
 
-Startup still refuses to serve traffic in three cases: the migration runner
-itself fails outright, the queue behind it fails to drain, or the fleet makes
-no progress for 25 passes (about two minutes: for example because Redis is
-unreachable, or another process holds every claim). In all three the process
-exits non-zero and the next start retries from scratch.
+The preparation step still fails in three cases: the migration runner itself
+fails outright, the queue behind it fails to drain, or the fleet makes no
+progress for 25 passes (about two minutes: for example because Redis is
+unreachable, or another process holds every claim). It exits non-zero, which
+fails the Helm pre-upgrade Job or the compose `migrate` service, so the
+previous version keeps serving; the next run retries from scratch.
 
 Keep the current identity-provider configuration, callback URLs, and
 `CREDENTIALS_SECRET` during the upgrade. The migration preserves the existing
@@ -192,13 +194,56 @@ To run it yourself, from the new image with the app's environment (`DATABASE_URL
 cd /app/apps/api && pnpm --silent run start:prepare:db
 ```
 
-That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first) and then the system-migrations pass. It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger.
+That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first) and then the system-migrations pass. It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger. Both take `--json`.
 
-`upgrade` exits non-zero and names the cause when it cannot proceed: `1` a step failed (a failed Prisma migration is named with the `prisma migrate resolve --rolled-back` command to clear it), `2` the installation is below this release's supported floor, `3` another upgrade holds the lease.
+`upgrade` exits non-zero and names the cause when it cannot proceed: `1` a step failed (a failed Prisma migration is named with the `prisma migrate resolve --rolled-back` command to clear it), `2` the installation is below this release's supported floor, `3` another upgrade holds the lease. A refused or failed run is recorded, so the Upgrades page and `upgrade status` show it.
+
+### What the upgrade does
+
+- **Release by release.** From the release the ledger records to the release of the image, each release's PostgreSQL migrations, then its ClickHouse migrations on every ClickHouse target (the shared one and each private dataplane), then its blocking data steps. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
+- **Never below the floor.** Each release names a long-term-support floor. An installation older than the floor is refused by name (exit code `2`): upgrade to the floor release first, then to this one.
+- **Short locks.** PostgreSQL statements run with a 10 second `lock_timeout`. A statement that waits longer fails the upgrade instead of blocking your traffic; the previous version keeps serving, and running the upgrade again resumes where it stopped.
+- **Background steps.** Data copies that do not block the release run on the workers after the upgrade. A step that must not run while an older version still writes waits until every running app and worker is on a version that knows it.
+
+### ClickHouse is required
+
+The app and the workers refuse to start without ClickHouse. An installation with no `CLICKHOUSE_URL`, or one where the upgrade never applied the ClickHouse migrations, stays refused by name until `pnpm task upgrade` has run against a reachable ClickHouse.
+
+### While it runs, and after
+
+Every running app and worker records itself in the upgrade ledger as it starts, refreshes that record every 15 seconds, and removes it on a graceful stop. A record not refreshed for 60 seconds counts as gone. The upgrade uses these records to tell when every older version has stopped. A process that cannot refresh its own record for 60 seconds stops serving until a refresh succeeds again, so it never keeps writing unseen.
+
+To follow an upgrade:
+
+| Where | What it shows |
+| --- | --- |
+| **Ops > Upgrades** (`/ops/upgrades`) | The installation's state, each release's steps with their status and a one-line description, every run with its phases and error. It refreshes while a run is in progress. Platform operators only (`ADMIN_EMAILS`). |
+| `pnpm task upgrade status` | The same state and steps, in the terminal, from the app image (`--json` for scripts) |
+| **Settings, Checkup**, `langwatch doctor` | A row for pending or failed PostgreSQL and ClickHouse migrations, with the fix |
+| `npx @langwatch/server doctor` | The same output as `upgrade status`, for a local install |
+
+The installation is in one of eight states: **Up to date**, **Finishing in background** (blocking steps done, background steps still running), **Behind** (this image declares steps the ledger has not run), **Never upgraded** (an empty ledger), **Upgrading**, **Rolled back** (an older version is running beside newer steps), **Needs attention** (a step or run failed) and **Unsupported** (below the floor).
+
+### Upgrade settings
+
+| Variable or value | Effect |
+| --- | --- |
+| `app.migrations.preRoll` (Helm, default `true`) | Runs the upgrade in a pre-upgrade Job. `false` leaves it to you; until you run it, new pods refuse to start. |
+| `app.migrations.preRollTimeoutSeconds` (Helm, default `2100`) | How long that Job may run. |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` (default `180`) | How long the upgrade waits for ClickHouse to accept connections. `0` fails on the first refused connection. |
+| `SKIP_PRISMA_MIGRATE=true` | The upgrade leaves PostgreSQL alone. The app and the workers then refuse to start until an upgrade runs without it. |
+| `SKIP_CLICKHOUSE_MIGRATE=true` | The upgrade leaves ClickHouse alone, with the same consequence. |
+| `SKIP_LWQL_PROVISION=true` | The upgrade skips LangWatchQL provisioning. |
 
 For the split into api, worker and tasks applications, see [the chart's upgrade notes](https://github.com/langwatch/langwatch/tree/main/charts/langwatch#upgrading-to-the-split-api-worker-and-tasks-applications). `app.features.skipEnvValidation` is inert: no process reads `SKIP_ENV_VALIDATION` any more.
 
 ## Rollback
+
+A rollback never runs migrations and never needs a down migration. Every migration in the supported window only adds, so the previous version runs on the upgraded schema as it is. The pre-upgrade Job runs on `helm upgrade` only, never on `helm rollback`.
+
+- A version at or above the installation's floor starts on the newer schema. One below the floor refuses by name.
+- The Upgrades page shows **Rolled back** while the older version runs. Background steps that an older version can undo are reopened, and run again after you upgrade again.
+- Data the newer version wrote stays. Features the older version does not know about are unavailable until you upgrade again.
 
 ### Helm
 

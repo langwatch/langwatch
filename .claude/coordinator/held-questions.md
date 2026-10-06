@@ -315,6 +315,11 @@ recommendation, and "default taken" if a lane proceeded on it.
 - Raw-client exceptions (Q212 R4): store-containment cannot see a raw client that arrives through `ProcessMembers["prisma"|"redis"|"clickhouse"]`, which is how both sites hold theirs, so the two named exceptions name today's files (`auth-composition.build.ts`, Prisma and Redis; `ops-composition.build.ts`, ClickHouse and Redis) and are inert until the rule also reads the members bag; the path moves with the code when spell-ops-auth relocates it; default taken, held for Alex.
 - migration-owners and §17 "a policy reads no baseline": the policy reports all 21 merged two-owner migrations (immutable history, so the list never shrinks) and the shrink-only list in `tests/baselines/migration-owners.json` with its test refuses a new one; the policy therefore never runs at zero findings and cannot join CI's zero-finding set; default taken, held for Alex.
 
+### upgrade-skills-docs
+
+- Docs ahead of code (no default taken; docs follow the rulings): the operator docs now say (a) an install without ClickHouse refuses to start (round 20), but `packages/upgrade/src/gate/serving-upgrade-gate.ts:165` still admits with ClickHouse steps ignored when no ClickHouse is configured, and `specs/upgrade/entry-points.feature:103` still asserts that; (b) a process whose presence lapses past 60 s stops serving (round 22), but nothing consumes `UpgradeGate.serving()` (no `/readyz` 503, no worker pause). Options: land both before the docs ship, or soften the two doc sentences until they land. Recommendation: land them; the docs are written to the ruling.
+- Declared code steps never run: no app calls `.migrationSteps(...)` and `apps/tasks/src/upgrade.ts` passes no `codeSteps` to `createUpgradeRunner`, so `identity:reopen-unproven-accounts` (blocking) is collected but not executed, and no worker runs background steps. The skills tell agents to declare steps and name the gap. Needs a lane owning `apps/tasks` and `apps/worker`.
+
 ### land-framework
 
 - clickhouse-table-ownership applies its declared records and named exceptions only when the workspace has a ClickHouse schema: on a fixture root every record and exception read as stale and broke `feature-package-boundaries.test.ts` and `cli.unit.test.ts`; the real tree is unaffected (13 findings before and after); default taken, held for Alex.

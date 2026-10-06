@@ -62530,8 +62530,8 @@ LangWatch is configured through environment variables. How you set them depends 
 | Variable                          | Description                                                                                                                             | Required | Default                       |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------- |
 | `DATABASE_URL`                    | PostgreSQL connection string                                                                                                            | Yes      | -                             |
-| `CLICKHOUSE_URL`                  | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`)                                                         | Yes      | -                             |
-| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds the boot migrations wait for ClickHouse to accept connections before failing. `0` fails on the first refused connection         | No       | `180`                         |
+| `CLICKHOUSE_URL`                  | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`). Without it the app and workers refuse to start| Yes      | -                             |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds `pnpm task upgrade` waits for ClickHouse to accept connections before failing. `0` fails on the first refused connection     | No       | `180`                         |
 | `REDIS_URL`                       | Redis connection string                                                                                                                 | Yes      | -                             |
 | `NODE_ENV`                        | Environment (`production`, `development`)                                                                                               | No       | `production`                  |
 | `BASE_HOST`                       | Public URL of the application, used in invite links, emails and the links the app hands out                                             | Yes      | -                             |
@@ -62847,11 +62847,15 @@ Model providers for evaluators, including Azure OpenAI, are configured per proje
 | `VOICE_TUNNEL` | Set to `true` to have the worker open a cloudflared quick tunnel at boot and use its URL when `VOICE_PUBLIC_BASE_URL` is unset. The tunnel calls Cloudflare. Phone runs fail when `VOICE_PUBLIC_BASE_URL` is unset and no tunnel is open. | `false` when `NODE_ENV=production` (a self-hosted install). Unset, it is on for LangWatch Cloud and when `NODE_ENV` is not `production`, for example local development |
 | `VOICE_WS_PORT` | Port the voice worker listens on for phone audio. Route your public origin to it. | `3300` |
 
-## Feature Flags
+## Upgrade
 
-| Variable              | Description                                     | Default |
-| --------------------- | ----------------------------------------------- | ------- |
-| `SKIP_PRISMA_MIGRATE` | `true` skips PostgreSQL migrations on startup | `false` |
+The app and the workers never migrate on startup: `pnpm task upgrade` does, before they start, and they refuse to start until it has run. See [Run the upgrade](/self-hosting/upgrade#run-the-upgrade).
+
+| Variable                  | Description                                                                                                         | Default |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------- |
+| `SKIP_PRISMA_MIGRATE`     | `true` makes `pnpm task upgrade` leave PostgreSQL alone. The app and workers refuse to start until an upgrade runs without it | `false` |
+| `SKIP_CLICKHOUSE_MIGRATE` | `true` makes `pnpm task upgrade` leave ClickHouse alone, with the same consequence                                    | `false` |
+| `SKIP_LWQL_PROVISION`     | `true` makes `pnpm task upgrade` skip LangWatchQL provisioning                                                        | `false` |
 
 ## Cloud admin
 
@@ -63110,7 +63114,7 @@ histogram_quantile(0.95, sum by (le) (rate(clickhouse_query_duration_seconds_buc
 The Helm chart configures probes automatically. The app probes `/api/health` on port 5560:
 
 ```yaml
-# Startup probe (allows up to 40 minutes for migrations)
+# Startup probe (allows up to 40 minutes: on a first install the app runs the upgrade before it serves)
 startupProbe:
   httpGet:
     path: /api/health
@@ -63538,7 +63542,7 @@ address is confirmed and the provider sends `email_verified: true`.
 
 ## Upgrading an existing installation
 
-Identity and access migrations run automatically as the app starts, one
+Identity and access migrations run automatically after each upgrade, one
 organization at a time. Each organization switches over as soon as it migrates
 cleanly. When an organization's historical data needs attention, it stays on
 its existing sign-in path and the deployment starts anyway. See the
@@ -63914,7 +63918,7 @@ Libraries inside the images can call third parties on their own. A self-hosted i
 | Host | Component | What it would do | Default | How to turn it on |
 |---|---|---|---|---|
 | `api.trycloudflare.com` and the Cloudflare tunnel edge; `cloudflare-dns.com`, `dns.google` | Workers | Open a public `*.trycloudflare.com` hostname to the worker's voice media listener, so phone calls can reach it | Off: the app leaves the tunnel off on a self-hosted production install, and the chart sets `VOICE_TUNNEL=false` | `VOICE_TUNNEL=true` on the Workers. Or set `VOICE_PUBLIC_BASE_URL` to your own hostname, which needs no tunnel |
-| `checkpoint.prisma.io` | App, Workers | Prisma's version check during the migration at each start: CLI version, hashed project path, database type, command name | Never: LangWatch sets `CHECKPOINT_DISABLE=1` in every environment, in the app's Prisma config, the image, the chart and the launcher | No switch |
+| `checkpoint.prisma.io` | App (the upgrade Job, or the app's first boot) | Prisma's version check while `pnpm task upgrade` applies migrations: CLI version, hashed project path, database type, command name | Never: LangWatch sets `CHECKPOINT_DISABLE=1` in every environment, in the app's Prisma config, the image, the chart and the launcher | No switch |
 | `openaipublic.blob.core.windows.net` | App, Workers, LangEvals | Download a tokenizer file for token counting | Never: the app image ships every file and sets `TIKTOKENS_PATH`, and the LangEvals image ships them in its tiktoken cache | No switch |
 | `raw.githubusercontent.com` | LangEvals | Download the LiteLLM model price list at startup | Never: LangEvals prices model calls from LangWatch's own model catalog, shipped in the image, on top of the list bundled with the pinned LiteLLM | No switch |
 | `t.explodinggradients.com` | LangEvals | RAGAS usage analytics: a random id, the RAGAS version, provider and model names, request counts | Off: LangEvals, its image and the chart set `RAGAS_DO_NOT_TRACK=true` | `RAGAS_DO_NOT_TRACK=false` |
@@ -65052,8 +65056,8 @@ clickhouse:
 The chart-managed ClickHouse is pinned to a version the release is tested
 against. An external instance is yours, so the version is your choice.
 LangWatch supports ClickHouse 25.8 and later, including 26.x and ClickHouse
-Cloud. The app runs its ClickHouse migrations at startup, so the version has to
-accept every migration in the release you deploy.
+Cloud. The upgrade applies the release's ClickHouse migrations before the app
+starts, so the version has to accept every migration in the release you deploy.
 
 ### Auto-Tuning
 
@@ -65098,7 +65102,7 @@ helm upgrade langwatch langwatch/langwatch \
   --wait --timeout 10m
 ```
 
-Database migrations run automatically on startup. Set `SKIP_PRISMA_MIGRATE=true` to disable PostgreSQL migrations if needed.
+A pre-upgrade Job runs `pnpm task upgrade` on the new image before any pod rolls; on a first install the app runs it once on its first boot. If the upgrade fails, the Job fails the `helm upgrade` and the previous version keeps serving. Follow it on **Ops > Upgrades** or with `pnpm task upgrade status`. To run the upgrade from your own pipeline instead, set `app.migrations.preRoll: false` and run it before `helm upgrade`; until then the new pods refuse to start.
 
 See [Upgrade Guide](/self-hosting/upgrade) for version-specific instructions.
 
@@ -65605,7 +65609,7 @@ Runs the in-product assistant's workers. Internal only, reached by the App and W
 <Card title="Control Plane" icon="database">
 **PostgreSQL**
 
-Users, teams, projects, configurations, prompt versions. Managed via Prisma with auto-migrations.
+Users, teams, projects, configurations, prompt versions. Managed via Prisma; migrations are applied by the upgrade before the app starts.
 
 </Card>
 <Card title="Data Plane" icon="chart-bar">
@@ -65687,7 +65691,7 @@ The worker manager behind the in-product assistant (image `langwatch/langyagent`
 
 ### PostgreSQL: Control Plane
 
-Stores users, teams, projects, configurations, prompt versions, evaluator definitions. Managed via Prisma ORM with auto-migrations on startup.
+Stores users, teams, projects, configurations, prompt versions, evaluator definitions. Managed via Prisma ORM; `pnpm task upgrade` applies its migrations before the app and workers start, and they refuse to start until it has.
 
 ### ClickHouse: Data Plane
 
@@ -67402,6 +67406,7 @@ across organizations.
 | `/ops/backoffice/identity-lookup` | Find an account, inspect its identity state and sign it out everywhere when required. |
 | `/ops/backoffice/sso-connections` | Inspect connection state and domain evidence, investigate setup, or pause and resume a connection. |
 | `/ops/backoffice/directory-sync` | Inspect SCIM sync failures, provisioning attempts and external user mappings. Retry a retired apply after fixing its cause. |
+| `/ops/upgrades` | Follow an upgrade: the installation's state, each release's steps and every run with its phases and error. |
 | `/ops/migrations` | Inspect migration progress and reports, or run a targeted migration for an organization. |
 
 Pausing SSO stops new sign-ins through the connection. It leaves existing
@@ -68331,7 +68336,7 @@ Common causes:
 First startup is slower because:
 
 - Docker pulls all images
-- PostgreSQL runs initial migrations
+- The `migrate` service runs the upgrade (PostgreSQL and ClickHouse migrations) before the app starts
 - OpenSearch initializes its cluster
 
 Subsequent starts are faster. If it remains slow, check Docker resource allocation.
@@ -68483,26 +68488,20 @@ Ensure the service account has S3 access (IRSA) or static credentials are config
 
 ## PostgreSQL Issues
 
-### Migration failures on startup
+### The app refuses to start: the installation is behind
 
-If Prisma migrations fail, the app pod crashes. Check logs:
+The app and the workers never migrate. They log `refuses to serve: the installation is behind this image` with the outstanding steps when the upgrade has not run for their version. Run it from the new image (see [Run the upgrade](/self-hosting/upgrade#run-the-upgrade)), or check why the pre-upgrade Job did not:
 
 ```bash
-kubectl -n langwatch logs deploy/langwatch-app --tail=100 | grep -i prisma
+kubectl -n langwatch get jobs | grep migrate-pre-roll
+kubectl -n langwatch logs job/<release>-migrate-pre-roll --tail=100
 ```
 
-To skip migrations temporarily (for debugging):
+### The upgrade failed
 
-```yaml
-app:
-  extraEnvs:
-    - name: SKIP_PRISMA_MIGRATE
-      value: "true"
-```
+A failed upgrade fails the `helm upgrade` before any pod rolls, so the previous version keeps serving. The Job's log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if nothing of it remains, and run the upgrade again. It resumes where it stopped.
 
-<Warning>
-  Only skip migrations for debugging. Running with pending migrations can cause application errors.
-</Warning>
+`SKIP_PRISMA_MIGRATE` and `SKIP_CLICKHOUSE_MIGRATE` do not get a stuck installation serving: the app refuses to start until the upgrade has applied every migration its version needs.
 
 ### Connection refused
 
@@ -69210,26 +69209,28 @@ description: "How to upgrade LangWatch to the latest version"
 
 ## Automatic identity and access migration
 
-Identity and access migrations run automatically during startup, organization
-by organization. A tenant whose authorization, identifier, and existing SSO
-data migrate cleanly is switched over. No preparatory release or manual
-migration pass is required.
+Identity and access migrations run automatically after each upgrade,
+organization by organization: the preparation step runs them right after
+`pnpm task upgrade`, and the workers run them again every hour. A tenant whose
+authorization, identifier, and existing SSO data migrate cleanly is switched
+over. No preparatory release or manual migration pass is required.
 
 A tenant whose historical data disagrees with the migrated result is **held**
 on its existing legacy sign-in path: the migration leaves that tenant's data
 untouched, and the app still starts and serves it as before. A tenant whose
 migration throws is **parked** the same way, also without blocking startup.
 
-Both are retried automatically. The next restart re-drives them from the
-start of its own preflight, and an operator can also trigger a pass, or
-target one organization, without waiting for a restart. See
+Both are retried automatically. The next upgrade and the workers' hourly pass
+re-drive them, and an operator can also trigger a pass, or target one
+organization, without waiting. See
 [Check the migration results](#check-the-migration-results) below.
 
-Startup still refuses to serve traffic in three cases: the migration runner
-itself fails outright, the queue behind it fails to drain, or the fleet makes
-no progress for 25 passes (about two minutes: for example because Redis is
-unreachable, or another process holds every claim). In all three the process
-exits non-zero and the next start retries from scratch.
+The preparation step still fails in three cases: the migration runner itself
+fails outright, the queue behind it fails to drain, or the fleet makes no
+progress for 25 passes (about two minutes: for example because Redis is
+unreachable, or another process holds every claim). It exits non-zero, which
+fails the Helm pre-upgrade Job or the compose `migrate` service, so the
+previous version keeps serving; the next run retries from scratch.
 
 Keep the current identity-provider configuration, callback URLs, and
 `CREDENTIALS_SECRET` during the upgrade. The migration preserves the existing
@@ -69390,13 +69391,56 @@ To run it yourself, from the new image with the app's environment (`DATABASE_URL
 cd /app/apps/api && pnpm --silent run start:prepare:db
 ```
 
-That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first) and then the system-migrations pass. It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger.
+That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first) and then the system-migrations pass. It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger. Both take `--json`.
 
-`upgrade` exits non-zero and names the cause when it cannot proceed: `1` a step failed (a failed Prisma migration is named with the `prisma migrate resolve --rolled-back` command to clear it), `2` the installation is below this release's supported floor, `3` another upgrade holds the lease.
+`upgrade` exits non-zero and names the cause when it cannot proceed: `1` a step failed (a failed Prisma migration is named with the `prisma migrate resolve --rolled-back` command to clear it), `2` the installation is below this release's supported floor, `3` another upgrade holds the lease. A refused or failed run is recorded, so the Upgrades page and `upgrade status` show it.
+
+### What the upgrade does
+
+- **Release by release.** From the release the ledger records to the release of the image, each release's PostgreSQL migrations, then its ClickHouse migrations on every ClickHouse target (the shared one and each private dataplane), then its blocking data steps. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
+- **Never below the floor.** Each release names a long-term-support floor. An installation older than the floor is refused by name (exit code `2`): upgrade to the floor release first, then to this one.
+- **Short locks.** PostgreSQL statements run with a 10 second `lock_timeout`. A statement that waits longer fails the upgrade instead of blocking your traffic; the previous version keeps serving, and running the upgrade again resumes where it stopped.
+- **Background steps.** Data copies that do not block the release run on the workers after the upgrade. A step that must not run while an older version still writes waits until every running app and worker is on a version that knows it.
+
+### ClickHouse is required
+
+The app and the workers refuse to start without ClickHouse. An installation with no `CLICKHOUSE_URL`, or one where the upgrade never applied the ClickHouse migrations, stays refused by name until `pnpm task upgrade` has run against a reachable ClickHouse.
+
+### While it runs, and after
+
+Every running app and worker records itself in the upgrade ledger as it starts, refreshes that record every 15 seconds, and removes it on a graceful stop. A record not refreshed for 60 seconds counts as gone. The upgrade uses these records to tell when every older version has stopped. A process that cannot refresh its own record for 60 seconds stops serving until a refresh succeeds again, so it never keeps writing unseen.
+
+To follow an upgrade:
+
+| Where | What it shows |
+| --- | --- |
+| **Ops > Upgrades** (`/ops/upgrades`) | The installation's state, each release's steps with their status and a one-line description, every run with its phases and error. It refreshes while a run is in progress. Platform operators only (`ADMIN_EMAILS`). |
+| `pnpm task upgrade status` | The same state and steps, in the terminal, from the app image (`--json` for scripts) |
+| **Settings, Checkup**, `langwatch doctor` | A row for pending or failed PostgreSQL and ClickHouse migrations, with the fix |
+| `npx @langwatch/server doctor` | The same output as `upgrade status`, for a local install |
+
+The installation is in one of eight states: **Up to date**, **Finishing in background** (blocking steps done, background steps still running), **Behind** (this image declares steps the ledger has not run), **Never upgraded** (an empty ledger), **Upgrading**, **Rolled back** (an older version is running beside newer steps), **Needs attention** (a step or run failed) and **Unsupported** (below the floor).
+
+### Upgrade settings
+
+| Variable or value | Effect |
+| --- | --- |
+| `app.migrations.preRoll` (Helm, default `true`) | Runs the upgrade in a pre-upgrade Job. `false` leaves it to you; until you run it, new pods refuse to start. |
+| `app.migrations.preRollTimeoutSeconds` (Helm, default `2100`) | How long that Job may run. |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` (default `180`) | How long the upgrade waits for ClickHouse to accept connections. `0` fails on the first refused connection. |
+| `SKIP_PRISMA_MIGRATE=true` | The upgrade leaves PostgreSQL alone. The app and the workers then refuse to start until an upgrade runs without it. |
+| `SKIP_CLICKHOUSE_MIGRATE=true` | The upgrade leaves ClickHouse alone, with the same consequence. |
+| `SKIP_LWQL_PROVISION=true` | The upgrade skips LangWatchQL provisioning. |
 
 For the split into api, worker and tasks applications, see [the chart's upgrade notes](https://github.com/langwatch/langwatch/tree/main/charts/langwatch#upgrading-to-the-split-api-worker-and-tasks-applications). `app.features.skipEnvValidation` is inert: no process reads `SKIP_ENV_VALIDATION` any more.
 
 ## Rollback
+
+A rollback never runs migrations and never needs a down migration. Every migration in the supported window only adds, so the previous version runs on the upgraded schema as it is. The pre-upgrade Job runs on `helm upgrade` only, never on `helm rollback`.
+
+- A version at or above the installation's floor starts on the newer schema. One below the floor refuses by name.
+- The Upgrades page shows **Rolled back** while the older version runs. Background steps that an older version can undo are reopened, and run again after you upgrade again.
+- Data the newer version wrote stays. Features the older version does not know about are unavailable until you upgrade again.
 
 ### Helm
 

@@ -20,8 +20,8 @@ LangWatch is configured through environment variables. How you set them depends 
 | Variable                          | Description                                                                                                                             | Required | Default                       |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------- |
 | `DATABASE_URL`                    | PostgreSQL connection string                                                                                                            | Yes      | -                             |
-| `CLICKHOUSE_URL`                  | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`)                                                         | Yes      | -                             |
-| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds the boot migrations wait for ClickHouse to accept connections before failing. `0` fails on the first refused connection         | No       | `180`                         |
+| `CLICKHOUSE_URL`                  | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`). Without it the app and workers refuse to start| Yes      | -                             |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds `pnpm task upgrade` waits for ClickHouse to accept connections before failing. `0` fails on the first refused connection     | No       | `180`                         |
 | `REDIS_URL`                       | Redis connection string                                                                                                                 | Yes      | -                             |
 | `NODE_ENV`                        | Environment (`production`, `development`)                                                                                               | No       | `production`                  |
 | `BASE_HOST`                       | Public URL of the application, used in invite links, emails and the links the app hands out                                             | Yes      | -                             |
@@ -337,11 +337,15 @@ Model providers for evaluators, including Azure OpenAI, are configured per proje
 | `VOICE_TUNNEL` | Set to `true` to have the worker open a cloudflared quick tunnel at boot and use its URL when `VOICE_PUBLIC_BASE_URL` is unset. The tunnel calls Cloudflare. Phone runs fail when `VOICE_PUBLIC_BASE_URL` is unset and no tunnel is open. | `false` when `NODE_ENV=production` (a self-hosted install). Unset, it is on for LangWatch Cloud and when `NODE_ENV` is not `production`, for example local development |
 | `VOICE_WS_PORT` | Port the voice worker listens on for phone audio. Route your public origin to it. | `3300` |
 
-## Feature Flags
+## Upgrade
 
-| Variable              | Description                                     | Default |
-| --------------------- | ----------------------------------------------- | ------- |
-| `SKIP_PRISMA_MIGRATE` | `true` skips PostgreSQL migrations on startup | `false` |
+The app and the workers never migrate on startup: `pnpm task upgrade` does, before they start, and they refuse to start until it has run. See [Run the upgrade](/self-hosting/upgrade#run-the-upgrade).
+
+| Variable                  | Description                                                                                                         | Default |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------- |
+| `SKIP_PRISMA_MIGRATE`     | `true` makes `pnpm task upgrade` leave PostgreSQL alone. The app and workers refuse to start until an upgrade runs without it | `false` |
+| `SKIP_CLICKHOUSE_MIGRATE` | `true` makes `pnpm task upgrade` leave ClickHouse alone, with the same consequence                                    | `false` |
+| `SKIP_LWQL_PROVISION`     | `true` makes `pnpm task upgrade` skip LangWatchQL provisioning                                                        | `false` |
 
 ## Cloud admin
 

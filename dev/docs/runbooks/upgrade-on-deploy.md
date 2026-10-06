@@ -10,8 +10,9 @@
 
 ## Status
 
-The contract is fixed now; the pieces it names land in slices. Until they do,
-the chart's pre-roll Job runs `start:prepare:db` and nothing writes presence.
+The contract is fixed now; the pieces it names land in slices. All five have landed:
+the chart's pre-roll Job runs `upgrade`, and every admitted api and worker writes presence
+(15 s refresh, 60 s stale).
 
 | Piece                                         | Lands with                                             |
 | --------------------------------------------- | ------------------------------------------------------ |
