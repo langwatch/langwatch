@@ -1,6 +1,11 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
-import { JoinRequestNotFoundError } from "@langwatch/identity-contract";
+import {
+  JoinRequestNotFoundError,
+  type JoinRequestOrigin,
+  readJoinerRole,
+  seatForJoiner,
+} from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 
 import { approveJoinCommandId, newJoinRequestCommandId } from "../rules/join-request-id.rules.ts";
@@ -43,6 +48,7 @@ export class JoinRequestResolutionService {
       joinRequestId,
       organizationId,
       userId: request.userId,
+      origin: request.origin,
       resolvedBy: { type: "user", id: adminUserId },
       actor: { type: "user", id: adminUserId },
       approvedByUserId: adminUserId,
@@ -186,6 +192,7 @@ export class JoinRequestResolutionService {
     joinRequestId,
     organizationId,
     userId,
+    origin,
     resolvedBy,
     actor,
     approvedByUserId,
@@ -194,6 +201,8 @@ export class JoinRequestResolutionService {
     joinRequestId: string;
     organizationId: string;
     userId: string;
+    /** Where the request was made; with the joiner seat, decides the seat. */
+    origin: JoinRequestOrigin;
     resolvedBy: { type: "user" | "policy" | "invite"; id: string };
     actor: { type: "user" | "system"; id: string };
     approvedByUserId: string | null;
@@ -225,6 +234,9 @@ export class JoinRequestResolutionService {
       return;
     }
 
+    // Decided from the request in hand (ADR-171 v6), so the automatic path never
+    // reads it back from a projection row that may not exist yet.
+    const { joinerRole } = await this.deps.settings.read({ organizationId });
     await this.deps.membership.attachDefaultMembership({
       userId,
       organizationId,
@@ -235,6 +247,8 @@ export class JoinRequestResolutionService {
         resolvedById: resolvedBy.id,
       }),
       approvedByUserId,
+      role: seatForJoiner({ origin, joinerRole: readJoinerRole(joinerRole) }),
+      origin,
     });
   }
 }

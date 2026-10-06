@@ -3,6 +3,7 @@ import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { readableDate } from "../../model/display-formatters.ts";
 import type { PendingJoinRequest } from "../../model/pending-join-request.ts";
 import { IdentityChip, IdentityRow, IdentityRowList } from "../elements/identity-row.tsx";
+import { orgRoleOptions } from "../elements/organization-user-role-field.tsx";
 
 interface JoinRequestsTableProps {
   requests: PendingJoinRequest[];
@@ -66,6 +67,10 @@ export function JoinRequestRow({
       chips={
         <>
           <IdentityChip label={request.domain} title="The domain their verified address is on." />
+          <IdentityChip
+            label={seatLabel(request.seat)}
+            title="The seat they land in if you approve. A request made from the terminal lands as a Developer; one made on the web lands your organization's joiner seat."
+          />
           <Text fontSize="xs" color="fg.muted">
             Asked {formatDay(request.requestedAt)}
             {request.expiresAt ? `, lapses ${formatDay(request.expiresAt)}` : ""}
@@ -96,6 +101,11 @@ export function JoinRequestRow({
       }
     />
   );
+}
+
+/** The same word the invitations tab uses for the seat. */
+function seatLabel(seat: PendingJoinRequest["seat"]): string {
+  return orgRoleOptions.find((option) => option.value === seat)?.label ?? seat;
 }
 
 /** Spelled out, never abbreviated: "24 Aug 2026", not "24/08". */

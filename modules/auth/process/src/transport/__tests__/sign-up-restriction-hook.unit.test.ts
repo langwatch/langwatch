@@ -18,7 +18,7 @@ function userCreateBefore({
   governingConnections = [],
 }: {
   verdict: SignUpVerdict;
-  governingConnections?: readonly string[];
+  governingConnections?: readonly { connectionId: string; methodId: string }[];
 }) {
   const checkSignUp = vi.fn(async () => verdict);
   const findGoverningConnections = vi.fn(async () => governingConnections);
@@ -54,7 +54,7 @@ describe("user.create.before", () => {
     it("creates the account even though the policy refuses the address", async () => {
       const { create, checkSignUp } = userCreateBefore({
         verdict: REFUSED,
-        governingConnections: ["ssoc_acme"],
+        governingConnections: [{ connectionId: "ssoc_acme", methodId: "ssoc_acme" }],
       });
 
       await expect(create("sam@acme.com")).resolves.toBeUndefined();

@@ -30,6 +30,7 @@ const request = (id: string): PendingJoinRequest => ({
   domain: "acme.com",
   requestedAt: "2026-09-01T10:00:00.000Z",
   expiresAt: null,
+  seat: "MEMBER",
 });
 
 describe("given people waiting to join", () => {

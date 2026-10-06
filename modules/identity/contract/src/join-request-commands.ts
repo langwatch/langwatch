@@ -2,7 +2,9 @@ import { ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import {
+  DEFAULT_JOIN_REQUEST_ORIGIN,
   joinMatchKindSchema,
+  joinRequestOriginSchema,
   joinResolverSchema,
   joinWithdrawalCauseSchema,
 } from "./join-request.ts";
@@ -74,6 +76,8 @@ export const requestJoinCommandDataSchema = commandDataSchema({
   expiresAtMs: z.number().int().nonnegative(),
   /** False only for a policy approval, which nobody has to act on. */
   notifyAdmins: z.boolean().default(true),
+  /** Where the request was made; see `JOIN_REQUEST_ORIGINS`. */
+  origin: joinRequestOriginSchema.default(DEFAULT_JOIN_REQUEST_ORIGIN),
 });
 export type RequestJoinCommandData = z.infer<typeof requestJoinCommandDataSchema>;
 

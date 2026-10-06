@@ -93,6 +93,7 @@ import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
+import { buildSignUpVerificationUrl } from "../rules/signup-verification-link.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
 import { AddressConfirmationService } from "../services/address-confirmation.service.ts";
 import type { CliAccessProject } from "../services/api-rest-credentials.service.ts";
@@ -977,7 +978,7 @@ export class AuthModule implements AuthApiContract {
   }
 
   async requestNewAccountVerification(
-    input: Readonly<{ email: string }>,
+    input: Readonly<{ email: string; callbackUrl?: string }>,
   ): Promise<SignUpVerificationRequest> {
     return this.requireSignUp().requestNewAccountVerification(input);
   }
@@ -1147,8 +1148,8 @@ function buildSignUpVerification({
     route,
     checkSignUp,
     isWithinBudget,
-    buildVerificationUrl: ({ token }) =>
-      `${publicBaseUrl}/auth/signup?verify=${encodeURIComponent(token)}`,
+    buildVerificationUrl: ({ token, callbackUrl }) =>
+      buildSignUpVerificationUrl({ baseUrl: publicBaseUrl, token, callbackUrl }),
     isEmailUnconfigured,
     now,
   });

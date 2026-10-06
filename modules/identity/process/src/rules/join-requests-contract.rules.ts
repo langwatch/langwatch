@@ -6,6 +6,7 @@
 import {
   type DomainJoinSetting,
   type JoinerRole,
+  type JoinRequestOrigin,
   type JoinSettingChange,
 } from "@langwatch/identity-contract";
 
@@ -78,6 +79,10 @@ export interface JoinMembership {
     commandId: string;
     /** The approving admin, or nobody when the policy approved. */
     approvedByUserId: string | null;
+    /** The seat decided from the request's origin and the joiner seat (ADR-171 v6). */
+    role: JoinerRole;
+    /** Where the request was made, for the audit row. */
+    origin: JoinRequestOrigin;
   }) => Promise<void>;
   isMember(args: { userId: string; organizationId: string }): Promise<boolean>;
   /** Which of these organizations the person is already in, in one read. */

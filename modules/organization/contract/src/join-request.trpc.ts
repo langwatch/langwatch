@@ -19,6 +19,7 @@ import {
   joinRequestWriteAckSchema,
 } from "./join-request.responses.ts";
 import {
+  joinRequestApiAdmitInputSchema,
   joinRequestApiDecisionInputSchema,
   joinRequestApiOrganizationScopeSchema,
   joinRequestApiRequestInputSchema,
@@ -69,7 +70,7 @@ export const joinRequestTrpc = defineTrpcContract("joinRequests")
 
   /** Walk in, where the organization asked for that; null organization when nothing admits. */
   .mutation("admitAutomatically")
-  .withInput(z.object({}))
+  .withInput(joinRequestApiAdmitInputSchema)
   .withOutput(joinRequestAdmittedSchema)
 
   /** Everything this person is waiting on, so a screen can say so. */

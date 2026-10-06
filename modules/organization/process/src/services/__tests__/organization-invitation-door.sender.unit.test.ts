@@ -21,6 +21,7 @@ describe("given an administrator creating a batch", () => {
       }));
       const service = OrganizationInvitationDoorService.create({
         invitations: createApiFixture<OrganizationInvitations>({ create }),
+        directory: { findProvenAddresses: async () => [] },
         joinRequests: null,
         signals: createApiFixture<OrganizationSignals>({ trackServerEvent: vi.fn() }),
         lifecycle: { membersInvited: vi.fn(), inviteAccepted: vi.fn() },

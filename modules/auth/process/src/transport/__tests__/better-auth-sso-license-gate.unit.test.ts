@@ -95,7 +95,7 @@ function buildOptions(
   federation: StubFederation,
   findGoverningConnections: (input: {
     email: string;
-  }) => Promise<readonly string[]> = async () => [],
+  }) => Promise<readonly { connectionId: string; methodId: string }[]> = async () => [],
 ) {
   return createAuthOptions({
     repo: {} as never,
@@ -125,7 +125,7 @@ function buildHook(
   federation: StubFederation,
   findGoverningConnections: (input: {
     email: string;
-  }) => Promise<readonly string[]> = async () => [],
+  }) => Promise<readonly { connectionId: string; methodId: string }[]> = async () => [],
 ) {
   const authOptions = buildOptions(federation, findGoverningConnections);
   const before = authOptions.hooks?.before;
@@ -296,7 +296,7 @@ describe("a deployment that issues its own passwords beside its provider (D09)",
 
   describe("given an address its organization routes through its own identity provider", () => {
     const governed = async ({ email }: { email: string }) =>
-      email.endsWith("@acme.com") ? ["ssoc_acme"] : [];
+      email.endsWith("@acme.com") ? [{ connectionId: "ssoc_acme", methodId: "ssoc_acme" }] : [];
 
     /** @scenario "An organization's own connection still refuses a local password" */
     /** @scenario "A recovery grant cannot start a password reset for an SSO governed address" */
@@ -320,7 +320,7 @@ describe("a deployment that issues its own passwords beside its provider (D09)",
     it("allows an address-less reset, which carries a token and no email", async () => {
       const federation = new StubFederation();
       federation.federationCapableValue = false;
-      const lookup = vi.fn(async () => ["ssoc_acme"]);
+      const lookup = vi.fn(async () => [{ connectionId: "ssoc_acme", methodId: "ssoc_acme" }]);
 
       await expect(
         buildHook(federation, lookup)("/api/auth/reset-password", { token: "t", newPassword: "x" }),

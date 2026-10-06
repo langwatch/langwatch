@@ -9,6 +9,7 @@ import {
   organizationInvitesCreatedSchema,
   organizationListedInvitesSchema,
   organizationPendingInvitationForCallerSchema,
+  organizationPendingInvitationsForCallerSchema,
 } from "./organization.responses.ts";
 import {
   organizationApiAcceptInviteInputSchema,
@@ -40,4 +41,9 @@ export const inviteTrpc = defineTrpcContract("invite")
   .query("myPendingInvitation")
   .withInput(z.object({}))
   .withOutput(organizationPendingInvitationForCallerSchema)
+
+  /** The invitations waiting on the caller's own VERIFIED addresses (ADR-171 v6). */
+  .query("pendingForMe")
+  .withInput(z.object({}))
+  .withOutput(organizationPendingInvitationsForCallerSchema)
   .build();

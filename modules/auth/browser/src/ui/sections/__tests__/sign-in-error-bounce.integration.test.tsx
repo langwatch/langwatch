@@ -9,7 +9,8 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { signInMock } = vi.hoisted(() => ({ signInMock: vi.fn() }));
+// The real `signIn` resolves to a result or undefined; the page chains on it.
+const { signInMock } = vi.hoisted(() => ({ signInMock: vi.fn(async () => undefined as unknown) }));
 
 vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
   const actual = await importOriginal<typeof authClientModule>();
@@ -39,6 +40,7 @@ function renderErrorRoute(query: Record<string, string>) {
 afterEach(() => {
   cleanup();
   signInMock.mockReset();
+  signInMock.mockResolvedValue(undefined);
 });
 
 describe("a refused native sign-in that named a connection", () => {
@@ -61,5 +63,26 @@ describe("a refusal whose named target is not a connection", () => {
 
     expect(await screen.findByText("Use your organization's sign-in")).toBeTruthy();
     expect(signInMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("a refused native sign-in whose connection the server will not dial", () => {
+  /** @scenario "A dial the server refuses shows the refusal instead of waiting" */
+  it("shows the refusal when the server answers the dial with an error", async () => {
+    signInMock.mockResolvedValueOnce({ error: "No provider found for the issuer", status: 404 });
+    renderErrorRoute({ error: "SSO_REQUIRED_BY_ORGANIZATION", error_description: "ssoc_gone" });
+
+    expect(await screen.findByText("Use your organization's sign-in")).toBeTruthy();
+    expect(signInMock).toHaveBeenCalledWith("ssoc_gone", { callbackUrl: "/" });
+    expect(screen.queryByText("Taking you to your organization's sign-in")).toBeNull();
+  });
+
+  /** @scenario "A dial the server refuses shows the refusal instead of waiting" */
+  it("shows the refusal when the dial itself throws", async () => {
+    signInMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    renderErrorRoute({ error: "SSO_REQUIRED_BY_ORGANIZATION", error_description: "ssoc_gone" });
+
+    expect(await screen.findByText("Use your organization's sign-in")).toBeTruthy();
+    expect(screen.queryByText("Taking you to your organization's sign-in")).toBeNull();
   });
 });

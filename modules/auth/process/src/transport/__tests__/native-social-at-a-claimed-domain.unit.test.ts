@@ -35,7 +35,11 @@ const licensed = createApiFixture<BetterAuthFederation>({
 
 /** The router's answer: acme.com is the connection's, every other domain nobody's. */
 const acmeGoverned: FindGoverningConnections = async ({ email }) =>
-  email.endsWith("@acme.com") ? [CONNECTION] : [];
+  email.endsWith("@acme.com") ? [{ connectionId: CONNECTION, methodId: CONNECTION }] : [];
+
+/** A grandfathered connection: the router names it, but the broker is what gets dialled. */
+const acmeBrokered: FindGoverningConnections = async ({ email }) =>
+  email.endsWith("@acme.com") ? [{ connectionId: CONNECTION, methodId: "auth0" }] : [];
 
 function repoFor({
   email = "sam@acme.com",
@@ -186,6 +190,18 @@ describe("the legacy ssoDomain columns", () => {
       })(accountFor("google"), null),
     ).rejects.toMatchObject({ body: { code: "SSO_PROVIDER_NOT_ALLOWED" } });
     expect(flagPendingSsoSetup).not.toHaveBeenCalled();
+  });
+
+  /** @scenario A connection reached through the broker refuses without bouncing */
+  it("leaves a brokered connection to the legacy guard instead of bouncing to it", async () => {
+    const { repo } = repoFor({ organization: LEGACY });
+    await expect(
+      createBeforeAccountCreateHook({
+        repo,
+        federation: licensed,
+        findGoverningConnections: acmeBrokered,
+      })(accountFor("google"), null),
+    ).rejects.toMatchObject({ body: { code: "SSO_PROVIDER_NOT_ALLOWED" } });
   });
 
   /** @scenario "A native social sign-in on an already-linked account is refused too" */

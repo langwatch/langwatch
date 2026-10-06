@@ -43,6 +43,16 @@ export const JOIN_MATCH_KINDS = ["verified-identifier-domain", "sso-connection-d
 export const joinMatchKindSchema = z.enum(JOIN_MATCH_KINDS);
 export type JoinMatchKind = z.infer<typeof joinMatchKindSchema>;
 
+/**
+ * Where a request was made (ADR-171 v6): `cli` when `langwatch login`'s device
+ * approval sent a new account to the welcome screen, `web` otherwise. A `cli`
+ * request lands a Developer; the origin only lowers the seat. Absent = `web`.
+ */
+export const JOIN_REQUEST_ORIGINS = ["web", "cli"] as const;
+export const joinRequestOriginSchema = z.enum(JOIN_REQUEST_ORIGINS);
+export type JoinRequestOrigin = z.infer<typeof joinRequestOriginSchema>;
+export const DEFAULT_JOIN_REQUEST_ORIGIN: JoinRequestOrigin = "web";
+
 /** Why a pending request was withdrawn. */
 export const JOIN_WITHDRAWAL_CAUSES = ["user", "invite-accepted"] as const;
 export const joinWithdrawalCauseSchema = z.enum(JOIN_WITHDRAWAL_CAUSES);
@@ -83,6 +93,9 @@ export const joinRequestedPayloadSchema = z.object({
    *  request derives it from this event, so the handoff cannot be lost
    *  between the command and a service-side callback. */
   notifyAdmins: z.boolean().default(true),
+  /** Where the request was made. Defaulted so a fact written before origins
+   *  existed folds to the same row the column default gives a replay. */
+  origin: joinRequestOriginSchema.default(DEFAULT_JOIN_REQUEST_ORIGIN),
   actor: ledgerActorSchema,
 });
 export type JoinRequestedPayload = z.infer<typeof joinRequestedPayloadSchema>;
@@ -160,6 +173,8 @@ export interface JoinRequestAggregateState {
   domain: string;
   state: JoinRequestState;
   matchedVia: JoinMatchKind;
+  /** Where it was made; what the seat is decided from on approval. */
+  origin: JoinRequestOrigin;
   createdAtMs: number;
   updatedAtMs: number;
   /** When PENDING lapses. Null once the request has an ending. */
@@ -183,6 +198,7 @@ export function emptyJoinRequest({
     domain: "",
     state: "PENDING",
     matchedVia: "verified-identifier-domain",
+    origin: DEFAULT_JOIN_REQUEST_ORIGIN,
     createdAtMs: 0,
     updatedAtMs: 0,
     expiresAtMs: null,
@@ -220,6 +236,7 @@ export function reduceJoinRequest({
         organizationId: fact.data.organizationId,
         domain: fact.data.domain,
         matchedVia: fact.data.matchedVia,
+        origin: fact.data.origin,
         state: "PENDING",
         expiresAtMs: fact.data.expiresAtMs,
         createdAtMs: fact.occurredAt,

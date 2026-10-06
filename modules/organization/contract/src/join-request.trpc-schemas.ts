@@ -9,8 +9,20 @@ export const joinRequestApiOrganizationScopeSchema = z.object({
 export type JoinRequestApiOrganizationScope = z.infer<typeof joinRequestApiOrganizationScopeSchema>;
 
 /** The organization being asked to let the caller in. */
+/**
+ * Where a request is made (ADR-171 v6), as the browser asserts it. Trusted
+ * because it only LOWERS the seat; an older client naming nothing is `web`.
+ */
+export const joinRequestApiOriginSchema = z.enum(["web", "cli"]).default("web");
+export type JoinRequestApiOrigin = z.infer<typeof joinRequestApiOriginSchema>;
+
 export const joinRequestApiRequestInputSchema = z.object({
   organizationId: z.string().min(1),
+  origin: joinRequestApiOriginSchema,
+});
+
+export const joinRequestApiAdmitInputSchema = z.object({
+  origin: joinRequestApiOriginSchema,
 });
 export type JoinRequestApiRequestInput = z.infer<typeof joinRequestApiRequestInputSchema>;
 

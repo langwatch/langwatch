@@ -27,3 +27,4 @@ export * from "./sso-test-sign-in.ts";
 export * from "./account-ceremonies.ts";
 export * from "./auth.config.ts";
 export * from "./auth-lifecycle.events.ts";
+export { isSafeReturnToPath } from "./return-path.ts";

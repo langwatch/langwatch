@@ -20,6 +20,7 @@ import {
   type OrganizationListedInvite,
   type OrganizationPendingInviteApplied,
   type OrganizationUserRole,
+  type PendingInvitationsForCaller,
 } from "@langwatch/organization-contract";
 import { toDate } from "@langwatch/time";
 
@@ -27,6 +28,7 @@ import { grantCallerOf } from "../rules/grant-caller.rules.ts";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import type { InviteCreationThrottleService } from "./invite-creation-throttle.service.ts";
+import type { OrganizationDirectory } from "./organization-directory.service.ts";
 import type {
   OrganizationGrantCeilingService,
   OrganizationIntendedGrant,
@@ -39,6 +41,8 @@ import type { OrganizationSignals } from "./organization-signals.service.ts";
 /** What the ceremony needs beside the invitation service itself. */
 interface OrganizationInvitationDoorDependencies {
   readonly invitations: OrganizationInvitations;
+  /** The one proven-address rule the join door also reads. */
+  readonly directory: Pick<OrganizationDirectory, "findProvenAddresses">;
   readonly joinRequests: OrganizationJoinRequests | null;
   readonly signals: OrganizationSignals;
   /** Where an invitation batch and an acceptance are recorded as organization's events. */
@@ -66,6 +70,15 @@ export class OrganizationInvitationDoorService {
   }
 
   private constructor(private readonly deps: OrganizationInvitationDoorDependencies) {}
+
+  /** The invitations waiting on the addresses this person has proven. */
+  async listPendingForCaller(
+    input: Readonly<{ userId: string }>,
+  ): Promise<PendingInvitationsForCaller> {
+    return this.deps.invitations.findPendingForAddresses({
+      addresses: await this.deps.directory.findProvenAddresses(input),
+    });
+  }
 
   /**
    * Invites a batch in the validation mode the caller chose. `strict` refuses

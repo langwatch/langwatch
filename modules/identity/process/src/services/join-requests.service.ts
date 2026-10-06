@@ -1,11 +1,13 @@
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
+  DEFAULT_JOIN_REQUEST_ORIGIN,
   DOMAIN_AUTO_JOIN_POLICY_ID,
   isPublicEmailDomain,
   type JoinLookupDecision,
   JoinNotAvailableError,
   type JoinOffer,
   type JoinRequestAggregateState,
+  type JoinRequestOrigin,
   type JoinSettingChange,
   extractJoinDomain,
   organizationAdmitsDomain,
@@ -158,10 +160,13 @@ export class JoinRequestsService {
     userId,
     verifiedEmail,
     organizationId,
+    origin = DEFAULT_JOIN_REQUEST_ORIGIN,
   }: {
     userId: string;
     verifiedEmail: string | null;
     organizationId: string;
+    /** Where the ask was made; `cli` lands a Developer on approval. */
+    origin?: JoinRequestOrigin;
   }): Promise<{ joinRequestId: string; state: "PENDING" | "APPROVED" }> {
     const domain = this.guards.provenDomainOrRefuse({ verifiedEmail });
     const candidate = await this.deps.candidates.getCandidateOrganization({
@@ -190,6 +195,7 @@ export class JoinRequestsService {
       matchedVia: "verified-identifier-domain",
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
       notifyAdmins: true,
+      origin,
     });
 
     return { joinRequestId, state: "PENDING" };
@@ -227,6 +233,8 @@ export class JoinRequestsService {
       matchedVia: "sso-connection-domain",
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
       notifyAdmins: true,
+      // No browser made this and no terminal claimed it: a sign-in did.
+      origin: DEFAULT_JOIN_REQUEST_ORIGIN,
     });
 
     return { raised: true, joinRequestId };
@@ -240,9 +248,12 @@ export class JoinRequestsService {
   async joinAutomaticallyIfAdmitted({
     userId,
     verifiedEmail,
+    origin = DEFAULT_JOIN_REQUEST_ORIGIN,
   }: {
     userId: string;
     verifiedEmail: string | null;
+    /** Where the arrival was made; `cli` walks in as a Developer. */
+    origin?: JoinRequestOrigin;
   }): Promise<{ organization: JoinOffer | null }> {
     const decision = await this.lookup({ userId, verifiedEmail });
     if (decision.outcome !== "auto") {
@@ -274,12 +285,14 @@ export class JoinRequestsService {
       matchedVia: "verified-identifier-domain",
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
       notifyAdmins: false,
+      origin,
     });
 
     await this.resolution.resolveApproved({
       joinRequestId,
       organizationId,
       userId,
+      origin,
       resolvedBy: { type: "policy", id: DOMAIN_AUTO_JOIN_POLICY_ID },
       actor: policyActor,
       approvedByUserId: null,
