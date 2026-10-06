@@ -18,6 +18,7 @@ import {
   liveStoresConfigured,
   SYNTHETIC_ENVIRONMENT,
 } from "./api-live.fixture.ts";
+import { upgradedLiveDatabase } from "./live-upgrade.fixture.ts";
 import { startMigratedClickHouseEndpoint } from "./monitor-performance.fixture.ts";
 
 const BOOT_TIMEOUT_MS = 120_000;
@@ -40,6 +41,11 @@ let clickHouseUrl = "";
 beforeAll(async () => {
   if (!liveStoresConfigured) return;
   clickHouseUrl = (await startMigratedClickHouseEndpoint()).url;
+  await upgradedLiveDatabase({
+    databaseUrl: liveDatabaseUrl(),
+    redisUrl: process.env.LANGWATCH_TEST_REDIS_URL ?? "",
+    clickHouseUrl,
+  });
 }, BOOT_TIMEOUT_MS);
 
 /** The deployment's environment for the executable, with `overrides` on top. */
