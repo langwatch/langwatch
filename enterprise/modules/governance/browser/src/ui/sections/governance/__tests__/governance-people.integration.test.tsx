@@ -7,6 +7,11 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@langwatch/browser-host/drawer", async () => ({
+  ...(await vi.importActual("@langwatch/browser-host/drawer")),
+  useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn(), goBack: vi.fn() }),
+}));
+
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const dataFor = (path: string): unknown => {
     if (path === "departments.list") return [{ id: "dept_mkt", name: "Marketing" }];

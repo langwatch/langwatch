@@ -88,6 +88,13 @@ export const governanceWeb = defineBrowserModule("governance")
         default: (await import("./features/agents/register-agent-drawer.tsx")).RegisterAgentDrawer,
       }),
     },
+    /** The People page opens it by address: `?drawer.open=addDepartment`. */
+    addDepartment: {
+      load: async () => ({
+        default: (await import("./features/people/ui/create-department-drawer.tsx"))
+          .CreateDepartmentDrawer,
+      }),
+    },
     /** The inventory source list opens it by address: `?drawer.open=editIngestionSource`. */
     editIngestionSource: {
       load: async () => ({

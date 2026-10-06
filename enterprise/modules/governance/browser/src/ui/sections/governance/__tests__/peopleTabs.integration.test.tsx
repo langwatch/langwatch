@@ -28,6 +28,17 @@ const harness = vi.hoisted(() => ({
   inputs: {} as Record<string, unknown>,
   calls: [] as { path: string; input: unknown }[],
   invalidated: [] as string[],
+  openDrawer: vi.fn(),
+  closeDrawer: vi.fn(),
+}));
+
+vi.mock("@langwatch/browser-host/drawer", async () => ({
+  ...(await vi.importActual("@langwatch/browser-host/drawer")),
+  useDrawer: () => ({
+    openDrawer: harness.openDrawer,
+    closeDrawer: harness.closeDrawer,
+    goBack: vi.fn(),
+  }),
 }));
 
 vi.mock("../../../../behavior/governance-api.ts", () => {
@@ -78,6 +89,7 @@ vi.mock("../../../../behavior/governance-api.ts", () => {
   return { api: node([]) };
 });
 
+import { CreateDepartmentDrawer } from "../../../../features/people/ui/create-department-drawer.tsx";
 import PeoplePage from "../governance-people.screen.tsx";
 
 const ADMIN = ["activityMonitor:view", "governance:manage", "ingestionSources:view"];
@@ -158,6 +170,8 @@ beforeEach(() => {
   harness.inputs = {};
   harness.calls = [];
   harness.invalidated = [];
+  harness.openDrawer.mockReset();
+  harness.closeDrawer.mockReset();
 });
 
 afterEach(() => cleanup());
@@ -595,10 +609,46 @@ describe("given alice, an organization admin, on the People page", () => {
     });
   });
 
-  describe("when she opens the create-department drawer from the header", () => {
-    const openDrawer = async () => {
-      const host = renderPage({ permissions: ADMIN }).host;
+  describe("when she presses Add department", () => {
+    /** @scenario "Adding a department opens the create-department drawer" */
+    it("navigates to the drawer by name and mounts no dialog of its own", async () => {
+      renderPage({ permissions: ADMIN });
       await userEvent.click(screen.getByRole("button", { name: /Add department/ }));
+
+      expect(harness.openDrawer).toHaveBeenCalledWith("addDepartment");
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    /** @scenario "The departments address can ask for the create-department drawer" */
+    it("selects the Departments tab and navigates to the drawer when the address asks", async () => {
+      renderPage({ permissions: ADMIN, query: { tab: "departments", add: "1" } });
+
+      expect(screen.getByRole("tab", { name: /Departments/ })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await waitFor(() => expect(harness.openDrawer).toHaveBeenCalledWith("addDepartment"));
+    });
+
+    /** @scenario "The request to add a department leaves the address once the drawer has it" */
+    it("takes the add request out of the address, keeps the rest and asks for no second drawer", () => {
+      const { host } = renderPage({
+        permissions: ADMIN,
+        query: { tab: "departments", add: "1", "drawer.open": "addDepartment" },
+      });
+
+      expect(host.recording.queries.at(-1)?.next).toEqual({
+        tab: "departments",
+        "drawer.open": "addDepartment",
+      });
+      expect(harness.openDrawer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when she opens the create-department drawer", () => {
+    const openDrawer = async () => {
+      const host = FakeGovernanceHost.create({ permissions: ADMIN });
+      renderWithGovernanceHost(<CreateDepartmentDrawer />, { host });
       return { host, drawer: await screen.findByRole("dialog") };
     };
 
@@ -621,7 +671,7 @@ describe("given alice, an organization admin, on the People page", () => {
       );
       await userEvent.click(within(drawer).getByRole("button", { name: "Create" }));
 
-      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      await waitFor(() => expect(harness.closeDrawer).toHaveBeenCalled());
       expect(harness.calls).toEqual([
         { path: "departments.create", input: { organizationId: "org-1", name: "Legal" } },
       ]);
@@ -636,7 +686,19 @@ describe("given alice, an organization admin, on the People page", () => {
 
       expect(within(drawer).getByText("Give the department a name.")).toBeInTheDocument();
       expect(harness.calls).toEqual([]);
+      expect(harness.closeDrawer).not.toHaveBeenCalled();
     });
+  });
+
+  /** @scenario "A viewer who reaches the create-department drawer is told which grant it needs" */
+  it("names the governance:manage grant and offers no name field or Create action by address", async () => {
+    const host = FakeGovernanceHost.create({ permissions: VIEWER });
+    renderWithGovernanceHost(<CreateDepartmentDrawer />, { host });
+    const drawer = await screen.findByRole("dialog");
+
+    expect(within(drawer).getByText(/governance:manage/)).toBeInTheDocument();
+    expect(within(drawer).queryByRole("textbox")).toBeNull();
+    expect(within(drawer).queryByRole("button", { name: "Create" })).toBeNull();
   });
 });
 
@@ -646,6 +708,7 @@ describe("given sam, a viewer without the manage grant", () => {
     const { host } = renderPage({ query: { tab: "departments", add: "1" } });
 
     expect(host.recording.queries.at(-1)?.next).toEqual({ tab: "departments" });
+    expect(harness.openDrawer).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

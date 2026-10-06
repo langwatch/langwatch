@@ -325,6 +325,93 @@ describe("IngestionSourceService", () => {
     expect(repository.updateInput).toBeNull();
   });
 
+  describe("given a source that has read its bill", () => {
+    const BILL_A = "aaaaaaaa-0000-4000-8000-000000000001";
+    const BILL_B = "bbbbbbbb-0000-4000-8000-000000000002";
+    const billing = { billingClientId: "bid", billingClientSecret: "bsecret" };
+    const read = JSON.stringify({ costPricedThroughDay: "2026-08-20" });
+
+    function billed({ claim, pollerCursor }: { claim?: string; pollerCursor: string | null }) {
+      const { service, repository } = harness();
+      repository.row = source({
+        sourceType: "copilot_studio",
+        parserConfig: {
+          adapter: "copilot_studio_dataverse",
+          credentials: "enc:v1:aaaa:bbbb:cccc",
+          ...(claim ? { azureSubscriptionId: claim } : {}),
+          ...(claim ? { _azureBillSubscriptionId: claim } : {}),
+        },
+        pollerCursor,
+      });
+      return { service, repository };
+    }
+
+    /** @scenario "A source that has read one bill cannot be pointed at another" */
+    it("refuses a different subscription, telling the admin to archive and create anew", async () => {
+      const { service, repository } = billed({ claim: BILL_A, pollerCursor: read });
+
+      await expect(
+        service.updateSource({
+          id: "source-1",
+          organizationId: "org-1",
+          parserConfig: {
+            azureSubscriptionId: BILL_B,
+            credentials: { clientId: "c", clientSecret: "s", ...billing },
+          },
+        }),
+      ).rejects.toThrow(/Archive this source and create a new one/);
+      expect(repository.updateInput).toBeNull();
+    });
+
+    /** @scenario "A source that has read one bill cannot be pointed at another" */
+    it("refuses the dropped claim coming back once cost memory exists", async () => {
+      const { service, repository } = billed({ pollerCursor: read });
+
+      await expect(
+        service.updateSource({
+          id: "source-1",
+          organizationId: "org-1",
+          parserConfig: {
+            azureSubscriptionId: BILL_A,
+            credentials: { clientId: "c", clientSecret: "s", ...billing },
+          },
+        }),
+      ).rejects.toThrow(/already read the bill/);
+      expect(repository.updateInput).toBeNull();
+    });
+
+    /** @scenario "A source that has read one bill cannot be pointed at another" */
+    it("lets the same subscription be saved again and lets the claim be dropped", async () => {
+      const { service, repository } = billed({ claim: BILL_A, pollerCursor: read });
+
+      await service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        parserConfig: { azureSubscriptionId: BILL_A.toUpperCase() },
+      });
+      expect(repository.updateInput).not.toBeNull();
+      repository.updateInput = null;
+
+      await service.updateSource({ id: "source-1", organizationId: "org-1", parserConfig: {} });
+      expect(repository.updateInput).not.toBeNull();
+    });
+
+    /** @scenario "A source that has read one bill cannot be pointed at another" */
+    it("lets the claim move before any cost read has been made", async () => {
+      const { service, repository } = billed({ claim: BILL_A, pollerCursor: null });
+
+      await service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        parserConfig: {
+          azureSubscriptionId: BILL_B,
+          credentials: { clientId: "c", clientSecret: "s", ...billing },
+        },
+      });
+      expect(repository.updateInput).not.toBeNull();
+    });
+  });
+
   /** @scenario "A source that starts pulling mid-save does not lose the rule" */
   it("atomically pins a report change before the first pull", async () => {
     const { service, repository } = harness();

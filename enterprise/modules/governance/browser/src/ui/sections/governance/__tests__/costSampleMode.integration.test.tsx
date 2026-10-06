@@ -265,14 +265,41 @@ describe("the sample panels on the cost screen", () => {
   describe("given the reader turns the sample panels on", () => {
     beforeEach(withRealFigures);
 
+    /** @scenario "Sample mode replaces real cost figures and restores them when disabled" */
+    it("replaces every real figure with sample ones and restores the real ones when turned off", () => {
+      harness.activity.spendByDepartment = [
+        { departmentId: "dep-9", departmentName: "Zed Holdings", spendUsd: "310.50" },
+      ];
+      renderScreen();
+      expect(screen.getByText("Zed Holdings")).toBeInTheDocument();
+      expect(screen.getByText("$123.45", { exact: false })).toBeInTheDocument();
+      expect(screen.getByText("42")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "See sample data" }));
+
+      expect(screen.getAllByText(A_SAMPLE_FIGURE).length).toBeGreaterThan(0);
+      expect(screen.queryByText("Zed Holdings")).toBeNull();
+      expect(screen.queryByText("$123.45", { exact: false })).toBeNull();
+      expect(screen.queryByText("42")).toBeNull();
+      expect(screen.getByRole("button", { name: "Hide sample data" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Hide sample data" }));
+
+      expect(screen.queryAllByText(A_SAMPLE_FIGURE)).toHaveLength(0);
+      expect(screen.getByText("Zed Holdings")).toBeInTheDocument();
+      expect(screen.getByText("$123.45", { exact: false })).toBeInTheDocument();
+    });
+
     /** @scenario "The reader's own choice outlives the data underneath it" */
-    it("shows them alongside the real ones", () => {
+    it("keeps the sample choice while real figures are present", () => {
       renderScreen();
 
       fireEvent.click(screen.getByRole("button", { name: "See sample data" }));
 
       expect(screen.getAllByText(A_SAMPLE_FIGURE).length).toBeGreaterThan(0);
-      expect(screen.getByText("Engineering")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Hide sample data" })).toHaveAttribute(
         "aria-pressed",
         "true",

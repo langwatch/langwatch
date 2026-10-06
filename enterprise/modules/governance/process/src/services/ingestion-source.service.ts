@@ -22,6 +22,7 @@ import type {
 } from "../repositories/ingestion-source.repository.ts";
 import {
   findAzureBillHistoryComplaints,
+  findAzureBillRepointComplaints,
   withAzureBillIdentity,
 } from "../rules/azure-bill-identity.rules.ts";
 import {
@@ -259,6 +260,13 @@ export class IngestionSourceService {
       this.validation.assertAdapterUnchanged(existing.parserConfig, incoming);
       cursorMustNotMove = this.validation.assertReportUnchangedOncePulled(existing, incoming);
       this.destinations.assertAllowed(incoming);
+      refuseOnComplaint(
+        findAzureBillRepointComplaints({
+          storedConfig: existing.parserConfig,
+          pollerCursor: existing.pollerCursor,
+          incoming,
+        }),
+      );
       const { providerAccountId } = await this.assertClaimsAreFree({
         organizationId: input.organizationId,
         sourceType: existing.sourceType,
