@@ -11,10 +11,10 @@ import {
  * An acceptance parked on a revoke's row lock re-reads the revoked row: no membership lands.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { raceOnOneRow } from "../../repositories/prisma/__tests__/support/row-lock-race.ts";
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
 import { inviteFromRecord } from "../../repositories/prisma/prisma.organization.mapper.ts";
 import type { InviteServiceDependencies } from "../../rules/invite-contracts.rules.ts";

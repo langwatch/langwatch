@@ -12,11 +12,11 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { PrismaIdentityUsersRepository } from "../prisma.identity-users.repository.ts";
-import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -42,7 +42,6 @@ describe.skipIf(!DB_URL)("PrismaIdentityUsersRepository.storeUserHashKeyIfMissin
           userId,
           userHashKey,
         });
-        return "minted" as const;
       };
 
       await raceOnOneRow({ prisma, table: "User", first: mint("first"), second: mint("second") });

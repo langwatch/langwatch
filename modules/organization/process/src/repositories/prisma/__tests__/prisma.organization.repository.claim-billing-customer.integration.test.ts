@@ -11,11 +11,11 @@ import {
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
-import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

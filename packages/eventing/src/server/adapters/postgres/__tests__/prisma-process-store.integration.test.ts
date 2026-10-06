@@ -10,6 +10,7 @@ import {
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { createTestLogger } from "@langwatch/test-harness";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { Temporal, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -21,7 +22,6 @@ import type {
   ProcessCommit,
 } from "../../../../process-manager/stores/processStore.types.ts";
 import { PrismaProcessStore } from "../prisma-process-store.ts";
-import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

@@ -16806,6 +16806,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../test-harness
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time
