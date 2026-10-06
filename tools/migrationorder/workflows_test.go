@@ -118,8 +118,8 @@ func TestCompatWorkflowRunsBaseSuitesOnHeadsSchema(t *testing.T) {
 	}
 	head := stepNamed(t, steps, "Migrate with head's tasks")
 	if !strings.HasSuffix(head.Env["CLICKHOUSE_URL"], "/test_analytics_migrated_schema") ||
-		!strings.Contains(head.Run, "pnpm prisma:migrate") || !strings.Contains(head.Run, "pnpm task clickhouse-migrate") {
-		t.Errorf("head must migrate Postgres and the fixture's ClickHouse database: %+v", head)
+		!strings.Contains(head.Run, "pnpm --filter @langwatch/tasks task upgrade") {
+		t.Errorf("head's upgrade must migrate Postgres and the fixture's ClickHouse database: %+v", head)
 	}
 	base := stepNamed(t, steps, "Checkout base (the merge commit's first parent)")
 	if base.With["ref"] != "${{ steps.base.outputs.sha }}" || base.With["path"] != "base" {

@@ -20,7 +20,7 @@ Feature: Migration compatibility gates
 
   @unit
   Scenario: Base code passes its live api suites on the schema head migrated
-    Given head's prisma-migrate and clickhouse-migrate tasks have migrated the databases
+    Given head's upgrade task has migrated the databases and recorded the upgrade ledger
     And the ClickHouse database is the one the base suites' fixture provisions, so base's own migrate is a no-op over it
     When base's api-executable and api-trpc-record suites run against those databases
     Then the job passes only if every suite file passed at least one test
