@@ -394,4 +394,28 @@ describe("PersonalIngestionKeyService", () => {
       expect(revoked).toEqual(["ak_1"]);
     });
   });
+
+  describe("when an agent mints a template source the caller already holds a key for", () => {
+    /** @scenario An agent minting a template source through MCP adds a key */
+    it("adds a traces:create key on the personal workspace and revokes none", async () => {
+      const { service, created, revoked, mint } = await setup([
+        apiKey({ id: "ak_held", ingestSourceType: "cursor" }),
+      ]);
+
+      await expect(service.install(mint)).resolves.toMatchObject({
+        apiKeyId: "ak_new",
+        sourceType: "cursor",
+      });
+
+      expect(created).toMatchObject([
+        {
+          userId: "user_1",
+          permissions: ["traces:create"],
+          bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: "project_p" }],
+          parentApiKeyId: null,
+        },
+      ]);
+      expect(revoked).toEqual([]);
+    });
+  });
 });

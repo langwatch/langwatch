@@ -28,9 +28,10 @@ function inventory(
     loginKeyRevoked: true,
     ingestKeysRevoked: 2,
   }),
+  tokenRecords: CliTokenRecordEntry[] = records,
 ) {
   const findCliTokenRecordsForUser = vi.fn<AuthApi["findCliTokenRecordsForUser"]>(
-    async () => records,
+    async () => tokenRecords,
   );
   const revokeCliTokens = vi.fn<AuthApi["revokeCliTokens"]>(async ({ tokenKeys }) => ({
     revokedCount: tokenKeys?.length ?? 0,
@@ -119,5 +120,36 @@ describe("the governance CLI session inventory", () => {
       revokedKeys: 3,
     });
     expect(revokeCliTokens).toHaveBeenCalledWith({ userId: "user" });
+  });
+
+  describe("when jane holds a laptop and a desktop session and revokes every device", () => {
+    const device = ({ key, startedAtMs }: { key: string; startedAtMs: number }) => ({
+      tokenKey: `lwcli:access:${key}`,
+      organizationId: "org",
+      cliApiKeyId: `login_${key}`,
+      issuedAtMs: startedAtMs,
+      expiresAtMs: 1_000,
+      clientInfo: { sessionStartedAtMs: startedAtMs },
+    });
+
+    /** @scenario Revoking every device retires every session's keys */
+    it("asks api-key to retire each session's login key and the ingest keys under it", async () => {
+      const retired: string[] = [];
+      const { service, revokeCliTokens } = inventory(
+        async ({ apiKeyId }) => {
+          retired.push(apiKeyId);
+          return { loginKeyRevoked: true, ingestKeysRevoked: 1 };
+        },
+        [device({ key: "laptop", startedAtMs: 100 }), device({ key: "desktop", startedAtMs: 200 })],
+      );
+
+      await expect(service.revokeAllSessions({ userId: "jane" })).resolves.toEqual({
+        revokedTokens: 0,
+        revokedKeys: 4,
+      });
+
+      expect(retired.toSorted()).toEqual(["login_desktop", "login_laptop"]);
+      expect(revokeCliTokens).toHaveBeenCalledWith({ userId: "jane" });
+    });
   });
 });
