@@ -79,6 +79,6 @@ export function makeRequest(
   return new Request("http://localhost/test", {
     method: "POST",
     headers,
-    body: body instanceof Buffer ? new Uint8Array(body) : new Uint8Array(body),
+    body: new Uint8Array(body),
   });
 }
