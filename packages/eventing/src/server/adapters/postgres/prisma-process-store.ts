@@ -682,10 +682,9 @@ export class PrismaProcessStore implements ProcessStore {
     const processNameFilter = params.processNames
       ? Prisma.sql`AND "processName" IN (${Prisma.join([...params.processNames])})`
       : Prisma.empty;
-    // Cross-project worker infrastructure by design. SKIP LOCKED splits scans
-    // that overlap across replicas, and skips a row mid-commit (about to move
-    // its wake); the locks end with the statement, so the revision fence still
-    // decides a wake two replicas both handle.
+    // Cross-project worker infrastructure by design. A plain read: it never
+    // waits on a row lock, and the revision fence decides a wake two replicas
+    // both handle, so row locks here would only add writes.
     const rows = await this.#prisma.$queryRaw<ProcessManagerInstance[]>(
       Prisma.sql`
         SELECT *
@@ -695,7 +694,6 @@ export class PrismaProcessStore implements ProcessStore {
         ORDER BY "nextWakeAt" ASC, "processName" ASC,
                  "projectId" ASC, "processKey" ASC
         LIMIT ${params.limit}
-        FOR UPDATE SKIP LOCKED
       `,
     );
     return rows.flatMap((row) =>

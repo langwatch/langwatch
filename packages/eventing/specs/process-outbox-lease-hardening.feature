@@ -121,6 +121,7 @@ Feature: Process outbox lease hardening
     And a notification drains at once and returns the poll to its base interval
     And a poll that leases a message returns the poll to its base interval
     And a poll that fails grows the interval like an empty one, never returning it to its base
+    And a drain that leased a full batch drains again at once instead of waiting a poll
 
   @unit @notify-on-insert
   Scenario: A commit that inserted no intent does not nudge the outbox
@@ -134,9 +135,3 @@ Feature: Process outbox lease hardening
     Given two process managers mounted on one runtime
     When a wake commits an intent for one of them
     Then only that process manager's outbox worker drains
-
-  @integration @wake-scan
-  Scenario: A wake row another scan holds is skipped rather than waited on
-    Given two due wakes and another connection holding a row lock on one of them
-    When the wake scan runs
-    Then it returns the unlocked wake without waiting for the lock
