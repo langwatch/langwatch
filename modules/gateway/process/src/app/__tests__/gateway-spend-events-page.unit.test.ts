@@ -139,6 +139,7 @@ describe("GatewayModule.listSpendEventsPage", () => {
   describe("given rows naming a virtual key", () => {
     /** @scenario Ledger rows resolve virtual key display names */
     /** @scenario Virtual key rows are read only through the gateway feature */
+    /** @scenario "A compatibility transport resolves a project's organization" */
     it("resolves virtual-key display names alongside the rows", async () => {
       const { app, nameReads } = await gatewayAppStub();
       const result = await app.listSpendEventsPage(BASE_INPUT);
@@ -165,6 +166,7 @@ describe("GatewayModule.listSpendEventsPage", () => {
 
   describe("when the project resolves to no organization", () => {
     /** @scenario Unknown project tenants do not resolve virtual-key names */
+    /** @scenario "A compatibility transport resolves a project's organization" */
     it("keeps virtual-key names empty", async () => {
       findOrganizationId.mockResolvedValue(undefined);
       const { app, nameReads } = await gatewayAppStub();

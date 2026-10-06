@@ -37,6 +37,7 @@ describe("ManagedModelProviderGatewayService", () => {
 
   describe("when a Bedrock call is prepared", () => {
     /** @scenario A managed call runs with the parameters the managed-provider peer builds */
+    /** @scenario "A feature resolves a project's organization" */
     it("names the project's organization and runs with the peer's parameters", async () => {
       const buildLitellmParameters = vi.fn<ManagedProviderApi["buildLitellmParameters"]>(
         async () => ({ model: "bedrock/claude", aws_session_token: "session" }),

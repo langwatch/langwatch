@@ -206,6 +206,7 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
 
   describe("when both are removed at the same time", () => {
     /** @scenario Two team admins removed at the same time cannot both succeed */
+    /** @scenario "Concurrent team membership edits race" */
     it("refuses one of the two and leaves the team with an admin", async () => {
       const teamId = await seedTeamWithTwoAdmins();
       revocationDelayMs = 0;

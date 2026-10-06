@@ -305,6 +305,31 @@ describe("gateway app installation", () => {
       }
     });
 
+    /** @scenario "The process owns one budget decision service" */
+    it("serves every request from the one GatewayModule the process built, with no repository member", async () => {
+      const { state, resources } = await installGateway();
+
+      try {
+        const app = state.provided;
+        if (!(app instanceof GatewayModule)) {
+          throw new Error("Gateway installation did not provide GatewayModule");
+        }
+        const door = servedInternalDoor(state, app);
+
+        const first = await door.request(signedHealthRequest());
+        const second = await door.request(signedHealthRequest());
+
+        expect([first.status, second.status]).toEqual([200, 200]);
+        expect(state.provided).toBe(app);
+        expect(app.internalDoor()).toBe(app.internalDoor());
+        expect(
+          Object.keys(app).filter((name) => /repositor|prisma|persistence/i.test(name)),
+        ).toEqual([]);
+      } finally {
+        await resources.close();
+      }
+    });
+
     /** @scenario "The spend pipeline is registered in both roles" */
     it("builds gateway_spend_processing for the api and for the worker", async () => {
       const { state, resources } = await installGateway();

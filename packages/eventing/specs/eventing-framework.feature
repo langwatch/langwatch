@@ -63,7 +63,7 @@ Feature: Eventing framework boundary and pipeline authoring
     Then the projection can be built without a Redis projection cache
     And ClickHouse cache and append options are not offered
 
-  @architecture @projection
+  @unit @architecture @projection
   Scenario: Projection evolution stays deterministic and bounded
     Given production source is named as an Eventing projection
     When architecture lint checks the projection
@@ -93,7 +93,7 @@ Feature: Eventing framework boundary and pipeline authoring
     When the projection later commits successfully on retry
     Then the subscriber is staged with exactly that committed document
 
-  @architecture @subscriber @idempotency
+  @unit @architecture @subscriber @idempotency
   Scenario: A strict-package subscriber proves redelivery safety
     Given a feature subscriber performs an externally visible action
     When architecture lint checks the feature package
@@ -101,7 +101,7 @@ Feature: Eventing framework boundary and pipeline authoring
     And the test observes one externally visible result
     And queue deduplication alone does not satisfy the rule
 
-  @architecture @subscriber
+  @unit @architecture @subscriber
   Scenario: A subscriber emits durable state through a command
     Given a subscriber reaction needs to create another durable domain event
     When its source is checked
@@ -124,7 +124,7 @@ Feature: Eventing framework boundary and pipeline authoring
     And resulting intents are persisted through its outbox contract
     And a retry does not apply the same event twice
 
-  @architecture @process-manager
+  @unit @architecture @process-manager
   Scenario: Process evolution and external work remain separate
     Given a feature owns a durable process manager
     When architecture lint checks its process and intent source
@@ -172,7 +172,7 @@ Feature: Eventing framework boundary and pipeline authoring
     And consumers cannot deep-import repositories or executors
     And Eventing depends on Group Queue only through its public API
 
-  @architecture @documentation
+  @unimplemented @architecture @documentation
   Scenario: Framework rationale and behavior live with the owning package
     Given an ADR or feature spec about Eventing or Group Queue mechanics
     When its ownership is classified

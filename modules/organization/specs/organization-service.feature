@@ -34,6 +34,7 @@ Feature: Shared organization service
     Then the organization service reports that trace-share revocation is required
     And the transport lists each project and revokes its trace shares after the commit
 
+  @unit
   Scenario: A request manages a shared team
     Given an organization-authenticated request has the required team permission
     When it creates, reads, updates, or archives a shared team
@@ -53,6 +54,7 @@ Feature: Shared organization service
     When the request archives it or changes its membership
     Then the organization service refuses with the personal-team domain error
 
+  @unit
   Scenario: A request lists a team's related resources
     When the request lists team members or projects
     Then it composes the AuthZ and Project services
@@ -92,6 +94,7 @@ Feature: Shared organization service
     When the organization service validates the edit
     Then it accepts the edit
 
+  @integration
   Scenario: Concurrent team membership edits race
     Given two editors read the same team revision
     When the first edit wins the repository revision fence
@@ -105,6 +108,7 @@ Feature: Shared organization service
     And removed access is revoked last
     And a failure tends toward retaining access rather than unexpectedly removing all access
 
+  @unit
   Scenario: A request manages an organization group
     When Hono or tRPC creates, reads, renames, or deletes a group
     Then it delegates to the process-owned organization service

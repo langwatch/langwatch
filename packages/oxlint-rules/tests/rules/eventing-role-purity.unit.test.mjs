@@ -22,6 +22,7 @@ const PROCESS_MANAGER = `${EVENTING}/processes/trace-retention.process.ts`;
 describe("given a projection", () => {
   describe("when its fold awaits, declares async work, sets a timer or imports I/O", () => {
     /** @scenario "Eventing roles remain mechanically distinct" */
+    /** @scenario "Projection evolution stays deterministic and bounded" */
     it.each([
       [
         'import { readFileSync } from "node:fs";\nexport {};',
@@ -39,6 +40,21 @@ describe("given a projection", () => {
     ])("reports projectionImpure at the offending line for %s", (code, line, detail) => {
       expect(report(code, PROJECTION)).toEqual([
         expect.objectContaining({ messageId: "projectionImpure", line, data: { detail } }),
+      ]);
+    });
+  });
+
+  describe("when the projection appends durable events itself", () => {
+    /** @scenario "Projection evolution stays deterministic and bounded" */
+    it("reports durableEvent naming the call", () => {
+      const code = "export function fold(store) {\n  store.appendEvents([]);\n}";
+
+      expect(report(code, PROJECTION)).toEqual([
+        expect.objectContaining({
+          messageId: "durableEvent",
+          line: 2,
+          data: { name: "appendEvents", role: "Projection" },
+        }),
       ]);
     });
   });
@@ -64,6 +80,20 @@ describe("given a projection", () => {
 });
 
 describe("given a process manager", () => {
+  describe("when its evolution awaits, sets a timer, fetches or imports dynamically", () => {
+    /** @scenario "Process evolution and external work remain separate" */
+    it.each([
+      ["export function decide() {\n  return fetch('x');\n}", "calls fetch()"],
+      ["export function decide() {\n  setTimeout(() => {}, 1);\n}", "calls setTimeout()"],
+      ["export function decide() {\n  return import('./late');\n}", "imports a module dynamically"],
+      ["const seed = {};\nexport const state = await seed;", "awaits work"],
+    ])("reports processImpure for %s", (code, detail) => {
+      expect(report(code, PROCESS_MANAGER)).toEqual([
+        expect.objectContaining({ messageId: "processImpure", data: { detail } }),
+      ]);
+    });
+  });
+
   describe("when a method is declared async", () => {
     /** @scenario "A process manager that declares async work is reported at the method" */
     it("reports processImpure at the method", () => {
@@ -93,6 +123,7 @@ describe("given a process manager", () => {
 
 describe("given a subscriber", () => {
   describe("when it has no redelivery test beside it", () => {
+    /** @scenario "A strict-package subscriber proves redelivery safety" */
     /** @scenario "A subscriber without a named redelivery test is reported" */
     it("reports missingRedeliveryTest with the path to add", () => {
       expect(
@@ -105,6 +136,21 @@ describe("given a subscriber", () => {
             expected: "src/eventing/__tests__/unproven.subscriber.redelivery.test.ts",
             name: "unproven.subscriber.ts",
           },
+        }),
+      ]);
+    });
+  });
+
+  describe("when it appends durable events itself", () => {
+    /** @scenario "A subscriber emits durable state through a command" */
+    it("reports durableEvent naming the call", () => {
+      const code = "export function onEvent(store) {\n  store.appendEvents([]);\n}";
+
+      expect(report(code, `${EVENTING}/proven.subscriber.ts`)).toEqual([
+        expect.objectContaining({
+          messageId: "durableEvent",
+          line: 2,
+          data: { name: "appendEvents", role: "Subscriber" },
         }),
       ]);
     });

@@ -39,14 +39,14 @@ Feature: Design system foundations and boundary
     Then the component is available from its named package export
     But package internals and undeclared components cannot be imported
 
-  @browser @accessibility
+  @integration @browser @accessibility
   Scenario: Modal overlays are safe by default
     Given a modal dialog is opened from a keyboard control
     Then focus is trapped inside the dialog
     And background interaction and scrolling are prevented
     And closing restores focus to the trigger
 
-  @browser @accessibility
+  @integration @browser @accessibility
   Scenario: Shared controls expose accessible names and focus
     Given a search input, icon action or tag editor from the design system
     When a keyboard or assistive-technology user reaches the control
@@ -54,7 +54,7 @@ Feature: Design system foundations and boundary
     And its focus indicator is visible
     And decorative icons are hidden from the accessibility tree
 
-  @browser @responsive
+  @unimplemented @browser @responsive
   Scenario: Shared composites have a small-screen strategy
     Given pagination or a selection action bar is rendered on a narrow viewport
     Then its controls remain operable without clipping or horizontal overflow

@@ -33,12 +33,6 @@ Feature: Trace span-tree read service
     Then it returns the updated span in start-time order
     And the query is not bounded by occurrence time
 
-  Scenario: Full compatibility routes wait for complete characterization
-    Given the existing drawer response has resource, evaluation, redaction, enrichment, event, link, and blob fields
-    When the Trace package owns the paged tree and delta routes
-    Then whole-tree, shared, REST and full-detail routes remain authoritative in the app
-    And their migration waits for a complete byte-and-field characterization fixture
-
   @unit
   Scenario: Full-read characterization preserves storage and projected summary distinctions
     Given a trace has a frozen storage anchor, an earlier span start, topic identities, and reserved token metrics
