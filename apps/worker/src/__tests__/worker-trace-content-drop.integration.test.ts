@@ -149,7 +149,6 @@ async function bootWorker({ prisma }: { prisma: ProcessMembers["prisma"] }) {
         queue: void 0,
         content: void 0,
         connectJudge: null,
-        rawSocketPort: 0,
         monitor: void 0,
         langwatchQl: {
           admin: { configured: false },

@@ -121,7 +121,6 @@ export class ProcessServer implements ProcessBoot {
     role,
     modules,
     pipelines,
-    members: suppliedMembers,
     transports,
   }: ProcessBootInput): Promise<BootedApplication> {
     if (!this.config.stores)
@@ -188,9 +187,8 @@ export class ProcessServer implements ProcessBoot {
         // refuses every resolve attempted after boot.
         secrets: (owner, declared) => this.resolver.scopeTo(owner, declared),
         operatorReads: (scope) => operatorReadsResolver.scopeTo(scope),
-        // The stores answer the declared members; what this process composed
-        // itself overrides them and extends the order, so a module naming a
-        // member no store carries is answered rather than refused at boot.
+        // The stores answer the declared members; the process facts below extend them
+        // until the last `static reads` module takes each from its config slice (§3.3).
         members: {
           ...storesBackedMembers(
             {
@@ -215,13 +213,8 @@ export class ProcessServer implements ProcessBoot {
               nlpCodeBlockTimeoutSeconds: this.settings.nlpCodeBlockTimeoutSeconds,
               // The proxy spellings, raw; each module's outbound calls parse and follow them.
               outboundProxy: this.settings.outboundProxy ?? {},
-              // The raw-socket door's port, which a module tunnelling to that door reads.
-              rawSocketPort: this.settings.rawSocketPort,
               // Role facts: the composition's word, never a deployment's.
               processName: this.server.name,
-              ...Object.fromEntries(
-                Object.entries(suppliedMembers).map(([name, build]) => [name, build(opened)]),
-              ),
             },
           ),
           close: () => opened.close(),

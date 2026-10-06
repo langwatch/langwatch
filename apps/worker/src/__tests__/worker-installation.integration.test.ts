@@ -132,7 +132,6 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
         queue: void 0,
         content: void 0,
         connectJudge: null,
-        rawSocketPort: 0,
         monitor: void 0,
         langwatchQl: {
           admin: { configured: false },

@@ -1,7 +1,6 @@
 import { TransportSelection } from "@langwatch/api/hosting/selection";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
 import type { ConfigOwner } from "@langwatch/config";
-import type { ProcessMemberSource } from "@langwatch/process-stores";
 import {
   ConsumerPipelines,
   ProducerPipelines,
@@ -23,12 +22,11 @@ export type BootedApplication = ServedApplication &
   Readonly<{
     tasks<Task>(isTask: (contribution: unknown) => contribution is Task): readonly Task[];
   }>;
-/** What one role boots: its modules, its pipelines' participation, and what it supplies. */
+/** What one role boots: its modules, its pipelines' participation and, on the api, transports. */
 export type ProcessBootInput = Readonly<{
   role: "api" | "worker" | "tasks";
   modules: readonly ProcessModule[];
   pipelines: PipelineParticipation;
-  members: Readonly<Record<string, ProcessMemberFactory>>;
   transports?: TransportSelection;
 }>;
 
@@ -37,29 +35,12 @@ export interface ProcessBoot {
   boot(input: ProcessBootInput): Promise<BootedApplication>;
 }
 
-/**
- * How a process builds a member of its own. Called once the stores are open,
- * so a supplied member may be composed over `prisma` or any other store.
- */
-export type ProcessMemberFactory = (members: ProcessMemberSource) => unknown;
-
 /** A container installs the modules its server's config named; the role decides its pipelines. */
 class ProcessContainer {
-  protected members: Record<string, ProcessMemberFactory> = {};
   protected constructor(
     protected readonly runtime: ProcessBoot,
     protected readonly modules: readonly ProcessModule[],
   ) {}
-
-  /**
-   * One member this process answers itself, beyond what its stores supply.
-   * A module claiming a name no store carries is answered here or refused
-   * at boot by module and member. Built once the stores are open.
-   */
-  withMember(name: string, build: ProcessMemberFactory): this {
-    this.members[name] = build;
-    return this;
-  }
 }
 
 export class ApiProcessContainer extends ProcessContainer {
@@ -81,7 +62,6 @@ export class ApiProcessContainer extends ProcessContainer {
       role: "api",
       modules: this.modules.map((module) => withOpenedSurfaces(module, selected)),
       pipelines: new ProducerPipelines().produce(),
-      members: this.members,
       transports: this.#transports,
     });
   }
@@ -97,7 +77,6 @@ export class WorkerProcessContainer extends ProcessContainer {
       role: "worker",
       modules: this.modules,
       pipelines: new ConsumerPipelines().consume(),
-      members: this.members,
     });
   }
 }
@@ -113,7 +92,6 @@ export class TasksProcessContainer extends ProcessContainer {
       role: "tasks",
       modules: this.modules,
       pipelines: new ProducerPipelines().produce(),
-      members: this.members,
     });
   }
 }
