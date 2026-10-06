@@ -17503,6 +17503,13 @@ export interface operations {
                     };
                 };
             };
+            /** @description The body was not valid JSON */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Missing or invalid API key */
             401: {
                 headers: {
@@ -17524,7 +17531,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description The body was not valid JSON, failed validation, or carried timestamps in seconds rather than milliseconds */
+            /** @description The body failed validation, or carried timestamps in seconds rather than milliseconds */
             422: {
                 headers: {
                     [name: string]: unknown;

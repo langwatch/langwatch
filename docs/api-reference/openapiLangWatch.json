@@ -42038,6 +42038,10 @@
               }
             }
           },
+          "400": {
+            "description": "The body was not valid JSON",
+            "content": {}
+          },
           "401": {
             "description": "Missing or invalid API key",
             "content": {}
@@ -42051,7 +42055,7 @@
             "content": {}
           },
           "422": {
-            "description": "The body was not valid JSON, failed validation, or carried timestamps in seconds rather than milliseconds",
+            "description": "The body failed validation, or carried timestamps in seconds rather than milliseconds",
             "content": {}
           },
           "500": {
@@ -42064,6 +42068,20 @@
         "tags": [
           "Experiments"
         ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "experiments:manage"
+          ]
+        },
         "requestBody": {
           "required": true,
           "content": {
@@ -42352,20 +42370,6 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ],
-        "x-access-policy": {
-          "kind": "handlerManaged",
-          "credential": [
-            "project_api_key"
-          ],
-          "permissions": [
-            "experiments:manage"
-          ]
         }
       }
     },
@@ -71518,11 +71522,13 @@
             }
           }
         },
-        "security": [],
         "x-access-policy": {
-          "kind": "public",
+          "kind": "handlerManaged",
           "credential": [
-            "none"
+            "session"
+          ],
+          "permissions": [
+            "ops:manage"
           ]
         },
         "requestBody": {
@@ -71574,11 +71580,13 @@
             }
           }
         },
-        "security": [],
         "x-access-policy": {
-          "kind": "public",
+          "kind": "handlerManaged",
           "credential": [
-            "none"
+            "session"
+          ],
+          "permissions": [
+            "ops:manage"
           ]
         }
       }
@@ -71610,11 +71618,13 @@
             }
           }
         },
-        "security": [],
         "x-access-policy": {
-          "kind": "public",
+          "kind": "handlerManaged",
           "credential": [
-            "none"
+            "session"
+          ],
+          "permissions": [
+            "ops:view"
           ]
         },
         "parameters": [
