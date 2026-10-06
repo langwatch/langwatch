@@ -92,6 +92,14 @@ Feature: Permission resolution
     Then no role grants it
     And only a member and above may share a trace
 
+  # Alex, 2026-10-06 (Q97): the playground's completion route asks
+  # playground:view, so the built-in administrators carry it.
+  Scenario: The built-in administrators may open the playground
+    Given the built-in team and organization roles
+    When "playground:view" is requested
+    Then a team admin and an organization admin are allowed
+    But a team member, a team viewer and a plain organization member are refused
+
   Scenario: A CUSTOM team role falls back to the viewer bag
     Given a team binding on the CUSTOM role with no permissions of its own
     When a permission is requested

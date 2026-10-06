@@ -13,10 +13,10 @@ Feature: The worker composes every capability for itself
     And no capability is handed to it by an application
 
   @unit
-  Scenario: A worker routes every key the frozen registry names
+  Scenario: A worker routes every key the installed pipelines declare
     When every feature installs
-    Then the routed job keys are exactly the keys the frozen job registry names
-    And a capability that stopped composing removes its own keys from that set
+    Then the routed command and projection keys are exactly the keys the installed pipelines declare
+    And a pipeline that stopped installing removes its own keys from that set
 
   @unit
   Scenario: The blob sweep walks the queue's own keyspace

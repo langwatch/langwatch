@@ -157,7 +157,10 @@ describe("startSystemMigrations", () => {
         expect(stubs.runPass).toHaveBeenCalledTimes(3);
       });
 
-      /** @scenario "A pass shut out by another process is not convergence" */
+      /**
+       * @scenario "A pass shut out by another process is not convergence"
+       * @scenario "A peer's claims do not keep this process from starting"
+       */
       it("stops when only some tenants were claimed, which is an ordinary pass", async () => {
         stubs.runPass.mockResolvedValue({
           ...summaryOf({ advanced: 0 }),

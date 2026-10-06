@@ -102,6 +102,8 @@ const ADMIN_ADDITIONS: readonly AuthzPermission[] = [
   "gatewayCacheRules:manage",
   "langy:manage",
   "featureFlags:manageExperiments",
+  // The playground's completion route asks playground:view (Alex, 2026-10-06, Q97).
+  "playground:view",
 ];
 
 /**
@@ -183,6 +185,8 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
   // whether the capability exists; this only says who may use it (D05).
   "sso:view",
   "sso:manage",
+  // The playground's completion route asks playground:view (Alex, 2026-10-06, Q97).
+  "playground:view",
 ];
 
 const ORG_MEMBER: readonly AuthzPermission[] = ["organization:view", "aiTools:view"];

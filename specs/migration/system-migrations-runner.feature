@@ -276,7 +276,7 @@ Feature: Running system migrations across organizations
     Given passes that advance nothing while a peer holds some of the fleet
     When the same shape repeats pass after pass
     Then the run ends and runtime processes start
-    And it says it is starting rather than waiting on a peer
+    And no further pass waits on the peer
 
   # A pass now enumerates only the tenants with work left, so on a settled
   # fleet that is a handful and a dozen replicas booting together can hold

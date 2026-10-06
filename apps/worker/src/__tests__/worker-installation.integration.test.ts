@@ -348,6 +348,31 @@ describe("the worker process installation", () => {
     }
   });
 
+  /** @scenario "A worker routes every key the installed pipelines declare" */
+  it("routes exactly the command and projection keys its installed pipelines declare", async () => {
+    const { runtime, eventing } = await bootWorker({ live: true });
+
+    try {
+      const declared = eventing.definitions.flatMap((pipeline) => {
+        const name = pipeline.metadata.name;
+        return pipeline.open((definition) => [
+          ...definition.commands.map((command) => `${name}:command:${command.definition.name}`),
+          ...[...definition.foldProjections.keys()].map((key) => `${name}:projection:${key}`),
+        ]);
+      });
+      const routed = [...eventing.globalJobRegistry.keys()];
+      const stray = routed.filter(
+        (key) => !declared.includes(key) && /:(command|projection):/.test(key),
+      );
+
+      expect(declared).not.toEqual([]);
+      expect(declared.filter((key) => !routed.includes(key))).toEqual([]);
+      expect(stray).toEqual([]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   /** @scenario "The worker routes span recording to the trace pipeline" */
   it("registers the trace pipeline's recordSpan handler in the job registry it consumes", async () => {
     const { runtime, eventing } = await bootWorker({ live: true });

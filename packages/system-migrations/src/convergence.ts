@@ -200,8 +200,8 @@ type StartupState =
 
 /**
  * The same loop, awaited rather than backgrounded: the boot-chain shape, for
- * a caller that must not return before the fleet stopped moving. Same
- * convergence rule, abort handling and never-throws contract.
+ * a caller that must not return before the fleet stopped moving. A loop still
+ * moving at the cap rejects, naming the pass count, so the boot refuses (main).
  */
 export async function driveSystemMigrationsToConvergence({
   signal,
@@ -234,6 +234,9 @@ export async function driveSystemMigrationsToConvergence({
   logger.error(
     { passes: MAX_PASSES },
     "system migrations still reported progress after the maximum passes; stopping. A migration whose status keeps changing without settling is the likely cause",
+  );
+  throw new SystemMigrationStartupIncompleteError(
+    `System migration preflight did not converge after ${MAX_PASSES} passes`,
   );
 }
 

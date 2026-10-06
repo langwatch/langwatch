@@ -104,4 +104,15 @@ describe("the installed api's REST routes", () => {
     expect(runs.filter((route) => !admitted(route))).toEqual([]);
     expect(archives.filter(admitted)).toEqual([]);
   });
+
+  /** @scenario "Every declared permission is reachable by a built-in role" */
+  it("grants every declared route permission to a built-in administrator", () => {
+    const admins = ["admin", "org-admin", "platform-operator"] as const;
+    const unreachable = declared.filter(
+      ({ permission }) => !admins.some((role) => builtinRoleGrants({ role, permission })),
+    );
+
+    expect(declared.length).toBeGreaterThan(0);
+    expect(unreachable).toEqual([]);
+  });
 });
