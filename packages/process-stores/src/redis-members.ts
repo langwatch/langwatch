@@ -1,3 +1,4 @@
+import { counter } from "@langwatch/observability/metrics";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { Cache, IdempotencyStore, RateLimiter } from "./members.ts";
@@ -6,6 +7,19 @@ const CACHE_PREFIX = "member:cache:";
 const TAG_PREFIX = "member:cache-tag:";
 const IDEMPOTENCY_PREFIX = "member:idempotency:";
 const RATE_LIMIT_PREFIX = "member:rate-limit:";
+
+/** Denied checks by calling scope, under main's metric name and label. */
+const rateLimitExceeded = counter({
+  name: "rate_limit_exceeded_total",
+  description:
+    "Rate-limit checks that returned allowed: false, by the calling scope (the key segment before its first ':')",
+});
+
+/** The key segment before its first ":", so the label never carries an address or hash. */
+function scopeOf(key: string): string {
+  const separator = key.indexOf(":");
+  return separator === -1 ? key : key.slice(0, separator);
+}
 
 /**
  * Response bodies, with one Redis set per tag so a family drops everything it
@@ -77,6 +91,7 @@ export function redisRateLimiter(
       const used = Number(await redis.eval(COUNT_IN_WINDOW, 1, counter, allowance.seconds));
       if (used <= allowance.requests) return { allowed: true };
 
+      rateLimitExceeded.inc({ scope: scopeOf(key) });
       const remaining = await redis.ttl(counter);
       return { allowed: false, retryAfterSeconds: remaining > 0 ? remaining : allowance.seconds };
     },
