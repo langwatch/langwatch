@@ -90,6 +90,44 @@ describe("llmMessagesForSpan", () => {
       const result = llmMessagesForSpan({ span: s });
       expect(result.input.filter((m) => m.role === "system")).toHaveLength(1);
     });
+
+    it("reads nested gen_ai.system_instructions from a gen_ai sub-object", () => {
+      const s = span({
+        span_id: "llm-3",
+        type: "llm",
+        input: {
+          type: "chat_messages",
+          value: [{ role: "user", content: "hello" }],
+        },
+        output: {
+          type: "chat_messages",
+          value: [{ role: "assistant", content: "hi" }],
+        },
+        params: { gen_ai: { system_instructions: "Be helpful." } },
+      } as any);
+      const result = llmMessagesForSpan({ span: s });
+      expect(result.input[0]).toEqual({
+        role: "system",
+        content: "Be helpful.",
+      });
+    });
+
+    it("prepends the instruction as the only message when input is empty", () => {
+      const s = span({
+        span_id: "llm-4",
+        type: "llm",
+        input: undefined,
+        output: {
+          type: "chat_messages",
+          value: [{ role: "assistant", content: "hi" }],
+        },
+        params: { "gen_ai.system_instructions": "You are a bot." },
+      } as any);
+      const result = llmMessagesForSpan({ span: s });
+      expect(result.input).toEqual([
+        { role: "system", content: "You are a bot." },
+      ]);
+    });
   });
 });
 

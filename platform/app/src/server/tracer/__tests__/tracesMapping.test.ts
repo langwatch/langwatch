@@ -1244,6 +1244,25 @@ describe("tryAndConvertTo", () => {
         ),
       ).toEqual(["Paris is in France.", "Rome is in Italy."]);
     });
+
+    it("returns an empty string for a blank-content RAGChunk scalar (no JSON-envelope fallback)", () => {
+      expect(
+        tryAndConvertTo({ document_id: "doc-empty", content: "" }, "string"),
+      ).toBe("");
+    });
+
+    it("omits blank-content RAGChunk entries from a string[] conversion", () => {
+      expect(
+        tryAndConvertTo(
+          [
+            { document_id: "doc-1", content: "Paris is in France." },
+            { document_id: "doc-blank", content: "" },
+            { document_id: "doc-2", content: "Rome is in Italy." },
+          ],
+          "string[]",
+        ),
+      ).toEqual(["Paris is in France.", "Rome is in Italy."]);
+    });
   });
 
   describe("when given a bare string", () => {

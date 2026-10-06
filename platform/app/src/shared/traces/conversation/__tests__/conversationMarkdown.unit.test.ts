@@ -75,7 +75,7 @@ describe("buildConversationMarkdownChunks", () => {
     });
   });
 
-  describe("turn headings", () => {
+  describe("when rendering turn headings", () => {
     /**
      * @scenario "Relative time in transcripts"
      * Turn headings must carry an absolute ISO timestamp, not a relative age

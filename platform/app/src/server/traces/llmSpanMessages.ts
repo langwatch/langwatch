@@ -70,9 +70,7 @@ export function llmMessagesForSpan({ span }: { span: Span }): LlmTraceMessages {
 
   // Prepend the system instruction when the canonicaliser moved it out of the
   // message list and the list does not already carry a system message.
-  const systemText = readSystemInstructions(
-    (span as unknown as { params?: Record<string, unknown> }).params ?? null,
-  );
+  const systemText = readSystemInstructions(span.params ?? null);
   const alreadyHasSystem = rawInput.some((m) => m.role === "system");
   const input =
     systemText && !alreadyHasSystem
