@@ -48,7 +48,8 @@ Feature: The worker runs the operational loops nobody else can
       When the ops feature installer runs
       Then the usage report does not start
 
-    @unit
+    # Alex 2026-10-06: never built. A worker with no Redis runs the memory twins and names no absence.
+    @unit @unimplemented
     Scenario: A worker with no queue Redis names the anomaly tick it cannot run
       Given a worker composed without the queue's Redis
       When it composes the operational loops
@@ -63,7 +64,8 @@ Feature: The worker runs the operational loops nobody else can
       Then it claims the fleet's writer lease on the shared snapshot store
       And it takes a writer epoch from the same store
 
-    @unit
+    # Alex 2026-10-06: never built. A worker with no Redis runs the memory twins and names no absence.
+    @unit @unimplemented
     Scenario: A worker with no queue Redis names the snapshot nobody will write
       Given a worker composed without the queue's Redis
       When it composes the operational loops

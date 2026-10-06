@@ -74,11 +74,11 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     So that retuning one alone cannot admit a release the kubelet kills mid-drain
 
   @unit @shutdown-budget
-  Scenario: The drain budget defaults to 25s in production and 5s in dev
+  Scenario: The drain budget defaults to 25s everywhere
     Given no configured override
     When the shutdown budget is resolved
-    Then production drains for 25 seconds
-    And a development or local environment drains for 5 seconds
+    Then the queue drains for 25 seconds
+    And no environment resolves a different default
 
   @unit @shutdown-budget
   Scenario: The chart is sized for the same production drain the code uses

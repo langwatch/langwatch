@@ -71,6 +71,7 @@ describe("the ops surface's declared answers", () => {
       await expect(operator.getScope()).resolves.toEqual({ scope: { kind: "platform" } });
     });
 
+    /** @scenario "A process with no snapshot collector says so rather than reporting an all-clear" */
     it("answers the badge reading, whose computedAt is null with no collector", async () => {
       const { operator } = mount(opsDashboardTrpcTransport);
 

@@ -70,9 +70,10 @@ Feature: The record path reads through the peers trace was installed with
 
     @unit
     Scenario: The record command composes from a database and a configuration
-      Given a background process holding one Prisma client and its resolved configuration
-      When it composes the record-span command
-      Then the command is built without a capability service being handed in
+      Given the background process booted over the installed module list
+      When the trace pipeline is mounted
+      Then the record-span command is registered in the job registry the worker consumes
+      And no capability service was handed in
 
     @unit
     Scenario: A folded span carries the customer's rates and keeps its content
@@ -96,7 +97,7 @@ Feature: The record path reads through the peers trace was installed with
     @unit
     Scenario: The worker reads the same flag overrides the application reads
       Given a deployment that named a flag on its force-enable list
-      When the worker configuration is resolved
+      When the feature flag module's configuration is parsed, as every process parses it
       Then that flag is carried on the resolved configuration
 
   Rule: The graph-alert vertical takes the project reads this process composes

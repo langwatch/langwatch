@@ -23,16 +23,17 @@ Feature: The back office answers over HTTP
   # to.
 
   @integration
-  Scenario: The back office is reachable on a deployment that composed it
-    Given the deployment composed an operator application and a browser-session transport
-    When the process mounts its REST families
+  Scenario: The back office is reachable by instance staff
+    Given the process mounted its REST families with the operator application
+    And a signed-in member of instance staff
+    When they ask `/api/admin` for a resource
     Then `/api/admin` answers
 
   @integration
-  Scenario: A deployment with no browser session still answers no one
-    Given the deployment composed no browser-session transport
-    When the process mounts its REST families
-    Then `/api/admin` is declared and answers every caller a not-found
+  Scenario: A caller with no browser session still answers no one
+    Given a caller with no browser session
+    When they ask `/api/admin` for a resource
+    Then the answer is the hidden not-found
     And nobody can be identified as instance staff
 
   @integration

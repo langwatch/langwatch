@@ -248,6 +248,7 @@ describe("given a process opening its stores", () => {
 
   describe("when neither CREDENTIALS_SECRET nor NEXTAUTH_SECRET is set", () => {
     /** @scenario "A process with no encryption key still opens its stores" */
+    /** @scenario "A deployment with no stored-secret key refuses each use of the cipher by name" */
     it("hands the member over instead of refusing the boot", async () => {
       const { encryption, close } = await encryptionFrom({});
 
@@ -259,6 +260,7 @@ describe("given a process opening its stores", () => {
     });
 
     /** @scenario "Using the encryption member without a key refuses by name" */
+    /** @scenario "A deployment with no stored-secret key refuses each use of the cipher by name" */
     it("refuses each encrypt and decrypt as the unconfigured encryption member", async () => {
       const { encryption, close } = await encryptionFrom({});
       const refusal = { name: "MemberNotConfiguredError", member: "encryption" };

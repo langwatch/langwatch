@@ -20,6 +20,7 @@ describe("langy server configuration", () => {
 
   describe("when assertLangyServerConfig checks the resolved secret", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
+    /** @scenario "A deployment without an agent manager runs without one, and half the pair is refused" */
     it("accepts both leaves absent", () => {
       expect(() => assertLangyServerConfig(resolve({}), undefined)).not.toThrow();
     });
@@ -29,6 +30,7 @@ describe("langy server configuration", () => {
     });
 
     /** @scenario "A cross-field rule refuses a half-configured feature at boot" */
+    /** @scenario "A deployment without an agent manager runs without one, and half the pair is refused" */
     it("refuses the configuration and names both variables", () => {
       const config = resolve({ LANGY_AGENT_URL: "http://127.0.0.1:5564" });
       expect(() => assertLangyServerConfig(config, undefined)).toThrow(
