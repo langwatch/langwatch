@@ -1454,6 +1454,13 @@ const presentations = {
   },
 
   // ---- access, org & limits ----
+  aggregate_project_has_no_credential: {
+    // Reached by an SDK or exporter pointed at the aggregate, so the answer is
+    // where the traces should go instead. The key is not the problem.
+    title: "This project doesn't receive traces",
+    describe: () =>
+      "It reads traces from other projects and accepts no API key of its own. Send traces to one of its member projects instead.",
+  },
   aggregate_rule_outside_organization: {
     // Raised before anything is written, so the form is still open with the
     // rule in it: the copy says what to change there. One answer for a

@@ -22,6 +22,7 @@ import {
   personalWorkspaceMoveViolation,
 } from "~/server/app-layer/projects/project.service";
 import {
+  AGGREGATE_PROJECT_INGEST_REFUSAL,
   AGGREGATE_PROJECT_KIND,
   aggregateProjectRouteViolation,
   isAggregateProjectKind,
@@ -116,6 +117,20 @@ function assertNotGovernanceProject(kind: string | null | undefined): void {
   const violation = governanceProjectRouteViolation(kind);
   if (violation) {
     throw new TRPCError({ code: "FORBIDDEN", message: violation });
+  }
+}
+
+/**
+ * An aggregate owns no credential (ADR-144 decision 7): its stored base key
+ * exists because the column is required, every API-key route refuses it, and
+ * it is never shown or re-keyed.
+ */
+function assertProjectHoldsACredential(kind: string | null | undefined): void {
+  if (isAggregateProjectKind(kind)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: AGGREGATE_PROJECT_INGEST_REFUSAL,
+    });
   }
 }
 
@@ -297,7 +312,7 @@ export const projectRouter = createTRPCRouter({
 
       const project = await prisma.project.findUnique({
         where: { id: input.projectId },
-        select: { apiKey: true },
+        select: { apiKey: true, kind: true },
       });
 
       if (!project) {
@@ -306,8 +321,9 @@ export const projectRouter = createTRPCRouter({
           message: "Project not found",
         });
       }
+      assertProjectHoldsACredential(project.kind);
 
-      return project;
+      return { apiKey: project.apiKey };
     }),
   getHasFirstMessage: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -328,6 +344,7 @@ export const projectRouter = createTRPCRouter({
         select: { kind: true },
       });
       assertNotGovernanceProject(target?.kind);
+      assertProjectHoldsACredential(target?.kind);
 
       // Generate new API key
       const newApiKey = generateApiKey();
