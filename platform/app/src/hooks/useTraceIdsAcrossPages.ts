@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type RouterInputs } from "~/utils/api";
 
-type TraceListInput = Omit<RouterInputs["traces"]["getAllForProject"], "scrollId">;
+type TraceListInput = Omit<
+  RouterInputs["traces"]["getAllForProject"],
+  "scrollId"
+>;
 
 type TraceListQueryOptions = {
   enabled?: boolean;

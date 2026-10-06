@@ -22,8 +22,10 @@ vi.mock("~/utils/api", () => ({
     }[] => {
       const t = {
         traces: {
-          getAllForProject: (input: { query?: string; scrollId?: string | null }) =>
-            input,
+          getAllForProject: (input: {
+            query?: string;
+            scrollId?: string | null;
+          }) => input,
         },
       };
       return (build(t) as { query?: string; scrollId?: string | null }[]).map(
