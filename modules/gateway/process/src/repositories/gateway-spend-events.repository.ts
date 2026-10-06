@@ -48,6 +48,21 @@ export interface SpendSummaryRow {
   costUsd: string;
 }
 
+/** One model's metered window total, named exactly as the ledger recorded it. */
+export type GatewaySpendModelTotal = Omit<GatewaySpendDay, "day"> & { readonly model: string };
+
+/** One virtual key's metered window total. The metered lane never groups by person. */
+export type GatewaySpendVirtualKeyTotal = Omit<GatewaySpendDay, "day"> & {
+  readonly virtualKeyId: string;
+};
+
+/** The metered window: every project tenant of one organization, inclusive UTC days. */
+export type GatewaySpendWindow = {
+  tenantIds: readonly string[];
+  fromDay: string;
+  toDay: string;
+};
+
 export abstract class GatewaySpendEventsRepository {
   abstract upsertFromFold(
     entries: {
@@ -130,6 +145,12 @@ export abstract class GatewaySpendEventsRepository {
     fromDay: string;
     toDay: string;
   }): Promise<GatewaySpendDay[]>;
+
+  /** Main's `sumWindowByModel`: the window's metered spend per model, money first, then name. */
+  abstract sumWindowByModel(input: GatewaySpendWindow): Promise<GatewaySpendModelTotal[]>;
+
+  /** Main's `sumWindowByVirtualKey`: the window's metered spend per key, money first, then id. */
+  abstract sumWindowByVirtualKey(input: GatewaySpendWindow): Promise<GatewaySpendVirtualKeyTotal[]>;
 
   /** The usage report's figures: one row per request at its latest status. */
   abstract countUsage(input: {

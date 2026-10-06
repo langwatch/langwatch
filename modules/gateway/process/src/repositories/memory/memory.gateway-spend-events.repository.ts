@@ -17,6 +17,9 @@ import { normalizeStatusFilter } from "../../rules/gateway-spend-filters.rules.t
 import { EMPTY_SPEND_USAGE } from "../../rules/gateway-spend-projection.rules.ts";
 import {
   GatewaySpendEventsRepository,
+  type GatewaySpendModelTotal,
+  type GatewaySpendVirtualKeyTotal,
+  type GatewaySpendWindow,
   type SpendEventsPageCursor,
   type SpendSummaryRow,
 } from "../gateway-spend-events.repository.ts";
@@ -304,43 +307,45 @@ export class MemoryGatewaySpendEventsRepository extends GatewaySpendEventsReposi
     };
   }
 
-  async sumDaysForOrganizationProjects(input: {
-    tenantIds: readonly string[];
-    fromDay: string;
-    toDay: string;
-  }): Promise<GatewaySpendDay[]> {
-    if (input.tenantIds.length === 0) return [];
-    const fromMs = utcDayStartMs(input.fromDay);
-    const toMs = utcDayStartMs(input.toDay) + DAY_MS;
-    const byDay = new Map<string, SpendEventRow[]>();
-    for (const row of this.#read(input.tenantIds)) {
+  async sumDaysForOrganizationProjects(input: GatewaySpendWindow): Promise<GatewaySpendDay[]> {
+    return this.#sumMetered({
+      window: input,
+      keyOf: (row) => row.occurredAt.toZonedDateTimeISO("UTC").toPlainDate().toString(),
+    })
+      .toSorted((left, right) => compareTuple([left.key], [right.key]))
+      .map(({ key, figures }) => ({ day: key, ...figures }));
+  }
+
+  async sumWindowByModel(input: GatewaySpendWindow): Promise<GatewaySpendModelTotal[]> {
+    return this.#sumMetered({ window: input, keyOf: (row) => row.model })
+      .toSorted(byAmountThenKey)
+      .map(({ key, figures }) => ({ model: key, ...figures }));
+  }
+
+  async sumWindowByVirtualKey(input: GatewaySpendWindow): Promise<GatewaySpendVirtualKeyTotal[]> {
+    return this.#sumMetered({ window: input, keyOf: (row) => row.virtualKeyId })
+      .toSorted(byAmountThenKey)
+      .map(({ key, figures }) => ({ virtualKeyId: key, ...figures }));
+  }
+
+  #sumMetered({
+    window,
+    keyOf,
+  }: {
+    window: GatewaySpendWindow;
+    keyOf: (row: SpendEventRow) => string;
+  }): { key: string; figures: Omit<GatewaySpendDay, "day"> }[] {
+    if (window.tenantIds.length === 0) return [];
+    const fromMs = utcDayStartMs(window.fromDay);
+    const toMs = utcDayStartMs(window.toDay) + DAY_MS;
+    const byKey = new Map<string, SpendEventRow[]>();
+    for (const row of this.#read(window.tenantIds)) {
       if (!inWindow(row, fromMs, toMs)) continue;
-      const day = row.occurredAt.toZonedDateTimeISO("UTC").toPlainDate().toString();
-      byDay.set(day, [...(byDay.get(day) ?? []), row]);
+      const key = keyOf(row);
+      byKey.set(key, [...(byKey.get(key) ?? []), row]);
     }
 
-    return [...byDay.entries()]
-      .toSorted(([left], [right]) => compareTuple([left], [right]))
-      .map(([day, rows]) => {
-        const charged = rows.filter((row) => CHARGED.has(row.status));
-        const tokens = (row: SpendEventRow) =>
-          row.tokensInput +
-          row.tokensOutput +
-          row.tokensCacheRead +
-          row.tokensCacheWrite +
-          row.tokensReasoning;
-        return {
-          day,
-          amountNanoUsd: parseSummedNanoUsd(
-            charged.reduce((sum, row) => sum + BigInt(row.costNanoUsd), 0n),
-          ),
-          requestCount: charged.length,
-          pricedRequestCount: charged.filter((row) => row.costNanoUsd > 0).length,
-          requestsWithoutAmount:
-            charged.filter((row) => row.costNanoUsd === 0 && tokens(row) > 0).length +
-            rows.filter((row) => row.status === "settled").length,
-        };
-      });
+    return [...byKey.entries()].map(([key, rows]) => ({ key, figures: meteredFiguresOf(rows) }));
   }
 
   async countUsage(input: {
@@ -541,6 +546,38 @@ function summaryOf({
     costNanoUsd: nano,
     costUsd: nanoUsdToDecimalString(nano),
   };
+}
+
+/** The metered figures of one group: charged money, charged and priced counts, unpriced beside. */
+function meteredFiguresOf(rows: readonly SpendEventRow[]): Omit<GatewaySpendDay, "day"> {
+  const charged = rows.filter((row) => CHARGED.has(row.status));
+  const tokens = (row: SpendEventRow) =>
+    row.tokensInput +
+    row.tokensOutput +
+    row.tokensCacheRead +
+    row.tokensCacheWrite +
+    row.tokensReasoning;
+  return {
+    amountNanoUsd: parseSummedNanoUsd(
+      charged.reduce((sum, row) => sum + BigInt(row.costNanoUsd), 0n),
+    ),
+    requestCount: charged.length,
+    pricedRequestCount: charged.filter((row) => row.costNanoUsd > 0).length,
+    requestsWithoutAmount:
+      charged.filter((row) => row.costNanoUsd === 0 && tokens(row) > 0).length +
+      rows.filter((row) => row.status === "settled").length,
+  };
+}
+
+/** The breakdowns' rank: largest amount first, then the key as the column compares. */
+function byAmountThenKey(
+  left: { key: string; figures: { amountNanoUsd: number } },
+  right: { key: string; figures: { amountNanoUsd: number } },
+): number {
+  return compareTuple(
+    [-left.figures.amountNanoUsd, left.key],
+    [-right.figures.amountNanoUsd, right.key],
+  );
 }
 
 /** Tuple order: numbers compared by value, strings by code unit, as the columns compare. */

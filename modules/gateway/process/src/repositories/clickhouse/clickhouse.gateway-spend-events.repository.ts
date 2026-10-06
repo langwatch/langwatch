@@ -23,6 +23,9 @@ import { z } from "zod";
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
 import {
   GatewaySpendEventsRepository,
+  type GatewaySpendModelTotal,
+  type GatewaySpendVirtualKeyTotal,
+  type GatewaySpendWindow,
   type SpendEventsPageCursor,
   type SpendSummaryRow,
 } from "../../repositories/gateway-spend-events.repository.ts";
@@ -82,10 +85,23 @@ function tenantSet({ tenantIds }: { tenantIds: readonly string[] }) {
   };
 }
 
-/** Main's governance metered-lane read: each request at its latest version, summed per day. */
-const spendDaysQuery = ({ placeholders }: { placeholders: string }) => `
+/**
+ * Main's governance metered-lane read: each request at its latest version, summed per one
+ * dimension (`governanceGatewaySpend.clickhouse.repository.ts`). Never grouped by person.
+ */
+const meteredSpendQuery = ({
+  placeholders,
+  dimension,
+  grouping,
+  ordering,
+}: {
+  placeholders: string;
+  dimension: string;
+  grouping: string;
+  ordering: string;
+}) => `
   SELECT
-    toDate(RequestOccurredAt, 'UTC') AS Day,
+    ${dimension},
     toString(sumIf(RequestCostNanoUSD, RequestStatus IN ${CHARGED_STATUSES})) AS AmountNanoUsd,
     countIf(RequestStatus IN ${CHARGED_STATUSES}) AS RequestCount,
     countIf(RequestStatus IN ${CHARGED_STATUSES} AND RequestCostNanoUSD > 0) AS PricedRequestCount,
@@ -103,6 +119,8 @@ const spendDaysQuery = ({ placeholders }: { placeholders: string }) => `
       argMax(Status, EventTimestamp)           AS RequestStatus,
       argMax(CostNanoUSD, EventTimestamp)      AS RequestCostNanoUSD,
       argMax(OccurredAt, EventTimestamp)       AS RequestOccurredAt,
+      argMax(Model, EventTimestamp)            AS RequestModel,
+      argMax(VirtualKeyId, EventTimestamp)     AS RequestVirtualKeyId,
       argMax(TokensInput, EventTimestamp)      AS RequestTokensInput,
       argMax(TokensOutput, EventTimestamp)     AS RequestTokensOutput,
       argMax(TokensCacheRead, EventTimestamp)  AS RequestTokensCacheRead,
@@ -114,19 +132,34 @@ const spendDaysQuery = ({ placeholders }: { placeholders: string }) => `
     HAVING RequestOccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
       AND RequestOccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
   )
-  GROUP BY Day
-  ORDER BY Day
+  GROUP BY ${grouping}
+  ORDER BY ${ordering}
 `;
 
-const spendDayRowSchema = z.object({
-  Day: z.string(),
+/** `AmountNanoUsd` is a string alias and would sort as text; rank on the number. */
+const AMOUNT_DESC = "toInt64(AmountNanoUsd) DESC";
+
+const meteredFiguresSchema = z.object({
   AmountNanoUsd: z.union([z.string(), z.number()]),
   RequestCount: z.coerce.number(),
   PricedRequestCount: z.coerce.number(),
   RequestsWithoutAmount: z.coerce.number(),
 });
 
-const spendDayRowsSchema = z.array(spendDayRowSchema);
+const meteredFigures = (row: z.infer<typeof meteredFiguresSchema>) => ({
+  amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
+  requestCount: row.RequestCount,
+  pricedRequestCount: row.PricedRequestCount,
+  requestsWithoutAmount: row.RequestsWithoutAmount,
+});
+
+const spendDayRowsSchema = z.array(z.object({ ...meteredFiguresSchema.shape, Day: z.string() }));
+const spendModelRowsSchema = z.array(
+  z.object({ ...meteredFiguresSchema.shape, Model: z.string() }),
+);
+const spendVirtualKeyRowsSchema = z.array(
+  z.object({ ...meteredFiguresSchema.shape, VirtualKeyId: z.string() }),
+);
 
 const utcDayStartMs = (day: string): number =>
   Temporal.Instant.from(`${day}T00:00:00.000Z`).epochMilliseconds;
@@ -599,21 +632,64 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     return parseSummedNanoUsd(rows[0]?.CostNanoUSD ?? 0);
   }
 
-  async sumDaysForOrganizationProjects({
-    tenantIds,
-    fromDay,
-    toDay,
+  async sumDaysForOrganizationProjects(input: GatewaySpendWindow): Promise<GatewaySpendDay[]> {
+    const rows = await this.#readMetered({
+      window: input,
+      dimension: "toDate(RequestOccurredAt, 'UTC') AS Day",
+      grouping: "Day",
+      ordering: "Day",
+    });
+    return spendDayRowsSchema.parse(rows).map((row) => ({ day: row.Day, ...meteredFigures(row) }));
+  }
+
+  async sumWindowByModel(input: GatewaySpendWindow): Promise<GatewaySpendModelTotal[]> {
+    const rows = await this.#readMetered({
+      window: input,
+      dimension: "RequestModel AS Model",
+      grouping: "RequestModel",
+      ordering: `${AMOUNT_DESC}, Model`,
+    });
+    return spendModelRowsSchema
+      .parse(rows)
+      .map((row) => ({ model: row.Model, ...meteredFigures(row) }));
+  }
+
+  async sumWindowByVirtualKey(input: GatewaySpendWindow): Promise<GatewaySpendVirtualKeyTotal[]> {
+    const rows = await this.#readMetered({
+      window: input,
+      dimension: "RequestVirtualKeyId AS VirtualKeyId",
+      grouping: "RequestVirtualKeyId",
+      ordering: `${AMOUNT_DESC}, VirtualKeyId`,
+    });
+    return spendVirtualKeyRowsSchema
+      .parse(rows)
+      .map((row) => ({ virtualKeyId: row.VirtualKeyId, ...meteredFigures(row) }));
+  }
+
+  /** One grouped read over the deduped requests; the client is resolved by the first tenant. */
+  async #readMetered({
+    window,
+    dimension,
+    grouping,
+    ordering,
   }: {
-    tenantIds: readonly string[];
-    fromDay: string;
-    toDay: string;
-  }): Promise<GatewaySpendDay[]> {
+    window: GatewaySpendWindow;
+    dimension: string;
+    grouping: string;
+    ordering: string;
+  }): Promise<unknown[]> {
+    const { tenantIds, fromDay, toDay } = window;
     const [firstTenantId] = tenantIds;
     if (firstTenantId === undefined) return [];
     const client = await this.resolveClient(firstTenantId);
     const tenant = tenantSet({ tenantIds });
     const result = await client.query({
-      query: spendDaysQuery({ placeholders: tenant.placeholders }),
+      query: meteredSpendQuery({
+        placeholders: tenant.placeholders,
+        dimension,
+        grouping,
+        ordering,
+      }),
       tenantIds,
       query_params: {
         ...tenant.params,
@@ -623,13 +699,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       format: "JSONEachRow",
       clickhouse_settings: { max_execution_time: METERED_READ_MAX_EXECUTION_SECONDS },
     });
-    return spendDayRowsSchema.parse(await result.json()).map((row) => ({
-      day: row.Day,
-      amountNanoUsd: parseSummedNanoUsd(row.AmountNanoUsd),
-      requestCount: row.RequestCount,
-      pricedRequestCount: row.PricedRequestCount,
-      requestsWithoutAmount: row.RequestsWithoutAmount,
-    }));
+    return result.json();
   }
 
   async readEndUserSpend({

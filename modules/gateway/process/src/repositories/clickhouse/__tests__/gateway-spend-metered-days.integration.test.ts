@@ -34,20 +34,24 @@ function state({
   updatedAt,
   costNanoUsd,
   lastEventAtMs = occurredAtMs,
+  model = "openai/gpt-5-mini",
+  virtualKeyId = `vk-${run}`,
 }: {
   status: GatewaySpendState["status"];
   occurredAtMs: number;
   updatedAt: number;
   costNanoUsd: number;
   lastEventAtMs?: number;
+  model?: string;
+  virtualKeyId?: string;
 }): GatewaySpendState {
   return {
     status,
     organizationId: `org-${run}`,
-    virtualKeyId: `vk-${run}`,
+    virtualKeyId,
     principalUserId: `user-${run}`,
     endUserId: "",
-    model: "openai/gpt-5-mini",
+    model,
     providerKey: `prov-${run}`,
     traceId: `trace-${run}`,
     requestType: "chat",
@@ -88,6 +92,8 @@ describe.skipIf(!enabled)("the metered day read on the spend record (real ClickH
     charged: `metered-charged-${run}`,
     twoMonths: `metered-two-months-${run}`,
     midnight: `metered-midnight-${run}`,
+    grouped: `metered-grouped-${run}`,
+    ranked: `metered-ranked-${run}`,
   };
 
   beforeAll(async () => {
@@ -225,6 +231,79 @@ describe.skipIf(!enabled)("the metered day read on the spend record (real ClickH
       expect(days.map(({ day, amountNanoUsd }) => [day, amountNanoUsd])).toEqual([
         ["2026-08-20", cost],
       ]);
+    });
+  });
+
+  describe("given requests from two virtual keys against two models", () => {
+    /** @scenario "Metered spend is grouped by model and by virtual key, never by person" */
+    it("totals each model and each virtual key on its own", async () => {
+      const at = Date.UTC(2026, 6, 1, 9, 0, 0);
+      const window = { tenantIds: [tenants.grouped], fromDay: "2026-07-01", toDay: "2026-07-01" };
+      for (const [index, [model, virtualKeyId, usd]] of (
+        [
+          ["gpt-5-mini", "vk_1", 3],
+          ["claude-sonnet-5", "vk_2", 4],
+        ] as const
+      ).entries()) {
+        await fold({
+          tenantId: tenants.grouped,
+          requestId: `req-grouped-${index}-${run}`,
+          at: state({
+            status: "confirmed",
+            occurredAtMs: at,
+            updatedAt: at + 1,
+            costNanoUsd: usd * NANO_PER_USD,
+            model,
+            virtualKeyId,
+          }),
+        });
+      }
+
+      const byModel = await repo.sumWindowByModel(window);
+      const byKey = await repo.sumWindowByVirtualKey(window);
+
+      expect(byModel.map(({ model, amountNanoUsd }) => [model, amountNanoUsd])).toEqual([
+        ["claude-sonnet-5", 4 * NANO_PER_USD],
+        ["gpt-5-mini", 3 * NANO_PER_USD],
+      ]);
+      expect(byKey.map(({ virtualKeyId, amountNanoUsd }) => [virtualKeyId, amountNanoUsd])).toEqual(
+        [
+          ["vk_2", 4 * NANO_PER_USD],
+          ["vk_1", 3 * NANO_PER_USD],
+        ],
+      );
+    });
+  });
+
+  describe("given two models where the smaller amount is the larger string", () => {
+    /** @scenario "Metered spend is grouped by model and by virtual key, never by person" */
+    it("ranks the larger amount first, in money order not text order", async () => {
+      // "88986800" > "7619357500" as text; $0.089 < $7.62 as money.
+      const at = Date.UTC(2026, 6, 2, 9, 0, 0);
+      const window = { tenantIds: [tenants.ranked], fromDay: "2026-07-02", toDay: "2026-07-02" };
+      for (const [model, virtualKeyId, costNanoUsd] of [
+        ["small-as-money", "vk_small", 88_986_800],
+        ["large-as-money", "vk_large", 7_619_357_500],
+      ] as const) {
+        await fold({
+          tenantId: tenants.ranked,
+          requestId: `req-${model}-${run}`,
+          at: state({
+            status: "confirmed",
+            occurredAtMs: at,
+            updatedAt: at + 1,
+            costNanoUsd,
+            model,
+            virtualKeyId,
+          }),
+        });
+      }
+
+      const byModel = await repo.sumWindowByModel(window);
+      const byKey = await repo.sumWindowByVirtualKey(window);
+
+      expect(byModel.map((row) => row.model)).toEqual(["large-as-money", "small-as-money"]);
+      expect(byKey.map((row) => row.virtualKeyId)).toEqual(["vk_large", "vk_small"]);
     });
   });
 });
