@@ -155,12 +155,12 @@ describe("authorize", () => {
     it("mints the own grant alone and never asks for shared reads", async () => {
       const { service, deps } = door({
         rows: [sharedRow()],
-        permissions: ["traces:view", "traces:manage", "project:view"],
+        permissions: ["traces:view", "traces:update", "project:view"],
       });
       const proof = await service.authorize({
         actor: ANA,
         principal: ANA,
-        permission: "traces:manage",
+        permission: "traces:update",
         scope: { projectId: AGGREGATE },
         purpose: ROUTE,
       });
