@@ -62,10 +62,10 @@ Feature: Hosted MCP sessions carry no more authority than the grant behind them
       Then the call is served without probing any person's grant
 
     @unit @regression
-    Scenario: A process without authorization serves no hosted MCP
+    Scenario: A process without authorization refuses to boot by name
       Given an API process that composed no authorization service
-      When the hosted MCP endpoint is composed
-      Then no endpoint is mounted
+      When the hosted MCP module is installed
+      Then boot refuses, naming the missing authorization dependency, and mounts no endpoint
 
   Rule: Every hosted MCP route verb declares an access policy
 

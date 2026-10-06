@@ -270,7 +270,7 @@ Feature: Saved LangWatchQL workbench charts — the persistence model and its wr
   Scenario: A path naming another project reaches nothing
     Given a key for one project and the id of another project that exists
     When the key is used against the other project's path
-    Then the request is refused with error code project_not_found
+    Then the request is refused with 403 and error code scope_input_mismatch
 
   @integration
   Scenario: A key that may read charts may not write them

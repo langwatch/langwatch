@@ -247,7 +247,7 @@ describe("a route whose API key does not grant the permission it requires", () =
     },
   };
 
-  /** @scenario "A denial answered by the security middleware carries the same channel" */
+  /** @scenario "An API-key ceiling denial carries the same channel" */
   it("answers a denial carrying the tips, documentation link and fault for re-scoping the key", async () => {
     const runtime = createRestRuntime({ identity: ceilingDoor, doors: { api_key: ceilingDoor } });
     const hono = runtime.mount(keys.router(), {

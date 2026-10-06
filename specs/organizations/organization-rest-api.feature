@@ -80,6 +80,7 @@ Feature: Organization REST API
     Then the response status is 200
     And the response reports the version as latest
     When I fetch the organization through the bare path
-    Then the response status is 404
+    Then the response status is 200
+    And the response reports the version as latest
     When I fetch the organization through a version namespace that does not exist
     Then the response status is 404

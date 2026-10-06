@@ -49,7 +49,8 @@ Feature: The API process serves the auth door
     And a CLI POST to "/api/auth/cli/project-key" is not refused by the sign-in door's origin gate
 
   @integration
-  Scenario: A process handed someone else's transport mounts no auth door
+  Scenario: A process with no Better Auth instance still declares the auth family
     Given a process that composed no Better Auth instance of its own
     When the browser reads the session endpoint
-    Then no auth family is mounted, so nothing answers "signed out" on a guess
+    Then the session answers null, signed out
+    And a sign-in attempt is refused as unavailable with the code service_unavailable

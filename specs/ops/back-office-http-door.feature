@@ -29,10 +29,11 @@ Feature: The back office answers over HTTP
     Then `/api/admin` answers
 
   @integration
-  Scenario: A deployment with no browser session leaves the door off
+  Scenario: A deployment with no browser session still answers no one
     Given the deployment composed no browser-session transport
     When the process mounts its REST families
-    Then `/api/admin` is not mounted at all rather than mounted refusing
+    Then `/api/admin` is declared and answers every caller a not-found
+    And nobody can be identified as instance staff
 
   @integration
   Scenario: An impersonating admin stays the acting person
@@ -54,7 +55,7 @@ Feature: The back office answers over HTTP
   Scenario: A signed-in person who is not staff cannot tell the door exists
     Given a signed-in person who holds no platform-operator grant
     When they ask the back office for a resource
-    Then the answer is the same nothing an unmounted door would give
+    Then the answer is a not-found that names no door, resource or grant
 
   @integration
   Scenario: Every instance admin resource the console lists answers

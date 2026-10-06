@@ -7,30 +7,8 @@ Feature: Machine-wide slots for whole-repo checks
   # Optional Haven hooks own agent admission (haven-agent-hooks.feature).
   # Repository scripts and pnpm-generated tool launchers run directly.
   # `haven slot run -- <command>` provides explicit terminal admission;
-  # The JavaScript check-queue.mjs and its bin shims are retired; postinstall
-  # only restores launchers the old shims replaced.
+  # The JavaScript check-queue.mjs and its bin shims are retired.
   # Flock waiters retry every 100 ms without changing capacity or memory limits.
-
-  @unit
-  Scenario: Installing dependencies retires automatic bin shims
-    Given the bin entries contain legacy queue shims and their original launchers
-    When the postinstall cleanup runs
-    Then the original executable launchers are restored
-    And repeating cleanup leaves them unchanged
-
-  @unit
-  Scenario: Cleanup preserves a newly generated launcher
-    Given pnpm has replaced a legacy shim with a fresh launcher
-    And an older launcher backup remains
-    When the postinstall cleanup runs
-    Then the fresh launcher remains in place
-
-  @unit
-  Scenario: Cleanup reports an incomplete legacy installation
-    Given a legacy shim has no original launcher backup
-    When the postinstall cleanup runs
-    Then it reports that restoration failed
-    And it preserves the current entry
 
   # --- The happy path stays invisible ---
 
@@ -331,18 +309,6 @@ Feature: Machine-wide slots for whole-repo checks
     When a whole-repo check runs through the queue
     Then the run is handed to haven's slot command
     And the command's exit code reaches the caller unchanged
-
-  @unit
-  Scenario: Without haven the JavaScript queue still gates
-    Given no haven binary is installed
-    When a whole-repo check runs through the queue
-    Then the JavaScript queue takes the slot and runs the command
-
-  @unit
-  Scenario: The operator can force the JavaScript queue
-    Given CHECK_QUEUE_IMPL is js
-    When a whole-repo check runs through the queue
-    Then haven is never consulted
 
   @unit
   Scenario: haven derives the same limit the JavaScript queue would
