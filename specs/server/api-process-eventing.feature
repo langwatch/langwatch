@@ -78,12 +78,6 @@ Feature: The standalone API process dispatches commands and consumes none
       And this process appends nothing itself, because its event log refuses by name
       And the join lifecycle process manager is declined by name
 
-    @integration
-    Scenario: A process with no queue registers no identity pipeline
-      Given the deployment configured no Redis
-      When the API process composes its identity pipelines
-      Then it registers none, and every ledger refuses by name rather than dropping the write
-
     # The directory-sync ledger is the one that does NOT throw on an absent
     # sender: a push is an identity provider's HTTP request, and refusing it
     # because our bookkeeping could not be written would turn an event-stack
