@@ -48,6 +48,7 @@ describe("given the platform-operator grant answers through authz", () => {
   });
 
   /** @scenario "Operator gates ask the platform-operator grant" */
+  /** @scenario "The banner and the way out keep working on the new claims" */
   it("reads an impersonating operator by the impersonator's own grant", async () => {
     await expect(app.admitOperator(IMPERSONATING_MANAGER, "ops:manage")).resolves.toBeUndefined();
     expect(await app.operatorScope(IMPERSONATING_MANAGER)).toEqual({ kind: "platform" });

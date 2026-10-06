@@ -174,6 +174,7 @@ describe("SystemMigrationPassService", () => {
 
   describe("when a pass runs", () => {
     /** @scenario "The reconciliation sweep runs on every migration pass" */
+    /** @scenario "The address-lock reap runs on every migration pass" */
     it("sweeps abandoned newborn streams alongside the migrations", async () => {
       const { database } = stubDatabase({ enrollments: [], memberships: {} });
       const { adapter, newbornSweep } = adapterOn(database);
@@ -184,6 +185,7 @@ describe("SystemMigrationPassService", () => {
     });
 
     /** @scenario "The reconciliation sweep runs on every migration pass" */
+    /** @scenario "The address-lock reap runs on every migration pass" */
     it("still reports the pass when the sweep itself fails", async () => {
       const { database } = stubDatabase({ enrollments: [], memberships: {} });
       const { adapter } = adapterOn(
