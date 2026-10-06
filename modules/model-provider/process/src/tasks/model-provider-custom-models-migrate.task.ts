@@ -15,7 +15,7 @@ const logger = createLogger("langwatch:task:model-provider-migrate-custom-models
  * Converts every legacy `string[]` custom-model column to
  * `CustomModelEntry[]`.
  */
-export async function runCustomModelsMigration({
+async function runCustomModelsMigration({
   database,
   registryLookup = getProviderModelOptions,
 }: {

@@ -120,7 +120,7 @@ interface ModelProviderCredentialRow {
 }
 
 /** What the credential migration does with one row: seal its plaintext keys, or leave it. */
-export type ModelProviderKeysSeal =
+type ModelProviderKeysSeal =
   | Readonly<{ outcome: "seal"; keys: Record<string, unknown> }>
   | Readonly<{ outcome: "unchanged" }>;
 

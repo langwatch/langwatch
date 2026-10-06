@@ -30,7 +30,7 @@ export type UnrepresentableModel = {
   fields: string[];
 };
 
-export type LitellmAudioMapping = {
+type LitellmAudioMapping = {
   entries: LLMModelEntry[];
   unrepresentable: UnrepresentableModel[];
 };

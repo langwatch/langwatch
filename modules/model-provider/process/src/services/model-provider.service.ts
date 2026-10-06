@@ -68,7 +68,7 @@ import type { ModelProviderCatalog } from "./registry-model-provider-catalog.ser
 import type { ModelTranslation } from "./vercel-ai-model-translation.service.ts";
 import type { ModelProviderConnectionRateLimiter } from "./windowed-model-provider-connection-rate-limiter.service.ts";
 
-export interface ModelProviderServiceOptions {
+interface ModelProviderServiceOptions {
   repository: ModelProviderRepository;
   projects: ProjectApi;
   organizations: OrganizationApi;

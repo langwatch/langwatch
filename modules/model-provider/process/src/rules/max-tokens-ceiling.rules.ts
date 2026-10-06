@@ -1,6 +1,6 @@
 import { findModelById, type CustomModelEntry } from "@langwatch/model-provider-contract";
 
-export type ProviderWithCustomModels = {
+type ProviderWithCustomModels = {
   customModels?: CustomModelEntry[] | null;
 };
 

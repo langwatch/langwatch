@@ -34,7 +34,7 @@ export abstract class ModelProviderEgress {
 }
 
 /** The address policy a deployment fences its outbound probes with. */
-export type ModelProviderEgressPolicy = Readonly<{
+type ModelProviderEgressPolicy = Readonly<{
   /** Refuse private, loopback and link-local destinations, and names resolving to them. */
   blockLocal: boolean;
   /** The literal hostname allowlist that relaxes the local block, and only it. */

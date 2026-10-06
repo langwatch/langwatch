@@ -41,7 +41,7 @@ export function pricedUnits(pricing: LLMModelPricing | undefined): string[] {
   return units;
 }
 
-export function hasAnyRate(pricing: LLMModelPricing | undefined): boolean {
+function hasAnyRate(pricing: LLMModelPricing | undefined): boolean {
   return pricedUnits(pricing).length > 0;
 }
 
@@ -52,7 +52,7 @@ export function findUnpricedModels(models: Record<string, LLMModelEntry>): strin
     .toSorted();
 }
 
-export type UnitMismatch = {
+type UnitMismatch = {
   modelId: string;
   origin: "overlay" | "generated";
   catalogUnits: string[];
@@ -60,7 +60,7 @@ export type UnitMismatch = {
   source: string;
 };
 
-export type PriceDisagreement = {
+type PriceDisagreement = {
   modelId: string;
   origin: "overlay" | "generated";
   field: string;

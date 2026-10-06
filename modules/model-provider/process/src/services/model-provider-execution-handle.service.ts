@@ -20,7 +20,7 @@ import type { ModelCostProject } from "./model-provider-project-scope.service.ts
  * feature's vertical, so a process with no gateway credential passes nothing and the cascade
  * refuses codex models by name; every other provider is unaffected.
  */
-export abstract class ModelProviderCodexHandle {
+abstract class ModelProviderCodexHandle {
   abstract resolve(input: {
     projectId: string;
     model: string;
@@ -31,7 +31,7 @@ export abstract class ModelProviderCodexHandle {
 /**
  * Returns a Vercel AI SDK model handle for the given project + feature.
  */
-export type ModelProviderExecutionHandleInput = {
+type ModelProviderExecutionHandleInput = {
   projectId: string;
   model?: string;
   featureKey?: string;
@@ -42,7 +42,7 @@ export type ModelProviderExecutionHandleInput = {
  * every helper in this file narrows to the same shape instead of each
  * spelling out its own slice of `ModelProviderApi`.
  */
-export type ModelProviderResolutionGateway = Pick<
+type ModelProviderResolutionGateway = Pick<
   ModelProviderApi,
   "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders" | "prepareExecution"
 >;

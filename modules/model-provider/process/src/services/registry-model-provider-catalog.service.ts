@@ -182,7 +182,7 @@ export abstract class ModelProviderCatalog {
 
 const customKeysSchema = z.record(z.string(), z.string());
 
-export type RegistryModelProviderCatalogOptions = {
+type RegistryModelProviderCatalogOptions = {
   /**
    * Whether LangWatch supplies a provider's credentials, and with what. The
    * composition root adapts its Enterprise service onto this; a deployment

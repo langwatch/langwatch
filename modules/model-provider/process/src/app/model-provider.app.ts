@@ -197,7 +197,7 @@ const EXECUTION_PROXY_PATH = "/go/proxy/v1";
  * What `create` composes the infrastructure over, derived from the contract's
  * own config slice rather than declared as a second schema.
  */
-export type ModelProviderBuildConfig = Readonly<{
+type ModelProviderBuildConfig = Readonly<{
   egress: Readonly<{ blockLocal: boolean; allowedHosts: string[]; verifyTls: boolean }>;
   /** Where a resolved model is executed, fully formed: nlpgo's `/go/proxy/v1`. */
   executionProxyBaseUrl: string;

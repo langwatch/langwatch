@@ -17,8 +17,6 @@ import { modelProviderTrpcTransport } from "./transport/model-provider.trpc.ts";
 import { playgroundRest } from "./transport/playground.rest.ts";
 import { translateTrpcTransport } from "./transport/translate.trpc.ts";
 
-export type { ModelProviderInfrastructure } from "./app/model-provider.app.ts";
-
 export const modelProviderProcessModule = defineProcessModule("model-provider")
   .withRepositories(modelProviderRepositories)
   .withApi(ModelProviderModule)

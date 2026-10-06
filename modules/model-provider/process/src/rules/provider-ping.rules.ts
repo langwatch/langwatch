@@ -13,7 +13,7 @@ export const UNPINGABLE_CREDENTIALS: readonly ModelProviderUncheckedReason[] = [
   "credential_masked",
 ];
 
-export type PingRefusal = "credit" | "usage_limit" | "auth" | "other";
+type PingRefusal = "credit" | "usage_limit" | "auth" | "other";
 
 function bareModelId(id: string): string {
   return id.split("/").slice(1).join("/");
