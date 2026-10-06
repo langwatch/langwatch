@@ -59,6 +59,31 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
+const spanDouble = vi.hoisted(() => ({
+  setStatus: vi.fn(),
+  setAttribute: vi.fn(),
+  setAttributes: vi.fn(),
+  recordException: vi.fn(),
+}));
+
+// Only the ingest tracers are doubled; everything else stays real.
+vi.mock("langwatch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("langwatch")>();
+  return {
+    ...actual,
+    getLangWatchTracer: (name: string) =>
+      name.startsWith("langwatch.otel.")
+        ? {
+            withActiveSpan: (
+              _name: string,
+              _options: unknown,
+              fn: (span: typeof spanDouble) => unknown,
+            ) => fn(spanDouble),
+          }
+        : actual.getLangWatchTracer(name),
+  };
+});
+
 vi.mock("~/server/db", () => ({ prisma: {} }));
 vi.mock("~/utils/posthogErrorCapture", () => ({ captureException: vi.fn() }));
 
@@ -152,6 +177,20 @@ describe("OTLP parse failures", () => {
         await postMalformed({ path });
 
         expect(captureException).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A malformed body leaves the ingest span status unset and records the customer fault" */
+      it("leaves the span status unset and records the customer fault on the span", async () => {
+        await postMalformed({ path });
+
+        expect(spanDouble.setStatus).not.toHaveBeenCalled();
+        expect(spanDouble.recordException).not.toHaveBeenCalled();
+        expect(spanDouble.setAttributes).toHaveBeenCalledWith(
+          expect.objectContaining({
+            "langwatch.error.fault": "customer",
+            "langwatch.otel.parse_error": expect.any(String),
+          }),
+        );
       });
     });
   });

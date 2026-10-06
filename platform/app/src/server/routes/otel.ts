@@ -588,7 +588,7 @@ secured
           // exporter does not count against span error rates.
           span.setAttributes({
             "langwatch.error.fault": "customer",
-            "langwatch.otlp.parse_error": parsed.error,
+            "langwatch.otel.parse_error": parsed.error,
           });
           loggerTraces.warn(
             {
@@ -667,7 +667,7 @@ secured
         if (!parsed.ok) {
           span.setAttributes({
             "langwatch.error.fault": "customer",
-            "langwatch.otlp.parse_error": parsed.error,
+            "langwatch.otel.parse_error": parsed.error,
           });
           loggerLogs.warn(
             {
@@ -760,7 +760,7 @@ secured
         if (!parsed.ok) {
           span.setAttributes({
             "langwatch.error.fault": "customer",
-            "langwatch.otlp.parse_error": parsed.error,
+            "langwatch.otel.parse_error": parsed.error,
           });
           loggerMetrics.warn(
             {

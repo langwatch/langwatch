@@ -37,3 +37,10 @@ Feature: OTLP parse failures are the client's error
     And one warning is logged, attributed to the client and the project
     And no error is logged
     And no exception is reported
+
+  @unit @regression
+  Scenario: A malformed body leaves the ingest span status unset and records the customer fault
+    When the project sends a malformed OTLP body to the traces, logs or metrics endpoint
+    Then the ingest span status is not set to error
+    And no exception is recorded on the ingest span
+    And the span records the customer fault and the parse error
