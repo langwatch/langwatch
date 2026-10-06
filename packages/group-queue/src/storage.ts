@@ -25,7 +25,6 @@ export type ProjectStorageDestination = StoredObjectStorageDestination;
 export interface ObjectStore {
   put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
   get(uri: string): Promise<Readable>;
-  delete(uri: string): Promise<void>;
 }
 
 export function mintUriForDestination({

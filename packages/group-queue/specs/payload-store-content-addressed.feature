@@ -26,10 +26,9 @@ Feature: GroupQueue content-addressed tiered payload store
   #     Identical bytes -> identical key -> one stored copy. PUTs idempotent.
   #     Keys are kind first, tenant second (ADR-172): s3://{bucket}/group-queue/{projectId}/<hash>.
   #     Tenants never share a blob, the operator's lifecycle rule on the
-  #     group-queue/ prefix can reach every object, and the owner can purge
-  #     group-queue/{projectId}/. Today's code still writes {projectId}/<hash>
-  #     (no lifecycle rule can reach it); the scenarios tagged @unimplemented
-  #     below describe the move.
+  #     group-queue/ prefix can reach every object; project deletion purges
+  #     nothing, the lifecycle rule alone reclaims them. A blob staged under the old {projectId}/<hash>
+  #     key before the move is read from there for one release.
   #   - Flat jobs: the fan-out producer hoists the shared component (event, fold
   #     state) out of every job; each job carries refs, not the payload. Decode
   #     resolves refs before the handler, which is unchanged.
@@ -80,24 +79,21 @@ Feature: GroupQueue content-addressed tiered payload store
     And the queued value is a flat envelope referencing the blob by tier "redis" and hash
     And the handler receives the payload intact
 
-  # Gap: today the key is {projectId}/{contentHash}; the group-queue/ prefix lands with the group-queue code slice of ADR-172.
-  @integration @unimplemented
+  @integration
   Scenario: A very large payload offloads to S3 through the reused object store
     When a job whose shared payload exceeds the S3 threshold is staged
     Then the body is stored via the neutral object-storage port under group-queue/{projectId}/{contentHash}
     And the queued value is a flat envelope referencing the blob by tier "s3" and hash
     And the handler receives the payload intact
 
-  # Gap: today a deduplicated re-stage may skip the PUT; the unconditional PUT lands with the group-queue code slice of ADR-172.
-  @unit @unimplemented
+  @unit
   Scenario: The same bytes always produce the same blob key
     Given two payloads with byte-identical canonical serializations
     When each is offloaded
     Then both resolve to the same content-addressed key
     And the second offload is a PUT over the existing key that restarts its lifecycle age
 
-  # Gap: no mint or store test asserts the prefix; the code slice of ADR-172 writes it.
-  @unit @unimplemented
+  @unit
   Scenario: The S3-tier key carries the lifecycle prefix first
     Given a payload above the S3 threshold for a project
     When it is offloaded
@@ -105,8 +101,7 @@ Feature: GroupQueue content-addressed tiered payload store
     And the project id is the second segment and the content hash the last
     And no key is written outside that prefix
 
-  # Gap: the legacy read lands with the group-queue code slice of ADR-172 and is removed one release later.
-  @unit @unimplemented
+  @unit
   Scenario: A blob staged before the move is read from its old key
     Given an S3-tier envelope staged under {projectId}/{contentHash} before the prefix move
     When the envelope is decoded and the new key is missing
@@ -154,12 +149,11 @@ Feature: GroupQueue content-addressed tiered payload store
     And a resolve-adapter reconstituted the components before the handler ran
     And the wire value carried refs in place of the shared components
 
-  @unit @unimplemented
+  @unit
   # Multi-tenancy guard: blob keys are namespaced by projectId (the tenant id;
   # tenantId === projectId) and the caller-owned group-queue segment. Isolation
   # is structural — in the key path — not incidental to content. The operator's
-  # lifecycle rule covers group-queue/*, and the owner can purge
-  # group-queue/{projectId}/. The Redis tier needs none; its 4-day TTL clears
+  # lifecycle rule covers group-queue/*. The Redis tier needs none; its 4-day TTL clears
   # once the project's jobs drain.
   Scenario: Blob keys are namespaced by tenant so tenants never share a blob
     Given two tenants whose jobs carry byte-identical user content
@@ -292,7 +286,7 @@ Feature: GroupQueue content-addressed tiered payload store
     And the replacement's own blob carries the full four-day backstop
 
   @integration
-  Scenario: An S3-tier release leaves the object to the GroupQueue durable-tier sweep
+  Scenario: An S3-tier release leaves the object to the operator's lifecycle rule
     Given an S3-tier blob whose only lease holder is retiring
     When that holder releases its lease
     Then no object-store delete is issued
