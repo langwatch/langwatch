@@ -3,9 +3,7 @@
  * safe, so the upload button and the run refuse on the same numbers.
  * @see specs/datasets/dataset-attachments.feature
  */
-import {
-  DATASET_ATTACHMENT_DEFAULT_MAX_BYTES,
-} from "@langwatch/plans";
+import { DATASET_ATTACHMENT_DEFAULT_MAX_BYTES } from "@langwatch/plans";
 import {
   DATASET_ATTACHMENT_PURPOSE,
   REFUSED_ATTACHMENT_MEDIA_TYPES,
@@ -64,7 +62,6 @@ export function datasetAttachmentAcceptance(input: {
   if (imageRefused || isRefusedAttachmentMediaType(mediaType)) {
     return { accepted: false, refusal: "type_refused" };
   }
-  if (input.byteLength > input.maxBytes)
-    return { accepted: false, refusal: "too_large" };
+  if (input.byteLength > input.maxBytes) return { accepted: false, refusal: "too_large" };
   return { accepted: true };
 }

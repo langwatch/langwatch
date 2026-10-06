@@ -19,9 +19,7 @@ import type { DatasetChunkRepository } from "../../repositories/dataset-chunk.re
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
-import {
-  DATASET_SEARCH_SCAN_BATCH,
-} from "../../rules/dataset-search.rules.ts";
+import { DATASET_SEARCH_SCAN_BATCH } from "../../rules/dataset-search.rules.ts";
 import { DatasetContentService } from "../dataset-content.service.ts";
 import type { DatasetRequestBoundsService } from "../dataset-request-bounds.service.ts";
 import { DatasetService } from "../dataset.service.ts";

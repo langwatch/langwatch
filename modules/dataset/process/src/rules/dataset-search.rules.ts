@@ -92,7 +92,11 @@ const safeStringifyValue = (value: unknown): string => {
 };
 
 /** Refuses a search scan once it has read more rows or bytes than one search may. */
-export function refuseSearchScan(rowsRead: number, bytesRead: number, caps: DatasetSearchCaps): void {
+export function refuseSearchScan(
+  rowsRead: number,
+  bytesRead: number,
+  caps: DatasetSearchCaps,
+): void {
   if (rowsRead > caps.maxRows) {
     throw new DatasetTooLargeToSearchError({
       rowCount: rowsRead,

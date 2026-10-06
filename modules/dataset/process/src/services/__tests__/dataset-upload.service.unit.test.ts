@@ -1,5 +1,8 @@
 import type { DatasetLimits } from "@langwatch/dataset-contract";
-import { storedObjectMetadataSchema, type StoredObjectApi } from "@langwatch/stored-object-contract";
+import {
+  storedObjectMetadataSchema,
+  type StoredObjectApi,
+} from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
@@ -8,6 +11,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
  */
 import { describe, expect, it } from "vitest";
 
+import {
+  createDatasetTestInlineAttachments,
+  createDatasetTestRequestBoundsWith,
+} from "../../app/__tests__/dataset.fixture.ts";
 import type { DatasetChunkRepository } from "../../repositories/dataset-chunk.repository.ts";
 import type {
   CreateDatasetInput,
@@ -18,10 +25,6 @@ import type { DatasetRow } from "../../repositories/dataset.repository.ts";
 import { MemoryDatasetContentRepository } from "../../repositories/memory/memory.dataset-content.repository.ts";
 import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
 import { DatasetUploadService } from "../dataset-upload.service.ts";
-import {
-  createDatasetTestInlineAttachments,
-  createDatasetTestRequestBoundsWith,
-} from "../../app/__tests__/dataset.fixture.ts";
 
 const PROJECT_ID = "project-1";
 const PNG_INLINE = `data:image/png;base64,${Buffer.from("89504e470d0a1a0a0000000d49484452", "hex").toString("base64")}`;

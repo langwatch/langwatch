@@ -59,7 +59,13 @@ function setup(attachmentBytes: number | Error = RAISED) {
     dispatch: async (input) => {
       dispatched.push(input);
 
-      return { ok: true, status: 200, statusText: "OK", json: async () => ({}), text: async () => "" };
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        json: async () => ({}),
+        text: async () => "",
+      };
     },
   });
 

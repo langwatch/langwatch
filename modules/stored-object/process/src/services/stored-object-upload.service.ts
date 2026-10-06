@@ -158,10 +158,7 @@ export class StoredObjectUploadService {
     const placement = await StoredObjectUploadService.storageCall(() =>
       this.options.storage.place({ projectId: input.projectId, objectId: id }),
     );
-    const limit = Math.min(
-      purposeByteLimitOf(policy, input.maxBytes),
-      placement.maxSinglePutBytes,
-    );
+    const limit = Math.min(purposeByteLimitOf(policy, input.maxBytes), placement.maxSinglePutBytes);
     if (input.byteLength > limit) throw new UploadTooLargeError(input.byteLength, limit);
 
     const now = this.options.now();

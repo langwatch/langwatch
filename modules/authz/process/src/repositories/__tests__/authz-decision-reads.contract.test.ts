@@ -620,6 +620,8 @@ describe.each(backends)("given the decision reads on the $name backend", (backen
       });
       await expect(fixture.repositories.read.findTeamOrganization({ teamId })).resolves.toEqual({
         organizationId,
+        isPersonal: false,
+        name: "Readers",
       });
       await expect(
         fixture.repositories.read.findProjectLineage({ projectId: id("project") }),

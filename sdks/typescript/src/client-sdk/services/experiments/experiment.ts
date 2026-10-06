@@ -40,6 +40,12 @@ import {
   type SummaryEvaluation,
 } from "./experiment-summary.ts";
 import { generateHumanReadableId } from "./humanReadableId.ts";
+import {
+  describeRefusedEntry,
+  endsTheRun,
+  halveLogResultsBody,
+  splitLogResultsBody,
+} from "./log-results-batching.ts";
 import type {
   Batch,
   BatchEntry,
@@ -62,12 +68,6 @@ import type {
   TargetExecutionContext,
   TargetContext,
 } from "./types.ts";
-import {
-  describeRefusedEntry,
-  endsTheRun,
-  halveLogResultsBody,
-  splitLogResultsBody,
-} from "./log-results-batching.ts";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;

@@ -12,18 +12,17 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  createDatasetTestInlineAttachments,
+  createDatasetTestRequestBounds,
+  createDatasetTestRequestBoundsWith,
+} from "../../app/__tests__/dataset.fixture.ts";
 import { toJsonlChunks } from "../../rules/dataset-chunking.rules.ts";
 import {
   DatasetNormalizeService,
   ImportSourceMismatchError,
 } from "../dataset-normalize.service.ts";
 import type { DatasetNormalizeDeps } from "../dataset-normalize.service.ts";
-
-import {
-  createDatasetTestInlineAttachments,
-  createDatasetTestRequestBounds,
-  createDatasetTestRequestBoundsWith,
-} from "../../app/__tests__/dataset.fixture.ts";
 
 /** The adapter's one operation, as the queue calls it. */
 const normalizeHandler =
@@ -576,9 +575,7 @@ describe("DatasetNormalizeService", () => {
     /** @scenario "An uploaded file with more rows than the row count limit is refused naming the limit" */
     it("fails the dataset as over the row count limit", async () => {
       const { storage } = makeStorage({
-        readStagedUpload: vi
-          .fn()
-          .mockResolvedValue(Readable.from(['{"a":1}\n{"a":2}\n{"a":3}\n'])),
+        readStagedUpload: vi.fn().mockResolvedValue(Readable.from(['{"a":1}\n{"a":2}\n{"a":3}\n'])),
       });
       const repo = makeRepo({ id: "d1", status: "processing" });
 
