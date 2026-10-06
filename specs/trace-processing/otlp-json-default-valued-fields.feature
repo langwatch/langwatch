@@ -54,3 +54,17 @@ Feature: OTLP/JSON spans omitting default-valued fields are accepted
     When the request is ingested
     Then no span is rejected
     And the span is recorded
+
+  @unit
+  Scenario: A resourceSpans entry that omits scopeSpans is accepted
+    Given an OTLP/JSON request whose resourceSpans entry has no scopeSpans field
+    When the request is validated for ingest
+    Then it is accepted with empty scopeSpans
+
+  @unit
+  Scenario: A span sent as OTLP/JSON with omitted defaults is stored the same as its protobuf form
+    Given the same span sent once as OTLP/JSON with default-valued fields omitted
+    And once as protobuf
+    When both requests are ingested
+    Then no span is rejected
+    And both record identical span data

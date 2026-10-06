@@ -209,7 +209,10 @@ export const spanSchema = z.object({
   traceState: z.string().nullable().optional(),
   parentSpanId: idSchema.nullable().optional(),
   name: z.string(),
-  kind: eSpanKindSchema.optional().default(ESpanKind.SPAN_KIND_UNSPECIFIED),
+  // Absent in ProtoJSON and null from the protobuf decoder when unset (0).
+  kind: eSpanKindSchema
+    .nullish()
+    .transform((kind) => kind ?? ESpanKind.SPAN_KIND_UNSPECIFIED),
   startTimeUnixNano: fixed64Schema,
   endTimeUnixNano: fixed64Schema,
   attributes: z.array(keyValueSchema).optional().default([]),

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   anyValueSchema,
   bytesSchema,
+  exportTraceServiceRequestSchema,
   idSchema,
   resourceSchema,
   spanSchema,
@@ -351,6 +352,20 @@ describe("otlp schemas", () => {
       const result = bytesSchema.safeParse(stringValue);
 
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe("exportTraceServiceRequestSchema", () => {
+    describe("when a resourceSpans entry omits scopeSpans", () => {
+      /** @scenario "A resourceSpans entry that omits scopeSpans is accepted" */
+      it("accepts the entry with empty scopeSpans", () => {
+        const result = exportTraceServiceRequestSchema.safeParse({
+          resourceSpans: [{ resource: {} }],
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.data?.resourceSpans?.[0]?.scopeSpans).toEqual([]);
+      });
     });
   });
 });
