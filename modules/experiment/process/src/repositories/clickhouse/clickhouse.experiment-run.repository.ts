@@ -18,6 +18,7 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { z } from "zod";
 
+import { deriveRunCompleteness } from "../../rules/experiment-run-completeness.rules.ts";
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import type { ExperimentWorkflowVersionRepository } from "../experiment-workflow-version.repository.ts";
 import {
@@ -79,6 +80,8 @@ type RunRow = {
   UpdatedAt: string;
   FinishedAt: string | null;
   StoppedAt: string | null;
+  ExpectedTargetResults?: number | string | null;
+  ExpectedEvaluatorResults?: number | string | null;
 };
 type ItemRow = {
   TenantId: string;
@@ -719,6 +722,9 @@ function mapRun({
 
 function mapRunWithItems(run: RunRow, items: ItemRow[], projectId: string): ExperimentRunWithItems {
   const targets = parseTargets(run.Targets);
+  const dataset = items.filter((item) => item.ResultType === "target").map(datasetEntryOf);
+  const evaluations = items.filter((item) => item.ResultType !== "target").map(evaluationOf);
+  const runTimestamps = timestamps(run);
   return experimentRunWithItemsSchema.parse({
     experimentId: run.ExperimentId,
     runId: run.RunId,
@@ -727,10 +733,24 @@ function mapRunWithItems(run: RunRow, items: ItemRow[], projectId: string): Expe
     progress: run.Progress,
     total: run.Total,
     targets,
-    dataset: items.filter((item) => item.ResultType === "target").map(datasetEntryOf),
-    evaluations: items.filter((item) => item.ResultType !== "target").map(evaluationOf),
-    timestamps: timestamps(run),
+    dataset,
+    evaluations,
+    timestamps: runTimestamps,
+    completeness: deriveRunCompleteness({
+      ended: runTimestamps.finishedAt !== null || runTimestamps.stoppedAt !== null,
+      received: { dataset: dataset.length, evaluations: evaluations.length },
+      expected: expectedCountsOf(run),
+    }),
   });
+}
+
+/** The counts the run reported, unknown where it reported none; ClickHouse may answer a string. */
+function expectedCountsOf(run: RunRow): { dataset: number | null; evaluations: number | null } {
+  const { ExpectedTargetResults: rows, ExpectedEvaluatorResults: verdicts } = run;
+  return {
+    dataset: rows === null || rows === undefined ? null : Number(rows),
+    evaluations: verdicts === null || verdicts === undefined ? null : Number(verdicts),
+  };
 }
 
 function datasetEntryOf(item: ItemRow): ExperimentRunWithItems["dataset"][number] {

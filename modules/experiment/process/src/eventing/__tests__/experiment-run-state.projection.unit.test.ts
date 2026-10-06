@@ -224,6 +224,40 @@ describe("experimentRunStateFoldProjection", () => {
     expect(state.StoppedAt).toBeNull();
   });
 
+  describe("given a run completed with the counts it reported", () => {
+    /** @scenario "The run keeps the expected counts it was completed with" */
+    it("still holds them after a late start event for the same run", () => {
+      const state = foldEvents([
+        createCompletedEvent({ expected: { dataset: 4, evaluations: 12 } }),
+        createStartedEvent(),
+      ]);
+
+      expect(state.ExpectedTargetResults).toBe(4);
+      expect(state.ExpectedEvaluatorResults).toBe(12);
+    });
+
+    it("keeps them when a second completion without counts is folded", () => {
+      const state = foldEvents([
+        createStartedEvent(),
+        createCompletedEvent({ expected: { dataset: 4, evaluations: 12 } }),
+        createCompletedEvent({ finishedAt: 6000 }),
+      ]);
+
+      expect(state.ExpectedTargetResults).toBe(4);
+      expect(state.ExpectedEvaluatorResults).toBe(12);
+    });
+  });
+
+  describe("given a run completed by an SDK that reports no counts", () => {
+    /** @scenario "A run completed without counts holds none" */
+    it("holds no expected counts", () => {
+      const state = foldEvents([createStartedEvent(), createCompletedEvent()]);
+
+      expect(state.ExpectedTargetResults).toBeNull();
+      expect(state.ExpectedEvaluatorResults).toBeNull();
+    });
+  });
+
   it("marks stopped when stoppedAt is provided", () => {
     const state = foldEvents([
       createStartedEvent(),

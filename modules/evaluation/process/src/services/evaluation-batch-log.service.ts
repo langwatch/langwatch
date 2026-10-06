@@ -87,9 +87,13 @@ export interface EvaluationExperimentRunWriter {
     experimentId: string;
     finishedAt?: number | undefined;
     stoppedAt?: number | undefined;
+    expected?: { dataset: number; evaluations: number } | undefined;
     occurredAt: number;
   }): Promise<unknown>;
 }
+
+/** Rows and verdicts the whole run reported, as the batch that ends it counts them. */
+type ExpectedCounts = { dataset: number; evaluations: number };
 
 /** What one batch's rows are written through. */
 type EvaluationBatchLogDeps = Readonly<{
@@ -157,17 +161,24 @@ export class EvaluationBatchLogService {
 
     eSBatchEvaluationSchema.parse(batchEvaluation);
 
-    await this.#dispatch({ projectId, experimentId: experiment.id, batchEvaluation });
+    await this.#dispatch({
+      projectId,
+      experimentId: experiment.id,
+      batchEvaluation,
+      expected: params.expected ?? undefined,
+    });
   }
 
   async #dispatch({
     projectId,
     experimentId,
     batchEvaluation,
+    expected,
   }: {
     projectId: string;
     experimentId: string;
     batchEvaluation: ESBatchEvaluation;
+    expected: ExpectedCounts | undefined;
   }): Promise<void> {
     const { run_id: runId } = batchEvaluation;
     const targets = mapLegacyExperimentTargets(batchEvaluation.targets ?? []);
@@ -241,7 +252,7 @@ export class EvaluationBatchLogService {
       ),
     ]);
 
-    await this.#completeRun({ projectId, experimentId, batchEvaluation });
+    await this.#completeRun({ projectId, experimentId, batchEvaluation, expected });
     await this.#reportVerdicts({ projectId, batchEvaluation });
   }
 
@@ -250,10 +261,12 @@ export class EvaluationBatchLogService {
     projectId,
     experimentId,
     batchEvaluation,
+    expected,
   }: {
     projectId: string;
     experimentId: string;
     batchEvaluation: ESBatchEvaluation;
+    expected: ExpectedCounts | undefined;
   }): Promise<void> {
     const { finished_at: finishedAt, stopped_at: stoppedAt } = batchEvaluation.timestamps;
 
@@ -266,6 +279,7 @@ export class EvaluationBatchLogService {
         experimentId,
         finishedAt: finishedAt ?? undefined,
         stoppedAt: stoppedAt ?? undefined,
+        expected,
         occurredAt: nowInstant().epochMilliseconds,
       });
     } catch (error) {

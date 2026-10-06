@@ -74,3 +74,18 @@ Feature: Python SDK sizes log_results requests by bytes
     When the body is split
     Then two requests hold two results each
     And only the last one carries the finished timestamp
+
+  # The platform stores results after they are reported, so a reader needs the
+  # run's own totals to tell a run still being stored from a whole one.
+
+  @unit
+  Scenario: The finishing batch carries the counts the run reported
+    Given an experiment that sent rows and verdicts over several batches
+    When the finishing batch is sent
+    Then it reports the number of distinct rows and verdicts of the whole run as expected
+
+  @unit
+  Scenario: A verdict logged twice for one cell counts once
+    Given an experiment that logged the same evaluator twice for one row and target
+    When the finishing batch is sent
+    Then the expected verdict count is one

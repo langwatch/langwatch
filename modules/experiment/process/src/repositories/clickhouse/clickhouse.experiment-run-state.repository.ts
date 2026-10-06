@@ -71,6 +71,8 @@ interface ClickHouseExperimentRunRecord {
   StartedAt: number | null;
   FinishedAt: number | null;
   StoppedAt: number | null;
+  ExpectedTargetResults: number | null;
+  ExpectedEvaluatorResults: number | null;
   LastProcessedEventId: string;
   TotalScoreSum: number;
   ScoreCount: number;
@@ -124,6 +126,8 @@ export class ClickHouseExperimentRunStateRepository<
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
       StoppedAt: record.StoppedAt === null ? null : Number(record.StoppedAt),
+      ExpectedTargetResults: record.ExpectedTargetResults ?? null,
+      ExpectedEvaluatorResults: record.ExpectedEvaluatorResults ?? null,
       TotalScoreSum: record.TotalScoreSum ?? 0,
       ScoreCount: record.ScoreCount ?? 0,
       PassedCount: record.PassedCount ?? 0,
@@ -169,6 +173,8 @@ export class ClickHouseExperimentRunStateRepository<
       StartedAt: clickHouseDateTime(data.StartedAt ?? data.CreatedAt),
       FinishedAt: data.FinishedAt != null ? clickHouseDateTime(data.FinishedAt) : null,
       StoppedAt: data.StoppedAt != null ? clickHouseDateTime(data.StoppedAt) : null,
+      ExpectedTargetResults: data.ExpectedTargetResults ?? null,
+      ExpectedEvaluatorResults: data.ExpectedEvaluatorResults ?? null,
       LastProcessedEventId: lastProcessedEventId,
       TotalScoreSum: data.TotalScoreSum,
       ScoreCount: data.ScoreCount,
@@ -214,6 +220,8 @@ export class ClickHouseExperimentRunStateRepository<
             toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
             toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt,
             toUnixTimestamp64Milli(t.StoppedAt) AS StoppedAt,
+            t.ExpectedTargetResults AS ExpectedTargetResults,
+            t.ExpectedEvaluatorResults AS ExpectedEvaluatorResults,
             t.LastProcessedEventId AS LastProcessedEventId,
             t.TotalScoreSum AS TotalScoreSum, t.ScoreCount AS ScoreCount,
             t.PassedCount AS PassedCount, t.GradedCount AS GradedCount,

@@ -49,6 +49,9 @@ export interface ExperimentRunStateData {
   StartedAt: number | null;
   FinishedAt: number | null;
   StoppedAt: number | null;
+  /** Rows and verdicts the reporter counted for the whole run; null when it reported none. */
+  ExpectedTargetResults: number | null;
+  ExpectedEvaluatorResults: number | null;
 
   // Raw counters for incremental aggregation
   TotalScoreSum: number;
@@ -145,6 +148,8 @@ export class ExperimentRunStateFoldProjection
       StartedAt: null,
       FinishedAt: null,
       StoppedAt: null,
+      ExpectedTargetResults: null,
+      ExpectedEvaluatorResults: null,
       TotalScoreSum: 0,
       ScoreCount: 0,
       PassedCount: 0,
@@ -301,6 +306,9 @@ export class ExperimentRunStateFoldProjection
       ...state,
       FinishedAt: event.data.finishedAt ?? null,
       StoppedAt: event.data.stoppedAt ?? null,
+      ExpectedTargetResults: event.data.expected?.dataset ?? state.ExpectedTargetResults ?? null,
+      ExpectedEvaluatorResults:
+        event.data.expected?.evaluations ?? state.ExpectedEvaluatorResults ?? null,
     };
   }
 }

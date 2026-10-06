@@ -155,6 +155,8 @@ export type LogResultsRequest = {
     finished_at?: number | null;
     stopped_at?: number | null;
   };
+  /** Rows and verdicts the whole run reported; sent with the request that ends the run. */
+  expected?: { dataset: number; evaluations: number };
 };
 
 /**

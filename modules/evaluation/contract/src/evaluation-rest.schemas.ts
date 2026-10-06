@@ -71,6 +71,16 @@ const batchEvaluationRESTParamsSchema = z.object({
       stopped_at: z.number().optional().nullable(),
     })
     .optional(),
+  expected: z
+    .object({
+      dataset: z.number().int().nonnegative(),
+      evaluations: z.number().int().nonnegative(),
+    })
+    .optional()
+    .nullable()
+    .describe(
+      "Rows and evaluations the whole run reported, sent with the batch that ends the run, so a read of the run can tell results still being stored from a whole run",
+    ),
 });
 
 type ESBatchEvaluationRESTParams = z.infer<typeof batchEvaluationRESTParamsSchema>;

@@ -1,6 +1,7 @@
 import { EventSchema } from "@langwatch/eventing";
 import {
   experimentRunEventingTargetSchema as targetSchema,
+  experimentRunExpectedCountsSchema,
   experimentRunPlanSchema,
 } from "@langwatch/experiment-contract";
 import {
@@ -164,6 +165,8 @@ export const experimentRunCompletedEventDataSchema = z.object({
   error: serializedHandledErrorSchema.optional(),
   /** A run refused before its start: its planned cell count, which its poller keeps reading. */
   total: z.number().int().nonnegative().optional(),
+  /** Rows and verdicts the reporter counted for the whole run; absent when it reports none. */
+  expected: experimentRunExpectedCountsSchema.optional(),
 });
 
 export const experimentRunCompletedEventSchema = z.object({

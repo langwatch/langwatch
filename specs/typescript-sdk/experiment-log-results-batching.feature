@@ -49,3 +49,12 @@ Feature: TypeScript SDK sizes logResults requests by bytes
     When the experiment finishes
     Then an error is logged that names the row index and its size
     And the other results are logged and the run is still marked as finished
+
+  # The platform stores results after they are reported, so a reader needs the
+  # run's own totals to tell a run still being stored from a whole one.
+
+  @unit
+  Scenario: The request that ends the run carries the counts the run reported
+    Given an experiment over three small rows with one evaluation each
+    When the experiment finishes
+    Then the request that carries the finished timestamp reports 3 rows and 3 evaluations expected

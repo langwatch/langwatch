@@ -454,7 +454,9 @@
     "LastProcessedEventId <- LastProcessedEventId",
     "LastEventOccurredAt <- LastEventOccurredAt",
     "_retention_days <- _retention_days",
-    "_size_bytes <- _size_bytes"
+    "_size_bytes <- _size_bytes",
+    "ExpectedTargetResults <- ExpectedTargetResults",
+    "ExpectedEvaluatorResults <- ExpectedEvaluatorResults"
   ],
   "gateway_budget_ledger <- gateway_budget_ledger_events": [
     "TenantId <- TenantId",

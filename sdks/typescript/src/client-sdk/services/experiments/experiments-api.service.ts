@@ -232,6 +232,15 @@ export interface ExperimentRunResultsResponse {
     finishedAt?: number | null;
     stoppedAt?: number | null;
   };
+  /** Absent on servers that predate it; the CLI then derives it from the timestamps. */
+  completeness?: ExperimentRunCompleteness;
+}
+
+/** What is stored of a run against what the run reported; `expected` is null when unreported. */
+export interface ExperimentRunCompleteness {
+  complete: boolean;
+  dataset: { received: number; expected: number | null };
+  evaluations: { received: number; expected: number | null };
 }
 
 /**

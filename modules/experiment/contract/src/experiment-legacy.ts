@@ -243,6 +243,12 @@ export const eSBatchEvaluationTargetRESTSchema = z.object({
 
 export type ESBatchEvaluationTargetREST = z.infer<typeof eSBatchEvaluationTargetRESTSchema>;
 
+/** Rows and verdicts the whole run reported; read from the batch that ends the run. */
+const batchEvaluationExpectedCountsSchema = z.object({
+  dataset: z.number().int().nonnegative(),
+  evaluations: z.number().int().nonnegative(),
+});
+
 // Duplicate in evaluation-contract (evaluation-rest.schemas.ts); keep in step.
 export const eSBatchEvaluationRESTParamsSchema = z.object({
   ...eSBatchEvaluationSchema.partial().omit({
@@ -264,6 +270,7 @@ export const eSBatchEvaluationRESTParamsSchema = z.object({
       stopped_at: z.number().optional().nullable(),
     })
     .optional(),
+  expected: batchEvaluationExpectedCountsSchema.optional().nullable(),
 });
 
 export type ESBatchEvaluationRESTParams = z.infer<typeof eSBatchEvaluationRESTParamsSchema>;
