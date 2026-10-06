@@ -167,7 +167,7 @@ const ledger = () => UpgradeLedgerRepository.create({ postgres: scratch.postgres
 const statusOf = async (id: string) =>
   (await ledger().findSteps()).find((s) => s.id === id)?.status;
 
-describe("the upgrade runner", () => {
+describe.skipIf(!DB_URL)("the upgrade runner", () => {
   describe("when another runner holds a live lease", () => {
     /** @scenario "A second runner waits for the lease, then exits naming the holder" */
     it("waits up to its deadline, then exits 3 naming the holder, without applying anything", async () => {
