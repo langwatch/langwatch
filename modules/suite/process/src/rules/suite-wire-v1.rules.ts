@@ -38,11 +38,11 @@ export const suiteRunOriginFact = defineRestMiddleware(
   }),
 );
 
-export const suiteFieldWireSchema = suiteFieldDefinitionSchema.describe(
+const suiteFieldWireSchema = suiteFieldDefinitionSchema.describe(
   "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it.",
 );
 
-export const suiteFieldsWireSchema = z
+const suiteFieldsWireSchema = z
   .array(suiteFieldWireSchema)
   .max(MAX_SUITE_FIELDS)
   .describe(
@@ -50,7 +50,7 @@ export const suiteFieldsWireSchema = z
   );
 
 /** The configuration a run plan holds, as a caller sends it. */
-export const runPlanConfigWireSchema = z.object({
+const runPlanConfigWireSchema = z.object({
   scope: runPlanScopeSchema,
   targets: z
     .array(suiteTargetSchema)
@@ -230,8 +230,6 @@ export const testSuiteWireSchema = z.object({
     .describe("Where to open this test suite in the LangWatch platform."),
 });
 
-export type TestSuiteWire = z.infer<typeof testSuiteWireSchema>;
-
 /** One test suite with the scenarios filed in it, named. */
 export const testSuiteDetailWireSchema = z.object({
   ...testSuiteWireSchema.shape,
@@ -276,8 +274,7 @@ export const testSuiteUpdateInputSchema = z.object({
     ),
 });
 
-export type SuiteTargetWire = z.infer<typeof suiteTargetSchema>;
-export type RunPlanRunResultWire = z.infer<typeof runPlanRunResultSchema>;
+type RunPlanRunResultWire = z.infer<typeof runPlanRunResultSchema>;
 
 /**
  * The runs a call queued, as the wire shape.

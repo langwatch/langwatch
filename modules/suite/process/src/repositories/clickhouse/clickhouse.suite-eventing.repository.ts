@@ -6,7 +6,7 @@ import type {
 } from "../suite-eventing.repository.ts";
 import { ClickHouseSuiteRunRepository } from "./clickhouse.suite-run.repository.ts";
 
-export type ClickHouseSuiteEventingRepositoryOptions = {
+type ClickHouseSuiteEventingRepositoryOptions = {
   /** The process's one ClickHouse client, which routes each statement itself. */
   clickhouse: ClickHouseQueryClient;
   defaultRetentionDays: () => number;

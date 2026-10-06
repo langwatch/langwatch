@@ -7,7 +7,7 @@ import type { Instant } from "@langwatch/time";
  * membership a dynamic scope is resolved against. A scenario is the scenario
  * feature's row, so only the three columns a scope reads are kept here.
  */
-export type MemoryScenarioRow = Readonly<{
+type MemoryScenarioRow = Readonly<{
   id: string;
   projectId: string;
   testSuiteId: string | null;

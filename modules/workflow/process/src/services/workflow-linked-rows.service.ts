@@ -8,7 +8,7 @@ import type { WorkflowService } from "./workflow.service.ts";
 
 type WorkflowScope = Readonly<{ workflowId: string; projectId: string }>;
 
-export type WorkflowLinkedRowsServiceOptions = {
+type WorkflowLinkedRowsServiceOptions = {
   workflows: Pick<WorkflowService, "archive">;
   agents: Pick<AgentApi, "listWorkflowConfigs" | "getNamesByIds" | "archive">;
   evaluators: Pick<EvaluatorApi, "listByWorkflow" | "archive">;

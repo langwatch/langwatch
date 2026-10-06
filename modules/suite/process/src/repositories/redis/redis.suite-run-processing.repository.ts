@@ -17,7 +17,7 @@ import type { SuiteRunProcessingRepository } from "../suite-run-processing.repos
  */
 const SUITE_RUN_FOLD_CACHE_KEY_PREFIX = "suite_runs";
 
-export type ClickHouseSuiteRunProcessingAdapterOptions = {
+type ClickHouseSuiteRunProcessingAdapterOptions = {
   /** The process's one ClickHouse client, which routes each statement itself. */
   clickhouse: ClickHouseQueryClient;
   /**

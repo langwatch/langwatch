@@ -58,7 +58,7 @@ function slugify(value: string): string {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type SuiteDatabase = Pick<
+type SuiteDatabase = Pick<
   PrismaClient,
   "scenario" | "simulationSuite" | "$transaction" | "$executeRaw"
 >;

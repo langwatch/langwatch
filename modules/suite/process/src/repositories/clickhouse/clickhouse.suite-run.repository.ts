@@ -14,7 +14,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { suiteRunStateDataSchema, type SuiteRunStateData } from "@langwatch/suite-contract";
 
-export type SuiteRunClickHouseRepositoryOptions = {
+type SuiteRunClickHouseRepositoryOptions = {
   /**
    * The process's one ClickHouse client. It routes each statement to the
    * server its tenant belongs on, so this repository holds no per-tenant

@@ -19,9 +19,7 @@ import {
   type WorkflowCreatedEvent,
 } from "./workflow-lifecycle.events.ts";
 
-export const recordWorkflowCreatedCommandDataSchema = withCommandEnvelope(
-  workflowCreatedEventDataSchema,
-);
+const recordWorkflowCreatedCommandDataSchema = withCommandEnvelope(workflowCreatedEventDataSchema);
 export type RecordWorkflowCreatedCommandData = z.infer<
   typeof recordWorkflowCreatedCommandDataSchema
 >;

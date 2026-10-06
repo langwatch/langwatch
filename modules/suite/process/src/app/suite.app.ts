@@ -92,11 +92,11 @@ import { SuiteService } from "../services/suite.service.ts";
  * are stored and shaped differently, so the application says which it found
  * and each door renders it the way its own wire contract always has.
  */
-export type SuiteOrTestSuite =
+type SuiteOrTestSuite =
   | Readonly<{ kind: "suite"; suite: Suite }>
   | Readonly<{ kind: "test_suite"; testSuite: ScenarioTestSuite }>;
 
-export interface SuiteAppDependencies {
+interface SuiteAppDependencies {
   scenarios: ScenarioApiType;
   agents: AgentApiType;
   prompts: PromptApiType;

@@ -1,6 +1,6 @@
 import { createCipheriv, randomBytes } from "node:crypto";
 
-export type SealedStagedPayload = Readonly<{
+type SealedStagedPayload = Readonly<{
   /** nonce (12) then ciphertext then GCM tag (16): what Go's `cipher.AEAD.Open` takes. */
   sealed: Buffer;
   /** The run's key, base64. It travels in the invoke envelope and is stored nowhere. */

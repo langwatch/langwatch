@@ -17,7 +17,7 @@ export const WORKFLOW_COMMIT_MESSAGE_PATCH_LABELS = {
 } as const;
 
 /** One prompt, as the two messages the call is made with. */
-export type WorkflowCommitMessagePrompt = Readonly<{
+type WorkflowCommitMessagePrompt = Readonly<{
   system: string;
   user: string;
 }>;

@@ -1,8 +1,5 @@
 import { createHash } from "node:crypto";
 
-/** Pre-parsed per-project Lambda deployment; pure functions stay testable without env. */
-export const NLP_LAMBDA_CONFIG_ENV = "LANGWATCH_NLP_LAMBDA_CONFIG";
-
 /** Every per-project studio function is named for the project behind it. */
 export const NLP_LAMBDA_NAME_PREFIX = "langwatch_nlp-";
 
@@ -10,10 +7,10 @@ export const NLP_LAMBDA_NAME_PREFIX = "langwatch_nlp-";
 export const LAMBDA_INVOCATION_TIMEOUT_SECONDS = 900;
 
 /** Left to nlpgo so it reports its own timeout before Lambda kills the run. */
-export const CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS = 10;
+const CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS = 10;
 
 /** The engine's default silence budget for one SSE stream. */
-export const NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS = 720;
+const NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS = 720;
 
 /** The engine's own compiled fallback for a code block. */
 export const NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS = 600;
@@ -22,13 +19,13 @@ export const NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS = 600;
 export const NLP_LAMBDA_MEMORY_SIZE_MB = 2048;
 
 /** Below the 6 MiB synchronous-invoke cap, with room for the envelope. */
-export const STUDIO_INVOKE_STAGING_THRESHOLD_BYTES = 5 * 1024 * 1024;
+const STUDIO_INVOKE_STAGING_THRESHOLD_BYTES = 5 * 1024 * 1024;
 
 /** Filed apart from the langevals prefix so a lifecycle rule can target it. */
 export const STUDIO_STAGING_PREFIX = "studio-staging";
 
 /** How long a staged studio body stays fetchable. */
-export const STUDIO_STAGING_TTL_SECONDS_DEFAULT = 600;
+const STUDIO_STAGING_TTL_SECONDS_DEFAULT = 600;
 
 /** The account, image and network the studio's per-project engines live in. */
 export type StudioLambdaConfig = Readonly<{

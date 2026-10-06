@@ -13,7 +13,7 @@ import { workflowCodeCompletionDefinitionSchema } from "@langwatch/workflow-cont
 import { CompletionCopilot } from "monacopilot";
 
 /** The feature key the Studio's code-node completions are priced and routed on. */
-export const WORKFLOW_CODE_COMPLETION_FEATURE_KEY = "studio.autocomplete";
+const WORKFLOW_CODE_COMPLETION_FEATURE_KEY = "studio.autocomplete";
 
 export class WorkflowCodeCompletionService {
   static create(options: {
