@@ -100,6 +100,23 @@ describe("DashboardService", () => {
       expect(listed?.graphCount).toBe(detail.graphs.length);
     });
 
+    /** @scenario "The dashboard's card procedures admit workbench rows only when the workbench flag is on" */
+    it("admits the workbench chart with the flag on and the builder graph alone with it off", async () => {
+      const on = await dashboardWithBothChartKinds(true);
+      const off = await dashboardWithBothChartKinds(false);
+
+      const [admitted] = await on.service.getAll({
+        projectId: PROJECT,
+        graphCountScope: "placeable",
+      });
+      const [builderOnly] = await off.service.getAll({
+        projectId: PROJECT,
+        graphCountScope: "placeable",
+      });
+
+      expect([admitted?.graphCount, builderOnly?.graphCount]).toEqual([2, 1]);
+    });
+
     describe("when the project may not place workbench cards", () => {
       it("counts only the builder graphs it can draw", async () => {
         const { service } = await dashboardWithBothChartKinds(false);

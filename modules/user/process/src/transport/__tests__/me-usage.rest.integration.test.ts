@@ -167,6 +167,7 @@ async function get({
 describe("GET /api/me/usage", () => {
   describe("given a key from my own personal workspace", () => {
     /** @scenario "Reading personal usage for the current month" */
+    /** @scenario "the delivered personal key authenticates /api/me/usage" */
     it("answers 200 with the summary, daily buckets and per-model breakdown", async () => {
       const { response, body, personalUsage } = await get();
 

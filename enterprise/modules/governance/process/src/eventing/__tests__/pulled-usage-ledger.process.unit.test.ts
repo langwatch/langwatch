@@ -107,6 +107,28 @@ describe("recognising a reissued charge", () => {
     });
   });
 
+  describe("given the filed cell is held in the ledger's own persisted state", () => {
+    /** @scenario "A correction still retracts its earlier version after the summary is rebuilt" */
+    it("withdraws from the persisted cell, with no summary read at all", async () => {
+      const { store, retraction, observe, drainOutbox } = ledgerRuntime();
+
+      await observe(observation({ currencyCode: "EUR", costNanoUsd: null }));
+      const filed = await store.findByRef<PulledUsageLedgerState>({ ref: LEDGER_REF });
+      await observe(
+        observation({
+          costNanoMinor: 13_000_000_000,
+          costNanoUsd: 13_000_000_000,
+          observedAtMs: T0 + DAY_MS,
+        }),
+      );
+      await drainOutbox();
+
+      expect(filed?.state.filedCell).toMatchObject({ currencyCode: "EUR" });
+      expect(retraction.sent).toHaveLength(1);
+      expect(retraction.sent[0]).toMatchObject({ currencyCode: "EUR", costNanoMinor: 0 });
+    });
+  });
+
   describe("given a charge whose reissue has already been withdrawn", () => {
     /** @scenario "Pulling the corrected day again withdraws nothing" */
     it("withdraws nothing when the corrected day is pulled again unchanged", async () => {
