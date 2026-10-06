@@ -1,6 +1,5 @@
 import {
   canonicalBaseResponses,
-  defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
@@ -20,7 +19,6 @@ import {
   type GatewaySpendSummariesQuery,
 } from "@langwatch/gateway-contract";
 import { moduleApi } from "@langwatch/module";
-import { z } from "zod";
 
 /**
  * @see ADR-072 (pull gates under the same plan flag as push)
@@ -53,16 +51,6 @@ export interface GatewaySpendDoorApi {
 
 export const GatewaySpendApi = moduleApi<GatewaySpendDoorApi>()("gateway");
 
-/**
- * Whether the credential's organization holds the plan billing events is
- * sold under (ADR-072). Bound via `withTransportFacts` against the
- * `entitlement` peer, resolved after auth and the permission check.
- */
-export const gatewaySpendBillingPlanGate = defineRestMiddleware(
-  "gatewaySpendBillingPlanGate",
-  z.object({}),
-);
-
 const spendResponses = canonicalBaseResponses;
 
 export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
@@ -78,7 +66,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
   .withQuery(gatewaySpendSummariesQuerySchema)
   .withPermission("gatewaySpend:view")
   .withOutput(gatewaySpendSummariesPageSchema)
-  .withMiddleware(gatewaySpendBillingPlanGate)
+  .withEntitlement("webhook_endpoints")
   .withDocs({
     operationId: "getApiGatewayV1SpendSummaries",
     tags: ["Gateway Spend"],
@@ -94,7 +82,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
   .withQuery(gatewaySpendEventsQuerySchema)
   .withPermission("gatewaySpend:view")
   .withOutput(gatewaySpendEventsPageSchema)
-  .withMiddleware(gatewaySpendBillingPlanGate)
+  .withEntitlement("webhook_endpoints")
   .withDocs({
     operationId: "getApiGatewayV1SpendEvents",
     tags: ["Gateway Spend"],
@@ -111,7 +99,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
   .withQuery(gatewayEndUserSpendQuerySchema)
   .withPermission("gatewaySpend:view")
   .withOutput(gatewayEndUserSpendResponseSchema)
-  .withMiddleware(gatewaySpendBillingPlanGate)
+  .withEntitlement("webhook_endpoints")
   .withDocs({
     operationId: "getApiGatewayV1EndUsersByIdSpend",
     tags: ["Gateway Spend"],

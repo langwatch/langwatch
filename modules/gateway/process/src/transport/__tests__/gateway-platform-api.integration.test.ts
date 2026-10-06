@@ -57,7 +57,6 @@ async function mount() {
   });
   const app = await GatewayModule.create({
     dependencies: {
-      entitlement: createApiFixture({}),
       authz: createApiFixture<AuthzApi>({}),
       projects: createApiFixture<ProjectApi>({
         findOrganizationId: async () => ORG_ID,

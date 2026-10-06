@@ -182,7 +182,6 @@ async function mountAsLegacyProjectKey() {
 
   const app = await GatewayModule.create({
     dependencies: {
-      entitlement: createApiFixture({}),
       authz: createApiFixture<AuthzApi>({}),
       projects,
       evaluators: createApiFixture({}),

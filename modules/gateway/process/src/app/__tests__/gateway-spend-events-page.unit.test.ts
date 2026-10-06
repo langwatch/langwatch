@@ -62,7 +62,6 @@ async function gatewayAppStub({ virtualKeyId = "vk_1" }: { virtualKeyId?: string
   const nameReads = vi.spyOn(repositories.virtualKeys, "findMetaByIds");
   const app = await GatewayModule.create({
     dependencies: {
-      entitlement: peer("entitlement"),
       authz: peer("authz"),
       projects: projectsStub({ findOrganizationId }),
       evaluators: peer("evaluators"),

@@ -20,7 +20,6 @@ const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayModule> {
   return GatewayModule.create({
     dependencies: {
-      entitlement: createApiFixture({}),
       authz: createApiFixture<AuthzApi>(authz),
       projects: createApiFixture({}),
       evaluators: createApiFixture({}),

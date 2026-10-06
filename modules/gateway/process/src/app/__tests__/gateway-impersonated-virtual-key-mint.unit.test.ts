@@ -21,7 +21,6 @@ async function gatewayApp() {
   const hasPermission = vi.fn<AuthzApi["hasPermission"]>(async () => true);
   const app = await GatewayModule.create({
     dependencies: {
-      entitlement: createApiFixture({}),
       authz: createApiFixture<AuthzApi>({ hasPermission }),
       projects: createApiFixture({}),
       evaluators: createApiFixture({}),

@@ -1,10 +1,8 @@
 import {
   bindRestCredential,
   bindRestMiddleware,
-  ForbiddenError,
   keyCredentialOfRequest,
   keyDoorPrincipalOfRequest,
-  organizationCredentialOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
@@ -34,20 +32,11 @@ import {
   gatewayRestCredential,
 } from "./transport/gateway-platform.rest.ts";
 import { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
-import { gatewaySpendBillingPlanGate, gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
+import { gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 
 export type { GatewayInfrastructure } from "./app/gateway.app.ts";
-
-/**
- * The organization a spend-plan check reads (ADR-072): off the raw request
- * the credential door recorded it against, never a context variable no door
- * here ever sets.
- */
-export function gatewaySpendPlanOrganizationId(context: { req: { raw: Request } }): string {
-  return organizationCredentialOfRequest(context.req.raw).organizationId;
-}
 
 export const gatewayProcessModule = defineProcessModule("gateway")
   .withRepositories(gatewayRepositories)
@@ -68,7 +57,7 @@ export const gatewayProcessModule = defineProcessModule("gateway")
   .withEventing(gatewayGovernanceEventsEventing)
   .withEventing(gatewaySpendEventing)
   .withEventing(gatewayRealtimeSessionEventing)
-  .withTransportFacts(({ app, dependencies }) => {
+  .withTransportFacts(({ app }) => {
     if (!(app instanceof GatewayModule)) {
       throw new TypeError("Gateway transport requires its constructed application");
     }
@@ -107,23 +96,6 @@ export const gatewayProcessModule = defineProcessModule("gateway")
       bindRestMiddleware(elevenLabsSignature, (context) => ({
         signature: context.req.header("elevenlabs-signature"),
       })),
-      /**
-       * ADR-072: the reconciliation pull gates under the webhook platform's
-       * plan flag, resolved per request after auth and the permission check.
-       * Fail-closed: a rejected lookup refuses; no plan store refuses at boot.
-       */
-      bindRestMiddleware(gatewaySpendBillingPlanGate, async (context) => {
-        const plan = await dependencies.entitlement.getActivePlan({
-          organizationId: gatewaySpendPlanOrganizationId(context),
-        });
-        if (plan.webhookEndpointsEnabled !== true) {
-          throw new ForbiddenError(
-            "The billing events API is an enterprise feature; this organization's plan does not include it.",
-          );
-        }
-
-        return {};
-      }),
     ];
   });
 

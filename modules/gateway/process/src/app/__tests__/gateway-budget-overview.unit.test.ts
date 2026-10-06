@@ -57,7 +57,6 @@ async function gatewayAppStub() {
   const budgetReads = vi.spyOn(repositories.budgets, "resolveApplicableBudgets");
   const app = await GatewayModule.create({
     dependencies: {
-      entitlement: peer("entitlement"),
       authz: peer("authz"),
       projects: projectsStub({}),
       evaluators: peer("evaluators"),

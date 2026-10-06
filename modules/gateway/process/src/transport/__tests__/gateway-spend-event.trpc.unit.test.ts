@@ -60,7 +60,6 @@ async function gatewayAppStub() {
   const pageReads = vi.spyOn(repositories.spendEvents, "readSpendEventsPage");
   const app = await GatewayModule.create({
     dependencies: {
-      entitlement: peer("entitlement"),
       authz: peer("authz"),
       projects: projectsStub({ findOrganizationId: async () => "org_1" }),
       evaluators: peer("evaluators"),

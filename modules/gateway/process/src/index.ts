@@ -6,7 +6,7 @@ export { gatewayProcessModule, createGatewayBudgetChangeDedupe } from "./gateway
 export { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 export { agentCacheRest } from "./transport/agent-cache.rest.ts";
 export { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
-export { gatewaySpendBillingPlanGate, gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
+export { gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 export type { GatewaySpendApp } from "./services/gateway-spend-reconciliation.service.ts";
 export { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
 export { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";

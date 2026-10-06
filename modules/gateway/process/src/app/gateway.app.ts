@@ -7,7 +7,6 @@ import type { RestIdentity } from "@langwatch/api/hosting";
 import type { RestDeclaredResult } from "@langwatch/api/rest";
 import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type {
@@ -1087,12 +1086,6 @@ type GatewaySetup = FeatureSetup<
 export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, GatewaySpendDoorApi {
   static readonly contract = GatewayApiToken;
   static readonly dependencies = {
-    /**
-     * Declared HERE though only the billing REST door ever asks it anything, so
-     * a process with no plan store refuses at boot rather than answering every
-     * org as entitled.
-     */
-    entitlement: EntitlementApi,
     /**
      * The four capabilities the control plane reaches that belong to other features, resolved
      * as peers rather than rebuilt. A guardrail attachment and the monitor page it points at

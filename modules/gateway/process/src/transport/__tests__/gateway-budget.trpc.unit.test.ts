@@ -126,7 +126,6 @@ async function callerFor(budgets: GatewayBudget[], debits: GatewayBudgetDebitRow
   const repositories = await seededRepositories({ budgets, debits });
   const app = await GatewayModule.create({
     dependencies: {
-      entitlement: peer("entitlement"),
       authz: peer("authz"),
       projects: projectsStub({
         findOrganizationId: async () => ORG_ID,
