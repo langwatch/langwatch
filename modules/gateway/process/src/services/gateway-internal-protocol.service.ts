@@ -35,6 +35,7 @@ import type { GatewayInternalStoreRepository } from "../repositories/gateway-int
 import type { GatewayConfigMaterialiserService } from "./gateway-config-materialisation.service.ts";
 import type { GatewayGuardrailEvaluationService } from "./gateway-guardrail-evaluation.service.ts";
 import type { GatewayJwtService } from "./gateway-jwt.service.ts";
+import { GatewayRealtimeSessionMeteringService } from "./gateway-realtime-session-metering.service.ts";
 import {
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
@@ -44,6 +45,7 @@ import type { GatewaySpendRating } from "./model-catalog-gateway-spend-rating.se
 import type { VirtualKeyService } from "./virtual-key.service.ts";
 
 const realtimeSessionService = GatewayRealtimeSessionService.create();
+const realtimeSessionMetering = GatewayRealtimeSessionMeteringService.create();
 
 /** A named sender per command; undefined per name is a 503, not an assumed presence. */
 export interface GatewaySpendCommandSender {
@@ -286,7 +288,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
   ): Promise<GatewayRealtimeUsageOutcome> {
     const collaborators = this.#members.realtimeSessions;
     if (!collaborators) return "unavailable" as const;
-    return realtimeSessionService.reportRealtimeSessionUsage({ collaborators, ...input });
+    return realtimeSessionMetering.reportRealtimeSessionUsage({ collaborators, ...input });
   }
 }
 

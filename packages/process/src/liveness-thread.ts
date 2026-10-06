@@ -11,7 +11,10 @@ export const LIVENESS_PATH = "/healthz";
  */
 export const HEARTBEAT_INTERVAL_MS = 1_000;
 export const HEARTBEAT_STALL_BUDGET_MS = 5 * 60 * 1000;
-/** How long a proxied request waits on the main thread before a stalled loop fails the scrape. */
+/**
+ * How long the main loop's heartbeat may stand still while a proxied request waits on it. A
+ * request on a turning loop waits as long as its handler takes (a long poll, a slow export).
+ */
 export const MAIN_THREAD_PROXY_TIMEOUT_MS = 10_000;
 
 const BIND_HANDOVER_MS = 10_000;
@@ -38,6 +41,7 @@ const stalledMs = () => {
 };
 const target = { host: "127.0.0.1", port: workerData.proxyPort };
 const unavailable = (res, body) => {
+  if (res.destroyed || res.writableEnded) return;
   if (res.headersSent) return res.destroy();
   res.writeHead(503, { "Content-Type": "text/plain" }).end(body);
 };
@@ -52,17 +56,23 @@ const server = http.createServer((req, res) => {
     return;
   }
   const upstream = http.request({ ...target, method: req.method, path: req.url, headers: req.headers, agent: false });
-  const timer = setTimeout(() => {
+  const timer = setInterval(() => {
+    if (stalledMs() < workerData.proxyTimeoutMs) return;
+    clearInterval(timer);
     upstream.destroy();
     unavailable(res, "main thread did not answer");
-  }, workerData.proxyTimeoutMs);
+  }, Math.min(1000, Math.max(10, workerData.proxyTimeoutMs / 4)));
+  res.on("close", () => {
+    clearInterval(timer);
+    if (!res.writableEnded) upstream.destroy();
+  });
   upstream.on("response", (reply) => {
-    clearTimeout(timer);
+    clearInterval(timer);
     res.writeHead(reply.statusCode ?? 502, reply.headers);
     reply.pipe(res);
   });
   upstream.on("error", () => {
-    clearTimeout(timer);
+    clearInterval(timer);
     unavailable(res, "main thread did not answer");
   });
   req.pipe(upstream);

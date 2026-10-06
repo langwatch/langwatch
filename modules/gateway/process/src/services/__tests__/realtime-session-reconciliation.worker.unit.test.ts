@@ -39,6 +39,9 @@ function buildWorker(options?: {
     listOpenElevenLabsSessions: vi.fn().mockResolvedValue(options?.sessions ?? [session]),
     releaseMissingVendorConversation: vi.fn().mockResolvedValue(void 0),
     confirmSession: vi.fn().mockResolvedValue(void 0),
+    listOrphanedGatewaySessions: vi.fn().mockResolvedValue([]),
+    listSessionsAwaitingSettlement: vi.fn().mockResolvedValue([]),
+    settleSession: vi.fn().mockResolvedValue("closed"),
   } satisfies RealtimeSessionReconciliationRepository;
   const readConversation = vi.fn().mockResolvedValue({
     report: { status: "done", metadata: { call_duration_secs: 4.2 } },
@@ -74,6 +77,8 @@ describe("GatewayRealtimeSessionReconciliationService", () => {
       examined: 1,
       confirmed: 1,
       expired: 2,
+      settled: 0,
+      estimated: 0,
     });
     expect(repository.listOpenElevenLabsSessions).toHaveBeenCalledWith({
       mintedBefore: Temporal.Instant.from("2026-08-25T11:58:00.000Z"),
@@ -140,7 +145,13 @@ describe("GatewayRealtimeSessionReconciliationService", () => {
       },
     });
 
-    await expect(worker.poll()).resolves.toEqual({ examined: 3, confirmed: 1, expired: 2 });
+    await expect(worker.poll()).resolves.toEqual({
+      examined: 3,
+      confirmed: 1,
+      expired: 2,
+      settled: 0,
+      estimated: 0,
+    });
     expect(repository.confirmSession).toHaveBeenCalledTimes(1);
     expect(repository.releaseMissingVendorConversation).not.toHaveBeenCalled();
   });

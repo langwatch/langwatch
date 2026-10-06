@@ -249,6 +249,31 @@ func TestExtractInputMessages_SpeechWithoutInputIsEmpty(t *testing.T) {
 	}
 }
 
+// @scenario "A transcript comes back in the response format the caller asked for"
+func TestExtractOutputMessages_PlainTextTranscriptIsTheOutput(t *testing.T) {
+	got := extractOutputMessages([]byte("Hello there.\n"), aitrace.RequestTypeTranscription)
+	if got != `[{"role":"assistant","content":"Hello there."}]` {
+		t.Fatalf("a text-format transcript is the span output, got %s", got)
+	}
+}
+
+// @scenario "A streamed transcription's span holds the transcript"
+func TestExtractOutputMessages_StreamedTranscriptionCarriesTranscript(t *testing.T) {
+	deltas := `data: {"type":"transcript.text.delta","delta":"Hello"}` + "\n\n" +
+		`data: {"type":"transcript.text.delta","delta":" there"}` + "\n\n"
+	done := `data: {"type":"transcript.text.done","text":"Hello there."}` + "\n\n"
+
+	got := extractOutputMessages([]byte(deltas+done), aitrace.RequestTypeTranscription)
+	if got != `[{"role":"assistant","content":"Hello there."}]` {
+		t.Fatalf("the final event states the transcript, got %s", got)
+	}
+	// A stream cut before its final event still holds what was transcribed.
+	got = extractOutputMessages([]byte(deltas), aitrace.RequestTypeTranscription)
+	if got != `[{"role":"assistant","content":"Hello there"}]` {
+		t.Fatalf("the deltas are the transcript of a cut stream, got %s", got)
+	}
+}
+
 func TestExtractOutputMessages_TranscriptionCarriesTranscript(t *testing.T) {
 	body := []byte(`{"text":"The quick brown fox jumps over the lazy dog.","duration":2.3}`)
 	got := extractOutputMessages(body, aitrace.RequestTypeTranscription)

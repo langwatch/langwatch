@@ -389,7 +389,6 @@ func TestApplyChange_BudgetMutationWithoutProjectIDEvictsOrganization(t *testing
 
 	for _, kind := range []string{
 		ChangeKindBudgetCreated,
-		ChangeKindBudgetUpdated,
 		ChangeKindBudgetDeleted,
 	} {
 		t.Run(kind, func(t *testing.T) {

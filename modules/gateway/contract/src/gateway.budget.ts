@@ -12,6 +12,8 @@ export const gatewayBudgetCheckInputSchema = z
     projectId: identifierSchema.nullable(),
     virtualKeyId: identifierSchema,
     principalUserId: identifierSchema.nullable().optional(),
+    /** Given it, a per-end-user budget is judged on that end user's own bucket. */
+    endUserId: identifierSchema.nullable().optional(),
     projectedCostUsd: moneySchema,
     providerKey: identifierSchema.nullable().optional(),
   })

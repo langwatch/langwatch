@@ -39,6 +39,12 @@ These apply to the base URLs customers configure on their own provider credentia
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
 | `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed to resolve to a private address while `BLOCK_LOCAL_HTTP_CALLS` is on |
 
+## Browser access
+
+| Var                               | Default | Purpose                                                                                                                                                                                                                                              |
+| --------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LW_GATEWAY_CORS_ALLOWED_ORIGINS` | empty   | Comma-separated exact origins (`https://app.example.com`) allowed to call `/v1` from a browser, or `*` alone for any origin. Empty sends no CORS headers. A malformed origin stops the gateway at boot. See [Security](/ai-gateway/security#calling-the-gateway-from-a-browser) |
+
 ## Auth cache
 
 The gateway caches each resolved virtual key in process. When a cached entry passes its JWT expiry and the refresh fails for a transport reason (network error, timeout, 5xx, unparseable response), the entry keeps serving: its soft expiry is extended by `SOFT_BUMP_SECONDS` per failed refresh, up to the JWT expiry plus `HARD_GRACE_SECONDS`. A `401`, `403` or `404` from the control plane evicts the entry at once.

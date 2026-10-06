@@ -1,7 +1,9 @@
 package httpmiddleware
 
 import (
+	"bufio"
 	"errors"
+	"net"
 	"net/http"
 	"time"
 
@@ -38,6 +40,9 @@ func Telemetry() func(http.Handler) http.Handler {
 				zap.Int("status", rec.status),
 				zap.Int("bytes", rec.bytes),
 				zap.Duration("duration", time.Since(start)),
+			}
+			if rec.hijacked {
+				fields = append(fields, zap.Bool("hijacked", true))
 			}
 
 			// Level follows fault attribution, the same rule the TS boundaries
@@ -84,6 +89,18 @@ type responseRecorder struct {
 	status int
 	bytes  int
 	err    error
+	// hijacked is set once a handler took the connection over.
+	hijacked bool
+}
+
+// Hijack hands the connection to the handler, which is how a WebSocket
+// upgrade leaves HTTP. Bytes written on it afterwards are not counted.
+func (r *responseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	conn, rw, err := http.NewResponseController(r.ResponseWriter).Hijack()
+	if err == nil {
+		r.hijacked = true
+	}
+	return conn, rw, err
 }
 
 func (r *responseRecorder) RecordError(err error) {

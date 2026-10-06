@@ -140,7 +140,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
-import { TraceApi } from "@langwatch/trace-contract";
+import { recordSpanCommandDataSchema, TraceApi } from "@langwatch/trace-contract";
 // The billing envelope is the webhook platform's, and a reconciliation pull has
 // to answer the same bytes a push delivers, so it ARRIVES from that contract.
 import {
@@ -1188,6 +1188,27 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
           await sender.send(data);
         },
       },
+      attribution: {
+        findSessionAttribution: async ({ virtualKeyId, projectId }) => {
+          const [[key], project] = await Promise.all([
+            repositories.internalStore.findVirtualKeysForAttribution([virtualKeyId]),
+            setup.dependencies.projects.findTraceDestination(projectId),
+          ]);
+          return { principalUserId: key?.principalUserId ?? null, teamId: project?.teamId ?? null };
+        },
+      },
+      budgets: controlPlane.budgetDecisions,
+      // The settled span rides the trace module's ingress command, like any collected span.
+      spanIngestion: {
+        ingestNormalizedSpan: async (input) => {
+          await setup.dependencies.traces.recordSpan(
+            recordSpanCommandDataSchema.parse({
+              ...input,
+              occurredAt: nowInstant().epochMilliseconds,
+            }),
+          );
+        },
+      },
     };
     const config = GatewayConfigMaterialiserService.create({
       scopeResolution: controlPlane.internalScopeResolution,
@@ -1652,7 +1673,13 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   }
 
   /** One voice reconciliation tick, what the reconcile process manager's intent runs. */
-  reconcileRealtimeSessions(): Promise<{ examined: number; confirmed: number; expired: number }> {
+  reconcileRealtimeSessions(): Promise<{
+    examined: number;
+    confirmed: number;
+    expired: number;
+    settled: number;
+    estimated: number;
+  }> {
     return this.#voice.reconciliation.poll();
   }
 

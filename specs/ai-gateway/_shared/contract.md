@@ -418,11 +418,13 @@ compares them in process. A cached bundle is therefore as fresh as the last
 time it was refreshed.
 
 **Change events do the refreshing.** Writing debits emits a `BUDGET_UPDATED`
-change event on the `/changes` long-poll (§4.3), and the gateway drops the
+change event on the `/changes` long-poll (§4.3), and the gateway marks the
 bundles it affects: the bundles of one project when the event carries a
 `project_id`, otherwise every bundle of the polled organization, since only
-project-scoped budget events can name a project. The next request through an
-evicted key refetches and enforces against the new totals. The 60s
+project-scoped budget events can name a project. The next request through a
+marked key is served from the cached bundle and starts one background refresh;
+the requests after it lands enforce against the new totals. `BUDGET_CREATED`
+and `BUDGET_DELETED` evict the same bundles instead. The 60s
 `CONFIG_TTL` on a cached bundle is the backstop rather than the mechanism: it
 bounds staleness when a change event is missed or arrives while the gateway is
 disconnected.
