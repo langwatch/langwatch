@@ -43,6 +43,14 @@ Feature: Event upcasting
     And every streamed event has type "lw.entitlement.month_counted"
 
   @unit
+  Scenario: A projection replay of a renamed aggregate finds its cutoffs under the current aggregate type
+    Given the replay source holds "lw.usage.month_counted" events of aggregate "usage_organization"
+    And it holds "lw.entitlement.month_counted" events of aggregate "entitlement_organization"
+    When a replay asks for the cutoffs of aggregate "entitlement_organization"
+    Then an aggregate holding only stored events has a cutoff under "entitlement_organization"
+    And an aggregate holding both keeps the later of its two cutoffs
+
+  @unit
   Scenario: A payload transform reshapes the stored data before the current schema parses it
     Given the upcast declares a pure transform of the stored payload
     When a stored event is read

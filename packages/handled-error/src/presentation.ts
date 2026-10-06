@@ -628,6 +628,12 @@ const presentations = {
     title: "Live updates disconnected",
     describe: () => "Refresh the page to reconnect.",
   },
+  // A link or button named a drawer no installed module declares (ADR-148 §8).
+  browser_drawer_undeclared: {
+    title: "That panel isn't available here",
+    describe: () =>
+      "The link points to a panel this deployment doesn't have. Carry on from the page.",
+  },
 
   // ---- workflows ----
   workflow_not_a_copy: {

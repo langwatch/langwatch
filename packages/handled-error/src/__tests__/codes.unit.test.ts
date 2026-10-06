@@ -60,6 +60,9 @@ const CLIENT_MINTED_CODES = new Set([
   // The sibling refusal from the same page, for a write that did not land for
   // any other reason. Also thrown in the browser, and relayed the same way.
   "langy_ui_save_failed",
+  // Thrown by browser-host's `openDrawer` for a drawer name no installed module
+  // declares (`BrowserDrawerUndeclaredError`, a plain Error, so the scan cannot see it).
+  "browser_drawer_undeclared",
   // Same shape, from `promoteModelUnavailableError`: the gateway's
   // `model_provider_not_bound` tells whoever configures a virtual key to bind
   // a provider to it or drop the prefix from the model name. In the panel the

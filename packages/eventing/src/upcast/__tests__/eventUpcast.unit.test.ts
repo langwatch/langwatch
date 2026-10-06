@@ -60,18 +60,20 @@ function stored({
   id,
   type = STORED,
   aggregateType = "usage_organization",
+  aggregateId = "organization-1",
   createdAt = 1,
   data = { organizationId: "organization-1", billableEvents: 7 },
 }: {
   id: string;
   type?: string;
   aggregateType?: string;
+  aggregateId?: string;
   createdAt?: number;
   data?: unknown;
 }): Event {
   return {
     id,
-    aggregateId: "organization-1",
+    aggregateId,
     aggregateType,
     tenantId: TENANT,
     type,
@@ -135,8 +137,23 @@ class FixedReplaySource implements ReplayEventSource {
     return this.#matching(eventTypes).length;
   }
 
-  async getBoundedCutoffs() {
-    return { cutoffs: new Map<string, CutoffInfo>(), occurredAtBounds: undefined };
+  /** The latest (timestamp, id) per stored aggregate key, as the ClickHouse source answers. */
+  async getBoundedCutoffs({
+    aggregateTypes,
+    eventTypes,
+  }: {
+    aggregateTypes: string[];
+    eventTypes: readonly string[];
+  }) {
+    const cutoffs = new Map<string, CutoffInfo>();
+    for (const event of this.#matching(eventTypes)) {
+      if (!aggregateTypes.includes(event.aggregateType)) continue;
+      const key = `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`;
+      const known = cutoffs.get(key);
+      if (known && known.timestamp >= event.timestamp) continue;
+      cutoffs.set(key, { timestamp: event.timestamp, eventId: event.id });
+    }
+    return { cutoffs, occurredAtBounds: undefined };
   }
 
   async streamEventsForAggregates({
@@ -156,11 +173,17 @@ class FixedReplaySource implements ReplayEventSource {
   }
 }
 
-function replayed(id: string): ReplayEvent {
+function replayed(
+  id: string,
+  {
+    timestamp = 1,
+    ...overrides
+  }: Partial<Parameters<typeof stored>[0]> & { timestamp?: number } = {},
+): ReplayEvent {
   return {
-    ...stored({ id }),
+    ...stored({ id, ...overrides }),
     tenantId: "organization-1",
-    timestamp: 1,
+    timestamp,
     idempotencyKey: id,
   };
 }
@@ -337,6 +360,47 @@ describe("an upcast declared on the owning pipeline", () => {
         }),
       ]);
       expect(streamed.map((event) => event.type)).toEqual([CURRENT, CURRENT]);
+    });
+  });
+
+  describe("when a projection replay asks for the cutoffs of the current aggregate type", () => {
+    /** @scenario "A projection replay of a renamed aggregate finds its cutoffs under the current aggregate type" */
+    it("answers each stored aggregate's cutoff under the current type, keeping the later one", async () => {
+      const current = { type: CURRENT, aggregateType: "entitlement_organization" };
+      const source = upcastReplayEventSource({
+        source: new FixedReplaySource([
+          replayed("a-stored", { aggregateId: "org-a", timestamp: 5 }),
+          replayed("b-stored", { aggregateId: "org-b", timestamp: 9 }),
+          replayed("b-current", { aggregateId: "org-b", timestamp: 4, ...current }),
+          replayed("c-stored", { aggregateId: "org-c", timestamp: 2 }),
+          replayed("c-current", { aggregateId: "org-c", timestamp: 6, ...current }),
+        ]),
+        upcasts: pipelineUpcastsOf([sealPipelineDefinition(entitlementPipeline())]),
+      });
+
+      const { cutoffs } = await source.getBoundedCutoffs({
+        tenantId: "organization-1",
+        aggregateTypes: ["entitlement_organization"],
+        aggregateIds: ["org-a", "org-b", "org-c"],
+        eventTypes: [CURRENT],
+      });
+
+      expect(cutoffs.get("organization-1:entitlement_organization:org-a")).toEqual({
+        timestamp: 5,
+        eventId: "a-stored",
+      });
+      expect(cutoffs.get("organization-1:entitlement_organization:org-b")).toEqual({
+        timestamp: 9,
+        eventId: "b-stored",
+      });
+      expect(cutoffs.get("organization-1:entitlement_organization:org-c")).toEqual({
+        timestamp: 6,
+        eventId: "c-current",
+      });
+      expect(cutoffs.get("organization-1:usage_organization:org-a")).toEqual({
+        timestamp: 5,
+        eventId: "a-stored",
+      });
     });
   });
 

@@ -1,9 +1,12 @@
 import type { SealedPipelineDefinition } from "../pipeline/sealedPipeline.ts";
+import { isAtOrBeforeCutoff } from "../replay/replayConstants.ts";
 import type {
+  CutoffInfo,
   DiscoveredAggregateWithEventTypes,
   ReplayEvent,
   ReplayEventSource,
 } from "../replay/replayEventSource.ts";
+import { aggregateKey } from "../replay/replayMarkers.ts";
 import { EventUpcaster, type PipelineUpcasts } from "./eventUpcast.ts";
 
 /** Every registered pipeline's upcasts, read off the definitions the process registered (§9). */
@@ -27,6 +30,17 @@ export function upcastReplayEventSource({
 }): ReplayEventSource {
   const upcasters = upcasts.map((own) => EventUpcaster.of(own)).filter((one) => one.active);
   return upcasters.length === 0 ? source : new UpcastingReplayEventSource(source, upcasters);
+}
+
+function laterCutoff(known: CutoffInfo | undefined, candidate: CutoffInfo): CutoffInfo {
+  if (!known) return candidate;
+  const knownFirst = isAtOrBeforeCutoff({
+    eventTimestamp: known.timestamp,
+    eventId: known.eventId,
+    cutoffTimestamp: candidate.timestamp,
+    cutoffEventId: candidate.eventId,
+  });
+  return knownFirst ? candidate : known;
 }
 
 class UpcastingReplayEventSource implements ReplayEventSource {
@@ -70,12 +84,29 @@ class UpcastingReplayEventSource implements ReplayEventSource {
     });
   }
 
-  getBoundedCutoffs(input: Parameters<ReplayEventSource["getBoundedCutoffs"]>[0]) {
-    return this.source.getBoundedCutoffs({
+  /**
+   * The source keys cutoffs by the stored aggregate type; replay looks them up by the current
+   * one. Each former-type cutoff is copied to its current key, the later one kept.
+   */
+  async getBoundedCutoffs(input: Parameters<ReplayEventSource["getBoundedCutoffs"]>[0]) {
+    const answered = await this.source.getBoundedCutoffs({
       ...input,
       aggregateTypes: this.#widenAggregateTypes(input.aggregateTypes),
       eventTypes: this.#widenTypes(input.eventTypes),
     });
+    const cutoffs = new Map(answered.cutoffs);
+    for (const aggregateType of input.aggregateTypes) {
+      for (const former of this.#formerAggregateTypesOf(aggregateType)) {
+        for (const aggregateId of input.aggregateIds) {
+          const stored = cutoffs.get(
+            aggregateKey({ tenantId: input.tenantId, aggregateType: former, aggregateId }),
+          );
+          const key = aggregateKey({ tenantId: input.tenantId, aggregateType, aggregateId });
+          if (stored) cutoffs.set(key, laterCutoff(cutoffs.get(key), stored));
+        }
+      }
+    }
+    return { ...answered, cutoffs };
   }
 
   streamEventsForAggregates(input: Parameters<ReplayEventSource["streamEventsForAggregates"]>[0]) {
@@ -101,10 +132,13 @@ class UpcastingReplayEventSource implements ReplayEventSource {
   }
 
   #widenAggregateTypes(types: readonly string[]): string[] {
-    const former = this.upcasters
-      .filter((one) => one.upcasts && types.includes(one.upcasts.aggregateType))
+    return [...new Set([...types, ...types.flatMap((type) => this.#formerAggregateTypesOf(type))])];
+  }
+
+  #formerAggregateTypesOf(aggregateType: string): readonly string[] {
+    return this.upcasters
+      .filter((one) => one.upcasts?.aggregateType === aggregateType)
       .flatMap((one) => one.formerAggregateTypes);
-    return [...new Set([...types, ...former])];
   }
 
   #currentType(type: string): string {

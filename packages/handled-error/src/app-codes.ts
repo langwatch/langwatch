@@ -105,6 +105,7 @@ export const APP_ERROR_CODES = [
   "billing_provider_unavailable",
   "billing_quote_expired",
   "broadcaster_not_active",
+  "browser_drawer_undeclared",
   "budget_not_found",
   "cache_entry_not_found",
   "cache_rule_not_found",
