@@ -103,12 +103,17 @@ vi.mock("~/server/app-layer/app", async () => {
   const { permissionsServiceFor } = await import(
     "~/server/app-layer/permissions/runtime"
   );
+  const { authorizationServiceFor } = await import(
+    "~/server/app-layer/authz/checks"
+  );
   const { prisma: dbForPermissions } = await import("~/server/db");
   return {
     // Consumers that degrade without Redis read through this one.
     tryGetApp: () => null,
     getApp: () => ({
       permissions: permissionsServiceFor(dbForPermissions),
+      // A trace route's permission check mints the proof it carries (ADR-144).
+      authorization: authorizationServiceFor(dbForPermissions),
       traces: {
         spans: {
           getSpanById: mocks.getSpanById,
