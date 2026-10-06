@@ -58,21 +58,28 @@ func Main(ctx context.Context, args []string, streams Streams, root string) int 
 	}
 	switch options.Mode {
 	case "api":
-		return runOrReport(ctx, streams, options, runAPI)
+		return runOrReport(ctx, modeRun{streams: streams, options: options}, runAPI)
 	case "ui":
-		return runOrReport(ctx, streams, options, runUI)
+		return runOrReport(ctx, modeRun{streams: streams, options: options}, runUI)
 	case "all":
-		if code := runOrReport(ctx, streams, options, runAPI); code != 0 {
+		if code := runOrReport(ctx, modeRun{streams: streams, options: options}, runAPI); code != 0 {
 			return code
 		}
-		return runOrReport(ctx, streams, options, runUI)
+		return runOrReport(ctx, modeRun{streams: streams, options: options}, runUI)
 	default:
 		fmt.Fprintf(streams.Err, "unknown mode %q; want api, ui or all\n", options.Mode)
 		return 2
 	}
 }
 
-func runOrReport(ctx context.Context, streams Streams, options Options, run func(context.Context, Streams, Options) error) int {
+// modeRun is one mode's run: where it writes and what it was asked.
+type modeRun struct {
+	streams Streams
+	options Options
+}
+
+func runOrReport(ctx context.Context, mode modeRun, run func(context.Context, Streams, Options) error) int {
+	streams, options := mode.streams, mode.options
 	err := run(ctx, streams, options)
 	var stopped *diffkit.Stopped
 	if errors.As(err, &stopped) {

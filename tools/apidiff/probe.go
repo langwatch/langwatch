@@ -12,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // bodyCaptureCap bounds each side's captured response body in a transcript.
@@ -165,7 +167,7 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 	defer engine.fixtureTraceSettled()
 
 	mainStart := time.Now()
-	stopTicker := startTicker(options.Progress, "probe", len(selected), engine.probeSnapshot)
+	stopTicker := diffkit.Ticker{Out: options.Progress, Label: "probe", Total: len(selected), Snapshot: engine.probeSnapshot}.Start()
 	findings, probed, collectionsVerified := engine.mainPass(selected)
 	stopTicker()
 	engine.phaseDone("probe main pass", mainStart)

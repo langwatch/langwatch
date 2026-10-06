@@ -94,23 +94,29 @@ func ScanSignatures(dir string) ([]Signature, error) {
 		return nil, err
 	}
 	sort.Strings(paths)
-	index := map[string]*Signature{}
-	var order []string
+	index := &signatureIndex{byKey: map[string]*Signature{}}
 	for _, path := range paths {
 		side, _, _ := strings.Cut(filepath.Base(path), "-")
-		if err := scanLog(path, side, index, &order); err != nil {
+		if err := index.scanLog(path, side); err != nil {
 			return nil, err
 		}
 	}
-	signatures := make([]Signature, 0, len(order))
-	for _, key := range order {
-		signatures = append(signatures, *index[key])
+	signatures := make([]Signature, 0, len(index.order))
+	for _, key := range index.order {
+		signatures = append(signatures, *index.byKey[key])
 	}
 	sort.SliceStable(signatures, func(a, b int) bool { return signatures[a].Count > signatures[b].Count })
 	return signatures, nil
 }
 
-func scanLog(path, side string, index map[string]*Signature, order *[]string) error {
+// signatureIndex collects signatures by level and message, in first-seen order.
+type signatureIndex struct {
+	byKey map[string]*Signature
+	order []string
+}
+
+// scanLog folds one log's levelled lines into the index under side.
+func (index *signatureIndex) scanLog(path, side string) error {
 	file, err := os.Open(path) // #nosec G304 -- a log this run wrote.
 	if err != nil {
 		return err
@@ -124,12 +130,12 @@ func scanLog(path, side string, index map[string]*Signature, order *[]string) er
 			continue
 		}
 		key := level + "\x00" + NormaliseSignature(message)
-		signature := index[key]
+		signature := index.byKey[key]
 		if signature == nil {
 			signature = &Signature{Level: level, Message: NormaliseSignature(message), Sides: map[string]bool{},
 				First: fmt.Sprintf("%s:%d", filepath.Base(path), number)}
-			index[key] = signature
-			*order = append(*order, key)
+			index.byKey[key] = signature
+			index.order = append(index.order, key)
 		}
 		signature.Count++
 		signature.Sides[side] = true

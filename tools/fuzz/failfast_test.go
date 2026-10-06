@@ -80,7 +80,7 @@ func TestAStoppedRunExitsThreeAndPrintsItsReason(t *testing.T) {
 	run := func(context.Context, Streams, Options) error {
 		return &diffkit.Stopped{Reason: "stopping: 200 consecutive errors, most common cause: timeout (x200)"}
 	}
-	code := runOrReport(context.Background(), Streams{Err: &out}, Options{Mode: "api"}, run)
+	code := runOrReport(context.Background(), modeRun{streams: Streams{Err: &out}, options: Options{Mode: "api"}}, run)
 	if code != diffkit.ExitStopped || strings.TrimSpace(out.String()) != "fuzz api: stopping: 200 consecutive errors, most common cause: timeout (x200)" {
 		t.Fatalf("code %d, %q", code, out.String())
 	}
@@ -89,7 +89,7 @@ func TestAStoppedRunExitsThreeAndPrintsItsReason(t *testing.T) {
 func TestARunnerThatAlreadyPrintedItsStopIsNotPrintedTwice(t *testing.T) {
 	var out bytes.Buffer
 	run := func(context.Context, Streams, Options) error { return &diffkit.Stopped{} }
-	if code := runOrReport(context.Background(), Streams{Err: &out}, Options{Mode: "ui"}, run); code != diffkit.ExitStopped || out.Len() != 0 {
+	if code := runOrReport(context.Background(), modeRun{streams: Streams{Err: &out}, options: Options{Mode: "ui"}}, run); code != diffkit.ExitStopped || out.Len() != 0 {
 		t.Fatalf("code %d, %q", code, out.String())
 	}
 }
@@ -99,7 +99,7 @@ func TestASetupFailureStopsBeforeAnyRequestIsFuzzed(t *testing.T) {
 	server.Close()
 	var out bytes.Buffer
 	options := Options{Mode: "api", URL: server.URL, Root: t.TempDir(), Duration: time.Second, MaxConsecutiveErrors: -1}
-	code := runOrReport(context.Background(), Streams{Err: &out, Out: &bytes.Buffer{}}, options, runAPI)
+	code := runOrReport(context.Background(), modeRun{streams: Streams{Err: &out, Out: &bytes.Buffer{}}, options: options}, runAPI)
 	if code != 1 || !strings.Contains(out.String(), "fuzz api: stopping: setup failed: seed fuzzer org:") {
 		t.Fatalf("code %d, %q", code, out.String())
 	}

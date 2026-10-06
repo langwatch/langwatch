@@ -6,14 +6,28 @@ import (
 	"time"
 )
 
-// ProgressInterval is how often StartTicker prints a status line.
+// ProgressInterval is how often a Ticker prints a status line.
 const ProgressInterval = 5 * time.Second
 
+// Ticker describes a periodic status line: what is done of Total, a detail,
+// the rate and the time left. Snapshot is asked for the done count and detail.
+type Ticker struct {
+	Out      io.Writer
+	Label    string
+	Total    int
+	Snapshot func() (done int, detail string)
+}
+
 // StartTicker prints one status line every ProgressInterval until the returned
-// stop is called: what is done of the total, a detail, the rate and the time
-// left. Copied from apidiff/progress.go; switch apidiff over later.
+// stop is called. tools/workerrun still calls it; new code starts a Ticker.
 func StartTicker(out io.Writer, label string, total int, snapshot func() (done int, detail string)) (stop func()) {
-	if out == nil {
+	return Ticker{Out: out, Label: label, Total: total, Snapshot: snapshot}.Start()
+}
+
+// Start prints one status line every ProgressInterval until the returned stop
+// is called. A nil Out prints nothing.
+func (ticker Ticker) Start() (stop func()) {
+	if ticker.Out == nil {
 		return func() {}
 	}
 	quit, finished := make(chan struct{}), make(chan struct{})
@@ -27,25 +41,32 @@ func StartTicker(out io.Writer, label string, total int, snapshot func() (done i
 			case <-quit:
 				return
 			case <-tick.C:
-				done, detail := snapshot()
-				fmt.Fprintln(out, ProgressLine(label, total, done, detail, time.Since(started)))
+				done, detail := ticker.Snapshot()
+				fmt.Fprintln(ticker.Out, ticker.line(progress{done: done, detail: detail, elapsed: time.Since(started)}))
 			}
 		}
 	}()
 	return func() { close(quit); <-finished }
 }
 
-// ProgressLine is one ticker line: label, done/total, a detail, the rate, and
-// the time left at that rate.
-func ProgressLine(label string, total, done int, detail string, elapsed time.Duration) string {
-	rate := float64(done) / max(elapsed.Seconds(), 0.001)
-	line := fmt.Sprintf("%s %d/%d", label, done, total)
-	if detail != "" {
-		line += " · " + detail
+// progress is one reading of a ticker's snapshot.
+type progress struct {
+	done    int
+	detail  string
+	elapsed time.Duration
+}
+
+// line is one ticker line: label, done/total, a detail, the rate, and the
+// time left at that rate.
+func (ticker Ticker) line(at progress) string {
+	rate := float64(at.done) / max(at.elapsed.Seconds(), 0.001)
+	line := fmt.Sprintf("%s %d/%d", ticker.Label, at.done, ticker.Total)
+	if at.detail != "" {
+		line += " · " + at.detail
 	}
 	line += fmt.Sprintf(" · %.1f/s", rate)
-	if rate > 0 && done < total {
-		line += " · ~" + (time.Duration(float64(total-done)/rate) * time.Second).Round(time.Second).String() + " left"
+	if rate > 0 && at.done < ticker.Total {
+		line += " · ~" + (time.Duration(float64(ticker.Total-at.done)/rate) * time.Second).Round(time.Second).String() + " left"
 	}
 	return line
 }

@@ -60,7 +60,8 @@ func checkStack(ctx context.Context, request checkStackRequest, times *checkTime
 	if err != nil {
 		return RunnerSide{}, err
 	}
-	stack := Stack{Name: "check", Dir: request.root, HavenSlug: request.slug, Layout: layout}
+	work := &checkStackWork{request: request, times: times,
+		stack: Stack{Name: "check", Dir: request.root, HavenSlug: request.slug, Layout: layout}}
 	if request.shared {
 		unlock, err := lockCheckStack(dir, request.stderr)
 		if err != nil {
@@ -68,33 +69,53 @@ func checkStack(ctx context.Context, request checkStackRequest, times *checkTime
 		}
 		defer unlock()
 	}
-	started := time.Now()
-	code := workingTreeKey(ctx, request.root)
-	booted, err := run.upCheckStack(ctx, &stack, request.adoptOnly)
-	if err == nil && !booted && !request.shared {
-		err = run.restartChangedBackend(ctx, &stack, code)
-	}
+	booted, code, err := work.boot(ctx, run)
 	if err != nil {
 		return RunnerSide{}, err
 	}
-	if !request.shared {
-		recordKey(filepath.Join(dir, "backend"), code)
-	}
-	times.boot = time.Since(started)
-	fmt.Fprintf(request.stderr, "check: phase boot %s\n", times.boot.Round(time.Second))
-	started = time.Now()
-	fixtures, err := seedCheckStack(ctx, stack, booted, times, request.stderr)
+	started := time.Now()
+	fixtures, err := work.seed(ctx, booted)
 	if err != nil {
 		return RunnerSide{}, err
 	}
 	times.seed = time.Since(started)
+	stack := work.stack
 	side := RunnerSide{Name: "candidate", BaseURL: stack.URL(), MailURL: stack.MailURL(), Fixtures: fixtures}
 	if !request.devUI {
 		started = time.Now()
-		side.StaticDir = buildCheckUI(ctx, stack, code, request.stderr)
+		side.StaticDir = work.buildUI(ctx, code)
 		times.build = time.Since(started)
 	}
 	return side, nil
+}
+
+// checkStackWork is check's own stack while checkStack readies it, and the
+// times each phase took.
+type checkStackWork struct {
+	request checkStackRequest
+	times   *checkTimes
+	stack   Stack
+}
+
+// boot brings the stack up through run, restarting a reused backend whose code
+// changed unless lanes share it. It reports a fresh boot and the code key.
+func (work *checkStackWork) boot(ctx context.Context, run *session) (bool, string, error) {
+	request := work.request
+	started := time.Now()
+	code := workingTreeKey(ctx, request.root)
+	booted, err := run.upCheckStack(ctx, &work.stack, request.adoptOnly)
+	if err == nil && !booted && !request.shared {
+		err = run.restartChangedBackend(ctx, &work.stack, code)
+	}
+	if err != nil {
+		return false, "", err
+	}
+	if !request.shared {
+		recordKey(filepath.Join(CheckDir(request.root), "backend"), code)
+	}
+	work.times.boot = time.Since(started)
+	fmt.Fprintf(request.stderr, "check: phase boot %s\n", work.times.boot.Round(time.Second))
+	return booted, code, nil
 }
 
 // upCheckStack reuses the stack when its lanes listen, waits for one still booting,
@@ -130,9 +151,10 @@ func stackLive(status havenrun.Status, slug string) bool {
 	return false
 }
 
-// seedCheckStack seeds a freshly booted stack, or one whose seed record is for other
+// seed seeds a freshly booted stack, or one whose seed record is for other
 // seed code, and records the fixtures beside check's run so later checks reuse them.
-func seedCheckStack(ctx context.Context, stack Stack, booted bool, times *checkTimes, stderr io.Writer) (map[string]string, error) {
+func (work *checkStackWork) seed(ctx context.Context, booted bool) (map[string]string, error) {
+	stack, times, stderr := work.stack, work.times, work.request.stderr
 	marker := filepath.Join(CheckDir(stack.Dir), "seeded")
 	keyFile := marker + ".key"
 	key := seedKey(stack)
@@ -204,10 +226,11 @@ func seedKey(stack Stack) string {
 	return hex.EncodeToString(digest.Sum(nil))
 }
 
-// buildCheckUI builds the working tree's UI for production when its code changed
+// buildUI builds the working tree's UI for production when its code changed
 // since the last check's build, so pages load without the dev server compiling
 // them. A failed build leaves the pages on the dev server, and says so.
-func buildCheckUI(ctx context.Context, stack Stack, key string, stderr io.Writer) string {
+func (work *checkStackWork) buildUI(ctx context.Context, key string) string {
+	stack, stderr := work.stack, work.request.stderr
 	_, relative := UIBuildCommand(stack.Layout)
 	built := filepath.Join(stack.Dir, relative)
 	keyFile := filepath.Join(CheckDir(stack.Dir), "uibuilt")
@@ -312,6 +335,8 @@ func downCheckStack(ctx context.Context, root string, stderr io.Writer) error {
 // lockCheckStack holds check's stack for one lane's boot and seed, so lanes sharing the
 // stack never boot or seed it twice at once. The lock goes when the process does.
 func lockCheckStack(dir string, stderr io.Writer) (func(), error) {
-	return diffkit.Lock(dir, "stack.lock", "check: another lane is booting or seeding the shared stack; waiting",
-		func(line string) { fmt.Fprintln(stderr, line) })
+	return diffkit.Lock(diffkit.LockOptions{
+		Dir: dir, Name: "stack.lock", Waiting: "check: another lane is booting or seeding the shared stack; waiting",
+		Progress: func(line string) { fmt.Fprintln(stderr, line) },
+	})
 }

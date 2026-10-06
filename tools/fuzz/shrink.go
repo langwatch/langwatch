@@ -28,7 +28,7 @@ func (run *apiRun) shrinkGroups(ctx context.Context) []Group {
 	byGroup := map[string][]rawFinding{}
 	order := make([]string, 0)
 	for _, finding := range raw {
-		key := signatureOf(finding.hit.Oracle, finding.item.op.Method, finding.item.op.Path, finding.status)
+		key := signatureOf(finding.hit.Oracle, finding.item.op, finding.status)
 		if _, seen := byGroup[key]; !seen {
 			order = append(order, key)
 		}

@@ -172,7 +172,7 @@ func runScenarioPhase(ctx context.Context, options scenarioOptions, report, prog
 	fmt.Fprintf(progress, "scenarios: shards seeded in %s\n", time.Since(seeded).Round(time.Millisecond))
 	phaseDone(progress, "scenario shards", seeded)
 	started := time.Now()
-	stopTicker := startTicker(progress, "scenarios", len(items), runner.snapshot)
+	stopTicker := diffkit.Ticker{Out: progress, Label: "scenarios", Total: len(items), Snapshot: runner.snapshot}.Start()
 	results := runner.runAll(items)
 	stopTicker()
 	phaseDone(progress, "scenarios", started)

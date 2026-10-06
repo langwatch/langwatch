@@ -1,6 +1,10 @@
 package fuzz
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
+)
 
 func TestGroupFindingsCollapsesBySignatureAndSortsByCount(t *testing.T) {
 	findings := []Finding{
@@ -21,18 +25,18 @@ func TestGroupFindingsCollapsesBySignatureAndSortsByCount(t *testing.T) {
 }
 
 func TestSignatureOfIsStable(t *testing.T) {
-	if signatureOf("5xx", "POST", "/api/x", 500) != signatureOf("5xx", "POST", "/api/x", 500) {
+	if signatureOf("5xx", diffkit.Operation{Method: "POST", Path: "/api/x"}, 500) != signatureOf("5xx", diffkit.Operation{Method: "POST", Path: "/api/x"}, 500) {
 		t.Fatal("signatureOf not stable")
 	}
-	if signatureOf("5xx", "POST", "/api/x", 500) == signatureOf("5xx", "POST", "/api/y", 500) {
+	if signatureOf("5xx", diffkit.Operation{Method: "POST", Path: "/api/x"}, 500) == signatureOf("5xx", diffkit.Operation{Method: "POST", Path: "/api/y"}, 500) {
 		t.Fatal("different routes share a signature")
 	}
 }
 
 func TestAliasPathsShareTheCanonicalRouteSignature(t *testing.T) {
-	canonical := signatureOf("5xx", "GET", "/api/annotations/{id}", 500)
+	canonical := signatureOf("5xx", diffkit.Operation{Method: "GET", Path: "/api/annotations/{id}"}, 500)
 	for _, alias := range []string{"/api/annotations/latest/{id}", "/api/annotations/2026-08-07/{id}"} {
-		if signatureOf("5xx", "GET", alias, 500) != canonical {
+		if signatureOf("5xx", diffkit.Operation{Method: "GET", Path: alias}, 500) != canonical {
 			t.Fatalf("%s does not group with %s", alias, "/api/annotations/{id}")
 		}
 		if !isVersionAlias(alias) {

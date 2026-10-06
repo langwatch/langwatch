@@ -76,17 +76,7 @@ func firstID(body []byte) string {
 		return ""
 	}
 	if wrapper, ok := value.(map[string]any); ok {
-		keys := make([]string, 0, len(wrapper))
-		for key := range wrapper {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			if id := firstID(mustJSON(wrapper[key])); id != "" {
-				return id
-			}
-		}
-		return ""
+		return firstIDInFields(wrapper)
 	}
 	list, _ := value.([]any)
 	if len(list) == 0 {
@@ -95,6 +85,21 @@ func firstID(body []byte) string {
 	element, _ := list[0].(map[string]any)
 	id, _ := element["id"].(string)
 	return id
+}
+
+// firstIDInFields is the first id found under a wrapper's fields, in key order.
+func firstIDInFields(wrapper map[string]any) string {
+	keys := make([]string, 0, len(wrapper))
+	for key := range wrapper {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if id := firstID(mustJSON(wrapper[key])); id != "" {
+			return id
+		}
+	}
+	return ""
 }
 
 func mustJSON(value any) []byte {
