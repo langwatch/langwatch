@@ -23,6 +23,7 @@ import { slugify } from "../../../utils/slugify";
 import { getApp } from "../../app-layer/app";
 import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
 import { DatasetService } from "../../datasets/dataset.service";
+import { assertProjectRunsMonitors } from "~/server/app-layer/monitors/monitor-project-guard";
 import { prisma } from "../../db";
 import { ExperimentTypeMismatchError } from "../../experiments/errors";
 import { ExperimentService } from "../../experiments/experiment.service";
@@ -471,6 +472,8 @@ export const experimentsRouter = createTRPCRouter({
     )
     .permission("workflows:create")
     .mutation(async ({ input }) => {
+      await assertProjectRunsMonitors({ prisma, projectId: input.projectId });
+
       const experiment =
         await experimentService().findByIdWithWorkflowCurrentVersion({
           projectId: input.projectId,

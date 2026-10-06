@@ -6,6 +6,7 @@ import { EvaluationExecutionMode, Prisma } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer";
 import { checkDeclaredPermission } from "~/server/app-layer/authz/trpc-middleware";
 import { MonitorEvaluatorRequiredError } from "~/server/app-layer/monitors/errors";
+import { assertProjectRunsMonitors } from "~/server/app-layer/monitors/monitor-project-guard";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
@@ -208,6 +209,8 @@ export const monitorsRouter = createTRPCRouter({
       } = input;
       const prisma = ctx.prisma;
 
+      await assertProjectRunsMonitors({ prisma, projectId });
+
       // A monitor without an evaluator sits enabled but evaluates nothing —
       // reject at the boundary instead of creating it broken.
       if (!evaluatorId) {
@@ -266,6 +269,8 @@ export const monitorsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { monitorId, projectId, sourceProjectId } = input;
       const prisma = ctx.prisma;
+
+      await assertProjectRunsMonitors({ prisma, projectId });
 
       const hasSourcePermission = await probeProjectPermission(
         ctx,

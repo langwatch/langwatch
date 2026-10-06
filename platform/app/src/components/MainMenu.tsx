@@ -17,6 +17,7 @@ import {
   isExperimentsActivePath,
   isOnlineEvaluationsActivePath,
 } from "./sidebar/navigationActiveState";
+import { projectNavigation } from "./sidebar/projectKindNavigation";
 import { projectScopedDestination } from "./sidebar/projectScopedNav";
 import { SidebarSection } from "./sidebar/SidebarSection";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
@@ -40,9 +41,10 @@ export const MainMenuSections = function MainMenuSections({
 }) {
   const router = useRouter();
   const { project, organization, hasPermission } = useOrganizationTeamProject();
+  const navigation = projectNavigation(project?.kind);
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
+    { enabled: !!project?.id && navigation.test },
   );
   const codingAgentLinks = useCodingAgentLinks();
 
@@ -55,27 +57,37 @@ export const MainMenuSections = function MainMenuSections({
 
   return (
     <>
-      <PageMenuLink
-        path={projectRoutes.home.path}
-        icon={featureIcons.home.icon}
-        label={projectRoutes.home.title}
-        project={project}
-        isActive={
-          router.pathname === "/[project]" &&
-          !router.pathname.includes("/analytics")
-        }
-        showLabel={showExpanded}
-      />
+      {navigation.home && (
+        <PageMenuLink
+          path={projectRoutes.home.path}
+          icon={featureIcons.home.icon}
+          label={projectRoutes.home.title}
+          project={project}
+          isActive={
+            router.pathname === "/[project]" &&
+            !router.pathname.includes("/analytics")
+          }
+          showLabel={showExpanded}
+        />
+      )}
 
-      <ObserveSection {...sectionProps} codingAgentLinks={codingAgentLinks} />
-      <TestSection
+      <ObserveSection
         {...sectionProps}
-        pendingAnnotationCount={pendingItemsCount.data}
+        codingAgentLinks={codingAgentLinks}
+        showOnlineEvaluations={navigation.onlineEvaluations}
       />
-      <BuildSection
-        {...sectionProps}
-        canSeeAutomations={hasPermission("triggers:view")}
-      />
+      {navigation.test && (
+        <TestSection
+          {...sectionProps}
+          pendingAnnotationCount={pendingItemsCount.data}
+        />
+      )}
+      {navigation.build && (
+        <BuildSection
+          {...sectionProps}
+          canSeeAutomations={hasPermission("triggers:view")}
+        />
+      )}
     </>
   );
 };
@@ -136,7 +148,11 @@ function ObserveSection({
   project,
   pathname,
   codingAgentLinks,
-}: ProjectSectionProps & { codingAgentLinks: CodingAgentLinks }) {
+  showOnlineEvaluations,
+}: ProjectSectionProps & {
+  codingAgentLinks: CodingAgentLinks;
+  showOnlineEvaluations: boolean;
+}) {
   return (
     <SidebarSection
       id="observe"
@@ -160,14 +176,16 @@ function ObserveSection({
         isActive={pathname.includes("/traces")}
         showLabel={showExpanded}
       />
-      <PageMenuLink
-        path={projectRoutes.online_evaluations.path}
-        icon={featureIcons.online_evaluations.icon}
-        label="Online Evals"
-        project={project}
-        isActive={isOnlineEvaluationsActivePath(pathname)}
-        showLabel={showExpanded}
-      />
+      {showOnlineEvaluations && (
+        <PageMenuLink
+          path={projectRoutes.online_evaluations.path}
+          icon={featureIcons.online_evaluations.icon}
+          label="Online Evals"
+          project={project}
+          isActive={isOnlineEvaluationsActivePath(pathname)}
+          showLabel={showExpanded}
+        />
+      )}
       {codingAgentLinks.shouldShowSessions && (
         <PageMenuLink
           path={projectRoutes.coding_agent_sessions.path}

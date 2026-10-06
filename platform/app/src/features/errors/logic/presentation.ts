@@ -974,6 +974,13 @@ const presentations = {
 
   // ---- evaluations & experiments ----
   evaluation_not_found: { title: "Evaluation not found" },
+  monitor_on_aggregate_project: {
+    // Reached from an online-evaluation form opened on an aggregate, so the
+    // answer is where the evaluation belongs instead.
+    title: "Online evaluations run on the projects it reads",
+    describe: () =>
+      "This project reads traces from other projects and has none of its own. Set up the online evaluation on the project the traces belong to; its results show here too.",
+  },
   monitor_evaluator_required: {
     title: "This evaluation needs an evaluator",
     describe: () =>
