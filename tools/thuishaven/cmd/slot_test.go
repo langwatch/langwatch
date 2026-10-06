@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -484,6 +485,51 @@ func TestSlotRunQueuesAndSaysSo(t *testing.T) {
 	}
 }
 
+// @scenario "A long wait repeats itself so it never looks hung"
+func TestSlotHeartbeatRepeatsPositionAndNamesHolders(t *testing.T) {
+	home := t.TempDir()
+	sem := semaphore.New(home)
+	store := fileregistry.New(home)
+	t.Setenv("CHECK_SLOTS", "1")
+	t.Setenv("CI", "")
+
+	release, _, ok, err := sem.TryAcquire(checkSlotName, 1)
+	if err != nil || !ok {
+		t.Fatalf("could not pre-hold the only slot: ok=%v err=%v", ok, err)
+	}
+	releaseHolder, err := store.ClaimHolder(os.Getpid(), checkSlotName, fileregistry.HolderClaim{
+		Label:     "@langwatch/web typecheck",
+		StartedAt: time.Now().Add(-5 * time.Second),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer releaseHolder()
+
+	var progress bytes.Buffer
+	done := make(chan int, 1)
+	go func() {
+		job := &slotJob{sem: sem, registry: store, label: "queued-run", argv: []string{"true"}, progress: &progress, heartbeat: 150 * time.Millisecond}
+		done <- job.run(context.Background())
+	}()
+
+	time.Sleep(800 * time.Millisecond)
+	release()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the queued run never started after the slot freed")
+	}
+
+	report := progress.String()
+	if !strings.Contains(report, "still queued at position 1 after") {
+		t.Fatalf("the heartbeat must repeat the position and the wait, got %q", report)
+	}
+	if !regexp.MustCompile(`Active: @langwatch/web typecheck for \d+s`).MatchString(report) {
+		t.Fatalf("the heartbeat must name the holder and how long it has held, got %q", report)
+	}
+}
+
 // fakeWaiterRegistry is a waiterRegistry test double: ClaimWaiter is a no-op
 // (nothing here asserts on the registration itself) and WaiterSnapshots
 // always answers with a fixed, caller-supplied list of other waiters - what
@@ -501,6 +547,12 @@ func (f *fakeWaiterRegistry) ClaimWaiter(int, string, fileregistry.WaiterClaim) 
 func (f *fakeWaiterRegistry) WaiterSnapshots(string) []fileregistry.WaiterSnapshot {
 	return f.snapshots
 }
+
+func (f *fakeWaiterRegistry) ClaimHolder(int, string, fileregistry.HolderClaim) (func(), error) {
+	return func() {}, nil
+}
+
+func (f *fakeWaiterRegistry) HolderSnapshots(string) []fileregistry.HolderSnapshot { return nil }
 
 // @scenario "Priority classes rank a person above a main session above a sub-agent"
 func TestSlotJobYieldsToAHigherPriorityWaiter(t *testing.T) {

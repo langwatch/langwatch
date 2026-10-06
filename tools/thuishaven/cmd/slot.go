@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -346,18 +347,21 @@ type slotAcquirer interface {
 type waiterRegistry interface {
 	ClaimWaiter(pid int, name string, claim fileregistry.WaiterClaim) (func(), error)
 	WaiterSnapshots(name string) []fileregistry.WaiterSnapshot
+	ClaimHolder(pid int, name string, claim fileregistry.HolderClaim) (func(), error)
+	HolderSnapshots(name string) []fileregistry.HolderSnapshot
 }
 
 // slotJob is one command's trip through the queue: what to run, how the run
 // is named to a human, where progress lines go, and the wait state the
 // announcements are computed from.
 type slotJob struct {
-	sem      slotAcquirer
-	label    string
-	limit    time.Duration // zero means the command may run as long as it likes
-	argv     []string
-	progress io.Writer
-	pressure domain.Pressure
+	sem       slotAcquirer
+	label     string
+	limit     time.Duration // zero means the command may run as long as it likes
+	argv      []string
+	progress  io.Writer
+	pressure  domain.Pressure
+	heartbeat time.Duration // zero means slotHeartbeat
 
 	// registry, caller, agentID and overrideHonored are all optional: a nil
 	// registry (every existing call site that builds a slotJob directly, and
@@ -392,11 +396,27 @@ func (j *slotJob) run(ctx context.Context) int {
 	if j.announced && release != nil {
 		fmt.Fprintf(j.progress, "checks: slot free after %s in the queue, starting now.\n", formatSlotWait(time.Since(j.queuedAt)))
 	}
+	if release != nil {
+		defer j.claimHolder()()
+	}
 	code := j.exec(ctx)
 	if release != nil {
 		release()
 	}
 	return code
+}
+
+// claimHolder lets queued runs name this one while it holds the slot. A nil
+// registry or a write error degrades to staying anonymous.
+func (j *slotJob) claimHolder() func() {
+	if j.registry == nil {
+		return func() {}
+	}
+	release, err := j.registry.ClaimHolder(os.Getpid(), checkSlotName, fileregistry.HolderClaim{Label: j.label, StartedAt: time.Now()})
+	if err != nil {
+		return func() {}
+	}
+	return release
 }
 
 // exec runs the command, stopping it with exit 124 once it outlives limit, so
@@ -522,10 +542,59 @@ func (j *slotJob) report(waited time.Duration) {
 			active, j.slots, j.label)
 		return
 	}
-	if j.announced && time.Since(j.lastBeat) >= slotHeartbeat {
-		j.lastBeat = time.Now()
-		fmt.Fprintf(j.progress, "checks: %s still queued after %s\n", j.label, formatSlotWait(waited))
+	beat := j.heartbeat
+	if beat <= 0 {
+		beat = slotHeartbeat
 	}
+	if j.announced && time.Since(j.lastBeat) >= beat {
+		j.lastBeat = time.Now()
+		fmt.Fprintf(j.progress, "checks: %s still queued%s after %s%s\n", j.label, j.positionNote(), formatSlotWait(waited), j.activeNote())
+	}
+}
+
+// positionNote is " at position N": arrival order among the runs queued for
+// the slot, as main's queue reported it. Empty without a registry or when this
+// run's own registration is not visible.
+func (j *slotJob) positionNote() string {
+	if j.registry == nil {
+		return ""
+	}
+	waiters := j.registry.WaiterSnapshots(checkSlotName)
+	sort.Slice(waiters, func(a, b int) bool {
+		if !waiters[a].QueuedAt.Equal(waiters[b].QueuedAt) {
+			return waiters[a].QueuedAt.Before(waiters[b].QueuedAt)
+		}
+		return waiters[a].PID < waiters[b].PID
+	})
+	for i, w := range waiters {
+		if w.PID == os.Getpid() {
+			return fmt.Sprintf(" at position %d", i+1)
+		}
+	}
+	return ""
+}
+
+// activeNote is ". Active: <label> for Ns, ..." naming the runs holding the
+// slots, oldest first, three at most.
+func (j *slotJob) activeNote() string {
+	if j.registry == nil {
+		return ""
+	}
+	holders := j.registry.HolderSnapshots(checkSlotName)
+	if len(holders) == 0 {
+		return ""
+	}
+	sort.Slice(holders, func(a, b int) bool { return holders[a].StartedAt.Before(holders[b].StartedAt) })
+	now := time.Now()
+	var shown []string
+	for _, h := range holders[:min(len(holders), 3)] {
+		shown = append(shown, fmt.Sprintf("%s for %s", h.Label, formatSlotWait(now.Sub(h.StartedAt))))
+	}
+	note := ". Active: " + strings.Join(shown, ", ")
+	if hidden := len(holders) - 3; hidden > 0 {
+		note += fmt.Sprintf(" and %d more", hidden)
+	}
+	return note
 }
 
 // slotExec runs argv with stdio inherited, CHECK_SLOTS=0 with this pid in
