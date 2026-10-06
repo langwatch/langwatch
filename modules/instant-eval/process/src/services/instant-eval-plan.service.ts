@@ -22,7 +22,7 @@ import type {
 } from "./instant-eval-run-context.service.ts";
 
 /** The Analytics peer, narrowed to the one question the page size asks it. */
-export interface InstantEvalKeyCapSource {
+interface InstantEvalKeyCapSource {
   langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[] }): number;
 }
 

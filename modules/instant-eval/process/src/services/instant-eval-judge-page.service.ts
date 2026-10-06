@@ -66,7 +66,7 @@ const logger = createLogger("langwatch:instant-eval:judge-page");
  * token bucket, rather than the number of open requests, is what a page waits
  * on: at about 250 ms a call, thirty-two could never reach that rate.
  */
-export const INSTANT_EVAL_PAGE_CONCURRENCY = 128;
+const INSTANT_EVAL_PAGE_CONCURRENCY = 128;
 
 /** What one page's requests sent and what they cost it. */
 interface InstantEvalPageUsage {
@@ -77,7 +77,7 @@ interface InstantEvalPageUsage {
 }
 
 /** One page, judged: the rows as they are written, and what they sent. */
-export interface InstantEvalJudgedPage {
+interface InstantEvalJudgedPage {
   readonly rows: readonly Record<string, unknown>[];
   readonly usage: InstantEvalPageUsage;
   /** Present when a stop reached the page, naming the rows it left unjudged. */

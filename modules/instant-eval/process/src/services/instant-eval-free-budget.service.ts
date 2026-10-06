@@ -27,7 +27,7 @@ import { NANO_USD_PER_USD } from "../rules/instant-eval-spend-outcome.rules.ts";
 const CACHE_TTL_MS = 60_000;
 
 /** The peers the budget is resolved through, each one operation wide. */
-export interface InstantEvalBudgetPeers {
+interface InstantEvalBudgetPeers {
   /** The organization the project belongs to, or undefined when it has none. */
   findOrganizationId(input: { projectId: string }): Promise<string | undefined>;
   /** Every project of the organization, archived ones included: the ledger's

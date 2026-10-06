@@ -11,7 +11,7 @@ import {
 } from "@langwatch/instant-eval-contract";
 import { cutToEstimatedTokensKeepingEnds } from "@langwatch/trace-contract";
 
-import { instantEvalScoreLevels, toClassifierQuestions } from "./instant-eval-judge-wire.rules.ts";
+import { toClassifierQuestions } from "./instant-eval-judge-wire.rules.ts";
 
 /**
  * Estimated tokens in a string, from its UTF-8 byte length. Deliberately not
@@ -59,7 +59,7 @@ export function instantEvalTextBudget({
 }
 
 /** The text as it will be sent, and whether fitting it cost anything. */
-export interface PreparedInstantEvalText {
+interface PreparedInstantEvalText {
   readonly text: string;
   readonly isTruncated: boolean;
 }
@@ -73,7 +73,7 @@ const JSON_STRUCTURE_SHARE = 0.15;
  * markdown transcript at the transcript ratio, a JSON-heavy digest at the
  * densest one, and a mix in between. The too-large retry covers a misjudged text.
  */
-export function instantEvalFitBytesPerToken({
+function instantEvalFitBytesPerToken({
   text,
   limits = INSTANT_EVAL_CLASSIFIER_LIMITS,
 }: {
@@ -173,23 +173,6 @@ export function estimateInstantEvalRequestTokens({
   const budget = limits.stateTokens - questionTokens - limits.reserveTokens;
   const textTokens = Math.min(estimateJudgedTextTokens({ text, limits }), Math.max(0, budget));
   return textTokens + questionTokens;
-}
-
-/** Whether a category question offers more options than the judge takes. */
-export function exceedsCategoryOptionLimit({
-  options,
-  limits = INSTANT_EVAL_CLASSIFIER_LIMITS,
-}: {
-  options: number;
-  limits?: InstantEvalClassifierLimits;
-}): boolean {
-  return options > limits.maxCategoryOptions;
-}
-
-/** How many levels a score range would ask the judge to weigh. */
-export function instantEvalScoreLevelCount(range: { min: number; max: number }): number {
-  return instantEvalScoreLevels({ id: "range", kind: "score", instructions: "range", range })
-    .length;
 }
 
 /**

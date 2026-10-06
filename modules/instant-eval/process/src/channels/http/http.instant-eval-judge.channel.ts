@@ -55,7 +55,7 @@ const REQUEST_TIMEOUT_MS = 120_000;
 /** At least the classifications one page keeps in flight. */
 const POOL_CONNECTIONS = 128;
 
-export interface HttpInstantEvalJudgeOptions {
+interface HttpInstantEvalJudgeOptions {
   readonly apiKey: string;
   /** Origin only; the path is this channel's own. */
   readonly baseUrl?: string;

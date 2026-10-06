@@ -13,13 +13,13 @@ import type {
 import { z } from "zod";
 
 /** The levels a score question offers, low to high. */
-export function instantEvalScoreLevels(question: InstantEvalScoreQuestion): number[] {
+function instantEvalScoreLevels(question: InstantEvalScoreQuestion): number[] {
   const { min, max } = question.range;
   return Array.from({ length: max - min + 1 }, (_, index) => min + index);
 }
 
 /** One question as the judge takes it. */
-export type ClassifierWireQuestion = Readonly<Record<string, unknown>>;
+type ClassifierWireQuestion = Readonly<Record<string, unknown>>;
 
 /** Every question of one request, keyed by our own question ids. */
 export function toClassifierQuestions(
@@ -86,7 +86,7 @@ export const classifierResponseSchema = z.object({
     .optional(),
 });
 
-export type ClassifierResponse = z.infer<typeof classifierResponseSchema>;
+type ClassifierResponse = z.infer<typeof classifierResponseSchema>;
 type ClassifierAnswer = z.infer<typeof answerSchema>;
 
 /**

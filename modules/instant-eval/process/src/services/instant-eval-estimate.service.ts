@@ -27,7 +27,7 @@ import type { AcceptedInstantEvalStatement } from "./instant-eval-statement.serv
 const logger = createLogger("langwatch:instant-eval:estimate");
 
 /** Rows an estimate measures the text size of. */
-export const INSTANT_EVAL_ESTIMATE_SAMPLE = 50;
+const INSTANT_EVAL_ESTIMATE_SAMPLE = 50;
 
 /**
  * The extraction half of a judged plan, run through Analytics: the same rows
@@ -46,7 +46,7 @@ export interface InstantEvalTextSource {
 }
 
 /** The judge's published rates, which are what an estimate is priced at. */
-export interface InstantEvalJudgeRates {
+interface InstantEvalJudgeRates {
   readonly limits: InstantEvalClassifierLimits;
   readonly pricing: InstantEvalPricing;
 }

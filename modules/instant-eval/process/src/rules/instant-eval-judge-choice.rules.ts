@@ -10,7 +10,7 @@ import {
   type InstantEvalServerConfig,
 } from "@langwatch/instant-eval-contract";
 
-export type InstantEvalJudgeKind = "none" | "own_key" | "connect" | "memory";
+type InstantEvalJudgeKind = "none" | "own_key" | "connect" | "memory";
 
 export function instantEvalJudgeKind({
   classifier,

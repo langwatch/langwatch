@@ -32,7 +32,7 @@ function runKey({
 
 const groupByTenant = (data: { tenantId: PropertyKey }): string => String(data.tenantId);
 
-export const RequestInstantEvalRunCommand = defineCommand({
+const RequestInstantEvalRunCommand = defineCommand({
   commandType: INSTANT_EVAL_COMMAND_TYPES.REQUEST,
   eventType: INSTANT_EVAL_EVENT_TYPES.REQUESTED,
   eventVersion: INSTANT_EVAL_EVENT_VERSIONS.REQUESTED,
@@ -50,7 +50,7 @@ export const RequestInstantEvalRunCommand = defineCommand({
   makeJobId: (data) => runKey({ ...data, phase: "requested" }),
 });
 
-export const RecordInstantEvalPlannedCommand = defineCommand({
+const RecordInstantEvalPlannedCommand = defineCommand({
   commandType: INSTANT_EVAL_COMMAND_TYPES.RECORD_PLANNED,
   eventType: INSTANT_EVAL_EVENT_TYPES.PLANNED,
   eventVersion: INSTANT_EVAL_EVENT_VERSIONS.PLANNED,
@@ -75,7 +75,7 @@ export function instantEvalPageDedupeId(data: {
   return runKey({ ...data, phase: `page-${data.page}` });
 }
 
-export const RecordInstantEvalPageJudgedCommand = defineCommand({
+const RecordInstantEvalPageJudgedCommand = defineCommand({
   commandType: INSTANT_EVAL_COMMAND_TYPES.RECORD_PAGE_JUDGED,
   eventType: INSTANT_EVAL_EVENT_TYPES.PAGE_JUDGED,
   eventVersion: INSTANT_EVAL_EVENT_VERSIONS.PAGE_JUDGED,
@@ -94,7 +94,7 @@ export const RecordInstantEvalPageJudgedCommand = defineCommand({
   makeJobId: instantEvalPageDedupeId,
 });
 
-export const RequestInstantEvalCancelCommand = defineCommand({
+const RequestInstantEvalCancelCommand = defineCommand({
   commandType: INSTANT_EVAL_COMMAND_TYPES.REQUEST_CANCEL,
   eventType: INSTANT_EVAL_EVENT_TYPES.CANCEL_REQUESTED,
   eventVersion: INSTANT_EVAL_EVENT_VERSIONS.CANCEL_REQUESTED,
@@ -108,7 +108,7 @@ export const RequestInstantEvalCancelCommand = defineCommand({
   makeJobId: (data) => runKey({ ...data, phase: "cancel" }),
 });
 
-export const RecordInstantEvalFinishedCommand = defineCommand({
+const RecordInstantEvalFinishedCommand = defineCommand({
   commandType: INSTANT_EVAL_COMMAND_TYPES.RECORD_FINISHED,
   eventType: INSTANT_EVAL_EVENT_TYPES.FINISHED,
   eventVersion: INSTANT_EVAL_EVENT_VERSIONS.FINISHED,

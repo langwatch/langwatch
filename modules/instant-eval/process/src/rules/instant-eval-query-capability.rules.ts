@@ -8,7 +8,7 @@
 import { InstantEvalNotEnabledError } from "@langwatch/instant-eval-contract";
 
 /** The tenant identity one run's statement is executed under. */
-export interface InstantEvalQueryCapability {
+interface InstantEvalQueryCapability {
   readonly id: string;
   readonly lwqlKey: string;
 }

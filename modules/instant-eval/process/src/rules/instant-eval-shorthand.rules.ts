@@ -35,7 +35,7 @@ import {
 const QUESTION_ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /** One projected column: the eval call and the name it lands under. */
-export interface InstantEvalShorthandColumn {
+interface InstantEvalShorthandColumn {
   readonly id: string;
   /** The eval call, with the text expression already inside it. */
   readonly expression: string;
@@ -46,7 +46,7 @@ export interface InstantEvalShorthandColumn {
  * eval functions over the same text are batched into one request per row,
  * which is what keeps a three-question run costing about what one costs.
  */
-export function instantEvalShorthandColumns({
+function instantEvalShorthandColumns({
   questions,
   text,
   reservedColumns,
@@ -203,7 +203,7 @@ function refuseForeignFields({
 }
 
 /** The statement a shorthand became, with the values it bound. */
-export interface ExpandedInstantEvalShorthand {
+interface ExpandedInstantEvalShorthand {
   readonly sql: string;
   readonly parameters: Readonly<Record<string, string | number | boolean | readonly string[]>>;
 }

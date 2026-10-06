@@ -45,7 +45,7 @@ import type {
 const logger = createLogger("langwatch:instant-eval:run");
 
 /** The plan a project's runs are capped by. */
-export interface InstantEvalRunPlan {
+interface InstantEvalRunPlan {
   readonly name: string;
   readonly isFree: boolean;
 }
@@ -86,7 +86,7 @@ export interface InstantEvalRunPeers {
 }
 
 /** An estimate, with what the free budget has left when one bounds the run. */
-export interface InstantEvalRunEstimate extends InstantEvalEstimate {
+interface InstantEvalRunEstimate extends InstantEvalEstimate {
   readonly freeBudgetRemainingUsd?: number;
 }
 
@@ -95,7 +95,7 @@ export interface InstantEvalRunEstimate extends InstantEvalEstimate {
  * operations this surface calls: what it composes is the behaviour, never the
  * repository behind it.
  */
-export interface InstantEvalRunUnits {
+interface InstantEvalRunUnits {
   statements: Pick<InstantEvalStatementService, "accept">;
   creates: Pick<InstantEvalCreateService, "createRun" | "nextRunId">;
   estimates: Pick<InstantEvalEstimateService, "estimateRun">;

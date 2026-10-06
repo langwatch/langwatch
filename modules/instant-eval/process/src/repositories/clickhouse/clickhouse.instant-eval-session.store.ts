@@ -2,7 +2,7 @@
  * What the process hands this module (ADR-147). The ClickHouse surface is
  * declared structurally so the package does not depend on the driver.
  */
-export type InstantEvalClickHouseClient = {
+type InstantEvalClickHouseClient = {
   query<T>(input: {
     query: string;
     query_params?: Record<string, unknown>;

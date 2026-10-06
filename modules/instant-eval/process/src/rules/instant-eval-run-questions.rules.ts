@@ -42,7 +42,7 @@ const questionKindSchema = z.enum(["boolean", "score", "category"]);
  * change, so a question whose function has since been renamed is still a run
  * that has to read back its counters.
  */
-export const instantEvalRunQuestionSchema = z.object({
+const instantEvalRunQuestionSchema = z.object({
   id: z.string().min(1),
   function: z.string().min(1),
   kind: questionKindSchema,
@@ -51,7 +51,7 @@ export const instantEvalRunQuestionSchema = z.object({
   threshold: z.number().optional(),
 });
 
-export const instantEvalRunQuestionsSchema = z.array(instantEvalRunQuestionSchema);
+const instantEvalRunQuestionsSchema = z.array(instantEvalRunQuestionSchema);
 
 /** The questions stored on a run, or none when the column is unreadable. */
 export function readInstantEvalRunQuestions(stored: unknown): readonly InstantEvalRunQuestion[] {

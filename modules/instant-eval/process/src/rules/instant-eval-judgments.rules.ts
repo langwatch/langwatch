@@ -68,7 +68,7 @@ export interface InstantEvalPageCounters {
   readonly skipped: number;
 }
 
-export interface InstantEvalPageMapping {
+interface InstantEvalPageMapping {
   readonly records: readonly InstantEvalJudgmentRecord[];
   readonly counters: InstantEvalPageCounters;
 }

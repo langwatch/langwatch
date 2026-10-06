@@ -56,7 +56,7 @@ export interface InstantEvalStoppablePage {
   readonly cancellation?: { readonly unjudgedRows: readonly number[] };
 }
 
-export interface InstantEvalPageCut {
+interface InstantEvalPageCut {
   /** The rows the page keeps: everything up to and including the last judged row. */
   readonly rows: readonly Record<string, unknown>[];
   /** Indexes into `rows` that carry no verdict because of the stop. */

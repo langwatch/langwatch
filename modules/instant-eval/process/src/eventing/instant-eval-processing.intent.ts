@@ -148,7 +148,7 @@ export interface InstantEvalDispatchDeps {
 }
 
 /** Whatever of an error is safe to log. */
-export function instantEvalErrorText(error: unknown): string {
+function instantEvalErrorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
@@ -156,7 +156,7 @@ export function instantEvalErrorText(error: unknown): string {
  * The code a failed run carries: a handled error's own, because it names
  * something a caller can act on. Anything else is `internal_error`.
  */
-export function instantEvalFailureCode(error: unknown): string {
+function instantEvalFailureCode(error: unknown): string {
   return error instanceof HandledError ? error.code : "internal_error";
 }
 
@@ -165,7 +165,7 @@ export function instantEvalFailureCode(error: unknown): string {
  * judged eighty pages and lost the eighty-first still spent what those pages
  * spent, and zeroing the counters here would file that spend nowhere.
  */
-export async function recordInstantEvalFailure({
+async function recordInstantEvalFailure({
   deps,
   payload,
   code,
@@ -205,7 +205,7 @@ export async function recordInstantEvalFailure({
  * The shared failure branch: retry while attempts remain, otherwise fail the
  * run and retire the message.
  */
-export async function handleInstantEvalIntentFailure({
+async function handleInstantEvalIntentFailure({
   deps,
   payload,
   error,

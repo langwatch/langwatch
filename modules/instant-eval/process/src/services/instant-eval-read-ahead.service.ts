@@ -16,10 +16,10 @@ const logger = createLogger("langwatch:instant-eval:read-ahead");
  * lands on another process never takes its page here; past the bound the
  * oldest is dropped, which costs that run one page read.
  */
-export const INSTANT_EVAL_READ_AHEAD_RUN_CAP = 64;
+const INSTANT_EVAL_READ_AHEAD_RUN_CAP = 64;
 
 /** What the next page must have been read with, to be the same page. */
-export type InstantEvalReadAheadKey = Readonly<{
+type InstantEvalReadAheadKey = Readonly<{
   runId: string;
   afterTraceId: string | null;
   afterSpanId: string | null;

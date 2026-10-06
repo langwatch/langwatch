@@ -34,26 +34,16 @@ export type InstantEvalIntents = {
 type InstantEvalContext = ProcessHandlerContext<InstantEvalIntents>;
 
 /** Deterministic outbox identities, unique per process instance. */
-export const instantEvalPlanKey = (runId: string): string => `plan:${runId}`;
+const instantEvalPlanKey = (runId: string): string => `plan:${runId}`;
 
-export const instantEvalPageIntentKey = ({
-  runId,
-  page,
-}: {
-  runId: string;
-  page: number;
-}): string => `page:${runId}:${page}`;
+const instantEvalPageIntentKey = ({ runId, page }: { runId: string; page: number }): string =>
+  `page:${runId}:${page}`;
 
-export const instantEvalFinishKey = ({
-  runId,
-  reason,
-}: {
-  runId: string;
-  reason: string;
-}): string => `finish:${runId}:${reason}`;
+const instantEvalFinishKey = ({ runId, reason }: { runId: string; reason: string }): string =>
+  `finish:${runId}:${reason}`;
 
 /** Schedule from the later of the input's instant and now. */
-export function instantEvalSchedulingRef(ctx: InstantEvalContext): number {
+function instantEvalSchedulingRef(ctx: InstantEvalContext): number {
   return Math.max(ctx.at, ctx.now);
 }
 
@@ -62,7 +52,7 @@ export function instantEvalSchedulingRef(ctx: InstantEvalContext): number {
  * omitted `nextWakeAt` to null: "leave the wake alone" is a value here, never
  * an omission.
  */
-export function instantEvalWakeFor(
+function instantEvalWakeFor(
   state: InstantEvalProcessState,
 ): Pick<ProcessEvolution<InstantEvalProcessState>, "nextWakeAt"> {
   switch (state.phase) {
@@ -82,7 +72,7 @@ export function instantEvalWakeFor(
 }
 
 /** A commit that moved the run on, with the stall wake re-armed. */
-export function instantEvalActive({
+function instantEvalActive({
   state,
   refMs,
   intents,
@@ -101,14 +91,14 @@ export function instantEvalActive({
 }
 
 /** A commit that changed nothing, keeping whatever wake was armed. */
-export function instantEvalUnchanged(
+function instantEvalUnchanged(
   state: InstantEvalProcessState,
 ): ProcessEvolution<InstantEvalProcessState> {
   return { state, ...instantEvalWakeFor(state) };
 }
 
 /** Rows one page judges, bounded by what the run may still judge. */
-export function instantEvalPageSizeFor(state: InstantEvalProcessState): number {
+function instantEvalPageSizeFor(state: InstantEvalProcessState): number {
   return Math.max(1, Math.min(state.pageSize, state.remaining));
 }
 

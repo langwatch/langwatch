@@ -13,7 +13,7 @@ import {
 } from "./instant-eval-run-questions.rules.ts";
 
 /** The columns a verdict fills, one kind of question each. */
-export interface InstantEvalVerdictColumns {
+interface InstantEvalVerdictColumns {
   readonly passed: number | null;
   readonly score: number | null;
   readonly label: string;

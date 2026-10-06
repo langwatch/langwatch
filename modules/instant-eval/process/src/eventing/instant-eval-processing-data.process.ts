@@ -29,15 +29,7 @@ export const INSTANT_EVAL_STALL_THRESHOLD_MS = 15 * 60 * 1000;
 export const INSTANT_EVAL_CANCEL_GRACE_MS = 2 * 60 * 1000;
 
 /** What a run is doing. */
-export const INSTANT_EVAL_PHASES = [
-  "idle",
-  "planning",
-  "running",
-  "cancelling",
-  "terminal",
-] as const;
-
-export type InstantEvalPhase = (typeof INSTANT_EVAL_PHASES)[number];
+const INSTANT_EVAL_PHASES = ["idle", "planning", "running", "cancelling", "terminal"] as const;
 
 export const instantEvalPlanIntentSchema = z.object({
   runId: z.string(),

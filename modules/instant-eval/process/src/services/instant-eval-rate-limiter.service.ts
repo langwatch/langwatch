@@ -34,7 +34,7 @@ const MAX_SLEEP_MS = 250;
  */
 const MAX_WAIT_MS = 120_000;
 
-export interface InstantEvalRateLimiterOptions extends InstantEvalRateLimitBuckets {
+interface InstantEvalRateLimiterOptions extends InstantEvalRateLimitBuckets {
   /** The shared buckets; when they cannot be reached the pod paces itself locally. */
   readonly buckets: InstantEvalRateLimitRepository;
   /** Input tokens a second the whole deployment may send. */
