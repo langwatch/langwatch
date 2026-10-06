@@ -2,11 +2,14 @@
  * @see specs/features/agents/voice-phone.feature
  */
 
+import { Socket } from "node:net";
+
 import { AgentRole } from "@langwatch/scenario";
 import type * as scenarioModule from "@langwatch/scenario";
 import {
   VoicePhoneTransportUnavailableError,
   PHONE_NO_BROWSER_CALL_MESSAGE,
+  VOICE_MEDIA_SOCKET_MESSAGE,
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -90,11 +93,13 @@ function buildTransport({
   environment = { voicePublicBaseUrl: "https://voice.example.com" },
   registerNonce = async () => {},
   raceUpgradeRefusal = <T>(promise: Promise<T>) => promise,
+  socketReceiver = { onVoiceSocket: () => () => {} },
 }: {
   adapter?: FakeAdapter;
   environment?: PhoneTransportEnvironment;
   registerNonce?: NonceRegistrar;
   raceUpgradeRefusal?: <T>(promise: Promise<T>) => Promise<T>;
+  socketReceiver?: Parameters<typeof createPhoneTransport>[0]["socketReceiver"];
 } = {}) {
   const factoryOptions: Parameters<TwilioAgentFactory>[0][] = [];
   const twilioAgentFactory: TwilioAgentFactory = (options) => {
@@ -107,7 +112,7 @@ function buildTransport({
     registerNonce,
     mintNonce: () => "nonce-1",
     raceUpgradeRefusal,
-    socketReceiver: { onVoiceSocket: () => () => {} },
+    socketReceiver,
   });
   return { transport, adapter, factoryOptions };
 }
@@ -185,6 +190,52 @@ describe("phoneTransport", () => {
         });
         await built.connect();
         expect(adapter.placeCallArgs[0]?.maxCallDurationSeconds).toBe(90);
+      });
+    });
+
+    describe("when the parent hands the child Twilio's media socket", () => {
+      /** @scenario "The child feeds a handed-off Twilio socket into its own adapter" */
+      it("forwards the received socket into the adapter's own upgrade handler", () => {
+        let deliver: Parameters<
+          NonNullable<Parameters<typeof createPhoneTransport>[0]["socketReceiver"]>["onVoiceSocket"]
+        >[0] = () => {};
+        const receiveExternalMediaSocket = vi.fn();
+        const adapter = Object.assign(fakeAdapter(), { receiveExternalMediaSocket });
+        const { transport } = buildTransport({
+          adapter,
+          socketReceiver: {
+            onVoiceSocket: (handler) => {
+              deliver = handler;
+              return () => {};
+            },
+          },
+        });
+        transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+        const socket = new Socket();
+        const head = Buffer.from("hello");
+
+        deliver({
+          message: {
+            type: VOICE_MEDIA_SOCKET_MESSAGE,
+            nonce: "nonce-1",
+            url: "/twilio/nonce-1",
+            method: "GET",
+            headers: { upgrade: "websocket" },
+            headBase64: head.toString("base64"),
+          },
+          socket,
+          head,
+        });
+
+        expect(receiveExternalMediaSocket).toHaveBeenCalledExactlyOnceWith({
+          req: { method: "GET", url: "/twilio/nonce-1", headers: { upgrade: "websocket" } },
+          socket,
+          head,
+        });
       });
     });
 

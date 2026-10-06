@@ -115,6 +115,34 @@ describe("the scenarios REST declaration", () => {
     });
   });
 
+  describe("when a scenario is created with field values", () => {
+    /** @scenario "The scenario API accepts and returns field values" */
+    it("answers the fields on create and on read", async () => {
+      const family = await buildScenarioFamily();
+      const suite = await family.app.createTestSuite({
+        projectId: PROJECT_ID,
+        name: "Case lookups",
+        fields: [{ identifier: "golden_sql", type: "text" }],
+      });
+
+      const createdResponse = await createScenario(family, {
+        name: "Chargebacks by quarter",
+        situation: "An analyst asks for chargebacks per quarter",
+        testSuiteId: suite.id,
+        fields: { golden_sql: "SELECT 1" },
+      });
+
+      expect(createdResponse.status).toBe(201);
+      const created = scenarioRestResponseWithPlatformUrlSchema.parse(await createdResponse.json());
+      expect(created.fields).toEqual({ golden_sql: "SELECT 1" });
+      const readResponse = await family.request(`/api/scenarios/${created.id}`);
+      expect(readResponse.status).toBe(200);
+      await expect(readResponse.json()).resolves.toMatchObject({
+        fields: { golden_sql: "SELECT 1" },
+      });
+    });
+  });
+
   describe("when clearing a model override", () => {
     /** @scenario "Update over REST clears a model override with null" */
     it("stores and returns null", async () => {

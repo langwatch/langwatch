@@ -1,5 +1,6 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
+import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type * as observability from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
@@ -14,7 +15,9 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => ({ info: logInfo, warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
+import { simulationRunState } from "../../__tests__/support/simulation-run-state.fixture.ts";
 import type { ScenarioTabStore } from "../../app/scenario.app.ts";
+import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { scenarioEventsRest } from "../scenario-event.rest.ts";
 import {
   createScenarioRestTestApp,
@@ -191,6 +194,38 @@ describe("the scenario-events REST declaration", () => {
         hasMore: false,
       });
       expect(deleteRun).toHaveBeenCalledTimes(2);
+    });
+
+    /** @scenario "Archiving the default set matches both default and empty set ids" */
+    it("selects the runs stored under both ids and no other set's", async () => {
+      const repositories = MemoryScenarioRepositories.create();
+      const store = repositories.simulationRunProcessing.runStateStore({
+        defaultRetentionDays: () => 30,
+      });
+      for (const [scenarioRunId, ScenarioSetId] of [
+        ["run-default", "default"],
+        ["run-legacy", ""],
+        ["run-other", "set-b"],
+      ] as const) {
+        await store.store(simulationRunState({ ScenarioRunId: scenarioRunId, ScenarioSetId }), {
+          tenantId: createTenantId(PROJECT_ID),
+          aggregateId: scenarioRunId,
+        });
+      }
+      const deleted: string[] = [];
+      const family = await buildEventFamily({
+        simulations: {
+          getRunIdsForSet: (input) => repositories.simulations.findAllRunIdsForSet(input),
+          deleteRun: async ({ scenarioRunId }) => {
+            deleted.push(scenarioRunId);
+          },
+        },
+      });
+
+      const response = await deleteEvents(family, "?scenarioSetId=default");
+
+      await expect(response.json()).resolves.toMatchObject({ archived: 2, failed: 0 });
+      expect(deleted.toSorted()).toEqual(["run-default", "run-legacy"]);
     });
 
     it("returns an empty archive result without dispatching deletes", async () => {
@@ -524,6 +559,7 @@ describe("the scenario-events usage gate", () => {
   describe("when the organization spent its monthly allowance", () => {
     /** @scenario "A scenario event past the monthly usage limit is refused" */
     /** @scenario "A scenario event past the monthly allowance is refused with the plan limit" */
+    /** @scenario "Reporting a scenario event over the allowance is refused" */
     it("refuses the event with the plan limit and dispatches nothing", async () => {
       const messageSnapshot = vi.fn();
       const family = await buildEventFamily({
@@ -533,6 +569,7 @@ describe("the scenario-events usage gate", () => {
 
       const response = await postJson(family, "/api/scenario-events", messageSnapshotEvent());
       expect(response.status).toBe(402);
+      expect(response.headers.get("retry-after")).toBeNull();
       await expect(response.json()).resolves.toMatchObject({ error: "ERR_PLAN_LIMIT" });
       expect(messageSnapshot).not.toHaveBeenCalled();
     });

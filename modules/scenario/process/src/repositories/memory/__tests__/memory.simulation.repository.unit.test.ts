@@ -2,6 +2,7 @@ import { createTenantId } from "@langwatch/eventing";
 import {
   AGENT_TEST_SET_SUFFIX,
   SimulationRunStatus,
+  Verdict,
   VOICE_CALL_SCENARIO_SET_ID,
 } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
@@ -611,6 +612,119 @@ describe("MemorySimulationRepository", () => {
       expect(await simulations.countUsage({ projectIds, since: 2_000 })).toBe(1);
       expect(await simulations.countOrganizationRuns({ projectIds })).toBe(2);
       expect(await simulations.countOrganizationRuns({ projectIds: [] })).toBe(0);
+    });
+  });
+
+  describe("when a run awaits its evaluators (PENDING_EVALUATION)", () => {
+    /** @scenario "A run with attached evaluators reads as pending until they are recorded" */
+    it("reads as pending with the judge's verdict and counts as running, not settled", async () => {
+      const { simulations } = await given([
+        runState({
+          ScenarioRunId: "pending",
+          BatchRunId: "batch-1",
+          Status: "PENDING_EVALUATION",
+          Verdict: "success",
+        }),
+        runState({ ScenarioRunId: "settled", BatchRunId: "batch-2", Status: "SUCCESS" }),
+      ]);
+
+      const pending = await simulations.findScenarioRunData({
+        projectId: PROJECT,
+        scenarioRunId: "pending",
+      });
+      const batch = await simulations.findBatchSummary({
+        projectId: PROJECT,
+        batchRunId: "batch-1",
+      });
+      const settled = await simulations.findScenarioRunData({
+        projectId: PROJECT,
+        scenarioRunId: "settled",
+      });
+      const settledBatch = await simulations.findBatchSummary({
+        projectId: PROJECT,
+        batchRunId: "batch-2",
+      });
+
+      expect(pending?.status).toBe(SimulationRunStatus.PENDING_EVALUATION);
+      expect(pending?.results?.verdict).toBe(Verdict.SUCCESS);
+      expect(batch).toMatchObject({ runningCount: 1, settledCount: 0 });
+      expect(settled?.status).toBe(SimulationRunStatus.SUCCESS);
+      expect(settledBatch).toMatchObject({ runningCount: 0, settledCount: 1, passCount: 1 });
+    });
+
+    /** @scenario "The batch and the set aggregates agree on a pending run" */
+    it("is no settled and no passed run in the batch summary nor in the set summaries", async () => {
+      const { simulations } = await given([
+        runState({
+          ScenarioRunId: "pending",
+          BatchRunId: "batch-1",
+          ScenarioSetId: "set-1",
+          Status: "PENDING_EVALUATION",
+        }),
+      ]);
+
+      const batch = await simulations.findBatchSummary({
+        projectId: PROJECT,
+        batchRunId: "batch-1",
+      });
+      const sets = await simulations.findExternalSetSummaries({ projectId: PROJECT });
+
+      expect(batch).toMatchObject({
+        totalCount: 1,
+        runningCount: 1,
+        settledCount: 0,
+        passCount: 0,
+      });
+      expect(sets).toEqual([
+        {
+          scenarioSetId: "set-1",
+          passedCount: 0,
+          failedCount: 0,
+          totalCount: 0,
+          lastRunTimestamp: 1_000,
+        },
+      ]);
+    });
+  });
+
+  describe("when a run stored with evaluations is read back (findScenarioRunData)", () => {
+    /** @scenario "Code-run results with evaluations are stored as sent and read back typed" */
+    it("answers every evaluation field in order, and none for a run without any", async () => {
+      const every: SimulationRunStateData["Evaluations"][number] = {
+        evaluatorId: "ragas/sql_query_equivalence",
+        name: "SQL Query Equivalence",
+        status: "failed",
+        required: true,
+        passed: false,
+        score: 0.25,
+        label: "different",
+        details: "The generated query filters on the wrong column.",
+        cost: { currency: "USD", amount: 0.002 },
+        inputs: { output: "SELECT 1", expected_output: "SELECT 2" },
+      };
+      const scored: SimulationRunStateData["Evaluations"][number] = {
+        evaluatorId: "eval_quality",
+        name: "Answer quality",
+        status: "scored",
+        required: false,
+        score: 0.8,
+      };
+      const { simulations } = await given([
+        runState({ ScenarioRunId: "evaluated", Evaluations: [every, scored] }),
+        runState({ ScenarioRunId: "plain", Evaluations: [] }),
+      ]);
+
+      const evaluated = await simulations.findScenarioRunData({
+        projectId: PROJECT,
+        scenarioRunId: "evaluated",
+      });
+      const plain = await simulations.findScenarioRunData({
+        projectId: PROJECT,
+        scenarioRunId: "plain",
+      });
+
+      expect(evaluated?.results?.evaluations).toEqual([every, scored]);
+      expect(plain?.results?.evaluations ?? []).toEqual([]);
     });
   });
 });
