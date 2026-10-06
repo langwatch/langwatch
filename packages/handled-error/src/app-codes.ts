@@ -556,7 +556,6 @@ export const APP_ERROR_CODES = [
   "personal_workspace_boundary",
   "personal_workspace_not_managed_here",
   "platform_health_subsystem_not_found",
-  "platform_health_unauthorized",
   "platform_health_unhealthy",
   "platform_operator_last_holder",
   "platform_operator_self_grant",

@@ -9,17 +9,28 @@ const secrets = new ScopedSecrets(async (handle: SecretHandle<unknown>, build) =
   build(values[handle.id]),
 );
 
+const presenting = (key: string) =>
+  new Request("http://localhost/api/v1/platform-health", {
+    headers: { authorization: `Bearer ${key}` },
+  });
+
 describe("given the monitoring key is declared as a secret handle", () => {
   describe("when the app is created", () => {
-    it("reads the key through the handle and accepts it", async () => {
+    it("reads the key through the handle into the family's door", async () => {
       const app = await PlatformHealthModule.create({
         dependencies: {},
         members: { publicBaseUrl: undefined },
         secrets,
       } as never);
 
-      expect(app.acceptsKey("monitoring-key")).toBe(true);
-      expect(app.acceptsKey("other")).toBe(false);
+      expect(app.monitorDoor.identify?.({ request: presenting("monitoring-key") })).toEqual({
+        actor: null,
+        scope: null,
+        internal: { type: "internalSecret", secretName: "platform-health" },
+      });
+      expect(() => app.monitorDoor.identify?.({ request: presenting("other") })).toThrow(
+        expect.objectContaining({ code: "unauthorized" }),
+      );
     });
   });
 });

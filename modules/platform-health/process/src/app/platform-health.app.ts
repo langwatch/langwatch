@@ -1,4 +1,6 @@
 import { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { RestIdentity } from "@langwatch/api/hosting";
+import { BearerIdentity } from "@langwatch/api/rest";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { LangyApi, type LangyKeyCaller } from "@langwatch/langy-contract";
 import {
@@ -20,7 +22,6 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { HttpSubsystemProbeChannel } from "../channels/http/http.subsystem-probe.channel.ts";
 import { LangyCanaryService } from "../services/langy-canary.service.ts";
-import { PlatformHealthKeyService } from "../services/platform-health-key.service.ts";
 import { PlatformHealthService } from "../services/platform-health.service.ts";
 import { ProjectKeyedProbeService } from "../services/project-keyed-probe.service.ts";
 import { ScenarioCanaryService } from "../services/scenario-canary.service.ts";
@@ -70,18 +71,18 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
   static readonly reads = ["publicBaseUrl"] as const;
 
   readonly #health: PlatformHealthService;
-  readonly #key: PlatformHealthKeyService;
+  readonly #monitorDoor: RestIdentity;
   readonly #projectKeyed: ProjectKeyedProbeService;
   readonly #langyCanary: LangyCanaryService;
 
   private constructor(services: {
     health: PlatformHealthService;
-    key: PlatformHealthKeyService;
+    monitorDoor: RestIdentity;
     projectKeyed: ProjectKeyedProbeService;
     langyCanary: LangyCanaryService;
   }) {
     this.#health = services.health;
-    this.#key = services.key;
+    this.#monitorDoor = services.monitorDoor;
     this.#projectKeyed = services.projectKeyed;
     this.#langyCanary = services.langyCanary;
   }
@@ -95,7 +96,9 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
       PlatformHealthModule.secrets.probeApiKey,
       (value) => value ?? "",
     );
-    const apiKey = await secrets.into(PlatformHealthModule.secrets.apiKey, (value) => value ?? "");
+    const monitorDoor = await secrets.into(PlatformHealthModule.secrets.apiKey, (token) =>
+      BearerIdentity.create({ name: "platform-health", token }),
+    );
     const collaborators: SubsystemProbeCollaborators = {
       canaries: HttpSubsystemProbeChannel.create({ publicBaseUrl: members.publicBaseUrl ?? "" }),
       automation: () => ({
@@ -123,9 +126,7 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
           SubsystemProbeRunService.create({ name, probes, credential }),
         ),
       }),
-      key: PlatformHealthKeyService.create({
-        apiKey,
-      }),
+      monitorDoor,
       projectKeyed: ProjectKeyedProbeService.create({
         probes,
         resolveProject: async (input) =>
@@ -159,7 +160,11 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
     return this.#health.checkOne(name, query);
   }
 
-  acceptsKey(presented: string | null | undefined): boolean {
-    return this.#key.accepts(presented);
+  /**
+   * The monitoring family's door: the deployment's key as a bearer. Unset, the
+   * family answers 404 as though it were not there; blank, it answers 500.
+   */
+  get monitorDoor(): RestIdentity {
+    return this.#monitorDoor;
   }
 }

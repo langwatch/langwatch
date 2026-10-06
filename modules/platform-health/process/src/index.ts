@@ -11,7 +11,4 @@ export type {
   SubsystemProbeResult,
   SubsystemProbeRunner,
 } from "./services/subsystem-probe-run.service.ts";
-export {
-  platformHealthAuthorization,
-  platformHealthRest,
-} from "./transport/platform-health.rest.ts";
+export { platformHealthRest } from "./transport/platform-health.rest.ts";

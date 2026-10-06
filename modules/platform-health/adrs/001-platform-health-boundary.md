@@ -65,9 +65,9 @@ presenting nothing.
 
 ## Errors
 
-A missing or wrong key raises `PlatformHealthUnauthorizedError`
-(`platform_health_unauthorized`, 401) before any probe runs, and says nothing
-about which half of the check failed. Everything else is reported rather than
+A missing or wrong key is refused by the family's bearer door (`unauthorized`, 401) before any probe runs, and says nothing about which half of the check
+failed; with no key set the door answers 404, as though the family were not there
+(amended 2026-10-06: the key moved from a route middleware to the door). Everything else is reported rather than
 thrown: a probe that fails is a `unhealthy` entry in the report, and a probe
 that throws is caught and reported the same way, because a monitor that loses
 the whole answer to one broken subsystem cannot tell a broken platform from a

@@ -3434,11 +3434,6 @@ const presentations = {
     describe: () =>
       "Ask for one of the subsystems this platform reports on, or drop the name to get the whole platform.",
   },
-  platform_health_unauthorized: {
-    title: "That platform health key was not accepted",
-    describe: () =>
-      "Send the monitoring key this deployment was configured with as a bearer token. Check it is current and copied in full.",
-  },
   platform_health_unhealthy: {
     title: "The platform is not healthy",
     describe: () =>
