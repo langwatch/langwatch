@@ -10,7 +10,7 @@ Feature flags: evaluation, operator administration and the browser's authorized 
 | -------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Classification | core (`modules/catalogue.json`)                                                                                          |
 | Subjects       | feature-flag                                                                                                             |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                                           |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                                 |
 | Api token      | `FeatureFlagApi` = `moduleApi<FeatureFlagApi>()("feature-flag")`, `contract/src/feature-flag.api.ts:138` (16 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                               |
 
@@ -30,7 +30,6 @@ Anything else feature-flag needs belongs to another module and is reached throug
 | --------------- | ----------------- | ----------------------------------------- |
 | `organizations` | `OrganizationApi` | [organization](../organization/README.md) |
 | `permissions`   | `AuthzApi`        | [authz](../authz/README.md)               |
-| `projects`      | `ProjectApi`      | [project](../project/README.md)           |
 
 ## Who depends on feature-flag
 

@@ -38,10 +38,7 @@ function serve({ limitBytes }: { limitBytes?: number } = {}): FakeServer {
     const size = new TextEncoder().encode(text).length;
     if (limitBytes !== undefined && size > limitBytes) {
       server.refusedSizes.push(size);
-      return Response.json(
-        { code: "payload_too_large", message: "Too large" },
-        { status: 413 },
-      );
+      return Response.json({ code: "payload_too_large", message: "Too large" }, { status: 413 });
     }
     server.sizes.push(size);
     server.bodies.push(JSON.parse(text) as LogResultsRequest);

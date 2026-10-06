@@ -93,10 +93,10 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   }),
 }));
 
-vi.mock("../../../behavior/agent-api.ts", () => ({
-  agentApi: {
-    agents: {
-      testRun: {
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    scenarios: {
+      testAgentRun: {
         useMutation: (options: {
           onSuccess: (run: { scenarioRunId: string; batchRunId: string }) => void;
           onError: (error: Error) => void;
@@ -111,6 +111,13 @@ vi.mock("../../../behavior/agent-api.ts", () => ({
           },
         }),
       },
+    },
+  },
+}));
+
+vi.mock("../../../behavior/agent-api.ts", () => ({
+  agentApi: {
+    agents: {
       getAll: {
         useQuery: () => ({
           data: listedAgents.current,

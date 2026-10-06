@@ -228,7 +228,7 @@ so F10 must be resolved before the first release (Q9).
 Every step has one shape:
 
 - **id**: stable, never reused, the ledger key. SQL steps use their file name
-  (`prisma:20261002120016_user_notification_preferences`, `clickhouse:00104`); code steps the owning
+  (`prisma:20261006170517_user_notification_preferences`, `clickhouse:00104`); code steps the owning
   module plus a name (`dataset:content-to-object-storage`).
 - **kind**: `postgres-schema`, `clickhouse-schema`, `data`, `tenant`, `procedure`.
 - **release**: stamped when the release is cut (6.3).

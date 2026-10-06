@@ -47,7 +47,9 @@ async function datasetWith(
   requestBounds = createDatasetTestRequestBounds(),
 ) {
   const getMetadata = vi.fn(async () => answer());
-  const storeFromBytes = vi.fn(async () => ({ reference: { id: "object-1", byteLength: 16 } }) as never);
+  const storeFromBytes = vi.fn(
+    async () => ({ reference: { id: "object-1", byteLength: 16 } }) as never,
+  );
   const storedObjects = createApiFixture<StoredObjectApi>(
     { getMetadata, storeFromBytes },
     "storedObjects",

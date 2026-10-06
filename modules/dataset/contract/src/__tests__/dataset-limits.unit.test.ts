@@ -1,7 +1,4 @@
-import {
-  DATASET_ATTACHMENT_OVERRIDE_CEILING_BYTES,
-  resolveRequestBound,
-} from "@langwatch/plans";
+import { DATASET_ATTACHMENT_OVERRIDE_CEILING_BYTES, resolveRequestBound } from "@langwatch/plans";
 import {
   DATASET_ATTACHMENT_PURPOSE_CEILING_BYTES,
   DATASET_ATTACHMENT_PURPOSE_DEFAULT_BYTES,
@@ -29,7 +26,9 @@ describe("dataset limits", () => {
     });
 
     it("never states a ceiling below the default", () => {
-      for (const name of Object.keys(DATASET_LIMIT_BOUND_KEYS) as (keyof typeof DATASET_DEFAULT_LIMITS)[]) {
+      for (const name of Object.keys(
+        DATASET_LIMIT_BOUND_KEYS,
+      ) as (keyof typeof DATASET_DEFAULT_LIMITS)[]) {
         expect(DATASET_CEILING_LIMITS[name]).toBeGreaterThanOrEqual(DATASET_DEFAULT_LIMITS[name]);
       }
     });

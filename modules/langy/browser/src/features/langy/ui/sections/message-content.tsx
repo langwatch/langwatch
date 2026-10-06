@@ -105,6 +105,8 @@ type MessageContentProps = {
    * emptiness was the user's own doing, and the copy should say so.
    */
   interrupted?: boolean;
+  /** The last message of the conversation: the empty reply row speaks only there. */
+  isLatest?: boolean;
   /** Active conversation id, so feedback can attach to it. */
   conversationId?: string | null;
   /**
@@ -335,8 +337,16 @@ function showsFeedbackPrompt({
  * A settled reply with nothing visible to say — the model spent the turn reasoning, or the user
  * stopped it first. While streaming there is no box at all: the working lines own the live edge.
  */
-function EmptyAnswer({ isStreaming, interrupted }: { isStreaming: boolean; interrupted: boolean }) {
-  if (isStreaming) return null;
+function EmptyAnswer({
+  isStreaming,
+  interrupted,
+  isLatest,
+}: {
+  isStreaming: boolean;
+  interrupted: boolean;
+  isLatest: boolean;
+}) {
+  if (isStreaming || !isLatest) return null;
   return <MutedAnswerLine>{interrupted ? "Interrupted" : "No content"}</MutedAnswerLine>;
 }
 
@@ -360,11 +370,17 @@ function MutedAnswerLine({ children }: { children: string }) {
  * No avatar: Langy's mark lives on the launcher and the empty state, nowhere else.
  */
 function AssistantMessage(props: MessageContentProps) {
-  const { message, isStreaming = false, interrupted = false, conversationId } = props;
+  const {
+    message,
+    isStreaming = false,
+    interrupted = false,
+    isLatest = true,
+    conversationId,
+  } = props;
   const { project } = useOrganizationTeamProject();
   const reading = useAnswerReading({ message, isStreaming });
   if (!answerHasContent(reading)) {
-    return <EmptyAnswer isStreaming={isStreaming} interrupted={interrupted} />;
+    return <EmptyAnswer isStreaming={isStreaming} interrupted={interrupted} isLatest={isLatest} />;
   }
   const view: RunView = {
     isStreaming,

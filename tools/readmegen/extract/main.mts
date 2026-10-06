@@ -2,7 +2,8 @@
 // facts syntactically, booting nothing, and writes one JSON manifest the Go
 // renderer decodes. Usage: node --experimental-transform-types main.mts <out> <root>
 import { writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   clickhouseTables,
@@ -31,6 +32,7 @@ import {
   type Stores,
   type Token,
 } from "./module-facts.mts";
+import { type ProcessFacts, readProcess } from "./process-facts.mts";
 
 type ModuleFacts = {
   id: string;
@@ -43,6 +45,7 @@ type ModuleFacts = {
   prismaClaims: { model: string; at: At }[];
   prismaDelegates: Delegate[];
   clickhouseWrites: { table: string; at: At }[];
+  process: ProcessFacts;
 };
 
 const [outFile, rootArgument] = process.argv.slice(2);
@@ -77,6 +80,12 @@ const tokensByModule = new Map(
 const moduleOfToken = new Map(
   [...tokensByModule.values()].flat().map((token) => [token.name, token.module]),
 );
+function moduleOfFile(file: string): string {
+  const owner = packages.find((pkg) => file.startsWith(pkg.root + sep));
+
+  return owner?.feature ?? "";
+}
+
 const access = collectAccess(root, catalogue, clickhouseTables(root));
 
 function factsOf(entry: FeatureCatalogueEntry): ModuleFacts {
@@ -110,11 +119,42 @@ function factsOf(entry: FeatureCatalogueEntry): ModuleFacts {
     })),
     prismaDelegates: readPrismaDelegates({ files: processFiles, reading }),
     clickhouseWrites: [...writes.values()],
+    process: readProcess({ files: processFiles, reading, moduleOfFile }),
   };
+}
+
+type MountedRoute = { method: string; path: string; family: string; canonicalPath: string };
+
+/** The api's REST app mounted from the declarations alone, as openapi-document.ts mounts it. */
+async function mountedRoutes(): Promise<{ routes: MountedRoute[]; error: string }> {
+  try {
+    const described = await import(
+      pathToFileURL(join(root, "apps/api/src/openapi-document.ts")).href
+    );
+    described.describedRestApplication();
+    const registry = await import(
+      pathToFileURL(join(root, "packages/api/src/route-registry.ts")).href
+    );
+    const routes = (
+      registry.allRegisteredRoutes() as (MountedRoute & { isNamespaceGuard?: boolean })[]
+    )
+      .filter((route) => !route.isNamespaceGuard)
+      .map((route) => ({
+        method: route.method,
+        path: route.path,
+        family: route.family,
+        canonicalPath: route.canonicalPath ?? "",
+      }));
+
+    return { routes, error: "" };
+  } catch (error) {
+    return { routes: [], error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 const manifest = {
   modules: catalogue.map(factsOf),
+  mounted: await mountedRoutes(),
   packages: packages.map((pkg) => ({
     name: pkg.name,
     root: relative(root, pkg.root),
@@ -124,3 +164,5 @@ const manifest = {
 };
 
 writeFileSync(outFile, `${JSON.stringify(manifest, null, 2)}\n`);
+// The mounted api graph holds timers and handles open; the manifest is written.
+process.exit(0);

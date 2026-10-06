@@ -10,7 +10,7 @@ Licences: validating and storing a signed licence, the plan it grants, and the p
 | -------------- | -------------------------------------------------------------------------------------------------------------- |
 | Classification | enterprise (`modules/catalogue.json`)                                                                          |
 | Subjects       | license, licensing                                                                                             |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                                 |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                       |
 | Api token      | `LicensingApi` = `moduleApi<LicensingApi>()("licensing")`, `contract/src/licensing.api.ts:285` (57 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                     |
 

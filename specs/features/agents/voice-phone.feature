@@ -283,9 +283,9 @@ Feature: Voice agents: reach an agent by phone
 
   @unit
   Scenario: A worker's own voice boot failure does not take the worker down
-    Given a worker whose voice tunnel or media listener boot step fails
-    When the worker boots
-    Then the failure is logged and the rest of the worker boots normally
+    Given a worker whose voice tunnel fails to open
+    When the worker resolves its public voice address
+    Then it stays up without an address and names the reason the tunnel gave
 
   @unit
   Scenario: A worker's boot plan always includes the voice media listener

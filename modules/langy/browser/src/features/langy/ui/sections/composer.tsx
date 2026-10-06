@@ -104,6 +104,11 @@ export const AWAITING_ANSWER_TERMINAL_PLACEHOLDER = LANGY_ANSWER_HERE_OR_TERMINA
 export const COMPOSER_DATA_USE_NOTICE = "Note: these chats are used by LangWatch to improve Langy.";
 
 /** The gutter under the composer card: none on the hero, tighter when floating. */
+/** A turn in flight is the one lock reason the model pill names on hover. */
+function turnLock({ turnActive }: { turnActive: boolean }) {
+  return turnActive ? ("turn-active" as const) : undefined;
+}
+
 function composerGutter({ hero, floating }: { hero: boolean; floating: boolean }) {
   if (hero) return 0;
   return floating ? 2 : 3.5;
@@ -402,6 +407,7 @@ function ComposerImpl({
                 // greys out until the turn settles rather than offering a
                 // choice that wouldn't take.
                 disabled={disabled || turnActive}
+                disabledReason={turnLock({ turnActive })}
               />
               <SigilButton
                 sigil="#"

@@ -82,7 +82,8 @@ def sync_detailed(
 ) -> Response[Any | DatasetAttachment]:
     """Upload a file for an image or file column and get the reference a cell holds. The project is named
     by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional
-    `datasetId` field. upload the file as a stored object, then put its reference in the cell
+    `datasetId` field. create the upload, send the file to the address it answers, confirm it as a
+    stored object, then put its reference in the cell
 
     Args:
         project_id (str):
@@ -116,7 +117,8 @@ def sync(
 ) -> Any | DatasetAttachment | None:
     """Upload a file for an image or file column and get the reference a cell holds. The project is named
     by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional
-    `datasetId` field. upload the file as a stored object, then put its reference in the cell
+    `datasetId` field. create the upload, send the file to the address it answers, confirm it as a
+    stored object, then put its reference in the cell
 
     Args:
         project_id (str):
@@ -145,7 +147,8 @@ async def asyncio_detailed(
 ) -> Response[Any | DatasetAttachment]:
     """Upload a file for an image or file column and get the reference a cell holds. The project is named
     by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional
-    `datasetId` field. upload the file as a stored object, then put its reference in the cell
+    `datasetId` field. create the upload, send the file to the address it answers, confirm it as a
+    stored object, then put its reference in the cell
 
     Args:
         project_id (str):
@@ -177,7 +180,8 @@ async def asyncio(
 ) -> Any | DatasetAttachment | None:
     """Upload a file for an image or file column and get the reference a cell holds. The project is named
     by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional
-    `datasetId` field. upload the file as a stored object, then put its reference in the cell
+    `datasetId` field. create the upload, send the file to the address it answers, confirm it as a
+    stored object, then put its reference in the cell
 
     Args:
         project_id (str):

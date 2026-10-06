@@ -8,7 +8,7 @@
 | -------------- | ------------------------------------- |
 | Classification | enterprise (`modules/catalogue.json`) |
 | Subjects       | beta                                  |
-| Halves         | [process](process)                    |
+| Halves         | [process](process/README.md)          |
 | Api token      | none                                  |
 | Installed by   | –                                     |
 

@@ -204,7 +204,8 @@ export const requestBounds = [
   },
   {
     key: "datasetAttachmentBytes",
-    description: "Largest file an image or file cell accepts; every other dataset byte bound derives from it.",
+    description:
+      "Largest file an image or file cell accepts; every other dataset byte bound derives from it.",
     unit: "bytes",
     free: DATASET_DEFAULT_BOUNDS.datasetAttachmentBytes,
     paid: DATASET_DEFAULT_BOUNDS.datasetAttachmentBytes,

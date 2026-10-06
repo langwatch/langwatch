@@ -76,7 +76,8 @@ const EXTENSION_BY_SUBTYPE: Readonly<Record<string, string>> = {
 /** The name a stored inline file gets: the column it sat in, with an ending for its media type. */
 export function inlineFileNameOf(column: string, mediaType: string): string {
   const subtype = mediaType.split("/")[1] ?? "";
-  const extension = EXTENSION_BY_SUBTYPE[subtype] ?? (/^[a-z0-9]+$/.test(subtype) ? subtype : "bin");
+  const extension =
+    EXTENSION_BY_SUBTYPE[subtype] ?? (/^[a-z0-9]+$/.test(subtype) ? subtype : "bin");
 
   // The served name is cut to a fixed length, so the column part leaves room for the ending.
   return `${column.slice(0, COLUMN_NAME_LENGTH)}.${extension}`;

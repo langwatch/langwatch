@@ -51,11 +51,13 @@ Feature: One shared scope host on every route
     Then annotation update is not permitted by the shared permission reader
     And the legacy permission reader also returns false
 
+  # Main's behaviour (Alex, 2026-10-06, scope knot Q2): organization permissions follow the project grant.
   @integration
-  Scenario: Organization permissions are independent of project permissions
-    Given the caller can manage a project but cannot manage its organization
+  Scenario: Organization permissions follow the active project's grant
+    Given the caller's grant in the active project includes organization management
     When the shared permission reader checks organization management
-    Then the project grant does not satisfy that check
+    Then the project grant satisfies that check
+    And no separate organization grant read is sent
 
   @integration
   Scenario Outline: A share route never falls back to the viewer's active project

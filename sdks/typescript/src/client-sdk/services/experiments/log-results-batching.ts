@@ -28,12 +28,16 @@ export function serializedBytes(value: unknown): number {
 
 function entriesOf(body: LogResultsRequest): SizedEntry[] {
   return [
-    ...body.dataset.map(
-      (entry): SizedEntry => ({ kind: "dataset", entry, bytes: serializedBytes(entry) }),
-    ),
-    ...body.evaluations.map(
-      (entry): SizedEntry => ({ kind: "evaluation", entry, bytes: serializedBytes(entry) }),
-    ),
+    ...body.dataset.map((entry): SizedEntry => ({
+      kind: "dataset",
+      entry,
+      bytes: serializedBytes(entry),
+    })),
+    ...body.evaluations.map((entry): SizedEntry => ({
+      kind: "evaluation",
+      entry,
+      bytes: serializedBytes(entry),
+    })),
   ];
 }
 

@@ -58,7 +58,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     in_flight: str | Unset = UNSET,
 ) -> Response[PollConnectedAgentInstanceResponse200]:
     """Wait for call and cancel frames while refreshing this instance's presence
@@ -87,7 +87,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     in_flight: str | Unset = UNSET,
 ) -> PollConnectedAgentInstanceResponse200 | None:
     """Wait for call and cancel frames while refreshing this instance's presence
@@ -111,7 +111,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     in_flight: str | Unset = UNSET,
 ) -> Response[PollConnectedAgentInstanceResponse200]:
     """Wait for call and cancel frames while refreshing this instance's presence
@@ -138,7 +138,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     in_flight: str | Unset = UNSET,
 ) -> PollConnectedAgentInstanceResponse200 | None:
     """Wait for call and cancel frames while refreshing this instance's presence

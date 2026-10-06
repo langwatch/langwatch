@@ -20,8 +20,6 @@ import type {
   AgentOverview,
   AgentOverviewPage,
   RelatedAgentEntities,
-  AgentTestRunResult,
-  AgentTestTurnResult,
   AgentCreationWindowInput,
 } from "./agent.queries.ts";
 import type * as agentQueriesModule from "./agent.queries.ts";
@@ -167,21 +165,6 @@ export interface AgentApi {
   getConnectedByName(input: { projectId: string; name: string }): Promise<Agent[]>;
   /** Unarchived, recently seen connected agents in these projects, newest registration first. */
   findConnectedInProjects(input: { projectIds: string[] }): Promise<Agent[]>;
-  testTurn(input: {
-    id: string;
-    projectId: string;
-    message: string;
-    params?: Record<string, string | number | boolean>;
-    actorId: string;
-  }): Promise<AgentTestTurnResult>;
-  testRun(input: {
-    agentId: string;
-    projectId: string;
-    /** The person who started it; null for a key that acts as nobody. */
-    actorId: string | null;
-    /** The API key they started it with; the run's own key holds no more than it. */
-    callerApiKeyId?: string | null;
-  }): Promise<AgentTestRunResult>;
   /** The platform's own deep link to this agent's editor drawer. */
   platformUrl(input: { projectSlug: string; agentId: string; agentType: string }): string;
 }

@@ -3,12 +3,12 @@ import { DATASET_DEFAULT_LIMITS, type DatasetApi } from "@langwatch/dataset-cont
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type { EvaluationCommandDispatcherService } from "../evaluation-command-dispatcher.service.ts";
 import {
   EvaluationBatchLogService,
   type EvaluationExperimentDirectory,
   type EvaluationExperimentRunWriter,
 } from "../evaluation-batch-log.service.ts";
+import type { EvaluationCommandDispatcherService } from "../evaluation-command-dispatcher.service.ts";
 
 const PROJECT_ID = "project-1";
 const DEFAULT_LIMIT = DATASET_DEFAULT_LIMITS.rowBytes;

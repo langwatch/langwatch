@@ -10,7 +10,7 @@ The GitHub integration: app installations, their webhooks, and the pull requests
 | -------------- | -------------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                    |
 | Subjects       | github, github-installation, github-pull-request                                                   |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                     |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                           |
 | Api token      | `GithubApi` = `moduleApi<GithubApi>()("github")`, `contract/src/github.api.ts:114` (33 operations) |
 | Other token    | `GithubInstallApi`, `process/src/transport/github-install.rest.ts:63`                              |
 | Other token    | `GithubConnectionApi`, `process/src/transport/github.trpc.ts:34`                                   |

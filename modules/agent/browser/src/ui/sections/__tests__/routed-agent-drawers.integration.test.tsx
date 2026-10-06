@@ -41,6 +41,14 @@ vi.mock("../../../model/agent-management-host.ts", () => ({
   }),
 }));
 
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    scenarios: {
+      testAgentTurn: { useMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }) },
+    },
+  },
+}));
+
 vi.mock("../../../behavior/agent-api.ts", () => {
   const mutation = (mutateAsync: (input: unknown) => Promise<unknown>) => ({
     useMutation: () => ({ mutateAsync, mutate: vi.fn(), isPending: false, error: null }),
@@ -60,7 +68,6 @@ vi.mock("../../../behavior/agent-api.ts", () => {
       agents: {
         getAll: { useQuery: () => ({ data: listed.rows, isLoading: false }) },
         getById: { useQuery: () => ({ data: fetched.agent, isLoading: false, isError: false }) },
-        testTurn: { useMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }) },
         create: mutation((input) => {
           calls.agentCreated.push(input);
           return Promise.resolve({ id: "agent_new" });

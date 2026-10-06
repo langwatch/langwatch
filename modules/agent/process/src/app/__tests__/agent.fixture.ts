@@ -4,7 +4,6 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -69,7 +68,6 @@ export function createAgentAppFixture(
     featureFlags?: FeatureFlagApi;
     permissions?: AuthzApi;
     projects?: ProjectApi;
-    scenarios?: ScenarioApi;
     secrets?: SecretApi;
     traces?: TraceApi;
     users?: UserApi;
@@ -86,7 +84,6 @@ export function createAgentAppFixture(
       featureFlags: options.featureFlags ?? createApiFixture<FeatureFlagApi>(),
       permissions: options.permissions ?? createApiFixture<AuthzApi>(),
       projects: options.projects ?? createApiFixture<ProjectApi>(),
-      scenarios: options.scenarios ?? createApiFixture<ScenarioApi>(),
       secrets: options.secrets ?? secretStoreFixture().secrets,
       traces: options.traces ?? createApiFixture<TraceApi>(),
       users: options.users ?? createApiFixture<UserApi>(),

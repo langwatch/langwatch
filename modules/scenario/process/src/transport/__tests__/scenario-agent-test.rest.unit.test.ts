@@ -1,13 +1,17 @@
 /**
+ * `POST /api/v1/agents/:id/test`, served by scenario at agent's path (R10).
  * @vitest-environment node
  * @see specs/agents/agent-test-run.feature
  */
 import type { AgentTestRunResult } from "@langwatch/agent-contract";
+import { allRegisteredRoutes } from "@langwatch/api";
+import { bindRestMiddleware, canonicalErrorResponse } from "@langwatch/api/rest";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { buildAgentApps } from "./agent-rest.fixture.ts";
+import { agentTestCallerKey, scenarioAgentTestRest } from "../scenario-agent-test.rest.ts";
+import { createScenarioRestTestRuntime, PROJECT_ID } from "./scenario-rest.harness.ts";
 
 const runResult: AgentTestRunResult = {
   scenarioRunId: "scenariorun_1",
@@ -17,12 +21,15 @@ const runResult: AgentTestRunResult = {
 
 async function startTestRun(caller: { viewerUserId: string | null; callerKey: string | null }) {
   const testAgentRun = vi.fn(async () => runResult);
-  const api = await buildAgentApps({
-    ...caller,
-    scenarios: createApiFixture<ScenarioApi>({ testAgentRun }),
+  const { runtime, projectFacts } = createScenarioRestTestRuntime({
+    viewerUserId: caller.viewerUserId,
   });
-  const agent = await api.createAgent();
-  const response = await api.v1(`/api/v1/agents/${agent.id}/test`, {
+  const mounted = runtime.mount(scenarioAgentTestRest.router(), {
+    app: () => createApiFixture<ScenarioApi>({ testAgentRun }),
+    onError: canonicalErrorResponse,
+    facts: [projectFacts, bindRestMiddleware(agentTestCallerKey, () => caller.callerKey)],
+  });
+  const response = await mounted.request("http://api.test/api/v1/agents/agent_http/test", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: "{}",
@@ -42,9 +49,11 @@ describe("POST /api/v1/agents/:id/test", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(runResult);
-    expect(testAgentRun).toHaveBeenCalledWith(
-      expect.objectContaining({ actor: { id: "user_runner", label: "user", apiKeyId: "pat_1" } }),
-    );
+    expect(testAgentRun).toHaveBeenCalledWith({
+      projectId: PROJECT_ID,
+      agentId: "agent_http",
+      actor: { id: "user_runner", label: "user", apiKeyId: "pat_1" },
+    });
   });
 
   /** @scenario "The REST route starts the run as the caller's person and the key they called with" */
@@ -56,5 +65,13 @@ describe("POST /api/v1/agents/:id/test", () => {
 
     expect(response.status).toBe(200);
     expect(testAgentRun).toHaveBeenCalledWith(expect.objectContaining({ actor: undefined }));
+  });
+
+  it("is registered as agent's path, served by scenario until it moves", async () => {
+    await startTestRun({ viewerUserId: "user_runner", callerKey: null });
+
+    expect(
+      allRegisteredRoutes().find((route) => route.path === "/api/v1/agents/:id/test"),
+    ).toMatchObject({ sharedPath: { owner: "agent" } });
   });
 });

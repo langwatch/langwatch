@@ -61,7 +61,11 @@ describe("the attachment link channel", () => {
       });
 
       await expect(
-        channel.fetchAttachment({ url: "https://example.com/report.pdf", columnType: "file", maxBytes }),
+        channel.fetchAttachment({
+          url: "https://example.com/report.pdf",
+          columnType: "file",
+          maxBytes,
+        }),
       ).rejects.toMatchObject({ code: "dataset_attachment_too_large" });
       expect(reached).toEqual([]);
     });
@@ -77,7 +81,11 @@ describe("the attachment link channel", () => {
       });
 
       await expect(
-        channel.fetchAttachment({ url: "https://example.com/report.pdf", columnType: "file", maxBytes }),
+        channel.fetchAttachment({
+          url: "https://example.com/report.pdf",
+          columnType: "file",
+          maxBytes,
+        }),
       ).rejects.toMatchObject({ code: "dataset_attachment_too_large" });
     });
   });
@@ -128,7 +136,11 @@ describe("the attachment link channel", () => {
       });
 
       await expect(
-        channel.fetchAttachment({ url: "https://example.com/page.html", columnType: "image", maxBytes }),
+        channel.fetchAttachment({
+          url: "https://example.com/page.html",
+          columnType: "image",
+          maxBytes,
+        }),
       ).rejects.toMatchObject({
         code: "dataset_attachment_unavailable",
         meta: { fileName: "page.html" },
@@ -145,7 +157,11 @@ describe("the attachment link channel", () => {
       });
 
       await expect(
-        channel.fetchAttachment({ url: "https://example.com/page.html", columnType: "file", maxBytes }),
+        channel.fetchAttachment({
+          url: "https://example.com/page.html",
+          columnType: "file",
+          maxBytes,
+        }),
       ).resolves.toMatchObject({ mediaType: "text/html", name: "page.html" });
     });
   });

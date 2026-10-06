@@ -98,6 +98,13 @@ Ruling: point the Python SDK e2e job at this branch's own stack instead of produ
 client calls `/api/v1/prompts/tags*`, which the branch serves and main does not. Paths: the Python SDK
 workflow in `.github/workflows/`; `go run ./cmd/ciguard` must pass.
 
+### W-05 Permission sweeps, the remaining two (M)
+
+Ruling Q133: three sweeps; the synthetic-router sweep is ported. Build (a) an `apps/api` test sweeping the
+installed route list (every route declares a permission or a named public exception), (b) a boot-time
+refusal when a route lacks a declaration, and (c) a type-level refusal: a route without a declaration does
+not compile. Paths: `packages/api/**`, `apps/api/src/__tests__/**`.
+
 ### W-06 Oversized payloads: operator surface and ops comment (S)
 
 Plan: `dev/docs/plans/oversized-payloads-2026-10-06.md` §5 slices 4 and 6 (slices 1, 2, 3 and 5 landed).
@@ -167,11 +174,10 @@ the reader the ops page uses. S3 and S4 follow (claim separately once S2 merges)
 
 ## Opens when its dependency lands
 
-| Item                                                                                                                                     | Opens after                                     | Outline                                                                                 |
-| ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------- |
-| W-20 Usage counting move (Q73; ruling D1: entitlement folds usage's limit facts on SaaS, self-hosted keeps its local count)              | peer cut E1 (entitlement)                       | move counting, warnings and the sweep from entitlement to usage                         |
-| W-21 Generated READMEs: browser pages (R5) and zod printer (R6)                                                                          | readmegen-2 lane                                | `tools/readmegen`                                                                       |
-| W-22 Package groups in package.json (`"langwatch": { "group": … }`, closed list, `--check` refuses a package without one)                | readmegen-2 lane                                | every `packages/*/package.json`, `tools/readmegen`                                      |
-| W-05 Permission sweeps, the remaining two (Q133: an apps/api sweep over the installed routes, a boot-time refusal, a type-level refusal) | api-shared-path lane (owns packages/api)        | `packages/api/**`, `apps/api/src/__tests__/**`                                          |
-| W-08 "Capabilities" to host-services vocabulary (§16)                                                                                    | scope-knot-q2 lane (owns packages/browser-host) | `packages/browser`, `packages/browser-host`, every `*.web.ts`, the browser-module skill |
-| W-23 to W-30 Peer-cycle batch B2 cuts (G, S2, AL, E2, ID, P, EV; plan §4)                                                                | batch B1 and the shared-path declaration        | one claim per cut, as listed in the plan                                                |
+| Item                                                                                                                      | Opens after                                     | Outline                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------- |
+| W-20 Usage counting (Q73): withdrawn, usage merges into entitlement (ruling 2026-10-06 late evening)                      | the entitlement merge plan                      | slices come from `dev/docs/plans/entitlement-merge-2026-10-06.md`                       |
+| W-21 Generated READMEs: browser pages (R5) and zod printer (R6)                                                           | readmegen-2 lane                                | `tools/readmegen`                                                                       |
+| W-22 Package groups in package.json (`"langwatch": { "group": … }`, closed list, `--check` refuses a package without one) | readmegen-2 lane                                | every `packages/*/package.json`, `tools/readmegen`                                      |
+| W-08 "Capabilities" to host-services vocabulary (§16)                                                                     | scope-knot-q2 lane (owns packages/browser-host) | `packages/browser`, `packages/browser-host`, every `*.web.ts`, the browser-module skill |
+| W-23 to W-30 Peer-cycle batch B2 cuts (G, S2, AL, E2, ID, P, EV; plan §4)                                                 | batch B1 and the shared-path declaration        | one claim per cut, as listed in the plan                                                |

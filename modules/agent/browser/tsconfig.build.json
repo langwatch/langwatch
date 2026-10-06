@@ -39,6 +39,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../scenario/client/tsconfig.build.json"
+    },
+    {
       "path": "../../scenario/contract/tsconfig.build.json"
     },
     {

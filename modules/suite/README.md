@@ -10,7 +10,7 @@ Suites (run plans): their definitions, the scenario references they hold and the
 | -------------- | ---------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                |
 | Subjects       | suite                                                                                          |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                 |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                       |
 | Api token      | `SuiteApi` = `moduleApi<SuiteApi>()("suite")`, `contract/src/suite.api.ts:123` (28 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                     |
 

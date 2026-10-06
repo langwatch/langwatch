@@ -117,18 +117,19 @@ function renderGrants({
 }
 
 describe("given grants answered for the scope the reader is standing in", () => {
-  /** @scenario "Organization permissions are independent of project permissions" */
-  it("keeps project grants out of organization permission checks", async () => {
+  /** @scenario "Organization permissions follow the active project's grant" */
+  it("lets the project grant answer the organization check, from the one grant read", async () => {
+    const reads: string[] = [];
     const view = renderGrants({
-      transport: answeringTransport((path, input) =>
-        path === UI_EFFECTIVE_PERMISSIONS_PROCEDURE && "projectId" in input
-          ? Promise.resolve({ permissions: ["annotations:update"] })
-          : Promise.resolve({ permissions: [] }),
-      ),
+      transport: answeringTransport((path, input) => {
+        if (path === UI_EFFECTIVE_PERMISSIONS_PROCEDURE) reads.push(JSON.stringify(input));
+        return Promise.resolve({ permissions: ["annotations:update"] });
+      }),
     });
 
-    await waitFor(() => expect(view.getByTestId("can-project").textContent).toBe("true"));
-    expect(view.getByTestId("can-org").textContent).toBe("false");
+    await waitFor(() => expect(view.getByTestId("can-org").textContent).toBe("true"));
+    expect(view.getByTestId("can-project").textContent).toBe("true");
+    expect(reads).toEqual([JSON.stringify({ projectId: "proj-app" })]);
   });
 
   describe("when the scope goes back to resolving", () => {

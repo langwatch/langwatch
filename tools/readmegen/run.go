@@ -73,11 +73,13 @@ func run(ctx context.Context, opts options) error {
 		return err
 	}
 	reportUnresolved(manifest, stderr)
+	disagreements := crossCheck(manifest, stderr)
 	target := settleTarget{root: root, check: opts.check, stdout: opts.stdout, stderr: stderr}
 	problems, err := settleAll(newGenerator(ws, manifest).pages(), opts.only, target)
 	if err != nil {
 		return err
 	}
+	problems += disagreements
 	if opts.check && problems > 0 {
 		fmt.Fprintf(stderr, "readmegen: %d pages need attention; run `pnpm generate:readmes` and describe each page above its block\n", problems)
 		return errStale{problems}

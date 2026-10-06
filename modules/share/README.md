@@ -10,7 +10,7 @@ Share links: creating, resolving and revoking them, and the retention pin an act
 | -------------- | --------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                               |
 | Subjects       | share                                                                                         |
-| Halves         | [contract](contract) · [process](process) · [browser](browser)                                |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                      |
 | Api token      | `ShareApi` = `moduleApi<ShareApi>()("share")`, `contract/src/share.api.ts:36` (12 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                    |
 

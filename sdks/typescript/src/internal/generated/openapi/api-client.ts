@@ -42,23 +42,6 @@ export interface paths {
         patch: operations["updateAgent"];
         trace?: never;
     };
-    "/api/v1/agents/{id}/test": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Schedule a scripted test run and return its run identifiers */
-        post: operations["testAgent"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/agents/{id}/call": {
         parameters: {
             query?: never;
@@ -4018,6 +4001,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Schedule a scripted test run and return its run identifiers */
+        post: operations["testAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/scenario-events": {
         parameters: {
             query?: never;
@@ -7037,36 +7037,6 @@ export interface operations {
                         updatedAt: string;
                         /** Format: uri */
                         platformUrl: string;
-                    };
-                };
-            };
-        };
-    };
-    testAgent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The agent id. */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @description The run to follow; open it in the simulations run drawer. */
-                        scenarioRunId: string;
-                        /** @description The batch the run belongs to. */
-                        batchRunId: string;
-                        /** @description The internal set that holds agent test runs. */
-                        setId: string;
                     };
                 };
             };
@@ -32911,6 +32881,36 @@ export interface operations {
                 content: {
                     "application/json": {
                         error: string;
+                    };
+                };
+            };
+        };
+    };
+    testAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The agent id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run to follow; open it in the simulations run drawer. */
+                        scenarioRunId: string;
+                        /** @description The batch the run belongs to. */
+                        batchRunId: string;
+                        /** @description The internal set that holds agent test runs. */
+                        setId: string;
                     };
                 };
             };

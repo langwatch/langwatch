@@ -9,6 +9,9 @@ Feature: Permission reads come from the session, and a public page holds none
   never shows a control its viewer may not use.
 
   The session capability (auth) answers hasPermission and hasOrganizationPermission.
+  An organization permission follows the grant the active scope holds, as on main
+  (Alex, 2026-10-06, scope knot Q2): the project's grant on a project page, the
+  organization's where no project is chosen, from one grant read.
   The scope capability (organization) answers which organization, team and project
   this page is about, and answers no permission. A public page (the shared trace)
   mounts an explicit no-session answer: every permission reads as not held there,
@@ -22,15 +25,22 @@ Feature: Permission reads come from the session, and a public page holds none
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: The session answers an organization permission on its own
-    Given the reader can manage a project but cannot manage its organization
+  Scenario: The session answers an organization permission from the active project's grant
+    Given the reader's grant in the active project lets them manage its organization
+    When a screen asks the session whether the reader may manage the organization
+    Then the answer is yes
+    And the only grant read sent names the active project
+
+  @integration
+  Scenario: A project grant without the organization permission answers no for the organization
+    Given the reader's grant in the active project lets them manage the project but not its organization
     When a screen asks the session whether the reader may manage the organization
     Then the answer is no
     And asking the session whether the reader may manage the project answers yes
 
   @integration
-  Scenario: An organization permission is still unanswered while the organization's grants load
-    Given the organization's grant read has not answered
+  Scenario: An organization permission is still unanswered while the active project's grants load
+    Given the active project's grant read has not answered
     When a screen asks the session for an organization permission
     Then the answer is no
     And the session does not report itself settled
@@ -41,10 +51,10 @@ Feature: Permission reads come from the session, and a public page holds none
 
   @integration @unimplemented
   Scenario: An organization permission reads the same under every module host
-    Given the reader can manage a project but cannot manage its organization
+    Given the reader's grant in the active project lets them manage the project but not its organization
     And the trace and scenario module hosts are mounted around the page
     When a screen inside them asks whether the reader may manage the organization
-    Then the answer is no
+    Then the answer is no, as the session answers it
 
   @integration @unimplemented
   Scenario: The demo project is recognised under every module host

@@ -10,7 +10,7 @@ The Enterprise half of the AI Gateway: routing policies and personal gateway key
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Classification | enterprise (`modules/catalogue.json`)                                                                                                           |
 | Subjects       | enterprise-gateway, personal-virtual-key, routing-policy                                                                                        |
-| Halves         | [contract](contract) · [process](process)                                                                                                       |
+| Halves         | [contract](contract) · [process](process/README.md)                                                                                             |
 | Api token      | `EnterpriseGatewayApi` = `moduleApi<EnterpriseGatewayApi>()("enterprise-gateway")`, `contract/src/enterprise-gateway.api.ts:72` (15 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                                                    |
 

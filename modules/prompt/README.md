@@ -10,7 +10,7 @@ Prompts: versioned prompt configurations, their tags and handles, syncing from t
 | -------------- | -------------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                    |
 | Subjects       | prompt, prompt-tag, prompt-version                                                                 |
-| Halves         | [contract](contract) · [process](process) · [browser](browser) · [client](client)                  |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)        |
 | Api token      | `PromptApi` = `moduleApi<PromptApi>()("prompt")`, `contract/src/prompt.api.ts:248` (52 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                         |
 

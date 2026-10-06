@@ -40,7 +40,7 @@ departure from main; it aims at no wire difference (section 6 names the candidat
   separately.
 - Database constraints: every `FOREIGN KEY`, `REFERENCES`, `RENAME CONSTRAINT` and `DROP` in the 365
   migrations, checked against `pg_constraint` on the local test database migrated to
-  `20261002120016_user_notification_preferences` (362 applied; the two later migrations add no key).
+  `20261006170517_user_notification_preferences` (362 applied; the two later migrations add no key).
 
 ### 1.2 The schema
 
@@ -942,4 +942,4 @@ back-relation field and its line.
 | 39  | `WebhookEndpointDelivery_endpointId_fkey`   | WebhookEndpointDelivery (webhook)              | endpointId            | WebhookEndpoint        | CASCADE   | same     | `20260802120001_webhook_endpoints_platform:56`                                           |
 | 40  | `WebhookEndpointDelivery_projectId_fkey`    | WebhookEndpointDelivery (webhook)              | projectId             | Project                | CASCADE   | cross    | `20260804120004_unify_webhook_delivery_log:59`                                           |
 | 41  | `WebhookEndpointDelivery_triggerId_fkey`    | WebhookEndpointDelivery (webhook)              | triggerId             | Trigger                | CASCADE   | cross    | `20260804120004_unify_webhook_delivery_log:62`                                           |
-| 42  | `slack_connection_claim_connectionId_fkey`  | slack_connection_claim (slack)                 | connectionId          | SlackIntegration       | RESTRICT  | same     | `20261002120012_slack_connection_claim:24`                                               |
+| 42  | `slack_connection_claim_connectionId_fkey`  | slack_connection_claim (slack)                 | connectionId          | SlackIntegration       | RESTRICT  | same     | `20261006170513_slack_connection_claim:24`                                               |

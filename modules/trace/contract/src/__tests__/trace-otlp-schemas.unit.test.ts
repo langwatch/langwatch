@@ -1,4 +1,11 @@
-import { anyValueSchema, bytesSchema, idSchema, spanSchema } from "@langwatch/trace-contract";
+import {
+  anyValueSchema,
+  bytesSchema,
+  exportTraceServiceRequestSchema,
+  idSchema,
+  resourceSchema,
+  spanSchema,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
 
@@ -113,6 +120,84 @@ describe("otlp schemas", () => {
       };
     }
 
+    describe("when a link omits ProtoJSON default-valued fields", () => {
+      /** @scenario "A link that omits droppedAttributesCount and attributes is accepted" */
+      it("accepts the link with empty attributes and a zero dropped count", () => {
+        const span = makeValidSpan({
+          links: [
+            {
+              traceId: "cccc0000000000000000000000000001",
+              spanId: "dddd000000000001",
+            },
+          ],
+        });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        expect(result.data?.links[0]).toMatchObject({
+          attributes: [],
+          droppedAttributesCount: 0,
+        });
+      });
+    });
+
+    describe("when an event omits ProtoJSON default-valued fields", () => {
+      /** @scenario "An event that omits attributes and droppedAttributesCount is accepted" */
+      it("accepts the event with empty attributes", () => {
+        const span = makeValidSpan({
+          events: [{ timeUnixNano: "1700000000500000000", name: "evt" }],
+        });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        expect(result.data?.events[0]?.attributes).toEqual([]);
+      });
+    });
+
+    describe("when the span omits attributes", () => {
+      /** @scenario "A span that omits attributes is accepted" */
+      it("accepts it with empty attributes", () => {
+        const { attributes: _omitted, ...span } = makeValidSpan();
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        expect(result.data?.attributes).toEqual([]);
+      });
+    });
+
+    describe("when the span omits kind", () => {
+      /** @scenario "A span that omits kind is accepted as unspecified" */
+      it("accepts it as SPAN_KIND_UNSPECIFIED", () => {
+        const { kind: _omitted, ...span } = makeValidSpan();
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        expect(result.data?.kind).toBe(0);
+      });
+    });
+
+    describe("when an attribute holds an empty array or key-value list", () => {
+      /** @scenario "An empty array or key-value-list attribute value is accepted" */
+      it("accepts both with empty values", () => {
+        const span = makeValidSpan({
+          attributes: [
+            { key: "a", value: { arrayValue: {} } },
+            { key: "k", value: { kvlistValue: {} } },
+          ],
+        });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        expect(result.data?.attributes[0]?.value.arrayValue?.values).toEqual([]);
+        expect(result.data?.attributes[1]?.value.kvlistValue?.values).toEqual([]);
+      });
+    });
+
     describe("when status is a valid object", () => {
       it("accepts status with code and message", () => {
         const span = makeValidSpan({ status: { code: 1, message: "OK" } });
@@ -151,6 +236,18 @@ describe("otlp schemas", () => {
         const parsed = expectParsed(spanSchema, span);
 
         expect(parsed.status).toEqual({});
+      });
+    });
+  });
+
+  describe("given a resource", () => {
+    describe("when attributes are omitted", () => {
+      /** @scenario "A resource that omits attributes is accepted" */
+      it("accepts it with empty attributes", () => {
+        const result = resourceSchema.safeParse({});
+
+        expect(result.success).toBe(true);
+        expect(result.data?.attributes).toEqual([]);
       });
     });
   });
@@ -214,6 +311,20 @@ describe("otlp schemas", () => {
       const result = bytesSchema.safeParse(stringValue);
 
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe("given an export request", () => {
+    describe("when a resourceSpans entry omits scopeSpans", () => {
+      /** @scenario "A resourceSpans entry that omits scopeSpans is accepted" */
+      it("accepts the entry with empty scopeSpans", () => {
+        const result = exportTraceServiceRequestSchema.safeParse({
+          resourceSpans: [{ resource: {} }],
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.data?.resourceSpans?.[0]?.scopeSpans).toEqual([]);
+      });
     });
   });
 });

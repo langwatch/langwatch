@@ -170,6 +170,28 @@ describe("given every annotation the All Annotations page holds", () => {
       expect(rows).toHaveLength(3);
     });
 
+    /** @scenario "Exporting the annotations list exports the rows the list shows" */
+    it("holds the comment about the trace and the three about its spans, each as a row", () => {
+      const comments = [
+        annotation({ id: "a0", comment: "about the trace" }),
+        ...["s1", "s2", "s3"].map((spanId) =>
+          annotation({
+            id: `a-${spanId}`,
+            comment: `about ${spanId}`,
+            anchorKind: "span",
+            anchorId: spanId,
+          }),
+        ),
+      ];
+
+      const { fields, rows } = allAnnotationsExport({ annotations: comments, traces: [] });
+
+      const commentColumn = fields.indexOf("Comment");
+      expect(rows.map((exported) => exported[commentColumn])).toEqual(
+        comments.map((comment) => comment.comment),
+      );
+    });
+
     it("carries the trace's input and output beside the comment", () => {
       const { fields, rows } = allAnnotationsExport({
         annotations: [annotation({ comment: "reads well" })],

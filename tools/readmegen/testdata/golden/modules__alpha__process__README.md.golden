@@ -1,0 +1,106 @@
+# @lw/alpha-process
+
+<!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
+
+## Installation
+
+`defineProcessModule("alpha").withApi(AlphaModule).withTransports(alphaRest, alphaTrpc).withEventing(alphaEventing).withTasks(…)`, `src/alpha.module.ts:9`.
+
+Installed by api, from each app's generated module list (`pnpm generate:modules`).
+
+## Module API (`AlphaApi`)
+
+Alpha's items.
+
+Peers call these through the token, declared at `../contract/src/alpha.api.ts:3`; nothing else in this package is public.
+
+#### `getItem`
+
+```typescript
+getItem(input: { id: string }): Promise<AlphaItem>;
+```
+
+## REST transport
+
+### `alphaRest`
+
+|             |                                                |
+| ----------- | ---------------------------------------------- |
+| Declared at | `src/transport/alpha.rest.ts:20`               |
+| Base URL    | `/api/alpha-items`, twin `/api/v1/alpha-items` |
+| Addressing  | dated                                          |
+| Credential  | project                                        |
+| Versions    | `2026-08-07`                                   |
+
+#### `GET /` · `listAlphaItems`
+
+List the project's alpha items.
+
+Permission `alpha:view`. Declared at `src/transport/alpha.rest.ts:22`.
+
+Answers at `/api/alpha-items`, `/api/v1/alpha-items`; also, undocumented, `/api/alpha-items/2026-08-07`, `/api/v1/alpha-items/2026-08-07`, `/api/alpha-items/latest`, `/api/v1/alpha-items/latest`.
+
+```typescript
+// Response: z.array(alphaItemSchema) (inline, src/transport/alpha.rest.ts:24)
+```
+
+#### `GET /:id` · `getAlphaItem`
+
+Public: a share link reads one item. Hidden from the OpenAPI document. Declared at `src/transport/alpha.rest.ts:30`.
+
+Answers at `/api/alpha-items/:id`, `/api/v1/alpha-items/:id`; also, undocumented, `/api/alpha-items/2026-08-07/:id`, `/api/v1/alpha-items/2026-08-07/:id`, `/api/alpha-items/latest/:id`, `/api/v1/alpha-items/latest/:id`.
+
+```typescript
+type Params = z.infer<typeof alphaItemParams>; // ../contract/src/alpha.schemas.ts:8
+```
+
+## tRPC transport
+
+### `alpha`
+
+Contract `../contract/src/alpha.trpc.ts:5`, router `src/transport/alpha.trpc.ts:7`.
+
+| Procedure      | Kind     | Gate                              | Input       | Output |
+| -------------- | -------- | --------------------------------- | ----------- | ------ |
+| `alpha.list`   | query    | No permission: every member lists | `listInput` | –      |
+| `alpha.remove` | mutation | ≈ not implemented by this router  | –           | –      |
+
+## Sockets
+
+| Protocol  | Paths                   | Prefixes | Declared at                              |
+| --------- | ----------------------- | -------- | ---------------------------------------- |
+| rawsocket | `/api/alpha/stream/:id` | –        | `src/transport/alpha-stream.socket.ts:4` |
+
+## Workers
+
+### Pipeline `alpha_items` (aggregate `alpha_item`)
+
+Declared at `src/eventing/alpha.pipeline.ts:12`. Events: `alphaItemAddedEventSchema`.
+
+The chain builds early when `!input.process` (`src/eventing/alpha.pipeline.ts:16`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
+
+| Kind                       | Name              | Handles                                                              | Declared at                         | Built                |
+| -------------------------- | ----------------- | -------------------------------------------------------------------- | ----------------------------------- | -------------------- |
+| command                    | `addItem`         | –                                                                    | `src/eventing/alpha.pipeline.ts:14` | always               |
+| process manager            | `alphaSweep`      | every 1 min (`ALPHA_SWEEP_MS = 60 * 1000`); intents `sweep` (outbox) | `src/eventing/alpha.pipeline.ts:18` | past the early build |
+| process manager            | `≈ input.process` | ≈ applier `input.process`                                            | `src/eventing/alpha.pipeline.ts:19` | past the early build |
+| peer subscriber            | `gammaChanged`    | `lw.gamma.changed` from [gamma](../../gamma/README.md)               | `src/eventing/alpha.pipeline.ts:21` | past the early build |
+| ClickHouse fold projection | `alphaItems`      | –                                                                    | `src/eventing/alpha.pipeline.ts:15` | always               |
+
+### Tasks
+
+Run by the tasks process, before serve.
+
+| Task             | Class               | Declared at                           |
+| ---------------- | ------------------- | ------------------------------------- |
+| `alpha-backfill` | `AlphaBackfillTask` | `src/tasks/alpha-backfill.task.ts:12` |
+
+## Configuration
+
+| Kind   | Leaf         | Environment variable | Declared at                         |
+| ------ | ------------ | -------------------- | ----------------------------------- |
+| secret | `signingKey` | `ALPHA_SIGNING_KEY`  | `src/app/alpha.app.ts:14`           |
+| config | `region`     | `ALPHA_REGION`       | `../contract/src/alpha.config.ts:3` |
+| config | `limits`     | ≈ `computeLimits()`  | `../contract/src/alpha.config.ts:4` |
+
+<!-- readme:generated:end -->

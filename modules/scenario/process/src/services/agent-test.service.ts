@@ -99,6 +99,10 @@ const connectedCallConfigSchema = z.looseObject({
 /** The targets a test RUN can queue: every kind a scenario runs against but a prompt. */
 type QueueableTarget = TargetConfig & { type: "http" | "code" | "workflow" | "connected" };
 
+/** A test once its agent is read: what the turn and the run work from. */
+type AgentUnderTest = Omit<TestAgentRunInput, "agentId"> & { agent: AgentWithFields };
+type TurnUnderTest = AgentUnderTest & Pick<TestAgentTurnInput, "message" | "params">;
+
 export class AgentTestService {
   static create(options: AgentTestServiceOptions): AgentTestService {
     const modelParameters = ScenarioModelParametersService.create(options.modelProviders);
@@ -206,7 +210,21 @@ export class AgentTestService {
     return result;
   }
 
-  async sendTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult> {
+  /** One turn to the project's agent, read here so a caller names it by id. */
+  async testTurn({ agentId, ...turn }: TestAgentTurnInput): Promise<AgentTestTurnResult> {
+    return this.sendTurn({ ...turn, agent: await this.readAgent({ ...turn, agentId }) });
+  }
+
+  /** A scripted test run of the project's agent, read here so a caller names it by id. */
+  async testRun({ agentId, ...run }: TestAgentRunInput): Promise<AgentTestRunResult> {
+    return this.scheduleRun({ ...run, agent: await this.readAgent({ ...run, agentId }) });
+  }
+
+  private readAgent(input: { projectId: string; agentId: string }): Promise<AgentWithFields> {
+    return this.options.agents.getById({ id: input.agentId, projectId: input.projectId });
+  }
+
+  async sendTurn(input: TurnUnderTest): Promise<AgentTestTurnResult> {
     const target = await this.resolveTarget(input);
 
     if (target.type === "connected") {
@@ -264,7 +282,7 @@ export class AgentTestService {
     throw new Error(answer.error);
   }
 
-  async #sendConnectedTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult> {
+  async #sendConnectedTurn(input: TurnUnderTest): Promise<AgentTestTurnResult> {
     const config = connectedCallConfigSchema.parse(input.agent.config ?? {});
     await resolveRunParameters({
       scenarios: [],
@@ -300,7 +318,7 @@ export class AgentTestService {
     };
   }
 
-  async scheduleRun(input: TestAgentRunInput): Promise<AgentTestRunResult> {
+  async scheduleRun(input: AgentUnderTest): Promise<AgentTestRunResult> {
     const target = await this.connectedTargets.resolve({
       projectId: input.projectId,
       target: await this.resolveTarget(input),

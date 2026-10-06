@@ -10,7 +10,7 @@ Weekly digest emails: folds the week's usage, picks a template per person and se
 | -------------- | ------------------------------------- |
 | Classification | enterprise (`modules/catalogue.json`) |
 | Subjects       | digest                                |
-| Halves         | [process](process)                    |
+| Halves         | [process](process/README.md)          |
 | Api token      | none                                  |
 | Installed by   | –                                     |
 

@@ -27,10 +27,13 @@ const voiceAgent: AgentWithFields = {
   fieldsResolved: true,
 };
 
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: { scenarios: { testAgentRun: { useMutation: () => ({ mutate: vi.fn() }) } } },
+}));
+
 vi.mock("../../../behavior/agent-api.ts", () => ({
   agentApi: {
     agents: {
-      testRun: { useMutation: () => ({ mutate: vi.fn() }) },
       getAll: {
         useQuery: () => ({ data: [voiceAgent], isLoading: false, error: null, isFetching: false }),
       },
