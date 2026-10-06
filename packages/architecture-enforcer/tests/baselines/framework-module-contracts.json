@@ -17,7 +17,6 @@
     "packages/browser-host -> @langwatch/workflow-contract": 1,
     "packages/clickhouse-migrations -> @langwatch/data-retention-contract": 1,
     "packages/group-queue -> @langwatch/stored-object-contract": 1,
-    "packages/prisma-client -> @langwatch/api-key-contract": 1,
-    "packages/process -> @langwatch/ops-contract": 1
+    "packages/prisma-client -> @langwatch/api-key-contract": 1
   }
 }
