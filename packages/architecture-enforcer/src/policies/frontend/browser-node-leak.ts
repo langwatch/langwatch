@@ -6,7 +6,7 @@ import type { WorkspaceModuleResolver } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 /**
- * Guards ADR-132: a browser-reachable package (contract, browser,
+ * Guards ADR-132: a browser-reachable package (contract, browser, client,
  * Design System) whose value-import graph reaches a Node
  * builtin, however deep — a per-file rule cannot see that graph shape.
  */
@@ -17,6 +17,9 @@ const NODE_BUILTIN_SPECIFIERS = new Set(
 
 /** A `*-contract` or `*-browser` package name: what a browser bundle can reach. */
 const BROWSER_REACHABLE_PACKAGE = /-(?:contract|browser)$/;
+
+/** A module's `<name>-client` folder is browser-reachable (§3.4); the raw store clients are not. */
+const MODULE_CLIENT_DIRECTORY = /(?:^|\/)modules\/[^/]+\/client$/;
 
 /** Trusted portable by construction (React, browser-host only) — still walked here to prove it. */
 const ALWAYS_CHECKED_PACKAGES = new Set([
@@ -32,8 +35,10 @@ function browserReachableRoots(
   const dummyFile = `${root}/package.json`;
   const roots: { name: string; file: string }[] = [];
 
-  for (const name of resolver.packages.keys()) {
-    if (!BROWSER_REACHABLE_PACKAGE.test(name) && !ALWAYS_CHECKED_PACKAGES.has(name)) continue;
+  for (const [name, record] of resolver.packages) {
+    const isModuleClient = MODULE_CLIENT_DIRECTORY.test(record.directory.split("\\").join("/"));
+    const isReachable = BROWSER_REACHABLE_PACKAGE.test(name) || isModuleClient;
+    if (!isReachable && !ALWAYS_CHECKED_PACKAGES.has(name)) continue;
 
     const entry = resolver.resolve({ specifier: name, file: dummyFile });
     if (entry) roots.push({ name, file: entry });
