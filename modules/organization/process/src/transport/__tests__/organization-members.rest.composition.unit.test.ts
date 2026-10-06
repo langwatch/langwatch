@@ -12,6 +12,7 @@ import {
  */
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
+import type { RoleApi } from "@langwatch/role-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -29,6 +30,7 @@ const TEAM_ID = "team-1";
 const PERSONAL_TEAM_ID = "team-personal";
 const ADMIN_ID = "user-admin";
 const MEMBER_ID = "user-member";
+const CUSTOM_ROLE_ID = "role-reviewer";
 const CREDENTIAL = "organization-credential";
 
 const onError = createCanonicalFamilyErrorHandler({
@@ -63,6 +65,8 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
   // The ceiling check finds nothing beyond the administrator; a cache invalidation is a no-op.
   permissions.findPermissionsBeyondCaller = async () => [];
   permissions.invalidateOrganization = async () => {};
+  permissions.findRolePermissions = async ({ roleIds }) =>
+    roleIds.map((id) => ({ id, name: id, permissions: ["traces:view"] }));
   const revokedSessions: string[] = [];
   const setup = organizationModuleSetup({
     permissions,
@@ -81,6 +85,13 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
     identity: createApiFixture<IdentityApi>(
       { verifiedEmailsOf: async () => ({ kind: "keep_legacy" }) },
       "IdentityApi",
+    ),
+    roles: createApiFixture<RoleApi>(
+      {
+        filterAssignableRoles: async ({ roleIds }) =>
+          roleIds.filter((roleId) => roleId === CUSTOM_ROLE_ID),
+      },
+      "RoleApi",
     ),
   });
   const { repositories } = setup;
@@ -157,7 +168,11 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
 type Refusal = { code: string; status: number };
 type Member = { userId: string; role: string; disabled: boolean };
 type InviteList = {
-  invites: { email: string; status: string; teams: { teamId: string }[] }[];
+  invites: {
+    email: string;
+    status: string;
+    teams: { teamId: string; role?: string; customRoleId?: string | null }[];
+  }[];
 };
 
 const invite = (email: string, teamId: string = TEAM_ID) => ({
@@ -249,6 +264,61 @@ describe("given an organization with a team and a personal workspace", () => {
       expect(second.status).toBe(409);
       expect(((await second.json()) as Refusal).code).toBe("duplicate_invite");
       expect(listed.invites.filter((entry) => entry.email === "dup@acme.test")).toHaveLength(1);
+    });
+  });
+
+  describe("when two people are invited with a team assignment carrying a custom role", () => {
+    /** @scenario "Creating invites assigns teams including a custom role" */
+    it("answers 201 and both invites carry the custom role on the team", async () => {
+      const { send } = await application();
+      const teams = [{ teamId: TEAM_ID, role: "CUSTOM", customRoleId: CUSTOM_ROLE_ID }];
+
+      const created = await send("/api/organization/invites", {
+        method: "POST",
+        body: {
+          invites: [
+            { email: "one@acme.test", role: "MEMBER", teams },
+            { email: "two@acme.test", role: "MEMBER", teams },
+          ],
+        },
+      });
+      const listed = (await (await send("/api/organization/invites")).json()) as InviteList;
+      const body = (await created.json()) as { invites: { emailNotSent: boolean }[] };
+
+      expect(created.status).toBe(201);
+      expect(body.invites.map((entry) => typeof entry.emailNotSent)).toEqual([
+        "boolean",
+        "boolean",
+      ]);
+      expect(listed.invites.map((entry) => entry.email).toSorted()).toEqual([
+        "one@acme.test",
+        "two@acme.test",
+      ]);
+      for (const entry of listed.invites) {
+        expect(entry.teams).toEqual([
+          { teamId: TEAM_ID, role: "CUSTOM", customRoleId: CUSTOM_ROLE_ID },
+        ]);
+      }
+    });
+
+    it("refuses a custom role that names no role id with custom_role_id_required and 422", async () => {
+      const { send } = await application();
+
+      const refused = await send("/api/organization/invites", {
+        method: "POST",
+        body: {
+          invites: [
+            {
+              email: "one@acme.test",
+              role: "MEMBER",
+              teams: [{ teamId: TEAM_ID, role: "CUSTOM" }],
+            },
+          ],
+        },
+      });
+
+      expect(refused.status).toBe(422);
+      expect(((await refused.json()) as Refusal).code).toBe("custom_role_id_required");
     });
   });
 

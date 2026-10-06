@@ -148,7 +148,10 @@ const inviteWire = (
   createdAt: invite.createdAt,
 });
 
-/** The team's role in the shape `createInvitations` accepts: built-in, or `custom:<id>`. */
+/**
+ * The team's role in the shape `createInvitations` accepts (built-in, or `custom:<id>`);
+ * `customRoleId` travels beside it.
+ */
 const requestedTeamRole = (team: { role: string; customRoleId?: string | undefined }) =>
   team.role === "CUSTOM" && team.customRoleId
     ? (`custom:${team.customRoleId}` as const)
@@ -341,6 +344,7 @@ export const organizationManagementRest: Readonly<{
           teams: (invite.teams ?? []).map((team) => ({
             teamId: team.teamId,
             role: requestedTeamRole(team),
+            ...(team.customRoleId ? { customRoleId: team.customRoleId } : {}),
           })),
         })),
       },
