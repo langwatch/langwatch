@@ -7,13 +7,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { HealthCheckFailedError } from "@langwatch/platform-health-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { logger } = vi.hoisted(() => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-}));
-
-vi.mock("@langwatch/observability", () => ({
-  createLogger: () => logger,
-}));
+const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 
 import { MemorySubsystemProbeChannel } from "../../channels/memory/memory.subsystem-probe.channel.ts";
 import type {
@@ -27,6 +21,7 @@ const CREDENTIAL = { authToken: "token", projectId: "project_1", signal: undefin
 
 function probes(canaries: SubsystemProbeChannel) {
   return SubsystemProbeService.create({
+    logger,
     collaborators: {
       canaries,
       automation: () => ({ findById: async () => null, getRecentFires: async () => [] }),
