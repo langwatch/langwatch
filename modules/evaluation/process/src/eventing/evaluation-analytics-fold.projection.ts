@@ -21,10 +21,7 @@ import {
 
 import { type EvaluationAnalyticsData } from "./evaluation-analytics-row.projection.ts";
 
-export type {
-  EvaluationAnalyticsData,
-  EvaluationAnalyticsRow,
-} from "./evaluation-analytics-row.projection.ts";
+export type { EvaluationAnalyticsData } from "./evaluation-analytics-row.projection.ts";
 
 const evaluationAnalyticsEvents = [
   evaluationScheduledEventSchema,
@@ -37,10 +34,10 @@ const evaluationAnalyticsEvents = [
 export const EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-07-27" as const;
 
 /** Read-back may trail the scheduled business time by up to one week. */
-export const EVALUATION_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const EVALUATION_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Bounds the persisted applied-event watermark for a single evaluation. */
-export const EVALUATION_ANALYTICS_COALESCE_MAX_BATCH = 128;
+const EVALUATION_ANALYTICS_COALESCE_MAX_BATCH = 128;
 
 function mergeEventMetadata(
   attributes: Record<string, string>,

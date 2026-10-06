@@ -58,7 +58,7 @@ function throwFetchFailure({
  * What the transport needs from the deployment: where the evaluator service
  * lives, how long a call may take and how many times a 5xx is retried.
  */
-export type LangevalsRuntimeConfig = Readonly<{
+type LangevalsRuntimeConfig = Readonly<{
   endpoint: string | undefined;
   maxRetries: number;
   timeoutMs: number;

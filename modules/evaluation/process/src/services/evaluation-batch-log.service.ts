@@ -90,7 +90,7 @@ export interface EvaluationExperimentRunWriter {
 }
 
 /** What one batch's rows are written through. */
-export type EvaluationBatchLogDeps = Readonly<{
+type EvaluationBatchLogDeps = Readonly<{
   experiments: EvaluationExperimentDirectory;
   runs: EvaluationExperimentRunWriter;
   report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;

@@ -1,7 +1,7 @@
 import { pickModelMetadata } from "@langwatch/model-provider-contract";
 
 /** The judge's own default for its max tokens setting (langevals DEFAULT_MAX_TOKENS). */
-export const JUDGE_DEFAULT_MAX_TOKENS = 128_000;
+const JUDGE_DEFAULT_MAX_TOKENS = 128_000;
 
 /** Left for the judge's answer inside the model's window (langevals ANSWER_RESERVE_TOKENS). */
 const ANSWER_RESERVE_TOKENS = 8_192;

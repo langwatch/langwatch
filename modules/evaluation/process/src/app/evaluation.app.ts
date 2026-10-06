@@ -194,13 +194,13 @@ export interface EvaluationRunAnalytics {
 }
 
 /** The monitors and datasets an evaluate call addresses by slug. */
-export interface EvaluationSlugDirectory {
+interface EvaluationSlugDirectory {
   findMonitorBySlug(input: EvaluationSlugLookup): Promise<EvaluationMonitorSummary | null>;
   findDatasetBySlug(input: EvaluationSlugLookup): Promise<EvaluationSlugMatch | null>;
 }
 
 /** The saved-evaluator directory the `evaluators/{slug|id}` form resolves on. */
-export interface EvaluationSavedEvaluatorDirectory {
+interface EvaluationSavedEvaluatorDirectory {
   resolveForExecution(input: SavedEvaluatorLookup): Promise<SavedEvaluatorResolution>;
 }
 
@@ -209,18 +209,18 @@ export interface EvaluationSavedEvaluatorDirectory {
  * caller's only answer to an unconfigured cascade is the evaluator's own
  * default, so the exception the cascade raises has no consumer on this path.
  */
-export interface EvaluationModelCascade {
+interface EvaluationModelCascade {
   findModelForFeature(input: EvaluationModelLookup): Promise<string | null>;
 }
 
 /** Where a run's cost and a dataset evaluation's rows are written. */
-export interface EvaluationLedger {
+interface EvaluationLedger {
   recordCost(input: EvaluationCostRecord): Promise<EvaluationSlugMatch>;
   recordDatasetRow(input: DatasetEvaluationRow): Promise<void>;
 }
 
 /** The one evaluator runtime this process composed. */
-export interface EvaluationRunner {
+interface EvaluationRunner {
   runEvaluation(input: RunEvaluatorInput): Promise<SingleEvaluationResult>;
 }
 

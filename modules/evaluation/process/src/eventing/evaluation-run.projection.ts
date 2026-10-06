@@ -14,19 +14,9 @@ import {
 } from "@langwatch/evaluation-contract";
 import {
   type FoldProjectionStore,
-  type Projection,
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "@langwatch/eventing";
-
-export type { EvaluationRunData };
-
-/**
- * Projection for evaluation run.
- */
-export interface EvaluationRun extends Projection<EvaluationRunData> {
-  data: EvaluationRunData;
-}
 
 const evaluationRunEvents = [
   evaluationScheduledEventSchema,

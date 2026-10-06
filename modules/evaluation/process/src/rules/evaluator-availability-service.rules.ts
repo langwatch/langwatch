@@ -4,8 +4,8 @@
  */
 import type { EvaluatorUnavailability } from "@langwatch/evaluation-contract";
 
-export const PRESIDIO_ENABLE_ENV_VAR = "LANGWATCH_ENABLE_PRESIDIO";
-export const LINGUA_ENABLE_ENV_VAR = "LANGWATCH_ENABLE_LINGUA";
+const PRESIDIO_ENABLE_ENV_VAR = "LANGWATCH_ENABLE_PRESIDIO";
+const LINGUA_ENABLE_ENV_VAR = "LANGWATCH_ENABLE_LINGUA";
 
 /** The environment as this reads it: names to raw values, nothing more. */
 export type EvaluatorInstallEnvironment = Readonly<Record<string, string | undefined>>;

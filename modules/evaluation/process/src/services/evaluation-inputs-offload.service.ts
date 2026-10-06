@@ -7,7 +7,7 @@ import type { EvaluationInputRepository } from "../repositories/evaluation-input
 
 export const STORED_OBJECT_MARKER_KEY = "__lw_stored_object" as const;
 
-export interface StoredObjectInputsMarker {
+interface StoredObjectInputsMarker {
   [STORED_OBJECT_MARKER_KEY]: {
     id: string;
     sizeBytes: number;
@@ -32,15 +32,12 @@ const logger = createLogger("langwatch:evaluation:inputs-offload");
 export const EVAL_INPUTS_INLINE_MAX_BYTES = 1024 * 1024;
 export const EVAL_INPUTS_HARD_CEILING_BYTES = 50 * 1024 * 1024;
 export const EVAL_INPUTS_PREVIEW_BYTES = 16 * 1024;
-export const EVAL_INPUTS_STORED_OBJECT_PURPOSE = "evaluation_inputs" as const;
 
-export type EvaluationInputOffloadConfig = Readonly<{
+type EvaluationInputOffloadConfig = Readonly<{
   inlineMaxBytes: number;
   hardCeilingBytes: number;
   previewBytes: number;
 }>;
-
-export const EVALUATION_INPUTS_STORED_OBJECT_MARKER_KEY = STORED_OBJECT_MARKER_KEY;
 
 export class EvaluationInputsOffloadService {
   static create(input: {

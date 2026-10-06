@@ -30,7 +30,7 @@ import type { EvaluationExecutionService } from "./evaluation-execution.service.
 import type { EvaluationInputsOffloadService } from "./evaluation-inputs-offload.service.ts";
 import { MonitorPerformanceService } from "./monitor-performance.service.ts";
 
-export type EvaluationServiceOptions = {
+type EvaluationServiceOptions = {
   repository: EvaluationRunRepository;
   monitorPerformance: MonitorPerformanceRepository;
   retention: EvaluationRetentionLookup;

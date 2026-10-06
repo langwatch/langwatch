@@ -1205,7 +1205,7 @@ type EvaluatorIncludingCustom =
  * A built-in or project custom evaluator by type; throws `EvaluatorNotFoundError` when neither
  * has it.
  */
-export const getEvaluatorIncludingCustom = async (
+const getEvaluatorIncludingCustom = async (
   app: EvaluationApi,
   projectId: string,
   checkType: EvaluatorTypes,
@@ -1244,7 +1244,7 @@ export const getEvaluatorIncludingCustom = async (
  * the `{ defaultModel, embeddingsModel }` shape `getEvaluatorDefaultSettings`
  * consumes for its `model` / `embeddings_model` fields.
  */
-export const resolveEvaluatorSettingsDefaults = async (
+const resolveEvaluatorSettingsDefaults = async (
   app: EvaluationApi,
   projectId: string,
 ): Promise<{ defaultModel: string | null; embeddingsModel: string | null }> => {

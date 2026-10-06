@@ -17,7 +17,7 @@ import {
 import { EvaluationAnalyticsRollupStore } from "./evaluation-rollup.store.ts";
 import { EvaluationRunStore } from "./evaluation-run.store.ts";
 
-export interface EvaluationEventingStores {
+interface EvaluationEventingStores {
   readonly evalRunStore: FoldProjectionStore<EvaluationRunData>;
   readonly evaluationAnalyticsStore: FoldProjectionStore<EvaluationAnalyticsData>;
   readonly evaluationAnalyticsRollupAppendStore: AppendStore<EvaluationAnalyticsRollupRow>;
