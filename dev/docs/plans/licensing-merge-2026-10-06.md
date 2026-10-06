@@ -1,5 +1,8 @@
 # Licensing merge: entitlement and usage into enterprise licensing
 
+Status: SUPERSEDED (Alex, 2026-10-06 late evening): usage merges into core entitlement; licensing and
+billing stay separate (rulings file). Sections 1, 3 and 4 remain useful as an inventory.
+
 Plan only, no code. Ruling: `.claude/coordinator/rulings-2026-10-05.md`, "Alex, 2026-10-06 (evening):
 commerce merge replaces R4; domains withdrawn". Measured against HEAD `acf03c2bf9`, 2026-10-06.
 
