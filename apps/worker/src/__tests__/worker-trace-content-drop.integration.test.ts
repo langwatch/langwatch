@@ -38,7 +38,8 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 /**
  * The worker records a span with the content its organization's privacy rule drops already gone.
- * Live eventing over memory stores; only the project's rows sit in a migrated test database.
+ * Eventing over memory stores, every module on its memory tier (§7); the project rows seeded in
+ * the test database are not read, so data-privacy resolves no project and fails open.
  * @vitest-environment node
  * @see specs/data-privacy/content-drop.feature
  */
@@ -77,9 +78,8 @@ function unreachable<Client extends object>(name: string): Client {
   return createApiFixture<Client>({}, `${name} (no raw client over memory stores)`);
 }
 
-/** The project module reads its rows from the test database: every other module is over memory. */
+/** Every module runs over memory: memoryStores() states one tier for the whole process (§7). */
 function overMemory(module: InstallableServerFeature<never>): InstallableServerFeature<never> {
-  if (module.name === "project") return module;
   return module.repositoryRegistry === void 0 ? module : withMemoryRepositories(module);
 }
 

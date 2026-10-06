@@ -62,7 +62,10 @@ const entra = (label: string) => `${ENTRA_HOST}/${SUITE}-${label}/v2.0`;
 const GRAPH_USERINFO = "https://graph.microsoft.com/oidc/userinfo";
 const CLIENT_ID = "langwatch-test-client";
 
-/** The modules a federated sign-in reads and writes; every other one runs over memory. */
+/**
+ * The modules a federated sign-in reads and writes. memoryStores() states the memory tier for the
+ * whole process (ARCHITECTURE.md §7), so none of these runs live: the suite stays red until it can.
+ */
 const LIVE_MODULES: ReadonlySet<string> = new Set(["auth", "identity", "organization", "user"]);
 
 const organizationIds: string[] = [];

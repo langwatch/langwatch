@@ -75,7 +75,7 @@ const expectSameNumbers = ({
 };
 
 describe("the api installed over a ClickHouse", () => {
-  it("boots with evaluation on its live repositories, reading nothing until asked", async () => {
+  it("boots with evaluation over its memory repositories, reading nothing until asked", async () => {
     const refusing: QueryDriver = {
       execute: () => Promise.reject(new Error("no statement is expected at boot")),
       insert: () => Promise.reject(new Error("no statement is expected at boot")),

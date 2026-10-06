@@ -33,7 +33,8 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 /**
  * The worker folds langy's conversation pipeline again: a created conversation is readable through
- * its projection. Live eventing over memory stores, langy's own rows in a migrated test database.
+ * its projection. Eventing over memory stores, every module on its memory tier (§7): the test
+ * database holds nothing the projection reads.
  * @vitest-environment node
  * @see modules/langy/specs/langy.feature
  */

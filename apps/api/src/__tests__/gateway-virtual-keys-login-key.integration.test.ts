@@ -70,7 +70,10 @@ const prisma = connection?.client as PrismaClient;
 const ns = generate("test").toString().toLowerCase();
 const BASE_URL = "http://langwatch.test";
 
-/** What a virtual key request reads and writes; every other module runs over memory. */
+/**
+ * What a virtual key request reads and writes. memoryStores() states the memory tier for the whole
+ * process (ARCHITECTURE.md §7), so none of these runs live: the suite stays red until it can.
+ */
 const LIVE_MODULES: ReadonlySet<string> = new Set([
   "api-key",
   "auth",
@@ -127,6 +130,7 @@ async function bootInstallation({ clickHouse }: { clickHouse: ClickHouseClient }
     identify: refuse,
     identifyOptional: refuse,
     authorize: refuse,
+    authorizePlatform: refuse,
   };
 
   let rest: RestHost | undefined;

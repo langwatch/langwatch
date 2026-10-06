@@ -23,8 +23,9 @@ import {
 } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
 /**
- * The api installed as `main.ts` installs it, with evaluation on its live repositories over a real
- * ClickHouse and every other module over memory stores (ARCHITECTURE.md §13).
+ * The api installed as `main.ts` installs it over memory stores (ARCHITECTURE.md §13), with a real
+ * ClickHouse client handed in. memoryStores() states the memory tier for the whole process (§7), so
+ * evaluation reads its memory repositories, not ClickHouse.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
@@ -44,7 +45,7 @@ function unreachable<Client extends object>(name: string): Client {
   return createApiFixture<Client>({}, `${name} (no raw client over memory stores)`);
 }
 
-/** The modules whose analytical reads the suites compare, left on their live repositories. */
+/** The modules whose analytical reads the suites compare; they run on memory like the rest (§7). */
 const ANALYTICAL_MODULES: ReadonlySet<string> = new Set(["evaluation"]);
 
 function overMemory(module: InstallableServerFeature<never>): InstallableServerFeature<never> {
