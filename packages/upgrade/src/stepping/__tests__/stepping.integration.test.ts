@@ -39,8 +39,7 @@ const resolves = (specifier: string) => {
   }
 };
 /** The client proof runs once `@prisma/client` and its pg adapter are devDependencies here. */
-const CLIENT_RESOLVES =
-  resolves("@prisma/client/package.json") && resolves("@prisma/adapter-pg/package.json");
+const CLIENT_RESOLVES = resolves("@prisma/client/package.json") && resolves("@prisma/adapter-pg");
 
 let sequence = 0;
 
@@ -395,7 +394,7 @@ describe.skipIf(!DB_URL || !CLIENT_RESOLVES)("a model client newer than its tabl
   it("fails the default select and a defaulted create with P2022 and passes a narrow select", async () => {
     const name = `stepping_client_${Date.now().toString(36)}`;
     const admin = new Pool({ connectionString: DB_URL, max: 1 });
-    const dir = join(PACKAGE_ROOT, "node_modules/.cache", name);
+    const dir = join(PACKAGE_ROOT, `tmp-probe-${name}`);
     await admin.query(`CREATE DATABASE "${name}"`);
     try {
       const url = new URL(DB_URL ?? "");
