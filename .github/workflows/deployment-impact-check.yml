@@ -18,6 +18,19 @@ on:
       - "dev/docs/best_practices/**"
       - ".env.example"
       - "docs/self-hosting/**"
+      - "infra/**"
+      - "apps/*/Dockerfile*"
+      - "apps/*/src/config.ts"
+      - "packages/config/**"
+      - "packages/secrets/**"
+      - "packages/prisma-client/prisma/migrations/**"
+      - "packages/clickhouse-migrations/migrations/**"
+      - "modules/*/process/src/migrations/**"
+      - "enterprise/modules/*/process/src/migrations/**"
+      - "modules/*/contract/src/*.config.ts"
+      - "enterprise/modules/*/contract/src/*.config.ts"
+      - "modules/*/adrs/**"
+      - "enterprise/modules/*/adrs/**"
 
 # Triggered on `edited`, and it reads the PR description, so an in-flight run
 # is grading a body the author has already rewritten. 18 of the last 100 runs
@@ -94,7 +107,7 @@ jobs:
           # Heading presence — strict H2 (`## `). Loosen to `##+` if H3 turns
           # out to be common in template usage.
           if ! printf '%s\n' "$PR_BODY" | grep -qiE '^##[[:space:]]+(deployment[[:space:]]+impact|operator[[:space:]]*/?[[:space:]]*deployment[[:space:]]+impact)' ; then
-            echo "::error::No '## Deployment Impact' heading found in PR description. This PR touches deployment surface (charts/services/ADRs/best-practices docs/env.example/self-hosting) — add the section as a top-level H2 (`## Deployment Impact`)."
+            echo "::error::No '## Deployment Impact' heading found in PR description. This PR touches deployment surface (charts/services/migrations/module config/ADRs/best-practices docs/env.example/self-hosting) — add the section as a top-level H2 (`## Deployment Impact`)."
             exit 1
           fi
 
