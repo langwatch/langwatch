@@ -29,6 +29,7 @@ import {
   type PersonalWorkspaceResourceIds,
   type StoredOrganizationSettings,
 } from "../organization.repository.ts";
+import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
 
 type Client = Prisma.TransactionClient | PrismaClient;
 
@@ -38,6 +39,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   private constructor(
     private readonly database: PrismaClient,
     private readonly cipher: OrganizationSettingsCipher,
+    private readonly audit: PrismaOrganizationAuditStore,
   ) {
     super();
   }
@@ -49,7 +51,11 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     database: PrismaClient;
     cipher: OrganizationSettingsCipher;
   }): PrismaOrganizationRepository {
-    return new PrismaOrganizationRepository(database, cipher);
+    return new PrismaOrganizationRepository(
+      database,
+      cipher,
+      PrismaOrganizationAuditStore.create({ database }),
+    );
   }
 
   async findAllIds(): Promise<string[]> {
@@ -493,16 +499,18 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
         where: { id: input.projectId },
         data: { personalFeatures: input.after },
       });
-      await transaction.auditLog.create({
-        data: {
+      await this.audit.append({
+        transaction,
+        fact: {
+          tenantId: input.organizationId ?? input.projectId,
           userId: input.callerUserId,
           projectId: input.projectId,
           organizationId: input.organizationId,
           action: input.action,
           targetKind: "project",
           targetId: input.projectId,
-          before: input.before as Prisma.InputJsonValue,
-          after: input.after as Prisma.InputJsonValue,
+          before: input.before,
+          after: input.after,
         },
       });
     });

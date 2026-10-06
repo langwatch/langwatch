@@ -132,8 +132,32 @@ Feature: Audit logging
       When the first delivery to the audit log fails
       Then the outbox delivers it again and the audit row is written once
 
-    @unit @unimplemented
+    @integration
     Scenario: A rolled-back change records no audit
       Given a producer whose domain change and audit intent share one commit
       When that commit rolls back
       Then no audit intent is left in its outbox and no audit row is written
+
+  Rule: Audit-log reacts to organization's audit facts (Alex, 2026-10-06, night, second round)
+    Organization appends an audit intent in the transaction of its change; its outbox records the
+    audit fact on organization's own pipeline, and audit-log's peer subscriber writes its own table
+    (record section 9). Organization holds no audit-log peer and never writes the audit table.
+
+    @integration
+    Scenario: A committed organization change leaves one audit intent in its outbox
+      Given a Developer admitted to an organization
+      When the admission commits
+      Then organization's audit outbox holds one intent naming the admission
+      And no audit row is written by organization
+
+    @unit
+    Scenario: Organization's audit intent records its audit fact
+      Given an audit intent in organization's outbox
+      When the outbox delivers it
+      Then organization records the audit fact, keyed by the intent's audit id
+
+    @unit
+    Scenario: An organization audit fact delivered twice writes one audit row
+      Given organization recorded an audit fact keyed by an audit id
+      When audit-log's subscriber receives the fact twice
+      Then one audit row is stored under that key, with organization's action and metadata

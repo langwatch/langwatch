@@ -12,10 +12,15 @@ const organizationFindUnique = vi.fn();
 const memberCreate = vi.fn();
 const memberFindUnique = vi.fn();
 const auditLogCreate = vi.fn();
+type OutboxRow = Prisma.ProcessManagerOutboxCreateManyInput;
+const outboxCreateMany = vi.fn(async (_input?: { data: OutboxRow[] | OutboxRow }) => ({
+  count: 1,
+}));
 
 const transactionClient = prismaDouble({
   organizationUser: { create: memberCreate, findUnique: memberFindUnique },
   auditLog: { create: auditLogCreate },
+  processManagerOutbox: { createMany: outboxCreateMany },
 });
 
 const prisma = prismaDouble({
@@ -24,6 +29,11 @@ const prisma = prismaDouble({
   auditLog: { create: auditLogCreate },
   $transaction: (run) => run(transactionClient),
 });
+
+/** The audit intents the admission's own transaction appended to organization's outbox. */
+function auditIntents() {
+  return outboxCreateMany.mock.calls.flatMap(([input]) => [input?.data ?? []].flat());
+}
 
 let repository: PrismaOrganizationMembershipRepository;
 
@@ -59,6 +69,7 @@ function admit() {
 beforeEach(() => {
   vi.clearAllMocks();
   auditLogCreate.mockResolvedValue({});
+  outboxCreateMany.mockResolvedValue({ count: 1 });
   repository = PrismaOrganizationMembershipRepository.create({
     database: prisma,
     cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
@@ -89,14 +100,20 @@ describe("given an organization whose joiner seat is Developer", () => {
 
       await admit();
 
-      expect(auditLogCreate).toHaveBeenCalledWith({
-        data: {
-          action: "organization.member.admitted",
-          userId: "user_sam",
-          organizationId: "org_acme",
-          metadata: { seat: "DEVELOPER", via: "sso" },
-        },
-      });
+      expect(auditLogCreate).not.toHaveBeenCalled();
+      expect(auditIntents()).toEqual([
+        expect.objectContaining({
+          processName: "organizationAudit",
+          intentType: "recordAudit",
+          payload: expect.objectContaining({
+            tenantId: "org_acme",
+            action: "organization.member.admitted",
+            userId: "user_sam",
+            organizationId: "org_acme",
+            metadata: { seat: "DEVELOPER", via: "sso" },
+          }),
+        }),
+      ]);
     });
   });
 });
@@ -110,7 +127,7 @@ describe("given a Developer-joiner organization where a Full member's row alread
       });
 
       await expect(admit()).resolves.toEqual({ outcome: "already-present", seat: "MEMBER" });
-      expect(auditLogCreate).not.toHaveBeenCalled();
+      expect(auditIntents()).toEqual([]);
     });
   });
 });
@@ -129,7 +146,7 @@ describe("given an organization that never changed the setting", () => {
           pendingSsoGrantId: "rolebinding_pending",
         }),
       });
-      expect(auditLogCreate).not.toHaveBeenCalled();
+      expect(auditIntents()).toEqual([]);
     });
   });
 });
@@ -152,14 +169,16 @@ describe("given a Full-seat organization and a join request made from the termin
       ).resolves.toEqual({ outcome: "created", seat: "DEVELOPER" });
 
       expect(organizationFindUnique).not.toHaveBeenCalled();
-      expect(auditLogCreate).toHaveBeenCalledWith({
-        data: {
-          action: "organization.member.admitted",
-          userId: "user_sam",
-          organizationId: "org_acme",
-          metadata: { seat: "DEVELOPER", via: "join-request-approved", origin: "cli" },
-        },
-      });
+      expect(auditIntents()).toEqual([
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            action: "organization.member.admitted",
+            userId: "user_sam",
+            organizationId: "org_acme",
+            metadata: { seat: "DEVELOPER", via: "join-request-approved", origin: "cli" },
+          }),
+        }),
+      ]);
     });
   });
 });

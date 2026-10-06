@@ -9,6 +9,7 @@ export * from "./invite.errors.ts";
 export * from "./join-request.trpc-schemas.ts";
 export * from "./join-request.responses.ts";
 export * from "./organization.ts";
+export * from "./organization-audit.events.ts";
 export * from "./organization-lifecycle.events.ts";
 export * from "./organization-settings.events.ts";
 export * from "./organization.trpc-schemas.ts";
