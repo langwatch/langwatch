@@ -1,4 +1,3 @@
-import type { AccessDeclaration } from "@langwatch/api/access";
 import type { TrpcProcedureFactory, TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 /**
@@ -6,7 +5,7 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
  * everything, and a factory that records what each procedure declared without
  * building one.
  */
-import type { Actor, AuthzPermission } from "@langwatch/authorization";
+import type { Actor } from "@langwatch/authorization";
 import { initTRPC } from "@trpc/server";
 
 type TestContext = object;
@@ -60,11 +59,17 @@ export function agentTrpcCaller<Api, Caller>(options: {
   return options.declaration.router(runtime, () => options.app).createCaller({});
 }
 
+/** A procedure's declared permission, or its whole access when it declares none. */
+type ProcedureAccess = Parameters<TrpcProcedureFactory<TestContext>["procedure"]>[0]["access"];
+type DeclaredAccess =
+  | Extract<ProcedureAccess, { kind: "permission" }>["permission"]
+  | ProcedureAccess;
+
 /** Records the access each declared procedure asked for, building nothing. */
 export function accessDeclaredBy(declaration: {
   router(runtime: TrpcProcedureFactory<TestContext>, app: (ctx: TestContext) => never): unknown;
-}): (AuthzPermission | AccessDeclaration)[] {
-  const declared: (AuthzPermission | AccessDeclaration)[] = [];
+}): DeclaredAccess[] {
+  const declared: DeclaredAccess[] = [];
   const runtime: TrpcProcedureFactory<TestContext> = {
     procedure: ({ access }) => {
       declared.push(access.kind === "permission" ? access.permission : access);
