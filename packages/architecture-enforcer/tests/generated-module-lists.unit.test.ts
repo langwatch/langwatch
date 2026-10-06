@@ -8,6 +8,7 @@ const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 const DEVSCRIPTS = join(REPOSITORY_ROOT, "dev/scripts/devscripts.sh");
 const PROCESS_APPS = ["api", "worker", "tasks"] as const;
 const processList = (app: string) => `apps/${app}/src/process-modules.generated.ts`;
+const COLD_GO_BUILD_TIMEOUT_MS = 60_000;
 const SERVER_MODULES = processList("api");
 const BROWSER_MODULES = "apps/ui/src/browser-modules.generated.ts";
 
@@ -27,9 +28,14 @@ function importedPackages(path: string): string[] {
 
 describe("given the checked-in module lists", () => {
   describe("when the generator runs again over the catalogue", () => {
-    it("writes exactly what is checked in", () => {
-      expect(() => generateModules({ args: ["--check"] })).not.toThrow();
-    });
+    // `go run` compiles the generator: 0.3s warm, 18s on a cold Go build cache (CI).
+    it(
+      "writes exactly what is checked in",
+      () => {
+        expect(() => generateModules({ args: ["--check"] })).not.toThrow();
+      },
+      COLD_GO_BUILD_TIMEOUT_MS,
+    );
 
     /**
      * One build carries every module. A licence lives in the running
