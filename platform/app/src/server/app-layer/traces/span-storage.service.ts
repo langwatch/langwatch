@@ -1,4 +1,6 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
+import { ownProjectIdOf } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -39,7 +41,15 @@ export interface SpanReadBlobResolutionDeps {
   ioExtractionService: TraceIOExtractionService;
 }
 
-type ByTraceId = { tenantId: string; traceId: string } & OccurredAtHint;
+/**
+ * Every read carries the sealed ADR-166 proof (ADR-144 block C). The
+ * repository fences the statement by it; the service reaches for the own
+ * project only where a store outside ClickHouse keys on a project id.
+ */
+type ByTraceId = {
+  authorization: Authorization;
+  traceId: string;
+} & OccurredAtHint;
 type BySpanId = ByTraceId & { spanId: string };
 type Paginated = ByTraceId & { limit: number; offset: number };
 /** Full-span delta: keyed on span start (see `findSpansSince`). */
@@ -115,7 +125,13 @@ export class SpanStorageService {
     const normalizedSpans =
       await this.repository.getNormalizedSpansByTraceId(params);
     const { resolvedSpans } = await resolveOffloadedTraces({
-      projectId: params.tenantId,
+      // Offloaded bodies live under the project the route minted the proof
+      // for. A member's offloaded span read through an aggregate keeps its
+      // preview value, the same way a stale pointer does.
+      projectId: ownProjectIdOf({
+        authorization: params.authorization,
+        reads: "traces",
+      }),
       normalizedSpans,
       blobStore: this.blobResolutionDeps.blobStore,
       ioExtractionService: this.blobResolutionDeps.ioExtractionService,
@@ -178,7 +194,13 @@ export class SpanStorageService {
     const normalizedSpans =
       await this.repository.getNormalizedSpansByTraceId(params);
     const { resolvedSpans } = await resolveOffloadedTraces({
-      projectId: params.tenantId,
+      // Offloaded bodies live under the project the route minted the proof
+      // for. A member's offloaded span read through an aggregate keeps its
+      // preview value, the same way a stale pointer does.
+      projectId: ownProjectIdOf({
+        authorization: params.authorization,
+        reads: "traces",
+      }),
       normalizedSpans,
       blobStore: this.blobResolutionDeps.blobStore,
       ioExtractionService: this.blobResolutionDeps.ioExtractionService,
@@ -260,7 +282,7 @@ export class SpanStorageService {
   }
 
   async getModelUsageStats(params: {
-    tenantId: string;
+    authorization: Authorization;
     fromMs: number;
     limit: number;
   }): Promise<ModelUsageStatsRow[]> {
@@ -268,7 +290,7 @@ export class SpanStorageService {
   }
 
   async getRecentSpansByModels(params: {
-    tenantId: string;
+    authorization: Authorization;
     models: string[];
     fromMs: number;
     perModelLimit: number;

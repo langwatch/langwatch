@@ -15,10 +15,11 @@
  * @see specs/features/suites/trace-role-cost-accumulation.feature
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
+import { ownProof } from "~/test-utils/authorizationProofs";
+import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
 import type { AggregateType } from "../../";
 import { definePipeline } from "../../";
 import { getTestClickHouseClient } from "../../__tests__/integration/testContainers";
@@ -133,7 +134,7 @@ describe.skipIf(!hasTestcontainers)(
 
       const spanAppendStore = new SpanAppendStore(
         new SpanStorageService(
-          new SpanStorageClickHouseRepository(async () => clickHouseClient),
+          spanStorageRepositoryFor(async () => clickHouseClient),
         ).repository,
       );
       traceSummaryStore = new TraceSummaryStore(
@@ -360,11 +361,9 @@ describe.skipIf(!hasTestcontainers)(
         // Read them back and verify the derivation produces the expected
         // per-role aggregates (both child LLM costs attributed to Agent; Agent
         // latency = its own span duration).
-        const spanRepo = new SpanStorageClickHouseRepository(
-          async () => clickHouseClient,
-        );
+        const spanRepo = spanStorageRepositoryFor(async () => clickHouseClient);
         const spans = await spanRepo.getNormalizedSpansByTraceId({
-          tenantId: tenantIdString,
+          authorization: ownProof({ projectId: tenantIdString }),
           traceId,
         });
         const { scenarioRoleCosts, scenarioRoleLatencies } =

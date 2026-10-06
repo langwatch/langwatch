@@ -53,7 +53,6 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceRequestCollectionService } from "~/server/app-layer/traces/trace-request-collection.service";
@@ -79,6 +78,7 @@ import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/tra
 import { EventStoreClickHouse } from "~/server/event-sourcing/stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
 import { makeQueueName } from "~/server/queues/makeQueueName";
+import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const otlpRoot = require("@opentelemetry/otlp-transformer/build/src/generated/root");
@@ -272,7 +272,7 @@ describe.skipIf(!shouldRun)(
 
       const spanAppendStore = new SpanAppendStore(
         new SpanStorageService(
-          new SpanStorageClickHouseRepository(async () => clickHouseClient),
+          spanStorageRepositoryFor(async () => clickHouseClient),
         ).repository,
       );
       const traceSummaryStore = new TraceSummaryStore(

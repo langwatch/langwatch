@@ -561,7 +561,10 @@ export function initializeDefaultApp(options?: {
   });
   // Shared between SpanStorageService and TraceSummaryService's full read.
   const spanStorageRepository = clickhouseEnabled
-    ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
+    ? new SpanStorageClickHouseRepository({
+        resolveClient: resolveClickHouseClient,
+        clickhouse: authorizedClickHouse,
+      })
     : new NullSpanStorageRepository();
 
   // Resolves the per-tenant retention cascade; shared by the DSPy CH repo

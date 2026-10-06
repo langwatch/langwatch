@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
+import { ownProof } from "~/test-utils/authorizationProofs";
+import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
 import { getTestClickHouseClient } from "../../../__tests__/integration/testContainers";
 import {
   cleanupTestDataForTenant,
@@ -104,7 +105,7 @@ describe.skipIf(!hasTestcontainers)(
         ).repository,
       );
       spanStorageService = new SpanStorageService(
-        new SpanStorageClickHouseRepository(async () => clickHouseClient),
+        spanStorageRepositoryFor(async () => clickHouseClient),
       );
     });
 
@@ -173,7 +174,7 @@ describe.skipIf(!hasTestcontainers)(
       );
 
       const storedSpans = await spanStorageService.getSpansByTraceId({
-        tenantId: currentTenantIdString,
+        authorization: ownProof({ projectId: currentTenantIdString }),
         traceId,
       });
 

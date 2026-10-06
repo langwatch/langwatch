@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/actor";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -77,7 +78,8 @@ export interface TraceEventRollup {
 }
 
 export interface TraceEventRollupParams {
-  tenantId: string;
+  /** The proof the read is fenced by (ADR-144 block C). */
+  authorization: Authorization;
   /** The visible page's trace ids. An empty list issues no query. */
   traceIds: string[];
   /**
@@ -205,7 +207,8 @@ export interface OccurredAtHint {
  * next adopter instead of relying on every caller remembering to pass one.
  */
 export interface NormalizedSpanByIdParams {
-  tenantId: string;
+  /** The proof the read is fenced by (ADR-144 block C). */
+  authorization: Authorization;
   traceId: string;
   spanId: string;
   /** Centre of the partition window: the SPAN'S OWN start, epoch ms. */
@@ -241,6 +244,13 @@ export interface ModelSpanSampleRow {
   startTimeMs: number;
 }
 
+/**
+ * Writes name their tenant on the row, the way the projection hands it over.
+ * Every read takes the sealed ADR-166 `authorization` proof instead of a
+ * tenant id: the store client fences the statement to the projects the proof
+ * covers, and the repository never writes a tenant predicate of its own
+ * (ADR-144 block C).
+ */
 export interface SpanStorageRepository {
   insertSpan(span: SpanInsertData): Promise<void>;
   insertSpans(spans: SpanInsertData[]): Promise<void>;
@@ -251,7 +261,7 @@ export interface SpanStorageRepository {
    */
   getSpansByTraceId(
     params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       limit?: number;
     } & OccurredAtHint,
@@ -264,14 +274,14 @@ export interface SpanStorageRepository {
    */
   getNormalizedSpansByTraceId(
     params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       limit?: number;
     } & OccurredAtHint,
   ): Promise<NormalizedSpan[]>;
   getSpanByIds(
     params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       spanId: string;
     } & OccurredAtHint,
@@ -296,7 +306,7 @@ export interface SpanStorageRepository {
    * for parity with the list the fold used to carry.
    */
   getTraceEventsByTraceId(
-    params: { tenantId: string; traceId: string } & OccurredAtHint,
+    params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<DerivedTraceEvent[]>;
   /**
    * Event rollups for a page of traces, for the trace list's Events column.
@@ -310,17 +320,17 @@ export interface SpanStorageRepository {
     params: TraceEventRollupParams,
   ): Promise<Record<string, TraceEventRollup>>;
   getEventsByTraceId(
-    params: { tenantId: string; traceId: string } & OccurredAtHint,
+    params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
   getSpanEvents(
     params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       spanId: string;
     } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
   getSpanSummaryByTraceId(
-    params: { tenantId: string; traceId: string } & OccurredAtHint,
+    params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]>;
   /**
    * Per-span LangWatch instrumentation signals — projected separately from
@@ -328,10 +338,10 @@ export interface SpanStorageRepository {
    * the attribute scan. Callers fire this in parallel and merge in the UI.
    */
   findLangwatchSignalsByTraceId(
-    params: { tenantId: string; traceId: string } & OccurredAtHint,
+    params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<SpanLangwatchSignalsRow[]>;
   findSpanResourcesByTraceId(
-    params: { tenantId: string; traceId: string } & OccurredAtHint,
+    params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<SpanResourceInfo[]>;
   /**
    * One page of span summaries in `(StartTimeMs, SpanId)` order, starting
@@ -341,7 +351,7 @@ export interface SpanStorageRepository {
    */
   findSpanSummariesPage(
     params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       limit: number;
       cursor?: SpanSummaryPageCursor;
@@ -355,14 +365,14 @@ export interface SpanStorageRepository {
    */
   findSpanSummariesSince(
     params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       sinceUpdatedAtMs: number;
     } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]>;
   findSpansPaginated(
     params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       limit: number;
       offset: number;
@@ -370,7 +380,7 @@ export interface SpanStorageRepository {
   ): Promise<{ spans: Span[]; total: number }>;
   findSpansSince(
     params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       sinceStartTimeMs: number;
     } & OccurredAtHint,
@@ -381,7 +391,7 @@ export interface SpanStorageRepository {
    * the model cost rule preview needs the project-wide model inventory.
    */
   findModelUsageStats(params: {
-    tenantId: string;
+    authorization: Authorization;
     fromMs: number;
     limit: number;
   }): Promise<ModelUsageStatsRow[]>;
@@ -391,7 +401,7 @@ export interface SpanStorageRepository {
    * usage are preferred over token-less ones.
    */
   findRecentSpansByModels(params: {
-    tenantId: string;
+    authorization: Authorization;
     models: string[];
     fromMs: number;
     perModelLimit: number;
@@ -408,14 +418,14 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
   }
 
   async getSpansByTraceId(
-    _params: { tenantId: string; traceId: string } & OccurredAtHint,
+    _params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<Span[]> {
     return [];
   }
 
   async getNormalizedSpansByTraceId(
     _params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       limit?: number;
     } & OccurredAtHint,
@@ -431,7 +441,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
 
   async getSpanByIds(
     _params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       spanId: string;
     } & OccurredAtHint,
@@ -440,7 +450,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
   }
 
   async getTraceEventsByTraceId(
-    _params: { tenantId: string; traceId: string } & OccurredAtHint,
+    _params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<DerivedTraceEvent[]> {
     return [];
   }
@@ -452,14 +462,14 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
   }
 
   async getEventsByTraceId(
-    _params: { tenantId: string; traceId: string } & OccurredAtHint,
+    _params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]> {
     return [];
   }
 
   async getSpanEvents(
     _params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       spanId: string;
     } & OccurredAtHint,
@@ -468,26 +478,26 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
   }
 
   async getSpanSummaryByTraceId(
-    _params: { tenantId: string; traceId: string } & OccurredAtHint,
+    _params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]> {
     return [];
   }
 
   async findLangwatchSignalsByTraceId(
-    _params: { tenantId: string; traceId: string } & OccurredAtHint,
+    _params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<SpanLangwatchSignalsRow[]> {
     return [];
   }
 
   async findSpanResourcesByTraceId(
-    _params: { tenantId: string; traceId: string } & OccurredAtHint,
+    _params: { authorization: Authorization; traceId: string } & OccurredAtHint,
   ): Promise<SpanResourceInfo[]> {
     return [];
   }
 
   async findSpanSummariesPage(
     _params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       limit: number;
       cursor?: SpanSummaryPageCursor;
@@ -498,7 +508,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
 
   async findSpanSummariesSince(
     _params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       sinceUpdatedAtMs: number;
     } & OccurredAtHint,
@@ -508,7 +518,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
 
   async findSpansPaginated(
     _params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       limit: number;
       offset: number;
@@ -519,7 +529,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
 
   async findSpansSince(
     _params: {
-      tenantId: string;
+      authorization: Authorization;
       traceId: string;
       sinceStartTimeMs: number;
     } & OccurredAtHint,
@@ -528,7 +538,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
   }
 
   async findModelUsageStats(_params: {
-    tenantId: string;
+    authorization: Authorization;
     fromMs: number;
     limit: number;
   }): Promise<ModelUsageStatsRow[]> {
@@ -536,7 +546,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
   }
 
   async findRecentSpansByModels(_params: {
-    tenantId: string;
+    authorization: Authorization;
     models: string[];
     fromMs: number;
     perModelLimit: number;

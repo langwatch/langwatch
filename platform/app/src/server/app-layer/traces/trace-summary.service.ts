@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 
 import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
@@ -26,6 +27,17 @@ export interface TraceSummaryFullResolutionDeps {
   ioExtractionService: TraceIOExtractionService;
 }
 
+/**
+ * Resolve offloaded (ADR-022) input/output back to the full value. Only
+ * meaningful on single-trace reads with full-resolution deps supplied at
+ * construction; never used by list reads. The re-read of the trace's spans
+ * is a proof-bearing read (ADR-144 block C), so asking for it means carrying
+ * the proof.
+ */
+type FullResolutionOption =
+  | { full: true; authorization: Authorization }
+  | { full?: false };
+
 export class TraceSummaryService {
   private readonly logger = createLogger(
     "langwatch:traces:trace-summary-service",
@@ -50,13 +62,7 @@ export class TraceSummaryService {
        * Omitted/null = ungated (internal callers).
        */
       visibilityCutoffMs?: number | null;
-      /**
-       * Resolve offloaded (ADR-022) input/output back to the full value.
-       * Only meaningful on single-trace reads with full-resolution deps
-       * supplied at construction; never used by list reads.
-       */
-      full?: boolean;
-    },
+    } & FullResolutionOption,
   ): Promise<TraceSummaryData> {
     const result = await this.repository.findByTraceId(
       tenantId,
@@ -85,7 +91,11 @@ export class TraceSummaryService {
     }
 
     if (options?.full && this.fullResolutionDeps) {
-      return await this.withFullIO(tenantId, result);
+      return await this.withFullIO({
+        tenantId,
+        authorization: options.authorization,
+        summary: result,
+      });
     }
     return result;
   }
@@ -96,16 +106,21 @@ export class TraceSummaryService {
    * back to the stored preview: a degraded header read must never become a
    * failed one.
    */
-  private async withFullIO(
-    tenantId: string,
-    summary: TraceSummaryData,
-  ): Promise<TraceSummaryData> {
+  private async withFullIO({
+    tenantId,
+    authorization,
+    summary,
+  }: {
+    tenantId: string;
+    authorization: Authorization;
+    summary: TraceSummaryData;
+  }): Promise<TraceSummaryData> {
     const deps = this.fullResolutionDeps;
     if (!deps) return summary;
     try {
       const normalizedSpans =
         await deps.spanStorageRepository.getNormalizedSpansByTraceId({
-          tenantId,
+          authorization,
           traceId: summary.traceId,
           occurredAtMs: summary.occurredAt,
         });

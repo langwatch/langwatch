@@ -4,6 +4,7 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 import { describe, expect, it, vi } from "vitest";
+import { ownProof } from "~/test-utils/authorizationProofs";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
 vi.mock("langwatch", () => ({
@@ -112,6 +113,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
 
       const result = await service.getByTraceId("proj-1", "trace-1", {
         full: true,
+        authorization: ownProof({ projectId: "proj-1" }),
       });
 
       expect(result.computedInput).toBe("preview-input…");
@@ -147,6 +149,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
 
         const result = await service.getByTraceId("proj-1", "trace-1", {
           full: true,
+          authorization: ownProof({ projectId: "proj-1" }),
         });
 
         expect(result.computedInput).toBe(fullInput);
@@ -196,6 +199,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
 
       const result = await service.getByTraceId("proj-1", "trace-1", {
         full: true,
+        authorization: ownProof({ projectId: "proj-1" }),
       });
 
       expect(result.computedInput).toBe("preview-input…");
@@ -228,6 +232,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
 
       const result = await service.getByTraceId("proj-1", "trace-1", {
         full: true,
+        authorization: ownProof({ projectId: "proj-1" }),
       });
 
       expect(result.computedInput).toBe("preview-input…");
@@ -254,6 +259,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
 
       const result = await service.getByTraceId("proj-1", "trace-1", {
         full: true,
+        authorization: ownProof({ projectId: "proj-1" }),
       });
 
       expect(result.computedInput).toBe("preview-input…");

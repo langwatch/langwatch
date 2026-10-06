@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { ownProof } from "~/test-utils/authorizationProofs";
 
 // Passthrough mock for langwatch tracer used by TraceIOExtractionService.
 vi.mock("langwatch", () => ({
@@ -150,7 +151,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         });
 
         const spans = await service.getSpansByTraceId({
-          tenantId: "proj-1",
+          authorization: ownProof({ projectId: "proj-1" }),
           traceId: "trace-1",
         });
 
@@ -177,7 +178,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         });
 
         const spans = await service.getSpansByTraceId({
-          tenantId: "proj-1",
+          authorization: ownProof({ projectId: "proj-1" }),
           traceId: "trace-1",
         });
 
@@ -199,7 +200,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         });
 
         const span = await service.getSpanById({
-          tenantId: "proj-1",
+          authorization: ownProof({ projectId: "proj-1" }),
           traceId: "trace-1",
           spanId: "span-1",
         });
@@ -224,7 +225,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         });
 
         const span = await service.getSpanById({
-          tenantId: "proj-1",
+          authorization: ownProof({ projectId: "proj-1" }),
           traceId: "trace-1",
           spanId: "non-existent-span",
         });
@@ -259,7 +260,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         });
 
         const spans = await service.getSpansByTraceId({
-          tenantId: "proj-1",
+          authorization: ownProof({ projectId: "proj-1" }),
           traceId: "trace-2",
         });
 
@@ -296,7 +297,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         const service = new SpanStorageService(repo);
 
         const spans = await service.getSpansByTraceId({
-          tenantId: "proj-1",
+          authorization: ownProof({ projectId: "proj-1" }),
           traceId: "trace-legacy",
         });
 
@@ -335,13 +336,13 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
 
         await expect(
           service.getSpansByTraceId({
-            tenantId: "proj-1",
+            authorization: ownProof({ projectId: "proj-1" }),
             traceId: "trace-stale",
           }),
         ).resolves.not.toThrow();
 
         const spans = await service.getSpansByTraceId({
-          tenantId: "proj-1",
+          authorization: ownProof({ projectId: "proj-1" }),
           traceId: "trace-stale",
         });
         const outputValue = spans[0]?.output;
