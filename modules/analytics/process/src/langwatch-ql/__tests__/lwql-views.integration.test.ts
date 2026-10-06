@@ -84,6 +84,31 @@ const GATED_COLUMN_POSITIONS = (database: string) =>
     ],
   ] as const;
 
+/** Where a column set can sit; each builder takes the matcher text. */
+const COLUMN_SET_POSITIONS: readonly (readonly [string, (matcher: string) => string])[] = [
+  ["a function argument", (m) => `SELECT toString(${m}) FROM traces AS t`],
+  ["WHERE", (m) => `SELECT t.TraceId FROM traces AS t WHERE ${m} = 1`],
+  ["GROUP BY", (m) => `SELECT count() FROM traces AS t GROUP BY ${m}`],
+  [
+    "HAVING",
+    (m) => `SELECT t.TraceId, count() AS n FROM traces AS t GROUP BY t.TraceId HAVING ${m} > 0`,
+  ],
+  ["ORDER BY", (m) => `SELECT t.TraceId FROM traces AS t ORDER BY ${m}`],
+  ["LIMIT BY", (m) => `SELECT t.TraceId FROM traces AS t ORDER BY t.TraceId LIMIT 1 BY ${m}`],
+  ["JOIN ON", (m) => `SELECT t.TraceId FROM traces AS t JOIN spans AS s ON ${m} = s.TraceId`],
+  ["a window PARTITION BY", (m) => `SELECT count() OVER (PARTITION BY ${m}) FROM traces AS t`],
+  ["a lambda body", (m) => `SELECT arrayMap(x -> toString(${m}), [1]) FROM traces AS t`],
+  ["a CTE body", (m) => `WITH c AS (SELECT ${m} FROM traces AS t) SELECT TraceId FROM c`],
+  [
+    "a subquery",
+    (m) => `SELECT TraceId FROM traces WHERE TraceId IN (SELECT ${m} FROM spans AS t)`,
+  ],
+  [
+    "a UNION ALL branch",
+    (m) => `SELECT TraceId FROM traces LIMIT 10 UNION ALL SELECT ${m} FROM spans AS t LIMIT 10`,
+  ],
+];
+
 let harness: LangWatchQLClickHouseHarness;
 let postgres: LangWatchQLPostgresHarness;
 /** The restricted identity carrying tenant-a's valid key-hash context. */
@@ -313,6 +338,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
 describe("given the LangWatchQL views provisioned over the shipped fact tables when the restricted identity reads a LangWatchQL view", () => {
   /** @scenario "Restricted identity with a valid key context reads only its own tenant's rows" */
   /** @scenario "A LangWatchQL view returns only the calling tenant's rows" */
+  /** @scenario "A judgement written by one project is invisible to another" */
   it("returns its own tenant's rows and none of the other tenant's, for every view", async () => {
     for (const view of LWQL_VIEW_CATALOG) {
       await recordSeedControl({
@@ -881,6 +907,57 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
         `${position}: refused a permitted caller, so the refusal is not the gate`,
       ).toBe(true);
     }
+  });
+});
+
+describe("given the LangWatchQL views provisioned over the shipped fact tables when a column set names the withheld captured input", () => {
+  const reportedQuery =
+    "SELECT TraceId, toString(COLUMNS('^CapturedInput$')) AS leaked FROM traces LIMIT 10";
+
+  const policyWithContentWithheld = () => ({
+    allowedTables: catalogShapes.allowedTables({ database, views: LWQL_VIEW_CATALOG }),
+    gatedColumns: catalogShapes.gatedColumns({
+      protections: {
+        catalogue: EVERY_CATALOGUE_PERMISSION,
+        canSeeCapturedInput: false,
+        canSeeCapturedOutput: false,
+        canSeeCosts: true,
+      },
+      views: LWQL_VIEW_CATALOG,
+    }),
+    defaultDatabase: database,
+  });
+
+  /** @scenario "The reported query is refused before it reaches the shipped views" */
+  it("refuses the reported query and every column-set position, while the database would answer it", async () => {
+    const policy = policyWithContentWithheld();
+    expect(policy.gatedColumns, "the caller has nothing withheld").toContain("CapturedInput");
+
+    const reported = validateLangWatchQL({ sql: reportedQuery, ...policy });
+    expect(reported.ok, "the reported query was accepted").toBe(false);
+    expect(reported.ok ? [] : reported.violations.map((violation) => violation.code)).toContain(
+      "WILDCARD_NOT_ALLOWED",
+    );
+
+    for (const matcher of ["COLUMNS('^CapturedInput$')", "t.COLUMNS('^CapturedInput$')"]) {
+      for (const [position, build] of COLUMN_SET_POSITIONS) {
+        const result = validateLangWatchQL({ sql: build(matcher), ...policy });
+        expect(result.ok, `${matcher} in ${position}: a column set was accepted`).toBe(false);
+        expect(
+          result.ok ? [] : result.violations.map((violation) => violation.code),
+          `${matcher} in ${position}: refused for the wrong reason`,
+        ).toContain("WILDCARD_NOT_ALLOWED");
+      }
+    }
+
+    const [leaked] = await selectRows<{ TraceId: string; leaked: string }>(
+      tenantA,
+      `SELECT TraceId, toString(COLUMNS('^CapturedInput$')) AS leaked FROM ${database}.traces LIMIT 10`,
+    );
+    expect(
+      leaked?.leaked,
+      "the database refused the query itself, so the validator is not the gate",
+    ).toContain(SEEDED_CONTENT.traceInput);
   });
 });
 
