@@ -144,8 +144,8 @@ VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/clickhouse-migrations test src/__t
 
 It reads every migration not in `src/__tests__/migration-safety.baseline.txt` and fails by name,
 with the fix: a `DROP` or a `MODIFY COLUMN` type change without the note, a variable-size column with
-no `DEFAULT`, more than one statement in a goose block, a down migration not commented out. Checking
-the note's release against the floor, a view replaced in place and the `IF NOT EXISTS` rule land
-with S7 and S9. The baseline is **frozen**; adding your migration to it is refused.
+no `DEFAULT`, more than one statement in a goose block, a down migration not commented out. Also
+landed (commit 4f47c8098e): the retirement note's release checked against the LTS floor,
+`IF [NOT] EXISTS` required, and no view replaced in place. The baseline is **frozen**; adding your migration to it is refused.
 
 Spec: `specs/ops/migration-safety.feature`. Postgres: the `postgres-migration` skill.

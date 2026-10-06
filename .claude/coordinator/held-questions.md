@@ -57,6 +57,10 @@ recommendation, and "default taken" if a lane proceeded on it.
 - mig-guard `set-not-null-on-populated-column` has no escape hatch (a NOT VALID check validated later is the only route; no "writers all fill it" note exists). Options: this, or a `-- contract: written in <release>` note checked against the floor. Recommendation: this until a real case needs the note; default taken, held for Alex.
 - Ledger widening (mig-ledger-widen): `findLivePresence({ staleAfterMs })` reads the database clock and takes no `now` (the manifest's `{ now, staleAfterMs }` mixed the caller's clock with the DB-clock heartbeat, and the temporal-only lint refuses a `Date` parameter); `acquireLease` answers null when a live holder keeps it, `renewLease` and `releaseLease` act only for the owner, `registerDeclaredSteps` refreshes owner and description but never a status, and a declared step with an empty description is refused (Q-U11). Options: take a `Temporal.Instant` `now` (needs `@langwatch/time` in packages/upgrade), or keep the DB clock. Recommendation: the DB clock; default taken, held for Alex.
 
+### SDK paths (sdk share-path lane, 2026-10-06 night)
+
+- SDK-1 The generated Python client publishes `/api/v1/traces/{trace_id}/transcript`, while the hand-written BARE_ONLY lists say the trace family has no /api/v1 twin. Either the document carries a v1 twin the lists should admit, or the transcript route should be bare. Needs a look at the trace routes' addressing; no default taken.
+
 ### Older numbered questions
 
 - Up to 79 ids in `.claude/coordinator/questions-2026-10-06.md` that no ruling cites (Q11 to Q13, Q29 to Q39, Q43 to Q78, Q86 to Q152, Q155 to Q220); an upper bound, several are coordinator defaults for review.
