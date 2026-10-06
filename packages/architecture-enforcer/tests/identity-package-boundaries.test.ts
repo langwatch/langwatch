@@ -120,7 +120,6 @@ describe("identity package boundaries", () => {
     /** @scenario "Only the identity module's app composes an IdentityService" */
     it("construct IdentityService only in the identity module's app", () => {
       expect(identityServiceConstructors()).toEqual([
-        "modules/identity/process/src/app/identity-migrations-composition.build.ts",
         "modules/identity/process/src/app/identity.app.ts",
       ]);
     });
