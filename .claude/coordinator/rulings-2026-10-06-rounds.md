@@ -66,3 +66,10 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Lapsed gate (cloud presence): STOP serving once the last good presence write is older than the stale bound (60 s).
 - Rollbacks (S3-ROLLBACK): detect FROM presence; an older image's live presence row after the last run reopens level-triggered background steps.
 - Masked 503s (CH-1, Trace 9 wire): UNMASK transient 503 refusals (clickhouse_overloaded, service_unavailable); amends the 5xx masking ruling.
+
+## Round 10 (D, upgrade surfaces)
+
+- OTLP report (OTLP-REPORT): REMOVE TraceApi.otlpReportError from the trace contract and app.
+- Ops renames (Q-U9): RENAME to ops.upgrade.*, no aliases; the wire difference is accepted.
+- Cloud fleet (Q-U6): ONE fleet page; cloud regions send the same usage report as self-hosted installs.
+- Alerts (Q-U7): EMAIL platform operators and show the operator banner; Slack only where ops' notifier is configured.
