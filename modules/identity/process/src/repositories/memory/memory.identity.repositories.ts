@@ -4,7 +4,6 @@ import type { MfaFoldState } from "../../eventing/mfa-enrollment-state.projectio
 import type { SsoConnectionFoldState } from "../../eventing/sso-connection-state.projection.ts";
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { MemoryIdentityAccountRekeyRepository } from "./memory.identity-account-rekey.repository.ts";
-import { MemoryIdentityHistoryRepository } from "./memory.identity-history.repository.ts";
 import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
 import { MemoryIdentityLookupRepository } from "./memory.identity-lookup.repository.ts";
 import { MemoryIdentityRateLimitRepository } from "./memory.identity-rate-limit.repository.ts";
@@ -92,7 +91,6 @@ export function identityRepositoriesOverMemory(store: MemoryIdentityStore): Iden
     joinRequestNotificationContext: MemoryJoinRequestNotificationContextRepository.create(store),
     ssoDomainOwnership: MemorySsoDomainOwnershipRepository.create(store),
     identityLookup: MemoryIdentityLookupRepository.create(store),
-    identityHistory: MemoryIdentityHistoryRepository.create(store),
     rateLimits: MemoryIdentityRateLimitRepository.create(),
   };
 }

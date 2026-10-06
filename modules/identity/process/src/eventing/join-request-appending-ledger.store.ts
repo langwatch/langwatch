@@ -1,10 +1,4 @@
-import {
-  type AggregateType,
-  createTenantId,
-  type EventSourcing,
-  type EventStore,
-  type StateProjectionStore,
-} from "@langwatch/eventing";
+import { createTenantId, type OwnEventStore, type StateProjectionStore } from "@langwatch/eventing";
 /**
  * The join-request ledger writer, in the shape the identity, connection and 1. the durable
  * ClickHouse append, WAITED — the fact lands before the caller returns;
@@ -20,13 +14,13 @@ import {
   REJECT_JOIN_COMMAND_TYPE,
   REQUEST_JOIN_COMMAND_TYPE,
   WITHDRAW_JOIN_COMMAND_TYPE,
-  JOIN_REQUEST_AGGREGATE_TYPE,
   JOIN_REQUEST_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { JoinRequestLedger } from "../rules/join-request-ledger.rules.ts";
+import type { IdentityEventing } from "./identity-command-senders.store.ts";
 import { joinRequestEventsFor } from "./join-request-events.intent.ts";
 import type { JoinRequestEvent, JoinRequestFoldState } from "./join-request-state.projection.ts";
 
@@ -48,45 +42,35 @@ const SENDER_NAME_BY_COMMAND: Record<JoinRequestCommandType, string> = {
   [EXPIRE_JOIN_COMMAND_TYPE]: "expireJoin",
 };
 
+/** The one write this ledger takes off the join_request pipeline's own store. */
+export type JoinRequestEventAppends = Pick<OwnEventStore, "append">;
+
 export type AppendingJoinRequestLedgerOptions = {
   projectionStore: StateProjectionStore<JoinRequestFoldState>;
-  /** The durable event store, resolved when the first command appends. */
-  eventStore: () => Promise<EventStore<JoinRequestEvent>>;
-  /** The registered pipeline's command sender, by name, or null while absent. */
-  tryResolveStagedSender: (name: string) => JoinRequestStagedSender | null;
+  /** The join_request pipeline's own store. */
+  eventStore: JoinRequestEventAppends;
+  /** The connected pipeline's command sender, by name, or null while absent. */
+  tryResolveStagedSender: (name: string) => Promise<JoinRequestStagedSender | null>;
   convergence?: { timeoutMs: number; pollMs: number };
 };
 
 export class AppendingJoinRequestLedgerStore implements JoinRequestLedger {
-  /** Over a runtime's own log and registered commands; not-yet-staged commands answer null. */
-  static forEventSourcing(options: {
+  /** Over the pipeline's own store and the senders the process connected. */
+  static forPipeline(options: {
     projectionStore: StateProjectionStore<JoinRequestFoldState>;
-    eventSourcing: EventSourcing;
+    eventStore: JoinRequestEventAppends;
+    commands: IdentityEventing;
   }): AppendingJoinRequestLedgerStore {
-    const { projectionStore, eventSourcing } = options;
+    const { projectionStore, eventStore, commands } = options;
     return AppendingJoinRequestLedgerStore.create({
       projectionStore,
-      eventStore: async () => {
-        const eventStore = eventSourcing.isEnabled
-          ? eventSourcing.getEventStore<JoinRequestEvent>()
-          : undefined;
-        if (!eventStore) {
-          throw new Error(
-            "join request ledger cannot append: the event-sourcing stack is unavailable",
-          );
-        }
-        return eventStore;
-      },
-      tryResolveStagedSender: (name) => {
-        if (!eventSourcing.isEnabled) return null;
-        try {
-          const command: JoinRequestStagedSender | undefined = eventSourcing.getPipeline(
-            JOIN_REQUEST_PIPELINE_NAME,
-          ).commands[name];
-          return command ?? null;
-        } catch {
-          return null;
-        }
+      eventStore,
+      tryResolveStagedSender: async (command) => {
+        const resolved = await commands.resolvePipelineCommand({
+          pipeline: JOIN_REQUEST_PIPELINE_NAME,
+          command,
+        });
+        return resolved.kind === "registered" ? resolved.sender : null;
       },
     });
   }
@@ -115,12 +99,7 @@ export class AppendingJoinRequestLedgerStore implements JoinRequestLedger {
     if (events.length === 0) return [];
     const { joinRequestId, tenantId } = command.data;
 
-    const eventStore = await this.options.eventStore();
-    await eventStore.storeEvents(
-      events,
-      { tenantId: createTenantId(tenantId) },
-      JOIN_REQUEST_AGGREGATE_TYPE as AggregateType,
-    );
+    await this.options.eventStore.append({ tenantId, events });
 
     await this.stage({ command });
     await this.awaitFold({ joinRequestId, tenantId, events });
@@ -129,7 +108,7 @@ export class AppendingJoinRequestLedgerStore implements JoinRequestLedger {
 
   private async stage({ command }: { command: JoinRequestCommand }): Promise<void> {
     const senderName = SENDER_NAME_BY_COMMAND[command.type];
-    const sender = this.options.tryResolveStagedSender(senderName);
+    const sender = await this.options.tryResolveStagedSender(senderName);
     if (!sender) {
       // A wiring defect, not a transient: the pipeline exposed no sender for a
       // command type it declares. Loud, because nothing downstream folds.

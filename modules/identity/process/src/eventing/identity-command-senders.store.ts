@@ -4,6 +4,8 @@ import {
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 
+import { SENDER_NAME_BY_COMMAND } from "./sso-connection-ledger.store.ts";
+
 /** One pipeline command's sender, or that this process registered none for it. */
 export type IdentityPipelineCommand =
   | { kind: "registered"; sender: { send(data: unknown): Promise<unknown> } }
@@ -83,24 +85,8 @@ const JOIN_REQUEST_COMMAND_NAMES = [
   "expireJoin",
 ] as const;
 
-/** The fifteen a connection has. */
-const SSO_CONNECTION_COMMAND_NAMES = [
-  "registerConnection",
-  "claimDomain",
-  "approveDomainClaim",
-  "rejectDomainClaim",
-  "discardConnection",
-  "requestVerification",
-  "attestDomain",
-  "withdrawDomain",
-  "verifyDomain",
-  "activateConnection",
-  "suspendConnection",
-  "resumeConnection",
-  "requestTeardown",
-  "completeTeardown",
-  "grandfatherConnection",
-] as const;
+/** Every verb a connection has: each one its ledger can stage (sso-activation.feature). */
+const SSO_CONNECTION_COMMAND_NAMES: readonly string[] = Object.values(SENDER_NAME_BY_COMMAND);
 
 /** The three pipelines and the verbs each one is expected to publish. */
 const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map<

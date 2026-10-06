@@ -5,7 +5,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import { EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
-import type { EventSourcing } from "@langwatch/eventing";
+import type { EventingParticipation, OwnEventStore } from "@langwatch/eventing";
 import {
   type AccountIdentifier,
   type EmailIdentifierAdded,
@@ -13,6 +13,9 @@ import {
   IdentityCapabilityUnavailableError,
   identityConfig,
   type IdentityEmailResolution,
+  IDENTITY_PIPELINE_NAME,
+  JOIN_REQUEST_PIPELINE_NAME,
+  SSO_CONNECTION_PIPELINE_NAME,
   type IdentityLookupAnswer,
   type IdentityLookupApi,
   type IdentityLookupOperator,
@@ -65,13 +68,13 @@ import { SSO_DOMAIN_PROOF_PUBLIC_EGRESS } from "../channels/sso-domain-proof-fil
 import { ssoDomainProofMailChannels } from "../channels/sso-domain-proof-mail-channels.registry.ts";
 import { ssoIssuerDiscoveryChannels } from "../channels/sso-issuer-discovery-channels.registry.ts";
 import { ConnectedIdentityEventing } from "../eventing/identity-command-senders.store.ts";
+import { IdentityEventStores } from "../eventing/identity-event-stores.store.ts";
 import { IdentityLedgerStore } from "../eventing/identity-ledger.store.ts";
 import { JoinRequestLedgerStore } from "../eventing/join-request-ledger.store.ts";
 import {
   composeJoinRequestPipeline,
   type JoinRequestPipeline,
 } from "../eventing/join-request.pipeline.ts";
-import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
 import {
   composeSsoConnectionGraph,
   type SsoConnectionPipeline,
@@ -80,10 +83,8 @@ import {
   composeIdentityPipeline,
   type IdentityPipeline,
 } from "../eventing/user-identity.pipeline.ts";
-import {
-  EventingSsoConnectionHistoryRepository,
-  type SsoConnectionEventReads,
-} from "../repositories/eventing/eventing.sso-connection-history.repository.ts";
+import { EventingIdentityHistoryRepository } from "../repositories/eventing/eventing.identity-history.repository.ts";
+import { EventingSsoConnectionHistoryRepository } from "../repositories/eventing/eventing.sso-connection-history.repository.ts";
 import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
@@ -186,16 +187,7 @@ import { VerificationCeremonyService } from "../services/verification-ceremony.s
  * internal reap of this exact repository call does.
  */
 const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
-type IdentityMembers = Readonly<{
-  /** The event stack the appending ledgers and the connection history reach. */
-  eventing: EventSourcing;
-}>;
-
-type IdentitySetup = FeatureSetup<
-  typeof IdentityModule.dependencies,
-  IdentityMembers,
-  IdentityServerConfig
-> &
+type IdentitySetup = FeatureSetup<typeof IdentityModule.dependencies, never, IdentityServerConfig> &
   Readonly<{ repositories: IdentityRepositories }>;
 
 type IdentityAppParts = {
@@ -216,7 +208,7 @@ type IdentityAppParts = {
   ssoConnections: SsoConnectionService | null;
   ssoConnectionGuards: SsoConnectionGuardsService;
   ssoBackoffice: SsoConnectionBackofficeService | null;
-  ssoConnectionHistory: SsoConnectionHistoryService | null;
+  ssoConnectionHistory: SsoConnectionHistoryService;
   ssoConnectionReads: OrganizationSsoConnectionsService;
   ssoIssuers: SsoIssuerDirectoryService;
   ssoDomainCeremony: SsoDomainCeremonyService | null;
@@ -241,6 +233,8 @@ type IdentityAppParts = {
 /** The three pipelines' definitions over the module's own rows, in every role (2026-09-27). */
 type IdentityPipelineBuilders = {
   eventing: ConnectedIdentityEventing;
+  /** Each pipeline's own event store, kept as the process builds it (record §7). */
+  stores: IdentityEventStores;
   identity: () => IdentityPipeline;
   joinRequests: () => JoinRequestPipeline;
   ssoConnections: () => SsoConnectionPipeline;
@@ -396,27 +390,6 @@ function joinSettingAudit(auditLog: AuditLogApi): JoinSettingAudit {
   };
 }
 
-/**
- * How the history reaches this process's log, resolved per read so a stack
- * that is not up yet at compose time still answers later.
- */
-function ssoConnectionHistoryStore(options: {
-  eventing: EventSourcing;
-}): () => Promise<SsoConnectionEventReads> {
-  const { eventing } = options;
-  return async () => {
-    const store = eventing.getEventStore<SsoConnectionEvent>();
-    if (!store) {
-      // A plain Error on purpose (error doctrine): the reader cannot act on
-      // an unavailable event stack, so this degrades to a retryable failure.
-      throw new Error(
-        "sso connection history cannot read: the event-sourcing stack is unavailable",
-      );
-    }
-    return store;
-  };
-}
-
 /** The process's one counter, in the window and allowance the join throttles name. */
 function joinRateLimit(limiter: IdentityRateLimitRepository): JoinRequestsServiceDeps["rateLimit"] {
   return async ({ key, windowSeconds, max }) => {
@@ -451,7 +424,6 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     /** Where every mail identity sends goes out; notification owns the gateway. */
     notifications: NotificationService,
   };
-  static readonly reads = ["eventing"] as const;
   /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and auth. */
   static readonly secrets = { internalSlackSignupsWebhook } as const;
 
@@ -474,6 +446,11 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       baseUrl: setup.config.publicBaseUrl ?? "",
     });
     const identityEventing = ConnectedIdentityEventing.create();
+    const eventStores = IdentityEventStores.create();
+    // Read through user_identity's own store: the lookup, the link proposals and the pipeline.
+    const identityHistory = EventingIdentityHistoryRepository.create({
+      eventStore: eventStores.of({ pipeline: IDENTITY_PIPELINE_NAME }),
+    });
     const ledger = IdentityLedgerStore.create({
       projectionStore: setup.repositories.identityProjection,
       eventing: identityEventing,
@@ -536,7 +513,8 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     // One connection service: the back office, the setup journey and the teardown timer share it.
     const ssoConnectionGraph = composeSsoConnectionGraph({
       repositories: setup.repositories,
-      eventSourcing: setup.members.eventing,
+      eventStore: eventStores.of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
+      commands: identityEventing,
       directoryMove: SsoConnectionDirectoryMoveService.create({
         connections: ssoConnectionReads,
         scim: setup.dependencies.scim,
@@ -551,23 +529,20 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
     });
     const ssoConnectionGuards = ssoConnectionGraph.guards;
     const ssoConnections: SsoConnectionService | null = ssoConnectionGraph.connections;
-    // Absent where this process composed no event stack: the history refuses by name rather
-    // than reading as empty, indistinguishable from a connection nothing ever happened to.
-    const ssoConnectionHistory = setup.members.eventing.isEnabled
-      ? SsoConnectionHistoryService.create({
-          history: EventingSsoConnectionHistoryRepository.create({
-            eventStore: ssoConnectionHistoryStore({ eventing: setup.members.eventing }),
-          }),
+    // Answered only once sso_connection is built here (see ssoConnectionHistory()): an absent
+    // log refuses by name rather than reading as a connection nothing ever happened to.
+    const ssoConnectionHistory = SsoConnectionHistoryService.create({
+      history: EventingSsoConnectionHistoryRepository.create({
+        eventStore: eventStores.of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
+      }),
+    });
+    const ssoBackoffice = ssoConnections
+      ? SsoConnectionBackofficeService.create({
+          reads: setup.repositories.ssoBackoffice,
+          connections: () => ssoConnections,
+          history: () => ssoConnectionHistory,
         })
       : null;
-    const ssoBackoffice =
-      ssoConnections && ssoConnectionHistory
-        ? SsoConnectionBackofficeService.create({
-            reads: setup.repositories.ssoBackoffice,
-            connections: () => ssoConnections,
-            history: () => ssoConnectionHistory,
-          })
-        : null;
     // Auth owns the operator's IdP allowlist; asked per discovery, not at boot.
     const dialableIdpOrigins = () => setup.dependencies.auth.findDialableIdentityProviderOrigins();
     // The same fence the published-proof reads go through: an issuer is a
@@ -809,15 +784,15 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       ssoSetupCommands,
       lookup: IdentityLookupService.create({
         reads: setup.repositories.identityLookup,
-        history: setup.repositories.identityHistory,
+        history: identityHistory,
         router: setup.dependencies.auth,
         identity: () => identity,
         links: LinkProposalService.create({
           guards: LinkProposalGuardsService.create({
-            proposals: setup.repositories.identityHistory,
+            proposals: identityHistory,
           }),
           ledger,
-          proposals: setup.repositories.identityHistory,
+          proposals: identityHistory,
           accounts: setup.dependencies.auth,
         }),
         authorization: setup.dependencies.permissions,
@@ -847,11 +822,14 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       signInRouter,
       pipelines: {
         eventing: identityEventing,
-        identity: () => composeIdentityPipeline({ repositories: setup.repositories }),
+        stores: eventStores,
+        identity: () =>
+          composeIdentityPipeline({ repositories: setup.repositories, history: identityHistory }),
         joinRequests: () =>
           composeJoinRequestPipeline({
             repositories: setup.repositories,
-            eventSourcing: setup.members.eventing,
+            eventStore: eventStores.of({ pipeline: JOIN_REQUEST_PIPELINE_NAME }),
+            commands: identityEventing,
             notifier: JoinRequestNotifierService.create({
               audience: setup.repositories.joinRequestAudience,
               context: setup.repositories.joinRequestNotificationContext,
@@ -878,6 +856,15 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
 
   ssoConnectionPipeline(): SsoConnectionPipeline {
     return this.#parts.pipelines.ssoConnections();
+  }
+
+  /** Keeps a built pipeline's own event store; a build only to be listed keeps nothing. */
+  keepEventStore(input: {
+    pipeline: string;
+    participation: EventingParticipation;
+    eventStore: OwnEventStore | undefined;
+  }): void {
+    this.#parts.pipelines.stores.keep(input);
   }
 
   /** Hands identity a registered pipeline's senders; a missing verb fails the install. */
@@ -1069,17 +1056,22 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
   }
 
   ssoBackoffice(): SsoConnectionBackofficeService {
-    if (!this.#parts.ssoBackoffice) {
+    if (!this.#parts.ssoBackoffice || !this.#holdsSsoConnectionLog()) {
       throw new IdentityCapabilityUnavailableError("SSO connection backoffice");
     }
     return this.#parts.ssoBackoffice;
   }
 
   ssoConnectionHistory(): SsoConnectionHistoryService {
-    if (!this.#parts.ssoConnectionHistory) {
+    if (!this.#holdsSsoConnectionLog()) {
       throw new IdentityCapabilityUnavailableError("SSO connection history");
     }
     return this.#parts.ssoConnectionHistory;
+  }
+
+  /** Whether this process built sso_connection over a store: without it there is no log to read. */
+  #holdsSsoConnectionLog(): boolean {
+    return this.#parts.pipelines.stores.holds({ pipeline: SSO_CONNECTION_PIPELINE_NAME });
   }
 
   ssoConnectionReads(): OrganizationSsoConnectionsService {

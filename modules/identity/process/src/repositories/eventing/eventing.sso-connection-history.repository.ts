@@ -1,7 +1,7 @@
-import { type EventStore, createTenantId } from "@langwatch/eventing";
+import type { OwnEventStore } from "@langwatch/eventing";
 import {
   CONNECTION_IDP_UPDATED_EVENT_TYPE,
-  SSO_CONNECTION_AGGREGATE_TYPE,
+  SSO_CONNECTION_EVENT_TYPES,
   type SsoConnectionSource,
   ssoConnectionSourceSchema,
 } from "@langwatch/identity-contract";
@@ -27,9 +27,10 @@ interface SsoConnectionPayloadShape {
   source?: unknown;
 }
 
-/** The one read this repository takes off the store — narrowed so a caller
- *  hands what it uses rather than a whole store it does not. */
-export type SsoConnectionEventReads = Pick<EventStore<SsoConnectionEvent>, "getEvents">;
+/** The one read this repository takes off the sso_connection pipeline's own store. */
+export type SsoConnectionEventReads = Pick<OwnEventStore, "read">;
+
+const SSO_CONNECTION_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set(SSO_CONNECTION_EVENT_TYPES);
 
 type SsoConnectionHistoryTextFields = Omit<
   SsoConnectionHistoryEntry,
@@ -44,18 +45,17 @@ function sourceOf(value: unknown): SsoConnectionSource {
 }
 
 /**
- * The connection log itself, read through this process's event store. The
- * events ARE the panel, so the panel is rebuildable for free and shows
- * nothing the log cannot re-derive.
+ * The connection log itself, read through the sso_connection pipeline's own store. The events
+ * ARE the panel, so it is rebuildable for free and shows nothing the log cannot re-derive.
  */
 export class EventingSsoConnectionHistoryRepository extends SsoConnectionHistoryRepository {
   static create(deps: {
-    eventStore: () => Promise<SsoConnectionEventReads>;
+    eventStore: SsoConnectionEventReads;
   }): EventingSsoConnectionHistoryRepository {
     return new EventingSsoConnectionHistoryRepository(deps.eventStore);
   }
 
-  private constructor(private readonly eventStore: () => Promise<SsoConnectionEventReads>) {
+  private constructor(private readonly eventStore: SsoConnectionEventReads) {
     super();
   }
 
@@ -68,14 +68,23 @@ export class EventingSsoConnectionHistoryRepository extends SsoConnectionHistory
     connectionId: string;
     limit: number;
   }): Promise<readonly SsoConnectionHistoryEntry[]> {
-    const store = await this.eventStore();
-    const events = await store.getEvents({
+    const events = await this.eventStore.read({
+      tenantId: organizationId,
       aggregateId: connectionId,
-      context: { tenantId: createTenantId(organizationId) },
-      aggregateType: SSO_CONNECTION_AGGREGATE_TYPE,
+      accepts: isSsoConnectionEvent,
     });
     return events.map(toHistoryEntry).toSorted(newestFirst).slice(0, limit);
   }
+}
+
+/** One of the facts the sso_connection pipeline declares. */
+function isSsoConnectionEvent(event: unknown): event is SsoConnectionEvent {
+  return (
+    typeof event === "object" &&
+    event !== null &&
+    "type" in event &&
+    SSO_CONNECTION_EVENT_TYPE_SET.has(event.type)
+  );
 }
 
 function toHistoryEntry(event: SsoConnectionEvent): SsoConnectionHistoryEntry {

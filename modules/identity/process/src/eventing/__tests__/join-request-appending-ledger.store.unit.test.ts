@@ -1,4 +1,4 @@
-import type { EventStore, StateProjectionStore } from "@langwatch/eventing";
+import type { OwnEventStore, StateProjectionStore } from "@langwatch/eventing";
 import {
   APPROVE_JOIN_COMMAND_TYPE,
   EXPIRE_JOIN_COMMAND_TYPE,
@@ -10,7 +10,7 @@ import {
   AppendingJoinRequestLedgerStore,
   type JoinRequestStagedSender,
 } from "../join-request-appending-ledger.store.ts";
-import type { JoinRequestEvent, JoinRequestFoldState } from "../join-request-state.projection.ts";
+import type { JoinRequestFoldState } from "../join-request-state.projection.ts";
 
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature
@@ -19,10 +19,10 @@ const ORGANIZATION = "organization_acme";
 const REQUEST = "joinreq_1";
 
 function compose(input: { senders?: Record<string, JoinRequestStagedSender> } = {}) {
-  const storeEvents = vi.fn<EventStore<JoinRequestEvent>["storeEvents"]>(async () => undefined);
+  const append = vi.fn<OwnEventStore["append"]>(async () => undefined);
   const send = vi.fn(async () => undefined);
   const senders = input.senders ?? { expireJoin: { send }, approveJoin: { send } };
-  const tryResolveStagedSender = vi.fn((name: string) => senders[name] ?? null);
+  const tryResolveStagedSender = vi.fn(async (name: string) => senders[name] ?? null);
   // A store whose cursor already sits past anything appended, so convergence
   // returns on the first read rather than sleeping through a real window.
   const get = vi.fn<StateProjectionStore<JoinRequestFoldState>["get"]>(async () => ({
@@ -37,17 +37,6 @@ function compose(input: { senders?: Record<string, JoinRequestStagedSender> } = 
     },
   }));
 
-  const unread = async (): Promise<never> => {
-    throw new Error("the ledger never reads the event log");
-  };
-  const eventStore: EventStore<JoinRequestEvent> = {
-    storeEvents,
-    getEvent: unread,
-    getEvents: unread,
-    getEventsOccurredSince: unread,
-    getEventsUpTo: unread,
-    countEventsBefore: unread,
-  };
   const projectionStore: StateProjectionStore<JoinRequestFoldState> = {
     get,
     store: async () => {
@@ -57,11 +46,11 @@ function compose(input: { senders?: Record<string, JoinRequestStagedSender> } = 
 
   const adapter = AppendingJoinRequestLedgerStore.create({
     projectionStore,
-    eventStore: async () => eventStore,
+    eventStore: { append },
     tryResolveStagedSender,
     convergence: { timeoutMs: 20, pollMs: 1 },
   });
-  return { adapter, storeEvents, send, tryResolveStagedSender, get };
+  return { adapter, append, send, tryResolveStagedSender, get };
 }
 
 const expireCommand = (): JoinRequestCommand => ({
@@ -81,14 +70,14 @@ describe("given a command whose guard stated a fact", () => {
   describe("when the ledger commits it", () => {
     /** @scenario "The expiry wake dispatches a command rather than writing the row" */
     it("appends the fact, then stages the command under the pipeline's own name", async () => {
-      const { adapter, storeEvents, send, tryResolveStagedSender } = compose();
+      const { adapter, append, send, tryResolveStagedSender } = compose();
 
       const facts = await adapter.commit({
         command: expireCommand(),
         facts: [{ type: "lw.identity.join_expired", data: {} }] as never,
       });
 
-      expect(storeEvents).toHaveBeenCalledOnce();
+      expect(append).toHaveBeenCalledOnce();
       // The sender is resolved by NAME, which is the only thing tying a
       // command type to a lane the pipeline actually registered.
       expect(tryResolveStagedSender).toHaveBeenCalledWith("expireJoin");
@@ -98,7 +87,7 @@ describe("given a command whose guard stated a fact", () => {
 
     /** @scenario "The expiry wake dispatches a command rather than writing the row" */
     it("refuses loudly when the pipeline exposes no lane for the command", async () => {
-      const { adapter, storeEvents } = compose({ senders: {} });
+      const { adapter, append } = compose({ senders: {} });
 
       // A wiring defect, not a transient: the pipeline declares this command
       // type and exposed no sender for it, so nothing downstream folds.
@@ -108,7 +97,7 @@ describe("given a command whose guard stated a fact", () => {
           facts: [{ type: "lw.identity.join_expired", data: {} }] as never,
         }),
       ).rejects.toThrow(/exposes no "expireJoin" sender/);
-      expect(storeEvents).toHaveBeenCalledOnce();
+      expect(append).toHaveBeenCalledOnce();
     });
   });
 });
@@ -117,7 +106,7 @@ describe("given a command whose guard stated nothing", () => {
   describe("when the ledger commits it", () => {
     /** @scenario "The expiry wake dispatches a command rather than writing the row" */
     it("appends nothing and stages nothing", async () => {
-      const { adapter, storeEvents, send } = compose();
+      const { adapter, append, send } = compose();
 
       const facts = await adapter.commit({
         command: { ...expireCommand(), type: APPROVE_JOIN_COMMAND_TYPE } as JoinRequestCommand,
@@ -125,7 +114,7 @@ describe("given a command whose guard stated nothing", () => {
       });
 
       expect(facts).toEqual([]);
-      expect(storeEvents).not.toHaveBeenCalled();
+      expect(append).not.toHaveBeenCalled();
       expect(send).not.toHaveBeenCalled();
     });
   });

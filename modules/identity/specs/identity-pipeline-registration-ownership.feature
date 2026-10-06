@@ -30,3 +30,17 @@ Feature: Identity's four pipelines are declared, and connected by the process
     Given the process connected the identity pipeline
     When a caller asks for a command outside identity's verb lists
     Then the answer is that the command is not commandable on this process
+
+  @unit
+  Scenario: Identity appends and reads its own aggregates through each pipeline's own event store
+    Given the process builds identity's pipelines over their own event stores
+    When a join-request command states a fact, or a person's identity history is read
+    Then the fact is appended through the join-request pipeline's store in the organization's tenant
+    And the history is read through the identity pipeline's store in the person's own tenant, MFA facts included
+    And a pipeline built only to be listed hands its store to nobody
+
+  @unit
+  Scenario: A ledger or history whose pipeline this process never built refuses by name
+    Given this process never built identity's join-request or identity pipeline
+    When a join-request command commits, or a person's identity history is read
+    Then it is refused naming the pipeline, and no command is staged

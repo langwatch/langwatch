@@ -4,10 +4,10 @@
  * break-glass binding and ledger writer as a second composition.
  * @see ../../eventing/sso-connection.pipeline.ts
  */
-import { EventSourcing } from "@langwatch/eventing";
 import {
   MIGRATION_FINALIZED_EVENT_TYPE,
   SSO_CONNECTION_AGGREGATE_TYPE,
+  SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
@@ -18,6 +18,8 @@ import {
   StubPlatformOperators,
 } from "../../__tests__/support/in-memory-connections.ts";
 import { liveRepositories } from "../../__tests__/support/live-repositories.ts";
+import { ConnectedIdentityEventing } from "../../eventing/identity-command-senders.store.ts";
+import { IdentityEventStores } from "../../eventing/identity-event-stores.store.ts";
 import { migrationFinalizedEventSchema } from "../../eventing/sso-connection-state.projection.ts";
 import {
   composeSsoConnectionGraph,
@@ -32,11 +34,6 @@ function testDatabase(): PrismaClient {
     user: model,
     organization: model,
   });
-}
-
-/** A runtime with the stack switched off: nothing here commits. */
-function testEventSourcing(): EventSourcing {
-  return new EventSourcing({ enabled: false });
 }
 
 class TestDirectoryMove {
@@ -66,7 +63,9 @@ const migrationFinalized = migrationFinalizedEventSchema.parse({
 function testGraph(directoryMove: TestDirectoryMove = new TestDirectoryMove()): SsoConnectionGraph {
   return composeSsoConnectionGraph({
     repositories: liveRepositories(testDatabase()),
-    eventSourcing: testEventSourcing(),
+    // No store kept and no senders: this process has not built the pipeline, so nothing commits.
+    eventStore: IdentityEventStores.create().of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
+    commands: ConnectedIdentityEventing.create(),
     directoryMove,
     licensing: licensingFixture(),
     authorization: new StubPlatformOperators(),

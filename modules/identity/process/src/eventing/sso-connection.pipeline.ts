@@ -1,7 +1,6 @@
 import {
   defineAggregate,
   definePipeline,
-  type EventSourcing,
   type IntentSpec,
   type ProcessManagerStage,
   type ProcessManagerInitialStage,
@@ -51,8 +50,12 @@ import {
   onTeardownRequested,
   onTornDown,
 } from "./connection-teardown.process.ts";
+import type { IdentityEventing } from "./identity-command-senders.store.ts";
 import { EngineFollowingSsoConnectionHeadStore } from "./sso-connection-head.store.ts";
-import { SsoConnectionLedgerStore } from "./sso-connection-ledger.store.ts";
+import {
+  type SsoConnectionEventAppends,
+  SsoConnectionLedgerStore,
+} from "./sso-connection-ledger.store.ts";
 import {
   type SsoConnectionEvent,
   type SsoConnectionFoldState,
@@ -437,7 +440,10 @@ export function composeSsoConnectionGraph(options: {
     | "ssoStranding"
     | "joinRequestAudience"
   >;
-  eventSourcing: EventSourcing;
+  /** The sso_connection pipeline's own store. */
+  eventStore: SsoConnectionEventAppends;
+  /** The senders the process connected, which the ledger stages through. */
+  commands: IdentityEventing;
   directoryMove: Pick<SsoConnectionDirectoryMoveService, "migrationFinalized">;
   directory?: SsoConnectionDirectoryRevocation;
   mail?: SsoDomainProofMail;
@@ -447,7 +453,7 @@ export function composeSsoConnectionGraph(options: {
   /** The platform-operator grant the operator-only acts are asked against. */
   authorization: SsoConnectionGuardsDeps["authorization"];
 }): SsoConnectionGraph {
-  const { repositories, eventSourcing } = options;
+  const { repositories, eventStore, commands } = options;
   const head = EngineFollowingSsoConnectionHeadStore.create({
     heads: repositories.ssoConnectionHeads,
     engineProvider: options.engineProvider,
@@ -465,7 +471,7 @@ export function composeSsoConnectionGraph(options: {
   });
   const connections = SsoConnectionService.create(
     guards,
-    SsoConnectionLedgerStore.forEventSourcing({ projectionStore: head, eventSourcing }),
+    SsoConnectionLedgerStore.forPipeline({ projectionStore: head, eventStore, commands }),
   );
   const mail = options.mail;
   const pipeline = () =>
@@ -489,8 +495,14 @@ export function composeSsoConnectionGraph(options: {
 
 export const ssoConnectionEventing = defineEventingModule({
   pipeline: SSO_CONNECTION_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<IdentityRepositories, IdentityModule>) =>
-    app.ssoConnectionPipeline(),
+  build: ({
+    app,
+    participation,
+    eventStore,
+  }: EventingSetup<IdentityRepositories, IdentityModule>) => {
+    app.keepEventStore({ pipeline: SSO_CONNECTION_PIPELINE_NAME, participation, eventStore });
+    return app.ssoConnectionPipeline();
+  },
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: SSO_CONNECTION_PIPELINE_NAME, commands }),
 });

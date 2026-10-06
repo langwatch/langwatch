@@ -1,6 +1,5 @@
 import {
   defineAggregate,
-  type EventSourcing,
   definePipeline,
   type IntentSpec,
   type ProcessManagerStage,
@@ -26,7 +25,11 @@ import { JoinRequestLifecycleDispatcherService } from "../services/join-request-
 import type { JoinRequestMail } from "../services/join-request-notification.service.ts";
 import { JoinRequestNotificationService } from "../services/join-request-notification.service.ts";
 import { JoinRequestService } from "../services/join-request.service.ts";
-import { AppendingJoinRequestLedgerStore } from "./join-request-appending-ledger.store.ts";
+import type { IdentityEventing } from "./identity-command-senders.store.ts";
+import {
+  AppendingJoinRequestLedgerStore,
+  type JoinRequestEventAppends,
+} from "./join-request-appending-ledger.store.ts";
 import {
   runExpireRequest,
   runPrepareNotification,
@@ -172,16 +175,19 @@ function mountRequestLifecycle(
 /** The join-request pipeline a draining process runs (D12, ADR-117): wakes expire and notify. */
 export function composeJoinRequestPipeline(options: {
   repositories: Pick<IdentityRepositories, "joinRequestProjection" | "joinRequests">;
-  eventSourcing: EventSourcing;
+  /** The join_request pipeline's own store. */
+  eventStore: JoinRequestEventAppends;
+  /** The senders the process connected, which the ledger stages through. */
+  commands: IdentityEventing;
   notifier: JoinRequestNotifier;
 }): JoinRequestPipeline {
-  const { repositories, eventSourcing, notifier } = options;
+  const { repositories, eventStore, commands, notifier } = options;
   const head = repositories.joinRequestProjection;
   const reads = repositories.joinRequests;
   const guards = JoinRequestGuardsService.create({ requests: reads });
   const requests = JoinRequestService.create(
     guards,
-    AppendingJoinRequestLedgerStore.forEventSourcing({ projectionStore: head, eventSourcing }),
+    AppendingJoinRequestLedgerStore.forPipeline({ projectionStore: head, eventStore, commands }),
   );
   return defineJoinRequestPipeline({
     joinRequestProjectionStore: head,
@@ -203,8 +209,14 @@ export function composeJoinRequestNotifications(options: {
 
 export const joinRequestEventing = defineEventingModule({
   pipeline: JOIN_REQUEST_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<IdentityRepositories, IdentityModule>) =>
-    app.joinRequestPipeline(),
+  build: ({
+    app,
+    participation,
+    eventStore,
+  }: EventingSetup<IdentityRepositories, IdentityModule>) => {
+    app.keepEventStore({ pipeline: JOIN_REQUEST_PIPELINE_NAME, participation, eventStore });
+    return app.joinRequestPipeline();
+  },
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: JOIN_REQUEST_PIPELINE_NAME, commands }),
 });

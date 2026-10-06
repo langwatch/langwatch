@@ -1,27 +1,34 @@
-import { type EventSourcing, type EventStore, createTenantId } from "@langwatch/eventing";
+import type { OwnEventStore } from "@langwatch/eventing";
 import {
+  IDENTITY_EVENT_TYPES,
   type IdentityHistoryEntry,
   type LinkProposalRecord,
-  USER_IDENTITY_AGGREGATE_TYPE,
+  MFA_EVENT_TYPES,
 } from "@langwatch/identity-contract";
 
 import type { IdentityEvent } from "../../eventing/identity-state.projection.ts";
 import { identityHistoryEntries, linkProposalsOf } from "../../rules/identity-history.rules.ts";
 import { IdentityHistoryRepository } from "../identity-history.repository.ts";
 
+/** The one read this repository takes off the user_identity pipeline's own store. */
+export type IdentityEventReads = Pick<OwnEventStore, "read">;
+
+/** Every fact the user_identity aggregate states: the MFA facts share it and the panel. */
+const USER_IDENTITY_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set([
+  ...IDENTITY_EVENT_TYPES,
+  ...MFA_EVENT_TYPES,
+]);
+
 /**
- * The identity log itself, read through this process's event store: the
- * history panel and the proposals are both folds of the same scan. The store
- * is resolved per read, so a stack that is not up at boot still answers later.
+ * The identity log itself, read through the user_identity pipeline's own store: the history
+ * panel and the proposals are both folds of the same scan.
  */
 export class EventingIdentityHistoryRepository extends IdentityHistoryRepository {
-  static create(deps: {
-    eventing: Pick<EventSourcing, "getEventStore">;
-  }): EventingIdentityHistoryRepository {
-    return new EventingIdentityHistoryRepository(deps.eventing);
+  static create(deps: { eventStore: IdentityEventReads }): EventingIdentityHistoryRepository {
+    return new EventingIdentityHistoryRepository(deps.eventStore);
   }
 
-  private constructor(private readonly eventing: Pick<EventSourcing, "getEventStore">) {
+  private constructor(private readonly eventStore: IdentityEventReads) {
     super();
   }
 
@@ -40,15 +47,20 @@ export class EventingIdentityHistoryRepository extends IdentityHistoryRepository
   }
 
   private async readEvents({ userId }: { userId: string }): Promise<readonly IdentityEvent[]> {
-    const store: EventStore<IdentityEvent> | undefined =
-      this.eventing.getEventStore<IdentityEvent>();
-    if (!store) {
-      throw new Error("identity history cannot read: the event-sourcing stack is unavailable");
-    }
-    return store.getEvents({
+    return this.eventStore.read({
+      tenantId: userId,
       aggregateId: userId,
-      context: { tenantId: createTenantId(userId) },
-      aggregateType: USER_IDENTITY_AGGREGATE_TYPE,
+      accepts: isUserIdentityEvent,
     });
   }
+}
+
+/** Typed as the identity union the history rules read structurally, as the log always was. */
+function isUserIdentityEvent(event: unknown): event is IdentityEvent {
+  return (
+    typeof event === "object" &&
+    event !== null &&
+    "type" in event &&
+    USER_IDENTITY_EVENT_TYPE_SET.has(event.type)
+  );
 }

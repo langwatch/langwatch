@@ -1,10 +1,4 @@
-import {
-  type AggregateType,
-  createTenantId,
-  type EventSourcing,
-  type EventStore,
-  type StateProjectionStore,
-} from "@langwatch/eventing";
+import { createTenantId, type OwnEventStore, type StateProjectionStore } from "@langwatch/eventing";
 /**
  * The SSO connection ledger writer: the app's implementation of `@langwatch/identity-process`'s
  * SsoConnectionLedger, in the shape the 1. the durable ClickHouse append,
@@ -39,13 +33,13 @@ import {
   type SsoConnectionFactInput,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
-  SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
+import type { IdentityEventing } from "./identity-command-senders.store.ts";
 import { ssoConnectionEventsFor } from "./sso-connection-events.intent.ts";
 import type {
   SsoConnectionEvent,
@@ -89,44 +83,34 @@ export const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> = 
   [FINALIZE_MIGRATION_COMMAND_TYPE]: "finalizeMigration",
 };
 
+/** The one write this ledger takes off the sso_connection pipeline's own store. */
+export type SsoConnectionEventAppends = Pick<OwnEventStore, "append">;
+
 export interface SsoConnectionLedgerWriterDeps {
   projectionStore: StateProjectionStore<SsoConnectionFoldState>;
-  /** Resolved on first append, off the runtime this pipeline registered on. */
-  eventStore: () => Promise<EventStore<SsoConnectionEvent>>;
-  stagedSender: (name: string) => SsoConnectionStagedSender | null;
+  /** The sso_connection pipeline's own store. */
+  eventStore: SsoConnectionEventAppends;
+  stagedSender: (name: string) => Promise<SsoConnectionStagedSender | null>;
   convergence?: { timeoutMs: number; pollMs: number };
 }
 
 export class SsoConnectionLedgerStore implements SsoConnectionLedger {
-  /** Over a runtime's own log and registered commands; not-yet-staged commands answer null. */
-  static forEventSourcing(options: {
+  /** Over the pipeline's own store and the senders the process connected. */
+  static forPipeline(options: {
     projectionStore: StateProjectionStore<SsoConnectionFoldState>;
-    eventSourcing: EventSourcing;
+    eventStore: SsoConnectionEventAppends;
+    commands: IdentityEventing;
   }): SsoConnectionLedgerStore {
-    const { projectionStore, eventSourcing } = options;
+    const { projectionStore, eventStore, commands } = options;
     return SsoConnectionLedgerStore.create({
       projectionStore,
-      eventStore: async () => {
-        const eventStore = eventSourcing.isEnabled
-          ? eventSourcing.getEventStore<SsoConnectionEvent>()
-          : undefined;
-        if (!eventStore) {
-          throw new Error(
-            "sso connection ledger cannot append: the event-sourcing stack is unavailable",
-          );
-        }
-        return eventStore;
-      },
-      stagedSender: (name) => {
-        if (!eventSourcing.isEnabled) return null;
-        try {
-          const command: SsoConnectionStagedSender | undefined = eventSourcing.getPipeline(
-            SSO_CONNECTION_PIPELINE_NAME,
-          ).commands[name];
-          return command ?? null;
-        } catch {
-          return null;
-        }
+      eventStore,
+      stagedSender: async (command) => {
+        const resolved = await commands.resolvePipelineCommand({
+          pipeline: SSO_CONNECTION_PIPELINE_NAME,
+          command,
+        });
+        return resolved.kind === "registered" ? resolved.sender : null;
       },
     });
   }
@@ -136,8 +120,8 @@ export class SsoConnectionLedgerStore implements SsoConnectionLedger {
   }
 
   private readonly projectionStore: StateProjectionStore<SsoConnectionFoldState>;
-  private readonly eventStore: () => Promise<EventStore<SsoConnectionEvent>>;
-  private readonly stagedSender: (name: string) => SsoConnectionStagedSender | null;
+  private readonly eventStore: SsoConnectionEventAppends;
+  private readonly stagedSender: (name: string) => Promise<SsoConnectionStagedSender | null>;
   private readonly convergence: { timeoutMs: number; pollMs: number };
 
   constructor(deps: SsoConnectionLedgerWriterDeps) {
@@ -161,12 +145,7 @@ export class SsoConnectionLedgerStore implements SsoConnectionLedger {
     if (events.length === 0) return [];
     const { connectionId, tenantId } = command.data;
 
-    const eventStore = await this.eventStore();
-    await eventStore.storeEvents(
-      events,
-      { tenantId: createTenantId(tenantId) },
-      SSO_CONNECTION_AGGREGATE_TYPE as AggregateType,
-    );
+    await this.eventStore.append({ tenantId, events });
 
     await this.stage({ command });
     await this.awaitFold({ connectionId, tenantId, events });
@@ -175,7 +154,7 @@ export class SsoConnectionLedgerStore implements SsoConnectionLedger {
 
   private async stage({ command }: { command: SsoConnectionCommand }): Promise<void> {
     const senderName = SENDER_NAME_BY_COMMAND[command.type];
-    const sender = this.stagedSender(senderName);
+    const sender = await this.stagedSender(senderName);
     if (!sender) {
       // A wiring defect, not a transient: the pipeline exposed no sender for
       // a command type it declares. Loud, because nothing downstream folds.

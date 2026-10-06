@@ -8,7 +8,6 @@ import type { IdentitySecretCarryRepository } from "../services/identity-secret-
 import type { IdentityAccountRekeyRepository } from "./identity-account-rekey.repository.ts";
 import type { IdentityBackfillRepository } from "./identity-backfill.repository.ts";
 import type { IdentityHeadsRepository } from "./identity-heads.repository.ts";
-import type { IdentityHistoryRepository } from "./identity-history.repository.ts";
 import type { IdentityLatchRepository } from "./identity-latch.repository.ts";
 import type { IdentityLookupRepository } from "./identity-lookup.repository.ts";
 import type { IdentityRateLimitRepository } from "./identity-rate-limit.repository.ts";
@@ -96,8 +95,6 @@ export interface IdentityRepositories {
   readonly ssoDomainOwnership: SsoDomainOwnershipRepository;
   /** The cross-organization reads the operator identity lookup takes (D05). */
   readonly identityLookup: IdentityLookupRepository;
-  /** A person's identity log, read: the lookup's history panel and its waiting proposals. */
-  readonly identityHistory: IdentityHistoryRepository;
   /** Identity's throttles: join requests, confirmation mails and the lookup's attempt budget. */
   readonly rateLimits: IdentityRateLimitRepository;
 }

@@ -11,6 +11,7 @@ import {
 import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
 import type { IdentityModule } from "../app/identity.app.ts";
+import type { IdentityHistoryRepository } from "../repositories/identity-history.repository.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
@@ -228,16 +229,19 @@ export function composeIdentityGuards(
 /** The identity pipeline a draining process runs, over the module's own rows. */
 export function composeIdentityPipeline({
   repositories,
+  history,
 }: {
   repositories: IdentityGuardRepositories &
-    Pick<IdentityRepositories, "identityProjection" | "mfaProjection" | "identityHistory">;
+    Pick<IdentityRepositories, "identityProjection" | "mfaProjection">;
+  /** A person's identity log, read through this pipeline's own store. */
+  history: IdentityHistoryRepository;
 }): IdentityPipeline {
   const { identityGuards, mfaGuards } = composeIdentityGuards(repositories);
   return defineIdentityPipeline({
     identityProjectionStore: repositories.identityProjection,
     identityGuards,
     linkProposalGuards: LinkProposalGuardsService.create({
-      proposals: repositories.identityHistory,
+      proposals: history,
     }),
     mfaProjectionStore: repositories.mfaProjection,
     mfaGuards,
@@ -246,7 +250,14 @@ export function composeIdentityPipeline({
 
 export const identityPipelineEventing = defineEventingModule({
   pipeline: IDENTITY_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<IdentityRepositories, IdentityModule>) => app.identityPipeline(),
+  build: ({
+    app,
+    participation,
+    eventStore,
+  }: EventingSetup<IdentityRepositories, IdentityModule>) => {
+    app.keepEventStore({ pipeline: IDENTITY_PIPELINE_NAME, participation, eventStore });
+    return app.identityPipeline();
+  },
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: IDENTITY_PIPELINE_NAME, commands }),
 });
