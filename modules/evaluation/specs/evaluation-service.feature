@@ -56,6 +56,7 @@ Feature: Evaluation service boundary
     Then the trace is read through that user's own read-time protections
     And the call is never refused for want of a composed trace evaluation runtime
 
+  @unit
   Scenario: API and workers share the same service
     Given the process has composed one Evaluation service
     When an API handler or worker reads a run
