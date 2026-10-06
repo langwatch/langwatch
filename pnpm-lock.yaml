@@ -1183,9 +1183,6 @@ importers:
       '@langwatch/trace-process':
         specifier: workspace:*
         version: link:../../modules/trace/process
-      '@langwatch/usage-process':
-        specifier: workspace:*
-        version: link:../../modules/usage/process
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../modules/user/contract
@@ -1950,9 +1947,6 @@ importers:
       '@langwatch/upgrade':
         specifier: workspace:*
         version: link:../../packages/upgrade
-      '@langwatch/usage-process':
-        specifier: workspace:*
-        version: link:../../modules/usage/process
       '@langwatch/user-process':
         specifier: workspace:*
         version: link:../../modules/user/process
@@ -2760,9 +2754,6 @@ importers:
       '@langwatch/trace-process':
         specifier: workspace:*
         version: link:../../modules/trace/process
-      '@langwatch/usage-process':
-        specifier: workspace:*
-        version: link:../../modules/usage/process
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../modules/user/contract
@@ -3130,9 +3121,6 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../../../modules/trace/contract
-      '@langwatch/usage-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/usage/contract
       '@slack/webhook':
         specifier: 'catalog:'
         version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
@@ -7704,6 +7692,9 @@ importers:
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
+      '@langwatch/clickhouse-client':
+        specifier: workspace:*
+        version: link:../../../packages/clickhouse-client
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
@@ -7713,6 +7704,9 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../evaluation/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
@@ -7743,6 +7737,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -7765,6 +7762,9 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -14845,86 +14845,6 @@ importers:
       nanoid:
         specifier: 'catalog:'
         version: 5.1.16
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  modules/usage/contract:
-    dependencies:
-      '@langwatch/config':
-        specifier: workspace:*
-        version: link:../../../packages/config
-      '@langwatch/entitlement-contract':
-        specifier: workspace:*
-        version: link:../../entitlement/contract
-      '@langwatch/module':
-        specifier: workspace:*
-        version: link:../../../packages/module
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
-    devDependencies:
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-
-  modules/usage/process:
-    dependencies:
-      '@langwatch/clickhouse-client':
-        specifier: workspace:*
-        version: link:../../../packages/clickhouse-client
-      '@langwatch/enterprise-billing-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/billing/contract
-      '@langwatch/entitlement-contract':
-        specifier: workspace:*
-        version: link:../../entitlement/contract
-      '@langwatch/evaluation-contract':
-        specifier: workspace:*
-        version: link:../../evaluation/contract
-      '@langwatch/eventing':
-        specifier: workspace:*
-        version: link:../../../packages/eventing
-      '@langwatch/module':
-        specifier: workspace:*
-        version: link:../../../packages/module
-      '@langwatch/observability':
-        specifier: workspace:*
-        version: link:../../../packages/observability
-      '@langwatch/process':
-        specifier: workspace:*
-        version: link:../../../packages/process
-      '@langwatch/project-contract':
-        specifier: workspace:*
-        version: link:../../project/contract
-      '@langwatch/scenario-contract':
-        specifier: workspace:*
-        version: link:../../scenario/contract
-      '@langwatch/time':
-        specifier: workspace:*
-        version: link:../../../packages/time
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../trace/contract
-      '@langwatch/usage-contract':
-        specifier: workspace:*
-        version: link:../contract
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
-    devDependencies:
-      '@langwatch/test-harness':
-        specifier: workspace:*
-        version: link:../../../packages/test-harness
-      '@langwatch/vitest-config':
-        specifier: workspace:*
-        version: link:../../../packages/vitest-config
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

@@ -85,7 +85,7 @@ export function createEntitlementTestUsers(): UserApi {
 
 export function createEntitlementTestApp(
   input: Readonly<{
-    repositories?: EntitlementRepositories;
+    repositories?: Pick<EntitlementRepositories, "membership" | "spend">;
     infrastructure: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
       Partial<Pick<EntitlementInfrastructure, "counter" | "warnings">>;
     dependencies?: Partial<{ users: UserApi; organizations: OrganizationApi }>;

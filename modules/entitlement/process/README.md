@@ -6,7 +6,7 @@ The server half of [entitlement](../README.md). What a plan allows, and what has
 
 ## Installation
 
-`defineProcessModule("entitlement").withRepositories(entitlementRepositories).withApi(EntitlementModule).withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport).withEventing(entitlementUsageWarningEventing)`, `src/entitlement.module.ts:12`.
+`defineProcessModule("entitlement").withRepositories(entitlementRepositories).withApi(EntitlementModule).withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport).withEventing(entitlementUsageWarningEventing).withEventing(usageEventing)`, `src/entitlement.module.ts:13`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -108,6 +108,20 @@ Declared at `src/eventing/entitlement-usage-warning.pipeline.ts:31`.
 | Kind            | Name                           | Handles                                                                                       | Declared at                                             |
 | --------------- | ------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | process manager | `entitlementUsageWarningSweep` | every 1 d (`USAGE_WARNING_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/entitlement-usage-warning.pipeline.ts:36` |
+
+### Pipeline `usage` (aggregate `usage_organization`)
+
+Declared at `src/eventing/usage.pipeline.ts:67`. Events: `monthCountedEventSchema`, `limitReachedEventSchema`, `limitClearedEventSchema`.
+
+The chain builds early when `!meterStores` (`src/eventing/usage.pipeline.ts:85`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
+
+| Kind                  | Name                                                                         | Handles                                     | Declared at                          | Built                |
+| --------------------- | ---------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------ | -------------------- |
+| command               | –                                                                            | –                                           | `src/eventing/usage.pipeline.ts:72`  | always               |
+| command               | `recordLimitDecision`                                                        | –                                           | `src/eventing/usage.pipeline.ts:84`  | always               |
+| process manager       | `refusedOrganizations`                                                       | intents `countMonth`, `recordLimitDecision` | `src/eventing/usage.pipeline.ts:87`  | past the early build |
+| global map projection | `≈ BillableEventsMeterProjection.create(meterStores.billableEvents).build()` | –                                           | `src/eventing/usage.pipeline.ts:98`  | past the early build |
+| global map projection | `≈ TraceMeterProjection.create(meterStores.traces).build()`                  | –                                           | `src/eventing/usage.pipeline.ts:102` | past the early build |
 
 ## Configuration
 

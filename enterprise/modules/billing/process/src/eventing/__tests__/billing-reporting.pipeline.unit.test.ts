@@ -1,7 +1,7 @@
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
+import { USAGE_MONTH_COUNTED_EVENT_TYPE } from "@langwatch/entitlement-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { USAGE_MONTH_COUNTED_EVENT_TYPE } from "@langwatch/usage-contract";
 import { describe, expect, it } from "vitest";
 
 import { BillingModule, type ConnectedBillingPeers } from "../../app/billing.app.ts";

@@ -45,6 +45,6 @@ Anything else billing needs belongs to another module and is reached through its
 
 ## Who depends on billing
 
-[entitlement](../../../modules/entitlement/README.md), [usage](../../../modules/usage/README.md) (as a peer).
+[entitlement](../../../modules/entitlement/README.md) (as a peer).
 
 <!-- readme:generated:end -->

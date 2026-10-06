@@ -173,17 +173,18 @@ on entitlement; a core caller never re-checks (Alex, 2026-09-29). Operator views
 Enterprise-licensed subjects moving to their owner land in that owner's enterprise module
 (`enterprise-gateway` owns routing policy and personal virtual keys), never relicensed into core (Alex, 2026-09-25).
 Enterprise modules mirror the shape exactly under `enterprise/modules/`.
-Usage is a module of its own and owns all counting: the counters, their enforcement, the warning
-thresholds, the billable-events meter (SaaS only; a projection and its table), and the trace count it takes itself.
-Entitlement keeps plans and features only. Usage is events (Alex, 2026-10-01): limits travel as
-`limit_reached` and `limit_cleared`, the month's total as `month_counted`, and no module asks `UsageApi`
-for either, so no trace-usage or billing-usage cycle forms (Alex, 2026-09-29). `UsageApi` exists with zero
-operations. Billing peer-subscribes to `month_counted`; a lower corrected total goes to Stripe as a negative
+Entitlement is one core module and owns plans, limits and all counting: the counters, their enforcement,
+the warning thresholds, the billable-events meter (SaaS only; a projection and its table), and the trace
+count it takes itself; usage merged into it with one Api, `EntitlementApi` (Alex, 2026-10-06). Counting is
+events (Alex, 2026-10-01): limits travel as `limit_reached` and `limit_cleared`, the month's total as
+`month_counted`, and no module asks entitlement to count, so no trace-usage or billing-usage cycle forms
+(Alex, 2026-09-29). Billing peer-subscribes to `month_counted`; a lower corrected total goes to Stripe as a negative
 meter event (Alex, 2026-10-01). Per-entity periodic work is a keyed process manager (§9, "Per-entity calendar
 work"), never `.schedule`. Every limit is soft:
 eventual and fail-open, with a documented enforcement lag and overshoot (Alex, 2026-10-01).
 Not built yet (Alex, 2026-09-30): `entitlement -> trace` and `trace -> entitlement` are peer cycle edges
-the peer-cycle test refuses until usage lands (the allowed list is gone, §5; Alex, 2026-10-05).
+the peer-cycle test refuses until entitlement counts from its own meters (the allowed list is gone, §5;
+Alex, 2026-10-05).
 Slack is a module of its own (Alex, 2026-09-30; supersedes ADR-093 §5a on ownership). `modules/slack`
 owns the Slack connection subjects: the `SlackIntegration` table, its repositories and services,
 `SlackApi` (main's list, create, update and delete of a connection, plus the reads delivery needs), the
@@ -2533,13 +2534,13 @@ peer), so its members refused every call and `checkLimit` answered 500.
 A seat limit reached is organization's event; billing learns it through §9's subscriber, which lives
 in billing on organization's events (Alex, 2026-09-28; placement Alex, 2026-09-29).
 
-**Usage warnings: usage decides, billing only sends** (Alex, 2026-09-29). Usage owns all counting
-(§3): it takes billing's billable-events meter projection and its table, and counts traces itself.
-It counts the month once per project in the organization's meter, decides the crossed threshold and
-records it as a usage event with the per-project counts; billing learns the warning from that event,
-resolves the admins and project names, sends once per threshold a month and records it. Billing
-counts nothing, learns the month's total from usage's `month_counted` event and holds no `TraceApi` peer
-for usage; no trace-usage or billing-usage cycle forms (Alex, 2026-09-29). Billing applies explicit
+**Usage warnings: entitlement decides, billing only sends** (Alex, 2026-09-29; usage merged into
+entitlement, Alex, 2026-10-06). Entitlement owns all counting (§3): it takes billing's billable-events
+meter projection and its table, and counts traces itself. It counts the month once per project in the
+organization's meter, decides the crossed threshold and records it as an event with the per-project
+counts; billing learns the warning from that event, resolves the admins and project names, sends once
+per threshold a month and records it. Billing counts nothing, learns the month's total from
+entitlement's `month_counted` event and holds no `TraceApi` peer for counting; no trace-usage or billing-usage cycle forms (Alex, 2026-09-29). Billing applies explicit
 adjustments, so a lower corrected total is never dropped as a stale reading, and `limit_cleared` reaches
 the doors promptly after an upgrade (Alex, 2026-10-01).
 

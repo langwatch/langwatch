@@ -703,12 +703,6 @@
       "path": "packages/upgrade/tsconfig.test.json"
     },
     {
-      "path": "modules/usage/contract/tsconfig.json"
-    },
-    {
-      "path": "modules/usage/process/tsconfig.json"
-    },
-    {
       "path": "modules/user/browser/tsconfig.json"
     },
     {

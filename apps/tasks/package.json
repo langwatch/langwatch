@@ -103,7 +103,6 @@
     "@langwatch/topic-process": "workspace:*",
     "@langwatch/trace-process": "workspace:*",
     "@langwatch/upgrade": "workspace:*",
-    "@langwatch/usage-process": "workspace:*",
     "@langwatch/user-process": "workspace:*",
     "@langwatch/webhook-process": "workspace:*",
     "@langwatch/workflow-process": "workspace:*",

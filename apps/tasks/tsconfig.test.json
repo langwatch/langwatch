@@ -252,9 +252,6 @@
       "path": "../../packages/upgrade/tsconfig.build.json"
     },
     {
-      "path": "../../modules/usage/process/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/user/process/tsconfig.build.json"
     },
     {

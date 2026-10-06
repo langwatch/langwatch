@@ -199,10 +199,10 @@ Declared at `src/eventing/billing-lifecycle.pipeline.ts:57`. Events: `subscripti
 
 Declared at `src/eventing/billing-reporting.pipeline.ts:72`.
 
-| Kind            | Name                | Handles                                                                    | Declared at                                     |
-| --------------- | ------------------- | -------------------------------------------------------------------------- | ----------------------------------------------- |
-| command         | –                   | –                                                                          | `src/eventing/billing-reporting.pipeline.ts:79` |
-| peer subscriber | `usageMonthCounted` | `lw.usage.month_counted` from [usage](../../../../modules/usage/README.md) | `src/eventing/billing-reporting.pipeline.ts:93` |
+| Kind            | Name                | Handles                                                                                | Declared at                                     |
+| --------------- | ------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| command         | –                   | –                                                                                      | `src/eventing/billing-reporting.pipeline.ts:79` |
+| peer subscriber | `usageMonthCounted` | `lw.usage.month_counted` from [entitlement](../../../../modules/entitlement/README.md) | `src/eventing/billing-reporting.pipeline.ts:93` |
 
 ### Pipeline `connected_billing` (aggregate `global`)
 

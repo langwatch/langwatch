@@ -89,7 +89,7 @@
       "id": "entitlement",
       "root": "modules/entitlement",
       "classification": "core",
-      "subjects": ["entitlement"]
+      "subjects": ["entitlement", "usage"]
     },
     {
       "id": "evaluation",
@@ -308,12 +308,6 @@
       "root": "modules/trace",
       "classification": "core",
       "subjects": ["trace", "trace-ingestion"]
-    },
-    {
-      "id": "usage",
-      "root": "modules/usage",
-      "classification": "core",
-      "subjects": ["usage"]
     },
     {
       "id": "user",

@@ -56,7 +56,6 @@ const EXPECTED_PUBLIC_NAMESPACES = {
   suite: "suites",
   topic: "topics",
   trace: "traces",
-  usage: "usage",
   user: "users",
   workflow: "workflows",
   "audit-log": "audit-logs",
