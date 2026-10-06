@@ -6,8 +6,15 @@ import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildProcessStores } from "../src/create-members.ts";
+import type * as datastoreMembers from "../src/datastore-members.ts";
+import { buildRedis } from "../src/datastore-members.ts";
 import { producerEventing } from "../src/eventing-role.ts";
 import type { ProcessConfig } from "../src/index.ts";
+
+vi.mock("../src/datastore-members.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof datastoreMembers>();
+  return { ...actual, buildRedis: vi.fn(actual.buildRedis) };
+});
 
 /** A process whose Redis names an address nothing answers on: the client connects lazily. */
 function config(overrides: Partial<ProcessConfig> = {}): ProcessConfig {
@@ -73,6 +80,28 @@ describe("given a process configured with Redis", () => {
 
       expect(closing).toHaveBeenCalledOnce();
       expect(order).toEqual(["eventing", "redis"]);
+    });
+  });
+});
+
+describe("given a Redis-backed member a request handler reads", () => {
+  describe("when the process stores are built and the member has not been read", () => {
+    /** @scenario "A request handler resolves the connection when it runs" */
+    it("resolves no connection until the member is read, then the process's one connection", async () => {
+      vi.mocked(buildRedis).mockClear();
+      const members = buildProcessStores({ config: config() }).members;
+      try {
+        expect(buildRedis).not.toHaveBeenCalled();
+
+        const limiter = members.read("rateLimiter");
+
+        expect(limiter).toBeDefined();
+        expect(buildRedis).toHaveBeenCalledOnce();
+        expect(members.read("redis")).toBe(vi.mocked(buildRedis).mock.results[0]?.value.value);
+        expect(buildRedis).toHaveBeenCalledOnce();
+      } finally {
+        await members.close();
+      }
     });
   });
 });
