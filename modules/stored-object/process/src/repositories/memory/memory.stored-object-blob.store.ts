@@ -3,7 +3,7 @@
  * from it, the way one bucket serves every client pointed at it: bytes put
  * through one repository are what another one reads back.
  */
-export type StoredObjectBlobEntry = Readonly<{
+type StoredObjectBlobEntry = Readonly<{
   bytes: Buffer;
   mediaType: string;
 }>;

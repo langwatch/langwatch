@@ -8,10 +8,10 @@ import {
 import type { ExternalImageChannel, ExternalImageResponse } from "../external-image.channel.ts";
 
 /** How long the proxy waits for an outside address before giving up on it. */
-export const EXTERNAL_IMAGE_TIMEOUT_MS = 30_000;
+const EXTERNAL_IMAGE_TIMEOUT_MS = 30_000;
 
 /** The address fence a deployment judges an outbound picture by. */
-export type ExternalImageEgressPolicy = Readonly<{
+type ExternalImageEgressPolicy = Readonly<{
   blockLocal: boolean;
   allowedHosts: readonly string[];
   /** Main verified certificates only on the hosted product, so on-prem self-signed hosts load. */

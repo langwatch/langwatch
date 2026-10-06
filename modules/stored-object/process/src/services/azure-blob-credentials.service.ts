@@ -78,8 +78,7 @@ const PUBLIC_CLOUD_SUFFIX = ".blob.core.windows.net";
  * Test-only escape hatch for plaintext HTTP endpoints in token auth mode.
  * Never true outside tests; never transmitted plaintext in production.
  */
-export const ALLOW_INSECURE_TOKEN_ENDPOINT_ENV =
-  "AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS";
+const ALLOW_INSECURE_TOKEN_ENDPOINT_ENV = "AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS";
 
 const TOKEN_MODES = new Set<AzureTokenAuthMode>([
   "workloadIdentity",

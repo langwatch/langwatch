@@ -1,4 +1,4 @@
-export type StoredObjectOwnerClickHouseClient = Readonly<{
+type StoredObjectOwnerClickHouseClient = Readonly<{
   query(input: {
     query: string;
     query_params: Record<string, string>;
@@ -10,7 +10,7 @@ export type StoredObjectOwnerClickHouseClient = Readonly<{
   }>;
 }>;
 
-export type StoredObjectOwnerClickHouseInstance = Readonly<{
+type StoredObjectOwnerClickHouseInstance = Readonly<{
   target: string;
   client: StoredObjectOwnerClickHouseClient;
 }>;

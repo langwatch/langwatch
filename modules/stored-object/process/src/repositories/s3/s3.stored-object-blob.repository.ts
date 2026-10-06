@@ -18,13 +18,13 @@ import type { StoredObjectBlobRepository } from "#repositories/stored-object-blo
 import { parseS3Uri } from "#rules/s3-uri.rules";
 
 /** S3 connection details for one project; separate from bucket selection. */
-export type StoredObjectS3Credentials = Readonly<{
+type StoredObjectS3Credentials = Readonly<{
   accessKeyId: string;
   secretAccessKey: string;
   sessionToken?: string;
 }>;
 
-export type StoredObjectS3Target = Readonly<{
+type StoredObjectS3Target = Readonly<{
   endpoint?: string;
   region?: string;
   credentials?: StoredObjectS3Credentials;
@@ -38,7 +38,7 @@ export interface StoredObjectS3TargetResolver {
 /**
  * The process's shared AWS transport policy, as this driver asks for it.
  */
-export type StoredObjectS3ClientPolicy = Readonly<{
+type StoredObjectS3ClientPolicy = Readonly<{
   build(input: {
     region?: string | undefined;
     targetHost: string;

@@ -89,8 +89,8 @@ const taskConfigSchema = z
     }
   });
 
-export type MigrationTaskConfig = z.infer<typeof taskConfigSchema>;
-export type MigrationTaskPhase = "plan" | "copy" | "finalize" | "verify";
+type MigrationTaskConfig = z.infer<typeof taskConfigSchema>;
+type MigrationTaskPhase = "plan" | "copy" | "finalize" | "verify";
 
 export function parseMigrationTaskConfig(source: NodeJS.ProcessEnv): MigrationTaskConfig {
   return taskConfigSchema.parse({
@@ -118,7 +118,7 @@ export function parseMigrationTaskConfig(source: NodeJS.ProcessEnv): MigrationTa
   });
 }
 
-export function parseMigrationTaskPhase(value: string | undefined): MigrationTaskPhase {
+function parseMigrationTaskPhase(value: string | undefined): MigrationTaskPhase {
   if (value === "plan" || value === "copy" || value === "finalize" || value === "verify") {
     return value;
   }
@@ -251,7 +251,7 @@ export async function auditQueuesForCutover(
 }
 
 /** Runs one phase of the migration. */
-export async function runMigrationPhase(
+async function runMigrationPhase(
   migration: ObjectStorageMigrationService,
   phase: MigrationTaskPhase,
 ): Promise<void | MigrationFinalizeReport | MigrationPlan> {
@@ -261,7 +261,7 @@ export async function runMigrationPhase(
   return migration.finalize();
 }
 
-export function toAzureCredentials(
+function toAzureCredentials(
   config: MigrationTaskConfig,
   identity?: AzureInjectedIdentity,
 ): AzureCredentials {

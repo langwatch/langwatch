@@ -13,7 +13,7 @@ import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
 import { parseS3Uri } from "#rules/s3-uri.rules";
 
-export type MigrationS3Configuration = {
+type MigrationS3Configuration = {
   bucket: string;
   endpoint?: string;
   region?: string;
@@ -22,7 +22,7 @@ export type MigrationS3Configuration = {
   sessionToken?: string;
 };
 
-export type MigrationS3RegionConfiguration = {
+type MigrationS3RegionConfiguration = {
   endpoint?: string;
   region?: string;
 };

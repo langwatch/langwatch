@@ -37,7 +37,7 @@ export interface StoredObjectFileReader {
 }
 
 /** What the process composes this service from. */
-export type StoredObjectsServiceOptions = Readonly<{
+type StoredObjectsServiceOptions = Readonly<{
   repository: StoredObjectsRepository;
   /**
    * The scheme dispatch a project's bytes are read through. A

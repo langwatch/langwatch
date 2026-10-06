@@ -12,7 +12,7 @@ export type StoredObjectStorageProject = {
   resolveDestination(): Promise<StoredObjectStorageDestination>;
 };
 
-export interface StoredObjectByteStore {
+interface StoredObjectByteStore {
   put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
   get(uri: string): Promise<Readable>;
   delete(uri: string): Promise<void>;

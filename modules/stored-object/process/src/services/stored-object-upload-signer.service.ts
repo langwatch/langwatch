@@ -22,7 +22,7 @@ const sealedUploadSchema = z
     expiresAt: z.string().datetime({ offset: true }),
   })
   .strict();
-export type SealedUpload = z.infer<typeof sealedUploadSchema>;
+type SealedUpload = z.infer<typeof sealedUploadSchema>;
 
 // `kind` keeps a read seal from opening as an upload, and an upload seal from opening as a read.
 const sealedReadSchema = z
@@ -34,7 +34,7 @@ const sealedReadSchema = z
     expiresAt: z.string().datetime({ offset: true }),
   })
   .strict();
-export type SealedRead = z.infer<typeof sealedReadSchema>;
+type SealedRead = z.infer<typeof sealedReadSchema>;
 
 export class StoredObjectUploadSignerService {
   static create(input: {

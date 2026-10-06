@@ -59,7 +59,7 @@ export type StoredObjectPermissions = Pick<AuthzApi, "getDecision">;
 /** How long a signed read URL answers, as long as an upload URL does (ADR-158 §4). */
 const READ_URL_EXPIRY_MS = 15 * 60 * 1000;
 
-export type StoredObjectServiceOptions = Readonly<{
+type StoredObjectServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
   permissions: StoredObjectPermissions;
   storage: StoredObjectBytesRepository;

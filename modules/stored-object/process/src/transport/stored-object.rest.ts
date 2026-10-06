@@ -20,7 +20,7 @@ import {
 } from "@langwatch/stored-object-contract";
 import { z } from "zod";
 
-export const STORED_OBJECTS_PUBLIC_API_VERSION = "2026-08-22" as const;
+const STORED_OBJECTS_PUBLIC_API_VERSION = "2026-08-22" as const;
 
 const SIGNED_URL = "signed URL: the sealed signature in the query is the credential";
 

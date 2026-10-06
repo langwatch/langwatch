@@ -40,7 +40,7 @@ import type {
 import { storedObjectReferenceOf } from "../rules/stored-object-view.rules.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
 
-export type StoredObjectUploadServiceOptions = Readonly<{
+type StoredObjectUploadServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
   storage: StoredObjectBytesRepository;
   signer: StoredObjectUploadSignerService;

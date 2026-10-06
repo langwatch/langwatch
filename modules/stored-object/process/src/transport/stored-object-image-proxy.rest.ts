@@ -8,11 +8,11 @@ import { moduleApi } from "@langwatch/module";
 import { type ImageProxyRequest, imageProxyQuerySchema } from "@langwatch/stored-object-contract";
 
 /** The one operation the proxy door reaches. */
-export interface StoredObjectImageProxyApi {
+interface StoredObjectImageProxyApi {
   proxyImage(input: ImageProxyRequest): Promise<Response>;
 }
 
-export const StoredObjectImageProxyApi = moduleApi<StoredObjectImageProxyApi>()("stored-object");
+const StoredObjectImageProxyApi = moduleApi<StoredObjectImageProxyApi>()("stored-object");
 
 export const storedObjectImageProxyRest = defineRestRouter(StoredObjectImageProxyApi)
   .withNamespace("image-proxy")
