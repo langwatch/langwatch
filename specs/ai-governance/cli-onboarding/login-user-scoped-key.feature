@@ -143,8 +143,8 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
       Then the response carries a `cli_api_key` in the `sk-lw-{lookupId}_{secret}` format
       And the ApiKey row records the approving user as owner
       And its permissionMode is "restricted" with the selected permission list
-      And the response still carries the personal project and its API key,
-        so older CLI versions keep working unchanged
+      And the response still carries the personal project's id, slug and name,
+        never its project API key
 
     @integration
     Scenario: the exchange reports the permissions the key was minted with
