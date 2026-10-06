@@ -58,6 +58,7 @@ export {
   type InstallableServerFeature,
   type InstalledFeatureState,
   type ModuleContributions,
+  type ModuleMigrationBinder,
   type ModuleTaskBinder,
   type ModuleTaskSetup,
   type ModuleTransportFacts,
@@ -108,6 +109,13 @@ export {
   ShutdownPhaseTimeoutError,
   type ShutdownSignalHost,
 } from "./graceful-shutdown.ts";
+export {
+  MigrationStepCollectionError,
+  type MigrationStepCollectionRefusal,
+  buildsMigrationSteps,
+  collectMigrationSteps,
+  migrationStepsOf,
+} from "./migration-steps.ts";
 export {
   loadTaskModules,
   parseTaskModuleSpecifiers,

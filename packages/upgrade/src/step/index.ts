@@ -1,0 +1,15 @@
+export {
+  type MigrationStep,
+  type MigrationStepCheckpoint,
+  type MigrationStepDeclaration,
+  MigrationStepDeclarationError,
+  type MigrationStepKind,
+  type MigrationStepRefusal,
+  type MigrationStepReport,
+  type MigrationStepRun,
+  defineMigrationStep,
+  isMigrationStep,
+  migrationStepDeclarationSchema,
+  migrationStepKindSchema,
+  migrationStepReportSchema,
+} from "./migration-step.ts";
