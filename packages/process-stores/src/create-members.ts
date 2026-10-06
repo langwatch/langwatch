@@ -38,6 +38,19 @@ export class MemberNotConfiguredError extends Error {
   }
 }
 
+/** An opened store that did not answer its readiness query, named by member. */
+export class StoreNotAnsweringError extends Error {
+  readonly code = "store_not_answering";
+
+  constructor(
+    readonly member: string,
+    cause: unknown,
+  ) {
+    super(`The "${member}" store did not answer its readiness query.`, { cause });
+    this.name = "StoreNotAnsweringError";
+  }
+}
+
 /** No key is a state, as main's lazy key was: only a use of the cipher refuses. */
 function refusingEncryption(): Encryption {
   const refuse = (): never => {
@@ -68,6 +81,11 @@ export interface MemberSource<Members> {
   readonly order: readonly (keyof Members & string)[];
   /** Builds the member, or refuses naming it. Repeated reads answer once. */
   read<Name extends keyof Members & string>(name: Name): Members[Name];
+  /**
+   * Resolves once every client this source opened answers one cheap query; rejects naming
+   * the first that does not. Spec: specs/server/process-readiness.feature.
+   */
+  answer?(): Promise<void>;
   /** Closes every client this source opened, in reverse construction order. */
   close(): Promise<void>;
   /** The same close, so `await using members = buildProcessStores(...).members` works. */
@@ -223,6 +241,7 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
 
   const built = new Map<MemberName, unknown>();
   const opened: { member: MemberName; close: () => Promise<void> }[] = [];
+  const answering: { member: string; answer: () => Promise<void> }[] = [];
 
   const read = <Name extends MemberName>(name: Name): ProcessMembers[Name] => {
     const handed = supplied[name];
@@ -232,6 +251,7 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
     const result = builders[name]();
     built.set(name, result.value);
     if (result.close) opened.push({ member: name, close: result.close });
+    if (result.answer) answering.push({ member: name, answer: result.answer });
     return result.value as ProcessMembers[Name];
   };
 
@@ -298,12 +318,22 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
     tier: "live",
     order: MEMBER_NAMES,
     read,
+    async answer(): Promise<void> {
+      await Promise.all(
+        answering.map(({ member, answer }) =>
+          answer().catch((error: unknown) => {
+            throw new StoreNotAnsweringError(member, error);
+          }),
+        ),
+      );
+    },
     async close(): Promise<void> {
       // Reverse construction order: eventing drains before the Redis its queue
       // sits on goes away, and a client is never closed under something still
       // holding it.
       for (const entry of [...opened].reverse()) await entry.close();
       opened.length = 0;
+      answering.length = 0;
       built.clear();
       directory = undefined;
     },
@@ -313,7 +343,17 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
   return { members: source, operatorReads };
 }
 
-/** Host before the runtime so its stores close after the runtime stops. */
+/** Host before the runtime so its stores close after the runtime stops; ready once they answer. */
 export function hostedMembers(source: ProcessMemberSource) {
-  return { name: "process stores", stop: () => source.close() };
+  return {
+    name: "process stores",
+    stop: () => source.close(),
+    ...(source.answer === undefined
+      ? {}
+      : {
+          ready: async () => {
+            await source.answer?.();
+          },
+        }),
+  };
 }

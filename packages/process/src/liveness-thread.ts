@@ -3,6 +3,8 @@ import { Worker } from "node:worker_threads";
 
 /** The kubelet's path; answered in the thread from the heartbeat, never proxied. */
 export const LIVENESS_PATH = "/healthz";
+/** Answered in the thread once the main thread latched ready; until then the main thread says. */
+export const READINESS_PATH = "/readyz";
 
 /**
  * A saturated worker can pin its loop for over a minute of legitimate work, so the probe judges
@@ -29,6 +31,7 @@ const http = require("node:http");
 const net = require("node:net");
 const { parentPort, workerData } = require("node:worker_threads");
 const heartbeat = new BigInt64Array(workerData.heartbeat);
+const readiness = new Int32Array(workerData.readiness);
 let lastBeat = Atomics.load(heartbeat, 0);
 let lastBeatSeenAt = Date.now();
 const stalledMs = () => {
@@ -53,6 +56,10 @@ const server = http.createServer((req, res) => {
       return;
     }
     res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
+    return;
+  }
+  if (req.url === workerData.readinessPath && Atomics.load(readiness, 0) === 1) {
+    res.writeHead(200, { "Content-Type": "text/plain" }).end("ready");
     return;
   }
   const upstream = http.request({ ...target, method: req.method, path: req.url, headers: req.headers, agent: false });
@@ -151,6 +158,7 @@ export type LivenessThread = Readonly<{
 export async function startLivenessThread({
   port,
   heartbeat,
+  readiness,
   proxyPort,
   logger,
   stallBudgetMs = HEARTBEAT_STALL_BUDGET_MS,
@@ -158,6 +166,8 @@ export async function startLivenessThread({
 }: {
   port: number;
   heartbeat: SharedArrayBuffer;
+  /** One Int32 the main thread sets to 1 once ready and back to 0 when it drains. */
+  readiness?: SharedArrayBuffer;
   /** The main thread's loopback listener every non-liveness request is proxied to. */
   proxyPort: number;
   logger: LivenessLogger;
@@ -169,10 +179,13 @@ export async function startLivenessThread({
     workerData: {
       port,
       heartbeat,
+      // Absent, the thread never answers readiness itself: every probe reaches the main thread.
+      readiness: readiness ?? new SharedArrayBuffer(4),
       proxyPort,
       stallBudgetMs,
       proxyTimeoutMs,
       livenessPath: LIVENESS_PATH,
+      readinessPath: READINESS_PATH,
       handoverMs: BIND_HANDOVER_MS,
     },
   });

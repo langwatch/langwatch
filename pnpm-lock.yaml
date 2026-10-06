@@ -16636,6 +16636,9 @@ importers:
       pino-pretty:
         specifier: ^13.1.3
         version: 13.1.3
+      prom-client:
+        specifier: 'catalog:'
+        version: 15.1.3
     devDependencies:
       '@opentelemetry/sdk-trace-node':
         specifier: 'catalog:'

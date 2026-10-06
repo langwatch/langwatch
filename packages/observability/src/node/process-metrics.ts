@@ -9,6 +9,7 @@ import { resourceFromAttributes } from "@opentelemetry/resources";
 import { AggregationType, MeterProvider } from "@opentelemetry/sdk-metrics";
 
 import { activateMetrics, deactivateMetrics, metricHistogramViews } from "../metrics/index.ts";
+import { installNodeDefaultMetrics, withRegistryFamilies } from "./node-default-metrics.ts";
 import { startOtlpMetricsExport } from "./otlp-metrics.ts";
 import { PrometheusPullReader } from "./prometheus-exposition.ts";
 import { prometheusMetrics } from "./prometheus-metrics-door.ts";
@@ -26,14 +27,23 @@ type MetricsContribution =
   | Readonly<{ name: string; stop: () => Promise<void> }>
   | ReturnType<typeof prometheusMetrics>;
 
+/** What this needs of the preamble's logger: a door left unmounted is named in the boot log. */
+type BootLogger = Readonly<{ error: (obj: object, msg: string) => void }>;
+
+type MetricsContext = TelemetryContext & Readonly<{ logger?: BootLogger }>;
+
 export function processMetrics(serviceName: string) {
-  return async ({ config, secrets }: TelemetryContext): Promise<readonly MetricsContribution[]> => {
+  return async ({
+    config,
+    secrets,
+    logger,
+  }: MetricsContext): Promise<readonly MetricsContribution[]> => {
     const settings = config.observability;
 
     if (settings.metrics.mode === "prometheus") {
       const production = config.process?.nodeEnvironment === "production";
       return secrets.into(metricsScrapeTokenSecret, (token) =>
-        scrapeDoor({ serviceName, settings, token, production }),
+        scrapeDoor({ serviceName, settings, token, production, logger }),
       );
     }
 
@@ -71,21 +81,30 @@ function scrapeDoor({
   settings,
   token,
   production,
+  logger,
 }: {
   serviceName: string;
   settings: TelemetrySettings;
   token: string | undefined;
   production: boolean;
+  logger: BootLogger | undefined;
 }): readonly MetricsContribution[] {
   if (!settings.metrics.enabled) return [inert()];
   // An unset token in production is a misconfiguration, not an invitation.
-  if (token === undefined && production) return [inert()];
+  if (token === undefined && production) {
+    logger?.error(
+      { setting: metricsScrapeTokenSecret.id },
+      `${serviceName}: /metrics is not mounted: ${metricsScrapeTokenSecret.id} is not set in production`,
+    );
+    return [inert()];
+  }
 
   const reader = new PrometheusPullReader();
   const meterProvider = meterProviderOver({ reader, serviceName, settings });
   metrics.setGlobalMeterProvider(meterProvider);
   activateMetrics();
   new HostMetrics({ meterProvider, name: serviceName }).start();
+  installNodeDefaultMetrics();
 
   return [
     {
@@ -98,7 +117,7 @@ function scrapeDoor({
     },
     prometheusMetrics({
       ...(token === undefined ? {} : { token }),
-      readMetrics: () => reader.read(),
+      readMetrics: async () => withRegistryFamilies(await reader.read()),
     }),
   ];
 }

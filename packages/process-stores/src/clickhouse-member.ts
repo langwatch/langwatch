@@ -254,5 +254,14 @@ export function buildClickHouse(options: {
       telemetry.unregisterLimiter(STATEMENT_BOUND_INSTANCE);
       return ClickHouseShutdownService.create().shutdown(connection);
     },
+    // The shared endpoint only: one organisation's private route never makes the process unready.
+    ...(configuration.shared === undefined
+      ? {}
+      : {
+          answer: async () => {
+            const result = await connection.shared().ping();
+            if (!result.success) throw result.error;
+          },
+        }),
   };
 }

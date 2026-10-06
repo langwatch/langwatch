@@ -205,7 +205,7 @@ spec:
             periodSeconds: 15
           readinessProbe:
             httpGet:
-              path: /api/health
+              path: /readyz
               port: http
             periodSeconds: 10
             timeoutSeconds: 5

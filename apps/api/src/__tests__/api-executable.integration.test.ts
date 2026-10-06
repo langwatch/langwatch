@@ -108,7 +108,6 @@ describe.skipIf(!liveStoresConfigured)("the api executable over live stores", ()
   });
 
   describe("given a process whose readiness has not yet passed", () => {
-    /** @scenario "The listener stays closed until readiness has passed" */
     it(
       "refuses every connection to its port until the boot resolves, then accepts",
       async () => {

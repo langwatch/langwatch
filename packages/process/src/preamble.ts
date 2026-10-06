@@ -50,6 +50,10 @@ type FactoryContext<Owners extends readonly PreambleOwner[]> = Readonly<{
   redactPaths: readonly string[];
 }>;
 
+/** Metrics also get the process logger, so boot names a scrape door it left unmounted. */
+type MetricsContext<Owners extends readonly PreambleOwner[]> = FactoryContext<Owners> &
+  Readonly<{ logger: ServerLogger }>;
+
 /** The environment the process was started with, as its main hands it in. */
 export type PreambleEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -74,7 +78,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
       owners: Owners;
       chain?: ChainBuilder<Owners>;
       telemetry?: (context: FactoryContext<Owners>) => Telemetry | Promise<Telemetry>;
-      metrics?: (context: FactoryContext<Owners>) => Metrics | Promise<Metrics>;
+      metrics?: (context: MetricsContext<Owners>) => Metrics | Promise<Metrics>;
       healthPort?: number;
       ownsProcess?: boolean;
       environment?: PreambleEnvironment;
@@ -114,7 +118,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
   }
 
   withMetrics(
-    factory: (context: FactoryContext<Owners>) => Metrics | Promise<Metrics>,
+    factory: (context: MetricsContext<Owners>) => Metrics | Promise<Metrics>,
   ): ServerPreamble<Owners> {
     return new ServerPreamble(this.name, { ...this.state, metrics: factory });
   }
@@ -185,6 +189,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
         config,
         secrets: frameworkSecrets,
         redactPaths,
+        logger: boundary.logger,
       })) {
         server.with(contribution);
       }

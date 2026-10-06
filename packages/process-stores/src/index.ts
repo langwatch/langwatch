@@ -28,6 +28,7 @@ export {
   hostedMembers,
   MemberNotConfiguredError,
   MemberSuppliedUndefinedError,
+  StoreNotAnsweringError,
   type MemberSource,
   type ProcessMemberSource,
   type ProcessStores,
