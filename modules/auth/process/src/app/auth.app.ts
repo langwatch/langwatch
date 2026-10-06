@@ -27,6 +27,8 @@ import {
   type ReleaseHeldAccountResult,
   type SaveSignInSecurityInput,
   type SaveSignInSecurityResult,
+  type SessionImpersonation,
+  type SessionImpersonationState,
   type SignInSecuritySettings,
   type VerifiedBrowserSession,
   type AuthUsageCount,
@@ -319,6 +321,24 @@ export class AuthModule implements AuthApiContract {
 
   findDialableIdentityProviderOrigins(): string[] {
     return [...this.#dialableIdentityProviderOrigins];
+  }
+
+  findMountedSocialMethodIds(): string[] {
+    return [...this.#mountedSocialMethodIds];
+  }
+
+  getImpersonation(input: { sessionId: string }): Promise<SessionImpersonationState> {
+    return this.#sessions.getImpersonation(input);
+  }
+
+  startImpersonation(
+    input: SessionImpersonation & { sessionId: string; reason: string },
+  ): Promise<void> {
+    return this.#sessions.startImpersonation(input);
+  }
+
+  stopImpersonation(input: { sessionId: string }): Promise<void> {
+    return this.#sessions.stopImpersonation(input);
   }
 
   private constructor({

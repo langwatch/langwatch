@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 const browserSessionUserSchema = z
@@ -56,10 +57,21 @@ export type BrowserSessionResolution =
   | { kind: "signed_in"; session: BrowserSession }
   | { kind: "anonymous" };
 
-export const browserSessionImpersonationSchema = browserSessionActorSchema
-  .safeExtend({ expires: z.coerce.date() })
-  .strict();
-export type BrowserSessionImpersonation = z.infer<typeof browserSessionImpersonationSchema>;
+/**
+ * A session's live impersonation (D06): the operator who really acts, the person whose access they
+ * borrow, the reason given, and when the borrowed access lapses.
+ */
+export type SessionImpersonation = Readonly<{
+  actorUserId: string;
+  subjectUserId: string;
+  reason: string | null;
+  expiresAt: Instant;
+}>;
+
+/** Whether a session acts as its own user or carries a live impersonation. */
+export type SessionImpersonationState =
+  | Readonly<{ kind: "none" }>
+  | Readonly<{ kind: "impersonating"; impersonation: SessionImpersonation }>;
 
 /**
  * One session as its owner reads it on their devices list. Carries how it

@@ -452,7 +452,6 @@ export const createAuthOptions = ({
       expiresAt: "expires",
     },
     additionalFields: {
-      impersonating: { type: "string", required: false, input: false },
       // What the minting sign-in proved (D06), written by the session create hook only.
       amr: { type: "string[]", required: false, input: false },
       // Which of the person's identifiers minted it (D06), written by the same hook only.
