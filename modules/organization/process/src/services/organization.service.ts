@@ -257,6 +257,12 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.repository.getPricing(input);
   }
 
+  getDatasetLimits(input: {
+    organizationId: string;
+  }): Promise<{ attachmentMaxBytes: number | null }> {
+    return this.repository.getDatasetLimits(input);
+  }
+
   isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean> {
     return this.repository.isInstantEvalsOptedIn(input);
   }

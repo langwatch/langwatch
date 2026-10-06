@@ -9,6 +9,7 @@ import {
 } from "../http/http.experiment-attachment-link.channel.ts";
 
 const PDF_BYTES = Buffer.from("%PDF-1.7");
+const maxBytes = DATASET_ATTACHMENT_MAX_BYTES;
 
 /** Answers with the given headers and body, and reports whether the body was reached. */
 function answering({ headers, chunks }: { headers: Record<string, string>; chunks: Buffer[] }) {
@@ -60,7 +61,7 @@ describe("the attachment link channel", () => {
       });
 
       await expect(
-        channel.fetchAttachment({ url: "https://example.com/report.pdf", columnType: "file" }),
+        channel.fetchAttachment({ url: "https://example.com/report.pdf", columnType: "file", maxBytes }),
       ).rejects.toMatchObject({ code: "dataset_attachment_too_large" });
       expect(reached).toEqual([]);
     });
@@ -76,8 +77,45 @@ describe("the attachment link channel", () => {
       });
 
       await expect(
-        channel.fetchAttachment({ url: "https://example.com/report.pdf", columnType: "file" }),
+        channel.fetchAttachment({ url: "https://example.com/report.pdf", columnType: "file", maxBytes }),
       ).rejects.toMatchObject({ code: "dataset_attachment_too_large" });
+    });
+  });
+
+  describe("when the caller's limit was raised above the default", () => {
+    /** @scenario "An organization with a raised file limit reads a file the default limit refuses" */
+    it("reads a body larger than the default limit", async () => {
+      const chunk = Buffer.alloc(1024 * 1024);
+      const { channel } = answering({
+        headers: {
+          "content-type": "application/pdf",
+          "content-length": String(21 * chunk.byteLength),
+        },
+        chunks: Array.from({ length: 21 }, () => chunk),
+      });
+
+      const read = await channel.fetchAttachment({
+        url: "https://example.com/report.pdf",
+        columnType: "file",
+        maxBytes: 2 * DATASET_ATTACHMENT_MAX_BYTES,
+      });
+
+      expect(read.bytes.byteLength).toBe(21 * chunk.byteLength);
+    });
+
+    it("still refuses a body above the raised limit, naming it", async () => {
+      const { channel } = answering({
+        headers: { "content-type": "application/pdf", "content-length": "11" },
+        chunks: [PDF_BYTES],
+      });
+
+      await expect(
+        channel.fetchAttachment({
+          url: "https://example.com/report.pdf",
+          columnType: "file",
+          maxBytes: 10,
+        }),
+      ).rejects.toMatchObject({ code: "dataset_attachment_too_large", meta: { maxBytes: 10 } });
     });
   });
 
@@ -90,7 +128,7 @@ describe("the attachment link channel", () => {
       });
 
       await expect(
-        channel.fetchAttachment({ url: "https://example.com/page.html", columnType: "image" }),
+        channel.fetchAttachment({ url: "https://example.com/page.html", columnType: "image", maxBytes }),
       ).rejects.toMatchObject({
         code: "dataset_attachment_unavailable",
         meta: { fileName: "page.html" },
@@ -107,7 +145,7 @@ describe("the attachment link channel", () => {
       });
 
       await expect(
-        channel.fetchAttachment({ url: "https://example.com/page.html", columnType: "file" }),
+        channel.fetchAttachment({ url: "https://example.com/page.html", columnType: "file", maxBytes }),
       ).resolves.toMatchObject({ mediaType: "text/html", name: "page.html" });
     });
   });

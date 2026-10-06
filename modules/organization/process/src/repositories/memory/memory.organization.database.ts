@@ -40,6 +40,8 @@ export interface MemoryOrganizationRow {
   joinerRole?: "MEMBER" | "DEVELOPER";
   /** The CLI/device session ceiling in days; absent reads as unbounded. */
   maxSessionDurationDays?: number;
+  /** The per-file dataset limit an operator set, in mebibytes. */
+  datasetAttachmentMaxMb?: number | null;
   /** The organization's own Instant Evals consent; absent reads as not given. */
   instantEvalsEnabledAt?: Instant | null;
   instantEvalsEnabledByUserId?: string | null;

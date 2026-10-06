@@ -3775,6 +3775,15 @@
           "documentation": ""
         },
         {
+          "name": "datasetAttachmentMaxMb",
+          "columnName": "datasetAttachmentMaxMb",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The largest file a dataset image or file cell accepts for this\norganization, in mebibytes. Null means the default. Set by an operator\nfrom the back office only; every other dataset size limit scales with it."
+        },
+        {
           "name": "maxSessionDurationDays",
           "columnName": "maxSessionDurationDays",
           "type": "Int",

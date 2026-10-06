@@ -115,6 +115,12 @@ type WorkflowRequest struct {
 	// DatasetEntry is the row index for evaluate_on="specific". Ignored
 	// otherwise.
 	DatasetEntry *int
+	// MaxAttachmentBytes is the per-file attachment limit the application
+	// resolved for the organization, from the payload's
+	// `max_attachment_bytes` or the X-LangWatch-Max-Attachment-Bytes header.
+	// Zero means the request named none; ResolveMaxAttachmentBytes turns it
+	// into the effective limit.
+	MaxAttachmentBytes int64
 }
 
 // WorkflowResult is the engine's response, ready for JSON serialization.

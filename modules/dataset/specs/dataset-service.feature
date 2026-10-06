@@ -123,6 +123,12 @@ Feature: Shared Dataset service
     When it is validated at the contract
     Then it is refused before any dataset or store is queried
 
+  @unit @regression
+  Scenario: A dataset prepared from an uploaded file opens in the browser
+    Given a dataset whose rows were prepared from an uploaded file, so its stored size is recorded
+    When the browser reads that dataset
+    Then the answer carries the size as a plain number the response can hold
+
   Rule: The Datasets pages are served from the browser application
 
     # The application keeps everything a browser module may not own: which grant each

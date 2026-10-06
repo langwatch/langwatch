@@ -3,6 +3,7 @@
  * The family's addresses, operation ids, door and access kinds, pinned.
  * @see specs/monitors/guardrails-api-compatibility.feature
  */
+import { DATASET_CEILING_LIMITS, DATASET_DEFAULT_LIMITS } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
 
 import { evaluationsLegacyRest } from "../evaluations-legacy.rest.ts";
@@ -76,16 +77,31 @@ describe("the public evaluation REST family", () => {
       }
     });
 
-    it("caps the batch log at 20MB and every evaluate door at 30MB", () => {
+    /** @scenario "The batch log route reads a body up to the largest limit any organization holds" */
+    it("caps the batch log at the ceiling an organization can be raised to and every evaluate door at 30MB", () => {
       const caps = Object.fromEntries(
         declaration.routes.map((route) => [route.operation, route.bodyLimit?.maxBytes]),
       );
 
-      expect(caps.postApiEvaluationsBatchLogResults).toBe(20 * 1024 * 1024);
+      expect(caps.postApiEvaluationsBatchLogResults).toBe(DATASET_CEILING_LIMITS.rowBytes);
+      expect(DATASET_CEILING_LIMITS.rowBytes).toBeGreaterThan(DATASET_DEFAULT_LIMITS.rowBytes);
       expect(caps.postApiEvaluationsByEvaluatorEvaluate).toBe(30 * 1024 * 1024);
       expect(caps.postApiEvaluationsByEvaluatorBySubpathEvaluate).toBe(30 * 1024 * 1024);
       expect(caps.postApiGuardrailsByEvaluatorEvaluate).toBe(30 * 1024 * 1024);
       expect(caps.postApiDatasetEvaluate).toBe(30 * 1024 * 1024);
+    });
+
+    /** @scenario "The batch log route reads a body up to the largest limit any organization holds" */
+    it("refuses a body past the ceiling by the batch log's own code", () => {
+      const route = declaration.routes.find(
+        (one) => one.operation === "postApiEvaluationsBatchLogResults",
+      );
+
+      expect(route?.bodyLimit?.onExceeded?.()).toMatchObject({
+        code: "evaluation_log_results_too_large",
+        httpStatus: 413,
+        meta: { maxBytes: DATASET_CEILING_LIMITS.rowBytes },
+      });
     });
   });
 });

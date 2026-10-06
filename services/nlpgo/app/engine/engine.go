@@ -142,6 +142,13 @@ type ExecuteRequest struct {
 	// DatasetEntry is the row index for evaluate_on="specific" (single-row
 	// re-runs from the evaluation results table).
 	DatasetEntry *int
+	// MaxAttachmentBytes is the per-file attachment limit this run fetches
+	// under, as the application resolved it for the organization. Zero or
+	// negative means app.DefaultMaxAttachmentBytes, and a larger value is
+	// clamped to app.MaxAttachmentBytesCeiling (app.ResolveMaxAttachmentBytes).
+	// Forwarded to nested workflow and evaluator calls as the
+	// X-LangWatch-Max-Attachment-Bytes header so they keep the same limit.
+	MaxAttachmentBytes int64
 }
 
 // ExecuteResult is what the engine returns. It mirrors the Python
@@ -388,6 +395,29 @@ func (r nodeRun) scrubbedValues() map[string]string {
 	return values
 }
 
+// forRun returns the engine as one run sees it: the same executors, with the
+// attachment fetcher carrying that run's per-file limit. The engine serves
+// concurrent runs, so the limit lives on this copy and the shared engine is
+// never written to.
+func (e *Engine) forRun(req ExecuteRequest) *Engine {
+	if e.attachments == nil {
+		return e
+	}
+	scoped := *e
+	scoped.attachments = e.attachments.withMaxBytes(req.MaxAttachmentBytes)
+	return &scoped
+}
+
+// forwardedMaxAttachmentBytes is the limit a nested call made on behalf of this
+// run carries: the resolved limit when the run names one, and zero (no header,
+// so the nested run applies the default) when it does not.
+func forwardedMaxAttachmentBytes(req ExecuteRequest) int64 {
+	if req.MaxAttachmentBytes <= 0 {
+		return 0
+	}
+	return app.ResolveMaxAttachmentBytes(req.MaxAttachmentBytes)
+}
+
 // dispatch routes a node to its executor and returns its declared
 // outputs (already filtered to the node's `outputs` declaration so
 // downstream nodes get exactly what the workflow author requested).
@@ -402,7 +432,7 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentHTTP:
 		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentSignature:
-		return e.runSignature(ctx, node, inputs, ns)
+		return e.forRun(req).runSignature(ctx, node, inputs, ns)
 	case dsl.ComponentPromptingTechnique:
 		// Decorator: produces no outputs of its own; signature nodes
 		// reference it via a parameter and apply it at LLM-call time.
@@ -1042,15 +1072,16 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 	}
 
 	res, err := e.evaluator.Execute(ctx, evaluatorblock.Request{
-		BaseURL:       e.langwatchBaseURL,
-		APIKey:        req.Workflow.APIKey,
-		EvaluatorSlug: slug,
-		Name:          paramString(node.Data.Parameters, "name"),
-		Settings:      paramAnyMap(node.Data.Parameters, "settings"),
-		Data:          inputs,
-		TraceID:       req.TraceID,
-		Origin:        req.Origin,
-		ThreadID:      req.ThreadID,
+		BaseURL:            e.langwatchBaseURL,
+		APIKey:             req.Workflow.APIKey,
+		EvaluatorSlug:      slug,
+		Name:               paramString(node.Data.Parameters, "name"),
+		Settings:           paramAnyMap(node.Data.Parameters, "settings"),
+		Data:               inputs,
+		TraceID:            req.TraceID,
+		Origin:             req.Origin,
+		ThreadID:           req.ThreadID,
+		MaxAttachmentBytes: forwardedMaxAttachmentBytes(req),
 	})
 	if err != nil {
 		return nil, &NodeError{Type: "evaluator_error", Message: err.Error()}
@@ -1154,14 +1185,15 @@ func (e *Engine) runAgentWorkflow(ctx context.Context, req ExecuteRequest, node 
 	}
 
 	res, err := e.agentWorkflow.Execute(ctx, agentblock.WorkflowRunRequest{
-		BaseURL:    e.langwatchBaseURL,
-		APIKey:     req.Workflow.APIKey,
-		WorkflowID: workflowID,
-		VersionID:  paramString(node.Data.Parameters, "version_id"),
-		Inputs:     inputs,
-		TraceID:    req.TraceID,
-		Origin:     req.Origin,
-		ThreadID:   req.ThreadID,
+		BaseURL:            e.langwatchBaseURL,
+		APIKey:             req.Workflow.APIKey,
+		WorkflowID:         workflowID,
+		VersionID:          paramString(node.Data.Parameters, "version_id"),
+		Inputs:             inputs,
+		TraceID:            req.TraceID,
+		Origin:             req.Origin,
+		ThreadID:           req.ThreadID,
+		MaxAttachmentBytes: forwardedMaxAttachmentBytes(req),
 	})
 	if err != nil {
 		return nil, &NodeError{Type: "agent_workflow_error", Message: err.Error()}
@@ -1239,14 +1271,15 @@ func (e *Engine) runCustom(ctx context.Context, req ExecuteRequest, node *dsl.No
 	}
 
 	res, err := e.agentWorkflow.Execute(ctx, agentblock.WorkflowRunRequest{
-		BaseURL:    e.langwatchBaseURL,
-		APIKey:     req.Workflow.APIKey,
-		WorkflowID: workflowID,
-		VersionID:  versionID,
-		Inputs:     inputs,
-		TraceID:    req.TraceID,
-		Origin:     req.Origin,
-		ThreadID:   req.ThreadID,
+		BaseURL:            e.langwatchBaseURL,
+		APIKey:             req.Workflow.APIKey,
+		WorkflowID:         workflowID,
+		VersionID:          versionID,
+		Inputs:             inputs,
+		TraceID:            req.TraceID,
+		Origin:             req.Origin,
+		ThreadID:           req.ThreadID,
+		MaxAttachmentBytes: forwardedMaxAttachmentBytes(req),
 	})
 	if err != nil {
 		return nil, &NodeError{Type: "custom_workflow_error", Message: err.Error()}

@@ -91,6 +91,8 @@ describe("the dataset tRPC declaration", () => {
         ["copy", "mutation", "datasets:create"],
         ["createFromStoredObject", "mutation", "datasets:manage"],
         ["appendStoredObject", "mutation", "datasets:update"],
+        ["getLimits", "query", "datasets:view"],
+        ["createAttachmentUpload", "mutation", "datasets:update"],
         ["retryNormalize", "mutation", "datasets:manage"],
       ]);
     });
@@ -302,7 +304,7 @@ describe("the dataset tRPC declaration", () => {
   });
 
   describe("when the editor reads a whole dataset", () => {
-    it("reads under the editor's byte budget, and lifts it for a download", async () => {
+    it("reads under the organization's inline budget, and lifts it for a download", async () => {
       const getDatasetWithRecords = vi.fn(async () => ({
         dataset: { id: "dataset-1" },
         records: [],
@@ -318,11 +320,12 @@ describe("the dataset tRPC declaration", () => {
         id: "dataset-1",
         datasetRecords: [],
         truncated: true,
+        loadedRows: 0,
+        totalRows: 0,
       });
       expect(getDatasetWithRecords).toHaveBeenCalledWith({
         slugOrId: "dataset-1",
         projectId: "project-1",
-        limitMb: 13,
       });
 
       await handlers.download!({ ...invocation, input });

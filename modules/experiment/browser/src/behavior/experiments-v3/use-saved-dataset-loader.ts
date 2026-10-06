@@ -7,6 +7,7 @@ import type {
   DatasetColumn,
   DatasetReference,
   SavedRecord,
+  SavedRecordsCut,
 } from "../../model/experiments-v3/types.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
@@ -30,6 +31,14 @@ const savedRecordsFrom = ({
       }),
     ),
   }));
+
+/** What a read that left rows out says it loaded, and nothing for a whole read. */
+const savedRecordsCutOf = (read: {
+  truncated: boolean;
+  loadedRows: number;
+  totalRows: number;
+}): SavedRecordsCut | undefined =>
+  read.truncated ? { loadedRows: read.loadedRows, totalRows: read.totalRows } : undefined;
 
 /**
  * ADR-032 I-READY: a still-preparing or failed dataset read throws
@@ -76,7 +85,7 @@ export const useSavedDatasetRecords = (dataset: DatasetReference | undefined) =>
       columnNames: dataset.columns.map((col) => col.name),
     });
 
-    setSavedDatasetRecords(dataset.id, savedRecords);
+    setSavedDatasetRecords(dataset.id, savedRecords, savedRecordsCutOf(query.data));
   }, [dataset, needsLoading, query.data, setSavedDatasetRecords]);
 
   // Reset ref when dataset changes
@@ -173,6 +182,7 @@ export const useDatasetSelectionLoader = ({
         datasetId,
         columns,
         savedRecords,
+        savedRecordsCut: savedRecordsCutOf(savedDatasetRecords.data),
       };
 
       addDataset(newDataset);

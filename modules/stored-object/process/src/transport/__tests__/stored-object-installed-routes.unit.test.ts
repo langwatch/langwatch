@@ -76,6 +76,7 @@ function restHost(): RestHost {
     },
     bearers: () => closed,
     audit: { record: async () => undefined },
+    rateLimiter: { check: async () => ({ allowed: true }) },
   });
 }
 

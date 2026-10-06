@@ -4,6 +4,7 @@
  * self-hosted OPEN_SOURCE answer enterprise, FREE/LAUNCH/unknown answer free, the rest paid.
  */
 
+import { DATASET_DEFAULT_BOUNDS } from "./dataset-bounds.ts";
 import { PLAN_TYPES } from "./plan-type.ts";
 
 /** What a bound is counted in; a number without its unit reads two ways on two screens. */
@@ -202,20 +203,76 @@ export const requestBounds = [
     enterprise: 30,
   },
   {
-    key: "datasetFileBytes",
-    description: "Dataset upload content, measured on the server.",
+    key: "datasetAttachmentBytes",
+    description: "Largest file an image or file cell accepts; every other dataset byte bound derives from it.",
     unit: "bytes",
-    free: 25 * MiB,
-    paid: 25 * MiB,
-    enterprise: 25 * MiB,
+    free: DATASET_DEFAULT_BOUNDS.datasetAttachmentBytes,
+    paid: DATASET_DEFAULT_BOUNDS.datasetAttachmentBytes,
+    enterprise: DATASET_DEFAULT_BOUNDS.datasetAttachmentBytes,
+  },
+  {
+    key: "datasetRowBytes",
+    description: "One dataset row in an uploaded file, sized for its images inline.",
+    unit: "bytes",
+    free: DATASET_DEFAULT_BOUNDS.datasetRowBytes,
+    paid: DATASET_DEFAULT_BOUNDS.datasetRowBytes,
+    enterprise: DATASET_DEFAULT_BOUNDS.datasetRowBytes,
+  },
+  {
+    key: "datasetFileBytes",
+    description: "Dataset upload content in one call, measured on the server.",
+    unit: "bytes",
+    free: DATASET_DEFAULT_BOUNDS.datasetFileBytes,
+    paid: DATASET_DEFAULT_BOUNDS.datasetFileBytes,
+    enterprise: DATASET_DEFAULT_BOUNDS.datasetFileBytes,
+  },
+  {
+    key: "datasetJsonFileBytes",
+    description: "A single .json array upload, which is parsed whole.",
+    unit: "bytes",
+    free: DATASET_DEFAULT_BOUNDS.datasetJsonFileBytes,
+    paid: DATASET_DEFAULT_BOUNDS.datasetJsonFileBytes,
+    enterprise: DATASET_DEFAULT_BOUNDS.datasetJsonFileBytes,
+  },
+  {
+    key: "datasetInlineReadBytes",
+    description: "Dataset rows answered inline in one response: the single GET and the grid load.",
+    unit: "bytes",
+    free: DATASET_DEFAULT_BOUNDS.datasetInlineReadBytes,
+    paid: DATASET_DEFAULT_BOUNDS.datasetInlineReadBytes,
+    enterprise: DATASET_DEFAULT_BOUNDS.datasetInlineReadBytes,
+  },
+  {
+    key: "datasetWholeReadBytes",
+    description: "Reads that hold a whole dataset in memory: search, copy and run.",
+    unit: "bytes",
+    free: DATASET_DEFAULT_BOUNDS.datasetWholeReadBytes,
+    paid: DATASET_DEFAULT_BOUNDS.datasetWholeReadBytes,
+    enterprise: DATASET_DEFAULT_BOUNDS.datasetWholeReadBytes,
+  },
+  {
+    key: "evaluationLogResultsBytes",
+    description: "One SDK log_results batch body.",
+    unit: "bytes",
+    free: DATASET_DEFAULT_BOUNDS.evaluationLogResultsBytes,
+    paid: DATASET_DEFAULT_BOUNDS.evaluationLogResultsBytes,
+    enterprise: DATASET_DEFAULT_BOUNDS.evaluationLogResultsBytes,
   },
   {
     key: "datasetRowsMax",
-    description: "Dataset upload row count.",
+    description: "Rows in one dataset upload, and rows one run reads from a saved dataset.",
     unit: "items",
-    free: 10_000,
-    paid: 10_000,
-    enterprise: 10_000,
+    free: 100_000,
+    paid: 100_000,
+    enterprise: 100_000,
+  },
+  {
+    key: "datasetAttachmentUploadsPerMinute",
+    description: "Dataset attachment uploads per caller per minute.",
+    unit: "requests-per-minute",
+    free: 600,
+    paid: 600,
+    enterprise: 600,
   },
   {
     key: "githubRepoListCacheSeconds",

@@ -72,8 +72,8 @@ Feature: Attach uploaded files to datasets
     And nothing is stored
 
   @unit
-  Scenario: A posted file over the old size limit is still refused
-    When I post a file larger than 25 MB to the dataset upload address
+  Scenario: A posted file over the upload limit is refused
+    When I post a file larger than the default upload limit to the dataset upload address
     Then the upload is refused as too large
 
   # ============================================================================
@@ -135,9 +135,48 @@ Feature: Attach uploaded files to datasets
     And the existing reference is kept as it was
 
   @unit
-  Scenario: Links and inline pictures still pass unchanged
-    When I save a row whose image cell holds a link to another site or an inline picture
-    Then the row is saved with the value as I wrote it
+  Scenario: A link to another site is saved as I wrote it
+    When I save a row whose image cell holds a link to another site
+    Then the row is saved with the link as I wrote it
+    And no file is stored
+
+  # A picture written into a cell as base64 is a whole file inside the row. It
+  # is stored like an uploaded attachment, so the row stays small enough to
+  # read, page and run.
+  @unit
+  Scenario: A picture written inline in a cell is stored as a file
+    When I save a row whose image cell holds a picture written inline as base64
+    Then the picture is stored as a dataset attachment
+    And the cell holds the reference to the stored picture
+
+  @unit
+  Scenario: A file written inline in a file cell is stored as a file
+    When I save a row whose file cell holds a document written inline as base64
+    Then the document is stored as a dataset attachment
+    And the cell holds the reference to the stored document
+
+  @unit
+  Scenario: An inline picture in a text column is left as text
+    When I save a row whose text cell holds a picture written inline as base64
+    Then the row is saved with the text as I wrote it
+    And no file is stored
+
+  @unit
+  Scenario: An inline value that is not a readable file is refused
+    When I save a row whose image cell holds an inline value that does not decode
+    Then the row is refused, naming the cell
+    And nothing is stored
+
+  @unit
+  Scenario: An image cell refuses an inline file that is not a picture
+    When I save a row whose image cell holds a document written inline as base64
+    Then the row is refused for its kind of file
+
+  @unit
+  Scenario: An inline picture larger than the per-file limit is refused
+    When I save a row whose image cell holds an inline picture larger than my organization's per-file limit
+    Then the row is refused as too large, told the limit
+    And nothing is stored
 
   @unit @unimplemented
   Scenario: The upload button and the save refuse on the same rules

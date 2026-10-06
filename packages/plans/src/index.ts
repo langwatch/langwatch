@@ -49,6 +49,20 @@ export {
   type PlanLimit,
   type PlanLimits,
 } from "./limits.ts";
+export {
+  base64LengthOf,
+  DATASET_ATTACHMENT_DEFAULT_MAX_BYTES,
+  DATASET_ATTACHMENT_OVERRIDE_CEILING_BYTES,
+  DATASET_ATTACHMENTS_PER_ROW,
+  DATASET_DEFAULT_BOUNDS,
+  DATASET_DERIVED_BOUND_KEYS,
+  DATASET_INLINE_STRING_CEILING_BYTES,
+  deriveDatasetBounds,
+  effectiveDatasetAttachmentMaxBytes,
+  isDatasetDerivedBoundKey,
+  type DatasetDerivedBoundKey,
+  type DatasetDerivedBounds,
+} from "./dataset-bounds.ts";
 export { applyOverride, planOverrideSchema, type PlanOverride } from "./override.ts";
 export {
   ENTERPRISE_PLAN_TYPES,

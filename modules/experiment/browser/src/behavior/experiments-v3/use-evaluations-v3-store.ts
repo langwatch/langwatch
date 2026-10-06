@@ -885,10 +885,12 @@ const resetSlice = (set: StoreSet): ResetActions => ({
     useEvaluationsV3Store.temporal.getState().clear();
   },
 
-  setSavedDatasetRecords: (datasetId: string, records) => {
+  setSavedDatasetRecords: (datasetId: string, records, cut) => {
     set((state) => ({
       datasets: state.datasets.map((d) =>
-        d.id === datasetId && d.type === "saved" ? { ...d, savedRecords: records } : d,
+        d.id === datasetId && d.type === "saved"
+          ? { ...d, savedRecords: records, savedRecordsCut: cut }
+          : d,
       ),
     }));
   },

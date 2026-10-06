@@ -4,7 +4,10 @@
  * fails. ADR-045 makes an unhandled cause generic.
  */
 import { createRestRuntime } from "@langwatch/api/rest";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import {
+  type EvaluationApi,
+  EvaluationLogResultsTooLargeError,
+} from "@langwatch/evaluation-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type * as observabilityModule from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -30,7 +33,15 @@ const DRIVER_MESSAGE =
 const PROJECT_ID = "project-1";
 
 /** No route here is expected to throw, so a failure must be legible. */
-function mount(logBatchEvaluation: EvaluationApi["logBatchEvaluation"]) {
+function mount(
+  logBatchEvaluation: EvaluationApi["logBatchEvaluation"],
+  options: {
+    assertBatchLogWithinLimit?: EvaluationApi["assertBatchLogWithinLimit"];
+    /** What the family's boundary was handed, for a refusal the route does not write itself. */
+    refused?: unknown[];
+  } = {},
+) {
+  const assertBatchLogWithinLimit = options.assertBatchLogWithinLimit ?? (async () => undefined);
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => ({
@@ -41,8 +52,12 @@ function mount(logBatchEvaluation: EvaluationApi["logBatchEvaluation"]) {
   });
 
   const app = runtime.mount(evaluationsLegacyRest.router(), {
-    app: () => createApiFixture<EvaluationApi>({ logBatchEvaluation }),
-    onError: (error, context) => context.json({ error: String(error) }, 500),
+    app: () => createApiFixture<EvaluationApi>({ logBatchEvaluation, assertBatchLogWithinLimit }),
+    onError: (error, context) => {
+      options.refused?.push(error);
+
+      return context.json({ error: String(error) }, 500);
+    },
   });
 
   return (body: unknown, sent: { contentType?: string; raw?: string } = {}) =>
@@ -59,6 +74,35 @@ function mount(logBatchEvaluation: EvaluationApi["logBatchEvaluation"]) {
 const MAIN_NOT_JSON_BODY = '{"message":"Invalid body, expecting json"}';
 
 describe("given the legacy evaluation batch log", () => {
+  describe("when the body is larger than the organization accepts", () => {
+    /** @scenario "A batch of results above the organization's limit is refused by name" */
+    it("hands the boundary the batch log's own refusal before the body is parsed or written", async () => {
+      const written = vi.fn(async () => undefined);
+      const sizes: number[] = [];
+      const refused: unknown[] = [];
+      const raw = JSON.stringify({ experiment_slug: "my-experiment", run_id: "run-1" });
+      const post = mount(written, {
+        refused,
+        assertBatchLogWithinLimit: async ({ payloadBytes }) => {
+          sizes.push(payloadBytes);
+          throw new EvaluationLogResultsTooLargeError({ maxBytes: 8 });
+        },
+      });
+
+      await post(undefined, { raw });
+
+      expect(refused).toEqual([
+        expect.objectContaining({
+          code: "evaluation_log_results_too_large",
+          httpStatus: 413,
+          meta: { maxBytes: 8 },
+        }),
+      ]);
+      expect(sizes).toEqual([Buffer.byteLength(raw)]);
+      expect(written).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the write fails with a driver diagnostic", () => {
     /** @scenario "A legacy evaluation batch failure returns no driver diagnostic" */
     it("answers a generic 500 rather than the store's own message", async () => {

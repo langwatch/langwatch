@@ -109,7 +109,11 @@ export const extractPersistedState = (state: EvaluationsV3State): PersistedEvalu
   // Only the dataset reference (datasetId, columns) needs to be persisted
   const datasetsWithoutRecords = datasets.map((dataset) => {
     if (dataset.type === "saved") {
-      const { savedRecords: _savedRecords, ...datasetWithoutRecords } = dataset;
+      const {
+        savedRecords: _savedRecords,
+        savedRecordsCut: _savedRecordsCut,
+        ...datasetWithoutRecords
+      } = dataset;
       return datasetWithoutRecords;
     }
     return dataset;

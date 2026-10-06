@@ -32,6 +32,8 @@ import {
 
 type Client = Prisma.TransactionClient | PrismaClient;
 
+const BYTES_PER_MEBIBYTE = 1024 * 1024;
+
 export class PrismaOrganizationRepository extends OrganizationRepository {
   private constructor(
     private readonly database: PrismaClient,
@@ -138,6 +140,17 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
       select: { pricingModel: true, currency: true },
     });
     return { pricingModel: row?.pricingModel ?? null, currency: row?.currency ?? "EUR" };
+  }
+
+  async getDatasetLimits({ organizationId }: { organizationId: string }): Promise<{
+    attachmentMaxBytes: number | null;
+  }> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { datasetAttachmentMaxMb: true },
+    });
+    const megabytes = row?.datasetAttachmentMaxMb ?? null;
+    return { attachmentMaxBytes: megabytes === null ? null : megabytes * BYTES_PER_MEBIBYTE };
   }
 
   async isInstantEvalsOptedIn({ organizationId }: { organizationId: string }): Promise<boolean> {

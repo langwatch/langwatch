@@ -1,3 +1,4 @@
+import { formatDatasetByteLimit } from "@langwatch/dataset-contract";
 import { HandledError } from "@langwatch/handled-error";
 
 export class WorkflowNotFoundError extends HandledError {
@@ -185,5 +186,20 @@ export class WorkflowNoCopiesSelectedError extends HandledError {
       fault: "customer",
     });
     this.name = "WorkflowNoCopiesSelectedError";
+  }
+}
+
+/** A saved dataset's rows total more bytes than one Studio run reads. */
+export class WorkflowDatasetTooLargeToRunError extends HandledError {
+  declare readonly code: "workflow_dataset_too_large_to_run";
+
+  constructor({ maxBytes, totalRows }: { maxBytes: number; totalRows: number }) {
+    super(
+      "workflow_dataset_too_large_to_run",
+      `The dataset's rows total more than the ${formatDatasetByteLimit(maxBytes)} one run reads. ` +
+        "Store images and files as attachments in image or file columns instead of inline data, or split the dataset.",
+      { httpStatus: 413, fault: "customer", meta: { maxBytes, totalRows } },
+    );
+    this.name = "WorkflowDatasetTooLargeToRunError";
   }
 }

@@ -86,6 +86,12 @@ describe("the dataset REST declaration", () => {
           permission: "datasets:manage",
         },
         {
+          method: "post",
+          path: "/attachments/uploads",
+          operation: "postApiDatasetAttachmentsUploads",
+          permission: "datasets:update",
+        },
+        {
           method: "get",
           path: "/:slugOrId",
           operation: "getApiDatasetBySlugOrId",
@@ -147,6 +153,7 @@ describe("the dataset REST declaration", () => {
         "postApiDatasetBySlugOrIdRecords",
         "postApiDatasetImports",
         "postApiDatasetUpload",
+        "postApiDatasetAttachmentsUploads",
       ]);
     });
 
@@ -193,7 +200,7 @@ describe("the dataset REST declaration", () => {
   });
 
   describe("when one dataset is read whole", () => {
-    it("asks for it under the family's own read ceiling", async () => {
+    it("asks for it whole, leaving the size check to the application", async () => {
       const getDatasetWithinLimit = vi.fn(async () => ({
         dataset: { id: "dataset-1", name: "One", slug: "one", columnTypes: [] },
         records: [],
@@ -209,7 +216,37 @@ describe("the dataset REST declaration", () => {
       expect(getDatasetWithinLimit).toHaveBeenCalledWith({
         slugOrId: "one",
         projectId: "project-1",
-        limitMb: 25,
+      });
+    });
+  });
+
+  describe("when an upload address is asked for a cell's file", () => {
+    /** @scenario "Asking for an upload address is held to the same rate as attachment uploads" */
+    it("asks the application for the key's project, at 600 a minute", async () => {
+      const upload = {
+        objectId: "object-1",
+        uploadUrl: "https://storage.test/upload",
+        method: "PUT" as const,
+        expiresAt: "2026-10-06T00:00:00.000Z",
+      };
+      const createAttachmentUpload = vi.fn(async () => upload);
+      const route = declaration.routes.find(
+        (candidate) => candidate.operation === "postApiDatasetAttachmentsUploads",
+      );
+
+      expect(route?.rateLimit).toEqual({ requests: 600, seconds: 60 });
+      await expect(
+        answer(
+          "postApiDatasetAttachmentsUploads",
+          completeDatasetApi({ createAttachmentUpload }),
+          { filename: "scan.png", mediaType: "image/png", byteLength: 1024 },
+        ),
+      ).resolves.toEqual(upload);
+      expect(createAttachmentUpload).toHaveBeenCalledWith({
+        projectId: "project-1",
+        filename: "scan.png",
+        mediaType: "image/png",
+        byteLength: 1024,
       });
     });
   });
@@ -229,8 +266,8 @@ describe("the dataset REST declaration", () => {
       );
       const file = new File(["png"], "receipt.png", { type: "image/png" });
 
-      expect(route?.deprecated?.successor).toBe("/api/v1/stored-objects");
-      expect(route?.rateLimit).toEqual({ requests: 30, seconds: 60 });
+      expect(route?.deprecated?.successor).toBe("/api/dataset/attachments/uploads");
+      expect(route?.rateLimit).toEqual({ requests: 600, seconds: 60 });
       await expect(
         answer(
           "postApiDatasetAttachments",

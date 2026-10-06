@@ -11363,6 +11363,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -13844,6 +13847,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
       zod:
         specifier: 'catalog:'
         version: 4.6.5

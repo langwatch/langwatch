@@ -1,10 +1,11 @@
-import type {
-  CopyDatasetInput,
-  Dataset,
-  DatasetApi,
-  DatasetEntrySelection,
-  DatasetLookupInput,
-  DatasetWithRecords,
+import {
+  type CopyDatasetInput,
+  type Dataset,
+  type DatasetApi,
+  DATASET_DEFAULT_LIMITS,
+  type DatasetEntrySelection,
+  type DatasetLookupInput,
+  type DatasetWithRecords,
 } from "@langwatch/dataset-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
@@ -14,7 +15,7 @@ export type DatasetWithRecordsInput = DatasetLookupInput & {
 };
 
 /**
- * The two dataset operations the workflow tests drive, recording what each was
+ * The dataset operations the workflow tests drive, recording what each was
  * asked for. Every other operation throws when called, so a workflow that
  * grows a new dataset dependency cannot pass a test in silence.
  */
@@ -34,6 +35,7 @@ export class TestDatasetService {
         getDatasetWithRecords: (input: DatasetWithRecordsInput) =>
           this.getDatasetWithRecords(input),
         copyDataset: (input: CopyDatasetInput) => this.copyDataset(input),
+        getLimits: async () => DATASET_DEFAULT_LIMITS,
       },
       "DatasetApi",
     );

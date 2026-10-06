@@ -127,6 +127,9 @@ Feature: Dataset Python SDK
     When I call langwatch.dataset.get_dataset("does-not-exist")
     Then a DatasetNotFoundError is raised
 
+  # The paged read behind get_dataset() is specified in
+  # specs/python-sdk/dataset-paged-read.feature.
+
   # ── Update Dataset ─────────────────────────────────────────────
 
   @integration @unimplemented

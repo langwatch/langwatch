@@ -3,10 +3,15 @@
  */
 
 import type { Agent, AgentApi } from "@langwatch/agent-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { DatasetApi, DatasetColumns } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
-import { ExperimentEvaluationInputError } from "@langwatch/experiment-contract";
+import {
+  ExperimentDatasetChangedDuringReadError,
+  ExperimentDatasetTooLargeToRunError,
+  ExperimentDatasetTooManyRowsError,
+  ExperimentEvaluationInputError,
+} from "@langwatch/experiment-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi, VersionedPrompt } from "@langwatch/prompt-contract";
 import {
@@ -20,7 +25,9 @@ import {
   type LoadedDataset,
   normalizeColumnIdsToNames,
   parseJsonColumns,
+  rowBytesOf,
   rowsFromInlineData,
+  savedDatasetPageRows,
 } from "../rules/experiment-execution-data.rules.ts";
 import { ExperimentTargetLoadingService } from "./experiment-target-loading.service.ts";
 
@@ -145,9 +152,9 @@ export type ExecutionDataServices = {
   workflows: ExperimentWorkflowDsl;
   evaluators?: EvaluatorApi;
   /**
-   * The tier-effective row bound inline data must fit under, and the directory
-   * that answers which organization a project belongs to. The load refuses
-   * rows above the caller's tier so the bound holds at every entry.
+   * The bounds the project's organization answers: the plan's row bound for
+   * rows sent with the request, and the row and byte bounds for a saved
+   * dataset. The load refuses above them so the bounds hold at every entry.
    */
   entitlements: Pick<EntitlementApi, "requestBound">;
   projects: Pick<ProjectApi, "getOrganizationId">;
@@ -165,60 +172,108 @@ export class ExperimentExecutionDataService {
   }
 
   /**
-   * Loads and normalizes a dataset (inline or saved).
+   * The dataset a workbench reference names, normalized: its inline rows, or
+   * every row of the saved dataset it points at.
    */
-  async loadDataset(
-    dataset: DatasetInput,
-    projectId: string,
-    datasets: DatasetApi,
-  ): Promise<LoadedDataset> {
-    let rows: Record<string, unknown>[];
-    let columns: { id: string; name: string; type: string }[];
-
+  private async loadDataset({
+    dataset,
+    projectId,
+    organizationId,
+    services,
+  }: {
+    dataset: DatasetInput;
+    projectId: string;
+    organizationId: string;
+    services: ExecutionDataServices;
+  }): Promise<BaseDataset> {
     if (dataset.type === "inline" && dataset.inline) {
-      columns = dataset.inline.columns;
+      const columns = dataset.inline.columns;
 
-      // Transpose from columns-first to rows-first
-      // Cast to string[] since the function handles any values internally
-      rows = transposeColumnsFirstToRowsFirstWithId(
-        dataset.inline.records as Record<string, string[]>,
+      // Transposed from columns-first to rows-first, then keyed by column
+      // name: inline records are keyed by column id, like "input_0".
+      const rows = normalizeColumnIdsToNames(
+        transposeColumnsFirstToRowsFirstWithId(dataset.inline.records as Record<string, string[]>),
+        columns,
       );
 
-      // Normalize column IDs to names (inline uses IDs like "input_0")
-      rows = normalizeColumnIdsToNames(rows, columns);
-
-      // Parse JSON columns
-      const jsonColumns = new Set(
-        columns.filter((c) => JSON_COLUMN_TYPES.some((type) => type === c.type)).map((c) => c.name),
-      );
-      rows = parseJsonColumns(rows, jsonColumns);
-    } else if (dataset.type === "saved" && dataset.datasetId) {
-      // ADR-032 I-READY: a non-ready (uploading/processing/failed) s3_jsonl
-      // dataset throws DatasetNotReadyError here — it must NOT be silently treated
-      // as empty. The throw propagates as a clear run error; do not swallow it.
-      const loadedDataset = await datasets.getDatasetWithRecords({
-        slugOrId: dataset.datasetId,
-        projectId,
-        entrySelection: "all",
-        limitMb: null,
-      });
-
-      columns = dataset.columns;
-      rows = loadedDataset.records.map((r) => r.entry as Record<string, unknown>);
-
-      // Parse JSON columns (saved datasets already use names as keys)
-      const jsonColumns = new Set(
-        columns.filter((c) => JSON_COLUMN_TYPES.some((type) => type === c.type)).map((c) => c.name),
-      );
-      rows = parseJsonColumns(rows, jsonColumns);
-    } else {
-      throw new ExperimentEvaluationInputError({
-        status: 400,
-        reason: "Invalid dataset configuration",
-      });
+      return { rows: parseJsonColumns(rows, jsonColumnNames(columns)), columns, source: "inline" };
     }
 
-    return { rows, columns };
+    if (dataset.type === "saved" && dataset.datasetId) {
+      const saved = await this.readSavedDataset({
+        slugOrId: dataset.datasetId,
+        projectId,
+        organizationId,
+        services,
+      });
+      const columns = dataset.columns;
+
+      // Saved datasets already use names as keys.
+      return {
+        rows: parseJsonColumns(saved.rows, jsonColumnNames(columns)),
+        columns,
+        source: "saved",
+      };
+    }
+
+    throw new ExperimentEvaluationInputError({
+      status: 400,
+      reason: "Invalid dataset configuration",
+    });
+  }
+
+  /**
+   * Every row of a saved dataset, read page by page, or a refusal: the run
+   * never starts over fewer rows than the dataset has. A dataset that is not
+   * ready (uploading, processing, failed) refuses the read by name.
+   */
+  private async readSavedDataset({
+    slugOrId,
+    projectId,
+    organizationId,
+    services,
+  }: {
+    slugOrId: string;
+    projectId: string;
+    organizationId: string;
+    services: ExecutionDataServices;
+  }): Promise<{ rows: Record<string, unknown>[]; columnTypes: DatasetColumns }> {
+    const [maxRows, maxBytes] = await Promise.all([
+      services.entitlements.requestBound({ key: "datasetRowsMax", organizationId }),
+      services.entitlements.requestBound({ key: "datasetWholeReadBytes", organizationId }),
+    ]);
+    const head = await services.datasets.getDatasetHead({ slugOrId, projectId });
+    const rowCount = head.total;
+    if (rowCount > maxRows) {
+      throw new ExperimentDatasetTooManyRowsError({ rowCount, maxRows });
+    }
+
+    const limit = savedDatasetPageRows(head.records.map((record) => record.entry));
+    const rows: Record<string, unknown>[] = [];
+    let bytes = 0;
+    for (let page = 1; rows.length < rowCount; page++) {
+      const read = await services.datasets.getDatasetPage({
+        slugOrId: head.dataset.id,
+        projectId,
+        page,
+        limit,
+      });
+      if (read.count !== rowCount || read.datasetRecords.length === 0) {
+        throw new ExperimentDatasetChangedDuringReadError({ rowCount, rowsRead: rows.length });
+      }
+      for (const record of read.datasetRecords) {
+        bytes += rowBytesOf(record.entry);
+        if (bytes > maxBytes) {
+          throw new ExperimentDatasetTooLargeToRunError({ maxBytes });
+        }
+        rows.push(record.entry);
+      }
+    }
+    if (rows.length !== rowCount) {
+      throw new ExperimentDatasetChangedDuringReadError({ rowCount, rowsRead: rows.length });
+    }
+
+    return { rows, columnTypes: head.dataset.columnTypes };
   }
 
   /**
@@ -241,23 +296,32 @@ export class ExperimentExecutionDataService {
     services: ExecutionDataServices;
     inputs?: ExecutionDataInputs;
   }): Promise<LoadedExecutionData> {
+    const organizationId = await services.projects.getOrganizationId(projectId);
     const baseDataset = await this.resolveBaseDataset({
       projectId,
+      organizationId,
       dataset,
       services,
       inputs,
     });
 
-    // The row bound the caller's plan answers, enforced at the load so it
-    // holds for inline data a transport let through and for saved datasets
-    // alike. Refused, not truncated: a run over a silently shortened dataset
-    // reports success over the wrong rows.
-    const rowBound = await this.resolveRowBound(projectId, services);
-    if (baseDataset.rows.length > rowBound) {
-      throw new ExperimentEvaluationInputError({
-        status: 422,
-        reason: `The dataset has ${baseDataset.rows.length} rows; this plan allows at most ${rowBound} per run. Reduce the rows or run against a saved dataset.`,
+    // Rows sent with the request answer the plan's row bound, which holds here
+    // for rows a transport let through. Refused, not truncated: a run over a
+    // silently shortened dataset reports success over the wrong rows.
+    if (baseDataset.source === "inline") {
+      const maxRows = await services.entitlements.requestBound({
+        key: "experimentInlineRowsMax",
+        organizationId,
       });
+      if (baseDataset.rows.length > maxRows) {
+        throw new ExperimentEvaluationInputError({
+          status: 422,
+          reason:
+            `The request carries ${baseDataset.rows.length} rows; this plan allows at most ` +
+            `${maxRows} rows sent with one run. Send fewer rows, or save them as a dataset and ` +
+            "run against it.",
+        });
+      }
     }
 
     // Caller parameters become constant columns across every row, and a single
@@ -306,66 +370,56 @@ export class ExperimentExecutionDataService {
   }
 
   /**
-   * The row bound the project's plan answers: the registry's
-   * `experimentInlineRowsMax` on the organization's tier, boot overrides
-   * included — the same resolution the entitlement application makes.
-   */
-  private async resolveRowBound(
-    projectId: string,
-    services: ExecutionDataServices,
-  ): Promise<number> {
-    const organizationId = await services.projects.getOrganizationId(projectId);
-
-    return services.entitlements.requestBound({
-      key: "experimentInlineRowsMax",
-      organizationId,
-    });
-  }
-
-  /**
    * The rows a run starts from: inline data, a named saved dataset, or the attached dataset
    * reference, in that precedence.
    */
   private async resolveBaseDataset({
     projectId,
+    organizationId,
     dataset,
     services,
     inputs,
   }: {
     projectId: string;
+    organizationId: string;
     dataset: DatasetInput;
     services: ExecutionDataServices;
     inputs?: ExecutionDataInputs;
-  }): Promise<LoadedDataset> {
+  }): Promise<BaseDataset> {
     if (inputs?.data) {
-      return rowsFromInlineData(inputs.data);
+      return { ...rowsFromInlineData(inputs.data), source: "inline" };
     }
 
     if (!inputs?.datasetId) {
-      return this.loadDataset(dataset, projectId, services.datasets);
+      return this.loadDataset({ dataset, projectId, organizationId, services });
     }
 
-    const loadedDataset = await services.datasets.getDatasetWithRecords({
+    const saved = await this.readSavedDataset({
       slugOrId: inputs.datasetId,
       projectId,
-      entrySelection: "all",
-      limitMb: null,
+      organizationId,
+      services,
     });
-    const columns = loadedDataset.dataset.columnTypes.map((c) => ({
+    const columns = saved.columnTypes.map((c) => ({
       id: c.name,
       name: c.name,
       type: c.type,
     }));
-    const jsonColumnKeys = new Set(
-      columns.filter((c) => JSON_COLUMN_TYPES.some((type) => type === c.type)).map((c) => c.name),
-    );
 
     return {
-      rows: parseJsonColumns(
-        loadedDataset.records.map((r) => r.entry as Record<string, unknown>),
-        jsonColumnKeys,
-      ),
+      rows: parseJsonColumns(saved.rows, jsonColumnNames(columns)),
       columns,
+      source: "saved",
     };
   }
+}
+
+/** The rows a run starts from, and whether the request or a saved dataset held them. */
+type BaseDataset = LoadedDataset & { source: "inline" | "saved" };
+
+/** The names of the columns whose cells hold JSON. */
+function jsonColumnNames(columns: { name: string; type: string }[]): Set<string> {
+  return new Set(
+    columns.filter((c) => JSON_COLUMN_TYPES.some((type) => type === c.type)).map((c) => c.name),
+  );
 }
