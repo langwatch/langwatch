@@ -222,6 +222,27 @@ describe("OrganizationMembershipService", () => {
     });
   });
 
+  describe("when a join is admitted by policy or approved by an administrator", () => {
+    /** @scenario "Every automatic join is on the customer's audit page" */
+    it("writes the same audit row either way, naming the policy as the route when no person approved", async () => {
+      vi.mocked(mockRepo.createMembership).mockResolvedValue({
+        outcome: "created",
+        seat: "DEVELOPER",
+      });
+      const viaOf = async (actor: { type: "user" | "system"; id: string }) => {
+        await service.createMembership({
+          organizationId: "org-123",
+          userId: "user-456",
+          admittedBy: { actor, commandId: "c-1" },
+        });
+        return vi.mocked(mockRepo.createMembership).mock.calls.at(-1)?.[0].via;
+      };
+
+      expect(await viaOf({ type: "system", id: "system:join-requests" })).toBe("domain-join");
+      expect(await viaOf({ type: "user", id: "user-admin" })).toBe("join-request-approved");
+    });
+  });
+
   describe("createMembership()", () => {
     it("mints one admission intent per membership, in the ledger's own scheme", async () => {
       vi.mocked(mockRepo.createMembership).mockResolvedValue({

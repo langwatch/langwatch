@@ -48,6 +48,26 @@ describe("scimStatusOf", () => {
   });
 });
 
+describe("given tearing the previous connection down revoked its directory sync", () => {
+  /** @scenario "A revoked legacy directory sync is not one left to repoint" */
+  it("counts it as nothing to move, so finishing is not held for a repoint it made impossible", () => {
+    // A revoked sync pushes nobody, so the previous connection reads as syncing nothing.
+    const scimStatus = scimStatusOf({ legacySyncs: false, replacementSyncState: null });
+
+    expect(scimStatus).toBe("not-applicable");
+    expect(
+      migrationBlockers({
+        selectedRoute: "direct",
+        testSignInDone: true,
+        liveRecoveryCount: 1,
+        quietComplete: true,
+        sharedLegacyIdentifiers: false,
+        scimStatus,
+      }),
+    ).toEqual([]);
+  });
+});
+
 describe("migrationBlockers", () => {
   const ready = {
     selectedRoute: "direct" as const,
