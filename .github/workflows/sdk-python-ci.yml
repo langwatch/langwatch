@@ -91,6 +91,62 @@ jobs:
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
+    env:
+      # The e2e step runs against this branch's own stack (api + worker below),
+      # not production: the SDK is regenerated from the branch's OpenAPI document,
+      # so routes only the branch serves must be reachable.
+      DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
+      BASE_HOST: "http://localhost:5560"
+      NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
+      NEXTAUTH_URL: "http://localhost:5560"
+      API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
+      CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/langwatch"
+      REDIS_URL: "redis://localhost:6379"
+      NODE_ENV: "test"
+      SKIP_ENV_VALIDATION: "true"
+      OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED: "1"
+      LANGWATCH_LICENSE_PUBLIC_KEY: ${{ secrets.TEST_LICENSE_PUBLIC_KEY }}
+      LANGWATCH_LOCAL_STORAGE_PATH: /tmp/langwatch-test-storage
+
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.10.2.65
+        ports:
+          - 8123:8123
+        env:
+          CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ci_password
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: langwatch_ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: langwatch_test
+        options: >-
+          --health-cmd "PGPASSWORD=ci_password psql -U langwatch_ci -d langwatch_test -c 'select 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -113,6 +169,84 @@ jobs:
           LANGWATCH_DEBUG: "true"
         run: make test-unit
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.6.0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      # node-pty has no Linux prebuild; see sdk-javascript-ci.yml for why the
+      # published node-gyp must replace pnpm's vendored copy.
+      - name: Install node-gyp (for node-pty postinstall)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g node-gyp@12.3.0
+          gyp="$(npm root -g)/node-gyp/bin/node-gyp.js"
+          test -f "$gyp"
+          test -x "$(dirname "$gyp")/../gyp/gyp_main.py"
+          echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
+
+      - name: Install LangWatch dependencies
+        run: >
+          CI=true pnpm install --frozen-lockfile
+          --filter "@langwatch/platform-api..."
+          --filter "@langwatch/worker..."
+          --filter "@langwatch/ui..."
+          --filter "@langwatch/tasks..."
+          --filter "@langwatch/workspace"
+
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: sdk-python-e2e
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      - name: Prepare LangWatch files
+        run: pnpm start:prepare:files && pnpm ensure:built
+
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        # Generated per run: a committed hex literal reads as a leaked key to the scanner.
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Setup database
+        run: pnpm prisma:migrate
+
+      - name: Seed test project
+        env:
+          HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-local-development-key
+        run: pnpm prisma:seed
+
+      - name: Install goose
+        run: bash .github/scripts/install-goose.sh
+
+      - name: Setup ClickHouse
+        working-directory: apps/tasks
+        run: pnpm task clickhouse-migrate
+
+      - name: Build LangWatch browser bundle
+        run: pnpm exec nx run workspace:build:types --outputStyle=static && pnpm exec nx run @langwatch/ui:build --outputStyle=static
+
+      - name: Start LangWatch server and worker
+        env:
+          # Pointing a LangWatch process at its own ingest is a feedback loop.
+          LANGWATCH_API_KEY: ""
+        run: |
+          API_PORT=5560 NODE_ENV=production pnpm --filter @langwatch/platform-api start > /tmp/langwatch-server.log 2>&1 &
+          pnpm --filter @langwatch/worker start > /tmp/langwatch-workers.log 2>&1 &
+          timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
+          echo "LangWatch server is ready"
+
       - name: Run e2e tests
         # Fork and Dependabot PRs don't receive repository secrets, so a
         # secret-backed run can only fail on a missing key. Skip it there;
@@ -125,7 +259,9 @@ jobs:
         working-directory: sdks/python
         env:
           LANGWATCH_DEBUG: "true"
-          LANGWATCH_API_KEY: ${{ secrets.PYTHON_SDK_LANGWATCH_API_KEY }}
+          # The branch's own stack, seeded above; never production.
+          LANGWATCH_ENDPOINT: http://localhost:5560
+          LANGWATCH_API_KEY: sk-lw-local-development-key
           LANGWATCH_PROMPT_ID: ${{ secrets.PYTHON_SDK_LANGWATCH_PROMPT_ID }}
           TEST_EVALUATION_SLUG: "test-evaluation"
           AZURE_OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
@@ -142,6 +278,14 @@ jobs:
           make test-e2e
           make cli-examples
           make test-examples
+
+      - name: Dump server and worker logs on failure
+        if: failure()
+        run: |
+          echo "===== langwatch server (last 300 lines) ====="
+          tail -300 /tmp/langwatch-server.log || true
+          echo "===== langwatch workers (last 300 lines) ====="
+          tail -300 /tmp/langwatch-workers.log || true
 
   # The ends of the interpreter range declared by requires-python. `test`
   # above covers the middle on the repo's own pinned version.
