@@ -3,6 +3,7 @@
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
 
+import { describeError } from "@langwatch/browser-host/errors";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ConnectStatus } from "@langwatch/enterprise-licensing-contract";
 import { act, cleanup, screen } from "@testing-library/react";
@@ -66,6 +67,12 @@ class TestHost extends LicensingHostApi {
   }
 }
 
+class ExplainingHost extends TestHost {
+  describeFailure(failure: LicensingFailureNotice) {
+    return describeError(failure);
+  }
+}
+
 function connected(overrides: Partial<Extract<ConnectStatus, { deployment: "on" }>> = {}) {
   return {
     deployment: "on",
@@ -81,9 +88,10 @@ function connected(overrides: Partial<Extract<ConnectStatus, { deployment: "on" 
   } satisfies ConnectStatus;
 }
 
-function screenFor({ admin }: { admin: boolean }) {
+function screenFor({ admin, explains = false }: { admin: boolean; explains?: boolean }) {
+  const host = explains ? new ExplainingHost(admin) : new TestHost(admin);
   const Wrapper = ({ children }: { children: ReactNode }) => (
-    <LicensingHostProvider value={new TestHost(admin)}>{children}</LicensingHostProvider>
+    <LicensingHostProvider value={host}>{children}</LicensingHostProvider>
   );
   return (
     <Wrapper>
@@ -92,9 +100,17 @@ function screenFor({ admin }: { admin: boolean }) {
   );
 }
 
-function renderScreen({ status, admin = true }: { status: ConnectStatus; admin?: boolean }) {
+function renderScreen({
+  status,
+  admin = true,
+  explains = false,
+}: {
+  status: ConnectStatus;
+  admin?: boolean;
+  explains?: boolean;
+}) {
   answer.status = status;
-  return renderWithDesignSystem(screenFor({ admin }));
+  return renderWithDesignSystem(screenFor({ admin, explains }));
 }
 
 function budgetOf({ capUsd, spentUsd }: { capUsd: number; spentUsd: number }) {
@@ -275,6 +291,21 @@ describe("ConnectScreen", () => {
       expect(screen.getByText("Hosted services need a license")).toBeDefined();
       const link = screen.getByRole("link", { name: "Open the License page" });
       expect(link.getAttribute("href")).toBe("/settings/license");
+    });
+  });
+
+  describe("given the hosted service refuses the license", () => {
+    /** @scenario "The page shows a refusal in place of the hosted services" */
+    it("says what the refusal means and what to do about it, keeping the services' settings", () => {
+      renderScreen({
+        explains: true,
+        status: connected({ refusal: { code: "connect_license_revoked" } }),
+      });
+
+      const refusal = screen.getByTestId("connect-refusal");
+      expect(refusal.textContent).toContain("This license is no longer active");
+      expect(refusal.textContent).toContain("Contact LangWatch for a new license");
+      expect(switchOf("instant_evals").checked).toBe(true);
     });
   });
 });
