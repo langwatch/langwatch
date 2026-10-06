@@ -5,6 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { MediaPartToken } from "@langwatch/scenario-contract";
 
 export const scenarioWeb = defineBrowserModule("scenario")
   .withHosts({
@@ -63,13 +64,14 @@ export const scenarioWeb = defineBrowserModule("scenario")
       }),
     },
   })
-  /** The call panel and parameter line lent to agent, the media renderer to trace (§3.4 rule 7). */
+  /** The media renderer, lent to trace by token (§10.1). */
+  .lends(MediaPartToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/media-part.tsx")).MediaPart,
+    }),
+  })
+  /** The call panel and parameter line lent to agent (§3.4 rule 7). */
   .withCapabilities({
-    mediaPart: {
-      load: async () => ({
-        default: (await import("./ui/sections/media-part.tsx")).MediaPart,
-      }),
-    },
     parameterLineField: {
       load: async () => ({
         default: (await import("./ui/sections/agent-testing/run/lent-parameter-line-field.tsx"))

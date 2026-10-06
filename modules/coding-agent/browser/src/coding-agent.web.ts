@@ -4,17 +4,20 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import {
+  CodingAgentPullRequestsTableToken,
+  CodingAgentSessionsTableToken,
+} from "@langwatch/coding-agent-contract";
 
-/** The pull requests and sessions tables, lent to user (§3.4 rule 7). */
-export const codingAgentWeb = defineBrowserModule("coding-agent").withCapabilities({
-  codingAgentPullRequestsTable: {
+/** The pull requests and sessions tables, lent to user by token (§10.1). */
+export const codingAgentWeb = defineBrowserModule("coding-agent")
+  .lends(CodingAgentPullRequestsTableToken, {
     load: async () => ({
       default: (await import("./lent-activity-tables.tsx")).LentPullRequestsTable,
     }),
-  },
-  codingAgentSessionsTable: {
+  })
+  .lends(CodingAgentSessionsTableToken, {
     load: async () => ({
       default: (await import("./lent-activity-tables.tsx")).LentSessionsTable,
     }),
-  },
-});
+  });

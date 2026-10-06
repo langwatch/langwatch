@@ -1,6 +1,10 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
+import {
+  CodingAgentPullRequestsTableToken,
+  CodingAgentSessionsTableToken,
+} from "@langwatch/coding-agent-contract";
 import { describe, expect, it } from "vitest";
 
 import { codingAgentWeb } from "../coding-agent.web.ts";
@@ -25,13 +29,16 @@ describe("given a browser that installs coding-agent", () => {
   });
 
   describe("when user's workspace reads a lent activity table", () => {
-    it.each([["codingAgentPullRequestsTable"], ["codingAgentSessionsTable"]] as const)(
-      "loads %s",
-      async (capability) => {
-        const loaded = await codingAgentWeb.installation.capabilities[capability].load();
+    it.each([
+      ["pull requests", CodingAgentPullRequestsTableToken],
+      ["sessions", CodingAgentSessionsTableToken],
+    ] as const)("loads the %s table under its token", async (_name, token) => {
+      const lend = codingAgentWeb.installation.lends.find(
+        ({ token: lent }) => lent.key === token.key,
+      );
+      const loaded = lend && "load" in lend ? await lend.load() : undefined;
 
-        expect(loaded.default).toBeTypeOf("function");
-      },
-    );
+      expect(loaded).toMatchObject({ default: expect.any(Function) });
+    });
   });
 });

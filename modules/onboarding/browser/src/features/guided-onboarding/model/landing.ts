@@ -5,10 +5,9 @@
  * @see specs/features/onboarding/guided-tour.feature
  * @see specs/home/guided-onboarding-offer.feature
  */
-import type { GuidedPath } from "@langwatch/onboarding-contract";
+import type { GuidedPath, GuidedSpace } from "@langwatch/onboarding-contract";
 
-/** The product space a path is set up in, keyed like the home offer's own ids. */
-export type GuidedSpace = "project" | "me" | "gateway" | "governance";
+export type { GuidedSpace };
 
 export const GUIDED_PATH_SPACE: Record<GuidedPath, GuidedSpace> = {
   llmops: "project",

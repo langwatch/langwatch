@@ -41,3 +41,4 @@ export type {
 export * from "./injected-notice.ts";
 export * from "./leading-context.ts";
 export * from "./coding-agent-span-admission.ts";
+export * from "./coding-agent-lent-components.ts";

@@ -4,6 +4,11 @@
  * injected value these screens are allowed to read.
  */
 
+import {
+  AnnotateBodyToken,
+  AnnotationFormFooterToken,
+  SuggestBodyToken,
+} from "@langwatch/annotation-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 import { createElement } from "react";
 import { z } from "zod";
@@ -81,17 +86,15 @@ export const annotationWeb = defineBrowserModule("annotation")
       }),
     },
   })
-  /** The annotation form's pieces, lent to the trace explorer (§3.4 rule 7). */
-  .withCapabilities({
-    annotateBody: {
-      load: async () => ({ default: (await import("./annotation-form.ts")).AnnotateBody }),
-    },
-    suggestBody: {
-      load: async () => ({ default: (await import("./annotation-form.ts")).SuggestBody }),
-    },
-    annotationFormFooter: {
-      load: async () => ({ default: (await import("./annotation-form.ts")).FormFooter }),
-    },
+  /** The annotation form's pieces, lent to the trace explorer by token (§10.1). */
+  .lends(AnnotateBodyToken, {
+    load: async () => ({ default: (await import("./annotation-form.ts")).AnnotateBody }),
+  })
+  .lends(SuggestBodyToken, {
+    load: async () => ({ default: (await import("./annotation-form.ts")).SuggestBody }),
+  })
+  .lends(AnnotationFormFooterToken, {
+    load: async () => ({ default: (await import("./annotation-form.ts")).FormFooter }),
   })
   /**
    * The deployment mode decides which documentation host an annotation screen

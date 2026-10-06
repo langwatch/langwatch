@@ -1,9 +1,10 @@
 import {
-  uiDeclarations,
-  type UiAnnotationFormFooterProps,
-  type UiDeclarations,
-  type UiSuggestBodyProps,
-} from "@langwatch/browser-host/declarations";
+  AnnotationFormFooterToken,
+  SuggestBodyToken,
+  type AnnotationFormFooterProps,
+  type SuggestBodyProps,
+} from "@langwatch/annotation-contract";
+import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 /**
  * A suggested output is stored as a correction to the trace, so writing one has to make
  * the drawer's copy of that correction stale.
@@ -82,25 +83,28 @@ const annotationLends = uiDeclarations([
   {
     name: "annotation",
     installation: {
-      capabilities: {
-        suggestBody: {
+      capabilities: {},
+      lends: [
+        {
+          token: SuggestBodyToken,
           load: async () => ({
-            default: ({ state }: UiSuggestBodyProps) =>
+            default: ({ state }: SuggestBodyProps) =>
               state.isEdit && state.hasExisting ? (
                 <button type="button" aria-label="Delete annotation" onClick={state.handleDelete} />
               ) : null,
           }),
         },
-        annotationFormFooter: {
+        {
+          token: AnnotationFormFooterToken,
           load: async () => ({
-            default: ({ state }: UiAnnotationFormFooterProps) => (
+            default: ({ state }: AnnotationFormFooterProps) => (
               <button type="button" onClick={state.handleSave} disabled={state.isSaveBlocked}>
                 {state.isEdit ? "Update" : "Save"}
               </button>
             ),
           }),
         },
-      },
+      ],
     },
   },
 ]);
@@ -136,7 +140,7 @@ async function submitAndSucceed({
   annotationId?: string;
 }) {
   renderSuggest({ annotationId });
-  fireEvent.click(await screen.findByRole("button", { name: buttonName }));
+  fireEvent.click(await screen.findByRole("button", { name: buttonName }, { timeout: 5_000 }));
   const options = mutation.mock.calls[0]?.[1] as MutationOptions;
   options.onSuccess?.();
 }

@@ -4,7 +4,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { GuidedTourToken } from "@langwatch/onboarding-contract";
+import { GuidedOnboardingOfferToken, GuidedTourToken } from "@langwatch/onboarding-contract";
 
 import { onboardingFirstTouchAttribution } from "./behavior/first-touch-attribution.capability.ts";
 import { onboardingGuidedPath } from "./features/guided-onboarding/behavior/guided-path-active.capability.ts";
@@ -55,4 +55,7 @@ export const onboardingWeb = defineBrowserModule("onboarding")
       load: () => import("./ui/sections/onboarding/setup.screen.tsx"),
     },
   })
-  .lends(GuidedTourToken, { value: onboardingGuidedTourHooks });
+  .lends(GuidedTourToken, { value: onboardingGuidedTourHooks })
+  .lends(GuidedOnboardingOfferToken, {
+    load: () => import("./features/guided-onboarding/ui/home/guided-onboarding-offer.tsx"),
+  });

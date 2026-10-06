@@ -1,11 +1,11 @@
-import type { UiGuidedOnboardingOfferProps } from "@langwatch/browser-host/declarations";
+import { chakra, HStack } from "@langwatch/design-system/primitives";
 /**
  * The "Start guided onboarding" pill on a day-zero home, one path per space. Hidden while guided,
  * done, in use (`spaceInUse`, null while unknown) or touring. Clicking begins the path.
  *
  * @see specs/home/guided-onboarding-offer.feature
  */
-import { chakra, HStack } from "@langwatch/design-system/primitives";
+import type { GuidedOnboardingOfferProps } from "@langwatch/onboarding-contract";
 import { Sparkles } from "lucide-react";
 import { useState } from "react";
 import { AnalyticsBoundary, useAnalytics } from "react-contextual-analytics";
@@ -22,7 +22,7 @@ import { offeredPath } from "../../model/offered-path.ts";
 import { buildKickoff, firstNameOf } from "../../model/tour-landing.ts";
 import { pathHasTour } from "../../model/tour-steps.ts";
 
-export default function GuidedOnboardingOffer(props: UiGuidedOnboardingOfferProps) {
+export default function GuidedOnboardingOffer(props: GuidedOnboardingOfferProps) {
   return (
     <AnalyticsBoundary name="onboarding_guided">
       <GuidedOnboardingOfferInner {...props} />
@@ -30,7 +30,7 @@ export default function GuidedOnboardingOffer(props: UiGuidedOnboardingOfferProp
   );
 }
 
-function GuidedOnboardingOfferInner({ space, spaceInUse }: UiGuidedOnboardingOfferProps) {
+function GuidedOnboardingOfferInner({ space, spaceInUse }: GuidedOnboardingOfferProps) {
   const host = useOnboardingHost();
   const { enabled, organizationId } = useGuidedOnboardingFlag();
   const { state } = useGuidedOnboarding();
