@@ -201,6 +201,60 @@ describe("LangyTokenBufferRedisRepository hybrid flush", () => {
     });
   });
 
+  describe("given Langy thinks out loud while it writes a reply", () => {
+    /** @scenario "Thinking narrated alongside the answer stays out of the reply" */
+    it("streams the thinking as reasoning frames and keeps the reply to the answer alone, in order", async () => {
+      const { redis, entries } = makeRedis();
+      const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+      await buffer.appendReasoning({ ...ids, text: "Let me check the traces first. " });
+      await buffer.appendChunk({ ...ids, text: "Found 3 failing traces." });
+      await buffer.appendReasoning({ ...ids, text: "Now I will summarise." });
+      await buffer.appendChunk({ ...ids, text: " They all time out." });
+      const { backstopped } = await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+      expect(
+        reasoning(entries)
+          .map((r) => r.text)
+          .join(""),
+      ).toBe("Let me check the traces first. Now I will summarise.");
+      expect(deltas(entries).map((d) => d.text)).toEqual([
+        "Found 3 failing traces.",
+        " They all time out.",
+      ]);
+      const reply = deltas(entries)
+        .map((d) => d.text)
+        .join("");
+      expect(reply).toBe("Found 3 failing traces. They all time out.");
+      expect(reply).not.toContain("check the traces first");
+      expect(reply).not.toContain("summarise");
+      expect(backstopped).toBe(false);
+    });
+  });
+
+  describe("given a turn said its lines with the say tool", () => {
+    describe("when the turn reaches its terminal marker", () => {
+      /** @scenario "A turn whose lines were all said with the say tool is not an empty turn" */
+      it("appends no fallback line", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        await buffer.appendTool({
+          ...ids,
+          id: "say_1",
+          name: "say",
+          phase: "end",
+          input: { text: "I checked the traces and found nothing failing." },
+        });
+        const { backstopped } = await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([]);
+        expect(entries.at(-1)?.type).toBe("end");
+      });
+    });
+  });
+
   describe("given a turn ends without the agent writing any text", () => {
     describe("when the turn reaches its terminal marker", () => {
       /** @scenario A turn never ends silently */

@@ -68,6 +68,35 @@ describe("langySessionKeyReap process", () => {
     });
   });
 
+  describe("given the worker installs the Langy maintenance pipeline", () => {
+    describe("when the scheduled reap intent is delivered", () => {
+      /** @scenario "The worker composes the session-key sweep from the feature package" */
+      it("registers the maintenance pipeline and its sweep runs the feature's own revoke", async () => {
+        const reap = vi.fn(async () => 2);
+        const pipeline = buildLangyMaintenancePipeline({
+          sessionKeyReap: { reap, deleteDispatchedBefore: async () => 0 },
+          virtualKeyProvisioning: { provisionCreated: async () => undefined },
+        });
+
+        expect(pipeline.metadata.name).toBe("langy_maintenance");
+        const process = pipeline.processManagers.get(LANGY_SESSION_KEY_REAP_PROCESS_NAME);
+        await process!.config.intents!.reap!.run(
+          { scheduledFor: 5_000 },
+          {
+            processName: LANGY_SESSION_KEY_REAP_PROCESS_NAME,
+            projectId: "__global__",
+            processKey: LANGY_SESSION_KEY_REAP_PROCESS_NAME,
+            tenantId: "__global__",
+            messageKey: "reap:5000",
+            attempt: 1,
+          },
+        );
+
+        expect(reap).toHaveBeenCalledOnce();
+      });
+    });
+  });
+
   describe("given the outbox retention prune fails", () => {
     describe("when the reap intent runs", () => {
       it("still counts the reap as done rather than retrying the revoke", async () => {

@@ -230,6 +230,7 @@ describe("LangyTurnPreparationService golden path", () => {
   });
 
   /** @scenario "A new conversation takes its placeholder title in sentence case" */
+  /** @scenario "An ordinary first message still gets its placeholder title" */
   it("records the first message as a sentence-case placeholder and chooses no title at creation", async () => {
     const fixture = makeFixture();
 
@@ -270,6 +271,100 @@ describe("LangyTurnPreparationService golden path", () => {
           userMessage: expect.objectContaining({ title: "Getting started" }),
         }),
       );
+    });
+  });
+
+  /** @scenario "A retry re-drives the turn instead of re-posting the message" */
+  it("runs a retry against the message already on record and records no second copy", async () => {
+    const fixture = makeFixture();
+
+    await LangyTurnService.create(fixture.deps).startConversationTurn({
+      ...input,
+      isRetry: true,
+    });
+
+    expect(fixture.acceptTurn).toHaveBeenCalledOnce();
+    expect(fixture.acceptTurn).toHaveBeenCalledWith(
+      expect.objectContaining({ questionParts: input.messages[0]!.parts }),
+    );
+    expect(fixture.acceptTurn).toHaveBeenCalledWith(
+      expect.not.objectContaining({ userMessage: expect.anything() }),
+    );
+  });
+
+  describe("given a turn stopped because GitHub was not connected and the user then connects it", () => {
+    const githubCredentials = (githubToken: string | undefined) => ({
+      getOrProvision: vi.fn(async () =>
+        workerCredentials({
+          organizationId: "organization-1",
+          ...(githubToken ? { githubToken, githubLogin: "octocat" } : {}),
+        }),
+      ),
+      findEgressAllowlist: vi.fn(async () => null),
+      resolveMirrorTier: vi.fn(async () => "content" as const),
+      findModelsAllowed: vi.fn(async () => null),
+    });
+
+    /** @scenario "Connecting GitHub resumes the turn without a duplicate message" */
+    it("re-drives it with the token in place, one permit and no second copy of the message", async () => {
+      const reserve = vi.fn(async () => ({ reserved: true, allowed: true, resetAt: 0 }));
+      const permits = { reserve, release: vi.fn(async () => undefined), check: vi.fn() };
+      const before = makeFixture({
+        credentials: githubCredentials(undefined),
+        permits: { ...permits, check: vi.fn(async () => ({ allowed: true })) },
+      });
+      await LangyTurnService.create(before.deps).startConversationTurn({ ...input });
+      expect(reserve).not.toHaveBeenCalled();
+
+      const after = makeFixture({
+        credentials: githubCredentials("gh-token"),
+        permits: { ...permits, check: vi.fn(async () => ({ allowed: true })) },
+      });
+      await LangyTurnService.create(after.deps).startConversationTurn({
+        ...input,
+        isRetry: true,
+      });
+
+      expect(reserve).toHaveBeenCalledTimes(1);
+      expect(after.acceptTurn).toHaveBeenCalledWith(
+        expect.not.objectContaining({ userMessage: expect.anything() }),
+      );
+      expect(after.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          credentials: expect.objectContaining({ githubToken: "gh-token" }),
+        }),
+      );
+    });
+  });
+
+  describe("given the user already opened the per-day maximum of pull requests", () => {
+    /** @scenario "The API process meters the daily pull-request cap on its own Redis" */
+    it("tells the turn the real per-day cap and the hour it resets", async () => {
+      const fixture = makeFixture({
+        credentials: {
+          getOrProvision: vi.fn(async () =>
+            workerCredentials({
+              organizationId: "organization-1",
+              githubToken: "gh-token",
+              githubLogin: "octocat",
+            }),
+          ),
+          findEgressAllowlist: vi.fn(async () => null),
+          resolveMirrorTier: vi.fn(async () => "content" as const),
+          findModelsAllowed: vi.fn(async () => null),
+        },
+        permits: {
+          reserve: vi.fn(async () => ({ reserved: false, allowed: false, resetAt: 0 })),
+          release: vi.fn(async () => undefined),
+          check: vi.fn(async () => ({ allowed: false })),
+        },
+      });
+
+      await LangyTurnService.create(fixture.deps).startConversationTurn({ ...input });
+
+      const dispatched = fixture.dispatch.mock.calls[0]![0] as { prompt: string };
+      expect(dispatched.prompt).toContain("of 5 GitHub pull requests");
+      expect(dispatched.prompt).not.toContain("of 0 GitHub pull requests");
     });
   });
 

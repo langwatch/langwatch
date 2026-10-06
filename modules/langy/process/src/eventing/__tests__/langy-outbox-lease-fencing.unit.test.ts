@@ -71,6 +71,28 @@ describe("Langy process outbox lease fencing", () => {
     });
   });
 
+  describe("given the worker stopped before it dispatched a committed intent", () => {
+    /** @scenario "A committed process intent survives a worker restart" */
+    it("lets another worker lease and dispatch it under the same logical identity", async () => {
+      const identity = `process:${CONVERSATION_ID}:dispatch:turn_1`;
+      const waiting = await store.findMessagesByRef({ ref });
+      expect(waiting.map((m) => [m.messageKey, m.status])).toEqual([[identity, "pending"]]);
+
+      const delivered = vi.fn<IntentHandler>(async () => undefined);
+      const restarted = new OutboxDispatcherService({
+        store,
+        handlers: { [LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH]: delivered },
+        leaseDurationMs: LANGY_OUTBOX_LEASE_DURATION_MS,
+      });
+      const report = await restarted.runOnce({ now: T0 + 1_000, limit: 1 });
+
+      expect(report.dispatched).toEqual([identity]);
+      expect(delivered).toHaveBeenCalledOnce();
+      const after = await store.findMessagesByRef({ ref });
+      expect(after.map((m) => [m.messageKey, m.status])).toEqual([[identity, "dispatched"]]);
+    });
+  });
+
   describe("given a lease shorter than a slow-but-live dispatch", () => {
     it("lets a second instance re-lease and double-deliver the same turn", async () => {
       const delivered: string[] = [];

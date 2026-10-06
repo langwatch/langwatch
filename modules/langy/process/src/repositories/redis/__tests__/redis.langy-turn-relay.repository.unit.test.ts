@@ -542,6 +542,66 @@ describe("LangyTurnRelayAdapter", () => {
       expect(conversations.recordToolCallCompleted).not.toHaveBeenCalled();
     });
 
+    /** @scenario "A navigate run in the shared folder opens the resource just the same" */
+    it("navigates to the platform link for a lookup run in the shared folder, drawing no card of its own", async () => {
+      const { relay, buffer, conversations } = makeRelay();
+      const inFolder = (payload: Record<string, unknown>) => frame({ ...payload, local: true });
+      const lookup = "langwatch trace get run_1";
+      const open = "langwatch navigate open run_1";
+      const platformUrl = "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1";
+      await handleAll({
+        relay,
+        frames: [
+          inFolder({
+            type: "tool",
+            id: "c1",
+            name: "bash",
+            phase: "start",
+            input: { command: lookup },
+          }),
+          inFolder({
+            type: "tool",
+            id: "c1",
+            name: "bash",
+            phase: "end",
+            input: { command: lookup },
+            output: JSON.stringify({ trace_id: "run_1", platformUrl }),
+          }),
+        ],
+      });
+      buffer.appendTool.mockClear();
+      conversations.recordToolCallStarted.mockClear();
+
+      await handleAll({
+        relay,
+        frames: [
+          inFolder({
+            type: "tool",
+            id: "c2",
+            name: "bash",
+            phase: "start",
+            input: { command: open },
+          }),
+          inFolder({
+            type: "tool",
+            id: "c2",
+            name: "bash",
+            phase: "end",
+            input: { command: open },
+            output: "ok",
+          }),
+        ],
+      });
+
+      expect(buffer.appendNavigate).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+        href: "/acme/simulations/set_1/batch_1?openRun=run_1",
+      });
+      expect(buffer.appendTool).not.toHaveBeenCalled();
+      expect(conversations.recordToolCallStarted).not.toHaveBeenCalled();
+    });
+
     /** @scenario "A resource surfaced in an earlier turn can still be opened" */
     it("resolves a resource surfaced in a PREVIOUS turn — the link store outlives the per-turn relay", async () => {
       // One relay instance per pushed connection means one instance per turn:

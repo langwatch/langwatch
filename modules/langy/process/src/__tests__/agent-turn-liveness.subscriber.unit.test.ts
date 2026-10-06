@@ -217,6 +217,7 @@ describe("agent turn liveness subscriber", () => {
     expect(deps.failTurn.failTurn).not.toHaveBeenCalled();
   });
 
+  /** @scenario "The completed branch has one owner for each effect" */
   it("re-dispatches a recently stalled turn and throws for queue retry", async () => {
     const deps = makeDeps({ handoff: makeHandoff() });
     const subscriber = createAgentTurnLivenessSubscriber(deps);

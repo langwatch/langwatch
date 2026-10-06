@@ -248,6 +248,7 @@ describe("LangyConversationProcess", () => {
       ]);
     });
 
+    /** @scenario "The completed branch has one owner for each effect" */
     it("emits no fail-turn or redispatch intent, ever", async () => {
       await deliver([
         ...startedTurnHistory(),

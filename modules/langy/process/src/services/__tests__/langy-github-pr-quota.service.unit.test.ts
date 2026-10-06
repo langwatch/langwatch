@@ -128,6 +128,36 @@ describe("LangyGithubPrQuotaService.reservePermit", () => {
   });
 });
 
+describe("LangyGithubPrQuotaService.reservePermit on the day bucket", () => {
+  describe("when the API process composed a Redis connection", () => {
+    /** @scenario "The API process meters the daily pull-request cap on its own Redis" */
+    it("spends the permit against that user's day bucket and no other user's", async () => {
+      incr.mockResolvedValue(1);
+
+      const out = await quota.reservePermit({ userId: "u1", limit: 20 });
+      await quota.reservePermit({ userId: "u2", limit: 20 });
+
+      expect(out).toMatchObject({ allowed: true, reserved: true, remaining: 19 });
+      const keys = incr.mock.calls.map(([key]) => key);
+      expect(keys[0]).toMatch(/^langy:gh:prs:u1:\d+$/);
+      expect(keys[1]).toMatch(/^langy:gh:prs:u2:\d+$/);
+      expect(keys[0]).not.toBe(keys[1]);
+    });
+  });
+
+  describe("when the counter cannot be reached at all", () => {
+    /** @scenario "A deployment with no counter never denies a pull request" */
+    it("allows the pull request and reports that nothing was reserved", async () => {
+      incr.mockRejectedValue(new Error("no redis connection"));
+
+      const out = await quota.reservePermit({ userId: "u1", limit: 20 });
+
+      expect(out).toMatchObject({ allowed: true, reserved: false, remaining: 20 });
+      expect(decr).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("LangyGithubPrQuotaService.releasePermit", () => {
   describe("when called for a turn that opened no PR", () => {
     /** @scenario "Permit must be released on every non-PR exit" */

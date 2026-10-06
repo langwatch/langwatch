@@ -143,6 +143,26 @@ describe("langy-conversation-processing pipeline shape", () => {
       });
     });
 
+    describe("when inspecting who owns each effect of a completed turn", () => {
+      /** @scenario "The completed branch has one owner for each effect" */
+      it("gives the process outbox the dispatch and title, and leaves liveness and broadcast as direct subscribers", () => {
+        const { pipeline } = buildPipeline();
+
+        expect([...pipeline.processManagers.keys()]).toEqual([LANGY_CONVERSATION_PROCESS_NAME]);
+        const pm = pipeline.processManagers.get(LANGY_CONVERSATION_PROCESS_NAME);
+        expect(Object.keys(pm!.config.intents).toSorted()).toEqual([
+          "langy.conversation.generate_title",
+          "langy.conversation.worker_dispatch",
+        ]);
+        expect([...pipeline.eventSubscribers.keys()].toSorted()).toEqual([
+          "agentTurnLiveness",
+          "langyConversationUpdateBroadcast",
+        ]);
+        expect(pipeline.foldSubscribers.size).toBe(0);
+        expect(pipeline.mapSubscribers.size).toBe(0);
+      });
+    });
+
     describe("when inspecting subscriber and outbox attachments", () => {
       it("attaches no subscriber or outbox to any Langy operational projection", () => {
         const { pipeline } = buildPipeline();

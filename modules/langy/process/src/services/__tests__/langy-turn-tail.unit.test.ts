@@ -247,6 +247,42 @@ describe("streamTurnEntries", () => {
     });
   });
 
+  describe("when the page was refreshed while the turn is still streaming", () => {
+    /** @scenario "A mid-stream refresh loses Stream B but Stream A replays the durable state" */
+    it("replays the buffered token tail first, then follows the live edge so no work is lost", async () => {
+      const live = createLiveEdge();
+      const { received, done } = pump(
+        tailService.streamTurnEntries({
+          ...CONVERSATION,
+          buffer: createBuffer({
+            tail: [
+              { type: "delta", text: "Found " },
+              { type: "delta", text: "3 failing " },
+            ],
+            live,
+          }),
+          readHealth: async () => null,
+          signal: new AbortController().signal,
+          release: vi.fn(),
+          pollMs,
+          delay: immediately,
+        }),
+      );
+
+      live.push({ type: "delta", text: "traces." });
+      live.push({ type: "end" });
+      live.close();
+      await done;
+
+      expect(received).toEqual([
+        { type: "delta", text: "Found " },
+        { type: "delta", text: "3 failing " },
+        { type: "delta", text: "traces." },
+        { type: "end" },
+      ]);
+    });
+  });
+
   describe("when a reconnect finds the turn settled but no terminal on the live edge", () => {
     /** @scenario "Stream A synthesizes the terminal a reconnect missed once the turn has settled" */
     it("yields the synthesized end and closes", async () => {
