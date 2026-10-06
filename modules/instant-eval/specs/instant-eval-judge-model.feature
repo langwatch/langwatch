@@ -9,8 +9,10 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
   The shape:
   - The evaluation module turns the judge's settings into one classifier question, and maps
     the verdict back to the result shape the judge returns today.
-  - Instant Evals answers one judge call: check the budget, classify, price, record one spend row.
-  - An organization the meter does not bill may spend one dollar in total.
+  - Instant Evals answers one judge call: check the budget, classify, record one spend row
+    priced for the customer.
+  - An organization the meter does not bill may spend one dollar in total. Calls admitted
+    together may run it slightly past, and every one of them is recorded.
 
   Rule: A judge with Instant Evals as its model is answered by Instant Evals
 
@@ -20,6 +22,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When a trace is evaluated
       Then Instant Evals answers it once
       And the evaluator service is not called
+      And no model provider is looked up
 
     @unit
     Scenario: A judge on any other model is unchanged
@@ -27,6 +30,12 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When a trace is evaluated
       Then the evaluator service answers it as today
       And Instant Evals is not called
+
+    @unit
+    Scenario: A queued evaluation passes its retry key to the judge call
+      Given a boolean judge on Instant Evals run from a queued evaluation command
+      When the trace is evaluated
+      Then the judge call carries the command's retry key
 
   Rule: The question keeps what the judge's prompt points at
 
@@ -38,12 +47,26 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
 
     @unit
     Scenario: A long input does not push out the output
-      Given an input far longer than the classifier's limit and a short output
+      Given an input far longer than the question leaves room for, and a short output
       When its question is built
-      Then the text fits the limit
+      Then the text fits the room the question leaves
       And the output section is kept whole
 
+    @unit
+    Scenario: An output longer than the whole room is cut keeping both ends
+      Given an output far longer than the question leaves room for
+      When its question is built
+      Then the text fits the room the question leaves
+      And the output section keeps its first and its last lines
+
   Rule: The result keeps today's shape and scale
+
+    @unit
+    Scenario: A boolean question asks whether the instructions call for true
+      Given a boolean judge whose prompt says "return false if it mentions a competitor"
+      When its question is built
+      Then the question carries the prompt as it was written
+      And its two criteria are "the instructions call for true" and "the instructions call for false"
 
     @unit
     Scenario: A fail-condition prompt keeps its polarity
@@ -63,7 +86,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
     @unit
     Scenario Outline: A score judge returns on its own range
       Given a score judge with range <min> to <max>
-      When the classifier answers at the top of the scale
+      When the classifier answers at the top of the scale it was asked
       Then the score is <max>
 
       Examples:
@@ -73,10 +96,29 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
         | 0   | 100 |
 
     @unit
+    Scenario: A whole-number range of at most ten levels is asked directly
+      Given a score judge with range 1 to 5
+      When its question is built
+      Then the question asks the levels 1 to 5
+
+    @unit
+    Scenario: Any other range is asked on 1 to 10
+      Given a score judge with range 0 to 100
+      When its question is built
+      Then the question asks the levels 1 to 10
+
+    @unit
+    Scenario: A whole-number range asked on 1 to 10 returns whole numbers
+      Given a score judge with range 0 to 10
+      When the classifier answers between two of the levels it was asked
+      Then the score is a whole number from 0 to 10
+
+    @unit
     Scenario: A score judge saved before the range setting reads as 0 to 1
       Given a score judge with no range in its settings
-      When its question is built
-      Then it is scored from 0 to 1
+      When the classifier answers at the top of the scale it was asked
+      Then the score is mapped onto 0 to 1
+      And the score is 1
 
     @unit
     Scenario: A category judge returns the most likely category
@@ -86,7 +128,13 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the label is "refund"
       And passed is not set
 
-  Rule: Every skip has a status
+    @unit
+    Scenario: The score judge's settings carry an optional range
+      Given the generated settings of the score judge
+      Then they hold an optional min and an optional max
+      And neither has a default
+
+  Rule: Every skip and refusal has a status
 
     @unit
     Scenario Outline: A classifier skip maps to a result status
@@ -95,18 +143,26 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the result status is <status>
 
       Examples:
-        | reason         | status  |
-        | input_too_large | skipped |
-        | not_configured | error   |
-        | rate_limited   | error   |
-        | failed         | error   |
+        | reason                     | status  |
+        | classifier_input_too_large | skipped |
+        | classifier_not_configured  | error   |
+        | classifier_rate_limited    | error   |
+        | classifier_failed          | error   |
 
     @unit
     Scenario: A judge with no content to judge is skipped
-      Given a judge whose mapped input and output are empty
+      Given a judge whose mapped input, output and contexts are empty
       When a trace is evaluated
       Then the result is skipped
       And Instant Evals is not called
+
+    @unit
+    Scenario: A judge refused by the free budget is an error with the reason
+      Given an organization whose free budget is spent
+      When a trace is evaluated by a judge on Instant Evals
+      Then the result status is error
+      And its details say the free budget is spent
+      And the refusal is returned as a result, not thrown
 
   Rule: One judge call is one spend row, once
 
@@ -115,7 +171,13 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Given a judge call that classified five hundred input tokens
       When it finishes
       Then one spend row is recorded with the customer price
-      And the result's cost is that price
+      And the call answers that price beside the verdict
+
+    @unit
+    Scenario: The result's cost is the customer price
+      Given a judge call answered with a price
+      When the result is mapped
+      Then the result's cost is that price in USD
 
     @unit
     Scenario: A judge call that used no tokens records nothing
@@ -124,11 +186,47 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then no spend row is recorded
 
     @unit
+    Scenario: The same retry key gives the same spend id
+      Given two judge calls with the same retry key
+      When each records its spend
+      Then both spend rows carry the same request id
+
+    @unit
     Scenario: A redelivered evaluation is billed once
       Given an evaluation command whose judge call succeeded
       And recording its outcome failed once
       When the command is delivered again
       Then the ledger holds one spend row for it
+
+    @unit
+    Scenario: A judge call with no retry key gets a fresh spend id
+      Given two judge calls with no retry key
+      When each records its spend
+      Then the two spend rows carry different request ids
+
+    @unit
+    Scenario: A guardrail check carries no retry key
+      Given a guardrail whose judge is on Instant Evals
+      When the gateway checks a request
+      Then the judge call carries no retry key
+
+    @unit
+    Scenario: A judge call cancelled after the classifier answered still records its spend
+      Given a judge call whose caller cancels after the classifier answered
+      When it finishes
+      Then one spend row is recorded
+
+    @unit
+    Scenario: A guardrail check writes one cost row
+      Given a guardrail whose judge is on Instant Evals
+      When the gateway checks a request
+      Then one guardrail cost row is written with the customer price
+
+    @unit
+    Scenario: A too-large text retried smaller is billed for the attempt that answered
+      Given a text the classifier refuses as too large once and answers when cut
+      When it is classified
+      Then the judgement carries the input tokens of the answered attempt alone
 
     @unit
     Scenario: The trace search bar stays unmetered
@@ -159,6 +257,48 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When a judge call arrives
       Then it is classified
 
+    @unit
+    Scenario: A project with no organization is not capped
+      Given a project that belongs to no organization
+      When a judge call arrives
+      Then it is classified
+
+    @unit
+    Scenario: A judge call past one dollar is still recorded in full
+      Given a free organization whose spend has not yet shown it past one dollar
+      And its real spend is past one dollar
+      When a judge call is classified
+      Then one spend row is recorded with the full customer price
+
+    @unit
+    Scenario: A judge call holds nothing against the budget
+      Given a free organization under the budget
+      When a judge call is classifying
+      Then nothing is reserved against the budget
+
+    @unit
+    Scenario: The run row cap reads the same rule as the budget
+      Given a paid organization the meter does not bill
+      When it asks for its Instant Evals run row cap
+      Then it gets the cap of an organization the meter does not bill
+
+  Rule: Billing says which organizations the meter bills
+
+    @unit
+    Scenario Outline: The meter's own rule answers whether an organization is usage billed
+      Given an organization <state>
+      When billing is asked whether the meter bills it
+      Then the answer is <billed>
+
+      Examples:
+        | state                                                       | billed |
+        | on usage pricing with a Stripe customer and a subscription  | yes    |
+        | on usage pricing with no subscription                       | no     |
+        | on usage pricing with no Stripe customer                    | no     |
+        | on tiered pricing                                           | no     |
+        | marked self-hosted with a connected billing account         | yes    |
+        | that does not exist                                         | no     |
+
   Rule: The picker offers Instant Evals behind the release flag
 
     @integration
@@ -172,3 +312,16 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Given a project with release_instant_evals off
       When a member opens the model picker on an LLM judge
       Then Instant Evals is not an option
+
+    @integration
+    Scenario: A project with no model provider can still pick Instant Evals
+      Given a project with release_instant_evals on and no model provider configured
+      When a member opens the model picker on an LLM judge
+      Then Instant Evals is one of the options
+
+    @integration
+    Scenario: The score range shows only for Instant Evals
+      Given a score judge
+      When a member picks Instant Evals as its model
+      Then the score range fields are shown
+      And they are hidden for any other model
