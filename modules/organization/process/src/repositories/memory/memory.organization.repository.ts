@@ -14,6 +14,7 @@ import {
   type PersonalFeatures,
   type PersonalWorkspace,
   type OrganizationUsageCount,
+  type PricingModel,
 } from "@langwatch/organization-contract";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
@@ -120,6 +121,17 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     maxSessionDurationDays: number;
   }): Promise<void> {
     this.requireOrganization(organizationId).maxSessionDurationDays = maxSessionDurationDays;
+  }
+
+  async getPricing({ organizationId }: { organizationId: string }): Promise<{
+    pricingModel: PricingModel | null;
+    currency: "USD" | "EUR";
+  }> {
+    const organization = this.memory.organizations.get(organizationId);
+    return {
+      pricingModel: organization ? (organization.pricingModel ?? "SEAT_EVENT") : null,
+      currency: organization ? (organization.currency ?? "USD") : "EUR",
+    };
   }
 
   async isInstantEvalsOptedIn({ organizationId }: { organizationId: string }): Promise<boolean> {

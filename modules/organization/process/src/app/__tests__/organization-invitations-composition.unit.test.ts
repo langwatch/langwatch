@@ -3,7 +3,7 @@
  * @see specs/organizations/organization-members-rest-api.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
+import type { EntitlementApi, Plan, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationCaller } from "@langwatch/organization-contract";
@@ -22,7 +22,7 @@ import { organizationModuleSetup } from "./support/organization-module-setup.ts"
 const ORGANIZATION_ID = "org-1";
 const TEAM_ID = "team-1";
 const BASE_HOST = "https://app.langwatch.test";
-const CALLER: OrganizationCaller = { id: "user-1", email: "sam@acme.test" };
+const CALLER: OrganizationCaller = { id: "user-1", name: "Sam", email: "sam@acme.test" };
 
 const roomyPlan: Plan = {
   planSource: "free",
@@ -42,13 +42,20 @@ const roomyPlan: Plan = {
  */
 async function application(options: { plan?: Partial<Plan> } = {}) {
   const plan: Plan = { ...roomyPlan, ...options.plan };
+  const planReads: ResolvePlanInput[] = [];
   const setup = organizationModuleSetup({
     permissions: createApiFixture<AuthzApi>(
       { findPermissionsBeyondCaller: async () => [] },
       "AuthzApi",
     ),
     entitlement: createApiFixture<EntitlementApi>(
-      { getActivePlan: async () => plan, requestBound: async () => 1_000 },
+      {
+        getActivePlan: async (input: ResolvePlanInput) => {
+          planReads.push(input);
+          return plan;
+        },
+        requestBound: async () => 1_000,
+      },
       "EntitlementApi",
     ),
     identity: createApiFixture<IdentityApi>(
@@ -75,7 +82,7 @@ async function application(options: { plan?: Partial<Plan> } = {}) {
       },
     } as never,
   });
-  return { app, recorded };
+  return { app, recorded, planReads };
 }
 
 describe("given the invitation member the process composes", () => {
@@ -106,6 +113,27 @@ describe("given the invitation member the process composes", () => {
       expect(listed[0]!.inviteUrl).toBe(
         `${BASE_HOST}/invite/accept?inviteCode=${listed[0]!.inviteCode}`,
       );
+    });
+  });
+
+  describe("when an administrator creates a batch", () => {
+    /** @scenario "The plan check for a batch of invitations is resolved for the inviting administrator" */
+    it("resolves the organization's plan for the administrator who sent it", async () => {
+      const { app, planReads } = await application();
+
+      await app.createInvitations(
+        {
+          organizationId: ORGANIZATION_ID,
+          validation: "lenient",
+          invites: [{ email: "plan-check@acme.test", role: "MEMBER", teamIds: TEAM_ID }],
+        },
+        CALLER,
+      );
+
+      expect(planReads).toContainEqual({
+        organizationId: ORGANIZATION_ID,
+        user: { id: "user-1", name: "Sam", email: "sam@acme.test" },
+      });
     });
   });
 

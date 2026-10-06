@@ -9,6 +9,7 @@ import type {
   PersonalWorkspace,
   PersonalWorkspaceInput,
   OrganizationUsageCount,
+  PricingModel,
 } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -108,6 +109,10 @@ export abstract class OrganizationRepository {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<void>;
+  /** An unknown organization has no pricing model and the schema's default currency (EUR). */
+  abstract getPricing(input: {
+    organizationId: string;
+  }): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }>;
   /** An unknown organization reads as not opted in. */
   abstract isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean>;
   /** First write wins: the moment and member that gave the agreement are kept. */

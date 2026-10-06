@@ -135,6 +135,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       s3SecretAccessKey: null,
       s3Bucket: null,
       stripeCustomerId: null,
+      pricingModel: input.pricingModel,
       createdAt: now,
       updatedAt: now,
     });
@@ -185,6 +186,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       s3SecretAccessKey: null,
       s3Bucket: null,
       stripeCustomerId: null,
+      pricingModel: input.pricingModel,
       createdAt: now,
       updatedAt: now,
     });

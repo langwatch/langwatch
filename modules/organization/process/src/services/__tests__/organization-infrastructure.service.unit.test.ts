@@ -21,6 +21,7 @@ import {
   type OrganizationTeamPage,
   type PersonalFeatures,
   type PersonalWorkspace,
+  type PricingModel,
 } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -65,6 +66,10 @@ class StubRepository extends OrganizationRepository {
   }
 
   async saveSessionPolicy(): Promise<void> {}
+
+  async getPricing(): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }> {
+    return { pricingModel: null, currency: "EUR" };
+  }
 
   async isInstantEvalsOptedIn(): Promise<boolean> {
     return false;

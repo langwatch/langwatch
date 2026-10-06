@@ -17,6 +17,7 @@ import {
   type PersonalFeatures,
   type PersonalWorkspace,
   type OrganizationUsageCount,
+  type PricingModel,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
@@ -126,6 +127,17 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
       where: { id: organizationId },
       data: { maxSessionDurationDays },
     });
+  }
+
+  async getPricing({ organizationId }: { organizationId: string }): Promise<{
+    pricingModel: PricingModel | null;
+    currency: "USD" | "EUR";
+  }> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { pricingModel: true, currency: true },
+    });
+    return { pricingModel: row?.pricingModel ?? null, currency: row?.currency ?? "EUR" };
   }
 
   async isInstantEvalsOptedIn({ organizationId }: { organizationId: string }): Promise<boolean> {

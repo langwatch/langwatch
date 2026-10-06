@@ -1,7 +1,7 @@
 /**
- * The two reads the scope capability resolves itself from — cached under the
- * key `trpcQueryKey` would produce for the same procedure, so this package's
- * queries and the application's own share ONE cache entry.
+ * The two reads the scope capability resolves itself from. The graph is keyed
+ * by the signed-in user beside the procedure's own key, so a user switch never
+ * reads the previous user's organization.
  */
 
 import { trpcQueryKey, type ModuleApiClient, type ModuleApiMap } from "@langwatch/api/web";
@@ -32,15 +32,18 @@ export function useUiOrganizations({
   transport,
   isDemo,
   enabled,
+  userId,
 }: {
   transport: UiFeatureApiTransport;
   isDemo: boolean;
   enabled: boolean;
+  userId: string | undefined;
 }): UseQueryResult<readonly UiScopeOrganization[]> {
   const procedure = isDemo ? UI_DEMO_ORGANIZATIONS_PROCEDURE : UI_ORGANIZATIONS_PROCEDURE;
   const input = isDemo ? { isDemo } : {};
+  const [path, options] = trpcQueryKey(procedure, { input, type: "query" });
   return useQuery({
-    queryKey: trpcQueryKey(procedure, { input, type: "query" }),
+    queryKey: [path, { ...options, userId }],
     queryFn: () => transport.query(procedure, input) as Promise<readonly UiScopeOrganization[]>,
     enabled,
   });
