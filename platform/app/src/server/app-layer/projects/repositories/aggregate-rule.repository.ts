@@ -1,3 +1,5 @@
+import type { AggregateRule } from "../aggregate-rule";
+
 /** The reads an aggregate rule needs to decide its members. */
 export interface AggregateRuleRepository {
   /**
@@ -22,4 +24,24 @@ export interface AggregateRuleRepository {
     organizationId: string;
     departmentId: string;
   }): Promise<boolean>;
+}
+
+/** An aggregate project as the reconciler needs it: where it lives, and its rule. */
+export type StoredAggregateProject = {
+  id: string;
+  organizationId: string;
+  /** The project or its team is archived; an archived aggregate reads nothing. */
+  archived: boolean;
+  /** Null when the stored column does not parse as a rule. */
+  rule: AggregateRule | null;
+};
+
+/** The reads the reconciler (ADR-144 block E) makes about aggregates themselves. */
+export interface AggregateProjectRepository {
+  /** The aggregate with this id, or null when no project of kind aggregate has it. */
+  findAggregate(params: {
+    aggregateProjectId: string;
+  }): Promise<StoredAggregateProject | null>;
+  /** The organisation's live aggregates, ordered by id. */
+  findLiveAggregateIds(params: { organizationId: string }): Promise<string[]>;
 }

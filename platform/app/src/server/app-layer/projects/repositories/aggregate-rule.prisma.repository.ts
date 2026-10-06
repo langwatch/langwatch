@@ -1,6 +1,14 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import { NON_DESTINATION_PROJECT_KINDS } from "../project-kinds";
-import type { AggregateRuleRepository } from "./aggregate-rule.repository";
+import { aggregateRuleFromDb } from "../aggregate-rule";
+import {
+  AGGREGATE_PROJECT_KIND,
+  NON_DESTINATION_PROJECT_KINDS,
+} from "../project-kinds";
+import type {
+  AggregateProjectRepository,
+  AggregateRuleRepository,
+  StoredAggregateProject,
+} from "./aggregate-rule.repository";
 
 /**
  * Every read is scoped to one organisation through the project's team, and
@@ -8,7 +16,9 @@ import type { AggregateRuleRepository } from "./aggregate-rule.repository";
  * reads (the governance project, which is not a workspace, and other
  * aggregates, which own no traces).
  */
-export class PrismaAggregateRuleRepository implements AggregateRuleRepository {
+export class PrismaAggregateRuleRepository
+  implements AggregateRuleRepository, AggregateProjectRepository
+{
   constructor(private readonly prisma: PrismaClient) {}
 
   async findPersonalProjectIds({
@@ -71,5 +81,45 @@ export class PrismaAggregateRuleRepository implements AggregateRuleRepository {
       select: { id: true },
     });
     return department !== null;
+  }
+
+  async findAggregate({
+    aggregateProjectId,
+  }: {
+    aggregateProjectId: string;
+  }): Promise<StoredAggregateProject | null> {
+    const row = await this.prisma.project.findFirst({
+      where: { id: aggregateProjectId, kind: AGGREGATE_PROJECT_KIND },
+      select: {
+        id: true,
+        archivedAt: true,
+        aggregateRule: true,
+        team: { select: { organizationId: true, archivedAt: true } },
+      },
+    });
+    if (!row) return null;
+    return {
+      id: row.id,
+      organizationId: row.team.organizationId,
+      archived: row.archivedAt !== null || row.team.archivedAt !== null,
+      rule: aggregateRuleFromDb(row.aggregateRule),
+    };
+  }
+
+  async findLiveAggregateIds({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> {
+    const rows = await this.prisma.project.findMany({
+      where: {
+        kind: AGGREGATE_PROJECT_KIND,
+        archivedAt: null,
+        team: { organizationId, archivedAt: null },
+      },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    return rows.map((row) => row.id);
   }
 }

@@ -35,6 +35,18 @@ export const aggregateRuleSchema = z.discriminatedUnion("kind", [
 
 export type AggregateRule = z.infer<typeof aggregateRuleSchema>;
 
+/**
+ * The rule as stored on `Project.aggregateRule`, or null when the column holds
+ * nothing a rule can be read from. The column is JSON, so a row written by
+ * hand, by an older shape or by a bug reads as "no rule" rather than being
+ * cast into one: a reconciler that guessed at a malformed rule would attach or
+ * revoke reads nobody asked for.
+ */
+export function aggregateRuleFromDb(value: unknown): AggregateRule | null {
+  const parsed = aggregateRuleSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 /** Preselected on creation: every personal project in the organisation. */
 export const AGGREGATE_DEFAULT_RULE = {
   kind: "all-personal",
