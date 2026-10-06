@@ -1277,6 +1277,7 @@ export interface LwqlPrismaRows {
     readonly targetId: "String?";
     readonly before: "Json?";
     readonly after: "Json?";
+    readonly idempotencyKey: "String?";
   };
   readonly LlmPromptConfig: {
     readonly id: "String";
