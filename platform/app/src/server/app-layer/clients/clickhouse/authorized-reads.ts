@@ -299,6 +299,29 @@ export class TenantScopedReader {
 }
 
 /**
+ * The checks a statement and a fragment share: a caller may neither name
+ * the tenant in a predicate of its own nor use the reserved parameter
+ * prefix the fence writes into.
+ */
+function refuseTenantInText({
+  text,
+  queryParams,
+}: {
+  text: string;
+  queryParams: Record<string, unknown>;
+}): void {
+  for (const param of Object.keys(queryParams)) {
+    if (param.startsWith(TENANT_SCOPE_PARAM_PREFIX)) {
+      throw new StatementScopeError({ kind: "reserved-param", param });
+    }
+  }
+  const bare = text.replace(MARKER, " ").replace(SET_MARKER, " ");
+  if (HAND_WRITTEN_TENANT_PREDICATE.test(bare)) {
+    throw new StatementScopeError({ kind: "hand-written-tenant-predicate" });
+  }
+}
+
+/**
  * Expand every marker into the fence and merge its parameters. Pure, so a
  * test can assert the exact statement without a server.
  */
@@ -311,15 +334,7 @@ export function expandStatement({
   queryParams: Record<string, unknown>;
   fence: TenantFence;
 }): { query: string; queryParams: Record<string, unknown> } {
-  for (const param of Object.keys(queryParams)) {
-    if (param.startsWith(TENANT_SCOPE_PARAM_PREFIX)) {
-      throw new StatementScopeError({ kind: "reserved-param", param });
-    }
-  }
-  const bare = query.replace(MARKER, " ").replace(SET_MARKER, " ");
-  if (HAND_WRITTEN_TENANT_PREDICATE.test(bare)) {
-    throw new StatementScopeError({ kind: "hand-written-tenant-predicate" });
-  }
+  refuseTenantInText({ text: query, queryParams });
   const expanded = replaceMarkers({ text: query, queryParams, fence });
   if (expanded.windowed === 0) {
     throw new StatementScopeError({ kind: "missing-marker" });
@@ -350,15 +365,7 @@ export function expandFragment({
   queryParams: Record<string, unknown>;
   fence: TenantFence;
 }): { sql: string; params: Record<string, unknown> } {
-  for (const param of Object.keys(queryParams)) {
-    if (param.startsWith(TENANT_SCOPE_PARAM_PREFIX)) {
-      throw new StatementScopeError({ kind: "reserved-param", param });
-    }
-  }
-  const bare = fragment.replace(MARKER, " ").replace(SET_MARKER, " ");
-  if (HAND_WRITTEN_TENANT_PREDICATE.test(bare)) {
-    throw new StatementScopeError({ kind: "hand-written-tenant-predicate" });
-  }
+  refuseTenantInText({ text: fragment, queryParams });
   const expanded = replaceMarkers({ text: fragment, queryParams, fence });
   return { sql: expanded.text, params: expanded.queryParams };
 }
