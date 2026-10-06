@@ -15,9 +15,10 @@ export function AskLangyButton({ name, onClick }: { name: string; onClick: () =>
         variant="ghost"
         size="xs"
         color="fg.subtle"
+        _hover={{ color: "fg", background: "bg.muted" }}
         onClick={onClick}
       >
-        <Sparkles size={13} aria-hidden />
+        <Sparkles size={14} aria-hidden />
       </IconButton>
     </Tooltip>
   );

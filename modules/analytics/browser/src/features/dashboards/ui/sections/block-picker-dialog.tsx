@@ -1,6 +1,6 @@
 /**
  * The "Add a block" picker: every catalogue widget, narrowed by the templates library's search
- * and chips (kept only while open), in branch sections coloured by trunk. Choosing one adds it,
+ * and filters (kept only while open), in branch sections marked by trunk. Choosing one adds it,
  * then drafts its prompt in Langy when available. A pinned footer asks Langy anything else.
  */
 
@@ -27,7 +27,6 @@ import {
 import { useRef, useState } from "react";
 
 import {
-  AGENT_KIND_LABELS,
   PICKER_QUESTIONS,
   type PickerQuestion,
   type PickerSection,
@@ -51,10 +50,12 @@ import {
   toggleCatalogueFilter,
 } from "../../model/catalogue-filter.ts";
 import {
-  CatalogueFilterChips,
+  AgentKindLabels,
+  CatalogueFilterBar,
   CatalogueFilterLabel,
+  TRUNK_ICONS,
   TRUNK_PALETTES,
-} from "../blocks/catalogue-filter-chips.tsx";
+} from "../blocks/catalogue-filters.tsx";
 
 const QUESTION_ICONS: Readonly<Record<BlockQuestionIcon, LucideIcon>> = {
   gauge: Gauge,
@@ -132,10 +133,9 @@ export function BlockPickerDialog({
             ref={searchRef}
             aria-label="Search questions"
             placeholder={langy.enabled ? "What do you need to know?" : "Search questions"}
-            height="54px"
-            borderRadius="2xl"
-            fontSize="15px"
-            boxShadow="xs"
+            height="44px"
+            borderRadius="xl"
+            fontSize="14px"
             value={filters.search}
             onChange={(event) => setFilters({ ...filters, search: event.target.value })}
             onKeyDown={(event) => {
@@ -144,10 +144,10 @@ export function BlockPickerDialog({
               askLangy(typed);
             }}
           />
-          <CatalogueFilterChips compact filters={filters} counts={counts} onChange={setFilters} />
+          <CatalogueFilterBar compact filters={filters} counts={counts} onChange={setFilters} />
         </VStack>
-        <Dialog.Body overflowY="auto" paddingY={5}>
-          <VStack align="stretch" gap={6}>
+        <Dialog.Body overflowY="auto" paddingX={3} paddingY={4}>
+          <VStack align="stretch" gap={5}>
             {sections.map((section) => (
               <QuestionSection
                 key={section.id}
@@ -158,7 +158,7 @@ export function BlockPickerDialog({
               />
             ))}
             {!hasMatches && (
-              <VStack align="start" gap={2}>
+              <VStack align="start" gap={2} paddingX={2}>
                 <Text fontSize="13px" color="fg.muted">
                   {langy.enabled
                     ? "No matching questions. Ask Langy below."
@@ -176,53 +176,20 @@ export function BlockPickerDialog({
           </VStack>
         </Dialog.Body>
         {langy.enabled && (
-          <Dialog.Footer borderTopWidth="1px" paddingX={5} paddingY={3.5} position="relative">
-            <Box
-              aria-hidden
-              position="absolute"
-              insetX={0}
-              top={0}
-              height="3px"
-              bgGradient="to-r"
-              gradientFrom="purple.400"
-              gradientVia="pink.400/60"
-              gradientTo="transparent"
-            />
+          <Dialog.Footer borderTopWidth="1px" paddingX={5} paddingY={3} background="bg.subtle">
             <HStack width="full" gap={3}>
-              <Box
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                boxSize={7}
-                borderRadius="md"
-                bgGradient="to-br"
-                gradientFrom="purple.500"
-                gradientTo="pink.500"
-                color="white"
-                flexShrink={0}
-              >
-                <Sparkles size={14} strokeWidth={2.1} aria-hidden />
-              </Box>
-              <Text
-                flex={1}
-                minWidth={0}
-                truncate
-                fontSize="12.5px"
-                fontWeight="medium"
-                color="purple.600"
-              >
+              <Text flex={1} minWidth={0} truncate fontSize="13px" color="fg.muted">
                 Can't find what you're looking for?
               </Text>
               <Button
-                variant="solid"
+                size="sm"
+                variant="outline"
                 flexShrink={0}
-                bgGradient="to-r"
-                gradientFrom="purple.600"
-                gradientTo="pink.600"
-                color="white"
-                _hover={{ opacity: 0.9 }}
                 onClick={() => askLangy(filters.search)}
               >
+                <Box as="span" display="inline-flex" colorPalette="purple" color="colorPalette.fg">
+                  <Sparkles size={14} aria-hidden />
+                </Box>
                 Ask Langy
               </Button>
             </HStack>
@@ -233,23 +200,27 @@ export function BlockPickerDialog({
   );
 }
 
-function SectionHeading({ title, why, palette }: { title: string; why: string; palette: string }) {
+/** A branch's heading: its trunk's icon as the one touch of colour, its name and why it matters. */
+function SectionHeading({ section }: { section: PickerSection }) {
+  const Icon = TRUNK_ICONS[section.trunk];
   return (
-    <VStack align="stretch" gap={0.5} paddingX={1}>
-      <Text
-        fontSize="10.5px"
-        fontWeight="semibold"
-        letterSpacing="0.09em"
-        textTransform="uppercase"
-        colorPalette={palette}
+    <HStack gap={2} minWidth={0} paddingX={3} paddingBottom={1}>
+      <Box
+        as="span"
+        display="inline-flex"
+        flexShrink={0}
+        colorPalette={TRUNK_PALETTES[section.trunk]}
         color="colorPalette.fg"
       >
-        {title}
+        <Icon size={13} strokeWidth={2.2} aria-hidden />
+      </Box>
+      <Text as="h3" flexShrink={0} fontSize="12.5px" fontWeight="semibold" color="fg">
+        {section.title}
       </Text>
-      <Text fontSize="12px" lineHeight="relaxed" color="fg.subtle">
-        {why}
+      <Text minWidth={0} truncate fontSize="12px" color="fg.subtle">
+        {section.why}
       </Text>
-    </VStack>
+    </HStack>
   );
 }
 
@@ -271,9 +242,9 @@ function QuestionSection({
       aria-label={section.title}
       data-trunk={section.trunk}
       align="stretch"
-      gap={1.5}
+      gap={0.5}
     >
-      <SectionHeading title={section.title} why={section.why} palette={palette} />
+      <SectionHeading section={section} />
       {section.questions.map((question) => (
         <PickerRow
           key={question.id}
@@ -305,29 +276,22 @@ function PickerRow({
 }) {
   const Icon = QUESTION_ICONS[question.icon];
   const comingSoon = question.status === "coming-soon";
-  const label = (pick: CatalogueFilterPick) => ({
-    isActive: isPicked({ filters, pick }),
-    onToggle: () => onFilter(pick),
-  });
+  const trunkPick: CatalogueFilterPick = { group: "trunks", value: question.trunk };
   return (
     <VStack
       align="stretch"
-      gap={0}
-      borderWidth="1px"
-      borderRadius="xl"
-      borderColor="border"
-      background="bg.panel"
-      boxShadow="xs"
-      _hover={{ borderColor: "teal.solid/50", boxShadow: "sm" }}
+      gap={1.5}
+      paddingX={3}
+      paddingY={2.5}
+      borderRadius="lg"
+      _hover={comingSoon ? void 0 : { background: "bg.muted" }}
     >
       <Button
         variant="plain"
         height="auto"
+        padding={0}
         justifyContent="flex-start"
         gap={3}
-        paddingX={4}
-        paddingTop={3}
-        paddingBottom={1.5}
         fontWeight="normal"
         disabled={comingSoon}
         onClick={onChoose}
@@ -336,56 +300,38 @@ function PickerRow({
           display="flex"
           alignItems="center"
           justifyContent="center"
-          boxSize={8}
+          boxSize={7}
           borderRadius="md"
           colorPalette={palette}
           background="colorPalette.subtle"
           color="colorPalette.fg"
           flexShrink={0}
         >
-          <Icon size={16} strokeWidth={2.1} aria-hidden />
+          <Icon size={14} strokeWidth={2.1} aria-hidden />
         </Box>
         <VStack align="stretch" gap={0} minWidth={0} flex={1} textAlign="start">
-          <Text fontSize="13px" lineHeight="1.375" fontWeight="medium" color="fg" truncate>
+          <Text fontSize="13px" lineHeight="20px" fontWeight="medium" color="fg" truncate>
             {question.question}
           </Text>
-          <Text fontSize="12px" lineHeight="1.625" color="fg.subtle" truncate>
+          <Text fontSize="12px" lineHeight="18px" color="fg.muted" truncate>
             {question.why}
           </Text>
         </VStack>
         {comingSoon && (
-          <Text
-            flexShrink={0}
-            fontSize="11px"
-            fontWeight="medium"
-            color="fg.muted"
-            background="bg.muted"
-            borderRadius="full"
-            paddingX={2}
-            paddingY={0.5}
-          >
+          <Text flexShrink={0} fontSize="12px" color="fg.subtle">
             Coming soon
           </Text>
         )}
       </Button>
-      {/* Lined up under the question text: the row's padding, the icon and the gap. */}
-      <HStack gap={1} wrap="wrap" paddingStart={15} paddingEnd={4} paddingBottom={3}>
+      {/* Lined up under the question text: the icon's width and the gap. */}
+      <HStack gap={1} wrap="wrap" paddingStart={10}>
         <CatalogueFilterLabel
           label={question.trunk}
           colorPalette={palette}
-          {...label({ group: "trunks", value: question.trunk })}
+          isActive={isPicked({ filters, pick: trunkPick })}
+          onToggle={() => onFilter(trunkPick)}
         />
-        {question.agentKinds.length === 0 ? (
-          <CatalogueFilterLabel label="Any agent" />
-        ) : (
-          question.agentKinds.map((kind) => (
-            <CatalogueFilterLabel
-              key={kind}
-              label={AGENT_KIND_LABELS[kind]}
-              {...label({ group: "agentKinds", value: kind })}
-            />
-          ))
-        )}
+        <AgentKindLabels agentKinds={question.agentKinds} filters={filters} onFilter={onFilter} />
       </HStack>
     </VStack>
   );

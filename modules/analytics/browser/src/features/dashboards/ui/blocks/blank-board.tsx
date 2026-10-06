@@ -1,7 +1,7 @@
 /**
- * A board with nothing on it yet: one calm empty state whose single action opens the
- * templates library, so the Ask bar above stays the first thing to reach for. The dashed
- * "Add a block" target stays only as the compact footer on a non-empty board.
+ * A board with nothing on it yet: one calm empty state, centred with room around it, whose
+ * single outlined pill opens the templates library, so the Ask bar above stays the first thing
+ * to reach for. The dashed "Add a block" target stays only as the footer on a non-empty board.
  */
 
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -25,12 +25,12 @@ export function AddBlockCard({ onClick }: { onClick: () => void }) {
       lineHeight="1.45"
       borderWidth="1px"
       borderStyle="dashed"
-      borderColor="border.emphasized/80"
+      borderColor="border.emphasized"
       borderRadius="2xl"
-      color="gray.400"
+      color="fg.subtle"
       fontWeight="normal"
       whiteSpace="normal"
-      _hover={{ borderColor: "teal.solid/60", color: "teal.solid" }}
+      _hover={{ borderColor: "fg.subtle", color: "fg" }}
       onClick={onClick}
     >
       <Box
@@ -60,31 +60,36 @@ export function AddBlockCard({ onClick }: { onClick: () => void }) {
 export function BlankBoard({ templatesHref }: { templatesHref: string }) {
   const host = useAnalyticsHost();
   return (
-    <NoDataInfoBlock
-      title="This board is empty"
-      description="Start from a ready-made dashboard and make it your own."
-      icon={<LayoutTemplate />}
-    >
-      <Button
-        asChild
-        variant="solid"
-        colorPalette="orange"
-        size="md"
-        borderRadius="full"
-        paddingX={5}
+    <Box display="flex" minHeight="360px" paddingY={10}>
+      <NoDataInfoBlock
+        title="This board is empty"
+        description="Start from a ready-made dashboard and make it your own."
+        icon={<LayoutTemplate />}
       >
-        <a
-          href={templatesHref}
-          onClick={(event) => {
-            if (opensElsewhere(event)) return;
-            event.preventDefault();
-            host.navigate(templatesHref);
-          }}
+        <Button
+          asChild
+          variant="outline"
+          size="md"
+          height="40px"
+          gap={2}
+          marginTop={1}
+          paddingX={5}
+          borderRadius="full"
+          fontSize="14px"
         >
-          <LayoutTemplate aria-hidden />
-          Start from a template
-        </a>
-      </Button>
-    </NoDataInfoBlock>
+          <a
+            href={templatesHref}
+            onClick={(event) => {
+              if (opensElsewhere(event)) return;
+              event.preventDefault();
+              host.navigate(templatesHref);
+            }}
+          >
+            <LayoutTemplate size={16} aria-hidden />
+            Start from a template
+          </a>
+        </Button>
+      </NoDataInfoBlock>
+    </Box>
   );
 }
