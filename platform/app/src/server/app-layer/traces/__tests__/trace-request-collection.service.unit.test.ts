@@ -1,14 +1,13 @@
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { describe, expect, it, vi } from "vitest";
-
 import type {
   PIIRedactionLevel,
   RecordSpanCommandData,
 } from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import type { SpanDedupService } from "../span-dedupe.service";
-import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { parseOtlpTraces } from "../../../otel/parseOtlpBody";
+import type { SpanDedupService } from "../span-dedupe.service";
 import { TraceRequestCollectionService } from "../trace-request-collection.service";
 
 function makeOtlpSpan(overrides: Partial<OtlpSpan> = {}): OtlpSpan {
@@ -409,8 +408,8 @@ describe("TraceRequestCollectionService.handleOtlpTraceRequest", () => {
           }),
         );
 
-        const requestType = (root as any).opentelemetry.proto.collector.trace
-          .v1.ExportTraceServiceRequest;
+        const requestType = (root as any).opentelemetry.proto.collector.trace.v1
+          .ExportTraceServiceRequest;
         const protobufBody = toBuffer(
           requestType
             .encode(
@@ -446,10 +445,7 @@ describe("TraceRequestCollectionService.handleOtlpTraceRequest", () => {
             .finish(),
         );
 
-        const ingest = async (
-          body: ArrayBuffer,
-          contentType: string,
-        ) => {
+        const ingest = async (body: ArrayBuffer, contentType: string) => {
           const parsed = parseOtlpTraces(body, contentType);
           if (!parsed.ok) throw new Error(parsed.error);
           const harness = makeService();
