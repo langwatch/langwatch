@@ -25,7 +25,8 @@ export class AutomationSettlementBreachLoggedService extends AutomationSettlemen
         count: input.count,
         skipped: input.skipped,
       },
-      "Automation passed its daily ceiling on confirmed matches and further matches are being skipped; this process composed no containment, so nobody has been notified and the automation has not been paused",
+      "Automation passed its daily ceiling on confirmed matches and further matches are being skipped; " +
+        "this process composed no containment, so nobody has been notified and the automation has not been paused",
     );
     return Promise.resolve();
   }

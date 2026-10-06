@@ -41,7 +41,8 @@ function refuseDelivery(): Promise<never> {
   return Promise.reject(
     new DispatchError({
       message:
-        "This process composes no outbound automation delivery: it named no BASE_HOST, so a digest would carry links back to nowhere. Set BASE_HOST to send settled notifications from here.",
+        "This process composes no outbound automation delivery: it named no BASE_HOST, so a digest " +
+        "would carry links back to nowhere. Set BASE_HOST to send settled notifications from here.",
       retryable: false,
     }),
   );

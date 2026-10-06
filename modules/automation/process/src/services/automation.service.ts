@@ -42,6 +42,7 @@ import { describeNextFiring } from "../rules/next-firing.rules.ts";
 import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import { AutomationEmailSuppressionService } from "./automation-email-suppression.service.ts";
+import { AutomationFireHistoryService } from "./automation-fire-history.service.ts";
 import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 import type { AutomationTemplateService } from "./automation-template.service.ts";
 import type { AutomationPersistCapService } from "./persist-cap.service.ts";
@@ -50,6 +51,22 @@ import type { AutomationGraphService } from "./trigger-graph.service.ts";
 
 /** The webhook module's log of this module's webhook attempts (ADR-167). */
 type WebhookDeliveryLog = Pick<WebhookApi, "findDeliveriesBySource">;
+
+type AutomationServiceDeps = {
+  triggers: TriggerRepository;
+  history: TriggerFireHistoryRepository;
+  suppressions: EmailSuppressionRepository;
+  names: EmailSuppressionNameRepository;
+  verifier: UnsubscribeTokenVerifier;
+  reportSchedules: ReportScheduleService;
+  clock: AutomationClock;
+  customGraphs: CustomGraphRepository;
+  webhookDeliveries: WebhookDeliveryLog;
+  graph: AutomationGraphService;
+  templates: AutomationTemplateService;
+  persistCaps: AutomationPersistCapService;
+  slackConnections: AutomationSlackConnectionService;
+};
 
 /**
  * The automation feature's own trigger-and-suppression service, narrowed
@@ -60,7 +77,7 @@ type WebhookDeliveryLog = Pick<WebhookApi, "findDeliveriesBySource">;
 export class AutomationService {
   private readonly activeCache: ActiveTriggerCacheService;
   private readonly triggers: TriggerRepository;
-  private readonly history: TriggerFireHistoryRepository;
+  private readonly fires: AutomationFireHistoryService;
   private readonly emailSuppressions: AutomationEmailSuppressionService;
   private readonly reportSchedules: ReportScheduleService;
   private readonly clock: AutomationClock;
@@ -85,23 +102,9 @@ export class AutomationService {
     templates,
     persistCaps,
     slackConnections,
-  }: {
-    triggers: TriggerRepository;
-    history: TriggerFireHistoryRepository;
-    suppressions: EmailSuppressionRepository;
-    names: EmailSuppressionNameRepository;
-    verifier: UnsubscribeTokenVerifier;
-    reportSchedules: ReportScheduleService;
-    clock: AutomationClock;
-    customGraphs: CustomGraphRepository;
-    webhookDeliveries: WebhookDeliveryLog;
-    graph: AutomationGraphService;
-    templates: AutomationTemplateService;
-    persistCaps: AutomationPersistCapService;
-    slackConnections: AutomationSlackConnectionService;
-  }) {
+  }: AutomationServiceDeps) {
     this.triggers = triggers;
-    this.history = history;
+    this.fires = AutomationFireHistoryService.create({ history, clock });
     this.emailSuppressions = AutomationEmailSuppressionService.create({
       suppressions,
       names,
@@ -118,21 +121,7 @@ export class AutomationService {
     this.activeCache = ActiveTriggerCacheService.create({ triggers, clock });
   }
 
-  static create(deps: {
-    triggers: TriggerRepository;
-    history: TriggerFireHistoryRepository;
-    suppressions: EmailSuppressionRepository;
-    names: EmailSuppressionNameRepository;
-    verifier: UnsubscribeTokenVerifier;
-    reportSchedules: ReportScheduleService;
-    clock: AutomationClock;
-    customGraphs: CustomGraphRepository;
-    webhookDeliveries: WebhookDeliveryLog;
-    graph: AutomationGraphService;
-    templates: AutomationTemplateService;
-    persistCaps: AutomationPersistCapService;
-    slackConnections: AutomationSlackConnectionService;
-  }): AutomationService {
+  static create(deps: AutomationServiceDeps): AutomationService {
     return new AutomationService(deps);
   }
 
@@ -352,9 +341,8 @@ export class AutomationService {
     });
   }
 
-  /** Main's view read: a page of fires, empty (not refused) for a trigger that is not there. */
   listFireHistoryPage(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage> {
-    return this.history.listPageByTriggerId(input);
+    return this.fires.listPage(input);
   }
 
   syncReportSchedule(input: {
@@ -379,45 +367,17 @@ export class AutomationService {
   }
 
   getFireStats(input: { projectId: string }): Promise<TriggerFireStats[]> {
-    return this.history.findAllStatsForProject({
-      projectId: input.projectId,
-      firesSince: this.clock.now().subtract({ milliseconds: 30 * 24 * 60 * 60 * 1000 }),
-    });
+    return this.fires.getStats(input);
   }
 
-  getRecentFires(input: {
-    projectId: string;
-    triggerId?: string;
-    limit: number;
-  }): Promise<TriggerFire[]> {
-    return input.triggerId
-      ? this.history.findAllRecentByTriggerId({
-          projectId: input.projectId,
-          triggerId: input.triggerId,
-          limit: input.limit,
-        })
-      : this.history.findAllRecentForProject({
-          projectId: input.projectId,
-          limit: input.limit,
-        });
+  getRecentFires(
+    input: Parameters<AutomationFireHistoryService["getRecent"]>[0],
+  ): Promise<TriggerFire[]> {
+    return this.fires.getRecent(input);
   }
 
-  recordFire(input: {
-    projectId: string;
-    triggerId: string;
-    traceId?: string | null;
-    customGraphId?: string | null;
-    createdAt: Instant;
-    resolvedAt?: Instant | null;
-  }): Promise<TriggerFire> {
-    return this.history.create({
-      projectId: input.projectId,
-      triggerId: input.triggerId,
-      traceId: input.traceId ?? null,
-      customGraphId: input.customGraphId ?? null,
-      createdAt: input.createdAt,
-      resolvedAt: input.resolvedAt ?? null,
-    });
+  recordFire(input: Parameters<AutomationFireHistoryService["record"]>[0]): Promise<TriggerFire> {
+    return this.fires.record(input);
   }
 
   getSuppressions(input: { projectId: string }): Promise<EmailSuppression[]> {
