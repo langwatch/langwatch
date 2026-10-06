@@ -48,6 +48,24 @@ describe("hosted MCP app installation", () => {
     }
   });
 
+  /** @scenario "A process without authorization refuses to boot by name" */
+  it("refuses at boot, naming authz, when the process composed no authorization service", async () => {
+    const withoutAuthz = createApp({ role: "api" })
+      .withModules([hostedMcpProcessModule])
+      .withStores(memoryStores())
+      .withConfig({ "hosted-mcp": { publicBaseUrl: "https://app.langwatch.ai" } })
+      .provide({
+        project: createApiFixture<ProjectApi>(),
+        auth: createApiFixture<AuthApi>(),
+        governance: createApiFixture<GovernanceRestApi>(),
+      });
+
+    // wrong-typed input: the types already refuse a missing peer; boot must too
+    const bootWithoutAuthz = (withoutAuthz as unknown as { boot(): Promise<unknown> }).boot();
+
+    await expect(bootWithoutAuthz).rejects.toThrow(/authz/i);
+  });
+
   it("refuses at boot, naming redis, when a live process has no Redis", async () => {
     const resources = new ResourceScope();
 

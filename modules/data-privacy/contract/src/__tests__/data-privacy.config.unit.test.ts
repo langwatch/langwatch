@@ -18,6 +18,16 @@ describe("data privacy server configuration", () => {
     });
   });
 
+  describe("given no privacy variable is set", () => {
+    /** @scenario "The four privacy variables are read the way the application reads them" */
+    it("leaves redaction on and carries each variable as the deployment wrote it", () => {
+      expect(read({}).enforcement).toBeUndefined();
+      expect(read({ LANGWATCH_DATA_PRIVACY_ENFORCEMENT: "off" }).enforcement).toBe("off");
+      expect(read({ LANGWATCH_DISABLE_GOOGLE_DLP: "true" }).googleDlpDisabled).toBe("true");
+      expect(read({}).googleDlpDisabled).toBeUndefined();
+    });
+  });
+
   describe("given native enforcement is turned off", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
     it("carries the deployment's own word for it", () => {

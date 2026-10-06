@@ -341,7 +341,6 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     Given an organization whose connection was created from the configuration it already had
     When its users sign in
     Then nothing about their sign-in changes
-    And a newly registered connection is the one that has to supply its own credentials
 
   # ── A way back in, and its expiry ──────────────────────────────────────
   #

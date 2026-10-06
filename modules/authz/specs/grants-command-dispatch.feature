@@ -85,6 +85,13 @@ Feature: One description of how grant commands are dispatched
       And its six command senders are all present
 
     @unit
+    Scenario: The API process registers the packaged grants pipeline, not a copy
+      Given a producer-only runtime
+      When the packaged grants pipeline is registered
+      Then it is registered under the packaged pipeline name
+      And a second registration of it is refused as already registered
+
+    @unit
     Scenario: A produced command carries the consuming process's routing key
       Given a producer-only registration of the packaged grants pipeline
       When each of the six commands is sent with a valid payload

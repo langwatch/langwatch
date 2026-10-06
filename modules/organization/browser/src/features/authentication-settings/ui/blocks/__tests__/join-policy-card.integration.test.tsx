@@ -57,6 +57,15 @@ const option = (value: string): HTMLInputElement => {
 
 describe("given the who-can-join policy", () => {
   describe("when the organization holds the Enterprise plan", () => {
+    /** @scenario The two ways a domain matters are told apart */
+    it("tells asking to join apart from joining automatically on a verified domain", () => {
+      renderCard({});
+
+      const text = screen.getByTestId("join-policy-card").textContent ?? "";
+      expect(text).toContain("People with a verified company address can ask to join.");
+      expect(text).toContain("People on a verified domain join without waiting for approval.");
+    });
+
     it("offers all three settings and no plan notice", () => {
       renderCard();
 

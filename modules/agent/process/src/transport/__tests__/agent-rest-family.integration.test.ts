@@ -7,7 +7,7 @@ import { agentSchema, type Agent } from "@langwatch/agent-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { agentFixture } from "../../app/__tests__/agent.fixture.ts";
-import { AGENTS_ALIAS_SUCCESSOR } from "../agent-legacy.rest.ts";
+import { AGENTS_ALIAS_SUCCESSOR, agentLegacyRest } from "../agent-legacy.rest.ts";
 import { createAgentRest } from "../agent.rest.ts";
 import { buildAgentApps, PROJECT_ID } from "./agent-rest.fixture.ts";
 
@@ -344,6 +344,18 @@ describe("given the deprecated /api/agents alias", () => {
       expect(response.headers.get("Link")).toBe(
         `<${AGENTS_ALIAS_SUCCESSOR}>; rel="successor-version"`,
       );
+    });
+  });
+
+  describe("when its declaration is read", () => {
+    /** @scenario "Legacy REST is documented as deprecated" */
+    it("is deprecated toward the successor family and kept out of the published document", async () => {
+      const declaration = agentLegacyRest.router();
+
+      expect(declaration.deprecated).toMatchObject({ successor: AGENTS_ALIAS_SUCCESSOR });
+      expect(declaration.routes.length).toBeGreaterThan(0);
+      expect(declaration.routes.every((route) => route.docs?.hide === true)).toBe(true);
+      expect((await api.legacy("/api/agents")).status).toBe(200);
     });
   });
 

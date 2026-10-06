@@ -176,6 +176,18 @@ describe("ShareService", () => {
   });
 
   describe("resolveForViewer()", () => {
+    describe("given a trace id presented in place of the token", () => {
+      /** @scenario Knowing a shared trace's id is not enough to read it */
+      it("throws not-found, because no share carries that token", async () => {
+        vi.mocked(repo.findByToken).mockResolvedValue(null);
+
+        await expect(
+          service.resolveForViewer({ token: "trace-1", viewer: anonymousViewer }),
+        ).rejects.toThrow(ShareLinkNotFoundError);
+        expect(repo.findByToken).toHaveBeenCalledWith("trace-1");
+      });
+    });
+
     describe("given no share matches the token", () => {
       it("throws not-found", async () => {
         vi.mocked(repo.findByToken).mockResolvedValue(null);

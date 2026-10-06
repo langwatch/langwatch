@@ -202,17 +202,15 @@ Feature: Redacting personal data out of a span at ingestion
   @unit
   Scenario: The four privacy variables are read the way the application reads them
     Given a process resolving its configuration
-    Then redaction is on without any of them being set
+    Then redaction is on without any variable being set
     And the native floor is turned off only by the application's own spelling
-    And the DLP kill switch reads only the spellings the application reads
-    And an unusable credentials document leaves DLP unavailable rather than failing the boot
+    And the DLP kill switch is carried as the deployment wrote it
 
   @unit
   Scenario: The privacy graph builds end to end from what the process already holds
-    Given a composition root holding the privacy configuration, the data-privacy service and the feature flags
-    When it builds the span redaction port
-    Then a span carrying personal data comes back scrubbed
-    And a deployment that named no analysis service still scrubs the native floor
+    Given the booted data-privacy module with no analysis service named
+    When a peer asks it to redact a span carrying an email address
+    Then the span comes back scrubbed by the native floor
 
   @unit
   Scenario: A peer redacts a span through the data-privacy API

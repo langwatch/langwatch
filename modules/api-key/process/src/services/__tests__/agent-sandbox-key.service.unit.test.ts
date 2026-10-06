@@ -97,6 +97,7 @@ describe("AgentSandboxKeyService", () => {
   });
 
   describe("given a project in a personal workspace", () => {
+    /** @scenario "A run in a personal workspace gets a key its owner holds" */
     it("mints the key as the workspace owner's own", async () => {
       const { service, created } = createService({ personal: { ownerUserId: "owner-1" } });
 
@@ -116,6 +117,7 @@ describe("AgentSandboxKeyService", () => {
   });
 
   describe("given a key already shared by the project's runs", () => {
+    /** @scenario "A later run in the same project reuses the key" */
     it("hands later runs the same key for eight hours, then mints the next", async () => {
       const { service, created } = createService();
 

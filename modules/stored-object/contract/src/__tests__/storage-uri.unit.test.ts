@@ -34,6 +34,7 @@ describe("stored object storage URIs", () => {
     ).toBe("file:///var/lib/langwatch/objects/proj-abc/deadbeef1234");
   });
 
+  /** @scenario "Stored Objects has one portable storage URI owner" */
   it("keeps the Azure account and container in the URI authority", () => {
     expect(
       mintAzureBlobStoredObjectUri({
@@ -45,6 +46,7 @@ describe("stored object storage URIs", () => {
     ).toBe("azure-blob://account/stored-objects/proj-abc/deadbeef1234");
   });
 
+  /** @scenario "Stored Objects has one portable storage URI owner" */
   it("recognizes only configured object driver schemes", () => {
     expect(getStoredObjectStorageScheme("s3://my-bucket/proj/sha")).toBe("s3");
     expect(() => getStoredObjectStorageScheme("gs://bucket/object")).toThrow(
@@ -52,6 +54,7 @@ describe("stored object storage URIs", () => {
     );
   });
 
+  /** @scenario "Stored Objects has one portable storage URI owner" */
   it("redacts tenant storage destinations and authorization material", () => {
     expect(redactStoredObjectStorageUri("S3://customer-private/proj-abc/sha256")).toBe(
       "S3://***/proj-abc/sha256",

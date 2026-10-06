@@ -19,6 +19,7 @@ const renderCard = (card: React.ReactNode) =>
 
 describe("the account lockout card", () => {
   describe("given lockout is off", () => {
+    /** @scenario The threshold is offered with the numbers the control asks for */
     it("offers the lock and saves the offered threshold", async () => {
       const onSave = vi.fn();
       renderCard(
@@ -28,6 +29,10 @@ describe("the account lockout card", () => {
       expect(screen.queryByTestId("sign-in-lockout-save")).toBeNull();
       // userEvent, not fireEvent: Chakra's radio group only hears a real click.
       await userEvent.click(screen.getByText("Temporary lockout"));
+      expect((screen.getByTestId("sign-in-lockout-attempts") as HTMLInputElement).value).toBe("5");
+      expect((screen.getByTestId("sign-in-lockout-minutes") as HTMLInputElement).value).toBe("30");
+      expect(screen.getByText("Applies to new sign-ins.")).toBeTruthy();
+      expect(onSave).not.toHaveBeenCalled();
       await userEvent.click(screen.getByTestId("sign-in-lockout-save"));
 
       expect(onSave).toHaveBeenCalledWith({

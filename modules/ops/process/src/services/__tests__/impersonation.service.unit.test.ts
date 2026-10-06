@@ -121,7 +121,10 @@ const input = {
 };
 
 describe("ImpersonationService", () => {
-  /** @scenario "A healthy target receives a bounded session window" */
+  /**
+   * @scenario "A healthy target receives a bounded session window"
+   * @scenario Starting an impersonation still takes a reason
+   */
   it("audits before installing a one-hour impersonation window", async () => {
     const repository = new InMemoryImpersonationRepository(target());
     const { audit, service } = serviceFor(repository);

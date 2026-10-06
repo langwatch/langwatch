@@ -589,16 +589,19 @@ describe("the scenario-events usage gate", () => {
   });
 
   describe("when the organization is within its allowance", () => {
-    it("asks for the organization the project belongs to", async () => {
+    /** @scenario "Reporting a scenario event within the allowance is accepted" */
+    it("asks for the organization the project belongs to, then writes the event", async () => {
       const assertWithinUsageLimit = vi.fn(async () => {});
+      const messageSnapshot = vi.fn(async () => {});
       const family = await buildEventFamily({
-        simulations: { messageSnapshot: async () => {} },
+        simulations: { messageSnapshot },
         plans: { assertWithinUsageLimit },
       });
 
       const response = await postJson(family, "/api/scenario-events", messageSnapshotEvent());
       expect(response.status).toBe(201);
       expect(assertWithinUsageLimit).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID });
+      expect(messageSnapshot).toHaveBeenCalledTimes(1);
     });
   });
 });

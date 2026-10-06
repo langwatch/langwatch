@@ -169,10 +169,12 @@ const callbackWith = async ({
   auth,
   variant,
   state: stateOverride,
+  replay = false,
 }: {
   auth: ReturnType<typeof buildHarness>["auth"];
   variant: TokenVariant;
   state?: string | null;
+  replay?: boolean;
 }) => {
   const started = await auth.handler(
     new Request(`${BASE_URL}/api/auth/sign-in/social`, {
@@ -197,7 +199,23 @@ const callbackWith = async ({
     .map((value) => value.split(";", 1)[0])
     .join("; ");
 
-  return auth.handler(new Request(callback, { headers: { cookie }, redirect: "manual" }));
+  const first = await auth.handler(
+    new Request(callback, { headers: { cookie }, redirect: "manual" }),
+  );
+  if (!replay) return first;
+  const jar = new Map(
+    cookie.split("; ").map((pair) => pair.split(/=(.*)/s, 2) as [string, string]),
+  );
+  for (const setCookie of first.headers.getSetCookie()) {
+    const [pair = ""] = setCookie.split(";", 1);
+    const [name = "", value = ""] = pair.split(/=(.*)/s, 2);
+    if (value === "" || /max-age=0/i.test(setCookie)) jar.delete(name);
+    else jar.set(name, value);
+  }
+  const replayCookie = [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
+  return auth.handler(
+    new Request(callback, { headers: { cookie: replayCookie }, redirect: "manual" }),
+  );
 };
 
 beforeAll(startIdentityProvider);
@@ -267,5 +285,16 @@ describe("the Auth0 provider this deployment builds", () => {
     expect(response.headers.get("location")).toContain("error=");
     expect(db.account).toHaveLength(0);
     expect(db.session).toHaveLength(0);
+  });
+
+  /** @scenario Replaying an accepted callback creates no additional account or session */
+  it("refuses a replayed callback after the browser applied the response cookies", async () => {
+    const { auth, db } = buildHarness();
+
+    const response = await callbackWith({ auth, variant: "valid", replay: true });
+
+    expect(response.headers.get("location")).toContain("error=");
+    expect(db.account).toHaveLength(1);
+    expect(db.session).toHaveLength(1);
   });
 });

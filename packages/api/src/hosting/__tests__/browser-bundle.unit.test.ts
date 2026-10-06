@@ -111,7 +111,10 @@ describe("the browser application on the door", () => {
     });
   }
 
-  /** @scenario "The browser application answers an unclaimed address" */
+  /**
+   * @scenario "The browser application answers an unclaimed address"
+   * @scenario "The production API serves the built UI artifact"
+   */
   it("serves the shell at an address no transport claimed, for the single page application to route", async () => {
     const response = await bundleOver(await fixture()).fetch(
       new Request("http://localhost/projects/one/settings"),

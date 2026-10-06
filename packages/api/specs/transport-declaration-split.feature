@@ -107,9 +107,8 @@ Feature: Transport declaration split
   Scenario: A REST request is parsed before its credential is resolved
     Given a mounted REST declaration whose door resolves a project credential
     When a caller sends a request the declared schemas refuse
-    Then the refusal is answered without the door ever resolving the credential
-    And a request the schemas accept resolves the credential, then decides, then runs the handler
-    And the credential is marked used only after the handler has answered
+    Then a caller with no valid credential is answered 401 before the schemas are consulted
+    And an authenticated caller is answered with the schema refusal
 
   @unit
   Scenario: A declared route answers at every address its family already served

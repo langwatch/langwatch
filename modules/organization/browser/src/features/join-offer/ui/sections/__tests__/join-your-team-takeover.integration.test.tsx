@@ -104,6 +104,18 @@ describe("given a person with a pending request to join an organization", () => 
     expect(screen.queryByTestId("current-organization")).not.toBeInTheDocument();
   });
 
+  /** @scenario A pending join request can be left by signing out */
+  it("starts the sign-out flow from the waiting screen", () => {
+    state.mine = [{ joinRequestId: "jr_1", organizationId: "org_current" }];
+
+    const { host } = renderWithOrganizationHost(
+      <JoinYourTeamTakeover currentOrganizationId="org_current" fallback={<div />} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(host.signedOut).toBe(true);
+  });
+
   it("leaves the dashboard alone once it has resolved to a different organization", () => {
     state.mine = [{ joinRequestId: "jr_other", organizationId: "org_other" }];
 

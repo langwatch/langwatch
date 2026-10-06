@@ -122,6 +122,7 @@ describe.skipIf(!DB_URL)("given an organization with two full members and one li
   });
 
   /** @scenario "Role change refused at a seat limit triggers notification" */
+  /** @scenario "Blocks upgrade from Lite Member to full member when at member limit" */
   it("refuses promoting the lite member past the plan and records the seat-limit event", async () => {
     const { infrastructure, recorded } = infrastructureOnPlan({ maxMembers: 2, maxMembersLite: 1 });
 
@@ -137,6 +138,22 @@ describe.skipIf(!DB_URL)("given an organization with two full members and one li
     expect(recorded).toEqual([
       expect.objectContaining({ organizationId, limitType: "members", current: 2, max: 2 }),
     ]);
+  });
+
+  /** @scenario "Allows upgrade from Lite Member to full member when under limit" */
+  it("lets the lite member become a full member while a full seat is free", async () => {
+    const { infrastructure, recorded } = infrastructureOnPlan({ maxMembers: 3, maxMembersLite: 1 });
+
+    await expect(
+      infrastructure.seats.assertRoleChangeAllowed({
+        organizationId,
+        currentRole: OrganizationUserRole.EXTERNAL,
+        userPermissions: undefined,
+        role: OrganizationUserRole.MEMBER,
+      }),
+    ).resolves.toBeUndefined();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(recorded).toEqual([]);
   });
 
   /** @scenario Developers are counted and never capped */

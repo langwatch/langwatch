@@ -569,11 +569,10 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
 
   @unit
   Scenario: The simulator is dialled outside production and nowhere else
-    Given a developer registering a connection against the identity provider
-    simulator
-    When the issuer they give is the simulator's own address
-    Then the provider is asked whether it is one
-    But the same address is refused on a production installation
+    Given a worktree running the identity-provider simulator
+    When the issuer a connection gives is the simulator's own address
+    Then its origin is trusted, so the sign-in engine may fetch from it
+    But the same address is not trusted on a production installation
 
   @unit
   Scenario: Vouching for an origin does not vouch for where it redirects

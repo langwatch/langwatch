@@ -105,6 +105,7 @@ function sealOf(claims: Record<string, unknown>): string {
 describe("storedObjects.getReadUrl and the signed content route", () => {
   describe("given a session viewer with the object's permission", () => {
     /** @scenario "A signed-in viewer gets a read URL that serves the object's bytes" */
+    /** @scenario "The browser reads stored media through a URL tRPC minted" */
     it("mints a same-origin URL that serves the bytes", async () => {
       const { session, fetch } = installed();
 

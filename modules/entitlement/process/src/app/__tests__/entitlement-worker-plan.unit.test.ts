@@ -150,6 +150,29 @@ describe("given the entitlement module installed on the worker role", () => {
     });
   });
 
+  describe("when the interactive process resolves a licensed organization's plan", () => {
+    /** @scenario "A licensed self-hosted deployment resolves the plan its licence names" */
+    it("answers the licence's plan, its seats and unmetered volume, and on hosted the licence outranks the subscription", async () => {
+      const licence: EntitlementGrant = { granted: true, plan: enterprise };
+
+      const selfHosted = await planOn({ role: "api", isSaas: false, licence });
+      const hosted = await planOn({
+        role: "api",
+        isSaas: true,
+        licence,
+        billing: billingAnswering(() => launch),
+      });
+
+      expect(selfHosted).toMatchObject({
+        type: "ENTERPRISE",
+        planSource: "license",
+        maxMembers: 42,
+        maxMessagesPerMonth: UNLIMITED,
+      });
+      expect(hosted).toMatchObject({ type: "ENTERPRISE", planSource: "license", maxMembers: 42 });
+    });
+  });
+
   describe("when the worker boots without a plan source", () => {
     /** @scenario "A worker without a plan source never boots" */
     it("refuses the boot, naming the dependency and its token", async () => {

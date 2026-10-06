@@ -374,6 +374,7 @@ describe("sso connection guards", () => {
 
     /** @scenario "Activation requires a verified domain and a live break-glass binding" */
     /** @scenario "Activation needs somebody who can still get in without the identity provider" */
+    /** @scenario The only connection on an installation still leaves a way in */
     it("refuses without a live break-glass binding and succeeds with one", async () => {
       breakGlass.set(false);
       await expect(

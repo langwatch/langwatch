@@ -47,6 +47,7 @@ Feature: Composing durable metric processing
 
   @unit
   Scenario: Producer and consumer clamp one lane count
-    Given a lane count named in the environment
-    When the worker composes durable metric and log processing
-    Then the command lanes are spread over that many shards
+    Given a shard count named in configuration
+    When the metric command lanes are computed
+    Then the count is clamped to 1-128 and the lane is always bounded and non-empty
+    And the commands registered on the real pipeline route through those lanes

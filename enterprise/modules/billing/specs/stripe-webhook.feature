@@ -89,9 +89,10 @@ Feature: Stripe webhook handling grants and removes plans correctly
 
   @unit
   Scenario: A deployment that bills composes the real subscription services
-    Given an installation configured with a payment provider
-    When the billing webhook is composed
-    Then checkout, the billing portal, invoices and seat changes are answered by real services
+    Given an installation configured with a payment provider and a signing secret
+    When the billing application is composed
+    Then connected renewals and seat changes are answered by the composed services
+    And a delivery signed with that secret is acknowledged
 
   @unit
   Scenario: A deployment with no Stripe composed answers the callback with 404

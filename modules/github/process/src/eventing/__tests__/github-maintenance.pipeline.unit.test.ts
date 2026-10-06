@@ -40,6 +40,21 @@ describe("the GitHub maintenance pipeline", () => {
     });
   });
 
+  describe("given the process store the pipeline was built with", () => {
+    /** @scenario "The worker composes the branch sweep from the feature package" */
+    it("reaps the recheck process's dispatched outbox rows when it prunes", async () => {
+      const { definition, sweep, deleteDispatchedBefore } = build();
+      const intents = definition.processManagers.get("githubBranchRecheck")!.config.intents!;
+
+      await intents.prune!.run({ scheduledFor: 0 } as never, {} as never);
+
+      expect(sweep.pruneStaleBranchLinkage).toHaveBeenCalledTimes(1);
+      expect(deleteDispatchedBefore).toHaveBeenCalledWith(
+        expect.objectContaining({ processName: expect.any(String) }),
+      );
+    });
+  });
+
   describe("given a sweep that is not the published GitHub service", () => {
     /**
      * The narrowing that lets a worker mount this at all: the definition takes

@@ -124,6 +124,7 @@ describe("the sso connection grandfather migration", () => {
   describe("given an organization carrying legacy ssoDomain and a provider string", () => {
     describe("when the migration runs for it", () => {
       /** @scenario "A legacy SSO organization is grandfathered without noticing" */
+      /** @scenario A connection carried over from an earlier configuration keeps routing */
       it("backfills a VERIFIED, ACTIVE connection from history that routes sign-ins exactly as before", async () => {
         const legacyRouting = new StubRouting({
           "acme.com": routable({ connectionId: `org:${ORG}` }),

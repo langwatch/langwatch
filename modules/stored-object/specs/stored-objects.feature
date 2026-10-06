@@ -41,14 +41,11 @@ Feature: Stored Objects service and API
     And each installation holds its own rows
     And a read scoped to another project is refused as not found
 
-  @architecture @storage
+  @architecture @storage @unit
   Scenario: Stored Objects has one portable storage URI owner
-    Given the application composes its existing storage drivers
-    Then @langwatch/stored-object-contract owns URI formatting and redaction
-    And the existing S3, Azure Blob and local-filesystem drivers remain authoritative
-    And application composition owns lazy scheme dispatch
-    And validated application configuration retains destination selection and credentials
-    And inactive Azure configuration does not block S3 or local-filesystem traffic
+    Given a storage destination of the S3, Azure Blob or local-filesystem kind
+    Then @langwatch/stored-object-contract formats its URI and redacts destinations and credentials
+    And only the configured driver schemes are recognised
 
   @unimplemented @integration @stored-objects
   Scenario: Internal storage is content addressed

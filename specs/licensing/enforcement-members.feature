@@ -294,19 +294,20 @@ Feature: Member Limit Enforcement with License
   # ============================================================================
 
   Scenario: Blocks upgrade from Lite Member to full member when at member limit
-    Given the organization has 3 Full Members
+    Given the organization has 2 Full Members
     And the organization has 1 Lite Member user "lite@example.com"
-    And the organization has a license with maxMembers 3
+    And the organization has a license with maxMembers 2
     When I update "lite@example.com" org role to MEMBER
-    Then the request fails with FORBIDDEN
-    And the error message contains "member limit reached"
+    Then the change is refused with code resource_limit_exceeded
+    And the seat-limit event is recorded for the members limit
 
   Scenario: Allows upgrade from Lite Member to full member when under limit
     Given the organization has 2 Full Members
     And the organization has 1 Lite Member user "lite@example.com"
     And the organization has a license with maxMembers 3
     When I update "lite@example.com" org role to MEMBER
-    Then the update succeeds
+    Then the change is allowed
+    And no seat-limit event is recorded
 
   @unimplemented
   Scenario: Blocks custom role change that would exceed full member limit

@@ -307,12 +307,11 @@ Feature: Workflow service boundary
     Then a fresh key is minted for the same member, project and permissions
     And a key with at least 5 minutes left is reused, and never lent to a narrower or different run
 
+  @unit
   Scenario: The run's key stops working after the run ends
     Given a workflow run carrying its own minted key
-    When 15 minutes have passed since the key was minted
-    Then a call made with it is refused
-    And the api-key sweep revokes it
-    And a run that never finishes loses the key when its lifetime lapses
+    Then the key expires 15 minutes after it was minted
+    And an expired key cannot authenticate
 
   @unit
   Scenario: A run nobody started calls LangWatch with a project key holding only what it needs

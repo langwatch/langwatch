@@ -104,6 +104,7 @@ type Setup = {
   cached?: unknown;
   refuseKey?: string;
   canSeeCosts?: boolean;
+  visibilityCutoffMs?: number;
 };
 
 function setup(options: Setup = {}) {
@@ -112,20 +113,25 @@ function setup(options: Setup = {}) {
     protections: [] as { userId: string | undefined; publiclyShared: boolean }[],
     limitKeys: [] as string[],
     cached: [] as unknown[],
+    cutoffs: [] as (number | null | undefined)[],
   };
   const protections: Protections = {
     canSeeCosts: options.canSeeCosts ?? false,
     canSeeCapturedInput: true,
     canSeeCapturedOutput: true,
-    visibilityCutoffMs: null,
+    visibilityCutoffMs: options.visibilityCutoffMs ?? null,
   };
   const reads = createApiFixture<TraceApi>({
-    readTraceSummary: async () => {
+    readTraceSummary: async (input) => {
+      calls.cutoffs.push(input.visibilityCutoffMs);
       if (options.missingTrace) throw new TraceNotFoundError(TRACE_ID);
       return summary();
     },
     readSpanSummaries: async () => [],
-    readSpans: async () => options.spans ?? [],
+    readSpans: async (input) => {
+      calls.cutoffs.push(input.visibilityCutoffMs);
+      return options.spans ?? [];
+    },
     readLangwatchSignals: async () => [],
     readSpanResources: async () => [],
     readTraceEvents: async () => [],
@@ -286,6 +292,26 @@ describe("TraceSharedReadService", () => {
 
       expect(hidden.header.totalCost).toBeNull();
       expect(shown.header.totalCost).toBe(1.5);
+    });
+
+    /** @scenario A shared view cannot see beyond the project's data-retention window */
+    it("bounds the summary and span reads by the viewer's visibility window", async () => {
+      const { service, calls } = setup({ visibilityCutoffMs: 1_700_000_000_000 });
+
+      await service.getSharedTrace(ANONYMOUS);
+
+      expect(calls.cutoffs).toEqual([1_700_000_000_000, 1_700_000_000_000]);
+    });
+
+    /** @scenario A shared link never reveals the surrounding conversation */
+    it("answers the trace alone for a trace that belongs to a thread", async () => {
+      const { service } = setup({ resolved: share({ threadId: "thread-1" }) });
+
+      const payload = await service.getSharedTrace(ANONYMOUS);
+
+      expect(
+        Object.keys(payload).filter((key) => /thread|conversation|session/i.test(key)),
+      ).toEqual([]);
     });
 
     /** @scenario A very large trace shares its timeline without every step's detail */
