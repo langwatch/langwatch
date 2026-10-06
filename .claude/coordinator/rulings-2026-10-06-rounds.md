@@ -59,3 +59,10 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Decoder deps (T1-D2-deps-extra): INLINE the ESpanKind enum and the tenant check in trace-contract; no new contract dependency.
 - Upgrade API (U2-API): SIX OpsApi reads (status, releases, steps, step, runs, run) backed by an ops service over UpgradeReader.
 - Live status (U2-LIVE): the upgrade RUNNER raises a read hint the api relays; the page refreshes on it, no polling.
+
+## Round 9 (D, upgrade runner and masked 503s)
+
+- Run phases (U2-PHASES): IN the run report; the runner writes phases in a fixed shape the reader parses, no new table.
+- Lapsed gate (cloud presence): STOP serving once the last good presence write is older than the stale bound (60 s).
+- Rollbacks (S3-ROLLBACK): detect FROM presence; an older image's live presence row after the last run reopens level-triggered background steps.
+- Masked 503s (CH-1, Trace 9 wire): UNMASK transient 503 refusals (clickhouse_overloaded, service_unavailable); amends the 5xx masking ruling.

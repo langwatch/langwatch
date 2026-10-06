@@ -160,6 +160,11 @@ recommendation, and "default taken" if a lane proceeded on it.
 
 - ID-2 placement: the SSO plugin (`@better-auth/sso`, `resolveUser`) and the storage it runs over (`prismaAdapter(..., { transaction: true })`) are composed only in modules/auth (`channels/http/http.better-auth.channel.ts:746`, `app/auth-composition.build.ts:97`); the manifest's allowed homes (modules/identity, enterprise/modules/sso) cannot reach that composition without importing `@langwatch/auth-process`, a cross-module reach and a new dependency. Options: (a) `modules/auth/process/src/app/__tests__/sso-oidc-sign-in.integration.test.ts`, beside `better-auth-storage-transactions.integration.test.ts` (AuthModule over Postgres, identity doubles), (b) `apps/api/src/__tests__/sso-oidc-sign-in.integration.test.ts` on `bootLiveApi`, as the SAML linking test does. Lane recommendation: (a), the cheaper and the one bind3 sized; no recommendation in the plan, so the item is stopped and held. The provider it needs (`@langwatch/test-harness/oidc-provider`) has landed.
 
+### a-billing-governance
+
+- Leak gate (pulled-rows :43, ui-contract :125): four surfaces list the governance home although main filtered them (data-privacy picker, data-retention picker, model-defaults picker, cost by project); the coordinator's "Q156 needs no leak fix" does not hold for these. No recommendation on who fixes them: held in the test's HELD_LEAKS, :43 and :125 stay unbound. Fix lines in handoffs/a-billing-governance.md §10.
+- governance-cost-screen :529: the ledger is gateway's on this branch; restoring main's sumWindowByModel/sumWindowByVirtualKey belongs in modules/gateway's spend-events repository (no Api operation, as main had no screen caller). No recommendation on the owning lane: held.
+
 ## Answered (moved to `.claude/coordinator/rulings-2026-10-05.md` when ruled)
 
 - Q1-upcast: ruled 2026-10-06 night, option (a), a framework upcaster, accessible in ops and the migrations ledger.
