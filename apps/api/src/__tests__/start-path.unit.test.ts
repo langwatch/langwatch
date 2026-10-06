@@ -60,22 +60,20 @@ describe("the API start path", () => {
   });
 
   describe("given the worker and the browser application", () => {
-    /** @scenario "The worker and the browser application never migrate" */
-    it("starts neither of them through preparation, leaving the API as the one migrator", () => {
+    /** @scenario "The browser application never migrates and the worker runs the API's preflight" */
+    it("starts the browser application without preparation and the worker through the API's", () => {
       const migrates =
         /start:prepare|prisma-migrate|clickhouse-migrate|lwql-provision|system-migrations-pass/;
-      const apps = ["worker", "ui"].map(
+      const [worker, ui] = ["worker", "ui"].map(
         (app) =>
           JSON.parse(readFromRoot(`apps/${app}/package.json`)).scripts as Record<string, string>,
       );
 
-      for (const appScripts of apps) {
-        for (const name of ["predev", "dev", "build", "start"]) {
-          expect(appScripts[name] ?? "").not.toMatch(migrates);
-        }
+      for (const name of ["predev", "dev", "build", "start"]) {
+        expect(ui?.[name] ?? "").not.toMatch(migrates);
       }
-      expect(apps[0]?.["start"]).toMatch(/^node .*src\/main\.ts$/);
-      expect(scripts["start"]).toContain(PREPARE);
+      expect(worker?.["start"]).toContain(PREPARE);
+      expect(worker?.["start:prepare:db"]).toBe(scripts["start:prepare:db"]);
     });
   });
 });
