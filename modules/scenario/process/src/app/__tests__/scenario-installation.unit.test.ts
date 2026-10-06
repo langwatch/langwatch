@@ -4,7 +4,12 @@
  */
 import { EventEmitter } from "node:events";
 
-import { type AgentApi, AgentNotFoundError, type AgentWithFields } from "@langwatch/agent-contract";
+import {
+  type AgentApi,
+  AgentNotFoundError,
+  type AgentOverview,
+  type AgentWithFields,
+} from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -52,6 +57,20 @@ const signatureAgent: AgentWithFields = {
   fieldsResolved: true,
 };
 
+const signatureOverview: AgentOverview = {
+  ...signatureAgent,
+  environment: null,
+  ownerUserId: null,
+  hostLabel: null,
+  lastSeenAt: null,
+  parameters: [],
+  owner: null,
+  status: "offline",
+  instances: [],
+  selectable: true,
+  notSelectableReason: null,
+};
+
 function process(role: "api" | "worker", emitter: EventEmitter) {
   return createApp({ role, secrets: scenarioInstallationSecrets() })
     .withModules([scenarioProcessModule])
@@ -62,6 +81,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
     .provide({
       agent: createApiFixture<AgentApi>({
         getById: async ({ id }) => {
+          if (id === signatureAgent.id) return signatureOverview;
           throw new AgentNotFoundError(id, projectId);
         },
       }),
@@ -102,7 +122,12 @@ describe("scenario app installation", () => {
         const app = runtime.service(ScenarioApi);
 
         await expect(
-          app.testAgentTurn({ projectId, agent: signatureAgent, actor: void 0, message: "hi" }),
+          app.testAgentTurn({
+            projectId,
+            agentId: signatureAgent.id,
+            actor: void 0,
+            message: "hi",
+          }),
         ).rejects.toMatchObject({ code: "agent_test_refused" });
 
         await expect(

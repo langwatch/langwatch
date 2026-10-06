@@ -12,8 +12,6 @@ import {
   agentHistoryEntrySchema,
   agentPushToCopiesSchema,
   agentSyncFromSourceSchema,
-  agentTestRunResultSchema,
-  agentTestTurnResultSchema,
   relatedAgentEntitiesSchema,
   agentWithLegacyCopyCountSchema,
   httpProxyResultSchema,
@@ -24,7 +22,6 @@ import {
   agentApiCopyRequestSchema,
   agentApiProjectInputSchema,
   agentApiPushToCopiesInputSchema,
-  agentApiTestTurnInputSchema,
 } from "./agent.schemas.ts";
 import { agentSchema, agentWithFieldsSchema } from "./agent.ts";
 
@@ -77,13 +74,6 @@ export const agentTrpc = defineTrpcContract("agents")
   .withInput(agentApiAgentReferenceInputSchema)
   .withOutput(agentHistoryEntrySchema.array())
 
-  .mutation("testTurn")
-  .withInput(agentApiTestTurnInputSchema)
-  .withOutput(agentTestTurnResultSchema)
-
-  .mutation("testRun")
-  .withInput(agentApiAgentReferenceInputSchema)
-  .withOutput(agentTestRunResultSchema)
   .build();
 
 export const httpProxyTrpc = defineTrpcContract("httpProxy")

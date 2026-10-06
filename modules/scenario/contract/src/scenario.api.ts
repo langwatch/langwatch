@@ -1,8 +1,4 @@
-import type {
-  AgentTestRunResult,
-  AgentTestTurnResult,
-  AgentWithFields,
-} from "@langwatch/agent-contract";
+import type { AgentTestRunResult, AgentTestTurnResult } from "@langwatch/agent-contract";
 import { moduleApi } from "@langwatch/module";
 import type { UserFullProfile, UserProfilesInput } from "@langwatch/user-contract";
 import type { z } from "zod";
@@ -103,9 +99,10 @@ import type {
   VoiceSessionMintResult,
 } from "./voice/voice-session.schemas.ts";
 
+/** A test of one of the project's agents; scenario reads the agent itself. */
 export interface TestAgentRunInput {
   projectId: string;
-  agent: AgentWithFields;
+  agentId: string;
   actor: RunActor | undefined;
 }
 

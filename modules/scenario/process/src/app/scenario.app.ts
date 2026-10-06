@@ -504,7 +504,7 @@ export class ScenarioModule implements ScenarioApi {
   }
 
   testAgentTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult> {
-    return this.#dependencies.agentTesting.sendTurn(input);
+    return this.#dependencies.agentTesting.testTurn(input);
   }
 
   generateScenario(input: ScenarioGenerateRequest): Promise<ScenarioGenerateResponse> {
@@ -566,7 +566,7 @@ export class ScenarioModule implements ScenarioApi {
   }
 
   testAgentRun(input: TestAgentRunInput): Promise<AgentTestRunResult> {
-    return this.#dependencies.agentTesting.scheduleRun(input);
+    return this.#dependencies.agentTesting.testRun(input);
   }
 
   /**
