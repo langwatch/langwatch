@@ -233,8 +233,12 @@ function tracesHolding(traceIds: string[]): TraceApi {
   });
 }
 
-function planWithCeiling(ceiling: number): EntitlementApi {
+function planWithCeiling(
+  ceiling: number,
+  nextStep?: EntitlementApi["resolvePlanNextStep"],
+): EntitlementApi {
   return createApiFixture<EntitlementApi>({
+    ...(nextStep ? { resolvePlanNextStep: nextStep } : {}),
     getActivePlan: async () => ({
       planSource: "subscription",
       type: "LAUNCH",
@@ -503,13 +507,14 @@ function organizationOf(members: { email: string; role: "ADMIN" | "MEMBER" }[]):
 
 async function breachedWorker(input: {
   filters: CreateTriggerCommand["filters"];
+  nextStep?: EntitlementApi["resolvePlanNextStep"];
   countTracesInLastDay: TraceApi["countTracesInLastDay"];
 }) {
   const { notification, sent } = capturingMail();
   const appended: string[] = [];
   const worker = await settlingWorker({
     notification,
-    entitlement: planWithCeiling(1),
+    entitlement: planWithCeiling(1, input.nextStep),
     authz: organizationOf([
       { email: "admin@acme.test", role: "ADMIN" },
       { email: "member@acme.test", role: "MEMBER" },
@@ -569,6 +574,39 @@ describe("given a memory-tier worker whose automation passes its plan's ceiling"
     expect(trigger.active).toBe(true);
     expect(sent.map(({ to }) => to)).toEqual(["admin@acme.test"]);
     expect(counted).toEqual(["project-1"]);
+  });
+});
+
+describe("given a memory-tier worker pricing its plans", () => {
+  /** @scenario "A ceiling notice sent from the background process offers the same next tier" */
+  it("names the next self-serve tier, at its own price, in the ceiling mail", async () => {
+    const asked: Parameters<EntitlementApi["resolvePlanNextStep"]>[0][] = [];
+    const { sent } = await breachedWorker({
+      filters: { "metadata.labels": ["checkout"] },
+      countTracesInLastDay: async () => 1_000_000,
+      nextStep: async (input) => {
+        asked.push(input);
+        return {
+          kind: "self_serve",
+          tier: "GROWTH",
+          name: "Growth-marker",
+          monthlyPrice: 12_345,
+          currency: "EUR",
+          pricedPerSeat: false,
+          maxMessagesPerMonth: 1,
+          maxMembers: 1,
+          automationDailyDispatchCeiling: 777,
+        };
+      },
+    });
+
+    expect(asked).toEqual([expect.objectContaining({ organizationId: "organization-1" })]);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.html).toContain("Growth-marker");
+    expect(sent[0]?.html).toContain("12,345");
+    expect(sent[0]?.html).toContain(
+      "https://app.langwatch.test/settings/subscription/checkout/growth",
+    );
   });
 });
 

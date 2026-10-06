@@ -103,6 +103,7 @@ import { AutomationEvaluationTriggerFilterService } from "../services/automation
 import type { AutomationDispatchError } from "../services/automation-graph-activity.service.ts";
 import { AutomationGraphAlertNotifierService } from "../services/automation-graph-alert-notifier.service.ts";
 import { AutomationMatchRecordMetricsService } from "../services/automation-match-record-metrics.service.ts";
+import { AutomationNextStepService } from "../services/automation-next-step.service.ts";
 import { AutomationNotificationDeliveryUnavailableService } from "../services/automation-notification-delivery-unavailable.service.ts";
 import { AutomationNotificationDeliveryService } from "../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
@@ -558,6 +559,13 @@ export class AutomationModule implements AutomationApi {
         mailer: { send: (content) => dependencies.notifications.sendEmail(content) },
         traces: dependencies.traces,
         metrics: AutomationRunawayMetricsOtelService.create(),
+        nextStep: AutomationNextStepService.create({
+          projects: dependencies.projects,
+          plans: dependencies.entitlement,
+          nextStep: dependencies.entitlement,
+          baseHost,
+          logger,
+        }),
         baseHost,
         logger,
       }),
