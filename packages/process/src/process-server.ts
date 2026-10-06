@@ -210,9 +210,6 @@ export class ProcessServer implements ProcessBoot {
               telemetryExporter,
               nodeEnvironment: this.settings.nodeEnvironment,
               isSaas: this.settings.isSaas ?? false,
-              nlpCodeBlockTimeoutSeconds: this.settings.nlpCodeBlockTimeoutSeconds,
-              // The proxy spellings, raw; each module's outbound calls parse and follow them.
-              outboundProxy: this.settings.outboundProxy ?? {},
               // Role facts: the composition's word, never a deployment's.
               processName: this.server.name,
             },

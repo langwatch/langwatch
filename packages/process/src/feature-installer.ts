@@ -299,7 +299,7 @@ export interface FeatureInstallArguments<Members> {
 
 /**
  * Application root's view of a module. Retains name + config schema for
- * compile-time checking (ADR-144).
+ * compile-time checking.
  */
 export interface InstallableServerFeature<Members, Name extends string = string, Config = unknown> {
   readonly name: Name;
@@ -342,9 +342,6 @@ export interface InstallableServerFeature<Members, Name extends string = string,
 
 /** One slice per module name, as a process states the config it hands them. */
 export type ModuleConfigRecord = Readonly<Record<string, unknown>>;
-
-/** A process that stated no module config at all. Its key set is empty. */
-export type NoModuleConfig = Readonly<Record<never, never>>;
 
 /** The module name a config slice is keyed by, or nothing where it declared none. */
 type ConfiguredModuleName<Module> =
@@ -1521,7 +1518,7 @@ class ConfiguredAppBuilder<
   /**
    * The doors this module declares. Answers a declaration that is already
    * installable, so there is no half-declared module and no build step to
-   * forget (ADR-144 s1).
+   * forget.
    */
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
@@ -1627,7 +1624,7 @@ class UnconfiguredAppBuilder<
   /**
    * The doors this module declares. Answers a declaration that is already
    * installable, so there is no half-declared module and no build step to
-   * forget (ADR-144 s1).
+   * forget.
    */
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
@@ -1718,7 +1715,7 @@ class UnconfiguredAppBuilder<
 
 /**
  * Installable declaration accepting further work contributions.
- * Stays installable after any contribution (ADR-144).
+ * Stays installable after any contribution.
  */
 export type ModuleContributions<
   Declaration,

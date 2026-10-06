@@ -26,10 +26,6 @@
     "./config": {
       "types": "./dist/config-owner.d.ts",
       "default": "./src/config-owner.ts"
-    },
-    "./open": {
-      "types": "./dist/open-stores.d.ts",
-      "default": "./src/open-stores.ts"
     }
   },
   "scripts": {

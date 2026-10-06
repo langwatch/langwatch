@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "../src/application.ts";
+import { ApplicationBuilder } from "../src/application.ts";
 import { serverFeature } from "../src/feature-installer.ts";
 import { memberSourceOf } from "./member-source.ts";
 
@@ -19,7 +19,7 @@ describe("given a worker process with one feature installer", () => {
         .withSetup(setup)
         .withWorker(consumers)
         .build();
-      const runtime = await createApp({ role: "worker", members: memberSourceOf({}) })
+      const runtime = await new ApplicationBuilder({ role: "worker", members: memberSourceOf({}) })
         .withService({ name: "consumers", start: started, stop: () => undefined })
         .withModules([feature])
         .boot();
@@ -59,7 +59,7 @@ describe("given a worker process with two feature installers", () => {
         })
         .build();
 
-      const booting = createApp({ role: "worker", members: memberSourceOf({}) })
+      const booting = new ApplicationBuilder({ role: "worker", members: memberSourceOf({}) })
         .withModules([first, second])
         .boot();
 

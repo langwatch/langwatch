@@ -2,7 +2,7 @@ import type { TransportPeers } from "@langwatch/api";
 import { ModuleApiToken, type ResolvedTokens, SupplyToken } from "@langwatch/module";
 import { type StoresMemberSource } from "@langwatch/process-stores";
 
-import { ApplicationBuilder, type BootedRuntime, type RuntimeService } from "./application.ts";
+import { ApplicationBuilder, type BootedRuntime } from "./application.ts";
 import type {
   InstallableServerFeature,
   ModuleSecretsScope,
@@ -22,6 +22,7 @@ import type {
   SupplyModule,
   ValidateSupply,
 } from "./process-supply.types.ts";
+import type { RuntimeService } from "./runtime-lifecycle.ts";
 import type { FeatureTransportHosts } from "./transport-mounting.ts";
 
 type SupplyRecord = Readonly<Record<string, unknown>>;
@@ -328,10 +329,6 @@ export class ProcessSupply<
 
   withKeyvalue<Value extends MemberValueFrom<RequiredMemberSet, "keyvalue">>(keyvalue: Value) {
     return this.#withMembers({ keyvalue });
-  }
-
-  withBlobs<Value extends MemberValueFrom<RequiredMemberSet, "blobs">>(blobs: Value) {
-    return this.#withMembers({ blobs });
   }
 
   withEventing<Value extends MemberValueFrom<RequiredMemberSet, "eventing">>(eventing: Value) {

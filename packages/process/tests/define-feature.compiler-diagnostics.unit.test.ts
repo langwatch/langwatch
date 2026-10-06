@@ -85,7 +85,7 @@ function diagnosticsFor(source: string): Diagnostic[] {
 describe("defineProcessModule compiler diagnostics", () => {
   it("accepts a valid declaration and matching root", () => {
     const diagnostics = diagnosticsFor(`
-      import { createApp } from "__APPLICATION__";
+      import { ApplicationBuilder } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
@@ -96,7 +96,7 @@ describe("defineProcessModule compiler diagnostics", () => {
         static create(setup: FeatureSetup<{}, {}, undefined>): App { return new App(); }
       }
       const feature = defineProcessModule("annotation").withApi(App).build();
-      createApp({ role: "api", members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withModules([feature]);
     `);
     expect(diagnostics).toEqual([]);
@@ -105,7 +105,7 @@ describe("defineProcessModule compiler diagnostics", () => {
   it("accepts inferred peer APIs and an implementation with private state", () => {
     expect(
       diagnosticsFor(`
-      import { createApp } from "__APPLICATION__";
+      import { ApplicationBuilder } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       import { moduleApi } from "__CONTRACT__";
@@ -124,7 +124,7 @@ describe("defineProcessModule compiler diagnostics", () => {
         projectName(): string { return this.#projects.name(); }
       }
       const feature = defineProcessModule("annotation").withApi(App).build();
-      createApp({ role: "api", members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withModules([feature]);
     `),
     ).toEqual([]);
@@ -292,11 +292,11 @@ describe("defineProcessModule compiler diagnostics", () => {
   it("accepts a module whose config slice this process stated", () => {
     expect(
       diagnosticsFor(`
-      import { createApp } from "__APPLICATION__";
+      import { ApplicationBuilder } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       ${configuredModule}
-      createApp({ role: "api", config: { annotation: { suffix: "!" } }, members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", config: { annotation: { suffix: "!" } }, members: memberSourceOf({}) })
         .withModules([feature]);
     `),
     ).toEqual([]);
@@ -305,12 +305,12 @@ describe("defineProcessModule compiler diagnostics", () => {
   it("accepts a module installed by a process whose config states no key set at all", () => {
     expect(
       diagnosticsFor(`
-      import { createApp } from "__APPLICATION__";
+      import { ApplicationBuilder } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       ${configuredModule}
       const config: Readonly<Record<string, unknown>> = { annotation: { suffix: "!" } };
-      createApp({ role: "api", config, members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", config, members: memberSourceOf({}) })
         .withModules([feature]);
     `),
     ).toEqual([]);
@@ -319,11 +319,11 @@ describe("defineProcessModule compiler diagnostics", () => {
   it("rejects a module whose config slice this process did not state", () => {
     expectOnlyDiagnostic(
       `
-      import { createApp } from "__APPLICATION__";
+      import { ApplicationBuilder } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       ${configuredModule}
-      createApp({ role: "api", config: { other: {} }, members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", config: { other: {} }, members: memberSourceOf({}) })
         .withModules([feature]); // EXPECT
     `,
       "TS2345",
@@ -333,11 +333,11 @@ describe("defineProcessModule compiler diagnostics", () => {
   it("rejects a module whose config slice does not parse to what its schema answers", () => {
     expectOnlyDiagnostic(
       `
-      import { createApp } from "__APPLICATION__";
+      import { ApplicationBuilder } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       ${configuredModule}
-      createApp({ role: "api", config: { annotation: {} }, members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", config: { annotation: {} }, members: memberSourceOf({}) })
         .withModules([feature]); // EXPECT
     `,
       "TS2345",
@@ -348,13 +348,13 @@ describe("defineProcessModule compiler diagnostics", () => {
   it("rejects a module list whose members lack one a module names", () => {
     expectOnlyDiagnostic(
       `
-      import { createApp } from "__APPLICATION__";
+      import { ApplicationBuilder } from "__APPLICATION__";
       import { memberSourceOf } from "__MEMBERS__";
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
       class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value: string; constructor(value: string) { super(); this.value = value; } static create(setup: FeatureSetup<{}, { suffix: string }, undefined>): App { return new App(setup.members.suffix); } }
       const feature = defineProcessModule("annotation").withApi(App).build();
-      createApp({ role: "api", members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withModules([feature]); // EXPECT
     `,
       "TS2322",

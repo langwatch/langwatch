@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "../src/application.ts";
+import { ApplicationBuilder } from "../src/application.ts";
 import { serverFeature } from "../src/feature-installer.ts";
 import { Server } from "../src/server.ts";
 import { memberSourceOf } from "./member-source.ts";
@@ -37,7 +37,7 @@ async function bootRuntime({
     })
     .build();
 
-  return createApp({ role, members: memberSourceOf({}) })
+  return new ApplicationBuilder({ role, members: memberSourceOf({}) })
     .withModules([feature])
     .boot();
 }

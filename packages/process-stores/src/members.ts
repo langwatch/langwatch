@@ -172,7 +172,7 @@ export type DatabaseTarget =
     }>;
 
 /**
- * What the process hands a module: one record, sixteen keys. `clickhouse`
+ * What the process hands a module: one record, fifteen keys. `clickhouse`
  * and `objectStorage` are each ONE client that routes internally, so "every
  * statement names its tenant" is structural, not a rule to remember.
  */

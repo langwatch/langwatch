@@ -1,7 +1,7 @@
 import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "../src/application.ts";
+import { ApplicationBuilder } from "../src/application.ts";
 import { defineProcessModule, type FeatureSetup } from "../src/index.ts";
 import {
   assertRepositoryOwnership,
@@ -46,7 +46,7 @@ describe("repository ownership", () => {
     "rejects conflicting ownership before any %s factory runs",
     async (role) => {
       created.mockClear();
-      const runtime = createApp({ role, members: memberSourceOf({}) }).withModules([
+      const runtime = new ApplicationBuilder({ role, members: memberSourceOf({}) }).withModules([
         defineProcessModule("user").withApi(UserModule).build(),
         defineProcessModule("annotation").withApi(AnnotationModule).build(),
       ]);

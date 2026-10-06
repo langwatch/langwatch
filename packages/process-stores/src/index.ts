@@ -1,7 +1,6 @@
 /**
- * The members a process hands its modules, and the function that builds them
- * from parsed config. No pool noun on purpose: a module names the members it
- * reads in `static readonly reads` and is handed exactly those.
+ * The stores a process opens and the members they hand its modules (ARCHITECTURE.md §7).
+ * A module names the members it reads in `static readonly reads` and is handed exactly those.
  */
 export {
   MEMBER_NAMES,

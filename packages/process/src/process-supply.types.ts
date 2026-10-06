@@ -176,12 +176,6 @@ export type MissingSupplyFields<
     Peers
   >
 >;
-export type MissingSupplyNames<
-  Modules extends readonly SupplyModule[],
-  Members,
-  Config,
-  Peers,
-> = keyof MissingSupplyFields<Modules, Members, Config, Peers> & string;
 export type MemberValue<
   Modules extends readonly SupplyModule[],
   Name extends string,

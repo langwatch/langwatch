@@ -20,7 +20,7 @@ import { cachedTenantDirectory, prismaTenantDirectory } from "./tenant-directory
 /**
  * A member this process was not configured to build. Thrown where the member is
  * read, so the caller that reached for it is on the stack and boot can name
- * both the module and the member (ADR-144 s2).
+ * both the module and the member.
  */
 export class MemberNotConfiguredError extends Error {
   constructor(

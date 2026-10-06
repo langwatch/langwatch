@@ -1,5 +1,5 @@
 /**
- * The seam between a module and the event-sourced half of a process (ADR-144).
+ * The seam between a module and the event-sourced half of a process (ARCHITECTURE.md §9).
  * Composition names no pipeline, projection or subscriber: it takes the
  * declaration types and the store it hands each pipeline from `@langwatch/eventing`.
  */

@@ -5,7 +5,7 @@ import { moduleApi } from "@langwatch/module";
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "../src/application.ts";
+import { ApplicationBuilder } from "../src/application.ts";
 import { DuplicateProviderError } from "../src/boot-errors.ts";
 import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { MissingMemberError } from "../src/module-members.ts";
@@ -72,7 +72,7 @@ describe("given a process whose modules declare what they read", () => {
     /** @scenario "A module names the pool members it reads" */
     it("builds only the declared union and asks for nothing else", async () => {
       const asked: string[] = [];
-      const runtime = await createApp({
+      const runtime = await new ApplicationBuilder({
         role: "api",
         members: recordingSource({ clock: () => "now", mail: { sent: [] }, unread: "x" }, asked),
       })
@@ -87,7 +87,7 @@ describe("given a process whose modules declare what they read", () => {
 
     /** @scenario "A module names the pool members it reads" */
     it("hands one module the members it named and nothing else", async () => {
-      const runtime = await createApp({
+      const runtime = await new ApplicationBuilder({
         role: "api",
         members: recordingSource({ clock: () => "now", mail: { sent: [] }, unread: "x" }, []),
       })
@@ -104,7 +104,7 @@ describe("given a process whose modules declare what they read", () => {
     /** @scenario "A pool member the module named is absent at boot" */
     it("refuses before serving, naming the module and the member", async () => {
       const create = vi.spyOn(AnnotationModule, "create");
-      const booting = createApp({ role: "api", members: recordingSource({}, []) })
+      const booting = new ApplicationBuilder({ role: "api", members: recordingSource({}, []) })
         .withProvided(ProjectApi, projects)
         .withModules([annotation])
         .boot();
@@ -121,7 +121,7 @@ describe("given a peer the process answers for itself", () => {
   describe("when a module depends on that peer", () => {
     /** @scenario "A process hands a module one peer by its token" */
     it("resolves the instance the caller handed in, unwrapped", async () => {
-      const runtime = await createApp({
+      const runtime = await new ApplicationBuilder({
         role: "api",
         members: recordingSource({ clock: () => "noon" }, []),
       })
@@ -137,7 +137,7 @@ describe("given a peer the process answers for itself", () => {
 
   describe("when the same token is handed in twice", () => {
     it("refuses at the second call, naming the token", () => {
-      const builder = createApp({
+      const builder = new ApplicationBuilder({
         role: "api",
         members: recordingSource({ clock: () => "noon" }, []),
       }).withProvided(ProjectApi, projects);
@@ -149,7 +149,7 @@ describe("given a peer the process answers for itself", () => {
   describe("when a module installed beside it provides the same token", () => {
     /** @scenario "A peer handed in and a module that provides it" */
     it("refuses to boot rather than choosing one", async () => {
-      const booting = createApp({
+      const booting = new ApplicationBuilder({
         role: "api",
         members: recordingSource({ clock: () => "noon" }, []),
       })

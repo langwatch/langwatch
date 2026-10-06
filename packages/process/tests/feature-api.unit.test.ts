@@ -1,7 +1,7 @@
 import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "../src/application.ts";
+import { ApplicationBuilder } from "../src/application.ts";
 import {
   DuplicateProviderError,
   FeatureApiUnavailableError,
@@ -241,7 +241,7 @@ function processMembers(harness: Harness = { events: [] }) {
 }
 
 function graph(harness: Harness, reversed = false, role: ServerRole = "api") {
-  const builder = createApp({ role, members: processMembers(harness) });
+  const builder = new ApplicationBuilder({ role, members: processMembers(harness) });
   return builder.withModules(reversed ? [organization, project] : [project, organization]);
 }
 
@@ -294,7 +294,7 @@ describe("feature APIs", () => {
       .provides(ProjectApi)
       .build();
     await expect(
-      createApp({ role: "api", members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withModules([legacy])
         .boot(),
     ).rejects.toThrow("defineProcessModule().withApi()");
@@ -363,7 +363,7 @@ describe("feature APIs", () => {
   it("rejects a missing API before constructing anything", async () => {
     const events: string[] = [];
     await expect(
-      createApp({ role: "api", members: processMembers({ events }) })
+      new ApplicationBuilder({ role: "api", members: processMembers({ events }) })
         .withModules([project])
         .boot(),
     ).rejects.toBeInstanceOf(MissingProviderError);
@@ -421,7 +421,7 @@ describe("feature APIs", () => {
   });
 
   it("rejects two distinct token objects claiming the same feature identity", async () => {
-    const builder = createApp({ role: "api", members: processMembers() }).withModules([
+    const builder = new ApplicationBuilder({ role: "api", members: processMembers() }).withModules([
       project,
       defineProcessModule("project").withApi(ProjectModule).build(),
     ]);
@@ -470,7 +470,7 @@ describe("feature APIs", () => {
 
     /** @scenario "The process supplies a capability a module of that name does not answer for" */
     it("keeps the module's own API and the process's apart", async () => {
-      const runtime = await createApp({ role: "api", members: processMembers() })
+      const runtime = await new ApplicationBuilder({ role: "api", members: processMembers() })
         .withModules([project, grantedOrganization])
         .withProvided(ProjectGrant, { grant: () => "granted" })
         .boot();
@@ -483,7 +483,7 @@ describe("feature APIs", () => {
     /** @scenario "A module cannot answer for a capability the process already supplied" */
     it("refuses a module answering for the very token the process handed over", async () => {
       await expect(
-        createApp({ role: "api", members: processMembers() })
+        new ApplicationBuilder({ role: "api", members: processMembers() })
           .withModules([project, organization])
           .withProvided(ProjectApi, {
             name: async () => "provided",
@@ -503,7 +503,7 @@ describe("feature APIs", () => {
     const declaration = defineProcessModule("organization").withApi(ProjectModule).build();
 
     await expect(
-      createApp({ role: "api", members: processMembers({ events }) })
+      new ApplicationBuilder({ role: "api", members: processMembers({ events }) })
         .withModules([declaration])
         .boot(),
     ).rejects.toThrow('cannot provide API "project"');

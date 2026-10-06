@@ -19,7 +19,7 @@ import {
   RoleContributionError,
   StoreTierUnstatedError,
 } from "./boot-errors.ts";
-/** Declares, constructs and starts the process graph; see ADR-133. */
+/** Declares, constructs and starts the process graph (ARCHITECTURE.md §5). */
 import type {
   FeatureTransportDescriptor,
   InstallableServerFeature,
@@ -68,7 +68,6 @@ import {
   type MountedTransports,
 } from "./transport-mounting.ts";
 import { transportPeersOf } from "./transport-peers.ts";
-export type { RuntimeService } from "./runtime-lifecycle.ts";
 
 /** What a booted runtime hands back for one feature. */
 export interface InstalledFeature<Provided, Rest, Trpc, Worker> {
@@ -149,7 +148,7 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     if (this.role !== "tasks") {
       throw new Error(
         `Asked "${this.name}" for its one-shot tasks, but only the "tasks" role hosts them ` +
-          `and this process is "${this.role}". Build it with createApp({ role: "tasks" }).`,
+          `and this process is "${this.role}". Build it with server.container("tasks").`,
       );
     }
     const tasks: Task[] = [];
@@ -289,7 +288,7 @@ export type TransportHostSource<Rest, Trpc> =
   | FeatureTransportHosts<Rest, Trpc>
   | TransportHostFactory<Rest, Trpc>;
 
-/** Process role, config, and member sources (ADR-144). */
+/** Process role, config, and member sources. */
 export interface ApplicationOptions<
   Members,
   Config extends ModuleConfigRecord = ModuleConfigRecord,
@@ -700,16 +699,6 @@ export class ApplicationBuilder<
       }
     }
   }
-}
-
-/**
- * A process, named by its role and holding its config and its one pool.
- * Nothing is constructed until `boot`.
- */
-export function createApp<Members, const Config extends ModuleConfigRecord = ModuleConfigRecord>(
-  options: ApplicationOptions<Members, Config>,
-): ApplicationBuilder<Members, never, never, Config> {
-  return new ApplicationBuilder<Members, never, never, Config>(options);
 }
 
 /** The eventing runtime member if this process holds one and eventing is declared. */

@@ -64,8 +64,8 @@ export const processOwner = {
      */
     baseHost: publicBaseUrl,
     /**
-     * The standard proxy spellings: the shared group, handed to every module whose
-     * outbound calls follow it, as the `outboundProxy` member.
+     * The standard proxy spellings: the shared group, which every module whose
+     * outbound calls follow it holds in its own config slice.
      */
     outboundProxy,
   })),

@@ -1,7 +1,7 @@
 import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "../src/application.ts";
+import { ApplicationBuilder } from "../src/application.ts";
 import {
   defineProcessModule,
   type FeatureSetup,
@@ -95,7 +95,7 @@ class ProjectModule implements ProjectApi {
 
 const project = defineProcessModule("project").withApi(ProjectModule).build();
 function graph(harness: Harness, role: ServerRole = "api") {
-  return createApp({
+  return new ApplicationBuilder({
     role,
     members: memberSourceOf<DeclaredMembers>({
       events: harness.events,

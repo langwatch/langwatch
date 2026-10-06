@@ -2,7 +2,7 @@ import { Config } from "@langwatch/config";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createApp } from "../src/application.ts";
+import { ApplicationBuilder } from "../src/application.ts";
 import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { memberSourceOf } from "./member-source.ts";
 
@@ -47,7 +47,7 @@ const directoryWithTransports = defineProcessModule("annotation")
 
 describe("defineProcessModule", () => {
   it("constructs the declared app once during boot and publishes its contract", async () => {
-    const runtime = await createApp({
+    const runtime = await new ApplicationBuilder({
       role: "api",
       config: { annotation: { suffix: "directory" } },
       members: memberSourceOf({ prefix: "tenant-" }),
@@ -78,7 +78,10 @@ describe("defineProcessModule", () => {
     }
 
     const declaration = defineProcessModule("presence").withApi(ResourceApp).build();
-    const runtime = await createApp({ role: "api", members: memberSourceOf({ prefix: "unused" }) })
+    const runtime = await new ApplicationBuilder({
+      role: "api",
+      members: memberSourceOf({ prefix: "unused" }),
+    })
       .withModules([declaration])
       .boot();
 

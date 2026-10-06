@@ -2,7 +2,7 @@ import { moduleApi } from "@langwatch/module";
 import { Secret, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
-import { createApp } from "../application.ts";
+import { ApplicationBuilder } from "../application.ts";
 import { defineProcessModule, type FeatureSetup } from "../feature-installer.ts";
 
 interface SessionIdentity {
@@ -53,7 +53,7 @@ describe("application secret declarations", () => {
   /** @scenario "Declared module secrets survive application registration" */
   it.each(["api", "worker"] as const)("constructs the declared identity for %s", async (role) => {
     const secrets = resolver();
-    const runtime = await createApp({
+    const runtime = await new ApplicationBuilder({
       role,
       secrets: (owner, declared) => secrets.scopeTo(owner, declared),
     })
@@ -75,7 +75,7 @@ describe("application secret declarations", () => {
     const undeclared = defineProcessModule("auth").withApi(UndeclaredSessionApp).build();
 
     await expect(
-      createApp({
+      new ApplicationBuilder({
         role: "worker",
         secrets: (owner, declared) => secrets.scopeTo(owner, declared),
       })
