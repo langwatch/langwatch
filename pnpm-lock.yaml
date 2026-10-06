@@ -11409,6 +11409,9 @@ importers:
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../../coding-agent/contract
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../../dashboard/contract

@@ -70,6 +70,8 @@ async function appFor(
       isSaas: false,
       signInProviders: { ...NO_SIGN_IN_PROVIDERS, ...providers.config },
       signUpMode: "open",
+      publicBaseUrl: undefined,
+      nodeEnvironment: undefined,
     },
     repositories: MemoryAuthRepositories.create(),
     dependencies: {
@@ -98,10 +100,8 @@ async function appFor(
       // nothing until a request reaches them; no test below reaches one.
       prisma: {} as never,
       redis: null as never,
-      publicBaseUrl: undefined,
       identityEmails: undefined as never,
       invites: null,
-      nodeEnvironment: undefined,
       processName: "langwatch-api",
     },
     resources: { own: () => undefined } as never,

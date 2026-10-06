@@ -15,8 +15,8 @@ import { UserNotFoundError } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import type { AuthDirectory } from "../../app/auth.members.ts";
 import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
+import type { AuthDirectoryRepository } from "../../repositories/auth-directory.repository.ts";
 import type { CliDeviceSessionRepository } from "../../repositories/cli-device-session.repository.ts";
 import {
   CliDeviceFlowService,
@@ -1458,7 +1458,7 @@ function deviceFlowWorld(
     validatedSelections: [],
   };
 
-  const directory: AuthDirectory = {
+  const directory: AuthDirectoryRepository = {
     getOrganizationIdBySsoDomain: () => Promise.reject(new OrganizationNotFoundError()),
     getPerson: (userId) =>
       world.personExists

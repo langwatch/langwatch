@@ -1,4 +1,12 @@
-import { Config, isSaas, signInProviders, signUpMode, type ConfigOf } from "@langwatch/config";
+import {
+  Config,
+  isSaas,
+  nodeEnvironment,
+  publicBaseUrl,
+  signInProviders,
+  signUpMode,
+  type ConfigOf,
+} from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { SignInMethodPolicyService } from "@langwatch/identity-contract";
 import { z } from "zod";
@@ -54,6 +62,9 @@ export const authServerConfig = Config.define((c) => ({
   isSaas,
   /** Organization decides who may sign up; read here only to tell the browser the mode. */
   signUpMode,
+  /** Process facts (§3.3): where links point, and what is trusted outside production only. */
+  publicBaseUrl,
+  nodeEnvironment,
 }));
 
 /**

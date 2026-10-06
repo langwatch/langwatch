@@ -161,11 +161,7 @@ export interface AuthInviteDirectory {
 
 const logger = createLogger("langwatch:auth");
 
-/**
- * The closed members this module reads as a literal, restated as a
- * named tuple so `publicBaseUrl` (a process fact, not one of the fourteen)
- * can be appended to the runtime list below without losing this typing.
- */
+/** The closed members this module reads, as a literal for the typing below. */
 const AUTH_CLOSED_READS = ["encryption", "prisma", "redis"] as const;
 
 /**
@@ -174,10 +170,6 @@ const AUTH_CLOSED_READS = ["encryption", "prisma", "redis"] as const;
  */
 export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
   Readonly<{
-    /** The public base URL this process was deployed under, or absent where
-     * it named none — the process's own fact (`packages/process`),
-     * never a module-declared env spelling. */
-    publicBaseUrl: string | undefined;
     /** The address the identifier ledger holds for a person, where it holds
      * one. `undefined` until the front-door wiring lane supplies identity's
      * service — the session read then falls back to the stored user's own
@@ -185,9 +177,6 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
     identityEmails: IdentityEmailService | undefined;
     /** The invitation reads, or nothing where this process composed none. */
     invites: AuthInviteDirectory | null;
-    /** The deployment's environment name — the process's own fact (`NODE_ENV`
-     * has one owner). Read for what is trusted outside production only. */
-    nodeEnvironment: string | undefined;
     /** Names this process in every refusal below. */
     processName: string;
     /** Process time, injected so session expiry has deterministic tests. */
@@ -236,9 +225,7 @@ export class AuthModule implements AuthApiContract {
   };
   static readonly config = authServerConfig;
   static readonly publicConfig = authBrowserConfig.project;
-  /** `secrets` resolves NEXTAUTH_SECRET (ADR-132); `publicBaseUrl` is the
-   * process's own fact. A process that cannot supply one refuses at boot. */
-  static readonly reads = [...AUTH_CLOSED_READS, "publicBaseUrl", "nodeEnvironment"] as const;
+  static readonly reads = AUTH_CLOSED_READS;
   /** The browser-session key. Only the identity built from it ever escapes (ADR-132). */
   static readonly secrets = {
     session: sessionSecret,
@@ -448,10 +435,10 @@ export class AuthModule implements AuthApiContract {
             permission: "project:view",
           }),
         featureFlags: () => dependencies.featureFlags,
-        publicBaseUrl: () => members.publicBaseUrl,
+        publicBaseUrl: () => config.publicBaseUrl,
       },
       signUp: buildSignUpVerification({
-        members,
+        publicBaseUrl: config.publicBaseUrl,
         mailer,
         repositories,
         now,
@@ -535,7 +522,7 @@ export class AuthModule implements AuthApiContract {
     app.#dialableIdentityProviderOrigins = resolveDialableIdentityProviderOrigins({
       trustedIdpOrigins: config.trustedIdpOrigins,
       idpSimulatorUrl: config.idpSimulatorUrl,
-      isProduction: members.nodeEnvironment === "production",
+      isProduction: config.nodeEnvironment === "production",
     });
 
     const signInProviders = await resolveSignInProviders({
@@ -566,7 +553,7 @@ export class AuthModule implements AuthApiContract {
       (webhookUrl) =>
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
-          publicBaseUrl: members.publicBaseUrl,
+          publicBaseUrl: config.publicBaseUrl,
           logger,
         }),
     );
@@ -579,7 +566,7 @@ export class AuthModule implements AuthApiContract {
           ? {
               secret: sessionSecret,
               baseUrl: config.sessionUrl,
-              publicBaseUrl: members.publicBaseUrl,
+              publicBaseUrl: config.publicBaseUrl,
               mfaEnrollmentOpen: config.mfaEnrollmentOpen,
               passkeysEnabled: config.passkeysEnabled,
               passkeyHandleSecret: config.passkeyHandleSecret ?? sessionSecret,
@@ -615,7 +602,7 @@ export class AuthModule implements AuthApiContract {
             organizations: dependencies.organizations,
             sendResetPassword: passwordResetSender({
               mail: passwordResetMailChannels.ses.create({ mailer }),
-              publicBaseUrl: members.publicBaseUrl,
+              publicBaseUrl: config.publicBaseUrl,
               processName: members.processName,
             }),
             users: dependencies.users,
@@ -629,7 +616,7 @@ export class AuthModule implements AuthApiContract {
             localPasswords: config.localPasswords,
             trustedIdpOrigins: config.trustedIdpOrigins,
             idpSimulatorUrl: config.idpSimulatorUrl,
-            isProduction: members.nodeEnvironment === "production",
+            isProduction: config.nodeEnvironment === "production",
             logger,
           });
       } else {
@@ -1105,7 +1092,7 @@ export class AuthModule implements AuthApiContract {
 
 /** The ceremony this process can run, or nothing where it has no public base URL to link to. */
 function buildSignUpVerification({
-  members,
+  publicBaseUrl,
   mailer,
   repositories,
   now,
@@ -1115,7 +1102,7 @@ function buildSignUpVerification({
   isWithinBudget,
   isEmailUnconfigured,
 }: {
-  members: AuthInfrastructure;
+  publicBaseUrl: string | undefined;
   mailer: MailSender;
   repositories: AuthRepositories;
   now: () => Instant;
@@ -1125,8 +1112,7 @@ function buildSignUpVerification({
   isWithinBudget: SignUpVerificationDeps["isWithinBudget"];
   isEmailUnconfigured: SignUpVerificationDeps["isEmailUnconfigured"];
 }): SignUpVerificationService | null {
-  const baseUrl = members.publicBaseUrl;
-  if (!baseUrl) return null;
+  if (!publicBaseUrl) return null;
 
   return SignUpVerificationService.create({
     tokens: repositories.signUpTokens,
@@ -1136,7 +1122,7 @@ function buildSignUpVerification({
     checkSignUp,
     isWithinBudget,
     buildVerificationUrl: ({ token }) =>
-      `${baseUrl}/auth/signup?verify=${encodeURIComponent(token)}`,
+      `${publicBaseUrl}/auth/signup?verify=${encodeURIComponent(token)}`,
     isEmailUnconfigured,
     now,
   });

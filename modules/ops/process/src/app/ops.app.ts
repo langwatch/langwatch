@@ -12,6 +12,7 @@ import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contra
 import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import { releaseVersionOf } from "@langwatch/config";
 import { DashboardApi } from "@langwatch/dashboard-contract";
 import {
   DataRetentionApi,
@@ -226,7 +227,7 @@ import {
   type OpsDoorAnswer,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import type { FeatureSetup } from "@langwatch/process";
+import type { FeatureSetup, ServerRole } from "@langwatch/process";
 import { storesOwner } from "@langwatch/process-stores/config";
 import {
   ProjectApi,
@@ -688,6 +689,13 @@ export interface OpsBadgeReading {
   computedAt: OpsApiGetBadgeCountsOutput["computedAt"];
 }
 
+/** The role names main's checkup printed ("running as the web process"), not the role ids. */
+const CHECKUP_ROLE_NAMES: Readonly<Record<ServerRole, string>> = {
+  api: "web",
+  worker: "worker",
+  tasks: "migration",
+};
+
 export class OpsModule implements OpsApi {
   static readonly contract = OpsApi;
   static readonly dependencies = {
@@ -731,16 +739,7 @@ export class OpsModule implements OpsApi {
     clickhouseUrl: storesOwner.secrets.clickhouse,
   } as const;
   static readonly publicConfig = opsBrowserConfig.project;
-  static readonly reads = [
-    "prisma",
-    "redis",
-    "clickhouse",
-    "eventing",
-    "nodeEnvironment",
-    "isSaas",
-    "serviceVersion",
-    "publicBaseUrl",
-  ] as const;
+  static readonly reads = ["prisma", "redis", "clickhouse", "eventing"] as const;
 
   /**
    * Builds this process's own {@link OpsAppInfrastructure} from the members it
@@ -772,16 +771,15 @@ export class OpsModule implements OpsApi {
       cloudOps,
     });
 
-    const { dependencies } = setup;
+    const { dependencies, config } = setup;
     const { members } = setup;
     const checkup = OpsCheckupService.create({
-      // The role names this process (§3.3).
-      members: {
-        isSaas: members.isSaas,
-        serviceVersion: members.serviceVersion,
-        publicBaseUrl: members.publicBaseUrl,
-        nodeEnvironment: members.nodeEnvironment,
-        processName: setup.role ?? "unknown",
+      facts: {
+        isSaas: config.isSaas,
+        serviceVersion: releaseVersionOf(config),
+        publicBaseUrl: config.publicBaseUrl,
+        nodeEnvironment: config.nodeEnvironment,
+        processRole: setup.role ? CHECKUP_ROLE_NAMES[setup.role] : "web",
       },
       config: setup.config,
       peers: {

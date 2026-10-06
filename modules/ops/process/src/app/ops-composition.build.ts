@@ -100,12 +100,6 @@ export type OpsProcessMembers = Readonly<{
   clickhouse: ClickHouseQueryClient;
   /** Cross-pipeline inspection and replay read the registered definitions, nothing more. */
   eventing: Pick<EventSourcing, "definitions">;
-  /** The process's own fact (§6), for the EXPLAIN fail-closed rule. */
-  nodeEnvironment: string | undefined;
-  /** The process's own facts the checkup and the usage report name. */
-  isSaas: boolean;
-  serviceVersion: string;
-  publicBaseUrl: string | undefined;
 }>;
 
 /**
@@ -299,7 +293,7 @@ export function buildOpsInfrastructure(input: {
     createSystemMigrations: ({ dependencies, passRequests }) =>
       SystemMigrationPassService.runner({
         repositories: input.repositories,
-        isSaaS: () => members.isSaas,
+        isSaaS: () => config.isSaas,
         routes: () => members.clickhouse.privateRoutes(),
         dependencies,
         passRequests,
@@ -316,10 +310,10 @@ export function buildOpsInfrastructure(input: {
       const { key, host } = config.productAnalytics;
       return key ? [{ key, ...(host ? { host } : {}) }] : [];
     },
-    isProduction: members.nodeEnvironment === "production",
+    isProduction: config.nodeEnvironment === "production",
     cloudOps: input.cloudOps,
     // Cloud never bootstraps: staff are seeded at cutover with the recovery task.
-    operatorSeed: { adminEmails: config.adminEmails, cloud: members.isSaas || input.cloudOps },
+    operatorSeed: { adminEmails: config.adminEmails, cloud: config.isSaas || input.cloudOps },
   };
 }
 

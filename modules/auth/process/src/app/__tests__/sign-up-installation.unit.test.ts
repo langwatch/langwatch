@@ -12,7 +12,6 @@ import type {
   NotificationService,
   SendEmailCommand,
 } from "@langwatch/notification-contract";
-import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { resolvedSecrets } from "@langwatch/process-stores";
@@ -42,11 +41,6 @@ async function bootAuth({
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }));
   return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
     .withModules([withMemoryRepositories(authProcessModule)])
-    .withMembers({
-      publicBaseUrl: "https://app.acme.test",
-      nodeEnvironment: "test",
-      logging: createLogger("langwatch:auth:sign-up-installation"),
-    })
     .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
     .withSecrets(resolvedSecrets({}))
     .withRelational(prismaDouble({}))
@@ -64,6 +58,8 @@ async function bootAuth({
         isSaas: false,
         signInProviders: NO_SIGN_IN_PROVIDERS,
         signUpMode: "open",
+        publicBaseUrl: "https://app.acme.test",
+        nodeEnvironment: "test",
       },
     })
     .provide({

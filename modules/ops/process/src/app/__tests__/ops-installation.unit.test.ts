@@ -99,14 +99,12 @@ function process(
         productAnalytics: { key: undefined, host: undefined },
         cloudOps: cloud.asked ?? false,
         adminEmails: [],
+        nodeEnvironment: undefined,
+        isSaas: false,
+        publicBaseUrl: undefined,
+        serviceVersion: "test",
+        otelResourceAttributes: undefined,
       },
-    })
-
-    .withMembers({
-      nodeEnvironment: undefined,
-      isSaas: false,
-      serviceVersion: "test",
-      publicBaseUrl: undefined,
     })
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
     .withAnalytical(memberWithoutStore<ClickHouseQueryClient>())

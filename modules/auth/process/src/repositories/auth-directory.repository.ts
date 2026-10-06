@@ -3,7 +3,7 @@
  * email domain claims, the person and organization a device grant names, and
  * whether a membership is still active.
  */
-export abstract class AuthDirectory {
+export abstract class AuthDirectoryRepository {
   /** Throws `OrganizationNotFoundError` when no organization claims the domain. */
   abstract getOrganizationIdBySsoDomain(domain: string): Promise<string>;
 

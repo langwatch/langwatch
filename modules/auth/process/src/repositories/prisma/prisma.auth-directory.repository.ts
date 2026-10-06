@@ -3,10 +3,12 @@ import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { UserNotFoundError } from "@langwatch/user-contract";
 
+import type { AuthDirectoryRepository } from "../auth-directory.repository.ts";
+
 type Database = Pick<PrismaClient, "user" | "organization" | "organizationUser" | "project">;
 type LiveProject = Prisma.ProjectGetPayload<{ select: typeof PROJECT_FIELDS }>;
 
-export class PrismaAuthDirectoryRepository {
+export class PrismaAuthDirectoryRepository implements AuthDirectoryRepository {
   private constructor(private readonly database: Database) {}
 
   static create(database: Database): PrismaAuthDirectoryRepository {
