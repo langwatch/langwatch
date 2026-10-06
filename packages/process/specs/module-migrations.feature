@@ -72,7 +72,7 @@ Feature: A module declares its migration steps beside its tasks
     Then it is handed the checkpoint, the dry-run flag and the abort signal
     And it returns its report
 
-  @unimplemented
+  @unit
   Scenario: A booted tasks or worker process answers its migration steps and the api refuses
     Given a tasks process and a worker process that install a module declaring two steps
     When each is asked for its migration steps with the step guard

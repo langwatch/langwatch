@@ -34,6 +34,7 @@ import type {
   ServerRole,
 } from "./feature-installer.ts";
 import { LocalFeatureApis } from "./local-feature-api.ts";
+import { migrationStepsOf } from "./migration-steps.ts";
 import {
   commandsOf,
   buildModuleEventing,
@@ -165,6 +166,14 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
       );
     }
     return tasks;
+  }
+
+  /** The migration steps this process's modules declared, narrowed by the caller's guard. */
+  migrationSteps<Step extends { readonly id: string }>(
+    isMigrationStep: (contribution: unknown) => contribution is Step,
+  ): readonly Step[] {
+    const { name, role, installed } = this;
+    return migrationStepsOf({ process: name, role, installed, isMigrationStep });
   }
 
   /**

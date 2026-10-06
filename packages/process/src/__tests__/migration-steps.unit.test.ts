@@ -131,6 +131,24 @@ describe("given a module that declares its migration steps over its own app", ()
       expect(built).toEqual(["dataset"]);
       await runtime.stop();
     });
+
+    /** @scenario "A booted tasks or worker process answers its migration steps and the api refuses" */
+    it("answers both steps from a booted tasks and worker process, and the api refuses naming its role", async () => {
+      const bootIn = (role: ServerRole) =>
+        new ApplicationBuilder({ role }).withModules([declaringTwoSteps().declaration]).boot();
+      const tasks = await bootIn("tasks");
+      const worker = await bootIn("worker");
+      const api = await bootIn("api");
+
+      try {
+        const expected = ["dataset:dataset-copy-keys", "dataset:drop-legacy-keys"];
+        expect(tasks.migrationSteps(isStandInStep).map((step) => step.id)).toEqual(expected);
+        expect(worker.migrationSteps(isStandInStep).map((step) => step.id)).toEqual(expected);
+        expect(() => api.migrationSteps(isStandInStep)).toThrowError(/this process is "api"/);
+      } finally {
+        await Promise.all([tasks.stop(), worker.stop(), api.stop()]);
+      }
+    });
   });
 });
 
