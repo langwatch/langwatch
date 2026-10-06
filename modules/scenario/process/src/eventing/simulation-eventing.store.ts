@@ -1,7 +1,5 @@
 import {
   RepositoryFoldStore,
-  type AppendStore,
-  type BulkAppendContext,
   type FoldProjectionStore,
   type Projection,
   type ProjectionStore,
@@ -13,7 +11,6 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { SIMULATION_PROJECTION_VERSIONS } from "@langwatch/scenario-contract";
 
-import { ClickHouseSimulationRunMetricsRepository } from "../repositories/clickhouse/clickhouse.simulation-run-metrics.repository.ts";
 import { ClickHouseSimulationRunStateRepository } from "../repositories/clickhouse/clickhouse.simulation-run-state.repository.ts";
 import type { SimulationEventingClickHouseResolver } from "../repositories/clickhouse/clickhouse.simulation-session.store.ts";
 import { MemorySimulationRunStateRepository } from "../repositories/memory/memory.simulation-run-state.repository.ts";
@@ -21,8 +18,6 @@ import {
   BACKFILL_STALE_THRESHOLD_MS,
   type StalledHistoricalRun,
 } from "../repositories/stalled-simulation-run.repository.ts";
-import type { SimulationRunMetricsProjectionRecord } from "./simulation-run-metrics.projection.ts";
-import { SimulationRunMetricsAppendStore } from "./simulation-run-metrics.store.ts";
 import {
   SimulationRunStateFoldProjection,
   type SimulationRunState,
@@ -82,17 +77,6 @@ class GatedSimulationRunStateFoldStore implements FoldProjectionStore<Simulation
 export type SimulationStalledRun = StalledHistoricalRun;
 export { BACKFILL_STALE_THRESHOLD_MS };
 
-type SimulationRunMetricsAppend = {
-  append(
-    record: SimulationRunMetricsProjectionRecord,
-    context: ProjectionStoreContext,
-  ): Promise<void>;
-  bulkAppend(
-    records: SimulationRunMetricsProjectionRecord[],
-    context: BulkAppendContext,
-  ): Promise<void>;
-};
-
 export class SimulationRunStateStore implements ProjectionStore {
   static create(
     options:
@@ -145,43 +129,5 @@ export class SimulationRunStateStore implements ProjectionStore {
     for (const projection of projections) {
       await this.store.storeProjection(projection, context);
     }
-  }
-}
-
-export class SimulationRunMetricsStore implements AppendStore<SimulationRunMetricsProjectionRecord> {
-  static create(
-    options:
-      | {
-          type: "clickhouse";
-          resolveClient: SimulationEventingClickHouseResolver;
-        }
-      | { type: "null" },
-  ): SimulationRunMetricsStore {
-    if (options.type === "null") {
-      return new SimulationRunMetricsStore({
-        async append() {},
-        async bulkAppend() {},
-      });
-    }
-
-    const repository = ClickHouseSimulationRunMetricsRepository.create(options.resolveClient);
-    const store = SimulationRunMetricsAppendStore.create(repository);
-    return new SimulationRunMetricsStore(store);
-  }
-
-  private constructor(private readonly store: SimulationRunMetricsAppend) {}
-
-  append(
-    record: SimulationRunMetricsProjectionRecord,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
-    return this.store.append(record, context);
-  }
-
-  bulkAppend(
-    records: SimulationRunMetricsProjectionRecord[],
-    context: BulkAppendContext,
-  ): Promise<void> {
-    return this.store.bulkAppend(records, context);
   }
 }

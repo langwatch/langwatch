@@ -35,7 +35,7 @@ export type AdapterRead =
  * The reads the agent test prefetch makes, handed in by the prefetcher so
  * this module reads the project and the agent the way every run does.
  */
-export interface AgentTestReads {
+interface AgentTestReads {
   project: () => Promise<ProjectRead>;
   adapter: () => Promise<AdapterRead>;
   /** The agent's display name, or nothing when the row is gone. */
@@ -45,7 +45,7 @@ export interface AgentTestReads {
 }
 
 /** A prefetch whose job always names the route a code or workflow turn posts along. */
-export type AgentTestPrefetchResult =
+type AgentTestPrefetchResult =
   | Exclude<ScenarioExecutionPrefetchResult, { success: true }>
   | (Extract<ScenarioExecutionPrefetchResult, { success: true }> & {
       data: { executeSyncRoute: ExecuteSyncRoute };

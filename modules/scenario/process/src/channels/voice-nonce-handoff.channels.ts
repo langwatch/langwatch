@@ -15,7 +15,7 @@ import {
 
 /** IPC-bearing subset of `process` the child side needs; eases testing (a
  *  fake stands in for the real `process` and its IPC channel). */
-export interface VoiceNonceRegisterProcess {
+interface VoiceNonceRegisterProcess {
   send?(message: unknown, callback?: (error: Error | null) => void): boolean;
   on(event: "message", listener: (message: unknown) => void): unknown;
   off(event: "message", listener: (message: unknown) => void): unknown;
@@ -26,7 +26,7 @@ export interface VoiceNonceRegisterProcess {
  *  parent acks within milliseconds; a slow parent is a bad enough sign that
  *  failing the dial fast is better than gambling the remainder of the TTL
  *  budget on a socket that hasn't even been registered yet. */
-export const VOICE_NONCE_REGISTER_TIMEOUT_MS = 5_000;
+const VOICE_NONCE_REGISTER_TIMEOUT_MS = 5_000;
 
 /** Thrown when the parent never acknowledges within the timeout. */
 export class VoiceNonceRegistrationTimeoutError extends Error {

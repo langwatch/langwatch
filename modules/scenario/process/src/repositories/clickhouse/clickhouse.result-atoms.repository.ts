@@ -46,7 +46,7 @@ export const PASSED_STATUS_VALUES = ["SUCCESS"] as const;
 const quoted = (values: readonly string[]): string => values.map((value) => `'${value}'`).join(",");
 
 /** How an atom's status reads: passed, failed or still pending. */
-export const OUTCOME_EXPR = `multiIf(
+const OUTCOME_EXPR = `multiIf(
   Status IN (${quoted(PASSED_STATUS_VALUES)}), 'passed',
   Status IN (${quoted(FAILED_STATUS_VALUES)}), 'failed',
   'pending')`;
@@ -109,7 +109,7 @@ function nameSlug(expr: string): string {
 }
 
 /** The reported agent names as a key, folded the way a scenario name is. */
-export const CODE_TARGET_SLUG_EXPR = nameSlug(CODE_TARGET_NAME_EXPR);
+const CODE_TARGET_SLUG_EXPR = nameSlug(CODE_TARGET_NAME_EXPR);
 
 /**
  * The key a target folds under: the platform's stamped key when present, a
@@ -127,16 +127,16 @@ export const TARGET_KEY_EXPR = `multiIf(
  * always stamps a target (both the one-off and suite paths) and an SDK/CI
  * push never does — the target's presence IS the signal, at no extra cost.
  */
-export const TRIGGER_EXPR = `if(${TARGET_REF_EXPR} = '', 'code', 'app')`;
+const TRIGGER_EXPR = `if(${TARGET_REF_EXPR} = '', 'code', 'app')`;
 
 /**
  * The set a run belongs to, the empty id read as `default` the way every
  * other read of a set that runs from code does.
  */
-export const SET_KEY_EXPR = `if(ScenarioSetId = '', 'default', ScenarioSetId)`;
+const SET_KEY_EXPR = `if(ScenarioSetId = '', 'default', ScenarioSetId)`;
 
 /** A run's name as a key, so two spellings of one scenario fold together. */
-export const NAME_SLUG_EXPR = nameSlug("ifNull(Name, '')");
+const NAME_SLUG_EXPR = nameSlug("ifNull(Name, '')");
 
 /**
  * The key a scenario folds under: a platform run's stored scenario id, or
@@ -161,27 +161,27 @@ const TRACE_COST_SUM = `arraySum(arrayMap(
  * apart from truly unmeasured: reading the per-trace map next resolved 260
  * of 309 NULL rows on local data; summing `TotalCost` alone under-reports.
  */
-export const COST_SOURCE_EXPR = `multiIf(
+const COST_SOURCE_EXPR = `multiIf(
   TotalCost IS NOT NULL, 'run',
   length(${TRACE_METRIC_KEYS}) > 0, 'traces',
   length(TraceIds) = 0, 'none',
   'unknown')`;
 
 /** The atom's cost, as a string, with '' standing for "never measured". */
-export const COST_VALUE_EXPR = `multiIf(
+const COST_VALUE_EXPR = `multiIf(
   TotalCost IS NOT NULL, toString(TotalCost),
   length(${TRACE_METRIC_KEYS}) > 0, toString(${TRACE_COST_SUM}),
   length(TraceIds) = 0, '0',
   '')`;
 
 /** The cost as a number for aggregation, with a never-measured atom as zero. */
-export const COST_NUMERIC_EXPR = `multiIf(
+const COST_NUMERIC_EXPR = `multiIf(
   TotalCost IS NOT NULL, TotalCost,
   length(${TRACE_METRIC_KEYS}) > 0, ${TRACE_COST_SUM},
   0)`;
 
 /** 1 when the atom's cost was never measured. */
-export const COST_UNKNOWN_EXPR = `if(${COST_SOURCE_EXPR} = 'unknown', 1, 0)`;
+const COST_UNKNOWN_EXPR = `if(${COST_SOURCE_EXPR} = 'unknown', 1, 0)`;
 
 /**
  * `StartedAt` moves (null -> `CreatedAt` -> started event), so a tight
@@ -190,7 +190,7 @@ export const COST_UNKNOWN_EXPR = `if(${COST_SOURCE_EXPR} = 'unknown', 1, 0)`;
  */
 export const DEDUP_WINDOW_SLACK_MS = 7 * 24 * 60 * 60 * 1000;
 
-export interface AtomFilterSql {
+interface AtomFilterSql {
   /**
    * Predicates safe inside the dedup subquery: a run never moves between
    * sets, and `ScenarioSetId` is part of the dedup key already, so narrowing

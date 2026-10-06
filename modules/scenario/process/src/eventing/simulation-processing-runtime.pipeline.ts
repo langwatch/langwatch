@@ -44,20 +44,20 @@ import {
 import type { SnapshotUpdateBroadcastSubscriberDeps } from "./snapshot-update-broadcast.subscriber.ts";
 import type { SuiteRunSyncSubscriberDeps } from "./suite-run-sync.subscriber.ts";
 
-export type SimulationTraceReads = Pick<
+type SimulationTraceReads = Pick<
   TraceApi,
   "findSummary" | "deriveScenarioRoleMetrics" | "readOrderedSpansForTrace"
 >;
 
 /** What grading a finished run reads through its peers. */
-export interface SimulationGradingPeers {
+interface SimulationGradingPeers {
   scenarios: RunScenarioEvaluationsDeps["scenarios"];
   suites: RunScenarioEvaluationsDeps["suites"];
   evaluations: Pick<EvaluationApi, "runEvaluator" | "reportEvaluation">;
 }
 
 /** Where a finished run reads its organization's admin, which the finished event carries. */
-export interface SimulationMilestonePeers {
+interface SimulationMilestonePeers {
   projects: Pick<ProjectApi, "resolveOrgAdmin">;
 }
 
@@ -69,7 +69,7 @@ const GRADING_PROTECTIONS: Protections = {
 };
 
 /** What this worker's pool holds: the slots it has and the runtime classes it consumes. */
-export interface ExecutionPoolBudget {
+interface ExecutionPoolBudget {
   readonly slotBudget: number;
   readonly consumed: readonly ScenarioResourceClass[];
 }

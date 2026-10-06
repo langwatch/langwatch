@@ -82,7 +82,7 @@ type WithDateWrites<RecordType, DateKeys extends keyof RecordType> = Omit<Record
   [Key in DateKeys]: Date | null;
 };
 
-export type SimulationClickHouseClientResolver = SimulationEventingClickHouseResolver;
+type SimulationClickHouseClientResolver = SimulationEventingClickHouseResolver;
 
 type ClickHouseSimulationRunWriteRecord = WithDateWrites<
   ClickHouseSimulationRunRecord,

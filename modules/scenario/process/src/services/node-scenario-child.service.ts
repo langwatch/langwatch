@@ -38,7 +38,7 @@ import type { VoicePublicUrl } from "./voice-public-url.service.ts";
 
 const logger = createLogger("langwatch:scenarios:child-process");
 
-export interface ScenarioChildParentEnvironment {
+interface ScenarioChildParentEnvironment {
   path?: string;
   home?: string;
   user?: string;
@@ -76,12 +76,12 @@ export interface ScenarioChildProcessConfig {
   parentEnvironment: ScenarioChildParentEnvironment;
 }
 
-export interface ScenarioChildTelemetry {
+interface ScenarioChildTelemetry {
   endpoint: string;
   apiKey: string;
 }
 
-export type ScenarioChildProcessResult = {
+type ScenarioChildProcessResult = {
   success: boolean;
   error?: string;
   reasoning?: string;

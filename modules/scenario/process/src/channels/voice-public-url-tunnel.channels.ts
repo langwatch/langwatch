@@ -22,7 +22,7 @@ export const defaultOpenTunnel: TunnelOpener = scenarioVoice.openTwilioTunnel;
  * matching the SDK's own gate. Propagation is usually seconds, but a short
  * cap turns a slow-but-working tunnel into a failed worker boot.
  */
-export const TUNNEL_READY_TIMEOUT_MS_DEFAULT = 300_000;
+const TUNNEL_READY_TIMEOUT_MS_DEFAULT = 300_000;
 /** Delay between resolution attempts while DNS propagates. */
 const POLL_INTERVAL_MS_DEFAULT = 1_000;
 

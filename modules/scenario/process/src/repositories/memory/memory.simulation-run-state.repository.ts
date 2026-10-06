@@ -32,5 +32,3 @@ export class MemorySimulationRunStateRepository<ProjectionType extends Projectio
     return [...this.store.values()];
   }
 }
-
-export { MemorySimulationRunStateRepository as SimulationRunStateRepositoryMemory };

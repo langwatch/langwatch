@@ -136,7 +136,7 @@ function buildFinishResults({
  * Command handler for finishing runs: emits RunFinished with event-carried
  * state (identity, traceIds; optional deps for backward compat).
  */
-export class FinishRunAdapter implements CommandHandler<
+class FinishRunAdapter implements CommandHandler<
   Command<FinishRunCommandData>,
   SimulationProcessingEvent
 > {

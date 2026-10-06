@@ -14,7 +14,7 @@ type WithDateWrites<RecordType, DateKeys extends keyof RecordType> = Omit<Record
   [Key in DateKeys]: Date | null;
 };
 
-export type SimulationMetricsClickHouseClientResolver = SimulationEventingClickHouseResolver;
+type SimulationMetricsClickHouseClientResolver = SimulationEventingClickHouseResolver;
 
 type ClickHouseSimulationRunMetricsWriteRecord = WithDateWrites<
   SimulationRunMetricsProjectionRecord,
@@ -28,7 +28,7 @@ interface ClickHouseSimulationRunMetricsRollupRow {
 }
 
 /** Aggregated metrics for one simulation run, rolled up across its traces. */
-export interface SimulationRunMetricsRollup {
+interface SimulationRunMetricsRollup {
   totalCost: number;
   roleCosts: Record<string, number>;
   roleLatencies: Record<string, number>;
@@ -159,5 +159,3 @@ export class ClickHouseSimulationRunMetricsRepository implements SimulationRunMe
     }
   }
 }
-
-export { ClickHouseSimulationRunMetricsRepository as SimulationRunMetricsRepositoryClickHouse };

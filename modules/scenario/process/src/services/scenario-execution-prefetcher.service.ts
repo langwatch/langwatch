@@ -22,20 +22,14 @@ import {
   ScenarioPrefetchCompletionService,
   type ScenarioPrefetchLookups,
 } from "./scenario-prefetch-completion.service.ts";
+import { ScenarioRunKeyService } from "./scenario-run-key.service.ts";
+import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 import {
   ScenarioTargetPrefetchService,
   type VoiceTargetReader,
 } from "./scenario-target-prefetch.service.ts";
-import type { ScenarioService } from "./scenario.service.ts";
-export type { VoiceTargetReader } from "./scenario-target-prefetch.service.ts";
-import { ScenarioRunKeyService } from "./scenario-run-key.service.ts";
-import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
-
-export type {
-  ModelParamsFailureReason,
-  ModelParamsResult,
-} from "./scenario-model-parameters.service.ts";
+import type { ScenarioService } from "./scenario.service.ts";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 

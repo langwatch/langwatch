@@ -29,10 +29,10 @@ const logger = createLogger("langwatch:scenarios:voice:elevenlabs");
  * can reject a bad agent id or hang on a network fault; either way the run
  * must fail inside the AC's 60s rather than the child's 15-minute timeout.
  */
-export const ELEVENLABS_CONNECT_TIMEOUT_MS = 45_000;
+const ELEVENLABS_CONNECT_TIMEOUT_MS = 45_000;
 
 /** Shown on a run when the project has no ElevenLabs key. */
-export const NO_ELEVENLABS_KEY_MESSAGE = "No ElevenLabs key in this project";
+const NO_ELEVENLABS_KEY_MESSAGE = "No ElevenLabs key in this project";
 
 /** Prefix for a run whose ElevenLabs socket was refused or never opened. */
 export const ELEVENLABS_CONNECT_REJECTED_PREFIX = "ElevenLabs rejected the connection";

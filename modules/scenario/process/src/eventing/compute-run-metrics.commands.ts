@@ -73,7 +73,7 @@ const SCHEMA = defineCommandSchema(
  * (trace summary) modes; schedules retry if summary unavailable; carries
  * occurredAt through retries as partition key.
  */
-export class ComputeRunMetricsAdapter implements CommandHandler<
+class ComputeRunMetricsAdapter implements CommandHandler<
   Command<ComputeRunMetricsCommandData>,
   SimulationProcessingEvent
 > {

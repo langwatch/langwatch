@@ -12,7 +12,7 @@ import type { SimulationRunProcessingRepository } from "../simulation-run-proces
 import { MemorySimulationRunStateRepository } from "./memory.simulation-run-state.repository.ts";
 
 /** The metrics rows the run fold appends, kept in arrival order. */
-export class MemorySimulationRunMetricsRepository extends SimulationRunMetricsRepository {
+class MemorySimulationRunMetricsRepository extends SimulationRunMetricsRepository {
   readonly rows: SimulationRunMetricsProjectionRecord[] = [];
 
   private constructor() {

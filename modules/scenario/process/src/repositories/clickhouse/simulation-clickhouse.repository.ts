@@ -153,10 +153,8 @@ export const RUN_NOTE_EXPR = "JSONExtractString(ifNull(Metadata, '{}'), 'note')"
  * namespace; the id/label pair is written together — empty id means no
  * person (a project key, or a pre-stamp run). @see specs/scenarios/run-actor-on-runs.feature
  */
-export const RUN_ACTOR_ID_EXPR =
-  "JSONExtractString(ifNull(Metadata, '{}'), 'langwatch', 'actorId')";
-export const RUN_ACTOR_LABEL_EXPR =
-  "JSONExtractString(ifNull(Metadata, '{}'), 'langwatch', 'actorLabel')";
+const RUN_ACTOR_ID_EXPR = "JSONExtractString(ifNull(Metadata, '{}'), 'langwatch', 'actorId')";
+const RUN_ACTOR_LABEL_EXPR = "JSONExtractString(ifNull(Metadata, '{}'), 'langwatch', 'actorLabel')";
 
 /**
  * Page size ceilings for set-level list reads: the trimmed projection caps

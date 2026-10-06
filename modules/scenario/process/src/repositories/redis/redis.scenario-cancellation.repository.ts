@@ -16,7 +16,7 @@ export type CancellationSubscriberClient = {
 };
 
 /** The process's Redis as cancellation reaches it: publishes, and a duplicable subscriber. */
-export type ScenarioCancellationRedis = CancellationPublisherClient & {
+type ScenarioCancellationRedis = CancellationPublisherClient & {
   duplicate(): CancellationSubscriberClient;
 };
 

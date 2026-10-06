@@ -34,7 +34,7 @@ import type { VoicePublicUrl } from "./voice-public-url.service.ts";
 const logger = createLogger("langwatch:scenarios:executor");
 
 /** The peers a run resolves against: the same applications the api reads. */
-export type ScenarioExecutorPeers = Readonly<{
+type ScenarioExecutorPeers = Readonly<{
   agents: AgentApi;
   prompts: PromptApi;
   secrets: SecretApi;
@@ -52,7 +52,7 @@ const WORKSPACE_ROOT = path.join(import.meta.dirname, "..", "..", "..", "..", ".
 const CHILD_PACKAGE_ROOT = path.join(WORKSPACE_ROOT, "apps", "scenario-child");
 
 /** The process facts a child is started with, as the module resolved them. */
-export type ScenarioExecutorHost = Readonly<{
+type ScenarioExecutorHost = Readonly<{
   voicePublicUrl: VoicePublicUrl;
   nlpServiceUrl: string | undefined;
   /** The engine hop's shared credential, as the process resolved it. */

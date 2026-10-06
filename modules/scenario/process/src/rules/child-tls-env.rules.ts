@@ -4,7 +4,7 @@
  * verification is permitted only for local, non-SaaS development.
  */
 
-export interface ChildTlsEnvInput {
+interface ChildTlsEnvInput {
   /** The app's IS_SAAS flag — true on the hosted product, false on-prem/local. */
   isSaaS: boolean;
   /** NODE_ENV supplied by parent process composition. */
@@ -13,7 +13,7 @@ export interface ChildTlsEnvInput {
   nodeExtraCaCerts: string | undefined;
 }
 
-export interface ChildTlsEnv {
+interface ChildTlsEnv {
   NODE_EXTRA_CA_CERTS?: string;
   NODE_TLS_REJECT_UNAUTHORIZED?: string;
 }

@@ -17,7 +17,7 @@ export const VOICE_NONCE_DEFAULT_TTL_MS = 60_000;
  * refusal still carries the child, so the door can stop it waiting for the connect timeout;
  * "unknown" has no child to notify.
  */
-export type VoiceNonceLookup =
+type VoiceNonceLookup =
   | { ok: true; child: ChildProcess }
   | { ok: false; reason: "unknown" }
   | { ok: false; reason: "expired"; child: ChildProcess };

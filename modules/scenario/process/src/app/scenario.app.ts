@@ -223,7 +223,7 @@ export interface ScenarioAppDependencies {
 }
 
 /** The peer APIs this feature reads directly. */
-export const scenarioAppDependencyTokens = {
+const scenarioAppDependencyTokens = {
   agents: AgentApi,
   users: UserApi,
   /** The project→organization hop the author-assist's window resolves through. */

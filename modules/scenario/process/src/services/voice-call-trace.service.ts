@@ -21,7 +21,7 @@ import type { VoiceSessionInfrastructure } from "./voice-call.service.ts";
  * command every span goes through, injected rather than located globally,
  * so a unit test records against an in-memory collector.
  */
-export interface VoiceCallTraceRecorderCollaborators {
+interface VoiceCallTraceRecorderCollaborators {
   traces: { recordSpan(input: RecordSpanCommandData): Promise<void> };
 }
 
@@ -29,7 +29,7 @@ const logger = createLogger("langwatch:voice:call-trace-writer");
 
 /** The scenario a "Call it myself" call is scored under. Absent for a drawer
  *  call, which flips the span origin to `application`. */
-export interface VoiceTraceScenario {
+interface VoiceTraceScenario {
   scenarioId: string;
   scenarioSetId: string;
 }

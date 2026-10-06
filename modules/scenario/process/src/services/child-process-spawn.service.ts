@@ -10,7 +10,7 @@ import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:scenarios:child-process-spawn");
 
-export interface SpawnConfig {
+interface SpawnConfig {
   command: string;
   args: string[];
 }

@@ -23,7 +23,7 @@ import { type VoiceTransportRunner } from "../channels/voice-transport.channel.t
 import type { VoiceSessionInfrastructure } from "./voice-call.service.ts";
 
 /** The project's ElevenLabs key and host; a project with none configured answers `found: false`. */
-export type ElevenLabsCredentialLookup =
+type ElevenLabsCredentialLookup =
   | { found: true; credential: { apiKey: string; baseUrl: string } }
   | { found: false };
 
