@@ -2,7 +2,7 @@
  * The trace filter language compiled against the LangWatchQL trace view: a
  * second dialect over the same boolean structure, answering what the trace row
  * carries and naming the rest (spans, evaluations, events) as out of reach.
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 
 import {

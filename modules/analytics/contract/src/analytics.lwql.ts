@@ -239,7 +239,8 @@ const passKeyColumnsSchema = z.array(langWatchQLPassKeyColumnSchema).readonly();
 
 /**
  * The fixed wrappers Analytics composes around an accepted statement, by kind. A caller names
- * one and never writes the wrapper's SQL. @see specs/instant-evals/instant-eval-pipeline.feature
+ * one and never writes the wrapper's SQL.
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 export const langWatchQLPassSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("probe") }).strict(),

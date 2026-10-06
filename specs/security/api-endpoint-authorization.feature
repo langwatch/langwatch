@@ -387,7 +387,7 @@ Feature: Hono API endpoint authorization and tenant isolation
     Langy surfaces an admin configures. The organization's GitHub connection is
     not one of them any more: it belongs to the organization rather than to
     Langy, so organization management gates it
-    (specs/integrations/github-connection.feature).
+    (modules/integration/specs/github-connection.feature).
 
     Granted from MEMBER upward and to org admins; below that, nothing. The
     permission grain is not what keeps Langy scarce — the rollout flag is — so

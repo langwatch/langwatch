@@ -1,7 +1,7 @@
 /**
  * The lifetime read one request type's allowance is judged against: TenantId
  * filtered first, confirmed rows only, and the partition column bounded when
- * a window is given. @see specs/instant-evals/instant-eval-billing.feature
+ * a window is given. @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { describe, expect, it } from "vitest";

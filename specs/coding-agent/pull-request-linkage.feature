@@ -20,7 +20,7 @@
 #
 # Related specs:
 #   modules/coding-agent/specs/session-git-context.feature, where the repo+branch identity comes from
-#   specs/integrations/github-connection.feature     , the org-level GitHub connection this rides
+#   modules/integration/specs/github-connection.feature     , the org-level GitHub connection this rides
 #
 # Motivation: the ledger question "what did this pull request cost in assistant
 # usage". Sessions carry repo+branch; the organization's GitHub connection maps

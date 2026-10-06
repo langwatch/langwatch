@@ -17,7 +17,7 @@ Feature: LangWatchQL eval functions — a judged column, read by the query and j
     judged. A judgement is made by an Instant Eval run (ADR-153), which pages the same
     statement, reads the text through the extraction functions and asks the classifier.
     The judging itself (one request per text, budgets, cancellation, spend) is specified in
-    specs/instant-evals/instant-eval-pipeline.feature, classifier.feature and
+    modules/instant-eval/specs/instant-eval-pipeline.feature, classifier.feature and
     instant-eval-cost.feature. Judging inside the query is an idea that was never built
     (ADR-136, "Ideas not built").
 

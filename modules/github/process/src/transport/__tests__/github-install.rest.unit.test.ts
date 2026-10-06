@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 /**
  * @vitest-environment node
  * The installation flow's routes and their `/github-langy/*` aliases.
- * @see specs/integrations/github-connection.feature
+ * @see modules/integration/specs/github-connection.feature
  */
 import { createRestRuntime, HttpError, UnauthorizedError } from "@langwatch/api/rest";
 import type {

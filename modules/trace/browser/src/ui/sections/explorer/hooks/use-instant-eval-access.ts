@@ -1,7 +1,7 @@
 /**
  * Whether the project may judge with Instant Evals: the release flag or the
  * organization's own switch, either is enough (main #8348).
- * @see specs/instant-evals/instant-eval-opt-in.feature
+ * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
 import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import type { ExplorerInstantEvalOptInAccess } from "@langwatch/trace-contract";

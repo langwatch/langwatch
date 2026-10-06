@@ -1,7 +1,7 @@
 /**
  * The fixed wrappers a pass runs an accepted statement inside, and the values they bind. The
  * statement goes into a subquery character for character; the wrapper only decides which of its
- * rows come back. @see specs/instant-evals/instant-eval-pipeline.feature
+ * rows come back. @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {

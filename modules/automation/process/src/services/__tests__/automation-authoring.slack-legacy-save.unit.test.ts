@@ -16,7 +16,7 @@ import { AutomationRulesService } from "../automation-rules.service.ts";
 import { AutomationSlackConnectionService } from "../automation-slack-connection.service.ts";
 import type { AutomationService } from "../automation.service.ts";
 
-/** @see specs/automations/slack-connections.feature */
+/** @see modules/slack/specs/slack-connections.feature */
 const crypto = {
   encrypt: (value: string) => `enc(${value})`,
   decrypt: (value: string) => value.replace(/^enc\(|\)$/g, ""),

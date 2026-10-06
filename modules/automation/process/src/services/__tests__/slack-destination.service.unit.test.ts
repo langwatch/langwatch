@@ -1,4 +1,4 @@
-/** Where a Slack delivery goes. @see specs/automations/slack-connections.feature */
+/** Where a Slack delivery goes. @see modules/slack/specs/slack-connections.feature */
 import type { SlackConnectionSecret } from "@langwatch/slack-contract";
 import { describe, expect, it } from "vitest";
 

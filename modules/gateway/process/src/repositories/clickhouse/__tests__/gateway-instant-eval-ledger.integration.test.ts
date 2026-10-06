@@ -3,7 +3,7 @@
 /**
  * A judged run or query's priced outcome, appended through the internal protocol and folded into
  * the spend record: the row the ledger holds is the row the customer is charged on.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";

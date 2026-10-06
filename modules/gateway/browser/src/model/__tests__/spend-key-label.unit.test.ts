@@ -1,6 +1,6 @@
 /**
  * @see ../spend-key-label.ts
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { describe, expect, it } from "vitest";

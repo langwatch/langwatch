@@ -3,7 +3,7 @@ import { GithubNotConnectedError, type GithubApi } from "@langwatch/github-contr
 /**
  * @vitest-environment node
  * The `github.*` procedures over the real tRPC runtime.
- * @see specs/integrations/github-connection.feature
+ * @see modules/integration/specs/github-connection.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";

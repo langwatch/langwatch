@@ -2,7 +2,7 @@
  * The organization's Instant Eval spend for a billing month, in meter units.
  * Read across every project it owns, because the ledger's tenant is the
  * project the judgement ran in.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";

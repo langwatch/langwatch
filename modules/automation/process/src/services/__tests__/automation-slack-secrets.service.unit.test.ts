@@ -1,4 +1,4 @@
-/** Slack params at rest and on read. @see specs/automations/slack-connections.feature */
+/** Slack params at rest and on read. @see modules/slack/specs/slack-connections.feature */
 import { describe, expect, it } from "vitest";
 
 import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";

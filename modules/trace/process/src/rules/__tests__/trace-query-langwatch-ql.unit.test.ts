@@ -1,7 +1,7 @@
 /**
  * The filter language against the LangWatchQL trace view: what it compiles,
  * what it names as out of reach, and whether it still agrees with the facets.
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 
 import { FilterParseError, type LangWatchQLTraceFilter } from "@langwatch/trace-contract";

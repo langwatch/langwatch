@@ -1,4 +1,4 @@
-/** The pure Slack connection migration plan. @see specs/automations/slack-connections.feature */
+/** The pure Slack connection migration plan. @see modules/slack/specs/slack-connections.feature */
 import { describe, expect, it } from "vitest";
 
 import { slackMigrationReport } from "../slack-connection-migration-report.rules.ts";

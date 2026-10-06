@@ -24,7 +24,7 @@ content rather than the preview).
 [specs/lwql/app-functions.feature](../../../specs/lwql/app-functions.feature),
 and for the eval functions
 [specs/lwql/eval-functions.feature](../../../specs/lwql/eval-functions.feature)
-plus [specs/instant-evals/classifier.feature](../../../specs/instant-evals/classifier.feature).
+plus [modules/instant-eval/specs/classifier.feature](../../../modules/instant-eval/specs/classifier.feature).
 
 ## Context
 

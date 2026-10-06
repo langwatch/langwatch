@@ -29,11 +29,11 @@ replacing table (§5), the `Cost` row was replaced by the
 rather than requests (§9).
 
 **Behavioural contract:**
-[specs/instant-evals/instant-eval-api.feature](../../../specs/instant-evals/instant-eval-api.feature),
-[specs/instant-evals/instant-eval-pipeline.feature](../../../specs/instant-evals/instant-eval-pipeline.feature),
-[specs/instant-evals/instant-eval-cost.feature](../../../specs/instant-evals/instant-eval-cost.feature),
+[modules/instant-eval/specs/instant-eval-api.feature](../../../modules/instant-eval/specs/instant-eval-api.feature),
+[modules/instant-eval/specs/instant-eval-pipeline.feature](../../../modules/instant-eval/specs/instant-eval-pipeline.feature),
+[modules/instant-eval/specs/instant-eval-cost.feature](../../../modules/instant-eval/specs/instant-eval-cost.feature),
 [specs/analytics/lwql-judgments-view.feature](../../../specs/analytics/lwql-judgments-view.feature),
-[specs/instant-evals/instant-eval-shorthand.feature](../../../specs/instant-evals/instant-eval-shorthand.feature),
+[modules/instant-eval/specs/instant-eval-shorthand.feature](../../../modules/instant-eval/specs/instant-eval-shorthand.feature),
 [specs/features/instant-eval-cli.feature](../../../specs/features/instant-eval-cli.feature).
 
 ## Context

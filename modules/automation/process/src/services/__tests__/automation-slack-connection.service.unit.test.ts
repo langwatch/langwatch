@@ -1,4 +1,4 @@
-/** Automation's half of a Slack save. @see specs/automations/slack-connections.feature */
+/** Automation's half of a Slack save. @see modules/slack/specs/slack-connections.feature */
 import { SlackIntegrationMissingError, type SlackConnectionView } from "@langwatch/slack-contract";
 import { describe, expect, it } from "vitest";
 

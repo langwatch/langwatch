@@ -292,7 +292,7 @@ Feature: Instant Evals inside the Trace Explorer
 
     # Instant Evals off for the organization: the popover offers the switch or a word
     # with us, depending on the plan. Both are specified in
-    # specs/instant-evals/instant-eval-opt-in.feature ("Instant Evals off for a
+    # modules/instant-eval/specs/instant-eval-opt-in.feature ("Instant Evals off for a
     # self-serve organization open the enable popover", "Instant Evals off for an
     # enterprise organization open the contact-us popover"). Either way no estimate
     # is requested, the typed query stays in the bar, and a chip typed alongside

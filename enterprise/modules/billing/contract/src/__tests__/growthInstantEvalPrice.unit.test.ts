@@ -2,7 +2,7 @@
  * The Instant Evals metered price on a Growth subscription: provisioned per
  * Stripe mode by hand, so the interesting case is the window where the name
  * resolves to nothing and a checkout still has to work.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { describe, expect, it } from "vitest";

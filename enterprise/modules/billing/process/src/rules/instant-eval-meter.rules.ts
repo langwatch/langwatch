@@ -2,7 +2,7 @@
  * The unit the Instant Evals meter is checkpointed in: ten-thousandths of a
  * dollar, so the running total is an integer and the value Stripe receives is
  * the dollar figure to four places, exactly.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { Temporal } from "@langwatch/time";
