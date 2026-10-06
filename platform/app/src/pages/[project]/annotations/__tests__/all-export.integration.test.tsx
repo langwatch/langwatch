@@ -76,7 +76,7 @@ vi.mock("~/utils/api", () => ({
     // One settled page with no scrollId per descriptor, so the walk ends at once.
     useQueries: (
       build: (t: unknown) => unknown[],
-    ): { data: undefined; isLoading: false; isError: false }[] =>
+    ): { data: undefined; isLoading: false; isError: boolean }[] =>
       build({
         traces: {
           getAllForProject: (_input: unknown, opts: { enabled?: boolean }) =>
