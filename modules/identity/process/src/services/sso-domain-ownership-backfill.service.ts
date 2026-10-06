@@ -1,6 +1,6 @@
 import type { SsoDomainOwnershipRepository } from "../repositories/sso-domain-ownership.repository.ts";
 
-export interface SsoDomainOwnershipRefusal {
+interface SsoDomainOwnershipRefusal {
   connectionId: string;
   reason: string;
 }

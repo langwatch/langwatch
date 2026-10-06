@@ -9,7 +9,7 @@ import type {
 } from "../sso-registrant.repository.ts";
 
 /** The models the gate's and the user resolver's person questions are read through. */
-export type PrismaSsoRegistrantDatabase = Pick<
+type PrismaSsoRegistrantDatabase = Pick<
   PrismaClient,
   "user" | "identifier" | "account" | "accountCredential" | "passkey"
 >;

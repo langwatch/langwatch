@@ -69,144 +69,144 @@ export const connectionRegisteredEventSchema = z.object({
   type: z.literal(CONNECTION_REGISTERED_EVENT_TYPE),
   data: connectionRegisteredPayloadSchema,
 });
-export type ConnectionRegisteredEvent = z.infer<typeof connectionRegisteredEventSchema>;
+type ConnectionRegisteredEvent = z.infer<typeof connectionRegisteredEventSchema>;
 
 export const domainClaimedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(DOMAIN_CLAIMED_EVENT_TYPE),
   data: domainClaimedPayloadSchema,
 });
-export type DomainClaimedEvent = z.infer<typeof domainClaimedEventSchema>;
+type DomainClaimedEvent = z.infer<typeof domainClaimedEventSchema>;
 
 export const domainClaimApprovedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(DOMAIN_CLAIM_APPROVED_EVENT_TYPE),
   data: domainClaimApprovedPayloadSchema,
 });
-export type DomainClaimApprovedEvent = z.infer<typeof domainClaimApprovedEventSchema>;
+type DomainClaimApprovedEvent = z.infer<typeof domainClaimApprovedEventSchema>;
 
 export const domainClaimRejectedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(DOMAIN_CLAIM_REJECTED_EVENT_TYPE),
   data: domainClaimRejectedPayloadSchema,
 });
-export type DomainClaimRejectedEvent = z.infer<typeof domainClaimRejectedEventSchema>;
+type DomainClaimRejectedEvent = z.infer<typeof domainClaimRejectedEventSchema>;
 
 export const connectionDiscardedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(CONNECTION_DISCARDED_EVENT_TYPE),
   data: connectionDiscardedPayloadSchema,
 });
-export type ConnectionDiscardedEvent = z.infer<typeof connectionDiscardedEventSchema>;
+type ConnectionDiscardedEvent = z.infer<typeof connectionDiscardedEventSchema>;
 
 export const verificationRequestedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(VERIFICATION_REQUESTED_EVENT_TYPE),
   data: verificationRequestedPayloadSchema,
 });
-export type VerificationRequestedEvent = z.infer<typeof verificationRequestedEventSchema>;
+type VerificationRequestedEvent = z.infer<typeof verificationRequestedEventSchema>;
 
 export const domainAttestedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(DOMAIN_ATTESTED_EVENT_TYPE),
   data: domainAttestedPayloadSchema,
 });
-export type DomainAttestedEvent = z.infer<typeof domainAttestedEventSchema>;
+type DomainAttestedEvent = z.infer<typeof domainAttestedEventSchema>;
 
 export const domainWithdrawnEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(DOMAIN_WITHDRAWN_EVENT_TYPE),
   data: domainWithdrawnPayloadSchema,
 });
-export type DomainWithdrawnEvent = z.infer<typeof domainWithdrawnEventSchema>;
+type DomainWithdrawnEvent = z.infer<typeof domainWithdrawnEventSchema>;
 
 export const domainVerifiedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(DOMAIN_VERIFIED_EVENT_TYPE),
   data: domainVerifiedPayloadSchema,
 });
-export type DomainVerifiedEvent = z.infer<typeof domainVerifiedEventSchema>;
+type DomainVerifiedEvent = z.infer<typeof domainVerifiedEventSchema>;
 
 export const domainProofWaveredEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(DOMAIN_PROOF_WAVERED_EVENT_TYPE),
   data: domainProofWaveredPayloadSchema,
 });
-export type DomainProofWaveredEvent = z.infer<typeof domainProofWaveredEventSchema>;
+type DomainProofWaveredEvent = z.infer<typeof domainProofWaveredEventSchema>;
 
 export const domainProofLapsedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(DOMAIN_PROOF_LAPSED_EVENT_TYPE),
   data: domainProofLapsedPayloadSchema,
 });
-export type DomainProofLapsedEvent = z.infer<typeof domainProofLapsedEventSchema>;
+type DomainProofLapsedEvent = z.infer<typeof domainProofLapsedEventSchema>;
 
 export const domainProofRecoveredEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(DOMAIN_PROOF_RECOVERED_EVENT_TYPE),
   data: domainProofRecoveredPayloadSchema,
 });
-export type DomainProofRecoveredEvent = z.infer<typeof domainProofRecoveredEventSchema>;
+type DomainProofRecoveredEvent = z.infer<typeof domainProofRecoveredEventSchema>;
 
 export const connectionActivatedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(CONNECTION_ACTIVATED_EVENT_TYPE),
   data: connectionActivatedPayloadSchema,
 });
-export type ConnectionActivatedEvent = z.infer<typeof connectionActivatedEventSchema>;
+type ConnectionActivatedEvent = z.infer<typeof connectionActivatedEventSchema>;
 
 export const connectionSuspendedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(CONNECTION_SUSPENDED_EVENT_TYPE),
   data: connectionSuspendedPayloadSchema,
 });
-export type ConnectionSuspendedEvent = z.infer<typeof connectionSuspendedEventSchema>;
+type ConnectionSuspendedEvent = z.infer<typeof connectionSuspendedEventSchema>;
 
 export const connectionResumedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(CONNECTION_RESUMED_EVENT_TYPE),
   data: connectionResumedPayloadSchema,
 });
-export type ConnectionResumedEvent = z.infer<typeof connectionResumedEventSchema>;
+type ConnectionResumedEvent = z.infer<typeof connectionResumedEventSchema>;
 
 export const teardownRequestedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(TEARDOWN_REQUESTED_EVENT_TYPE),
   data: teardownRequestedPayloadSchema,
 });
-export type TeardownRequestedEvent = z.infer<typeof teardownRequestedEventSchema>;
+type TeardownRequestedEvent = z.infer<typeof teardownRequestedEventSchema>;
 
 export const connectionTornDownEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(CONNECTION_TORN_DOWN_EVENT_TYPE),
   data: connectionTornDownPayloadSchema,
 });
-export type ConnectionTornDownEvent = z.infer<typeof connectionTornDownEventSchema>;
+type ConnectionTornDownEvent = z.infer<typeof connectionTornDownEventSchema>;
 
 export const connectionArrivalPolicySetEventSchema = EventSchema.safeExtend({
   type: z.literal(CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE),
   data: connectionArrivalPolicySetPayloadSchema,
 });
-export type ConnectionArrivalPolicySetEvent = z.infer<typeof connectionArrivalPolicySetEventSchema>;
+type ConnectionArrivalPolicySetEvent = z.infer<typeof connectionArrivalPolicySetEventSchema>;
 
 export const connectionRenamedEventSchema = EventSchema.safeExtend({
   type: z.literal(CONNECTION_RENAMED_EVENT_TYPE),
   data: connectionRenamedPayloadSchema,
 });
-export type ConnectionRenamedEvent = z.infer<typeof connectionRenamedEventSchema>;
+type ConnectionRenamedEvent = z.infer<typeof connectionRenamedEventSchema>;
 
 /** What the engine dials, replaced on the same connection id. */
 export const connectionIdpUpdatedEventSchema = EventSchema.safeExtend({
   type: z.literal(CONNECTION_IDP_UPDATED_EVENT_TYPE),
   data: connectionIdpUpdatedPayloadSchema,
 });
-export type ConnectionIdpUpdatedEvent = z.infer<typeof connectionIdpUpdatedEventSchema>;
+type ConnectionIdpUpdatedEvent = z.infer<typeof connectionIdpUpdatedEventSchema>;
 
 export const replacementConnectionRegisteredEventSchema = EventSchema.safeExtend({
   type: z.literal(REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE),
   data: replacementConnectionRegisteredPayloadSchema,
 });
-export type ReplacementConnectionRegisteredEvent = z.infer<
+type ReplacementConnectionRegisteredEvent = z.infer<
   typeof replacementConnectionRegisteredEventSchema
 >;
 
@@ -214,21 +214,19 @@ export const migrationRouteSelectedEventSchema = EventSchema.safeExtend({
   type: z.literal(MIGRATION_ROUTE_SELECTED_EVENT_TYPE),
   data: migrationRouteSelectedPayloadSchema,
 });
-export type MigrationRouteSelectedEvent = z.infer<typeof migrationRouteSelectedEventSchema>;
+type MigrationRouteSelectedEvent = z.infer<typeof migrationRouteSelectedEventSchema>;
 
 export const migrationFinalizationStartedEventSchema = EventSchema.safeExtend({
   type: z.literal(MIGRATION_FINALIZATION_STARTED_EVENT_TYPE),
   data: migrationFinalizationStartedPayloadSchema,
 });
-export type MigrationFinalizationStartedEvent = z.infer<
-  typeof migrationFinalizationStartedEventSchema
->;
+type MigrationFinalizationStartedEvent = z.infer<typeof migrationFinalizationStartedEventSchema>;
 
 export const migrationFinalizedEventSchema = EventSchema.safeExtend({
   type: z.literal(MIGRATION_FINALIZED_EVENT_TYPE),
   data: migrationFinalizedPayloadSchema,
 });
-export type MigrationFinalizedEvent = z.infer<typeof migrationFinalizedEventSchema>;
+type MigrationFinalizedEvent = z.infer<typeof migrationFinalizedEventSchema>;
 
 export const ssoConnectionEventSchema = z.discriminatedUnion("type", [
   connectionArrivalPolicySetEventSchema,
@@ -260,7 +258,7 @@ export type SsoConnectionEvent = z.infer<typeof ssoConnectionEventSchema>;
 
 const SSO_CONNECTION_PROJECTION_VERSION = "2026-08-24";
 
-export const SSO_CONNECTION_PROJECTION_NAME = "ssoConnectionState" as const;
+const SSO_CONNECTION_PROJECTION_NAME = "ssoConnectionState" as const;
 
 const ssoConnectionEvents = [
   connectionArrivalPolicySetEventSchema,

@@ -31,37 +31,37 @@ export const joinRequestedEventSchema = z.object({
   type: z.literal(JOIN_REQUESTED_EVENT_TYPE),
   data: joinRequestedPayloadSchema,
 });
-export type JoinRequestedEvent = z.infer<typeof joinRequestedEventSchema>;
+type JoinRequestedEvent = z.infer<typeof joinRequestedEventSchema>;
 
 export const joinApprovedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(JOIN_APPROVED_EVENT_TYPE),
   data: joinApprovedPayloadSchema,
 });
-export type JoinApprovedEvent = z.infer<typeof joinApprovedEventSchema>;
+type JoinApprovedEvent = z.infer<typeof joinApprovedEventSchema>;
 
 export const joinRejectedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(JOIN_REJECTED_EVENT_TYPE),
   data: joinRejectedPayloadSchema,
 });
-export type JoinRejectedEvent = z.infer<typeof joinRejectedEventSchema>;
+type JoinRejectedEvent = z.infer<typeof joinRejectedEventSchema>;
 
 export const joinExpiredEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(JOIN_EXPIRED_EVENT_TYPE),
   data: joinExpiredPayloadSchema,
 });
-export type JoinExpiredEvent = z.infer<typeof joinExpiredEventSchema>;
+type JoinExpiredEvent = z.infer<typeof joinExpiredEventSchema>;
 
 export const joinWithdrawnEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(JOIN_WITHDRAWN_EVENT_TYPE),
   data: joinWithdrawnPayloadSchema,
 });
-export type JoinWithdrawnEvent = z.infer<typeof joinWithdrawnEventSchema>;
+type JoinWithdrawnEvent = z.infer<typeof joinWithdrawnEventSchema>;
 
-export const joinRequestEventSchema = z.discriminatedUnion("type", [
+const joinRequestEventSchema = z.discriminatedUnion("type", [
   joinRequestedEventSchema,
   joinApprovedEventSchema,
   joinRejectedEventSchema,
@@ -72,7 +72,7 @@ export type JoinRequestEvent = z.infer<typeof joinRequestEventSchema>;
 
 const JOIN_REQUEST_PROJECTION_VERSION = "2026-08-24";
 
-export const JOIN_REQUEST_PROJECTION_NAME = "joinRequestState" as const;
+const JOIN_REQUEST_PROJECTION_NAME = "joinRequestState" as const;
 
 const joinRequestEvents = [
   joinRequestedEventSchema,

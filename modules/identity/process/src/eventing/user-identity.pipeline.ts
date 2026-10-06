@@ -61,7 +61,7 @@ import {
 import { ProposeLinkCommand } from "./propose-link.intent.ts";
 import { VerifyIdentifierCommand } from "./verify-identifier.intent.ts";
 
-export interface IdentityPipelineDeps {
+interface IdentityPipelineDeps {
   identityProjectionStore: StateProjectionStore<IdentityFoldState>;
   /** The guards every command handler runs — `@langwatch/identity-process`'s
    *  IdentityGuardsService over the app's heads repository, the same instance shape
@@ -206,7 +206,7 @@ export type IdentityGuardsComposition = {
   reservations: IdentityReservationRepository;
 };
 
-export type IdentityGuardRepositories = Pick<
+type IdentityGuardRepositories = Pick<
   IdentityRepositories,
   "heads" | "users" | "reservations" | "mfaEnrollment"
 >;

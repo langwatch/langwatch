@@ -8,7 +8,7 @@ import type { SsoIssuerDiscoveryChannel } from "../channels/sso-issuer-discovery
 const FOUND_TTL_MS = 10 * 60_000;
 const MISSING_TTL_MS = 60_000;
 
-export interface SsoIssuerEndpointOriginsServiceDeps {
+interface SsoIssuerEndpointOriginsServiceDeps {
   discovery: SsoIssuerDiscoveryChannel;
   resolveHost: HostAddressResolver;
   /** Origins an operator vouched for (`SSO_TRUSTED_IDP_ORIGINS`), which may

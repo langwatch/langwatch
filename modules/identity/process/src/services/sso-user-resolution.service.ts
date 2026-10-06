@@ -23,7 +23,7 @@ const CONTINUE = { action: "continue" } as const;
 const REFUSE = { action: "reject", code: "OAuthAccountNotLinked" } as const;
 const logger = createLogger("langwatch:identity:sso-user-resolution");
 
-export interface SsoUserResolutionServiceDeps {
+interface SsoUserResolutionServiceDeps {
   /** Identity's own person rows: `User`, `Account`, `Identifier`, credentials. */
   people: SsoRegistrantReadRepository;
   connections: SsoConnectionReadRepository;

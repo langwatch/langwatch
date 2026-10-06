@@ -4,9 +4,7 @@
 const BROKER_METHOD_ID = "auth0";
 
 /** Whether a pin has a door here, and which method it is. */
-export type LegacySsoDial =
-  | Readonly<{ dialable: true; methodId: string }>
-  | Readonly<{ dialable: false }>;
+type LegacySsoDial = Readonly<{ dialable: true; methodId: string }> | Readonly<{ dialable: false }>;
 
 const NOT_DIALABLE: LegacySsoDial = { dialable: false };
 

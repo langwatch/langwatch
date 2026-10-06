@@ -49,10 +49,10 @@ import type {
 const logger = createLogger("langwatch:identity:sso-connection-ledger");
 
 /** The read-your-writes window, the identity ledger's convergence shape. */
-export const SSO_CONNECTION_CONVERGENCE_TIMEOUT_MS = 2_000;
-export const SSO_CONNECTION_CONVERGENCE_POLL_MS = 25;
+const SSO_CONNECTION_CONVERGENCE_TIMEOUT_MS = 2_000;
+const SSO_CONNECTION_CONVERGENCE_POLL_MS = 25;
 
-export type SsoConnectionStagedSender = {
+type SsoConnectionStagedSender = {
   send(data: unknown): Promise<unknown>;
 };
 
@@ -86,7 +86,7 @@ export const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> = 
 /** The one write this ledger takes off the sso_connection pipeline's own store. */
 export type SsoConnectionEventAppends = Pick<OwnEventStore, "append">;
 
-export interface SsoConnectionLedgerWriterDeps {
+interface SsoConnectionLedgerWriterDeps {
   projectionStore: StateProjectionStore<SsoConnectionFoldState>;
   /** The sso_connection pipeline's own store. */
   eventStore: SsoConnectionEventAppends;

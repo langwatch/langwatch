@@ -13,14 +13,14 @@ import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.
 const logger = createLogger("langwatch:identity:join-request-adapters");
 
 /** The organization's plan, read only for the fields the seat census needs. */
-export type JoinRequestNotifierPlans = {
+type JoinRequestNotifierPlans = {
   getActivePlan(input: {
     organizationId: string;
   }): Promise<{ maxMembers: number; planSource?: string; overrideAddingLimitations?: boolean }>;
 };
 
 /** How many full members an organization holds, for the same seat census as the plan check. */
-export type JoinRequestNotifierMemberships = {
+type JoinRequestNotifierMemberships = {
   getMemberCount(organizationId: string): Promise<number>;
 };
 

@@ -24,7 +24,7 @@ const logger = createLogger("langwatch:identity:sso-arrival");
 /** Duplicate and ineligible join requests are ordinary arrival outcomes. */
 const ROUTINE_REFUSALS = new Set(["join_request_already_pending", "join_not_available"]);
 
-export interface SsoArrivalServiceDeps {
+interface SsoArrivalServiceDeps {
   connections: SsoConnectionReadRepository;
   memberships: SsoArrivalMemberships;
   authz: AuthzApi;

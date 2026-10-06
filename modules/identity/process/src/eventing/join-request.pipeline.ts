@@ -69,7 +69,7 @@ import {
   WithdrawJoinCommand,
 } from "./join-request.intent.ts";
 
-export interface JoinRequestPipelineDeps {
+interface JoinRequestPipelineDeps {
   joinRequestProjectionStore: StateProjectionStore<JoinRequestFoldState>;
   /** The guards every command handler runs — `@langwatch/identity-process`'s
    *  JoinRequestGuardsService over the app's projection reads, the same instance
@@ -90,7 +90,7 @@ export type JoinRequestPipeline = StaticPipelineDefinition<
  * the Postgres `JoinRequest` head in per-request FIFO.
  * The join-request pipeline (D12, ADR-117). One aggregate per request; the
  */
-export function defineJoinRequestPipeline(deps: JoinRequestPipelineDeps): JoinRequestPipeline {
+function defineJoinRequestPipeline(deps: JoinRequestPipelineDeps): JoinRequestPipeline {
   const builder = definePipeline({
     name: JOIN_REQUEST_PIPELINE_NAME,
     aggregate: defineAggregate({

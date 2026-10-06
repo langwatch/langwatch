@@ -10,7 +10,7 @@ import type {
 } from "../join-request-audience.repository.ts";
 
 /** Every model a join-request notification reads, and no other. */
-export type PrismaJoinRequestAudienceDatabase = Pick<
+type PrismaJoinRequestAudienceDatabase = Pick<
   PrismaClient,
   "joinRequest" | "organization" | "organizationUser" | "user"
 >;

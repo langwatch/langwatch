@@ -150,7 +150,6 @@ export type {
   OperatorActor,
 } from "./services/sso-connection-backoffice.service.ts";
 export type { PerSubjectCachedFlag } from "./services/per-subject-cached-gate.service.ts";
-export type { ConnectionDirectoryRevocation } from "./services/sso-connection-teardown.service.ts";
 export type { IdentityRepositories } from "./repositories/identity.repositories.ts";
 export {
   composeIdentityGuards,

@@ -3,13 +3,6 @@ import { z } from "zod";
 
 export const CONNECTION_TEARDOWN_PROCESS_NAME = "connectionTeardown" as const;
 
-/**
- * How long a requested teardown stays reversible: seven days, so a teardown
- * started Friday is undoable by a colleague Monday, and a mistake found a
- * week later still has room — routing stops the moment it is requested.
- */
-export const CONNECTION_TEARDOWN_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
-
 export const completeTeardownIntentSchema = z.object({
   connectionId: z.string().min(1),
   organizationId: z.string().min(1),

@@ -27,8 +27,8 @@ import type { JoinRequestEvent, JoinRequestFoldState } from "./join-request-stat
 const logger = createLogger("langwatch:identity:join-request-ledger");
 
 /** The read-your-writes window, the identity ledger's convergence shape. */
-export const JOIN_REQUEST_CONVERGENCE_TIMEOUT_MS = 2_000;
-export const JOIN_REQUEST_CONVERGENCE_POLL_MS = 25;
+const JOIN_REQUEST_CONVERGENCE_TIMEOUT_MS = 2_000;
+const JOIN_REQUEST_CONVERGENCE_POLL_MS = 25;
 
 export type JoinRequestStagedSender = {
   send(data: unknown): Promise<unknown>;
@@ -45,7 +45,7 @@ const SENDER_NAME_BY_COMMAND: Record<JoinRequestCommandType, string> = {
 /** The one write this ledger takes off the join_request pipeline's own store. */
 export type JoinRequestEventAppends = Pick<OwnEventStore, "append">;
 
-export type AppendingJoinRequestLedgerOptions = {
+type AppendingJoinRequestLedgerOptions = {
   projectionStore: StateProjectionStore<JoinRequestFoldState>;
   /** The join_request pipeline's own store. */
   eventStore: JoinRequestEventAppends;

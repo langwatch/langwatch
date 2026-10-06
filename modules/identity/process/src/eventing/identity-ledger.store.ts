@@ -50,7 +50,7 @@ export const identityProjectionConvergenceTimeoutsTotal = new Counter({
 });
 
 /** End-to-end cost of one identity commit: append, stage, and the wait. */
-export const identityCommitDurationSeconds = new Histogram({
+const identityCommitDurationSeconds = new Histogram({
   name: "identity_commit_duration_seconds",
   help: "Duration of an identity ledger commit: durable append, queue staging, and the read-your-writes wait.",
   buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],

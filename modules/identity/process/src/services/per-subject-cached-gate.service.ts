@@ -34,7 +34,7 @@ export type PerSubjectCachedFlag = {
 /**
  * Default hard cap on distinct subjects one gate holds at once.
  */
-export const MAX_CACHE_ENTRIES = 5_000;
+const MAX_CACHE_ENTRIES = 5_000;
 
 /** One gate's closed-over state - the maps plus what settles/evicts them. */
 type GateState = {

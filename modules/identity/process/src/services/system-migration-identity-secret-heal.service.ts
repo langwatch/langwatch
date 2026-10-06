@@ -4,7 +4,7 @@ import type { IdentitySecretCarryService } from "./identity-secret-carry.service
 
 /** Its own state-table key, separate from the backfill's on purpose — see
  *  the class docblock. Never rename. */
-export const IDENTITY_SECRET_HEAL_MIGRATION_NAME = "identity-d01-secret-heal" as const;
+const IDENTITY_SECRET_HEAL_MIGRATION_NAME = "identity-d01-secret-heal" as const;
 
 /**
  * ## Why this is a second migration rather than a step in the first The user this leg exists for is

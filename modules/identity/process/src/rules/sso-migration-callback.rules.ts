@@ -47,11 +47,11 @@ export function migrationCallbackPairs(
 }
 
 /** After this, the grandfathered side authenticates nobody (ADR-117 §6). */
-export const legacyAuthenticationIsRetired = (phase: SsoMigrationPhase | null): boolean =>
+const legacyAuthenticationIsRetired = (phase: SsoMigrationPhase | null): boolean =>
   phase === "FINALIZING" || phase === "FINALIZED";
 
 /** Whether this account is one of the pair's two sides. */
-export function accountMatchesPair({
+function accountMatchesPair({
   account,
   pair,
 }: {
@@ -79,7 +79,7 @@ export function pairProvesDomain({
   return qualifySsoDomainOwnership({ state: pair.replacement, domain }).status === "QUALIFIED";
 }
 
-export type SsoMigrationLinkPairResolution =
+type SsoMigrationLinkPairResolution =
   | { kind: "pair"; pair: SsoMigrationCallbackPair; direct: boolean }
   | { kind: "reject"; code: SsoMigrationLinkRefusalCode };
 
@@ -162,7 +162,7 @@ const DIRECT_CALLBACK_MARKERS = ["/sso/callback/", "/sso/saml2/sp/acs/"];
  * this deployment mounted, or neither. Stated rather than spelled as an
  * absence — most sign-ins are through no callback at all.
  */
-export type SsoCallbackPathReading =
+type SsoCallbackPathReading =
   | { readonly recognized: true; readonly kind: "direct" | "legacy"; readonly providerId: string }
   | { readonly recognized: false };
 
@@ -252,7 +252,7 @@ const legacyMatch = ({
 });
 
 /** What the sign-in is recorded against, once it is allowed to happen. */
-export type SsoMigrationAuthenticationOutcome =
+type SsoMigrationAuthenticationOutcome =
   | SsoMigrationAuthenticationDecision
   | {
       action: "record";

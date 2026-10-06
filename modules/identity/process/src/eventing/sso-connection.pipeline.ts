@@ -159,7 +159,7 @@ const CONNECTION_COMMANDS = [
 /** The sender names the pipeline carries, which the ledger's own table must match. */
 export const CONNECTION_COMMAND_NAMES: readonly string[] = CONNECTION_COMMANDS;
 
-export interface SsoConnectionPipelineDeps {
+interface SsoConnectionPipelineDeps {
   connectionProjectionStore: StateProjectionStore<SsoConnectionFoldState>;
   /** The guards every command handler runs — `@langwatch/identity-process`'s
    *  SsoConnectionGuardsService over the app's projection reads, the same instance
@@ -184,9 +184,7 @@ export type SsoConnectionPipeline = StaticPipelineDefinition<
   RegisteredCommand
 >;
 
-export function defineSsoConnectionPipeline(
-  deps: SsoConnectionPipelineDeps,
-): SsoConnectionPipeline {
+function defineSsoConnectionPipeline(deps: SsoConnectionPipelineDeps): SsoConnectionPipeline {
   const builder = definePipeline({
     name: SSO_CONNECTION_PIPELINE_NAME,
     aggregate: defineAggregate({

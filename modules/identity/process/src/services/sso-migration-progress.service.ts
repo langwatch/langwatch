@@ -49,7 +49,7 @@ export interface SsoMigrationMemberships {
  * Unanswered means this installation provisions nobody, which is what
  * `not-applicable` says.
  */
-export interface SsoMigrationDirectoryReads {
+interface SsoMigrationDirectoryReads {
   readSyncStatus(args: {
     organizationId: string;
     legacyConnectionId: string;
@@ -77,7 +77,7 @@ export interface SsoMigrationFinalizationEvidence {
   legacyAccessRetired: boolean;
 }
 
-export interface SsoMigrationProgressServiceDeps {
+interface SsoMigrationProgressServiceDeps {
   connections: SsoConnectionReadRepository;
   evidence: SsoMigrationEvidenceRepository;
   breakGlass: SsoBreakGlassRepository;
@@ -97,7 +97,7 @@ export interface SsoMigrationReading {
 }
 
 /** The pair, and the page size the journey asks for. */
-export interface SsoMigrationProgressRequest {
+interface SsoMigrationProgressRequest {
   organizationId: string;
   /** Which replacement, when the caller names one; the newest otherwise. */
   connectionId?: string;

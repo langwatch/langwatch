@@ -8,7 +8,7 @@ import {
 
 import type { TwoStepVerificationRepository } from "../repositories/two-step-verification.repository.ts";
 
-export type TwoStepAccountServiceDeps = {
+type TwoStepAccountServiceDeps = {
   accounts: TwoStepVerificationRepository;
   /** Whether this deployment offers two-step verification at all; auth owns the flag. */
   deployment: Pick<AuthApi, "offersTwoStepVerification">;

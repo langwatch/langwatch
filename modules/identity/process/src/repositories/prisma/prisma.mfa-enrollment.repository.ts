@@ -5,7 +5,7 @@ import type { MfaEnrollmentRepository } from "../mfa-enrollment.repository.ts";
 import { mfaEnrollmentRowToState } from "./prisma.mfa-enrollment.mapper.ts";
 
 /** The enrollment head, and the person the membership question is asked through. */
-export type PrismaMfaEnrollmentDatabase = Pick<PrismaClient, "mfaEnrollment" | "user">;
+type PrismaMfaEnrollmentDatabase = Pick<PrismaClient, "mfaEnrollment" | "user">;
 
 /**
  * The reads the two-step verification guards run against (D06). Postgres,

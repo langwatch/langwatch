@@ -28,7 +28,7 @@ interface SsoConnectionPayloadShape {
 }
 
 /** The one read this repository takes off the sso_connection pipeline's own store. */
-export type SsoConnectionEventReads = Pick<OwnEventStore, "read">;
+type SsoConnectionEventReads = Pick<OwnEventStore, "read">;
 
 const SSO_CONNECTION_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set(SSO_CONNECTION_EVENT_TYPES);
 

@@ -26,7 +26,7 @@ import type { VerificationCeremonyService } from "./verification-ceremony.servic
 const CONFIRMATION_MAILS_PER_HOUR = 10;
 const HOUR_SECONDS = 60 * 60;
 
-export interface AccountIdentifiersServiceDeps {
+interface AccountIdentifiersServiceDeps {
   heads: IdentityHeadsRepository;
   identity: Pick<IdentityService, "attachIdentifier" | "markPrimary" | "detachIdentifier">;
   ceremony: Pick<VerificationCeremonyService, "mintEmailVerification">;

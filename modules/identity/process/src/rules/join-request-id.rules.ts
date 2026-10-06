@@ -19,21 +19,6 @@ export function newJoinRequestCommandId(): string {
 }
 
 /**
- * The command id an EXPIRY wake dispatches with, derived from the request
- * and deadline so a redelivered wake derives a byte-identical idempotency
- * key and the event store dedupes it.
- */
-export function expireJoinCommandId({
-  joinRequestId,
-  scheduledFor,
-}: {
-  joinRequestId: string;
-  scheduledFor: number;
-}): string {
-  return `join-expire:${joinRequestId}:${scheduledFor}`;
-}
-
-/**
  * The command id an APPROVAL dispatches with, derived from request and
  * resolver, not minted fresh — a retry after a partial failure must be the
  * same command so a replay attaches membership exactly once.

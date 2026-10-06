@@ -3,7 +3,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { SsoRegistrantReadRepository } from "../repositories/sso-registrant.repository.ts";
 import type { SsoRegistrantReads } from "../rules/sso-assertion-contract.rules.ts";
 
-export interface SsoRegistrantReadsDeps {
+interface SsoRegistrantReadsDeps {
   registrants: SsoRegistrantReadRepository;
   organizations: OrganizationApi;
 }

@@ -34,7 +34,7 @@ export interface SsoRetirementMemberships extends SsoMigrationMemberships {
   organizationIdsForMember(args: { userId: string }): Promise<string[]>;
 }
 
-export interface SsoLegacyIdentityRetirementServiceDeps {
+interface SsoLegacyIdentityRetirementServiceDeps {
   identity: IdentityService;
   connections: SsoConnectionReadRepository;
   evidence: SsoMigrationEvidenceRepository;

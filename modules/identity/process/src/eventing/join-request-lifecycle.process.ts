@@ -34,7 +34,7 @@ export const expireRequestIntentSchema = z.object({
   scheduledFor: z.number().int(),
 });
 
-export const JOIN_REQUEST_NOTIFICATION_KINDS = [
+const JOIN_REQUEST_NOTIFICATION_KINDS = [
   "requestArrived",
   "requestStillWaiting",
   "requestApproved",
@@ -43,7 +43,7 @@ export const JOIN_REQUEST_NOTIFICATION_KINDS = [
   "joinedAutomatically",
 ] as const;
 
-export type JoinRequestNotificationKind = (typeof JOIN_REQUEST_NOTIFICATION_KINDS)[number];
+type JoinRequestNotificationKind = (typeof JOIN_REQUEST_NOTIFICATION_KINDS)[number];
 
 /** One notice, derived from a recorded fact, so the handoff cannot be lost after the command. */
 export const joinRequestNotificationIntentSchema = z.object({

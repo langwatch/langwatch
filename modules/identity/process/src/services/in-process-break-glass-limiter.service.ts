@@ -5,8 +5,8 @@ import type { SignInBreakGlassLimiter } from "./signin-router.service.ts";
  * The budget on `?local=1` (ADR-117 §2: break-glass "is rate-limited,
  * A fixed window in process memory, deliberately. The gate ADR-027 froze is
  */
-export const BREAK_GLASS_WINDOW_MS = 60_000;
-export const BREAK_GLASS_WINDOW_BUDGET = 10;
+const BREAK_GLASS_WINDOW_MS = 60_000;
+const BREAK_GLASS_WINDOW_BUDGET = 10;
 
 export class InProcessBreakGlassLimiterService implements SignInBreakGlassLimiter {
   private windowStartedAt = 0;

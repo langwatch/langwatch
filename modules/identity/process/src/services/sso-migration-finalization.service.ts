@@ -13,7 +13,7 @@ import type {
   SsoMigrationProgressService,
 } from "./sso-migration-progress.service.ts";
 
-export interface SsoMigrationFinalizationServiceDeps {
+interface SsoMigrationFinalizationServiceDeps {
   connections: () => SsoConnectionService;
   evidence: SsoMigrationProgressService;
   retirement: SsoLegacyIdentityRetirementService;

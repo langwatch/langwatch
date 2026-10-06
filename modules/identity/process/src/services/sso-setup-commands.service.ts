@@ -49,7 +49,7 @@ const REMOVABLE_BY_DISCARD = new Set([
  *  trail is per connection, and a test sign-in is among its newest rows. */
 const TEST_SIGN_IN_LOOKBACK = 20;
 
-export interface SsoSetupCommandsServiceDeps {
+interface SsoSetupCommandsServiceDeps {
   connections: () => SsoConnectionService;
   reads: SsoConnectionReadRepository;
   /** The trail going live reads the test sign-in off. */

@@ -23,7 +23,7 @@ import {
 } from "../rules/sso-engine-provider.rules.ts";
 import { discoveryEndpointFor } from "../rules/sso-idp-registration.rules.ts";
 
-export type SsoEngineProviderDeps = {
+type SsoEngineProviderDeps = {
   credentials: SsoCredentialRepository;
   rows: SsoEngineProviderRepository;
   /** The deployment's own address: a SAML service provider has to say what it

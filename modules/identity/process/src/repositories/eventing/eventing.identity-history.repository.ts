@@ -11,7 +11,7 @@ import { identityHistoryEntries, linkProposalsOf } from "../../rules/identity-hi
 import { IdentityHistoryRepository } from "../identity-history.repository.ts";
 
 /** The one read this repository takes off the user_identity pipeline's own store. */
-export type IdentityEventReads = Pick<OwnEventStore, "read">;
+type IdentityEventReads = Pick<OwnEventStore, "read">;
 
 /** Every fact the user_identity aggregate states: the MFA facts share it and the panel. */
 const USER_IDENTITY_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set([

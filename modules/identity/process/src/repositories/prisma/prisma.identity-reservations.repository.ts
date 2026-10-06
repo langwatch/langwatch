@@ -12,10 +12,7 @@ import type {
  * written in — one statement each, for the reasons below, and neither is
  * expressible through the fluent client.
  */
-export type PrismaIdentityReservationsDatabase = Pick<
-  PrismaClient,
-  "identifierReservation" | "$queryRaw"
->;
+type PrismaIdentityReservationsDatabase = Pick<PrismaClient, "identifierReservation" | "$queryRaw">;
 
 /**
  * The address lock over Postgres (ADR-116 §6). Deliberately exempt from the

@@ -11,7 +11,7 @@ import type {
 } from "../identity-account-rekey.repository.ts";
 
 /** The one client call the move is made through. */
-export type PrismaIdentityAccountRekeyDatabase = Pick<PrismaClient, "$transaction">;
+type PrismaIdentityAccountRekeyDatabase = Pick<PrismaClient, "$transaction">;
 
 export class PrismaIdentityAccountRekeyRepository implements IdentityAccountRekeyRepository {
   static create(

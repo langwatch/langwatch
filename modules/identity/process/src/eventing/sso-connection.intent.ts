@@ -6,77 +6,53 @@ import {
 } from "@langwatch/eventing";
 import {
   ACTIVATE_CONNECTION_COMMAND_TYPE,
-  type ActivateConnectionCommandData,
   APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
-  type ApproveDomainClaimCommandData,
   ATTEST_DOMAIN_COMMAND_TYPE,
   WITHDRAW_DOMAIN_COMMAND_TYPE,
-  type AttestDomainCommandData,
-  type WithdrawDomainCommandData,
   activateConnectionCommandDataSchema,
   approveDomainClaimCommandDataSchema,
   attestDomainCommandDataSchema,
   withdrawDomainCommandDataSchema,
   CLAIM_DOMAIN_COMMAND_TYPE,
-  type ClaimDomainCommandData,
   COMPLETE_TEARDOWN_COMMAND_TYPE,
-  type CompleteTeardownCommandData,
   claimDomainCommandDataSchema,
   completeTeardownCommandDataSchema,
   DISCARD_CONNECTION_COMMAND_TYPE,
-  type DiscardConnectionCommandData,
   discardConnectionCommandDataSchema,
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
-  type GrandfatherConnectionCommandData,
   grandfatherConnectionCommandDataSchema,
   REGISTER_CONNECTION_COMMAND_TYPE,
   REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
-  type RegisterReplacementConnectionCommandData,
   registerReplacementConnectionCommandDataSchema,
   RENAME_CONNECTION_COMMAND_TYPE,
-  type RenameConnectionCommandData,
   renameConnectionCommandDataSchema,
   UPDATE_CONNECTION_IDP_COMMAND_TYPE,
-  type UpdateConnectionIdpCommandData,
   updateConnectionIdpCommandDataSchema,
   SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
-  type SelectMigrationRouteCommandData,
   selectMigrationRouteCommandDataSchema,
   BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
-  type BeginMigrationFinalizationCommandData,
   beginMigrationFinalizationCommandDataSchema,
   FINALIZE_MIGRATION_COMMAND_TYPE,
-  type FinalizeMigrationCommandData,
   finalizeMigrationCommandDataSchema,
   RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
   RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
-  type RecordDomainProofAbsentCommandData,
-  type RecordDomainProofPresentCommandData,
   recordDomainProofAbsentCommandDataSchema,
   recordDomainProofPresentCommandDataSchema,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
-  type RegisterConnectionCommandData,
-  type RejectDomainClaimCommandData,
-  type RequestTeardownCommandData,
-  type RequestVerificationCommandData,
-  type ResumeConnectionCommandData,
   registerConnectionCommandDataSchema,
   rejectDomainClaimCommandDataSchema,
   requestTeardownCommandDataSchema,
   requestVerificationCommandDataSchema,
   resumeConnectionCommandDataSchema,
   SET_ARRIVAL_POLICY_COMMAND_TYPE,
-  type SetArrivalPolicyCommandData,
   setArrivalPolicyCommandDataSchema,
   type SsoConnectionCommand,
   SUSPEND_CONNECTION_COMMAND_TYPE,
-  type SuspendConnectionCommandData,
   suspendConnectionCommandDataSchema,
   VERIFY_DOMAIN_COMMAND_TYPE,
-  type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
 } from "@langwatch/identity-contract";
 import type { ZodTypeAny, z } from "zod";
@@ -150,7 +126,6 @@ export const RegisterConnectionCommand = connectionCommand({
   description: "Start an organization's SSO connection as a draft",
   verb: "registerConnection",
 });
-export type RegisterConnectionPayload = RegisterConnectionCommandData;
 
 export const ClaimDomainCommand = connectionCommand({
   type: CLAIM_DOMAIN_COMMAND_TYPE,
@@ -158,7 +133,6 @@ export const ClaimDomainCommand = connectionCommand({
   description: "Claim an email domain for a connection, pending ops approval",
   verb: "claimDomain",
 });
-export type ClaimDomainPayload = ClaimDomainCommandData;
 
 export const ApproveDomainClaimCommand = connectionCommand({
   type: APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
@@ -166,7 +140,6 @@ export const ApproveDomainClaimCommand = connectionCommand({
   description: "Record an operator approving a domain claim",
   verb: "approveDomainClaim",
 });
-export type ApproveDomainClaimPayload = ApproveDomainClaimCommandData;
 
 export const RejectDomainClaimCommand = connectionCommand({
   type: REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
@@ -174,7 +147,6 @@ export const RejectDomainClaimCommand = connectionCommand({
   description: "Record an operator rejecting a domain claim, with the note",
   verb: "rejectDomainClaim",
 });
-export type RejectDomainClaimPayload = RejectDomainClaimCommandData;
 
 export const DiscardConnectionCommand = connectionCommand({
   type: DISCARD_CONNECTION_COMMAND_TYPE,
@@ -182,7 +154,6 @@ export const DiscardConnectionCommand = connectionCommand({
   description: "Abandon a draft connection",
   verb: "discardConnection",
 });
-export type DiscardConnectionPayload = DiscardConnectionCommandData;
 
 export const RequestVerificationCommand = connectionCommand({
   type: REQUEST_VERIFICATION_COMMAND_TYPE,
@@ -190,7 +161,6 @@ export const RequestVerificationCommand = connectionCommand({
   description: "Open a domain ownership ceremony, recording the proof's hash",
   verb: "requestVerification",
 });
-export type RequestVerificationPayload = RequestVerificationCommandData;
 
 export const AttestDomainCommand = connectionCommand({
   type: ATTEST_DOMAIN_COMMAND_TYPE,
@@ -198,7 +168,6 @@ export const AttestDomainCommand = connectionCommand({
   description: "Record a platform operator attesting that a domain is the organization's",
   verb: "attestDomain",
 });
-export type AttestDomainPayload = AttestDomainCommandData;
 
 export const WithdrawDomainCommand = connectionCommand({
   type: WITHDRAW_DOMAIN_COMMAND_TYPE,
@@ -206,7 +175,6 @@ export const WithdrawDomainCommand = connectionCommand({
   description: "Take a domain back out of the connection",
   verb: "withdrawDomain",
 });
-export type WithdrawDomainPayload = WithdrawDomainCommandData;
 
 export const VerifyDomainCommand = connectionCommand({
   type: VERIFY_DOMAIN_COMMAND_TYPE,
@@ -214,7 +182,6 @@ export const VerifyDomainCommand = connectionCommand({
   description: "Record that a domain's ownership proof was found",
   verb: "verifyDomain",
 });
-export type VerifyDomainPayload = VerifyDomainCommandData;
 
 export const ActivateConnectionCommand = connectionCommand({
   type: ACTIVATE_CONNECTION_COMMAND_TYPE,
@@ -222,7 +189,6 @@ export const ActivateConnectionCommand = connectionCommand({
   description: "Put a verified connection into service",
   verb: "activateConnection",
 });
-export type ActivateConnectionPayload = ActivateConnectionCommandData;
 
 export const SuspendConnectionCommand = connectionCommand({
   type: SUSPEND_CONNECTION_COMMAND_TYPE,
@@ -230,7 +196,6 @@ export const SuspendConnectionCommand = connectionCommand({
   description: "Stop a connection routing, reversibly",
   verb: "suspendConnection",
 });
-export type SuspendConnectionPayload = SuspendConnectionCommandData;
 
 export const ResumeConnectionCommand = connectionCommand({
   type: RESUME_CONNECTION_COMMAND_TYPE,
@@ -238,7 +203,6 @@ export const ResumeConnectionCommand = connectionCommand({
   description: "Return a suspended connection to service",
   verb: "resumeConnection",
 });
-export type ResumeConnectionPayload = ResumeConnectionCommandData;
 
 export const RequestTeardownCommand = connectionCommand({
   type: REQUEST_TEARDOWN_COMMAND_TYPE,
@@ -246,7 +210,6 @@ export const RequestTeardownCommand = connectionCommand({
   description: "Start a connection's grace period before removal",
   verb: "requestTeardown",
 });
-export type RequestTeardownPayload = RequestTeardownCommandData;
 
 export const CompleteTeardownCommand = connectionCommand({
   type: COMPLETE_TEARDOWN_COMMAND_TYPE,
@@ -254,7 +217,6 @@ export const CompleteTeardownCommand = connectionCommand({
   description: "Remove a connection whose teardown grace has elapsed",
   verb: "completeTeardown",
 });
-export type CompleteTeardownPayload = CompleteTeardownCommandData;
 
 export const GrandfatherConnectionCommand = connectionCommand({
   type: GRANDFATHER_CONNECTION_COMMAND_TYPE,
@@ -262,7 +224,6 @@ export const GrandfatherConnectionCommand = connectionCommand({
   description: "Record the history an organization's legacy SSO strings already imply",
   verb: "grandfatherConnection",
 });
-export type GrandfatherConnectionPayload = GrandfatherConnectionCommandData;
 
 export const RenameConnectionCommand = connectionCommand({
   type: RENAME_CONNECTION_COMMAND_TYPE,
@@ -270,7 +231,6 @@ export const RenameConnectionCommand = connectionCommand({
   description: "Change the word an administrator reads on a connection's card",
   verb: "renameConnection",
 });
-export type RenameConnectionPayload = RenameConnectionCommandData;
 
 export const UpdateConnectionIdpCommand = connectionCommand({
   type: UPDATE_CONNECTION_IDP_COMMAND_TYPE,
@@ -278,7 +238,6 @@ export const UpdateConnectionIdpCommand = connectionCommand({
   description: "Replace the identity provider settings a connection dials",
   verb: "updateConnectionIdp",
 });
-export type UpdateConnectionIdpPayload = UpdateConnectionIdpCommandData;
 
 export const RegisterReplacementConnectionCommand = connectionCommand({
   type: REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
@@ -286,7 +245,6 @@ export const RegisterReplacementConnectionCommand = connectionCommand({
   description: "Register the direct connection that replaces a grandfathered one",
   verb: "registerReplacementConnection",
 });
-export type RegisterReplacementConnectionPayload = RegisterReplacementConnectionCommandData;
 
 export const SelectMigrationRouteCommand = connectionCommand({
   type: SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
@@ -294,7 +252,6 @@ export const SelectMigrationRouteCommand = connectionCommand({
   description: "Choose which connection of a migration pair decides ordinary sign-ins",
   verb: "selectMigrationRoute",
 });
-export type SelectMigrationRoutePayload = SelectMigrationRouteCommandData;
 
 export const BeginMigrationFinalizationCommand = connectionCommand({
   type: BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
@@ -302,7 +259,6 @@ export const BeginMigrationFinalizationCommand = connectionCommand({
   description: "Open the durable gate that retiring the legacy connection runs behind",
   verb: "beginMigrationFinalization",
 });
-export type BeginMigrationFinalizationPayload = BeginMigrationFinalizationCommandData;
 
 export const FinalizeMigrationCommand = connectionCommand({
   type: FINALIZE_MIGRATION_COMMAND_TYPE,
@@ -310,7 +266,6 @@ export const FinalizeMigrationCommand = connectionCommand({
   description: "Record that the legacy connection has been retired",
   verb: "finalizeMigration",
 });
-export type FinalizeMigrationPayload = FinalizeMigrationCommandData;
 
 export const SetArrivalPolicyCommand = connectionCommand({
   type: SET_ARRIVAL_POLICY_COMMAND_TYPE,
@@ -318,7 +273,6 @@ export const SetArrivalPolicyCommand = connectionCommand({
   description: "Choose what happens to a person this connection has never seen",
   verb: "setArrivalPolicy",
 });
-export type SetArrivalPolicyPayload = SetArrivalPolicyCommandData;
 
 export const RecordDomainProofAbsentCommand = connectionCommand({
   type: RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
@@ -326,7 +280,6 @@ export const RecordDomainProofAbsentCommand = connectionCommand({
   description: "Record that a re-check found a domain's ownership proof gone",
   verb: "recordDomainProofAbsent",
 });
-export type RecordDomainProofAbsentPayload = RecordDomainProofAbsentCommandData;
 
 export const RecordDomainProofPresentCommand = connectionCommand({
   type: RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
@@ -334,4 +287,3 @@ export const RecordDomainProofPresentCommand = connectionCommand({
   description: "Record that a re-check found a domain's ownership proof back",
   verb: "recordDomainProofPresent",
 });
-export type RecordDomainProofPresentPayload = RecordDomainProofPresentCommandData;

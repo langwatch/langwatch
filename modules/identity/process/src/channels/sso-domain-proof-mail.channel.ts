@@ -1,5 +1,5 @@
 /** What to publish again, named exactly, in both domain-proof mails. */
-export type SsoDomainProofRecord = {
+type SsoDomainProofRecord = {
   recordType: string;
   recordName: string;
   recordLabel: string;

@@ -8,7 +8,7 @@ const logger = createLogger("langwatch:identity:sso-domain-reproof:sweep");
 /** Outbox rows are bookkeeping, one per tick, pruned like every recurring process's. */
 const SWEEP_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
-export interface SsoDomainReproofSweepDeps {
+interface SsoDomainReproofSweepDeps {
   sweep: () => Promise<SsoDomainReproofOutcome>;
   deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
   now?: () => number;

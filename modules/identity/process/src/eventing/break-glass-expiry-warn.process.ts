@@ -13,13 +13,13 @@ export const breakGlassExpiryWarnSchema = z.object({
 export const breakGlassExpiryWarnStateSchema = z.object({
   lastWarnAt: z.number().nullable(),
 });
-export type BreakGlassExpiryWarnState = z.infer<typeof breakGlassExpiryWarnStateSchema>;
+type BreakGlassExpiryWarnState = z.infer<typeof breakGlassExpiryWarnStateSchema>;
 
 export const BREAK_GLASS_EXPIRY_WARN_INITIAL_STATE: BreakGlassExpiryWarnState = {
   lastWarnAt: null,
 };
 
-export type BreakGlassExpiryWarnIntents = {
+type BreakGlassExpiryWarnIntents = {
   warn: IntentSpec<typeof breakGlassExpiryWarnSchema>;
 };
 

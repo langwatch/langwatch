@@ -31,10 +31,7 @@ import {
 import { PrismaSsoBreakGlassRepository } from "./prisma.sso-break-glass.repository.ts";
 
 /** The connection head, and the ownership rows written in the same transaction. */
-export type PrismaSsoConnectionProjectionDatabase = Pick<
-  PrismaClient,
-  "ssoConnection" | "$transaction"
->;
+type PrismaSsoConnectionProjectionDatabase = Pick<PrismaClient, "ssoConnection" | "$transaction">;
 
 const storedDomainClaimsSchema = z.array(ssoDomainClaimSchema).catch([]);
 

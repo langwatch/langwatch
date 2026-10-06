@@ -112,7 +112,7 @@ export interface IdentityStorageAdapterDeps {
   passkeyRemoval: PasskeyRemoval;
 }
 
-export type PasskeyRemovalOutcome = "deleted" | "not_found" | "would_strand_user";
+type PasskeyRemovalOutcome = "deleted" | "not_found" | "would_strand_user";
 
 /**
  * The atomic persistence boundary behind better-auth's one-passkey delete.
