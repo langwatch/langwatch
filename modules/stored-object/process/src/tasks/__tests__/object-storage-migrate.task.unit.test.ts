@@ -13,6 +13,7 @@ import type { StoredObjectBlobRepository } from "#repositories/stored-object-blo
 import { createMigrationStorageEndpoint } from "../../rules/object-storage-migration-transfer.rules.ts";
 import { ObjectStorageMigrationService } from "../../services/object-storage-migration.service.ts";
 import {
+  createMigrationTask,
   ObjectStorageMigrateTask,
   parseMigrationTaskConfig,
 } from "../object-storage-migrate.task.ts";
@@ -161,5 +162,38 @@ describe("ObjectStorageMigrateTask", () => {
 
       expect(nothingMoved().inventoryReads).toBe(1);
     });
+  });
+});
+
+describe("createMigrationTask in a token auth mode", () => {
+  const build = (azureEnvironment: NodeJS.ProcessEnv) =>
+    createMigrationTask({
+      config: parseMigrationTaskConfig({
+        ...migrationEnvironment(),
+        OBJECT_STORAGE_MIGRATION_AZURE_AUTH_MODE: "workloadIdentity",
+        OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_KEY: "",
+        ...azureEnvironment,
+      }),
+      inventory: setup(ACTIVE_S3).inventory,
+      publishStoredObject: async () => {},
+      auditQueues: async () => [],
+      s3Driver: new RecordingDriver(),
+    });
+
+  /** @scenario The storage migration task builds its own Azure credentials and shares the services' token-transport guards */
+  it("refuses a plaintext or authority-less sovereign endpoint and accepts a public-cloud one", () => {
+    expect(() =>
+      build({ OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT: "http://storage.example.com/destination" }),
+    ).toThrow(/must use https/);
+    expect(() =>
+      build({
+        OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT: "https://destination.blob.core.usgovcloudapi.net",
+      }),
+    ).toThrow(/AZURE_BLOB_AUTHORITY_HOST/);
+    expect(() =>
+      build({
+        OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT: "https://destination.blob.core.windows.net",
+      }),
+    ).not.toThrow();
   });
 });
