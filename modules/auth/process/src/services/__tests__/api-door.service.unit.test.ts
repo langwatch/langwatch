@@ -833,4 +833,32 @@ describe("the organization's second-factor gate (Q184)", () => {
       await expect(authz.assertSecondFactor?.(at("team", "team-own"))).resolves.toBeUndefined();
     });
   });
+
+  describe("given a batch over two projects of one organization", () => {
+    /** @scenario "A batch over several projects of one organization reads the standing once" */
+    it("reads the standing once and still applies the personal exemption per scope", async () => {
+      const { authz, asked } = gate({ offered: true, satisfied: false });
+
+      const [own, other] = await Promise.allSettled([
+        authz.assertSecondFactor?.(at("project", "project-own")),
+        authz.assertSecondFactor?.(at("project", "project-1")),
+      ]);
+
+      expect(asked.standings).toHaveLength(1);
+      expect(own?.status).toBe("fulfilled");
+      expect(other).toMatchObject({
+        status: "rejected",
+        reason: { code: "identity_mfa_enrollment_required" },
+      });
+    });
+
+    it("keeps nothing once the read settles, so a later request reads afresh", async () => {
+      const { authz, asked } = gate({ offered: true, satisfied: true });
+
+      await authz.assertSecondFactor?.(at("project", "project-1"));
+      await authz.assertSecondFactor?.(at("project", "project-1"));
+
+      expect(asked.standings).toHaveLength(2);
+    });
+  });
 });

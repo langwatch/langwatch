@@ -295,6 +295,13 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then the answer says the requirement is not required and satisfied
     And no membership, session sign-in method or account factor is read
 
+  @unit
+  Scenario: A batch over several projects of one organization reads the standing once
+    Given "acme" requires two-step verification
+    When "sam" asks, in one batch, about two projects of "acme" at the same time
+    Then the organization's standing is read once
+    And the personal-workspace exemption is still decided for each project
+
   @integration
   Scenario: Setting it up opens the gate on the session they already hold
     Given "sam" is held at the enrollment gate for "acme"
