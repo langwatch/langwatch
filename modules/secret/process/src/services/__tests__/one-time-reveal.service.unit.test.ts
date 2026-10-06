@@ -42,6 +42,7 @@ async function codeOf(run: () => Promise<unknown>): Promise<unknown> {
 
 describe("the one-time reveal", () => {
   /** @scenario "The first read returns the secret and the second refuses" */
+  /** @scenario "The reveal survives without Redis" */
   it("serves the secret once and refuses every read after it", async () => {
     const { service } = fixture();
 
@@ -73,6 +74,7 @@ describe("the one-time reveal", () => {
   });
 
   /** @scenario "A reveal belongs to the organization that stashed it" */
+  /** @scenario "A reveal belongs to the organization that minted it" */
   it("does not serve one organization's reveal to another", async () => {
     const { service } = fixture();
 

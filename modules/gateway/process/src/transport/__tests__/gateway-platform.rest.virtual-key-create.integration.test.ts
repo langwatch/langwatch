@@ -16,6 +16,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GatewayVirtualKeyCaller } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi, StashRevealInput } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -76,7 +77,10 @@ type Credential =
   | { kind: "apiKey"; holds: (input: { permission: string; scopeId: string }) => boolean };
 
 /** The credential is what the route's caller fact names; the grants are what authz answers. */
-async function mountedCreate(credential: Credential) {
+async function mountedCreate(
+  credential: Credential,
+  { oneTimeReveals }: { oneTimeReveals?: SecretApi } = {},
+) {
   const store = MemoryGatewayStore.create({
     teams: [
       { id: "team_1", organizationId: ORGANIZATION_ID, name: "Platform", slug: "platform" },
@@ -129,7 +133,7 @@ async function mountedCreate(credential: Credential) {
       featureFlags: createApiFixture({}),
       modelProviders: createApiFixture({}),
       traces: createApiFixture({}),
-      oneTimeReveals: createApiFixture({}),
+      oneTimeReveals: oneTimeReveals ?? createApiFixture({}),
       apiKeys: createApiFixture({}),
     },
     repositories,
@@ -204,6 +208,43 @@ const langySession: Credential = {
 };
 
 describe("the platform family's virtual-key create", () => {
+  describe("given a create that asks for reveal_once", () => {
+    /** @scenario "The REST create with reveal_once answers with the reveal id and the prefix, not the secret" */
+    it("answers the key, its prefix and a reveal id, and parks the secret for that id", async () => {
+      const stashed: StashRevealInput[] = [];
+      const { call } = await mountedCreate(
+        { kind: "project" },
+        {
+          oneTimeReveals: createApiFixture<SecretApi>({
+            stashReveal: async (input) => {
+              stashed.push(input);
+              return { revealId: "rvl_content_marker" };
+            },
+          }),
+        },
+      );
+
+      const created = await call("POST", "/virtual-keys", {
+        body: { name: "production-app", reveal_once: true },
+      });
+
+      expect(created.status).toBe(201);
+      expect(created.body.virtual_key).toMatchObject({ name: "production-app" });
+      expect(created.body).toMatchObject({ reveal_id: "rvl_content_marker" });
+      expect(created.body.secret).toBeUndefined();
+      expect(stashed).toHaveLength(1);
+      const [parked] = stashed;
+      expect(parked).toMatchObject({
+        organizationId: ORGANIZATION_ID,
+        kind: "virtual_key",
+        keyId: created.body.virtual_key?.id,
+        preview: (created.body as { preview?: string }).preview,
+      });
+      expect(parked?.secret).toMatch(/^vk-lw-/);
+      expect(created.text).not.toContain(parked?.secret ?? "no secret was parked");
+    });
+  });
+
   describe("given a project key", () => {
     /** @scenario Create a virtual key with the SDK's current shape */
     it("mints with the SDK's shape, tolerates the retired ids field and round-trips a config", async () => {
