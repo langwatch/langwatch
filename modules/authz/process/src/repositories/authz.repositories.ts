@@ -1,7 +1,12 @@
 import type { AuthzAdmissionRepository } from "./authz-admission.repository.ts";
+import type { AuthzAuditTrailRepository } from "./authz-audit-trail.repository.ts";
 import type { AuthzCutoverRepository } from "./authz-cutover.repository.ts";
 import type { AuthzEpochRepository } from "./authz-epoch.repository.ts";
+import type { AuthzGrantProjectionRepository } from "./authz-grant-projection.repository.ts";
 import type { AuthzManagedGrantRepository } from "./authz-managed-grant.repository.ts";
+import type { AuthzMembershipStampRepository } from "./authz-membership-stamp.repository.ts";
+import type { AuthzPlatformGrantRepository } from "./authz-platform-grant.repository.ts";
+import type { AuthzRevocationRepository } from "./authz-revocation.repository.ts";
 import type { AuthzSessionVersionRepository } from "./authz-session-version.repository.ts";
 import type { AuthzUserStandingRepository } from "./authz-user-standing.repository.ts";
 
@@ -13,4 +18,9 @@ export interface AuthzRepositories {
   readonly userStandings: AuthzUserStandingRepository;
   readonly epoch: AuthzEpochRepository;
   readonly sessionVersions: AuthzSessionVersionRepository;
+  readonly auditTrail: AuthzAuditTrailRepository;
+  readonly platformGrants: AuthzPlatformGrantRepository;
+  readonly membershipStamps: AuthzMembershipStampRepository;
+  readonly grantProjection: AuthzGrantProjectionRepository;
+  readonly revocation: AuthzRevocationRepository;
 }

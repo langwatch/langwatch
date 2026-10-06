@@ -2,13 +2,18 @@ import type { OrganizationRole } from "@langwatch/authorization";
 import type { MigrationTenantStatus } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { AuthzAuditRow } from "../authz-audit-trail.repository.ts";
 import type {
   AuthzAssignableRoleRow,
   AuthzBindingScopeRow,
-  AuthzGrantPrincipalRow,
   AuthzManagedBindingRow,
   AuthzUserGroupRow,
 } from "../authz-managed-grant.repository.ts";
+import type {
+  CompatShareLinkRowShape,
+  GrantRowShape,
+  RoleRowShape,
+} from "../prisma/prisma.authz-grant.mapper.ts";
 
 /** One membership's unfinished admission marker. */
 export type AuthzMemoryAdmissionRow = {
@@ -34,12 +39,25 @@ export type AuthzMemoryAdmissionGrantRow = {
   revoked: boolean;
 };
 
-export type AuthzMemoryGrantRow = {
-  organizationId: string;
-  principal: AuthzGrantPrincipalRow["principal"];
-  roleKey: string | null;
-  revoked: boolean;
+/** A Grant head row: the projected fact, and the revocation mark that ends it. */
+export type AuthzMemoryGrantRow = GrantRowShape & {
+  revokedAt: Instant | null;
+  revokedReason: string | null;
 };
+
+/** A Role head row; a deleted role keeps its row, marked. */
+export type AuthzMemoryRoleRow = RoleRowShape & { deletedAt: Instant | null };
+
+/** The CustomRole compat head the legacy resolver and the binding reads still read. */
+export type AuthzMemoryCustomRoleRow = AuthzAssignableRoleRow & {
+  organizationId: string;
+  name: string;
+  description: string | null;
+  kind: string;
+};
+
+/** A membership's generation, the column the grant fence compares. */
+export type AuthzMemoryMembershipStampRow = { membershipStamp: string; disabled: boolean };
 
 export type AuthzMemoryCutoverRow = {
   organizationId: string;
@@ -66,10 +84,18 @@ export class AuthzMemoryStore {
   readonly organizationRoles = new Map<string, OrganizationRole>();
   readonly legacySharedTeamMemberships: { organizationId: string; userId: string }[] = [];
   readonly teamMemberships: { organizationId: string; teamId: string; userId: string }[] = [];
-  /** The grant ledger head's rows, as far as a role's holders need them. */
+  /** The grant ledger's Grant head, as the projection writes it. */
   readonly grants: AuthzMemoryGrantRow[] = [];
-  readonly roles: (AuthzAssignableRoleRow & { organizationId: string })[] = [];
+  readonly roleHeads: AuthzMemoryRoleRow[] = [];
+  /** The CustomRole compat head. */
+  readonly roles: AuthzMemoryCustomRoleRow[] = [];
+  readonly shareLinks: (CompatShareLinkRowShape & { viewCount: number })[] = [];
   readonly apiKeys: { organizationId: string; apiKeyId: string }[] = [];
+  /** Keyed `organizationId:userId`, as `organizationRoles` is: the same membership row. */
+  readonly membershipStamps = new Map<string, AuthzMemoryMembershipStampRow>();
+  /** Organizations that exist, as far as the bootstrap fence asks. */
+  readonly organizations = new Set<string>();
+  readonly auditLogs: AuthzAuditRow[] = [];
 
   static create(): AuthzMemoryStore {
     return new AuthzMemoryStore();
@@ -89,6 +115,8 @@ export class AuthzMemoryStore {
     this.cutovers.clear();
     this.userStandings.clear();
     this.organizationRoles.clear();
+    this.membershipStamps.clear();
+    this.organizations.clear();
     for (const rows of [
       this.admissions,
       this.admissionGrants,
@@ -98,8 +126,11 @@ export class AuthzMemoryStore {
       this.legacySharedTeamMemberships,
       this.teamMemberships,
       this.grants,
+      this.roleHeads,
       this.roles,
+      this.shareLinks,
       this.apiKeys,
+      this.auditLogs,
     ]) {
       rows.length = 0;
     }

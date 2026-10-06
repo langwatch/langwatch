@@ -25,6 +25,7 @@ import type { AuthzEpochRepository } from "../repositories/authz-epoch.repositor
 import { BindingMissingError, type GrantWrite } from "../repositories/authz-grant.repository.ts";
 import type { AuthzMembershipStampRepository } from "../repositories/authz-membership-stamp.repository.ts";
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
+import type { AuthzRevocationRepository } from "../repositories/authz-revocation.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
 import { liveGrants, liveRoles } from "../repositories/eventing/eventing.authz-live-rows.mapper.ts";
 import {
@@ -43,7 +44,6 @@ import {
   samePermissions,
   storedId,
 } from "../repositories/prisma/prisma.authz-ledger.mapper.ts";
-import type { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
 import {
   membershipFenceFields,
   userIdsNeedingStamp,
@@ -119,7 +119,7 @@ export type EventingAuthzLedgerAdapterOptions = {
   database: AuthzLedgerDatabase;
   dispatcher: AuthzGrantsCommandDispatcher;
   epoch: AuthzEpochRepository;
-  revocation: PrismaAuthzRevocationRepository;
+  revocation: AuthzRevocationRepository;
   /** The membership lifetime a USER attach is fenced to. */
   membershipStamps: AuthzMembershipStampRepository;
   now?: () => number;

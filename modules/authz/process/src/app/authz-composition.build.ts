@@ -24,24 +24,19 @@ import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import type { AuthzGrantWriteDatabase } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import { EventingAuthzListingRepository } from "../repositories/eventing/eventing.authz-listing.repository.ts";
-import { EventingAuthzPlatformGrantRepository } from "../repositories/eventing/eventing.authz-platform-grant.repository.ts";
 import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
 import type { AuthzAuditDatabase } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import { PrismaAuthzAuditRepository } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import type { AuthzCutoverDatabase } from "../repositories/prisma/prisma.authz-cutover.repository.ts";
 import type { PrismaAuthzGrantDatabase } from "../repositories/prisma/prisma.authz-grant.repository.ts";
 import type { AuthzManagedGrantDatabase } from "../repositories/prisma/prisma.authz-managed-grant.repository.ts";
-import {
-  type AuthzMembershipStampDatabase,
-  PrismaAuthzMembershipStampRepository,
-} from "../repositories/prisma/prisma.authz-membership-stamp.repository.ts";
+import type { AuthzMembershipStampDatabase } from "../repositories/prisma/prisma.authz-membership-stamp.repository.ts";
 import type { AuthzMigrationDatabase } from "../repositories/prisma/prisma.authz-migration.repository.ts";
 import { PrismaAuthzMigrationRepository } from "../repositories/prisma/prisma.authz-migration.repository.ts";
 import {
   type AuthzProjectionDatabase,
   PrismaAuthzProjectionRepository,
 } from "../repositories/prisma/prisma.authz-projection.repository.ts";
-import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
 import type { PrismaAuthzUserStandingDatabase } from "../repositories/prisma/prisma.authz-user-standing.repository.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import type {
@@ -193,15 +188,12 @@ export class PostgresAuthzAdapter {
     // API-key adoption; every decision and listing reads the grants head.
     const isOnEngine = (organizationId: string) => cutover.isOn({ organizationId });
 
-    const revocation = PrismaAuthzRevocationRepository.create({
-      database,
-    });
     const ledgerOptions: EventingAuthzLedgerAdapterOptions = {
       database,
       dispatcher: this.options.dispatcher,
       epoch,
-      revocation,
-      membershipStamps: PrismaAuthzMembershipStampRepository.create({ database }),
+      revocation: repositories.revocation,
+      membershipStamps: repositories.membershipStamps,
     };
     if (this.options.now) ledgerOptions.now = this.options.now;
     if (this.options.newCommandId) {
@@ -213,7 +205,7 @@ export class PostgresAuthzAdapter {
     const bindingRepository = repositories.bindings;
     const standings = repositories.userStandings;
     const platformOperators = AuthzPlatformOperatorsService.create({
-      grants: EventingAuthzPlatformGrantRepository.create(database),
+      grants: repositories.platformGrants,
       standings,
       ledger,
       newGrantId: this.options.newBindingId,
@@ -254,8 +246,8 @@ export class PostgresAuthzAdapter {
     });
 
     const pipeline = EventingAuthzAdapter.build({
-      authzGrantsWriteStore: PrismaAuthzProjectionRepository.create(database),
-      authzAuditTrailStore: PrismaAuthzAuditRepository.create(database),
+      authzGrantsWriteStore: repositories.grantProjection,
+      authzAuditTrailStore: repositories.auditTrail,
       sessionVersions,
       userStandings,
     });

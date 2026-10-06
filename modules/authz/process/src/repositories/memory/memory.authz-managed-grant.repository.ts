@@ -1,5 +1,5 @@
 import type { OrganizationRole } from "@langwatch/authorization";
-import type { GrantScopeTier } from "@langwatch/authz-contract";
+import { type GrantScopeTier, PRINCIPAL_KIND_FROM_STORED } from "@langwatch/authz-contract";
 
 import {
   type AuthzAssignableRoleRow,
@@ -86,9 +86,12 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
           (row) =>
             row.organizationId === input.organizationId &&
             row.roleKey === `custom:${input.roleId}` &&
-            !row.revoked,
+            row.revokedAt === null,
         )
-        .map(({ principal }) => [`${principal.type}:${principal.id}`, principal]),
+        .map(({ principalType, principalId }) => {
+          const type = PRINCIPAL_KIND_FROM_STORED[principalType];
+          return [`${type}:${principalId}`, { type, id: principalId }] as const;
+        }),
     );
     return [...distinct.values()].slice(0, input.limit);
   }

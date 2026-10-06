@@ -1,12 +1,12 @@
 import { createLogger } from "@langwatch/observability";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import { AuthzEpochRepository } from "../authz-epoch.repository.ts";
 
 const logger = createLogger("langwatch:authz:epoch");
 const EPOCH_KEY_PREFIX = "authz:epoch:";
 
-export type AuthzEpochRedis = Pick<ProcessMembers["redis"], "get" | "incr">;
+export type AuthzEpochRedis = Pick<RedisConnection, "get" | "incr">;
 
 export type RedisAuthzEpochRepositoryOptions = {
   redis: AuthzEpochRedis | null;

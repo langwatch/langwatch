@@ -10,16 +10,21 @@ import { STORED_PRINCIPAL_KIND } from "@langwatch/authz-contract";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
-import { Temporal } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import type { AuthzManagedGrantRepository } from "../authz-managed-grant.repository.ts";
 import type { AuthzRepositories } from "../authz.repositories.ts";
 import { AuthzMemoryStore } from "../memory/authz-memory.store.ts";
 import { MemoryAuthzAdmissionRepository } from "../memory/memory.authz-admission.repository.ts";
+import { MemoryAuthzAuditTrailRepository } from "../memory/memory.authz-audit-trail.repository.ts";
 import { MemoryAuthzCutoverRepository } from "../memory/memory.authz-cutover.repository.ts";
 import { MemoryAuthzEpochRepository } from "../memory/memory.authz-epoch.repository.ts";
+import { MemoryAuthzGrantProjectionRepository } from "../memory/memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzManagedGrantRepository } from "../memory/memory.authz-managed-grant.repository.ts";
+import { MemoryAuthzMembershipStampRepository } from "../memory/memory.authz-membership-stamp.repository.ts";
+import { MemoryAuthzPlatformGrantRepository } from "../memory/memory.authz-platform-grant.repository.ts";
+import { MemoryAuthzRevocationRepository } from "../memory/memory.authz-revocation.repository.ts";
 import { MemoryAuthzSessionVersionRepository } from "../memory/memory.authz-session-version.repository.ts";
 import { MemoryAuthzUserStandingRepository } from "../memory/memory.authz-user-standing.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "../prisma/prisma.authz-managed-grant.repository.ts";
@@ -46,6 +51,11 @@ const backends: readonly Backend[] = [
         userStandings: MemoryAuthzUserStandingRepository.create({ memory }),
         epoch: MemoryAuthzEpochRepository.create({ memory }),
         sessionVersions: MemoryAuthzSessionVersionRepository.create({ memory }),
+        auditTrail: MemoryAuthzAuditTrailRepository.create({ memory }),
+        platformGrants: MemoryAuthzPlatformGrantRepository.create({ memory }),
+        membershipStamps: MemoryAuthzMembershipStampRepository.create({ memory }),
+        grantProjection: MemoryAuthzGrantProjectionRepository.create({ memory }),
+        revocation: MemoryAuthzRevocationRepository.create({ memory }),
       };
     },
   },
@@ -373,7 +383,27 @@ function memoryHolderFixture(): HolderFixture {
       return teamId;
     },
     grant: async ({ principal, roleKey, revoked = false }) => {
-      memory.grants.push({ organizationId, principal, roleKey, revoked });
+      memory.grants.push({
+        id: id("grant"),
+        organizationId,
+        principalType: STORED_PRINCIPAL_KIND[principal.type],
+        principalId: principal.id,
+        roleKey,
+        legacyRole: null,
+        source: "grants-service",
+        scopeType: "PROJECT",
+        scopeId: id("project"),
+        token: null,
+        permission: null,
+        resourceKind: null,
+        projectId: null,
+        createdByUserId: null,
+        expiresAt: null,
+        maxViews: null,
+        occurredAt: nowInstant(),
+        revokedAt: revoked ? nowInstant() : null,
+        revokedReason: null,
+      });
     },
     close: async () => {},
   };
