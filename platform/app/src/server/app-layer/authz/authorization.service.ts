@@ -26,7 +26,10 @@ import type {
   AuthzService,
   GrantCondition,
 } from "@langwatch/authz-server";
-import type { SharedReadsGrantsRepository } from "./repositories/shared-reads.grants.repository";
+import type {
+  SharedReadRow,
+  SharedReadsGrantsRepository,
+} from "./repositories/shared-reads.grants.repository";
 
 /** A proof never outlives this, whatever the grants say: the ceiling on
  *  how stale a route's view of access may be. */
@@ -71,7 +74,7 @@ export class AuthorizationService {
     const scopeRef = await collector.resolveScopeRef({
       projectId: scope.projectId,
     });
-    if (!scopeRef || scopeRef.type !== "project") {
+    if (scopeRef?.type !== "project") {
       throw new AccessNotGrantedError(permission);
     }
     const { decision } = await authz.checkDetailed({
@@ -102,24 +105,12 @@ export class AuthorizationService {
           readerProjectId: scope.projectId,
         })
       : [];
-    const shared: AuthorizationGrant[] = [];
-    let expiresAt = now + AUTHORIZATION_MAX_AGE_MS;
-    for (const row of rows) {
-      if (row.memberProjectId === scope.projectId) continue;
-      const condition = proofCondition(row.condition);
-      if (!condition) continue;
-      if (row.expiresAt && row.expiresAt.getTime() <= now) continue;
-      shared.push({
-        projectId: row.memberProjectId,
-        permissions: [permission],
-        via: [row.grantId],
-        kind: "shared",
-        condition,
-      });
-      if (row.expiresAt) {
-        expiresAt = Math.min(expiresAt, row.expiresAt.getTime());
-      }
-    }
+    const { shared, expiresAt } = sharedGrantsFrom({
+      rows,
+      readerProjectId: scope.projectId,
+      permission,
+      now,
+    });
 
     return sealAuthorization({
       actor,
@@ -130,6 +121,44 @@ export class AuthorizationService {
       purpose,
     });
   }
+}
+
+/**
+ * One shared grant per applicable row, and the earliest expiry among them
+ * under the ceiling. A row that cannot be applied - a where clause, an
+ * expired grant, the reader naming itself - is left out.
+ */
+function sharedGrantsFrom({
+  rows,
+  readerProjectId,
+  permission,
+  now,
+}: {
+  rows: SharedReadRow[];
+  readerProjectId: string;
+  permission: AuthzPermission;
+  now: number;
+}): { shared: AuthorizationGrant[]; expiresAt: number } {
+  const shared: AuthorizationGrant[] = [];
+  let expiresAt = now + AUTHORIZATION_MAX_AGE_MS;
+  for (const row of rows) {
+    const condition = proofCondition(row.condition);
+    const expiry = row.expiresAt?.getTime();
+    const applicable =
+      row.memberProjectId !== readerProjectId &&
+      condition !== undefined &&
+      (expiry === undefined || expiry > now);
+    if (!applicable) continue;
+    shared.push({
+      projectId: row.memberProjectId,
+      permissions: [permission],
+      via: [row.grantId],
+      kind: "shared",
+      condition,
+    });
+    if (expiry !== undefined) expiresAt = Math.min(expiresAt, expiry);
+  }
+  return { shared, expiresAt };
 }
 
 /**
