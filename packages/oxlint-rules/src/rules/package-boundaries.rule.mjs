@@ -13,6 +13,10 @@ const BROWSER_RUNTIME =
   /^(?:react|react-dom|@chakra-ui\/|@langwatch\/(?:browser-host|design-system|browser)(?:\/|$))/;
 const SERVER_RUNTIME =
   /^(?:hono|@trpc\/server|@langwatch\/(?:eventing|group-queue|process|process-stores)(?:\/|$))/;
+/** The raw store clients: a module client never takes one (§3.4). */
+const STORE_CLIENT = /^@langwatch\/(?:prisma-client|clickhouse-client|redis-client)(?:\/|$)/;
+/** The browser runtime a module client may take: React and browser-host (Alex, 2026-10-06). */
+const CLIENT_BROWSER_RUNTIME = /^(?:react|@langwatch\/browser-host)(?:\/|$)/;
 /** apps/tasks' pre-serve migration steps: its `*migrat*` files and the two LangWatchQL steps. */
 const MIGRATION_RUNNER =
   /^apps\/tasks\/src\/(?:[^/]*migrat[^/]*|lwql-provision|lwql-render-access-config)\.[cm]?tsx?$/;
@@ -144,14 +148,18 @@ function runtimeFinding(file, specifier) {
   if (file.role === "browser" && (node || server)) return "browserImportsProcess";
   if (file.role === "process" && browser) return "processImportsBrowser";
   const runtime = node || server || browser;
-  if (file.role === "library" && runtime && !isClientHook(file, specifier)) return "libraryRuntime";
+  if (file.role === "library" && runtime) return "libraryRuntime";
+  if (file.role === "client") return clientRuntimeFinding({ node, server, browser, specifier });
 
   return undefined;
 }
 
-/** A module client may take `react` for generic hooks, nothing else browser (Alex, 2026-10-01). */
-function isClientHook(file, specifier) {
-  return specifier === "react" && /(?:^|\/)modules\/[^/]+\/client\//.test(file.filename);
+/** A client takes React and browser-host, never node, a server runtime or a store (§3.4). */
+function clientRuntimeFinding({ node, server, browser, specifier }) {
+  if (node || server || STORE_CLIENT.test(specifier)) return "clientRuntime";
+  if (browser && !CLIENT_BROWSER_RUNTIME.test(specifier)) return "clientRuntime";
+
+  return undefined;
 }
 
 /** A library takes its own module's contract and other libraries, nothing else (§2). */
@@ -162,7 +170,25 @@ function libraryDirectionFinding(file, target) {
   return "libraryRuntime";
 }
 
+/** A client takes its own contract only; only browser code reads a client (§3.4, §10.1). */
+function clientDirectionFinding(file, target) {
+  if (file.role === "client") {
+    const isOwnContract = target.role === "contract" && target.module === file.module;
+
+    const isSelf = target.role === "client" && target.module === file.module;
+
+    return isOwnContract || isSelf ? undefined : "clientRuntime";
+  }
+  if (target.role !== "client") return undefined;
+  const isBrowserReader = file.role === "browser" || file.workspacePath.startsWith("apps/ui/");
+
+  return isBrowserReader ? undefined : "clientConsumer";
+}
+
 function directionFinding(file, target) {
+  const client = clientDirectionFinding(file, target);
+  if (client) return client;
+  if (file.role === "client" || target.role === "client") return undefined;
   if (file.role === "library") return libraryDirectionFinding(file, target);
   if (file.role === "contract" && target.role !== "contract") return "contractRuntime";
   if (file.role === "browser" && target.role === "process") return "browserImportsProcess";
@@ -221,7 +247,8 @@ function peerData(target) {
 }
 
 function crossModuleFinding({ file, target, subpath, node }) {
-  const isPortable = target.role === "contract" || target.role === "library";
+  const isPortable =
+    target.role === "contract" || target.role === "library" || target.role === "client";
   if (isPortable || target.module === file.module) return undefined;
   if (isTestSeam(file, subpath, target) || isPeerInstallation({ file, target, subpath, node })) {
     return undefined;
@@ -390,6 +417,16 @@ export const boundaryRule = defineRule({
       what: "`{{specifier}}` is a runtime, framework or another package's implementation, and this is a module's portable, framework-free library.",
       why: "Process and browser both import a module library, so a runtime import ties it to one side.",
       fix: "Import only this module's contract, other module libraries and framework-free packages here; move the code that needs `{{specifier}}` into the module's process or browser package.",
+    },
+    clientRuntime: {
+      what: "`{{specifier}}` is a runtime, store, component or another package's implementation, and this is a module's client package.",
+      why: "Every browser that reads a client takes all it imports, so it stays light.",
+      fix: "Import only this module's contract, `@langwatch/api`, `@langwatch/browser-host` and `react` here; restate another module's type as a structural shape, and move the rest into the module's browser package (ARCHITECTURE.md §3.4, §10.1).",
+    },
+    clientConsumer: {
+      what: "`{{specifier}}` is `{{module}}`'s client, and only browser packages and apps/ui read a client.",
+      why: "A client carries React hooks and lent tokens, browser code a server graph must not hold.",
+      fix: "Call `{{api}}` from `{{contract}}` instead, or move this read into a browser package (ARCHITECTURE.md §2, §3.4).",
     },
     retiredPackageRuntime: {
       what: "`{{specifier}}` is a retired runtime or package entry point.",

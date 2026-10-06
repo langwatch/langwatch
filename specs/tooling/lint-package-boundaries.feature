@@ -70,7 +70,7 @@ Feature: The package-boundaries lint rule
   Scenario: A module client may take react for generic hooks and nothing else of the browser
     Given a module's client file that imports react, and another that imports react-dom or chakra
     When the package-boundaries rule runs over them
-    Then react is allowed and the others are reported as libraryRuntime
+    Then react is allowed and the others are reported as clientRuntime
 
   @unit
   Scenario: Process, browser and application code may import any module's library

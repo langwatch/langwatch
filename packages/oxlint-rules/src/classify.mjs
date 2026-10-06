@@ -137,7 +137,7 @@ function classifyPath(cwd, filename) {
       feature: library.module,
       kind: "library",
       relative: library.relative,
-      role: "library",
+      role: library.role,
       sourcePath: library.relative.startsWith("src/")
         ? library.relative.slice("src/".length)
         : undefined,
@@ -178,6 +178,7 @@ function libraryPackageOf(cwd, workspacePath) {
     enterprise: workspacePath.startsWith("enterprise/"),
     module: match[2],
     relative: match[3],
+    role: match[1].endsWith("/client") ? "client" : "library",
   };
 }
 
@@ -186,7 +187,7 @@ function libraryRootsOf(cwd) {
   if (cached) return cached;
   const roots = new Set();
   for (const pkg of modulePackages(cwd).values()) {
-    if (pkg.role === "library") roots.add(pkg.root);
+    if (pkg.role === "library" || pkg.role === "client") roots.add(pkg.root);
   }
   libraryRootCache.set(cwd, roots);
 
@@ -262,9 +263,16 @@ function readModulePackage({ cwd, moduleRoot, folder }) {
     exports: new Set(Object.keys(manifest.exports ?? {})),
     module: moduleRoot.slice(moduleRoot.lastIndexOf("/") + 1),
     name: manifest.name,
-    role: MODULE_ROLES.includes(folder) ? folder : "library",
+    role: packageRoleOf(folder),
     root,
   };
+}
+
+/** `client` is its own role (§3.4, §10.1; Alex, 2026-10-06); any other folder is a library. */
+function packageRoleOf(folder) {
+  if (MODULE_ROLES.includes(folder)) return folder;
+
+  return folder === "client" ? "client" : "library";
 }
 
 /**
