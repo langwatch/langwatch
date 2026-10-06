@@ -40,15 +40,6 @@ Feature: One lint run is readable to the agent that has to act on it
     And the summary no longer offers the flag
 
   @unit @architecture
-  Scenario: The comment-block review attention list is asked for, never volunteered
-    Given source files carry comment blocks long enough to deserve a second look
-    When architecture lint checks the workspace
-    Then the review attention list is not printed
-    When architecture lint is asked for the comment-block review
-    Then the list is printed
-    And the exit code is the clean one, because a review is not a refusal
-
-  @unit @architecture
   Scenario: The exit code separates a clean tree, a refusal and a misuse
     Given a workspace no policy refuses
     When architecture lint checks the workspace

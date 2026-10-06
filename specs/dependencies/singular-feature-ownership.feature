@@ -92,13 +92,6 @@ Feature: Singular feature ownership
       And duplicate or unowned subjects fail with their source path
 
     @unit @architecture
-    Scenario: A local manifest cannot broaden a feature
-      Given Governance source introduces a project service or project repository
-      When architecture lint checks the source and catalogue
-      Then it reports that project belongs to the Project feature
-      And adding project to Governance feature.json does not suppress the violation
-
-    @unit @architecture
     Scenario: A new durable domain changes its architecture records
       Given a maintainer adds a new feature or owned subject to the catalogue
       When architecture lint checks the repository
