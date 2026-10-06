@@ -20,6 +20,7 @@ function report(filename, code) {
 
 describe("given a service", () => {
   describe("when it value-imports a ClickHouse or Redis client", () => {
+    /** @scenario "Service dependencies are explicit domain capabilities" */
     /** @scenario "A store client value-imported outside its repository folder is reported" */
     it("reports storeClientValue on the import's line", () => {
       const code = [
@@ -50,6 +51,7 @@ describe("given a service", () => {
   });
 
   describe("when it names Prisma, even as a type", () => {
+    /** @scenario "Service dependencies are explicit domain capabilities" */
     /** @scenario "Prisma named outside repositories/prisma is reported, even as a type" */
     it("reports storeNamed", () => {
       const code = [

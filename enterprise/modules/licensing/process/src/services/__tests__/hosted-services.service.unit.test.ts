@@ -163,6 +163,16 @@ describe("HostedServicesService.classify", () => {
     expect(spend[0]?.priceUsd).toBeCloseTo(0.042 * 1.3, 10);
   });
 
+  /** @scenario "A connected customer is governed by its contract budget, not the free allowance" */
+  it("judges for a customer far past any free allowance while its contract budget has headroom", async () => {
+    const { service, judge } = harness({ budgets: [budget({ spentUsd: 900, limitUsd: 1000 })] });
+
+    await expect(
+      service.classify({ caller: CALLER, payload: { text: "hello", questions: [QUESTION] } }),
+    ).resolves.toMatchObject({ input_tokens: 1_000_000 });
+    expect(judge.seen).toHaveLength(1);
+  });
+
   /** @scenario A hosted judgement stops when the calling install hangs up */
   it("hands the judge the signal of the call it was given", async () => {
     const { service, judge } = harness({});
