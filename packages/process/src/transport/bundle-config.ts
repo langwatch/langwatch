@@ -13,7 +13,12 @@ import { z } from "zod";
 
 import { assetBaseBootstrapScript, assetBaseOrigin, normalizeAssetBase } from "./asset-base.ts";
 
-export type ApiUiBundle = Readonly<{ directory: string; head: string; assetOrigin: string | null }>;
+export type ApiUiBundle = Readonly<{
+  directory: string;
+  head: string;
+  assetOrigin: string | null;
+  assetBase: string;
+}>;
 export type BundleConfig = Readonly<{
   directory: string;
   assetBase?: string;
@@ -40,6 +45,7 @@ export function resolveUiBundle(config: BundleConfig): ApiUiBundle | undefined {
       );
     },
     assetOrigin: assetBaseOrigin(assetBase),
+    assetBase,
   };
 }
 

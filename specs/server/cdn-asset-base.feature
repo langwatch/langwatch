@@ -49,14 +49,13 @@ Feature: Production HTTP server — runtime-configurable CDN asset base
       Then the response body defines window.__lwAssetUrl
       And the resolver returns "/assets/x.js" for the path "assets/x.js"
 
-    # Unimplemented: the served shell injects the resolver only; the entry and preload links stay /assets/ (injectAssetBaseIntoHtml in packages/process/src/transport/asset-base.ts is no longer called).
-    @unimplemented @unit
+    @unit
     Scenario: Entry script and preload links are rewritten to the CDN base
       Given LANGWATCH_ASSET_BASE is "https://cdn.langwatch.ai/abc123/"
       And dist/client/index.html references /assets/index-deadbeef.js
       When a client requests /
       Then the response body references https://cdn.langwatch.ai/abc123/assets/index-deadbeef.js
-      And the resolver returns "https://cdn.langwatch.ai/abc123/assets/x.js" for the path "assets/x.js"
+      And the preload and stylesheet links under /assets/ are rewritten the same way
 
     @unit
     Scenario: Same-origin rewriting is a no-op for the entry references

@@ -192,6 +192,7 @@ class ApiSurface {
     const page = BrowserBundle.create({
       dist: selected.bundle ? bundle?.directory : void 0,
       publicConfig: () => bundle?.head ?? "",
+      ...(bundle ? { assetBase: bundle.assetBase } : {}),
       sessionReader: this.sessions,
       security: selected.bundle ? selected.bundle.security : SecurityHeaders.strict(),
       ...(selected.bundle && selected.bundle.authorizeDocument

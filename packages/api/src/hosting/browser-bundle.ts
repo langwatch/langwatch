@@ -52,6 +52,11 @@ export class BrowserBundle {
     dist: string | undefined;
     /** Injected at the START of the shell's head, ahead of the bundle's scripts. */
     publicConfig: PublicConfigHead;
+    /**
+     * Where the content-hashed assets are hosted: an absolute base ending in "/",
+     * already validated by the process. Absent or "/" leaves the shell same-origin.
+     */
+    assetBase?: string;
     /** Read on document requests only. Never on a hashed asset. */
     sessionReader: SessionReader;
     /** The floor plus the document policy this deployment composed. */
@@ -63,6 +68,7 @@ export class BrowserBundle {
 
   private readonly dist: string | undefined;
   private readonly publicConfig: PublicConfigHead;
+  private readonly assetBase: string | undefined;
   private readonly sessionReader: SessionReader;
   private readonly security: SecurityHeaders;
   private readonly authorizeDocument: DocumentAccess | undefined;
@@ -70,18 +76,21 @@ export class BrowserBundle {
   private constructor({
     dist,
     publicConfig,
+    assetBase,
     sessionReader,
     security,
     authorizeDocument,
   }: {
     dist: string | undefined;
     publicConfig: PublicConfigHead;
+    assetBase?: string;
     sessionReader: SessionReader;
     security: SecurityHeaders;
     authorizeDocument?: DocumentAccess;
   }) {
     this.dist = dist;
     this.publicConfig = publicConfig;
+    this.assetBase = assetBase;
     this.sessionReader = sessionReader;
     this.security = security;
     this.authorizeDocument = authorizeDocument;
@@ -197,7 +206,9 @@ export class BrowserBundle {
     const refusal = await this.authorizeDocument?.(request, caller);
     if (refusal) return refusal;
 
-    return new Response(injectHead(html, this.publicConfig(caller)), {
+    const linked = rewriteAssetLinks(html, this.assetBase);
+
+    return new Response(injectHead(linked, this.publicConfig(caller)), {
       status: 200,
       headers: {
         ...this.security.headers,
@@ -210,6 +221,20 @@ export class BrowserBundle {
 
 function text(status: number, body: string): Response {
   return new Response(body, { status, headers: { "Content-Type": "text/plain" } });
+}
+
+/**
+ * Points the shell's entry script, preload and stylesheet links at the asset
+ * base. Whitespace-anchored so a `data-src` is never touched; the function
+ * replacer keeps a "$" in the base from reading as a replacement token.
+ */
+function rewriteAssetLinks(html: string, base: string | undefined): string {
+  if (base === void 0 || base === "/") return html;
+
+  return html.replace(
+    /(\s(?:src|href))="\/assets\//g,
+    (_match, attribute: string) => `${attribute}="${base}assets/`,
+  );
 }
 
 function injectHead(html: string, head: string): string {
