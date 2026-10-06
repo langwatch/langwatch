@@ -1,39 +1,27 @@
-Feature: The API process builds the optional collaborators it can build itself
+Feature: A module's collaborators are installed modules, never optional options
   As an operator running a LangWatch API deployment
-  I want the process to answer its own optional ports from its own graph
-  So that a surface is not left refusing on every deployment nobody hosts
+  I want a module that collaborates with another module to refuse to boot without it
+  So that no surface is left refusing on every request because nobody hosted its collaborator
 
-  # WHY THIS EXISTS
-  #
-  # The production composition takes one flat options object, and every field
-  # on it is optional so that a host can override what the process would build.
-  # The runnable process supplies none of them: `api.main.ts` composes with `{}`.
-  #
-  # An option with a fallback degrades correctly under that — the process
-  # builds its own. An option WITHOUT one does not degrade at all: the surface
-  # behind it refuses by name on every deployment, forever, and reads to a
-  # customer as an outage rather than as a capability nobody configured.
-  #
-  # Five of them were in the second shape: the caller's read-time redactions,
-  # the reviewer's trace content, the setup checklist's simulation evidence,
-  # the person-shaped messages, and the seat allowances the members page reads.
+  # The production composition used to take one flat options object whose fields
+  # were all optional: a field with no fallback left the surface behind it
+  # refusing by name on every deployment. There is no such object now. Each
+  # collaborator (read-time redactions, the reviewer's trace content, simulation
+  # evidence, person-shaped messages, seat allowances) is another module's *Api,
+  # declared by the module that needs it and answered by the installed module.
 
-  Rule: an optional collaborator the process can build, the process builds
+  Rule: a collaborator is a peer module, present or the boot refuses
 
     @unit
-    Scenario: Every optional collaborator the API process can build, it builds
-      Given a deployment that configured a database, a queue and a mail host
-      And no host supplies any of the process's optional collaborators
-      When the API process composes
-      Then it resolves the caller's read-time redactions from its own trace reads
-      And it resolves the reviewer's trace content from its own trace application
-      And it resolves the simulation evidence from its own simulation reads
-      And it resolves the person-shaped messages from its own mail gateway
-      And it resolves the seat allowances from its own plan and membership reads
+    Scenario: A module whose collaborating module is not installed refuses to boot
+      Given a module that declares another module's Api as a collaborator
+      When a process installs it without the collaborating module
+      Then the boot refuses, naming the module and the collaborator
+      And no surface is mounted that would refuse every request
 
     @unit
-    Scenario: A collaborator whose graph is genuinely absent stays absent
-      Given a deployment that configured no database
-      When the API process composes
-      Then the collaborators that stand on the database are absent
-      And the surfaces behind them refuse by name rather than guessing an answer
+    Scenario: A module whose collaborating module is installed boots and is answered by it
+      Given a module that declares another module's Api as a collaborator
+      When a process installs both modules
+      Then the boot succeeds
+      And the module reaches its collaborator through the installed module

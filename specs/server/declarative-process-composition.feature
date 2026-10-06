@@ -46,11 +46,12 @@ Feature: Composing a process declaratively
     Then the peer arrives through the module graph
     And the pool holds no api
 
-  @unimplemented
+  @unit
   Scenario: A missing peer refuses by name
     Given a module whose app names a peer no installed module provides
     When the process boots
     Then boot refuses naming the peer
+    And the module's app is never constructed
 
   @unit
   Scenario: A role reads only the declarations addressed to it

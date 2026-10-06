@@ -1,5 +1,5 @@
 /**
- * The internal bearer door (cron, instance-admin) admits only its configured secret, and
+ * The internal bearer door (instance-admin) admits only its configured secret, and
  * compares it in constant time.
  */
 import type * as NodeCrypto from "node:crypto";
@@ -13,7 +13,7 @@ vi.mock("node:crypto", async (importOriginal) => {
   return { ...actual, timingSafeEqual: vi.fn(actual.timingSafeEqual) };
 });
 
-const SECRET = "cron-secret-value";
+const SECRET = "bearer-marker-value";
 
 // Loaded fresh, under this file's node:crypto mock. Test files share one
 // module registry, so a static import can return an api-surface instance
@@ -22,11 +22,11 @@ const SECRET = "cron-secret-value";
 // makes the assertion depend on the door, not on what ran before it.
 vi.resetModules();
 const { bearerDoor } = await import("../api-surface.ts");
-const door = bearerDoor({ name: "cron", token: SECRET });
+const door = bearerDoor({ name: "instance-admin", token: SECRET });
 
 function presenting(authorization: string) {
   if (!door.identify) throw new Error("the bearer door identifies no one");
-  const request = new Request("http://localhost/api/cron/run", { headers: { authorization } });
+  const request = new Request("http://localhost/api/organizations", { headers: { authorization } });
 
   return door.identify({ request });
 }
@@ -41,14 +41,14 @@ function refusalCode(action: () => unknown): string {
   throw new Error("the door admitted the request");
 }
 
-describe("the cron bearer door", () => {
+describe("the bearer door", () => {
   describe("given the configured secret", () => {
     it("admits the caller as the internal secret, comparing in constant time", async () => {
       vi.mocked(timingSafeEqual).mockClear();
 
       const caller = await presenting(`Bearer ${SECRET}`);
 
-      expect(caller.internal).toEqual({ type: "internalSecret", secretName: "cron" });
+      expect(caller.internal).toEqual({ type: "internalSecret", secretName: "instance-admin" });
       expect(timingSafeEqual).toHaveBeenCalledTimes(1);
     });
   });

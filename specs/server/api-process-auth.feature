@@ -1,78 +1,23 @@
-Feature: The standalone API process composes its own Auth service
+Feature: The API process authenticates through the installed auth module
   As an operator running a LangWatch API deployment
-  I want the API process to build the Auth service its request policy reads
-  So that a deployment hands it one Better Auth instance and nothing else
+  I want the API process to refuse to boot without the module that verifies a caller
+  So that no product transport mounts over a door that verifies nothing
 
-  # WHY THIS EXISTS
-  #
-  # `API_UNAVAILABLE_PRODUCT_ADAPTERS` named "IdentityEmailService and the
-  # Better Auth browser-session transport" as one entry, because both arrive
-  # through one option: `ApiAuthSessionCompositionPort` hands the Auth service
-  # and the transport over as a pair. They were never one gap.
-  #
-  # `IdentityEmailService` was not process-bound. It answers which address is a
-  # person's from the `Identifier` projection, for a user whose backfill has
-  # finalized, and both halves are reads over the client this process already
-  # composes. `PostgresIdentityEmailAdapter` is both, and with it the whole
-  # Auth service composes here — the packaged user service under it too, its
-  # avatar storage declared absent because reading a profile needs no object
-  # store and writing one does.
-  #
-  # The transport genuinely is. It is one configured Better Auth server
-  # instance, and every option that decides whether a cookie verifies belongs
-  # to the deployment: the signing secret, the base URL and trusted origins,
-  # the cookie prefix, the session model mapping, the secondary-storage prefix,
-  # the mounted social and generic-OIDC providers whose ids a stored account
-  # row is keyed by, the identity storage adapter, and the request hooks. A
-  # second instance composed here from a different option set would not fail —
-  # it would verify nothing and answer null, which every caller reads as
-  # "signed out".
+  # The auth module binds the process's one API door: sessions, the identities
+  # a family may name, the authz reads and the audit sinks. A process that
+  # installs no module binding the door refuses to boot, naming "auth"; two
+  # that bind it refuse too (record section 8). The one Better Auth instance is
+  # auth's own: a second, built from another option set, would answer "signed
+  # out" to everybody rather than fail. No host injects a service or transport.
 
-  Rule: A process with a database and a transport composes the Auth service
+  Rule: a process verifies callers through exactly one installed module
 
     @unit
-    Scenario: The API process composes its own Auth service
-      Given the deployment configured a database
-      And a host supplied the deployment's Better Auth transport
-      And no host supplied an Auth composition
-      When the process composes
-      Then it builds the Auth service over its own guarded client
-      And the request policy authenticates through it
-
-    @unit
-    Scenario: An injected Auth composition is the one the process authenticates with
-      Given a host supplies the API process with its own Auth service and transport
-      When the process composes
-      Then callers are authenticated by the host's composition
-      And the process composes none of its own
-      # Two Auth services in one process would read the same session rows
-      # through two graphs, and only one of them is the one a host can observe.
-
-    @unit
-    Scenario: A process with no browser-session transport mounts no product transports
-      Given the deployment configured a database
-      And no host supplied a browser-session transport or an Auth composition
-      When the process composes
-      Then it composes no Auth service, and names the missing transport at boot
+    Scenario: A process that installs no module binding the API door refuses to boot, naming auth
+      Given a process whose installed modules bind no API door
+      When the API surface is composed at boot
+      Then the boot refuses, naming the auth module to install
       And no product transport is mounted
-      # Absent rather than mounted, and this gap is the sharpest of the three
-      # the process can have: a policy built over a transport that verifies
-      # nothing does not fail, it answers "signed out" to everybody.
-
-    @unit
-    Scenario: A process with no database composes no Auth service
-      Given the deployment configured no database
-      And a host supplied only a browser-session transport
-      When the process composes
-      Then it composes no Auth service, and names the missing half at boot
-
-    @unit
-    Scenario: A process with no organization service composes no Auth service
-      Given the process resolved no organization service
-      When it composes the Auth graph
-      Then it composes no Auth service, and names the missing half at boot
-      # The user service the Auth service reads a profile through resolves a
-      # person's personal workspace, so there is no Auth graph without one.
 
   Rule: The session a composed Auth service answers with reads the identifiers
 

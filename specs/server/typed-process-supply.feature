@@ -137,11 +137,9 @@ Feature: A process cannot boot without what its modules declared
 
   Rule: a credential the deployment supplies is named, not spelled
 
-    @unit
-    Scenario: A misspelled shared secret is refused where it is written
-      Given a process supplying the deployment's own shared secrets
-      When one is given under a name no door guards
-      Then it is refused where it was written, rather than guarding nothing
+    # The deployment's shared-secret map (CRON_API_KEY) is retired: no family
+    # used it. A module that needs a bearer owns it and binds it on its own
+    # family (record section 4), so there is no host-side name to misspell.
 
     @unit
     Scenario: A door whose credential was never supplied refuses callers

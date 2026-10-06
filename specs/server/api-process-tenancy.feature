@@ -1,74 +1,25 @@
-Feature: The standalone API process composes the services its routes address
+Feature: The API process serves credentials through the installed tenancy modules
   As an operator running a LangWatch API deployment
-  I want the API process to build the organization, project and API-key
-  services it resolves credentials and scopes against
-  So that serving product traffic does not require a second process to hand it
-  a credential graph
+  I want the credential services to be the installed modules' own
+  So that a presented key resolves through the organization and project it belongs to
 
-  # WHY THIS EXISTS
-  #
-  # `API_UNAVAILABLE_PRODUCT_ADAPTERS` named `ApiKeyBindingIdPort`,
-  # `ApiKeyDiagnosticsPort` and the organization identity ports. By the time
-  # this entry closed, none of those was the legacy application's any more:
-  # each mints a PERSISTED format — a ksuid with its exact prefix, a slug
-  # derived through an exact pre-pass, `sk-lw-` plus 48 characters of a 54-byte
-  # alphabet — and formats belong to the feature that promises them, not to
-  # whichever process composes it.
-  #
-  # What actually kept the entry open was underneath them: the three services
-  # are built from an AuthZ service AND its grants half, which no process
-  # outside the legacy application could compose. That changed. The remaining
-  # two collaborators are genuinely a process's own, because they resolve from
-  # its environment: the cipher an organization's settings are stored under,
-  # and the pepper an API key's stored hash is derived under.
-
-  Rule: The three services are one graph or none
-
-    @unit
-    Scenario: The API process composes its own organization and API-key services
-      Given the deployment configured a database, a stored-secret key and an
-      API-key pepper
-      And the process composed its own AuthZ services
-      When it composes
-      Then it builds the organization, project and API-key services together
-      And it mounts the API-key family over the services it built
-
-    @unit
-    Scenario: Half a credential graph is refused at boot
-      Given a host supplies one of the API-key and organization services
-      When the composition is created
-      Then it is refused before any resource is opened
-      # The API-key service reads the project service, which resolves through
-      # the organization service. Composing the missing half here would give
-      # this process an API-key service whose organizations are not the
-      # organizations its own routes resolve.
-
-  Rule: A host that owns the graph owns the pair
-
-    @unit
-    Scenario: An injected pair is the one the process serves
-      Given a host supplies both the API-key and organization services
-      When the process composes
-      Then those are the services its routes resolve against
-      And the process composes none of its own
+  # The organization, project and API-key modules declare each other as peers
+  # (project reads organization, api-key reads project); a process installing
+  # one without the module it reads refuses to boot, naming both (see
+  # declarative-process-composition.feature). No host hands the process a half
+  # of that graph, so a half graph cannot be offered.
 
   Rule: A credential this process cannot verify is not a weaker service
 
-    @unit
-    Scenario: A process missing any of the four composes no credential services
-      Given the process is missing its database, its AuthZ, or its pepper
-      When it tries to compose the credential services
-      Then it composes none, and names what was missing at boot
-
-    @unit
-    Scenario: A process that can compose no credential services mounts no product transports
-      Given the process composed AuthZ but was configured with no API-key pepper
-      When it composes
-      Then it serves its lifecycle surface and mounts no product transports
-      # Every product route on this process resolves a credential. A door open
-      # over a pepper this deployment does not have would authenticate none of
-      # the keys a customer already holds, and would say so one request at a
-      # time instead of once at boot.
+    @unit @unimplemented
+    Scenario: A process configured with no API-key pepper refuses to boot, naming the setting
+      Given the process installs the API-key module
+      And the deployment configured no API-key pepper
+      When the process boots
+      Then the boot refuses, naming the pepper setting
+      # Gap: the pepper is an optional secret today. An unset one still mounts
+      # the product transports and every presented key is refused per request
+      # (open question Q154(3), handoffs/process-bearer-gating.md).
 
   Rule: A persisted format is read the way the other tier writes it
 
