@@ -5,14 +5,13 @@ import {
   PresenceApi,
   type PresenceApi as PresenceApiContract,
   type PresenceCursorSubscription,
-  type PresenceCursorTickInput,
-  type PresenceHeartbeatInput,
+  type PresenceCursorInput,
   type PresenceLeaveInput,
   type PresenceProjectInput,
   type PresenceProjectEvent,
   type PresenceSession,
   type PresenceTenantEmitter,
-  type PresenceUser,
+  type PresenceUpdateInput,
   type PresenceCursorEvent,
   type PresenceEvent,
   type ReadHint,
@@ -20,7 +19,6 @@ import {
 } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
-import { UserApi } from "@langwatch/user-contract";
 import type { Cluster, Redis } from "ioredis";
 
 import type { PresenceRepositories } from "../repositories/presence.repositories.ts";
@@ -72,13 +70,12 @@ type PresenceSetup = FeatureSetup<
 
 export class PresenceModule implements PresenceApiContract, PresenceBroadcastFabric {
   static readonly contract = PresenceApi;
-  static readonly dependencies = { projects: ProjectApi, users: UserApi };
+  static readonly dependencies = { projects: ProjectApi };
   static readonly reads = ["redis", "logger"] as const;
 
   readonly #presence: PresenceService;
   readonly #stream: PresenceStreamService;
   readonly #readHints: ReadHintStreamService;
-  readonly #users: UserApi;
   /** The same fabric {@link PresenceBroadcastFabric} exposes to a peer. */
   readonly #emitters: PresenceEmitter;
   readonly #broadcast: PresenceBroadcast;
@@ -87,21 +84,18 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
     presence,
     stream,
     readHints,
-    users,
     emitters,
     broadcast,
   }: {
     presence: PresenceService;
     stream: PresenceStreamService;
     readHints: ReadHintStreamService;
-    users: UserApi;
     emitters: PresenceEmitter;
     broadcast: PresenceBroadcast;
   }) {
     this.#presence = presence;
     this.#stream = stream;
     this.#readHints = readHints;
-    this.#users = users;
     this.#emitters = emitters;
     this.#broadcast = broadcast;
   }
@@ -137,7 +131,6 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
       presence,
       stream: PresenceStreamService.create({ presence, emitters }),
       readHints: ReadHintStreamService.create({ emitters }),
-      users: dependencies.users,
       emitters,
       broadcast,
     });
@@ -163,15 +156,10 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
     return this.#presence.isEnabledForProject(input);
   }
 
-  async update(input: PresenceHeartbeatInput): Promise<void> {
+  async update(input: PresenceUpdateInput): Promise<void> {
     if (!(await this.#presence.isEnabledForProject({ projectId: input.projectId }))) return;
 
-    await this.#presence.update({
-      projectId: input.projectId,
-      sessionId: input.sessionId,
-      user: await this.#presenting(input.userId),
-      location: input.location,
-    });
+    await this.#presence.update(input);
   }
 
   async leave(input: PresenceLeaveInput): Promise<void> {
@@ -184,15 +172,10 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
     return this.#presence.list(input);
   }
 
-  async broadcastCursor(input: PresenceCursorTickInput): Promise<void> {
+  async broadcastCursor(input: PresenceCursorInput): Promise<void> {
     if (!(await this.#presence.isEnabledForProject({ projectId: input.projectId }))) return;
 
-    await this.#presence.broadcastCursor({
-      projectId: input.projectId,
-      sessionId: input.sessionId,
-      user: await this.#presenting(input.userId),
-      payload: input.payload,
-    });
+    await this.#presence.broadcastCursor(input);
   }
 
   events(input: PresenceProjectInput & { signal?: AbortSignal }): AsyncGenerator<PresenceEvent> {
@@ -213,16 +196,5 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
   }: ReadHintsWatchInput & { signal?: AbortSignal }): AsyncIterable<ReadHint> {
     const tenantIds = [userId, organizationId, ...(projectId === undefined ? [] : [projectId])];
     return this.#readHints.watch({ tenantIds, ...(signal === undefined ? {} : { signal }) });
-  }
-
-  /**
-   * The person peers see, read from the directory by the id the boundary
-   * authenticated — never from the payload, which would let one member publish
-   * a session under another member's name and avatar.
-   */
-  async #presenting(userId: string): Promise<PresenceUser> {
-    const profile = await this.#users.findById({ id: userId });
-
-    return { id: userId, name: profile?.name ?? null, image: profile?.image ?? null };
   }
 }

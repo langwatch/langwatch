@@ -1,14 +1,34 @@
-import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
-import { PresenceApi, presenceTrpc } from "@langwatch/presence-contract";
+import {
+  defineTrpcFact,
+  defineTrpcRouter,
+  type TrpcHandlerActor,
+  type TrpcRouterDeclaration,
+} from "@langwatch/api/trpc";
+import { PresenceApi, presenceTrpc, type PresenceUser } from "@langwatch/presence-contract";
+import { z } from "zod";
 
 const accepted = { ok: true } as const;
+
+/** The signed-in person the door binds under this name, as langy and onboarding declare it. */
+export const presenceSessionPersonFact = defineTrpcFact(
+  "organizationSessionPerson",
+  z.object({ name: z.string().nullable(), image: z.string().nullable() }).nullable(),
+);
+
+type SessionPerson = z.infer<typeof presenceSessionPersonFact.schema>;
+
+/** The presenter: the authenticated id, with the session's name and image, never the payload's. */
+function presenterOf(actor: TrpcHandlerActor, person: SessionPerson): PresenceUser {
+  return { id: actor.id, name: person?.name ?? null, image: person?.image ?? null };
+}
 
 export const presenceTrpcTransport: TrpcRouterDeclaration<PresenceApi, typeof presenceTrpc> =
   defineTrpcRouter(PresenceApi, presenceTrpc)
     .procedure("update")
+    .withFacts(presenceSessionPersonFact)
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
-      await app.update({ ...input, userId: actor.id });
+    .handle(async ({ app, input, actor }, person) => {
+      await app.update({ ...input, user: presenterOf(actor, person) });
 
       return accepted;
     })
@@ -22,9 +42,10 @@ export const presenceTrpcTransport: TrpcRouterDeclaration<PresenceApi, typeof pr
     })
 
     .procedure("cursor")
+    .withFacts(presenceSessionPersonFact)
     .withPermission("traces:view")
-    .handle(async ({ app, input, actor }) => {
-      await app.broadcastCursor({ ...input, userId: actor.id });
+    .handle(async ({ app, input, actor }, person) => {
+      await app.broadcastCursor({ ...input, user: presenterOf(actor, person) });
 
       return accepted;
     })

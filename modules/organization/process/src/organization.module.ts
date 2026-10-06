@@ -5,6 +5,7 @@ import { OrganizationModule } from "./app/organization.app.ts";
 import { organizationLifecycleEventing } from "./eventing/organization-lifecycle.pipeline.ts";
 import { seatLimitEventing } from "./eventing/seat-limit.pipeline.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
+import { OrganizationPresenceSettingBackfillTask } from "./tasks/organization-presence-setting-backfill.task.ts";
 import { groupsRest } from "./transport/group.rest.ts";
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
 import { inviteTrpcTransport } from "./transport/invite.trpc.ts";
@@ -43,4 +44,5 @@ export const organizationProcessModule = defineProcessModule("organization")
     })),
   ])
   .withEventing(seatLimitEventing)
-  .withEventing(organizationLifecycleEventing);
+  .withEventing(organizationLifecycleEventing)
+  .withTasks(({ app }) => [OrganizationPresenceSettingBackfillTask.create({ organizations: app })]);

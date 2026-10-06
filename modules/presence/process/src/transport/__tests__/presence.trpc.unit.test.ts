@@ -16,7 +16,6 @@ import { describe, expect, it } from "vitest";
 import {
   createPresenceTestApp,
   createPresenceTestProjects,
-  createPresenceTestUsers,
   RecordingPresenceBroadcast,
   TestPresenceEmitters,
 } from "../../app/__tests__/presence.fixture.ts";
@@ -25,20 +24,30 @@ import { accessDeclaredBy, presenceTrpcCaller } from "./presence-trpc.fixture.ts
 
 const location: PresenceLocation = { lens: "traces", route: { traceId: "trace-1" } };
 
-function createCaller(options: { enabled?: boolean; permitted?: boolean; userId?: string } = {}) {
+function createCaller(
+  options: {
+    enabled?: boolean;
+    permitted?: boolean;
+    userId?: string;
+    person?: { name: string | null; image: string | null } | null;
+  } = {},
+) {
   const broadcast = new RecordingPresenceBroadcast();
   const emitters = new TestPresenceEmitters();
   const app = createPresenceTestApp({
     broadcast,
     emitters,
     projects: createPresenceTestProjects(options.enabled ?? true),
-    users: createPresenceTestUsers({ name: "Ada", image: "https://example.test/ada.png" }),
   });
   const mounted = presenceTrpcCaller({
     declaration: presenceTrpcTransport,
     app,
     ...(options.userId === undefined ? {} : { userId: options.userId }),
     ...(options.permitted === undefined ? {} : { permitted: options.permitted }),
+    person:
+      options.person === undefined
+        ? { name: "Ada", image: "https://example.test/ada.png" }
+        : options.person,
   });
 
   return { ...mounted, app, broadcast, emitters };
@@ -102,6 +111,34 @@ describe("when a browser session sends a heartbeat", () => {
     });
     await expect(app.list({ projectId: "project-1" })).resolves.toMatchObject([
       { sessionId: "tab-1", user: { id: "user-bob" } },
+    ]);
+  });
+
+  /** @scenario "The presenter's name and image come from the signed-in session" */
+  it("shows peers the session person's name and avatar under the authenticated id", async () => {
+    const { caller, app } = createCaller({
+      userId: "user-grace",
+      person: { name: "Grace", image: "https://example.test/grace.png" },
+    });
+
+    await caller.update({ projectId: "project-1", sessionId: "tab-1", location });
+
+    await expect(app.list({ projectId: "project-1" })).resolves.toMatchObject([
+      {
+        sessionId: "tab-1",
+        user: { id: "user-grace", name: "Grace", image: "https://example.test/grace.png" },
+      },
+    ]);
+  });
+
+  /** @scenario "A caller with no session person is shown without a name or image" */
+  it("shows peers the authenticated id alone when the door binds no session person", async () => {
+    const { caller, app } = createCaller({ userId: "user-grace", person: null });
+
+    await caller.update({ projectId: "project-1", sessionId: "tab-1", location });
+
+    await expect(app.list({ projectId: "project-1" })).resolves.toMatchObject([
+      { sessionId: "tab-1", user: { id: "user-grace", name: null, image: null } },
     ]);
   });
 

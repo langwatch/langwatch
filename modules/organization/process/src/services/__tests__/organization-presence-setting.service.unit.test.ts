@@ -13,6 +13,7 @@ import type { GroupRepository } from "../../repositories/group.repository.ts";
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "../../repositories/memory/memory.organization.repository.ts";
 import type { TeamRepository } from "../../repositories/team.repository.ts";
+import { OrganizationPresenceSettingBackfillTask } from "../../tasks/organization-presence-setting-backfill.task.ts";
 import type { GroupIdentity } from "../group-identity.service.ts";
 import { OrganizationLifecycleNoticeService } from "../organization-lifecycle-notice.service.ts";
 import { OrganizationService, type OrganizationSettingsNotices } from "../organization.service.ts";
@@ -112,7 +113,7 @@ describe("given two organizations whose presence settings were stored before the
     seedOrganization("org_globex", false);
   });
 
-  describe("when every organization's stored setting is recorded twice", () => {
+  describe("when the backfill-organization-presence-setting task runs twice", () => {
     /** @scenario "Existing organizations' presence settings are recorded by the backfill, idempotently" */
     it("records each stored setting once per run, marked backfilled, with no changer", async () => {
       const sent: RecordPresenceSettingChangedCommandData[] = [];
@@ -136,11 +137,13 @@ describe("given two organizations whose presence settings were stored before the
       });
       const service = serviceOver(notices);
       const repository = MemoryOrganizationRepository.create({ memory: database });
-      const backfill = async () => {
-        for (const organizationId of await repository.findAllIds()) {
-          await service.recordStoredPresenceSetting({ organizationId });
-        }
-      };
+      const task = OrganizationPresenceSettingBackfillTask.create({
+        organizations: {
+          findAllIds: () => repository.findAllIds(),
+          recordStoredPresenceSetting: (input) => service.recordStoredPresenceSetting(input),
+        },
+      });
+      const backfill = () => task.run({ args: [], signal: new AbortController().signal });
 
       await backfill();
       const firstRun = sent.map(({ occurredAt: _at, ...rest }) => rest);

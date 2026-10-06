@@ -1,12 +1,16 @@
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { PresenceRepositories } from "../presence.repositories.ts";
+import { RedisPresenceSettingsRepository } from "./redis.presence-settings.repository.ts";
 import { RedisPresenceRepository } from "./redis.presence.repository.ts";
 
 export class RedisPresenceRepositories {
   static readonly requires = ["redis"] as const;
 
   static create(members: { redis: RedisConnection }): PresenceRepositories {
-    return { sessions: RedisPresenceRepository.create(members.redis) };
+    return {
+      sessions: RedisPresenceRepository.create(members.redis),
+      settings: RedisPresenceSettingsRepository.create(members.redis),
+    };
   }
 }

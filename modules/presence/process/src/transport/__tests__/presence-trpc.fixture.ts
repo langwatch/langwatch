@@ -1,5 +1,5 @@
-import type { AccessDeclaration } from "@langwatch/api/access";
 import {
+  bindTrpcFact,
   createTrpcRuntime,
   redactAuditArgs,
   type TrpcProcedureFactory,
@@ -18,7 +18,11 @@ import type { TrpcContract } from "@langwatch/module";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import { initTRPC } from "@trpc/server";
 
+import { presenceSessionPersonFact } from "../presence.trpc.ts";
+
 type TestContext = object;
+
+type DeclaredAccess = Parameters<TrpcProcedureFactory<TestContext>["procedure"]>[0]["access"];
 
 function members(
   actor: TrpcHandlerActor | null,
@@ -58,6 +62,8 @@ export function presenceTrpcCaller<Contract extends TrpcContract>(options: {
   declaration: TrpcRouterDeclaration<PresenceApi, Contract>;
   app: PresenceApi;
   userId?: string;
+  /** The session person the door binds; Ada with no avatar unless a test says otherwise. */
+  person?: { name: string | null; image: string | null } | null;
   permitted?: boolean;
 }) {
   const root = initTRPC.context<TestContext>().create();
@@ -71,7 +77,14 @@ export function presenceTrpcCaller<Contract extends TrpcContract>(options: {
       audit,
     ),
   });
-  const router = root.router({ presence: options.declaration.router(runtime, () => options.app) });
+  const presence = runtime.mount(options.declaration, () => options.app, {
+    facts: [
+      bindTrpcFact(presenceSessionPersonFact, () =>
+        options.person === undefined ? { name: "Ada", image: null } : options.person,
+      ),
+    ],
+  });
+  const router = root.router({ presence });
 
   return { audit, router, caller: router.createCaller({}).presence };
 }
@@ -79,8 +92,8 @@ export function presenceTrpcCaller<Contract extends TrpcContract>(options: {
 /** Records the access each declared procedure asked for, building nothing. */
 export function accessDeclaredBy(declaration: {
   router(runtime: TrpcProcedureFactory<TestContext>, app: (ctx: TestContext) => never): unknown;
-}): (AuthzPermission | AccessDeclaration)[] {
-  const declared: (AuthzPermission | AccessDeclaration)[] = [];
+}): (AuthzPermission | DeclaredAccess)[] {
+  const declared: (AuthzPermission | DeclaredAccess)[] = [];
   const runtime: TrpcProcedureFactory<TestContext> = {
     procedure: ({ access }) => {
       declared.push(access.kind === "permission" ? access.permission : access);

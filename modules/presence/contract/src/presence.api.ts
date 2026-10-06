@@ -3,12 +3,12 @@ import { moduleApi } from "@langwatch/module";
 import type {
   PresenceCursorEvent,
   PresenceCursorSubscription,
-  PresenceCursorTickInput,
+  PresenceCursorInput,
   PresenceEvent,
-  PresenceHeartbeatInput,
   PresenceLeaveInput,
   PresenceProjectInput,
   PresenceSession,
+  PresenceUpdateInput,
 } from "./presence.ts";
 import type { ReadHint, ReadHintsWatchInput } from "./read-hints.ts";
 
@@ -35,11 +35,14 @@ export type PresenceProjectEvent = Readonly<{
 /** Who else is looking at this project, where they are, and where their cursor is. */
 export interface PresenceApi {
   isEnabledForProject(input: PresenceProjectInput): Promise<boolean>;
-  /** One browser session's heartbeat: its location now, and that it is still here. */
-  update(input: PresenceHeartbeatInput): Promise<void>;
+  /**
+   * One browser session's heartbeat: its location now, and that it is still here. `user` is the
+   * presenter the door resolved (authenticated id, session name and image), never the payload's.
+   */
+  update(input: PresenceUpdateInput): Promise<void>;
   leave(input: PresenceLeaveInput): Promise<void>;
   list(input: PresenceProjectInput): Promise<PresenceSession[]>;
-  broadcastCursor(input: PresenceCursorTickInput): Promise<void>;
+  broadcastCursor(input: PresenceCursorInput): Promise<void>;
   events(
     input: PresenceProjectInput & { signal?: PresenceStreamSignal },
   ): AsyncGenerator<PresenceEvent>;

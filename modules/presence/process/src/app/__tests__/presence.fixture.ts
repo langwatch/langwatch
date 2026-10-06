@@ -5,12 +5,10 @@ import { EventEmitter } from "node:events";
  * records rather than publishes, and peers that answer only what a test asked
  * for.
  */
-import type { PresenceUser } from "@langwatch/presence-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { UserApi } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
 import { MemoryPresenceRepositories } from "../../repositories/memory/memory.presence.repositories.ts";
@@ -38,26 +36,6 @@ export function createPresenceTestProjects(enabled = true): ProjectApi {
   return createApiFixture<ProjectApi>({ isPresenceEnabled: async () => enabled });
 }
 
-export function createPresenceTestUsers(profile?: Pick<PresenceUser, "name" | "image">): UserApi {
-  return createApiFixture<UserApi>({
-    findById: async ({ id }) =>
-      profile === undefined
-        ? null
-        : {
-            id,
-            name: profile.name,
-            email: null,
-            emailVerified: true,
-            image: profile.image,
-            pendingSsoSetup: false,
-            createdAt: new Date(0),
-            updatedAt: new Date(0),
-            lastLoginAt: null,
-            deactivatedAt: null,
-          },
-  });
-}
-
 export function createPresenceTestApp(
   input: Readonly<{
     repositories?: PresenceRepositories;
@@ -65,7 +43,6 @@ export function createPresenceTestApp(
     emitters?: PresenceEmitter;
     diagnostics?: PresenceDiagnostics;
     projects?: ProjectApi;
-    users?: UserApi;
   }> = {},
 ): PresenceModule {
   return PresenceModule.create({
@@ -79,7 +56,6 @@ export function createPresenceTestApp(
     },
     dependencies: {
       projects: input.projects ?? createPresenceTestProjects(),
-      users: input.users ?? createPresenceTestUsers({ name: "Ada", image: null }),
     },
     config: void 0,
     resources: new ResourceScope(),

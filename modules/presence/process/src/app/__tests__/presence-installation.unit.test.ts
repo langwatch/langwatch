@@ -8,7 +8,7 @@ import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
 import { presenceProcessModule } from "../../presence.module.ts";
-import { createPresenceTestProjects, createPresenceTestUsers } from "./presence.fixture.ts";
+import { createPresenceTestProjects } from "./presence.fixture.ts";
 
 function bootPresence() {
   return createApp({ role: "api" })
@@ -17,7 +17,6 @@ function bootPresence() {
     .withMember("logging", { warn: () => undefined })
     .provide({
       project: createPresenceTestProjects(),
-      user: createPresenceTestUsers({ name: "Ada", image: null }),
     })
     .boot();
 }
@@ -32,7 +31,7 @@ describe("given a process that installs presence", () => {
         projectId: "project-1",
         sessionId: "tab-1",
         location: { lens: "traces", route: {} },
-        userId: "user-1",
+        user: { id: "user-1", name: "Ada", image: null },
       });
 
       await expect(presence.list({ projectId: "project-1" })).resolves.toMatchObject([

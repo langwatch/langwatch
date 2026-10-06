@@ -162,6 +162,7 @@ describe("the tasks process installation", () => {
         "process-manager-purge",
         "grant-platform-operator",
         "system-migrations-pass",
+        "backfill-organization-presence-setting",
         "backfill-project-created",
         "backfill-project-presence-setting",
         "stalled-runs-backfill",
