@@ -39,4 +39,33 @@ describe("given the operator lookup and the organization identity surface", () =
       }
     });
   });
+  describe("when every control on the surface is listed", () => {
+    const GUARDED = new Set([
+      "confirmProposedSignIn",
+      "rejectProposedSignIn",
+      "detachMethod",
+      "endSessions",
+      "resendInvitation",
+      "extendInvitation",
+    ]);
+
+    /** @scenario "Every repair is a guarded command, and no raw edit exists on the surface" */
+    it("writes only through the guarded identityLookup commands and never names the actor", () => {
+      for (const [name, source] of Object.entries(LOOKUP_SOURCES)) {
+        const mutations = [...source.matchAll(/\bapi\.identityLookup\.(\w+)\.useMutation\b/g)].map(
+          (match) => match[1] ?? "",
+        );
+
+        for (const mutation of mutations) {
+          expect(GUARDED.has(mutation), `${name} calls ${mutation}`).toBe(true);
+        }
+        expect(source, `${name} reaches a generic write`).not.toMatch(
+          /\.(update|delete|remove|set|upsert|create|edit)\w*\.useMutation|useUtils\(\)\.client|fetch\(/,
+        );
+        expect(source, `${name} sends an actor of its own`).not.toMatch(
+          /\.mutate(Async)?\(\s*\{[^}]*\b(operator|actor)\w*\s*[:,}]/,
+        );
+      }
+    });
+  });
 });
