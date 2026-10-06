@@ -177,21 +177,26 @@ func newScenarioRunner(ctx context.Context, options scenarioOptions) *scenarioRu
 	}
 	runner := &scenarioRunner{ctx: ctx, engine: engine, options: options, live: map[string]int{}, streak: diffkit.NewStreak(options.MaxErrors), cancel: cancel, tag: strconv.FormatInt(time.Now().Unix()%1_000_000_000, 36)}
 	if options.B == "" {
-		runner.sides = []*scenarioSide{newScenarioSide("stack", options.A, options.MailA, options)}
+		runner.sides = []*scenarioSide{newScenarioSide(sideTarget{name: "stack", baseURL: options.A, mailURL: options.MailA}, options)}
 		runner.sides[0].trpc = cmp.Or(options.TRPC, trpcNone)
 		return runner
 	}
 	runner.sides = []*scenarioSide{
-		newScenarioSide("branch", options.A, options.MailA, options),
-		newScenarioSide("main", options.B, options.MailB, options),
+		newScenarioSide(sideTarget{name: "branch", baseURL: options.A, mailURL: options.MailA}, options),
+		newScenarioSide(sideTarget{name: "main", baseURL: options.B, mailURL: options.MailB}, options),
 	}
 	runner.sides[0].trpc, runner.sides[1].trpc = trpcNone, trpcSuperjson
 	return runner
 }
 
-func newScenarioSide(name, baseURL, mailURL string, options scenarioOptions) *scenarioSide {
+// sideTarget is the stack one side talks to: its name, app origin and mail sink.
+type sideTarget struct {
+	name, baseURL, mailURL string
+}
+
+func newScenarioSide(target sideTarget, options scenarioOptions) *scenarioSide {
 	return &scenarioSide{
-		name: name, baseURL: baseURL, mailURL: mailURL, creds: sideCredentials{},
+		name: target.name, baseURL: target.baseURL, mailURL: target.mailURL, creds: sideCredentials{},
 		shared: sharedShard(options.Keys),
 		slots:  make(chan struct{}, options.Concurrency),
 	}
@@ -266,7 +271,7 @@ func (runner *scenarioRunner) lockInstance(serial int) func() {
 		return nil
 	}
 	say := func(text string) { fmt.Fprintln(runner.options.Progress, text) }
-	unlock, err := lockFile(filepath.Join(runner.options.DoneRoot, ".visualdiff", "check"), "instance.lock", "scenarios: another tool holds the instance lock; the serial pass waits", say)
+	unlock, err := diffkit.Lock(diffkit.LockOptions{Dir: filepath.Join(runner.options.DoneRoot, ".visualdiff", "check"), Name: "instance.lock", Waiting: "scenarios: another tool holds the instance lock; the serial pass waits", Progress: say})
 	if err != nil {
 		say("scenarios: instance lock: " + err.Error())
 		return nil

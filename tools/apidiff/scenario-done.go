@@ -95,7 +95,8 @@ func (ledger scenarioDoneLedger) scope(items []scenario) ([]scenario, []string) 
 
 // markScenarioDone copies a scenario's proof out of a finished run into the
 // ledger. It refuses a scenario that did not pass unless forced.
-func markScenarioDone(root, runID, id, note string, force bool, now time.Time) (scenarioDoneEntry, error) {
+func markScenarioDone(root string, inputs scenarioDoneInputs, now time.Time) (scenarioDoneEntry, error) {
+	runID, id, note, force := inputs.runID, inputs.id, inputs.note, inputs.force
 	if strings.TrimSpace(note) == "" {
 		return scenarioDoneEntry{}, errors.New("done: -note is required")
 	}
@@ -199,7 +200,7 @@ func doneScenariosSubcommand(args []string, out streams) int {
 	if err := flags.Parse(args); err != nil {
 		return exitError
 	}
-	if err := runScenarioDone(*root, doneInputsOf(*runID, *id, *note, *undo, *force, *list), out); err != nil {
+	if err := runScenarioDone(*root, scenarioDoneInputs{runID: *runID, id: *id, note: *note, undo: *undo, force: *force, list: *list}, out); err != nil {
 		fmt.Fprintln(out.stderr, "apidiff:", err)
 		return exitError
 	}
@@ -209,10 +210,6 @@ func doneScenariosSubcommand(args []string, out streams) int {
 type scenarioDoneInputs struct {
 	runID, id, note, undo string
 	force, list           bool
-}
-
-func doneInputsOf(runID, id, note, undo string, force, list bool) scenarioDoneInputs {
-	return scenarioDoneInputs{runID: runID, id: id, note: note, undo: undo, force: force, list: list}
 }
 
 func runScenarioDone(root string, inputs scenarioDoneInputs, out streams) error {
@@ -232,7 +229,7 @@ func runScenarioDone(root string, inputs scenarioDoneInputs, out streams) error 
 	case inputs.runID == "" || inputs.id == "":
 		return errors.New("done: want -run and -scenario, or -list, or -undo KEY")
 	}
-	entry, err := markScenarioDone(root, inputs.runID, inputs.id, inputs.note, inputs.force, time.Now())
+	entry, err := markScenarioDone(root, inputs, time.Now())
 	if err != nil {
 		return err
 	}

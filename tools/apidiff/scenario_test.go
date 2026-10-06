@@ -243,7 +243,7 @@ func runFake(t *testing.T, branch, main *fakeStack, yaml string, repeat int) (in
 		Concurrency: 4, Shards: 2, Repeat: repeat, Glob: path, RunDir: t.TempDir(),
 	}
 	var report bytes.Buffer
-	code := runScenarioPhase(context.Background(), options, &report, &report)
+	code := runScenarioPhase(context.Background(), scenarioPhase{options: options, report: &report, progress: &report})
 	if _, err := os.Stat(filepath.Join(options.RunDir, "scenarios.jsonl")); err != nil {
 		t.Fatalf("the phase wrote no results (exit %d):\n%s", code, report.String())
 	}

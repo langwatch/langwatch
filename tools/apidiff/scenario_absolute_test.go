@@ -64,7 +64,7 @@ func TestAbsoluteURLStepSendsRawBytesToTheCapturedHostWithoutCredentials(t *test
 		Concurrency: 2, Shards: 1, Glob: writeScenarioYAML(t, absoluteScenario), RunDir: t.TempDir(),
 	}
 	var report bytes.Buffer
-	runScenarioPhase(context.Background(), options, &report, &report)
+	runScenarioPhase(context.Background(), scenarioPhase{options: options, report: &report, progress: &report})
 	results := readResults(t, options.RunDir)
 	if len(results) != 1 || results[0].Verdict != verdictPass {
 		t.Fatalf("results %+v\n%s", results, report.String())

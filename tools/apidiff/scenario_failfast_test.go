@@ -27,7 +27,7 @@ func runPhase(t *testing.T, baseURL string, options scenarioOptions, count int, 
 		options.Keys = Keys{ProjectKey: "key", OrgKey: "org"}
 	}
 	var report bytes.Buffer
-	code := runScenarioPhase(context.Background(), options, &report, &report)
+	code := runScenarioPhase(context.Background(), scenarioPhase{options: options, report: &report, progress: &report})
 	return code, report.String()
 }
 

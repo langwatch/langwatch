@@ -129,12 +129,12 @@ func writeDeferredList(dir string, deferred []string) (string, error) {
 }
 
 // reportDeferred prints the deferred line and keeps the list beside the run.
-func reportDeferred(report, progress io.Writer, dir string, deferred []string) {
-	writeDeferred(report, deferred)
-	if target, err := writeDeferredList(dir, deferred); err != nil {
-		fmt.Fprintln(progress, "scenarios: deferred list:", err)
+func (phase scenarioPhase) reportDeferred(deferred []string) {
+	writeDeferred(phase.report, deferred)
+	if target, err := writeDeferredList(phase.options.RunDir, deferred); err != nil {
+		fmt.Fprintln(phase.progress, "scenarios: deferred list:", err)
 	} else if target != "" {
-		fmt.Fprintln(progress, "scenarios: deferred list:", target)
+		fmt.Fprintln(phase.progress, "scenarios: deferred list:", target)
 	}
 }
 

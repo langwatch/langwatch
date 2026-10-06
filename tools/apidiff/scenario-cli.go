@@ -81,22 +81,29 @@ func runScenariosSubcommand(ctx context.Context, args []string, out streams) int
 	if runDir == "" {
 		runDir = filepath.Join(".apidiff", "scenarios-"+time.Now().Format("20060102-150405"))
 	}
-	if probe.a != "" && probe.b != "" {
-		if err := rememberHavenOrigins(ctx, probe.a, probe.b); err != nil {
-			fmt.Fprintln(out.stderr, "scenarios: haven origins:", err)
-		}
-	}
-	if probe.a != "" && probe.b == "" {
-		filled, err := fillHavenCredentials(ctx, probe.a, &probe.keys)
-		if err != nil {
-			fmt.Fprintln(out.stderr, "scenarios: haven credentials:", err)
-		} else if len(filled) > 0 {
-			fmt.Fprintln(out.stderr, "scenarios: took from the haven stack:", strings.Join(filled, ", "))
-		}
-	}
+	fillFromHaven(ctx, probe, out.stderr)
 	scenarios.mailA = cmp.Or(scenarios.mailA, serviceMailURL(ctx, probe.a))
 	scenarios.mailB = cmp.Or(scenarios.mailB, serviceMailURL(ctx, probe.b))
-	return runScenarioPhase(ctx, scenarios.options(probe, runDir, out.stderr), out.stdout, out.stderr)
+	return runScenarioPhase(ctx, scenarioPhase{options: scenarios.options(probe, runDir, out.stderr), report: out.stdout, progress: out.stderr})
+}
+
+// fillFromHaven remembers both stacks' haven origins for a comparison, or
+// takes a lone stack's credentials from haven.
+func fillFromHaven(ctx context.Context, probe *probeFlags, stderr io.Writer) {
+	if probe.a != "" && probe.b != "" {
+		if err := rememberHavenOrigins(ctx, probe.a, probe.b); err != nil {
+			fmt.Fprintln(stderr, "scenarios: haven origins:", err)
+		}
+	}
+	if probe.a == "" || probe.b != "" {
+		return
+	}
+	filled, err := fillHavenCredentials(ctx, probe.a, &probe.keys)
+	if err != nil {
+		fmt.Fprintln(stderr, "scenarios: haven credentials:", err)
+	} else if len(filled) > 0 {
+		fmt.Fprintln(stderr, "scenarios: took from the haven stack:", strings.Join(filled, ", "))
+	}
 }
 
 // fromSuite fills the sides diffsuite handed this run that no flag named
@@ -125,27 +132,24 @@ func (probe *probeFlags) runScenarioAfterMainPass(ctx context.Context, out strea
 			return exitEqual
 		}
 	}
-	return runScenarioPhase(ctx, options, out.stderr, out.stderr)
+	return runScenarioPhase(ctx, scenarioPhase{options: options, report: out.stderr, progress: out.stderr})
+}
+
+// scenarioPhase is one scenarios phase: its options, where the report goes
+// and where progress goes.
+type scenarioPhase struct {
+	options          scenarioOptions
+	report, progress io.Writer
 }
 
 // runScenarioPhase loads, seeds, runs and reports; it answers the exit code.
-func runScenarioPhase(ctx context.Context, options scenarioOptions, report, progress io.Writer) int {
-	if options.Glob == "" {
-		options.Glob = defaultScenarioGlob
+func runScenarioPhase(ctx context.Context, phase scenarioPhase) int {
+	if phase.options.Glob == "" {
+		phase.options.Glob = defaultScenarioGlob
 	}
-	loaded, err := loadScenarios(options.Glob)
-	if err != nil {
-		fmt.Fprintln(progress, "scenarios:", err)
-		return exitError
-	}
-	items := selectScenarios(loaded, options.IDs)
-	if items, err = withoutDone(items, options, progress); err != nil {
-		fmt.Fprintln(progress, "scenarios:", err)
-		return exitError
-	}
-	items = repeatScenarios(items, options.Repeat)
-	if len(items) == 0 {
-		fmt.Fprintln(progress, "scenarios: no scenario selected")
+	options, progress := phase.options, phase.progress
+	loaded, items, ok := phase.selected()
+	if !ok {
 		return exitError
 	}
 	if options.DryRun {
@@ -158,27 +162,14 @@ func runScenarioPhase(ctx context.Context, options scenarioOptions, report, prog
 	runner.probeAdminKey()
 	items, deferred := runner.deferAdminScenarios(items)
 	if len(items) == 0 {
-		reportDeferred(report, progress, options.RunDir, deferred)
+		phase.reportDeferred(deferred)
 		return exitEqual
 	}
-	fmt.Fprintf(progress, "scenarios: %d selected, %d in flight per side, %d shards per kind\n", len(items), runner.options.Concurrency, options.Shards)
-	seeded := time.Now()
-	needs := needsOf(items, options.Shards)
-	runner.seed(needs)
-	if cause := runner.setupFailure(needs); cause != "" {
-		fmt.Fprintln(progress, "apidiff:", diffkit.SetupFailed(errors.New(cause)))
+	if !phase.seed(runner, items) {
 		return exitError
 	}
-	fmt.Fprintf(progress, "scenarios: shards seeded in %s\n", time.Since(seeded).Round(time.Millisecond))
-	phaseDone(progress, "scenario shards", seeded)
-	started := time.Now()
-	stopTicker := diffkit.Ticker{Out: progress, Label: "scenarios", Total: len(items), Snapshot: runner.snapshot}.Start()
-	results := runner.runAll(items)
-	stopTicker()
-	phaseDone(progress, "scenarios", started)
-	timing := scenarioTiming{Wall: time.Since(started), Requests: runner.requests.Load(), Waits: time.Duration(runner.waitNanos.Load()), Workers: runner.options.Concurrency}
-	writeScenarioReport(report, results, timing)
-	reportDeferred(report, progress, options.RunDir, deferred)
+	results := phase.runAll(runner, items)
+	phase.reportDeferred(deferred)
 	if target, err := writeScenariosJSONL(options.RunDir, results); err != nil {
 		fmt.Fprintln(progress, "scenarios.jsonl:", err)
 	} else if target != "" {
@@ -189,6 +180,56 @@ func runScenarioPhase(ctx context.Context, options scenarioOptions, report, prog
 		return exitStopped
 	}
 	return scenarioExit(results)
+}
+
+// selected loads the scenario files and answers every loaded scenario and the
+// ones to run; ok is false, said on progress, when none can run.
+func (phase scenarioPhase) selected() (loaded, items []scenario, ok bool) {
+	options, progress := phase.options, phase.progress
+	loaded, err := loadScenarios(options.Glob)
+	if err != nil {
+		fmt.Fprintln(progress, "scenarios:", err)
+		return nil, nil, false
+	}
+	items = selectScenarios(loaded, options.IDs)
+	if items, err = withoutDone(items, options, progress); err != nil {
+		fmt.Fprintln(progress, "scenarios:", err)
+		return nil, nil, false
+	}
+	items = repeatScenarios(items, options.Repeat)
+	if len(items) == 0 {
+		fmt.Fprintln(progress, "scenarios: no scenario selected")
+		return nil, nil, false
+	}
+	return loaded, items, true
+}
+
+// seed seeds the shards the items need; false, said on progress, when setup failed.
+func (phase scenarioPhase) seed(runner *scenarioRunner, items []scenario) bool {
+	progress := phase.progress
+	fmt.Fprintf(progress, "scenarios: %d selected, %d in flight per side, %d shards per kind\n", len(items), runner.options.Concurrency, phase.options.Shards)
+	seeded := time.Now()
+	needs := needsOf(items, phase.options.Shards)
+	runner.seed(needs)
+	if cause := runner.setupFailure(needs); cause != "" {
+		fmt.Fprintln(progress, "apidiff:", diffkit.SetupFailed(errors.New(cause)))
+		return false
+	}
+	fmt.Fprintf(progress, "scenarios: shards seeded in %s\n", time.Since(seeded).Round(time.Millisecond))
+	phaseDone(progress, "scenario shards", seeded)
+	return true
+}
+
+// runAll runs the items with a progress ticker and writes the report.
+func (phase scenarioPhase) runAll(runner *scenarioRunner, items []scenario) []scenarioResult {
+	started := time.Now()
+	stopTicker := diffkit.Ticker{Out: phase.progress, Label: "scenarios", Total: len(items), Snapshot: runner.snapshot}.Start()
+	results := runner.runAll(items)
+	stopTicker()
+	phaseDone(phase.progress, "scenarios", started)
+	timing := scenarioTiming{Wall: time.Since(started), Requests: runner.requests.Load(), Waits: time.Duration(runner.waitNanos.Load()), Workers: runner.options.Concurrency}
+	writeScenarioReport(phase.report, results, timing)
+	return results
 }
 
 // withoutDone drops the scenarios the done ledger has signed off, unless -final.
