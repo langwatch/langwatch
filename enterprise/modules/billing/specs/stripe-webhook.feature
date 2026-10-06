@@ -153,3 +153,9 @@ Feature: Stripe webhook handling grants and removes plans correctly
     Given a hosted deployment with Stripe and its webhook signing secret
     When a delivery signed with that secret arrives
     Then the delivery is acknowledged
+
+  @unit
+  Scenario: A Stripe delivery verifies alike over the provider and its memory twin
+    Given the Stripe delivery channel over the provider and over its memory twin, each holding a signing secret
+    When a delivery signed with that secret, one signed with another secret and one where no secret is held arrive
+    Then each tier answers the first with its event and refuses the other two

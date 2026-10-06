@@ -112,3 +112,17 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Upcast decl (mig-declare): .withUpcasts, after clarification (a read-time rule owned by the pipeline; the ledger step is derived)
 - Step checks (mig-declare): AS built
 - Upcast kind (UP-1): EVENT-upcast kind
+
+## Round 16 (C, UP-2, UP-4, UP-5, held:69 (fresh-install upcast))
+
+- Upcast id (UP-2): PIPELINE ids upcast:<pipeline>:<stored type>
+- Rewrite (UP-4): COPY, delete originals at the floor
+- Drain life (UP-5): LINT drains older than one release
+- Fresh inst. (mig-s2-manifests): PLAN by mode
+
+## Round 17 (C, U1-a, U1-b, U1-c, S3-REFUSED-RUN)
+
+- Empty ledger (U1-a): EIGHTH state, a distinct 'never upgraded' state in reader and UI (not the recommended Behind-with-reason)
+- Upgrading (U1-b): RUN stands in until the lease table lands
+- Reader wire (U1-c): USE HandledError now; packages/upgrade takes the handled-error dependency (not the recommended plain error)
+- Refused run (S3-REFUSED-RUN): RECORD a refused upgrade as a failed run with report.refused

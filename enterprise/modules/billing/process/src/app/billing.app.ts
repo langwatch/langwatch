@@ -50,6 +50,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { fromDate, Temporal, type Instant } from "@langwatch/time";
 import Stripe from "stripe";
 
+import type { BillingStripeChannels } from "../channels/billing-stripe.channels.ts";
 import { billingSubscriptionNotifierChannels } from "../channels/billing-subscription-notifier-channels.registry.ts";
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
 import { billingWebhookHostChannels } from "../channels/billing-webhook-host-channels.registry.ts";
@@ -58,6 +59,7 @@ import { connectedInvoicingChannels } from "../channels/connected-invoicing-chan
 import { connectedStatementMailChannels } from "../channels/connected-statement-mail-channels.registry.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
 import { licenseEmailChannels } from "../channels/license-email-channels.registry.ts";
+import { stripeWebhooksChannels } from "../channels/stripe-webhooks-channels.registry.ts";
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
 import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
 import {
@@ -104,7 +106,6 @@ import { ResourceLimitAlertService } from "../services/resource-limit-alert.serv
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
-import { StripeWebhookSignatureService } from "../services/stripe-webhook-signature.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 import { BillingSubscriptionService } from "../services/subscription.service.ts";
 import { UsageLimitOrganizationService } from "../services/usage-limit-organization.service.ts";
@@ -148,11 +149,17 @@ export type ConnectedBillingPeers = Readonly<{
   gateway: ConnectedCustomerPeers["gateway"];
 }>;
 
-/** Stripe API version this callback's client speaks, as the rest of billing pins it. */
+/** Stripe API version billing's one client speaks. */
 const STRIPE_API_VERSION = "2024-04-10";
 
+/** Billing's Stripe, built once per deployment that holds the key. */
+type BillingStripe = Readonly<{
+  channels: BillingStripeChannels;
+  /** The one SDK client, for the services not yet on a subject channel (Q69-2 to Q69-4). */
+  client: Stripe;
+}>;
+
 type StripeWebhookComposition = Readonly<{
-  signing: StripeWebhookSignatureService;
   host: BillingWebhookHost;
   /** Data-retention's rules, which a first seat activation stamps at the platform default. */
   retention: SeatRetentionRules;
@@ -222,8 +229,9 @@ export class BillingModule
     const mailer: MailSender = {
       send: (content) => setup.dependencies.notifications.sendEmail(content),
     };
-    const signing = await setup.secrets.into(BillingModule.secrets.stripeWebhookSecret, (secret) =>
-      StripeWebhookSignatureService.create(secret),
+    const webhooks = await setup.secrets.into(
+      BillingModule.secrets.stripeWebhookSecret,
+      (signingSecret) => stripeWebhooksChannels.http.create({ signingSecret }),
     );
     const notices = await BillingModule.#composeNotices(setup);
     // Licensing holds the signing key and refuses a purchase it cannot sign.
@@ -238,12 +246,17 @@ export class BillingModule
       }),
     });
     const resourceLimitAlerts = BillingModule.#composeResourceLimitAlerts(setup, notices);
-    return setup.secrets.into(BillingModule.secrets.stripeSecretKey, (stripeSecretKey) =>
+    const { nodeEnvironment } = setup.config;
+    return setup.secrets.into(BillingModule.secrets.stripeSecretKey, (secretKey) =>
       BillingModule.assemble({
         repositories: setup.repositories,
         config: setup.config,
         peers: setup.dependencies,
-        stripeSecretKey,
+        stripe: secretKey
+          ? BillingModule.#composeStripe({ secretKey, webhooks, nodeEnvironment })
+          : void 0,
+        usageReporting: () =>
+          StripeUsageReportingBuilder.create({ secretKey, nodeEnvironment }).build(),
         statementMail: connectedStatementMailChannels.ses.create(mailer),
         usageWarnings: BillingModule.#composeUsageWarnings(setup, notices),
         resourceLimitAlerts,
@@ -254,7 +267,6 @@ export class BillingModule
           planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices),
         }),
         webhook: {
-          signing,
           host: billingWebhookHostChannels.slack.create({ notices }),
           retention: setup.dependencies.dataRetention,
           invites: setup.dependencies.organizations,
@@ -266,6 +278,26 @@ export class BillingModule
         },
       }),
     );
+  }
+
+  /** The one Stripe client, and every subject channel billing has over it. */
+  static #composeStripe({
+    secretKey,
+    webhooks,
+    nodeEnvironment,
+  }: {
+    secretKey: string;
+    webhooks: BillingStripeChannels["webhooks"];
+    nodeEnvironment: string | undefined;
+  }): BillingStripe {
+    const client = new Stripe(secretKey, { apiVersion: STRIPE_API_VERSION });
+    const connectedInvoicing = connectedInvoicingChannels.http.create({
+      stripe: client,
+      usagePriceId: () =>
+        BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).prices
+          .CONNECTED_HOSTED_USAGE_QUARTERLY,
+    });
+    return { client, channels: { webhooks, connectedInvoicing } };
   }
 
   /** Main's Slack, HubSpot and usage-limit mail notices; each Slack webhook is a secret. */
@@ -355,7 +387,8 @@ export class BillingModule
     repositories,
     config,
     peers,
-    stripeSecretKey,
+    stripe,
+    usageReporting,
     statementMail,
     usageWarnings,
     resourceLimitAlerts,
@@ -382,12 +415,15 @@ export class BillingModule
       "bankDetails" | "licensePaymentLinkId" | "isSaas" | "nodeEnvironment"
     >;
     peers: ConnectedBillingPeers;
-    stripeSecretKey: string | undefined;
+    /** Billing's Stripe; absent where the deployment holds no key, and nothing bills. */
+    stripe?: BillingStripe;
+    /** The meter LangWatch Cloud reports usage to, built on first use; it refuses without a key. */
+    usageReporting: () => UsageReportingService;
     /** The monthly statement mail; absent, statements wait and nothing is recorded. */
     statementMail?: ConnectedStatementMailChannel;
     usageWarnings: UsageWarningService;
     resourceLimitAlerts: ResourceLimitAlertService;
-    /** The Stripe callback's signing secret and outside reach; absent, the callback answers 404. */
+    /** The Stripe callback's outside reach; absent, the callback answers 404. */
     webhook?: StripeWebhookComposition;
     /** Main's subscription door; absent, every `subscription.*` procedure answers not found. */
     subscription?: SubscriptionComposition;
@@ -420,16 +456,10 @@ export class BillingModule
         peers,
         facts,
         nodeEnvironment,
-        usageReporting: isSaas
-          ? () =>
-              StripeUsageReportingBuilder.create({
-                secretKey: stripeSecretKey,
-                nodeEnvironment,
-              }).build()
-          : void 0,
+        usageReporting: isSaas ? usageReporting : void 0,
       }),
     };
-    if (!stripeSecretKey) {
+    if (!stripe) {
       return new BillingModule({
         ...gate,
         lifecycle,
@@ -439,12 +469,7 @@ export class BillingModule
       });
     }
 
-    const invoicing = connectedInvoicingChannels.http.create({
-      secretKey: stripeSecretKey,
-      usagePriceId: () =>
-        BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).prices
-          .CONNECTED_HOSTED_USAGE_QUARTERLY,
-    });
+    const invoicing = stripe.channels.connectedInvoicing;
     const { licensing } = peers;
     const billing = ConnectedBillingService.create({
       repository,
@@ -469,7 +494,7 @@ export class BillingModule
         ? BillingModule.#composeStripeWebhook({
             webhook,
             isSaas,
-            stripeSecretKey,
+            stripe,
             nodeEnvironment,
             repositories,
             licensePaymentLinkId: config.licensePaymentLinkId,
@@ -481,7 +506,7 @@ export class BillingModule
         subscription && isSaas
           ? BillingModule.#composeSubscriptions({
               subscription,
-              stripeSecretKey,
+              stripe: stripe.client,
               nodeEnvironment,
               repositories,
             })
@@ -520,19 +545,18 @@ export class BillingModule
   /** Main's `createSubscriptionRouter` services: customers, subscriptions and seat checkouts. */
   static #composeSubscriptions({
     subscription,
-    stripeSecretKey,
+    stripe,
     nodeEnvironment,
     repositories,
   }: {
     subscription: SubscriptionComposition;
-    stripeSecretKey: string;
+    stripe: Stripe;
     nodeEnvironment: string | undefined;
     repositories: Pick<
       BillingRepositories,
       "subscriptions" | "organizations" | "seatEventSubscriptions"
     >;
   }): SubscriptionDoor {
-    const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
     const prices = BillingPriceCatalogue.create(
       getStripeEnvironmentFromNodeEnv(nodeEnvironment),
     ).prices;
@@ -654,7 +678,7 @@ export class BillingModule
   static #composeStripeWebhook({
     webhook,
     isSaas,
-    stripeSecretKey,
+    stripe,
     nodeEnvironment,
     repositories,
     licensePaymentLinkId,
@@ -664,7 +688,7 @@ export class BillingModule
     announcer: BillingLifecycleAnnouncerService | undefined;
     webhook: StripeWebhookComposition;
     isSaas: boolean;
-    stripeSecretKey: string;
+    stripe: BillingStripe;
     nodeEnvironment: string | undefined;
     repositories: Pick<BillingRepositories, "webhookSubscriptions" | "webhookOrganizations">;
     licensePaymentLinkId: string | undefined;
@@ -676,7 +700,7 @@ export class BillingModule
     const events = EEWebhookService.create({
       subscriptionRepository: repositories.webhookSubscriptions,
       organizationRepository: repositories.webhookOrganizations,
-      stripe: new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION }),
+      stripe: stripe.client,
       itemCalculator: SubscriptionItemCalculatorService.create(prices),
       licensePaymentLinkId,
       inviteApprover: webhook.invites,
@@ -688,8 +712,8 @@ export class BillingModule
     });
     return StripeWebhookReceiptService.create({
       dispatchesEvents: () => isSaas,
-      hasSigningSecret: () => webhook.signing.isConfigured(),
-      constructEvent: (input) => webhook.signing.constructEvent(input),
+      hasSigningSecret: () => stripe.channels.webhooks.isConfigured(),
+      constructEvent: (input) => stripe.channels.webhooks.constructEvent(input),
       handleEvent: (event) => events.handleEvent(event),
     });
   }
