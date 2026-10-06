@@ -214,6 +214,83 @@ describe("given the encryption member", () => {
   });
 });
 
+describe("given a process started mid-rotation, with the old key as CREDENTIALS_SECRET_PREVIOUS", () => {
+  const previous = hexKey();
+  const current = hexKey();
+  const environment = { CREDENTIALS_SECRET: current, CREDENTIALS_SECRET_PREVIOUS: previous };
+
+  describe("when it reads a value sealed before the rotation", () => {
+    /** @scenario "A value sealed before the rotation still reads while the previous secret is set" */
+    it("reads the original plaintext", async () => {
+      const { encryption, close } = await encryptionFrom(environment);
+
+      try {
+        expect(encryption.decrypt(mainEncrypt(CREDENTIAL, previous))).toBe(CREDENTIAL);
+        expect(encryption.decrypt(mainEncrypt(CREDENTIAL, current))).toBe(CREDENTIAL);
+      } finally {
+        await close();
+      }
+    });
+  });
+
+  describe("when it saves a value", () => {
+    /** @scenario "A value written after the rotation is sealed under the new secret alone" */
+    it("seals under the new key, which the previous key does not open", async () => {
+      const { encryption, close } = await encryptionFrom(environment);
+
+      try {
+        const sealed = encryption.encrypt(CREDENTIAL);
+
+        expect(mainDecrypt(sealed, current)).toBe(CREDENTIAL);
+        expect(() => mainDecrypt(sealed, previous)).toThrow(/unable to authenticate/);
+      } finally {
+        await close();
+      }
+    });
+  });
+
+  describe("when a value opens under neither key", () => {
+    it("refuses without quoting the sealed value", async () => {
+      const { encryption, close } = await encryptionFrom(environment);
+      const sealed = mainEncrypt(CREDENTIAL, hexKey());
+
+      try {
+        expect(() => encryption.decrypt(sealed)).toThrow("Failed to decrypt");
+        expect(() => encryption.decrypt(sealed)).not.toThrow(sealed);
+      } finally {
+        await close();
+      }
+    });
+  });
+
+  describe("when the previous key is not 64 hex characters", () => {
+    /** @scenario "A previous secret in the wrong format is refused" */
+    it.each(["0f".repeat(16), "not-hex-at-all", "0f".repeat(33)])(
+      "refuses %j by name when the member is read",
+      async (malformed) => {
+        const { members } = await openStores({
+          name: "encryption-member-test",
+          config: storesConfig,
+          secrets: SecretsResolver.over(
+            SecretsChain.start({
+              environment: { CREDENTIALS_SECRET: current, CREDENTIALS_SECRET_PREVIOUS: malformed },
+            }).withEnv(),
+          ).scopeTo(storesOwner.name, Object.values(storesOwner.secrets)),
+          pipelines: PipelineParticipation.producer(),
+          production: false,
+        });
+
+        try {
+          expect(() => members.read("encryption")).toThrow(/CREDENTIALS_SECRET_PREVIOUS/);
+          expect(() => members.read("encryption")).toThrow(/AES-256 needs 32/);
+        } finally {
+          await members.close();
+        }
+      },
+    );
+  });
+});
+
 describe("given a process opening its stores", () => {
   describe("when CREDENTIALS_SECRET is unset and NEXTAUTH_SECRET is set", () => {
     /** @scenario "The session secret keys the member when CREDENTIALS_SECRET is unset" */

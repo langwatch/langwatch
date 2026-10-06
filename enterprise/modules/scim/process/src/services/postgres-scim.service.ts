@@ -25,6 +25,7 @@ export class PostgresScimService {
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     tokenPepper: string | undefined;
+    previousTokenPepper?: string | undefined;
     connections: ScimHeldConnections;
   }): ScimServiceContract {
     return ScimService.create({
@@ -37,6 +38,7 @@ export class PostgresScimService {
       lifecycle: options.lifecycle,
       provenOffboarding: options.provenOffboarding,
       tokenPepper: options.tokenPepper,
+      previousTokenPepper: options.previousTokenPepper,
       connections: options.connections,
     });
   }

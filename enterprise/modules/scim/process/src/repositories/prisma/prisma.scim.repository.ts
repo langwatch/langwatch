@@ -612,6 +612,16 @@ export class PrismaScimRepository extends ScimRepository {
       take: 2,
     });
   }
+  async replaceTokenDigest(input: {
+    tokenId: string;
+    hashedToken: string;
+    hashScheme: ScimTokenHashScheme;
+  }): Promise<void> {
+    await this.prisma.scimToken.updateMany({
+      where: { id: input.tokenId },
+      data: { hashedToken: input.hashedToken, hashScheme: input.hashScheme },
+    });
+  }
   // Arrow instance property to match the base class's property-typed
   // declaration (see `findMembership` above for why).
   recordTokenUse = async (input: { tokenId: string; usedAt: Instant }): Promise<void> => {

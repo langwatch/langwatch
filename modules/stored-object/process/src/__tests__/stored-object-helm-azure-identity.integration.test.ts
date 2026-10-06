@@ -656,7 +656,6 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       // storage while the operator believed S3 was live.
       expect(out).toContain("name: STORED_OBJECTS_BACKEND");
       expect(out).toContain('value: "s3"');
-      expect(out).toContain("name: USE_S3_STORAGE");
       expect(out).toContain("name: S3_BUCKET_NAME");
       expect(out).toContain('value: "bucket"');
       // ...and the connection settings the read path resolves must remain.

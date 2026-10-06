@@ -121,6 +121,11 @@ secrets:
     # Key for credentials encryption (used by app)
     ## @param secrets.secretKeys.credentialsEncryptionKey [string] Key name for credentials encryption.
     credentialsEncryptionKey: "credentialsEncryptionKey"
+    # Key holding the previous credentials encryption key during a rotation.
+    # Empty means the Secret carries none and CREDENTIALS_SECRET_PREVIOUS is
+    # not set.
+    ## @param secrets.secretKeys.credentialsEncryptionKeyPrevious [string] Key name for the previous credentials encryption key, set only during a rotation.
+    credentialsEncryptionKeyPrevious: ""
     # Key for cron API key (used by app and cronjobs)
     ## @param secrets.secretKeys.cronApiKey [string] Key name for cron API key.
     cronApiKey: "cronApiKey"
@@ -243,6 +248,17 @@ app:
   credentialsEncryptionKey:
     value: ""
     secretKeyRef: { name: "", key: "" }
+    # The key being rotated away from. Set it together with the new key above
+    # so the app, the workers and the migration Jobs can still decrypt data
+    # written under the old one (CREDENTIALS_SECRET_PREVIOUS). Same format as
+    # the key itself: 64 hex characters. Remove it once the rotation is done.
+    # autogen never generates it.
+    ## @extra app.credentialsEncryptionKey.previous Previous credentials encryption key, set only during a rotation.
+    ## @param app.credentialsEncryptionKey.previous.value [string] Previous encryption key value (not recommended in production).
+    ## @param app.credentialsEncryptionKey.previous.secretKeyRef [object] Reference to a secret holding the previous encryption key.
+    previous:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
 
   # API key for internal cron job authentication
   # Used by scheduled tasks to authenticate with the application
@@ -317,26 +333,11 @@ app:
   upstreams:
     nlp: { scheme: http, port: 5561 }
     langevals: { scheme: http, port: 5562 }
-  # AI model evaluator configurations
-  # These enable integration with various AI providers for evaluation tasks
+  # Server-wide provider credentials. Model providers for evaluators are
+  # configured per project in Settings > Model Providers, not here.
   ## @extra app.evaluators Evaluator providers configuration.
   evaluators:
-    # Azure OpenAI integration for model evaluation
-    ## @extra app.evaluators.azureOpenAI Azure OpenAI evaluator configuration.
-    ## @param app.evaluators.azureOpenAI.enabled [default: false] Enable Azure OpenAI evaluator.
-    ## @param app.evaluators.azureOpenAI.endpoint.value [string] Azure OpenAI endpoint.
-    ## @param app.evaluators.azureOpenAI.apiKey.value [string] Azure OpenAI API key.
-    azureOpenAI:
-      enabled: false
-      endpoint:
-        value: ""
-        ## @param app.evaluators.azureOpenAI.endpoint.secretKeyRef [object] Secret ref for Azure OpenAI endpoint.
-        secretKeyRef: { name: "", key: "" }
-      apiKey:
-        value: ""
-        ## @param app.evaluators.azureOpenAI.apiKey.secretKeyRef [object] Secret ref for Azure OpenAI API key.
-        secretKeyRef: { name: "", key: "" }
-    # Google AI integration for model evaluation
+    # Google service account used for Google Cloud DLP PII redaction
     ## @extra app.evaluators.google Google evaluator configuration.
     ## @param app.evaluators.google.enabled [default: false] Enable Google evaluator.
     ## @param app.evaluators.google.credentials.value [string] Google credentials JSON (base64 or inline).

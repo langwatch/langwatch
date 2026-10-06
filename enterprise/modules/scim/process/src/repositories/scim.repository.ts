@@ -243,6 +243,12 @@ export abstract class ScimRepository {
   }): Promise<number>;
   /** At most two rows; a token naming more than one authenticates nobody. */
   abstract findTokensByHashes(hashedTokens: string[]): Promise<ScimTokenIdentity[]>;
+  /** Stores a token's digest under another pepper or scheme; the token itself is unchanged. */
+  abstract replaceTokenDigest(input: {
+    tokenId: string;
+    hashedToken: string;
+    hashScheme: ScimTokenHashScheme;
+  }): Promise<void>;
   abstract findTokenIdsForConnection(input: {
     organizationId: string;
     connectionId: string;

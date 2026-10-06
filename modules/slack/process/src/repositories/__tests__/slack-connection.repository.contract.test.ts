@@ -213,6 +213,42 @@ describe.each(backends)("given the $name Slack connection repositories", ({ crea
     });
   });
 
+  describe("when a connection's fingerprint is restamped", () => {
+    it("stores the new fingerprint, and leaves the row alone where its scope holds it already", async () => {
+      const world = create();
+      try {
+        const [first] = await world.connections.create({
+          record: record(world, { secretFingerprint: "old" }),
+          actorId: "user-1",
+        });
+        const [second] = await world.connections.create({
+          record: record(world, { name: "Other", secretFingerprint: "other" }),
+          actorId: "user-1",
+        });
+        if (!first || !second) throw new Error("the connections were not stored");
+        const scope = { organizationId: world.organizationId };
+
+        await world.connections.replaceFingerprint({
+          ...scope,
+          id: first.id,
+          secretFingerprint: "new",
+        });
+        await world.connections.replaceFingerprint({
+          ...scope,
+          id: second.id,
+          secretFingerprint: "new",
+        });
+
+        const [restamped] = await world.connections.findById({ id: first.id });
+        const [untouched] = await world.connections.findById({ id: second.id });
+        expect(restamped?.secretFingerprint).toBe("new");
+        expect(untouched?.secretFingerprint).toBe("other");
+      } finally {
+        await world.cleanup();
+      }
+    });
+  });
+
   describe("when a connection is edited and then deleted", () => {
     it("answers the edited row, then no row", async () => {
       const world = create();

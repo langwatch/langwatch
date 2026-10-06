@@ -4,6 +4,7 @@ import { prismaRepositories } from "@langwatch/prisma-client";
 import type { OpsRepositories } from "../ops.repositories.ts";
 import { PrismaImpersonationRepository } from "./prisma.admin.repository.ts";
 import { PrismaBugReportRepository } from "./prisma.bug-report.repository.ts";
+import { PrismaCredentialsResealRepository } from "./prisma.credentials-reseal.repository.ts";
 import { PrismaPostgresHealthRepository } from "./prisma.datastore-health.repository.ts";
 import { PrismaAdminBackofficeRepository } from "./prisma.instance-admin.repository.ts";
 import { PrismaMigrationMembershipRepository } from "./prisma.migration-membership.repository.ts";
@@ -50,6 +51,7 @@ export const PostgresOpsRepositories = {
       ...claimedOpsRepositories.create(members),
       processStore: PrismaProcessStore.create({ database: prisma }),
       processManagerPurge: PrismaProcessManagerPurgeRepository.create({ database: prisma }),
+      credentialsReseal: PrismaCredentialsResealRepository.create({ database: prisma }),
       migrationState: PrismaSystemMigrationStateRepository.create({ prisma }),
       migrationEnrollments: PrismaSystemMigrationEnrollmentRepository.create({ prisma }),
       migrationMemberships: PrismaMigrationMembershipRepository.create({ prisma }),

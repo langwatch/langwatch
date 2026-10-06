@@ -28,6 +28,7 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     findTokenIdsForConnection: vi.fn(async () => []),
     moveDirectoryToConnection: vi.fn(async () => undefined),
     findTokensByHashes: vi.fn(async () => []),
+    replaceTokenDigest: vi.fn(async () => undefined),
     recordTokenUse: vi.fn(async () => undefined),
     scimConnectionExists: vi.fn(async () => true),
     findDirectoryUserId: vi.fn(async () => null),

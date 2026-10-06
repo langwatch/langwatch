@@ -12,6 +12,11 @@ data:
       scrape_interval: {{ .Values.prometheus.server.global.scrape_interval | default "15s" }}
       evaluation_interval: {{ .Values.prometheus.server.global.evaluation_interval | default "15s" }}
 
+    {{- /* Each job keeps only its own workload's pods, by the
+           app.kubernetes.io/name label its Deployment sets. Every annotated pod
+           in the namespace matches the scrape annotation, and the two workloads
+           serve /metrics on different ports, so the annotation alone would
+           send each job to the other's pods on a port they do not listen on. */}}
     scrape_configs:
       - job_name: 'langwatch'
         kubernetes_sd_configs:
@@ -25,6 +30,9 @@ data:
           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
             action: keep
             regex: true
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            action: keep
+            regex: {{ .Release.Name }}-app
           - source_labels: [__meta_kubernetes_pod_ip]
             action: replace
             target_label: __address__
@@ -48,6 +56,9 @@ data:
           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
             action: keep
             regex: true
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            action: keep
+            regex: {{ .Release.Name }}-workers
           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
             action: replace
             target_label: __metrics_path__

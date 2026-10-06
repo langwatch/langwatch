@@ -4,6 +4,7 @@ import type { MigrationLeaseRepository } from "@langwatch/system-migrations";
 import type { AnomalyStateRepository } from "./anomaly.repository.ts";
 import type { BlobStoreRepository } from "./blob-store.repository.ts";
 import type { BugReportRepository } from "./bug-report.repository.ts";
+import type { CredentialsResealRepository } from "./credentials-reseal.repository.ts";
 import type {
   PostgresHealthRepository,
   RedisHealthRepository,
@@ -39,6 +40,8 @@ export interface OpsRepositories {
   readonly processStore: ProcessStore;
   /** The outbox and inbox retention purge only the process-manager-purge task runs. */
   readonly processManagerPurge: ProcessManagerPurgeRepository;
+  /** The walk over every stored sealed value only the credentials-reseal task makes. */
+  readonly credentialsReseal: CredentialsResealRepository;
   readonly migrationState: SystemMigrationStateRepository;
   readonly migrationEnrollments: SystemMigrationEnrollmentRepository;
   readonly migrationMemberships: MigrationMembershipRepository;

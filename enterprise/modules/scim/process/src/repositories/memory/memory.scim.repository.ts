@@ -539,6 +539,16 @@ export class MemoryScimRepository extends ScimRepository {
       .map(identityOf);
   }
 
+  async replaceTokenDigest(input: {
+    tokenId: string;
+    hashedToken: string;
+    hashScheme: ScimTokenHashScheme;
+  }): Promise<void> {
+    for (const token of this.tokens) {
+      if (token.id === input.tokenId) token.hashedToken = input.hashedToken;
+    }
+  }
+
   recordTokenUse = async (input: { tokenId: string; usedAt: Instant }): Promise<void> => {
     for (const token of this.tokens) {
       if (token.id === input.tokenId) token.lastUsedAt = toDate(input.usedAt);
