@@ -214,9 +214,9 @@ describe("the project door", () => {
     ] as const)("is told to name a project, %s", async (_name, method) => {
       const asked = request({ authorization: "Bearer sk-lw-org" });
 
-      expect(await refusalCode(door[method]({ request: asked, permission: "traces:view" }))).toBe(
-        "project_required",
-      );
+      expect(
+        await refusalCode(door[method]({ request: asked, permissions: ["traces:view"] })),
+      ).toBe("project_required");
     });
   });
 
@@ -267,7 +267,7 @@ describe("a project-bound CLI access token", () => {
     it("authenticates as that person on that project, asking their own access", async () => {
       const credential = await tokenDoor(true).authenticate({
         request: bearer,
-        permission: "traces:view",
+        permissions: ["traces:view"],
       });
 
       expect(credential.project.id).toBe("project-1");
@@ -289,7 +289,7 @@ describe("a project-bound CLI access token", () => {
     it("authenticates as that person on the bound project", async () => {
       const credential = await tokenDoor(true).authenticate({
         request: request({ "x-auth-token": "lw_at_session" }),
-        permission: "traces:view",
+        permissions: ["traces:view"],
       });
 
       expect(credential.actsAsPerson).toEqual({ userId: "user-9" });
@@ -316,7 +316,7 @@ describe("a project-bound CLI access token", () => {
     it("is refused as a permission denial", async () => {
       expect(
         await refusalCode(
-          tokenDoor(false).authenticate({ request: bearer, permission: "traces:view" }),
+          tokenDoor(false).authenticate({ request: bearer, permissions: ["traces:view"] }),
         ),
       ).toBe("api_key_permission_denied");
     });

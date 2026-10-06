@@ -101,48 +101,71 @@ export class ApiRestCredentialsService {
     this.logger = peers.logger;
   }
 
+  /** Every permission the route asks, in order, after one resolve; the first missing refuses. */
   async authenticate(input: {
     request: Request;
-    permission: AuthzPermission;
+    permissions: readonly AuthzPermission[];
     /** The key kinds the route admits (E7): refused once the key resolves, before permission. */
     keyKinds?: readonly RestKeyKind[];
   }): Promise<ApiProjectCredential> {
-    const person = await this.#cliAccessCredential(input.request);
-    if (person) {
-      if (input.keyKinds) {
-        assertKeyKind({ key: keyCredentialOf(person.resolved), admitted: input.keyKinds });
-      }
-      const allowed = await this.authz.hasProjectPermission({
-        userId: person.actsAsPerson.userId,
-        projectId: person.project.id,
-        permission: input.permission,
-      });
-      if (!allowed) throw new ApiKeyPermissionDeniedError(input.permission);
-
-      return person;
-    }
-
-    const credentials = extractApiKeyRequestCredentials(input.request);
-    if (!credentials) throw new ProjectMissingCredentialsError();
-
-    const resolved = await this.apiKeys.findResolvedToken(credentials);
-    if (!resolved) throw await this.unresolvedProjectRefusal(credentials);
+    const credential = await this.identify({ request: input.request });
     if (input.keyKinds) {
-      assertKeyKind({ key: keyCredentialOf(resolved), admitted: input.keyKinds });
+      assertKeyKind({ key: keyCredentialOf(credential.resolved), admitted: input.keyKinds });
     }
 
-    if (resolved.type === "apiKey") {
-      const allowed = await this.isWithinCeiling({ resolved, permission: input.permission });
-      if (!allowed) throw apiKeyCeilingRefusal(resolved, input.permission, this.logger);
+    for (const permission of asked(input.permissions)) {
+      if (!(await this.#projectHolds({ credential, permission }))) {
+        throw this.#projectRefusal({ credential, permission });
+      }
     }
+
+    return credential;
+  }
+
+  /** A route-scoped permission (E3), asked only at the project the credential resolved. */
+  async authorizeProjectRoute(input: {
+    credential: ApiProjectCredential;
+    permission: AuthzPermission;
+    projectId: string;
+  }): Promise<PermissionDecision> {
+    const { credential, permission, projectId } = input;
+    if (projectId !== credential.project.id) return { permitted: false, organizationRole: null };
 
     return {
-      project: resolved.project,
-      resolved,
-      markUsed: () => {
-        if (resolved.type === "apiKey") this.apiKeys.markUsed({ id: resolved.apiKeyId });
-      },
+      permitted: await this.#projectHolds({ credential, permission }),
+      organizationRole: null,
     };
+  }
+
+  /** A person is asked their own access, a key its ceiling; a legacy key holds all by its class. */
+  #projectHolds(input: {
+    credential: ApiProjectCredential;
+    permission: AuthzPermission;
+  }): Promise<boolean> {
+    const { credential, permission } = input;
+    if (credential.actsAsPerson) {
+      return this.authz.hasProjectPermission({
+        userId: credential.actsAsPerson.userId,
+        projectId: credential.project.id,
+        permission,
+      });
+    }
+    const { resolved } = credential;
+    if (resolved.type !== "apiKey") return Promise.resolve(true);
+
+    return this.isWithinCeiling({ resolved, permission });
+  }
+
+  #projectRefusal(input: {
+    credential: ApiProjectCredential;
+    permission: AuthzPermission;
+  }): HandledError {
+    const { credential, permission } = input;
+    if (!credential.actsAsPerson && credential.resolved.type === "apiKey") {
+      return apiKeyCeilingRefusal(credential.resolved, permission, this.logger);
+    }
+
+    return new ApiKeyPermissionDeniedError(permission);
   }
 
   async identify(input: { request: Request }): Promise<ApiProjectCredential> {
@@ -228,16 +251,16 @@ export class ApiRestCredentialsService {
    */
   async authenticateKey(input: {
     request: Request;
-    permission: AuthzPermission;
+    permissions: readonly AuthzPermission[];
     reach?: ApiKeyPermissionReach;
   }): Promise<ApiKeyDoorCredential> {
+    const { reach } = input;
     const credential = await this.identifyKey({ request: input.request });
-    const allowed = await this.#keyHolds({
-      principal: credential.principal,
-      permission: input.permission,
-      reach: input.reach,
-    });
-    if (!allowed) throw keyPermissionRefusal({ credential, ...input });
+    for (const permission of asked(input.permissions)) {
+      const allowed = await this.#keyHolds({ principal: credential.principal, permission, reach });
+      if (!allowed)
+        throw keyPermissionRefusal({ credential, permission, ...(reach ? { reach } : {}) });
+    }
 
     return credential;
   }
@@ -342,18 +365,20 @@ export class ApiRestCredentialsService {
 
   async authenticateOrganization(input: {
     request: Request;
-    permission: AuthzPermission;
+    permissions: readonly AuthzPermission[];
   }): Promise<ApiOrganizationCredential> {
-    const identified = await this.identifyOrganization(input);
+    const identified = await this.identifyOrganization({ request: input.request });
     const resolved = identified.resolved;
-    const allowed = await this.authz.hasApiKeyPermission({
-      apiKeyId: resolved.apiKeyId,
-      userId: resolved.userId,
-      organizationId: resolved.organizationId,
-      scope: { type: "org", id: resolved.organizationId },
-      permission: input.permission,
-    });
-    if (!allowed) throw new OrganizationPermissionError(input.permission);
+    for (const permission of asked(input.permissions)) {
+      const allowed = await this.authz.hasApiKeyPermission({
+        apiKeyId: resolved.apiKeyId,
+        userId: resolved.userId,
+        organizationId: resolved.organizationId,
+        scope: { type: "org", id: resolved.organizationId },
+        permission,
+      });
+      if (!allowed) throw new OrganizationPermissionError(permission);
+    }
 
     return identified;
   }
@@ -448,6 +473,13 @@ export class ApiRestCredentialsService {
       permission,
     });
   }
+}
+
+/** A door asked no permission is a mis-wired route: refused, never admitted. */
+function asked(permissions: readonly AuthzPermission[]): readonly AuthzPermission[] {
+  if (permissions.length === 0) throw new Error("A credential door was asked no permission");
+
+  return permissions;
 }
 
 /** The one denial every tier answers with, at the scope the key was asked at. */

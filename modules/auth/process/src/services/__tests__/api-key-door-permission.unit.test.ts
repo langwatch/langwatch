@@ -112,7 +112,7 @@ function ask(token: string, reach?: ApiKeyPermissionReach) {
     request: new Request("http://localhost/api/gateway/v1/virtual-keys", {
       headers: { authorization: `Bearer ${token}` },
     }),
-    permission: "virtualKeys:view",
+    permissions: ["virtualKeys:view"],
     ...(reach ? { reach } : {}),
   });
 }

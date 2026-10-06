@@ -8,7 +8,9 @@ import type {
   ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
 import type { RestIdentity } from "@langwatch/api/hosting";
+import { ForbiddenError } from "@langwatch/api/rest";
 import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
+import type { Plan } from "@langwatch/entitlement-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiDoorService, type ApiDoorPeers } from "../api-door.service.ts";
@@ -219,6 +221,294 @@ describe("the project door's admitted key kinds", () => {
       await expect(authenticate({ authorization: "Bearer lw_at_bound" })).rejects.toMatchObject({
         code: "key_type_not_allowed",
       });
+    });
+  });
+});
+
+describe("a route asking several permissions (E2)", () => {
+  function doorsHolding(held: readonly string[]) {
+    const hasApiKeyPermission = vi.fn<AuthzApi["hasApiKeyPermission"]>(async ({ permission }) =>
+      held.includes(permission),
+    );
+    const hasProjectPermission = vi.fn<AuthzApi["hasProjectPermission"]>(async ({ permission }) =>
+      held.includes(permission),
+    );
+    const door = ApiDoorService.create({
+      ...peers,
+      authz: { ...peers.authz, hasApiKeyPermission, hasProjectPermission },
+    }).door();
+
+    return { identities: door.identities, hasApiKeyPermission, hasProjectPermission };
+  }
+  const asked = ["workflows:create", "evaluations:view"] as const;
+  const keyRequest = () =>
+    new Request("http://localhost/api/workflows/w/evaluate", {
+      headers: { authorization: "Bearer sk-lw-owned", "x-project-id": "project-1" },
+    });
+
+  describe("given a project key holding every permission", () => {
+    it("asks each in declared order and admits", async () => {
+      const { identities, hasApiKeyPermission } = doorsHolding(asked);
+
+      await identities.project.authenticate({
+        request: keyRequest(),
+        permission: asked[0],
+        permissions: asked,
+      });
+
+      expect(hasApiKeyPermission.mock.calls.map(([input]) => input.permission)).toEqual(asked);
+    });
+  });
+
+  describe("given a project key missing the second", () => {
+    it("refuses api_key_permission_denied naming that permission", async () => {
+      const { identities } = doorsHolding(["workflows:create"]);
+
+      await expect(
+        identities.project.authenticate({
+          request: keyRequest(),
+          permission: asked[0],
+          permissions: asked,
+        }),
+      ).rejects.toMatchObject({
+        code: "api_key_permission_denied",
+        httpStatus: 403,
+        meta: { permission: "evaluations:view" },
+      });
+    });
+  });
+
+  describe("given a person's CLI access token missing the first", () => {
+    it("refuses on the first and never asks the second", async () => {
+      const { identities, hasProjectPermission } = doorsHolding(["evaluations:view"]);
+
+      await expect(
+        identities.project.authenticate({
+          request: new Request("http://localhost/api/x", {
+            headers: { authorization: "Bearer lw_at_bound" },
+          }),
+          permission: asked[0],
+          permissions: asked,
+        }),
+      ).rejects.toMatchObject({
+        code: "api_key_permission_denied",
+        meta: { permission: "workflows:create" },
+      });
+      expect(hasProjectPermission).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given an API key no user owns, bound to the project, starting a workflow run", () => {
+    /** @scenario An evaluation run is judged against an API key's own bindings */
+    it("asks authz about the key at that project with no user", async () => {
+      const { identities, hasApiKeyPermission } = doorsHolding(asked);
+
+      await identities.project.authenticate({
+        request: new Request("http://localhost/api/workflows/w/evaluate", {
+          headers: { authorization: "Bearer sk-lw-unowned", "x-project-id": "project-1" },
+        }),
+        permission: asked[0],
+        permissions: asked,
+      });
+
+      expect(hasApiKeyPermission).toHaveBeenCalledWith({
+        apiKeyId: "key-unowned",
+        userId: null,
+        organizationId: "org-1",
+        scope: { type: "project", id: "project-1", teamId: "team-1" },
+        permission: "evaluations:view",
+      });
+    });
+  });
+
+  describe("given a person's project-bound access token starting a workflow run", () => {
+    /** @scenario An evaluation run started with a project-bound access token is judged as its person */
+    it("asks authz about that person at that project, and no key id", async () => {
+      const { identities, hasApiKeyPermission, hasProjectPermission } = doorsHolding(asked);
+
+      await identities.project.authenticate({
+        request: new Request("http://localhost/api/workflows/w/evaluate", {
+          headers: { authorization: "Bearer lw_at_bound" },
+        }),
+        permission: asked[0],
+        permissions: asked,
+      });
+
+      expect(hasProjectPermission).toHaveBeenCalledWith({
+        userId: "user-3",
+        projectId: "project-1",
+        permission: "evaluations:view",
+      });
+      expect(hasApiKeyPermission).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an organization key missing the second", () => {
+    it("refuses insufficient_permissions naming that permission", async () => {
+      const { identities } = doorsHolding(["gatewaySpend:view"]);
+
+      await expect(
+        identities.organization.authenticate({
+          request: new Request("http://localhost/api/x", {
+            headers: { authorization: "Bearer sk-lw-org-owned" },
+          }),
+          permission: "gatewaySpend:view",
+          permissions: ["gatewaySpend:view", "gatewaySpend:manage"],
+        }),
+      ).rejects.toMatchObject({
+        code: "insufficient_permissions",
+        httpStatus: 403,
+        meta: { permission: "gatewaySpend:manage" },
+      });
+    });
+  });
+
+  describe("given any API key missing the second on the key door", () => {
+    it("refuses permission_denied", async () => {
+      const { identities } = doorsHolding(["virtualKeys:view"]);
+
+      await expect(
+        identities.api_key.authenticate({
+          request: keyRequest(),
+          permission: "virtualKeys:view",
+          permissions: ["virtualKeys:view", "virtualKeys:manage"],
+        }),
+      ).rejects.toMatchObject({ code: "permission_denied", httpStatus: 403 });
+    });
+  });
+});
+
+describe("the project door's route-scoped question (E3)", () => {
+  async function authorizeAt(projectId: string, holds: boolean) {
+    const hasApiKeyPermission = vi.fn<AuthzApi["hasApiKeyPermission"]>(async () => holds);
+    const { identities } = ApiDoorService.create({
+      ...peers,
+      authz: { ...peers.authz, hasApiKeyPermission },
+    }).door();
+    const caller = await identities.project.identify!({
+      request: new Request("http://localhost/api/x", {
+        headers: { authorization: "Bearer sk-lw-owned", "x-project-id": "project-1" },
+      }),
+    });
+
+    return identities.project.authorize!({
+      caller,
+      permission: "workflows:view",
+      target: { tier: "project", id: projectId },
+    });
+  }
+
+  describe("given the key's own project and a ceiling holding the permission", () => {
+    it("permits", async () => {
+      await expect(authorizeAt("project-1", true)).resolves.toMatchObject({ permitted: true });
+    });
+  });
+
+  describe("given the key's own project and a ceiling without it", () => {
+    it("does not permit", async () => {
+      await expect(authorizeAt("project-1", false)).resolves.toMatchObject({ permitted: false });
+    });
+  });
+
+  describe("given another project", () => {
+    it("does not permit, whatever the ceiling holds", async () => {
+      await expect(authorizeAt("project-9", true)).resolves.toMatchObject({ permitted: false });
+    });
+  });
+
+  describe("given a caller the door never resolved", () => {
+    it("throws rather than answering", async () => {
+      expect(() =>
+        identities.project.authorize!({
+          caller: { actor: null, scope: { tier: "project", id: "project-1" } },
+          permission: "workflows:view",
+          target: { tier: "project", id: "project-1" },
+        }),
+      ).toThrow("did not resolve");
+    });
+  });
+});
+
+describe("the plan questions (E6)", () => {
+  const plan = (type: string, webhookEndpointsEnabled: boolean): Plan => ({
+    planSource: "license",
+    type,
+    name: type,
+    free: false,
+    maxMembers: 10,
+    maxMembersLite: 10,
+    maxMessagesPerMonth: 10,
+    canPublish: true,
+    webhookEndpointsEnabled,
+    prices: { USD: 0, EUR: 0 },
+  });
+  function entitlementsOn(active: Plan) {
+    return ApiDoorService.create({
+      ...peers,
+      entitlements: { getActivePlan: async () => active },
+    }).door().entitlements;
+  }
+  const organization = { tier: "organization", id: "org-1" } as const;
+
+  describe("given webhook_endpoints asked of a plan with the webhook platform", () => {
+    it("holds, whatever the tier", async () => {
+      await expect(
+        entitlementsOn(plan("LAUNCH", true)).holds({
+          entitlement: "webhook_endpoints",
+          scope: organization,
+        }),
+      ).resolves.toBe(true);
+    });
+  });
+
+  describe("given webhook_endpoints asked of an enterprise plan without it", () => {
+    it("does not hold", async () => {
+      await expect(
+        entitlementsOn(plan("ENTERPRISE", false)).holds({
+          entitlement: "webhook_endpoints",
+          scope: organization,
+        }),
+      ).resolves.toBe(false);
+    });
+
+    it("refuses 403 forbidden with main's billing events message", () => {
+      const refusal = entitlementsOn(plan("ENTERPRISE", false)).refusal?.({
+        entitlement: "webhook_endpoints",
+        feature: undefined,
+      });
+
+      expect(refusal).toBeInstanceOf(ForbiddenError);
+      expect(refusal).toMatchObject({
+        status: 403,
+        message:
+          "The billing events API is an enterprise feature; this organization's plan does not include it.",
+      });
+    });
+  });
+
+  describe("given enterprise asked", () => {
+    it("holds on the enterprise tier alone", async () => {
+      await expect(
+        entitlementsOn(plan("ENTERPRISE", false)).holds({
+          entitlement: "enterprise",
+          scope: organization,
+        }),
+      ).resolves.toBe(true);
+      await expect(
+        entitlementsOn(plan("LAUNCH", true)).holds({
+          entitlement: "enterprise",
+          scope: organization,
+        }),
+      ).resolves.toBe(false);
+    });
+
+    it("refuses as an enterprise plan requirement naming the feature", () => {
+      const refusal = entitlementsOn(plan("LAUNCH", true)).refusal?.({
+        entitlement: "enterprise",
+        feature: "Audit log export",
+      });
+
+      expect(refusal).toMatchObject({ code: "enterprise_plan_required" });
     });
   });
 });
