@@ -1,5 +1,4 @@
-import type { AccessDeclaration } from "@langwatch/api/access";
-import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
+import type { TrpcAccess, TrpcProcedureFactory } from "@langwatch/api/trpc";
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 /**
  * The declared tRPC path, as these tests need it: a runtime whose ports permit
@@ -63,8 +62,8 @@ export function promptTrpcCaller<Api, Caller>(options: {
 /** Records the access each declared procedure asked for, building nothing. */
 export function accessDeclaredBy(declaration: {
   router(runtime: TrpcProcedureFactory<TestContext>, app: (ctx: TestContext) => never): unknown;
-}): (AuthzPermission | AccessDeclaration)[] {
-  const declared: (AuthzPermission | AccessDeclaration)[] = [];
+}): (AuthzPermission | TrpcAccess)[] {
+  const declared: (AuthzPermission | TrpcAccess)[] = [];
   const runtime: TrpcProcedureFactory<TestContext> = {
     procedure: ({ access }) => {
       declared.push(access.kind === "permission" ? access.permission : access);
