@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { hostname } from "node:os";
 import { fileURLToPath } from "node:url";
 
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { type ClickHouseClient, ClickHouseError, createClient } from "@clickhouse/client";
 import {
   parseConnectionUrl,
   reconcileTTL,
@@ -64,9 +64,21 @@ export function withLockTimeout({
   return parsed.toString();
 }
 
-function sqlReader(client: ClickHouseClient): UpgradeClickHouse {
+/** Rows as JSON; a database goose has not created yet holds none (upgrade-command.feature). */
+export function sqlReader({
+  client,
+}: {
+  client: Pick<ClickHouseClient, "query">;
+}): UpgradeClickHouse {
   return {
-    queryRows: async (sql) => (await client.query({ query: sql, format: "JSONEachRow" })).json(),
+    async queryRows<Row extends object>(sql: string): Promise<Row[]> {
+      try {
+        return await (await client.query({ query: sql, format: "JSONEachRow" })).json<Row>();
+      } catch (error) {
+        if (error instanceof ClickHouseError && error.type === "UNKNOWN_DATABASE") return [];
+        throw error;
+      }
+    },
   };
 }
 
@@ -154,7 +166,7 @@ async function migrateClickHouse({ input }: { input: TaskInput }): Promise<Schem
     const client = createClient({
       url: parseConnectionUrl({ connectionUrl: target.url }).databaseUrl,
     });
-    const applied = await gooseAppliedStepIds({ clickhouse: sqlReader(client) })
+    const applied = await gooseAppliedStepIds({ clickhouse: sqlReader({ client }) })
       .catch(() => null)
       .finally(() => client.close());
     reports.push({ engine: "clickhouse", target: target.name, ok: error === null, error, applied });
@@ -233,7 +245,7 @@ export async function runUpgradeCommand({
   try {
     const runner = createUpgradeRunner({
       postgres: database.sql,
-      clickhouse: shared ? sqlReader(shared) : undefined,
+      clickhouse: shared ? sqlReader({ client: shared }) : undefined,
       image: { release: newest, steps: imageSteps({ release: newest ?? "0.0.0" }) },
       releases,
       applier: oneReleaseApplier({ input }),

@@ -81,6 +81,13 @@ Feature: The upgrade command
     And the run still plans as a fresh install, marking data steps not-needed
     And the upgrade completes with code 0
 
+  @unit
+  Scenario: A ClickHouse database goose has not created yet reads as holding no goose history
+    Given CLICKHOUSE_URL names a database that does not exist on the server
+    When the upgrade reads goose's history before applying the schema
+    Then the read finds no rows instead of failing
+    And any other ClickHouse error still fails the read
+
   @integration
   Scenario: A second run is a no-op
     Given a database the upgrade has already brought to the image's release
