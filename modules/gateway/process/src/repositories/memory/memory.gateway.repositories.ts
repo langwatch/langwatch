@@ -43,7 +43,7 @@ export class MemoryGatewayRepositories {
 
   constructor(store: MemoryGatewayStore) {
     const changeEvents = MemoryGatewayChangeEventsRepository.create();
-    const audit = MemoryGatewayAuditRepository.create();
+    const audit = MemoryGatewayAuditRepository.create(store);
     const budgetSpend = MemoryGatewayBudgetSpendRepository.create();
     const spendEvents = MemoryGatewaySpendEventsRepository.create();
 

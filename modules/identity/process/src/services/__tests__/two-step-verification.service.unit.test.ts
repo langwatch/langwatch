@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryOrganizationMfaRequirementMailChannel } from "../../channels/memory/memory.organization-mfa-requirement-mail.channel.ts";
 import { MemoryTwoStepVerificationRepository } from "../../repositories/memory/memory.two-step-verification.repository.ts";
+import { MemoryTwoStepVerificationStore } from "../../repositories/memory/memory.two-step-verification.store.ts";
 import { OrganizationMfaNotifierService } from "../organization-mfa-notifier.service.ts";
 import { OrganizationMfaService } from "../organization-mfa.service.ts";
 import { TwoStepAccountService } from "../two-step-account.service.ts";
@@ -60,39 +61,41 @@ function organizationService(
 }
 
 describe("two-step verification", () => {
+  let store: MemoryTwoStepVerificationStore;
   let accounts: MemoryTwoStepVerificationRepository;
 
   beforeEach(() => {
-    accounts = MemoryTwoStepVerificationRepository.create();
-    accounts.putPerson({
+    store = MemoryTwoStepVerificationStore.create();
+    accounts = MemoryTwoStepVerificationRepository.create(store);
+    store.putPerson({
       userId: "user_ana",
       name: "Ana",
       email: "ana@acme.test",
       accountEnrollmentEnabled: true,
       passkeyCount: 0,
     });
-    accounts.putPerson({
+    store.putPerson({
       userId: "user_bo",
       name: "Bo",
       email: "bo@acme.test",
       accountEnrollmentEnabled: false,
       passkeyCount: 2,
     });
-    accounts.putOrganization({
+    store.putOrganization({
       organizationId: "org_acme",
       name: "Acme",
       slug: "acme",
       mfaRequired: true,
     });
-    accounts.putOrganization({
+    store.putOrganization({
       organizationId: "org_open",
       name: "Open",
       slug: "open",
       mfaRequired: false,
     });
-    accounts.putSeat({ organizationId: "org_acme", userId: "user_ana" });
-    accounts.putSeat({ organizationId: "org_acme", userId: "user_bo" });
-    accounts.putSeat({ organizationId: "org_open", userId: "user_ana" });
+    store.putSeat({ organizationId: "org_acme", userId: "user_ana" });
+    store.putSeat({ organizationId: "org_acme", userId: "user_bo" });
+    store.putSeat({ organizationId: "org_open", userId: "user_ana" });
   });
 
   describe("given the caller reads their own security screen", () => {
@@ -201,7 +204,7 @@ describe("two-step verification", () => {
 
   describe("given an administrator reads the requirement", () => {
     it("says there is no connection when the only one was torn down", async () => {
-      accounts.putConnection({
+      store.putConnection({
         connectionId: "conn_old",
         organizationId: "org_acme",
         state: "TORN_DOWN",
@@ -216,12 +219,12 @@ describe("two-step verification", () => {
     });
 
     it("reports only recognised factors the connection's own sign-ins asserted", async () => {
-      accounts.putConnection({
+      store.putConnection({
         connectionId: "conn_idp",
         organizationId: "org_acme",
         state: "ACTIVE",
       });
-      accounts.putIdentifier({
+      store.putIdentifier({
         identifierId: "ident_bo",
         userId: "user_bo",
         providerId: "conn_idp",
@@ -331,7 +334,7 @@ describe("two-step verification", () => {
     });
 
     it("hands the request's own cookie to the plugin's re-proof and disable", async () => {
-      accounts.putPerson({
+      store.putPerson({
         userId: "user_cy",
         name: "Cy",
         email: "cy@solo.test",

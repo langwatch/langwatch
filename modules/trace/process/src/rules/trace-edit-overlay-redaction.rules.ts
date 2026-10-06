@@ -11,7 +11,7 @@ import {
   traceAttributeKeyForMetadata,
 } from "@langwatch/trace-contract";
 
-import { TraceAttributeRedactionService } from "../services/trace-attribute-redaction.service.ts";
+import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
 
 /**
  * The content category each editable span field belongs to. `params` rides
@@ -73,7 +73,7 @@ function readableFieldValue({
   }
 
   if (field === "params") {
-    return TraceAttributeRedactionService.create(hiddenAttributes).redact(spanPatch.params);
+    return createAttributeRedactor({ hidden: hiddenAttributes })(spanPatch.params);
   }
 
   return value;
@@ -157,7 +157,7 @@ function deriveRedactedMetadataEdits({
     byAttributeKey[traceAttributeKeyForMetadata(key)] = value;
   }
 
-  const redacted = TraceAttributeRedactionService.create(hiddenAttributes).redact(byAttributeKey);
+  const redacted = createAttributeRedactor({ hidden: hiddenAttributes })(byAttributeKey);
   if (redacted === byAttributeKey) {
     return metadata;
   }

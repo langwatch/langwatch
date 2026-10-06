@@ -27,7 +27,7 @@ import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
 import { clonePayload } from "../rules/payload-clone.rules.ts";
-import { TraceAttributeCapService } from "../services/trace-attribute-cap.service.ts";
+import { capOversizedAttributes } from "../rules/trace-attribute-cap.rules.ts";
 
 export interface TraceSpanPiiRedaction {
   redact(input: {
@@ -67,8 +67,6 @@ export interface TraceSpanSpool {
   read(identity: TraceSpanSpoolIdentity): Promise<string>;
   delete(identity: TraceSpanSpoolIdentity): Promise<void>;
 }
-
-const traceAttributeCapService = TraceAttributeCapService.create();
 
 const spooledRecordSpanSchema = z.object({
   span: spanSchema,
@@ -301,7 +299,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     traceId: string;
     spanId: string;
   }): void {
-    const cappedAttributeCount = traceAttributeCapService.capOversizedAttributes(span, resource);
+    const cappedAttributeCount = capOversizedAttributes(span, resource);
     if (cappedAttributeCount === 0) {
       return;
     }

@@ -5,7 +5,7 @@ Feature: Trace rollups and span storage fold idempotently
 
   # trace-rollup.projection.ts, span-storage.projection.ts,
   # custom-evaluation-sync.subscriber.ts, origin-guarded.subscriber.ts,
-  # trace-attribute-cap.service.ts, trace-payload-cap.rules.ts,
+  # trace-attribute-cap.rules.ts, trace-payload-cap.rules.ts,
   # trace-retention-floor.service.ts
 
   @unit

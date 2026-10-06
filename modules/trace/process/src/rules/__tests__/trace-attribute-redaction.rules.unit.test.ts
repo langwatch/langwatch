@@ -1,20 +1,20 @@
 import type { Protections } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceAttributeRedactionService } from "../trace-attribute-redaction.service.ts";
+import { createAttributeRedactor } from "../trace-attribute-redaction.rules.ts";
 
 /** The one-shot spelling, which is what most call sites want. */
 const redactHiddenAttributes = <T extends Record<string, unknown> | null | undefined>(
   value: T,
   hidden: Protections["hiddenAttributes"],
-): T => TraceAttributeRedactionService.create(hidden).redact(value);
+): T => createAttributeRedactor({ hidden })(value);
 
 const hidden = [
   { pattern: "app.billing.*", visibleTo: "Admins" },
   { pattern: "app.session_token", visibleTo: "no one" },
 ];
 
-describe("TraceAttributeRedactionService", () => {
+describe("createAttributeRedactor", () => {
   describe("given a flat dotted-key record", () => {
     /** @scenario A restricted custom attribute is hidden from outside the audience */
     it("replaces matched values with a placeholder naming the audience and keeps the rest", () => {
@@ -100,27 +100,27 @@ describe("TraceAttributeRedactionService", () => {
   });
   describe("given many records to redact in one request", () => {
     it("applies the same rules from one redactor, without recompiling per record", () => {
-      // The reason this is a class: a trace redacts its spans and their events
+      // The reason this returns a redactor: a trace redacts its spans and their events
       // against one viewer's rules, and compiling the patterns per record was
       // what the second, pre-compiled entry point existed to avoid.
-      const redactor = TraceAttributeRedactionService.create(hidden);
+      const redactor = createAttributeRedactor({ hidden });
 
-      expect(redactor.redact({ "app.session_token": "x" })).toEqual({
+      expect(redactor({ "app.session_token": "x" })).toEqual({
         "app.session_token": "[REDACTED] (visible to no one)",
       });
-      expect(redactor.redact({ "app.billing.plan": "pro" })).toEqual({
+      expect(redactor({ "app.billing.plan": "pro" })).toEqual({
         "app.billing.plan": "[REDACTED] (visible to Admins)",
       });
-      expect(redactor.redact({ "app.public": "keep" })).toEqual({ "app.public": "keep" });
+      expect(redactor({ "app.public": "keep" })).toEqual({ "app.public": "keep" });
     });
   });
 
   describe("given a viewer with nothing hidden", () => {
     it("hands every record straight back", () => {
-      const redactor = TraceAttributeRedactionService.create(undefined);
+      const redactor = createAttributeRedactor({ hidden: undefined });
       const value = { "app.session_token": "x" };
 
-      expect(redactor.redact(value)).toBe(value);
+      expect(redactor(value)).toBe(value);
     });
   });
 });

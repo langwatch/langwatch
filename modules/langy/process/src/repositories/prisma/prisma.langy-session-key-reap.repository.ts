@@ -8,7 +8,7 @@ import { LangySessionKeyReapRepository } from "../langy-session-key-reap.reposit
  * the wider Langy graph; naming only `apiKey` lets a worker compose the
  * reaper without also claiming the conversation graph.
  */
-export type PrismaLangySessionKeyReapDatabase = Pick<PrismaClient, "apiKey">;
+type PrismaLangySessionKeyReapDatabase = Pick<PrismaClient, "apiKey">;
 
 export class PrismaLangySessionKeyReapRepository extends LangySessionKeyReapRepository {
   private constructor(private readonly database: PrismaLangySessionKeyReapDatabase) {

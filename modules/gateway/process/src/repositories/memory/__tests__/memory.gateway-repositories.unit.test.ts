@@ -181,7 +181,8 @@ describe("memory gateway repositories", () => {
   });
 
   it("keeps every audit entry in the order it was written", async () => {
-    const audit = MemoryGatewayAuditRepository.create();
+    const store = MemoryGatewayStore.create();
+    const audit = MemoryGatewayAuditRepository.create(store);
     await audit.append({
       organizationId: ORG,
       actorUserId: "usr_1",
@@ -190,7 +191,7 @@ describe("memory gateway repositories", () => {
       targetId: "b_1",
     });
 
-    expect(audit.entries()).toEqual([
+    expect(store.auditEntries).toEqual([
       expect.objectContaining({ action: "gateway.budget.created", projectId: null }),
     ]);
   });

@@ -7,10 +7,10 @@ import type {
   FindByTraceIdOptions,
   TraceSummaryRepository,
 } from "../repositories/trace-summary.repository.ts";
+import { teaserOf } from "../rules/trace-visibility-teaser.rules.ts";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service.ts";
 import { TraceOffloadResolutionService } from "./trace-offload-resolution.service.ts";
-import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
 
 /**
  * Optional blob-offload resolution dependencies for the `full` read path (ADR-022). When provided,
@@ -70,15 +70,11 @@ export class TraceSummaryService {
       // to redact it would be a wasted spans + event_log read.
       return {
         ...result,
-        computedInput: result.computedInput
-          ? VisibilityWindowService.teaserOf(result.computedInput)
-          : result.computedInput,
+        computedInput: result.computedInput ? teaserOf(result.computedInput) : result.computedInput,
         computedOutput: result.computedOutput
-          ? VisibilityWindowService.teaserOf(result.computedOutput)
+          ? teaserOf(result.computedOutput)
           : result.computedOutput,
-        errorMessage: result.errorMessage
-          ? VisibilityWindowService.teaserOf(result.errorMessage)
-          : result.errorMessage,
+        errorMessage: result.errorMessage ? teaserOf(result.errorMessage) : result.errorMessage,
         redactedByVisibilityWindow: true,
       };
     }

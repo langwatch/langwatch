@@ -22,8 +22,8 @@ import {
   stampCodexHelperThread,
   type ScopedSpans,
 } from "../rules/codex-helper-thread.rules.ts";
+import { normalizeOtlpId } from "../rules/otlp-span-identity.rules.ts";
 import { storableSpanTimesOf, type UnstorableSpanTime } from "../rules/storable-span-time.rules.ts";
-import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
 import { TraceIngestionMetricsService } from "./trace-ingestion-metrics.service.ts";
 
 type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
@@ -276,9 +276,7 @@ export class TraceIngestionService {
     }
 
     // The stamp is the admission: it is applied before the filter reads the span.
-    const helperThreadId = input.helperThreads?.get(
-      OtlpTraceRequestService.normalizeOtlpId(spanParseResult.data.spanId),
-    );
+    const helperThreadId = input.helperThreads?.get(normalizeOtlpId(spanParseResult.data.spanId));
     const span =
       helperThreadId === undefined
         ? spanParseResult.data
@@ -310,7 +308,7 @@ export class TraceIngestionService {
    * the pipeline want one of them.
    */
   private withHexIds(span: OtlpSpan): OtlpSpan {
-    const hex = OtlpTraceRequestService.normalizeOtlpId;
+    const hex = normalizeOtlpId;
 
     return {
       ...span,

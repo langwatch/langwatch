@@ -13,13 +13,11 @@ import {
 } from "@langwatch/trace-contract";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
-import { TraceAttributeCapService } from "../services/trace-attribute-cap.service.ts";
 import { clonePayload } from "./payload-clone.rules.ts";
+import { capOversizedAttributes, hasOversizedAttribute } from "./trace-attribute-cap.rules.ts";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "./trace-payload-cap.rules.ts";
 
 type LeanableEvent = { id: string; type: string; data: unknown };
-
-const traceAttributeCapService = TraceAttributeCapService.create();
 
 /**
  * Preview budget for IO attributes. Covers a complete chat-style Claude completion at
@@ -102,7 +100,7 @@ function leanSpanReceivedEvent(event: LeanableEvent): LeanableEvent {
   // Scan only, before anything is allocated: does any IO attribute exceed the preview budget, and
   // does any surface the cap walks need the larger cap?
   const hasLargeIoAttr = (data.span.attributes ?? []).some(isOversizedIoAttribute);
-  const needsNonIoCap = traceAttributeCapService.hasOversizedAttribute(
+  const needsNonIoCap = hasOversizedAttribute(
     data.span,
     data.resource ?? null,
     DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
@@ -123,7 +121,7 @@ function leanSpanReceivedEvent(event: LeanableEvent): LeanableEvent {
   }
 
   // IO attributes are already under the preview budget, so the cap never touches them.
-  traceAttributeCapService.capOversizedAttributes(clonedSpan, clonedResource);
+  capOversizedAttributes(clonedSpan, clonedResource);
 
   return { ...event, data: { ...data, span: clonedSpan, resource: clonedResource } };
 }

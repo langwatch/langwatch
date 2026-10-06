@@ -7,7 +7,7 @@ import {
 } from "@langwatch/coding-agent-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 
-import { OtlpTraceRequestService } from "../services/otlp-trace-request.service.ts";
+import { normalizeOtlpId } from "./otlp-span-identity.rules.ts";
 
 /** The parsed spans of one instrumentation scope entry of an export request. */
 export type ScopedSpans = {
@@ -46,7 +46,7 @@ function codexRequestSpanIds({ scopes }: { scopes: ScopedSpans[] }): Set<string>
       if (
         isCodexTemporaryStructuredRequestSpan({ scopeName, attributes: stringAttributes(span) })
       ) {
-        requestSpanIds.add(OtlpTraceRequestService.normalizeOtlpId(span.spanId));
+        requestSpanIds.add(normalizeOtlpId(span.spanId));
       }
     }
   }
@@ -63,7 +63,7 @@ function addQueueChildMarker({
   markers: Map<string, string>;
 }): void {
   if (span.name !== REQUEST_QUEUE_SPAN_NAME || !span.parentSpanId) return;
-  const parentId = OtlpTraceRequestService.normalizeOtlpId(span.parentSpanId);
+  const parentId = normalizeOtlpId(span.parentSpanId);
   if (!requestSpanIds.has(parentId)) return;
   const queued = queuedThreadOf({ key: stringAttributes(span).key });
   if (queued.kind === "named") markers.set(parentId, queued.threadId);

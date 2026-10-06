@@ -10,7 +10,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { memoryVirtualKeySeed } from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
-import { MemoryGatewayAuditRepository } from "../../repositories/memory/memory.gateway-audit.repository.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { MemoryGatewayStore } from "../../repositories/memory/memory.gateway.store.ts";
 import { GatewayModule } from "../gateway.app.ts";
@@ -26,8 +25,7 @@ async function gatewayHolding({ updateAt }: { updateAt: string[] }) {
   const store = MemoryGatewayStore.create({
     teams: [{ id: "team_1", organizationId: ORGANIZATION_ID, name: "Platform", slug: "platform" }],
   });
-  const audit = MemoryGatewayAuditRepository.create();
-  const repositories = { ...new MemoryGatewayRepositories(store).repositories, audit };
+  const repositories = new MemoryGatewayRepositories(store).repositories;
   await repositories.virtualKeys.create({
     ...memoryVirtualKeySeed({ id: "vk_demo", name: "demo", organizationId: ORGANIZATION_ID }),
     scopes: [{ scopeType: "PROJECT", scopeId: "demo" }],
@@ -79,13 +77,13 @@ async function gatewayHolding({ updateAt }: { updateAt: string[] }) {
     resources: new ResourceScope(),
     secrets,
   });
-  return { app, audit, hasPermission, repositories };
+  return { app, store, hasPermission, repositories };
 }
 
 describe("given a virtual key scoped to a project", () => {
   /** @scenario Updating a VK requires virtualKeys:update at every one of the VK's scopes */
   it("lets the holder of update at that project rename it and audits who changed it", async () => {
-    const { app, audit, hasPermission } = await gatewayHolding({ updateAt: ["demo"] });
+    const { app, store, hasPermission } = await gatewayHolding({ updateAt: ["demo"] });
 
     await app.authorizeVirtualKeyUpdate({
       actor: ACTOR,
@@ -107,7 +105,7 @@ describe("given a virtual key scoped to a project", () => {
       }),
     );
     expect(updated.name).toBe("renamed");
-    expect(audit.entries()).toEqual([
+    expect(store.auditEntries).toEqual([
       expect.objectContaining({
         actorUserId: "ian",
         action: "gateway.virtual_key.updated",
@@ -118,7 +116,7 @@ describe("given a virtual key scoped to a project", () => {
   });
 
   it("refuses a holder of update at another project, changing and auditing nothing", async () => {
-    const { app, audit, repositories } = await gatewayHolding({ updateAt: ["elsewhere"] });
+    const { app, store, repositories } = await gatewayHolding({ updateAt: ["elsewhere"] });
 
     await expect(
       app.authorizeVirtualKeyUpdate({
@@ -131,6 +129,6 @@ describe("given a virtual key scoped to a project", () => {
       (await repositories.virtualKeys.findById({ id: "vk_demo", organizationId: ORGANIZATION_ID }))
         ?.name,
     ).toBe("demo");
-    expect(audit.entries()).toEqual([]);
+    expect(store.auditEntries).toEqual([]);
   });
 });

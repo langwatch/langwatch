@@ -1,11 +1,11 @@
 import { TraceState } from "@opentelemetry/core";
-import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types.js";
 import {
   ESpanKind,
   type EStatusCode,
 } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types.js";
 import { match } from "ts-pattern";
 
+import { normalizeOtlpId } from "../rules/otlp-span-identity.rules.ts";
 import { OtlpAttributeFlatteningService } from "./otlp-attribute-flattening.service.ts";
 
 const { parseJsonStringValues, reconstructFlattenedArrays } = OtlpAttributeFlatteningService;
@@ -122,41 +122,11 @@ const decodeScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
 
 const isScalar = (v: OtlpAnyValue): boolean => decodeScalar(v) !== void 0;
 
-const normalizeOtlpId = (id: string | Uint8Array): string => {
-  if (id instanceof Uint8Array) {
-    return Buffer.from(id).toString("hex");
-  }
-
-  return id;
-};
-
 const normalizeOtlpSpanIds = (span: OtlpSpan): { traceId: string; spanId: string } => {
   const traceId = normalizeOtlpId(span.traceId);
   const spanId = normalizeOtlpId(span.spanId);
 
   return { traceId, spanId };
-};
-
-const normalizeOtlpUnixNano = (value: Fixed64): number => {
-  if (typeof value === "string") {
-    return parseInt(value, 10);
-  }
-
-  if (typeof value === "number") {
-    return value;
-  }
-
-  if (typeof value === "object" && "high" in value && "low" in value) {
-    const { high, low } = value;
-
-    if (typeof high === "number" && typeof low === "number") {
-      const bigIntValue = Number((BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn));
-
-      return bigIntValue;
-    }
-  }
-
-  throw new Error(`Invalid Unix nano value: ${JSON.stringify(value)}`);
 };
 
 const normalizeOtlpParentAndTraceContext = (
@@ -345,10 +315,6 @@ const normalizeOtlpAttributes = (
   return parseJsonStringValues(reconstructed);
 };
 
-const convertUnixNanoToUnixMs = (unixNano: number): number => {
-  return Math.round(unixNano / 1_000_000);
-};
-
 /**
  * Parses the trace flags from the span flags.
  *
@@ -406,15 +372,12 @@ export class OtlpTraceRequestService {
     return new OtlpTraceRequestService();
   }
 
-  static normalizeOtlpId = normalizeOtlpId;
   static normalizeOtlpSpanIds = normalizeOtlpSpanIds;
-  static normalizeOtlpUnixNano = normalizeOtlpUnixNano;
   static normalizeOtlpParentAndTraceContext = normalizeOtlpParentAndTraceContext;
   static normalizeOtlpSpanKind = normalizeOtlpSpanKind;
   static normalizeOtlpStatusCode = normalizeOtlpStatusCode;
   static normalizeOtlpAnyValue = normalizeOtlpAnyValue;
   static normalizeOtlpAttributes = normalizeOtlpAttributes;
-  static convertUnixNanoToUnixMs = convertUnixNanoToUnixMs;
   static parseTraceFlags = parseTraceFlags;
   static parseTraceState = parseTraceState;
   static reconstructFlattenedArrays = reconstructFlattenedArrays;

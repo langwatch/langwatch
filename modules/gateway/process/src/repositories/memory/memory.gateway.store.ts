@@ -9,6 +9,8 @@ import type {
 } from "@langwatch/gateway-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
+import type { AppendGatewayAuditInput } from "../gateway-audit.repository.ts";
+
 /** A group as the memory directory holds it; the organization module owns the real rows. */
 export type MemoryGatewayGroup = {
   id: string;
@@ -88,6 +90,8 @@ export class MemoryGatewayStore {
   virtualKeys = new Map<string, GatewayVirtualKeyRecord>();
   connectColumns = new Map<string, MemoryGatewayConnectColumns>();
   readonly guardrails = new Map<string, GatewayGuardrailResource>();
+  /** The audit trail, oldest first; the audit twin appends and a test reads it back. */
+  readonly auditEntries: AppendGatewayAuditInput[] = [];
   readonly groups: readonly MemoryGatewayGroup[];
   readonly groupMemberships: readonly { groupId: string; userId: string }[];
   readonly modelProviders: readonly MemoryGatewayModelProvider[];

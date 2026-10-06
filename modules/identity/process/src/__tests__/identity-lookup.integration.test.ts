@@ -76,7 +76,7 @@ class FakeAuditLog implements AuditLogApi {
 
   private async write(command: RecordAuditLogCommand): Promise<void> {
     this.rows.unshift(command);
-    this.reads.record({
+    this.reads.activity.unshift({
       auditId: `audit_${this.rows.length}`,
       operatorUserId: command.userId ?? null,
       operatorName: null,

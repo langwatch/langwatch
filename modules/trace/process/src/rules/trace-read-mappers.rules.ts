@@ -32,7 +32,7 @@ import {
   resolveNonBilledCost,
 } from "@langwatch/trace-contract";
 
-import { TraceAttributeRedactionService } from "../services/trace-attribute-redaction.service.ts";
+import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
 
 // ---------------------------------------------------------------------------
 // Ports
@@ -535,12 +535,12 @@ function redactHiddenAttributes<T extends RedactableV2Dto>({
   ];
   if (hidden.length === 0) return;
 
-  const redactor = TraceAttributeRedactionService.create(hidden);
+  const redactor = createAttributeRedactor({ hidden });
   if (dto.attributes) {
-    redacted.attributes = redactor.redact(dto.attributes);
+    redacted.attributes = redactor(dto.attributes);
   }
   if (dto.params) {
-    redacted.params = redactor.redact(dto.params);
+    redacted.params = redactor(dto.params);
   }
 
   // Span-detail events carry their own attribute records (list-item events
@@ -549,7 +549,7 @@ function redactHiddenAttributes<T extends RedactableV2Dto>({
   if (!events?.some((event) => event.attributes)) return;
 
   (redacted as Record<string, unknown>).events = events.map((event) =>
-    event.attributes ? { ...event, attributes: redactor.redact(event.attributes) } : event,
+    event.attributes ? { ...event, attributes: redactor(event.attributes) } : event,
   );
 }
 

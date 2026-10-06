@@ -4,7 +4,7 @@
 #   modules/coding-agent/process/src/services/coding-agent.service.ts (the canonical read service)
 #   modules/coding-agent/contract/src/coding-agent.ts                        (codingAgents.sessionsList)
 #   modules/coding-agent/process/src/transport/api-trpc/coding-agent.gates.ts                  (the title and cost gates)
-#   modules/trace/process/src/services/trace-viewer-protections.service.ts (the shared content-visibility rule)
+#   modules/trace/process/src/services/trace-viewer-protections.rules.ts (the shared content-visibility rule)
 #   The page and its table live under [gone] src/pages/me/ and
 #   [gone] src/components/me/.
 #

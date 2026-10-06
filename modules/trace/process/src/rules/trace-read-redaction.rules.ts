@@ -10,8 +10,8 @@ import type {
 } from "@langwatch/trace-contract";
 import { parsePythonInsideJson } from "@langwatch/trace-contract";
 
-import { TraceAttributeRedactionService } from "../services/trace-attribute-redaction.service.ts";
-import { VisibilityWindowService } from "../services/trace-visibility-window.service.ts";
+import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
+import { redactSpanContent, redactTraceContent } from "./trace-visibility-teaser.rules.ts";
 
 // Stable display order for the content categories a drop policy can strip, so
 // the trace-view marker always lists them the same way ("input, output").
@@ -230,7 +230,7 @@ export const applySpanProtections = (
   // them. Hidden input/output content riding along inside params (e.g. the
   // raw gen_ai message attributes) is scrubbed by the redactions set.
   const transformedParams = redactObject(
-    TraceAttributeRedactionService.create(protections.hiddenAttributes).redact(
+    createAttributeRedactor({ hidden: protections.hiddenAttributes })(
       span.params as Record<string, unknown> | null | undefined,
     ),
     redactions,
@@ -250,7 +250,7 @@ export const applySpanProtections = (
     protections.visibilityCutoffMs !== undefined &&
     span.timestamps.started_at < protections.visibilityCutoffMs
   ) {
-    return VisibilityWindowService.redactSpanContent(transformed);
+    return redactSpanContent(transformed);
   }
 
   return transformed;
@@ -304,9 +304,8 @@ export const applyDerivedTraceEventProtections = (
     return {
       ...event,
       attributes:
-        TraceAttributeRedactionService.create(protections.hiddenAttributes).redact(
-          event.attributes,
-        ) ?? event.attributes,
+        createAttributeRedactor({ hidden: protections.hiddenAttributes })(event.attributes) ??
+        event.attributes,
     };
   });
 };
@@ -346,7 +345,7 @@ export function applyTraceProtections(trace: Trace, protections: Protections): T
     const { spans, ...traceWithoutSpans } = transformed;
 
     return {
-      ...VisibilityWindowService.redactTraceContent({ ...traceWithoutSpans, spans: [] }),
+      ...redactTraceContent({ ...traceWithoutSpans, spans: [] }),
       spans,
     };
   }

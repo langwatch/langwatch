@@ -261,9 +261,10 @@ describe("memory gateway twins", () => {
 
   it("writes a cache rule with its change event and audit row, and pages by priority", async () => {
     const changes = MemoryGatewayChangeEventsRepository.create();
-    const audit = MemoryGatewayAuditRepository.create();
+    const store = MemoryGatewayStore.create();
+    const audit = MemoryGatewayAuditRepository.create(store);
     const rules = MemoryGatewayCacheRuleRepository.create({
-      store: MemoryGatewayStore.create(),
+      store,
       changes,
       audit,
     });
@@ -302,7 +303,7 @@ describe("memory gateway twins", () => {
       "CACHE_RULE_CREATED",
       "CACHE_RULE_CREATED",
     ]);
-    expect(audit.entries().map((entry) => entry.action)).toEqual([
+    expect(store.auditEntries.map((entry) => entry.action)).toEqual([
       "gateway.cache_rule.created",
       "gateway.cache_rule.created",
     ]);

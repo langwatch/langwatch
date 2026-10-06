@@ -13,7 +13,7 @@ import type {
   SessionGroupsRepository,
   SessionGroupCursor,
 } from "../repositories/session-groups.repository.ts";
-import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
+import { teaserOf } from "../rules/trace-visibility-teaser.rules.ts";
 
 const SORT_COLUMN_KEYS = {
   lastActivity: true,
@@ -141,13 +141,13 @@ const normalizeEmptyToNull = (value: string | null | undefined): string | null =
 function teasedSession(session: SessionGroupDto): SessionGroupDto {
   return {
     ...session,
-    input: session.input ? VisibilityWindowService.teaserOf(session.input) : session.input,
-    output: session.output ? VisibilityWindowService.teaserOf(session.output) : session.output,
+    input: session.input ? teaserOf(session.input) : session.input,
+    output: session.output ? teaserOf(session.output) : session.output,
     codingAgent: session.codingAgent
       ? {
           ...session.codingAgent,
           title: session.codingAgent.title
-            ? VisibilityWindowService.teaserOf(session.codingAgent.title)
+            ? teaserOf(session.codingAgent.title)
             : session.codingAgent.title,
         }
       : session.codingAgent,
