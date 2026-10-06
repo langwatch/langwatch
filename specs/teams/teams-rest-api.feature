@@ -215,6 +215,29 @@ Feature: Teams REST API
     When I DELETE /api/teams/:id/members/:userId for them
     Then the request is refused with code team_membership_not_found and status 404
 
+  @integration
+  Scenario: An organization key is answered on every route that names a team
+    Given a team exists in my organization
+    When I use my organization key on every route that names that team
+    Then reading, renaming, listing members, listing projects and archiving it answer 200
+    And adding a user outside the organization answers 422 with code user_not_in_organization
+    And removing a member who holds no role answers 404 with code team_membership_not_found
+
+  @integration
+  Scenario: An organization key granted on one team is refused on every route naming another
+    Given two teams exist in my organization
+    And an organization key whose only grant is on the first team
+    When it asks every route that names the second team
+    Then each answers 403 with code insufficient_permissions
+    And the second team is neither renamed nor archived
+
+  @integration
+  Scenario: An organization key is told a team of another organization does not exist
+    Given a team exists in a different organization
+    When I use my organization key on every route that names that team
+    Then each answers 404 with code team_not_found
+    And that team is neither renamed nor archived
+
   # ============================================================================
   # Permission denial
   # ============================================================================

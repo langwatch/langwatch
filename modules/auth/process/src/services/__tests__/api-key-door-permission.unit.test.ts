@@ -92,9 +92,14 @@ const authz = {
       : { outcome: "denied" },
   hasProjectPermission: ({ userId, projectId }) => answer(`person:${userId}@${projectId}`),
   listApiKeyBindings: () => Promise.resolve(grants as never),
+  getScope: () => Promise.reject(new Error("the key door reads no scope")),
 } satisfies Pick<
   AuthzApi,
-  "hasApiKeyPermission" | "getApiKeyProjectDecision" | "hasProjectPermission" | "listApiKeyBindings"
+  | "hasApiKeyPermission"
+  | "getApiKeyProjectDecision"
+  | "hasProjectPermission"
+  | "listApiKeyBindings"
+  | "getScope"
 >;
 
 const door = ApiRestCredentialsService.create({

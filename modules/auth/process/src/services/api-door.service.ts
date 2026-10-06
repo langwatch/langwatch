@@ -158,15 +158,22 @@ export class ApiDoorService {
           await this.#credentials.identifyOrganization({ request }),
         ),
       authorize: ({ caller, permission, target }) => {
-        if (target.tier !== "project") {
+        if (target.tier !== "project" && target.tier !== "team") {
           throw new Error(
-            `The organization door answers a route-scoped permission at a project, and ` +
-              `"${permission}" was asked at a ${target.tier}`,
+            `The organization door answers a route-scoped permission at a project or a team, ` +
+              `and "${permission}" was asked at a ${target.tier}`,
           );
         }
         const credential = this.#callerCredentials.get(caller);
         if (!credential) {
           throw new Error("The organization door authorized a caller it did not resolve");
+        }
+        if (target.tier === "team") {
+          return this.#credentials.authorizeOrganizationTeamRoute({
+            credential,
+            permission,
+            teamId: target.id,
+          });
         }
 
         return this.#credentials.authorizeOrganizationRoute({

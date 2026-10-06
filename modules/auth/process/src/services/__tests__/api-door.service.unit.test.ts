@@ -429,6 +429,81 @@ describe("the project door's route-scoped question (E3)", () => {
   });
 });
 
+describe("the organization door's route-scoped question at a team (H4)", () => {
+  const teamOrganizations = new Map([
+    ["team-a", "org-1"],
+    ["team-b", "org-1"],
+    ["team-foreign", "org-9"],
+  ]);
+
+  async function authorizeAt(teamId: string, grantedOn: readonly string[]) {
+    const hasApiKeyPermission = vi.fn<AuthzApi["hasApiKeyPermission"]>(async ({ scope }) =>
+      grantedOn.includes(scope.id),
+    );
+    const getScope: AuthzApi["getScope"] = async (ids) => {
+      const organizationId = ids.teamId ? teamOrganizations.get(ids.teamId) : undefined;
+      if (!ids.teamId || !organizationId) throw new AuthzScopeNotFoundError(ids);
+      return { type: "team", id: ids.teamId, organizationId };
+    };
+    const { identities } = ApiDoorService.create({
+      ...peers,
+      authz: { ...peers.authz, hasApiKeyPermission, getScope },
+    }).door();
+    const caller = await identities.organization.identify!({
+      request: new Request("http://localhost/api/teams/x", {
+        headers: { authorization: "Bearer sk-lw-org-owned" },
+      }),
+    });
+    const answer = identities.organization.authorize!({
+      caller,
+      permission: "team:manage",
+      target: { tier: "team", id: teamId },
+    });
+
+    return { answer: Promise.resolve(answer), hasApiKeyPermission };
+  }
+
+  describe("given a key whose grant reaches the team it names", () => {
+    it("permits, asking authz about the key at that team of its own organization", async () => {
+      const { answer, hasApiKeyPermission } = await authorizeAt("team-a", ["team-a"]);
+
+      await expect(answer).resolves.toMatchObject({ permitted: true });
+      expect(hasApiKeyPermission).toHaveBeenCalledWith({
+        apiKeyId: "key-org-owned",
+        userId: "user-2",
+        organizationId: "org-1",
+        scope: { type: "team", id: "team-a" },
+        permission: "team:manage",
+      });
+    });
+  });
+
+  describe("given a key whose grant covers one team and not the one it names", () => {
+    it("does not permit", async () => {
+      const { answer } = await authorizeAt("team-b", ["team-a"]);
+
+      await expect(answer).resolves.toMatchObject({ permitted: false });
+    });
+  });
+
+  describe("given a team of another organization", () => {
+    it("answers team_not_found and never asks the key's grants", async () => {
+      const { answer, hasApiKeyPermission } = await authorizeAt("team-foreign", ["team-foreign"]);
+
+      await expect(answer).rejects.toMatchObject({ code: "team_not_found", httpStatus: 404 });
+      expect(hasApiKeyPermission).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a team that does not exist", () => {
+    it("answers team_not_found", async () => {
+      const { answer } = await authorizeAt("team-missing", ["team-missing"]);
+
+      await expect(answer).rejects.toMatchObject({ code: "team_not_found", httpStatus: 404 });
+    });
+  });
+});
+
 describe("the plan questions (E6)", () => {
   const plan = (type: string, webhookEndpointsEnabled: boolean): Plan => ({
     planSource: "license",

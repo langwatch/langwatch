@@ -24,11 +24,15 @@ import {
   type RestProjectIdentity,
   type RestResolvedProjectCredential,
 } from "@langwatch/authorization";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
 import type { HandledError } from "@langwatch/handled-error";
 import { classifyForLangy } from "@langwatch/langy-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import {
+  OrganizationNotFoundError,
+  TeamNotFoundError,
+  type OrganizationApi,
+} from "@langwatch/organization-contract";
 
 import { CliDeviceSessionService } from "./cli-device-session.service.ts";
 
@@ -69,6 +73,7 @@ export type ApiRestCredentialPeers = Readonly<{
     | "getApiKeyProjectDecision"
     | "hasProjectPermission"
     | "listApiKeyBindings"
+    | "getScope"
   >;
   /** Reads the person and project behind a CLI access bearer; refuses one bound to none. */
   cliProjects: Readonly<{
@@ -413,6 +418,41 @@ export class ApiRestCredentialsService {
     // the five reasons the vocabulary names is the one that decided a project
     // the key may not reach.
     return { permitted: decision.outcome === "allowed", organizationRole: null };
+  }
+
+  /**
+   * A route-scoped permission at a team (finding H4). The team's organization is read from the
+   * team, never taken from the key; a team outside the key's organization answers as missing.
+   */
+  async authorizeOrganizationTeamRoute(input: {
+    credential: ResolvedOrganizationApiKeyToken;
+    permission: AuthzPermission;
+    teamId: string;
+  }): Promise<PermissionDecision> {
+    const { apiKeyId, userId, organizationId } = input.credential;
+    if (!(await this.isTeamOf({ teamId: input.teamId, organizationId }))) {
+      throw new TeamNotFoundError(input.teamId);
+    }
+    const permitted = await this.authz.hasApiKeyPermission({
+      apiKeyId,
+      userId,
+      organizationId,
+      scope: { type: "team", id: input.teamId },
+      permission: input.permission,
+    });
+
+    return { permitted, organizationRole: null };
+  }
+
+  private async isTeamOf(input: { teamId: string; organizationId: string }): Promise<boolean> {
+    try {
+      const scope = await this.authz.getScope({ teamId: input.teamId });
+
+      return scope.type === "team" && scope.organizationId === input.organizationId;
+    } catch (error) {
+      if (AuthzScopeNotFoundError.is(error)) return false;
+      throw error;
+    }
   }
 
   /**
