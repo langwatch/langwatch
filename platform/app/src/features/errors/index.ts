@@ -25,6 +25,7 @@ export {
   explainAnyError,
   explainHandledError,
   explainSerializedError,
+  PROVIDER_CONFIG_PROBLEMS,
   PROVIDER_CREDENTIAL_REASONS,
   PROVIDER_INVALID_REQUEST_REASONS,
   PROVIDER_MODEL_MISSING_REASONS,

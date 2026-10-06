@@ -344,10 +344,12 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       }
     }
 
+    // One write. The save carries `enabled`, the credentials and the scope
+    // together, so there is never a stored provider that is switched on and
+    // holds no key, and the step completes only once the key is stored.
     const submitForm = () => {
       void actions
-        .setEnabled(true)
-        .then(() => actions.submit())
+        .submit()
         .catch((err) =>
           logger.error(err, "failed to submit model provider settings"),
         );
