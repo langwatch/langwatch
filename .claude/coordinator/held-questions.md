@@ -1,5 +1,7 @@
 # Held questions for Alex
 
+Tracking issue: https://github.com/langwatch/langwatch/issues/8493; the PR-body refresh lane syncs it from this file.
+
 Alex, 2026-10-06 night: "no more questions for now, hold them somewhere for me later". Every
 question a lane or the coordinator raises goes HERE, not to Alex, until he asks for them. Ask them
 only when he says so ("ask anything now" or similar), in rounds of four, recommendation first.
