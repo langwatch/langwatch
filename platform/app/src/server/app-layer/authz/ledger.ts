@@ -729,33 +729,11 @@ export class GrantsLedgerWriter {
 
     const principal = { type: "project" as const, id: readerProjectId };
     const scope = { type: "PROJECT" as const, id: memberProjectId };
-    // The id is a function of the pair and the SECOND it was attached in, so
-    // re-attaching a pair revoked earlier in the same second derives the
-    // revoked row's id, and the attach lands on a row that stays revoked: the
-    // read never returns and the wait below times out. A reconciler that
-    // revokes on one trigger and re-attaches on the next can do exactly that,
-    // so the fact moves to the next free second instead.
-    let occurredAtMs = this.now();
-    let grantId = deriveGrantId({
+    const { grantId, occurredAtMs } = await this.freshGrantIdentity({
       organizationId,
       principal,
       scope,
-      occurredAtMs,
     });
-    while (
-      await this.prisma.grant.findFirst({
-        where: { id: grantId, organizationId },
-        select: { id: true },
-      })
-    ) {
-      occurredAtMs = (Math.floor(occurredAtMs / 1000) + 1) * 1000;
-      grantId = deriveGrantId({
-        organizationId,
-        principal,
-        scope,
-        occurredAtMs,
-      });
-    }
     const { commands } = await this.commands();
     await commands.attachGrant.send({
       tenantId: organizationId,
@@ -811,6 +789,41 @@ export class GrantsLedgerWriter {
       grantId: row.id,
       memberProjectId: row.scopeId,
     }));
+  }
+
+  /**
+   * A grant id no row holds yet, and the business time it encodes. The id is
+   * a function of the pair and the SECOND it was attached in, so
+   * re-attaching a pair revoked earlier in the same second derives the
+   * revoked row's id, and the attach lands on a row that stays revoked: the
+   * read never returns and the projection wait times out. A reconciler that
+   * revokes on one trigger and re-attaches on the next can do exactly that,
+   * so the fact moves to the next free second instead.
+   */
+  private async freshGrantIdentity({
+    organizationId,
+    principal,
+    scope,
+  }: {
+    organizationId: string;
+    principal: { type: "project"; id: string };
+    scope: { type: "PROJECT"; id: string };
+  }): Promise<{ grantId: string; occurredAtMs: number }> {
+    let occurredAtMs = this.now();
+    for (;;) {
+      const grantId = deriveGrantId({
+        organizationId,
+        principal,
+        scope,
+        occurredAtMs,
+      });
+      const taken = await this.prisma.grant.findFirst({
+        where: { id: grantId, organizationId },
+        select: { id: true },
+      });
+      if (!taken) return { grantId, occurredAtMs };
+      occurredAtMs = (Math.floor(occurredAtMs / 1000) + 1) * 1000;
+    }
   }
 
   /**

@@ -557,8 +557,7 @@ export function initializeDefaultApp(options?: {
     new ProjectService(
       projectRepository,
       new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
-      aggregateRules,
-      aggregateReconciler,
+      { rules: aggregateRules, reconciler: aggregateReconciler },
     ),
     "ProjectService",
   );
@@ -2361,17 +2360,15 @@ export function createTestApp(overrides?: TestAppOverrides): App {
     testAggregateRuleRepository,
   );
   const nullProjects = traced(
-    new ProjectService(
-      nullProjectRepository,
-      new NullLwqlKeyMapRepository(),
-      testAggregateRules,
-      new AggregateReconciler({
+    new ProjectService(nullProjectRepository, new NullLwqlKeyMapRepository(), {
+      rules: testAggregateRules,
+      reconciler: new AggregateReconciler({
         aggregates: testAggregateRuleRepository,
         rules: testAggregateRules,
         ledger: () => new GrantsLedgerWriter(testPrisma),
         schedule: new PrismaScheduledJobRepository(testPrisma),
       }),
-    ),
+    }),
     "ProjectService",
   );
 

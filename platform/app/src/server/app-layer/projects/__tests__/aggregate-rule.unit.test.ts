@@ -137,7 +137,7 @@ describe("given a rule that names a project in another organisation", () => {
         findBySlugInTeam: vi.fn().mockResolvedValue(null),
         create: vi.fn(),
       } as unknown as ProjectRepository;
-      const projects = new ProjectService(repo, undefined, service);
+      const projects = new ProjectService(repo, undefined, { rules: service });
 
       await expect(
         projects.create({

@@ -161,8 +161,7 @@ describe("Feature: the reconciler keeps members current", () => {
       projects: new ProjectService(
         new PrismaProjectRepository(prisma),
         new NullLwqlKeyMapRepository(),
-        rules,
-        reconciler,
+        { rules, reconciler },
       ),
       _eventSourcing: createAuthzTestEventSourcing(prisma),
     });

@@ -273,6 +273,15 @@ async function aggregateProjectCreateFields({
 }
 
 export class ProjectService {
+  private readonly aggregateRules?: AggregateRuleService;
+
+  /**
+   * Public because its other triggers (a personal workspace joining, a
+   * department move) live outside this service and reach it through the
+   * App's project service.
+   */
+  readonly aggregateReconciler?: AggregateReconciler;
+
   constructor(
     readonly repo: ProjectRepository,
     /**
@@ -281,16 +290,19 @@ export class ProjectService {
      * same way a failed write is.
      */
     private readonly lwqlKeyMap?: LwqlKeyMapRepository,
-    /** Absent where no aggregate can be created; such a request is refused. */
-    private readonly aggregateRules?: AggregateRuleService,
     /**
-     * ADR-144 block E: keeps aggregates' shared reads in line with their
-     * rules. Public because its other triggers (a personal workspace joining,
-     * a department move) live outside this service and reach it through the
-     * App's project service. Absent where nothing reconciles.
+     * ADR-144. `rules` validates an aggregate's rule; absent, creating one is
+     * refused. `reconciler` (block E) keeps aggregates' shared reads in line
+     * with their rules; absent, nothing reconciles.
      */
-    readonly aggregateReconciler?: AggregateReconciler,
-  ) {}
+    aggregates: {
+      rules?: AggregateRuleService;
+      reconciler?: AggregateReconciler;
+    } = {},
+  ) {
+    this.aggregateRules = aggregates.rules;
+    this.aggregateReconciler = aggregates.reconciler;
+  }
 
   async getById(id: string): Promise<Project | null> {
     return this.repo.getById(id);
