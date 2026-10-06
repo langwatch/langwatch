@@ -414,3 +414,13 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   two open forks of v3 were settled by the captain: build on `main` and port
   later; audit matches the existing admin view row. Implementation starts
   at block A.
+- v4.1 (2026-10-06, implementation note, no decision changed): "writes no
+  `TenantId`" in decision 6 means no tenant *predicate*. A repository may
+  still project the column or name it in a dedup tuple
+  (`(TenantId, TraceId, UpdatedAt) IN (...)`), since two member projects
+  can hold the same trace id and the tuple is what keeps them apart. The
+  client refuses a hand-written predicate; the lint gate checks for the
+  same. The window on a shared grant is applied once, on the primary
+  table's occurrence column; a subquery on a side table (evaluations,
+  annotations) takes the tenant set without the window, because that
+  table's timestamp is not the trace's.

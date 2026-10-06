@@ -120,8 +120,10 @@ Feature: An aggregate project reads its member projects
   @unit
   Scenario: Trace repositories write no tenant of their own
     When the trace list, summary, span and analytics repositories are checked
-    Then none of their query text names the tenant column
-    And a repository that names it fails the lint gate
+    Then none of their query text filters on the tenant column
+    And a repository that filters on it fails the lint gate
+    # Naming the column as a projected value or a dedup tuple member is
+    # fine; only a predicate picks tenants, and only the client writes one.
 
   @integration
   Scenario: A plain project reads the same rows as before
