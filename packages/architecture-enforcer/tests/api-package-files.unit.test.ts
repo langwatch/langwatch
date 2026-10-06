@@ -60,6 +60,7 @@ const TARGET_FILES = new Set([
   "rest/host.ts",
   "rest/idempotency.ts",
   "rest/key-credential.ts",
+  "rest/legacy-error.ts",
   "rest/openapi.ts",
   "rest/request.ts",
   "rest/response.ts",
