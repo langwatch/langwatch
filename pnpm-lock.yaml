@@ -17168,6 +17168,9 @@ importers:
 
   packages/upgrade:
     dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../handled-error
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../ksuid

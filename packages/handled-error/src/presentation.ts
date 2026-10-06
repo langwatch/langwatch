@@ -4814,6 +4814,14 @@ const presentations = {
     title: "That request was sent in the wrong format",
     describe: () => "Send the body with the Content-Type this endpoint reads, then try again.",
   },
+  upgrade_not_found: {
+    title: "That upgrade record wasn't found",
+    describe: () => "The step or run may be from another installation. Reload the upgrades page.",
+  },
+  upgrade_invalid_cursor: {
+    title: "That page of upgrade runs couldn't be read",
+    describe: () => "Reload the upgrades page to start from the newest run.",
+  },
   // ==========================================================================
   // Codes raised by the Go services (generated into `goErrorCodes` by
   // cmd/herrgen). They reach the browser whenever the control plane proxies a

@@ -83,6 +83,8 @@ const PARAMETERIZED_CODES = new Set([
   "langy_api_key_unowned",
   "langy_api_key_no_langy_access",
   "langy_api_actor_missing",
+  "upgrade_invalid_cursor",
+  "upgrade_not_found",
 ]);
 
 /**

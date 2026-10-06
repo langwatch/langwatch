@@ -487,6 +487,8 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
       });
       await expect(reader.getRun({ id: "run_missing" })).rejects.toMatchObject({
         code: "upgrade_not_found",
+        isHandled: true,
+        httpStatus: 404,
       });
       await expect(reader.getRun({ id: "run_missing" })).rejects.toBeInstanceOf(UpgradeReadError);
     });
@@ -523,6 +525,8 @@ describe.skipIf(!DB_URL)("UpgradeReader over the ledger tables", () => {
         readerOver({ scratch }).listRuns({ cursor: "not-a-cursor" }),
       ).rejects.toMatchObject({
         code: "upgrade_invalid_cursor",
+        isHandled: true,
+        httpStatus: 400,
       });
     });
 
