@@ -168,3 +168,13 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Seat wiring (Q209 follow-up): Alex asked back 'unclean?' about both options; clarification asked.
 - Seat wiring (Q209, clarified): the process hands the seat to registries like any store; TRACE's registry builds an event-payloads repository over it, scoped to trace's own aggregates, with a memory twin.
 - Stop serving (lapsed presence): /readyz turns 503 so the load balancer drains it AND a worker pauses taking jobs; both resume after a good presence write. Readiness must be able to turn off again.
+
+## Round 23 (C, mig-ci D7a, mig-ci D7b, mig-ci D7c, mig-ci D7d)
+
+- Advisory CI (mig-ci D7a): ADVISORY for a month, then required
+- Prisma drift (mig-ci D7b): FAIL new drift only
+- No live base (mig-ci D7c): WARN and pass
+- Smoke scope (mig-ci D7d): AS built, floor only
+- Meters (Q69-4): a SIXTH subject channel, meters, with its own twin; usage reporting and the prices sync read it.
+- Connected invoicing (Q69-4): STAYS one channel beside the subjects, as connectedInvoicing over the shared client.
+- Stripe types (Q69-2 default): DOMAIN shapes; rewrite the subscription item calculator and seat-quote rules over billing's own shapes, and the subscriptions channel answers domain shapes (not the recommended keep-Stripe-types).
