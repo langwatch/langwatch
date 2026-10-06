@@ -68,6 +68,30 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
     And the statement already running is left alone
     And the wait bound is shorter than the time one statement may spend on the wire
 
+  # An insert holds its connection until the async insert flushes, so with one
+  # shared bound a burst of ingest could occupy every slot and starve UI reads.
+  # Each lane gets its own share of the same budget (configurable via
+  # CLICKHOUSE_INSERT_CONCURRENCY_SHARE), so neither can delay the other and
+  # together they still never exceed the budget.
+  @unit
+  Scenario: a saturated insert lane does not delay reads
+    Given the insert lane has used all of its share of the budget
+    When a read is issued
+    Then the read starts immediately
+    And the surplus inserts keep waiting
+
+  @unit
+  Scenario: a saturated read lane does not delay inserts
+    Given the read lane has used all of its share of the budget
+    When an insert is issued
+    Then the insert starts immediately
+
+  @unit
+  Scenario: both lanes together never exceed the connection budget
+    Given both lanes have more statements than they can run
+    When the statements are issued
+    Then no more statements run at once than the whole budget allows
+
   # Sizing the bound is where this went wrong in practice. The budget was read
   # as one server's allowance and then divided across the whole fleet, but the
   # cluster runs several nodes and the fleet's statements spread over all of

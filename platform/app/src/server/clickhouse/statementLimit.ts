@@ -8,6 +8,7 @@ import { ClickHouseOverloadedError } from "~/server/app-layer/traces/errors";
 import { toError } from "~/utils/posthogErrorCapture";
 import {
   incrementClickHouseStatementsShed,
+  type LimiterLane,
   observeClickHouseStatementWait,
   registerClickHouseLimiter,
 } from "./metrics";
@@ -53,6 +54,51 @@ export const STATEMENT_WAIT_TIMEOUT_MS = 20_000;
 type LimitedOperation = "query" | "insert" | "command" | "exec";
 
 /**
+ * The share of a process's statement slots reserved for inserts.
+ *
+ * An async insert with `wait_for_async_insert=1` holds its connection until the
+ * server flushes the buffer, so it is slow by design, not by fault. With one
+ * bound shared by everything, ingest could occupy every slot and the UI's reads
+ * queued behind it until they timed out. Splitting the budget caps each kind of
+ * work at its own lane, so a flood of either can no longer starve the other.
+ * Half and half is the neutral starting point; tune it per deployment with
+ * `CLICKHOUSE_INSERT_CONCURRENCY_SHARE`.
+ */
+export const DEFAULT_INSERT_SHARE = 0.5;
+
+/**
+ * Divides a slot budget into an insert lane and a read lane.
+ *
+ * Each lane gets at least one slot, so neither can be configured out of
+ * existence, and the two always sum to `maxConcurrent`, so the total can never
+ * exceed the connection pool. Returns `null` when the budget is too small to
+ * split (a single slot cannot serve two lanes); the caller then keeps one shared
+ * bound rather than starving one kind of work entirely.
+ */
+export function splitStatementBudget({
+  maxConcurrent,
+  insertShare,
+}: {
+  maxConcurrent: number;
+  insertShare: number;
+}): { insert: number; read: number } | null {
+  if (maxConcurrent < 2) return null;
+  const insert = Math.min(
+    maxConcurrent - 1,
+    Math.max(1, Math.round(maxConcurrent * insertShare)),
+  );
+  return { insert, read: maxConcurrent - insert };
+}
+
+/** One bound, with the label its metrics are reported under. */
+interface Lane {
+  lane: LimiterLane;
+  max: number;
+  maxQueued: number;
+  limiter: ConcurrencyLimiter;
+}
+
+/**
  * The subset of a statement's parameters this layer reads. Every ClickHouse
  * driver method takes an options object that may carry an abort signal; nothing
  * else here is inspected.
@@ -64,6 +110,47 @@ interface StatementParams {
 function signalOf(params: unknown): AbortSignal | undefined {
   if (!params || typeof params !== "object") return undefined;
   return (params as StatementParams).abort_signal;
+}
+
+function buildLane(lane: LimiterLane, max: number): Lane {
+  const maxQueued = Math.max(MIN_QUEUE_DEPTH, max * QUEUE_DEPTH_PER_SLOT);
+  return {
+    lane,
+    max,
+    maxQueued,
+    limiter: new ConcurrencyLimiter({ maxConcurrent: max, maxQueued }),
+  };
+}
+
+/**
+ * Builds statement limiters for insert and read operations, or a shared limiter if the budget is too small to split.
+ */
+function buildLanes({
+  maxConcurrent,
+  insertShare,
+}: {
+  maxConcurrent: number;
+  insertShare: number;
+}): {
+  lanes: Lane[];
+  laneFor: (operation: LimitedOperation) => Lane;
+} {
+  const split = splitStatementBudget({ maxConcurrent, insertShare });
+
+  if (!split) {
+    const shared = buildLane("all", maxConcurrent);
+    return {
+      lanes: [shared],
+      laneFor: () => shared,
+    };
+  }
+
+  const insert = buildLane("insert", split.insert);
+  const read = buildLane("read", split.read);
+  return {
+    lanes: [insert, read],
+    laneFor: (op) => (op === "insert" ? insert : read),
+  };
 }
 
 /**
@@ -81,29 +168,44 @@ function signalOf(params: unknown): AbortSignal | undefined {
  * What changes is where the queueing happens: in a queue that is finite, timed
  * and counted, rather than inside the connection pool where it had no timeout,
  * no metric and no ceiling.
+ *
+ * The budget is split into two lanes: inserts have their own slots, and
+ * `query`, `command` and `exec` share the rest. A saturated lane queues and
+ * sheds on its own, so slow inserts cannot hold every slot against reads, nor
+ * the reverse. The lanes sum to `maxConcurrent`, so the pool is never exceeded.
+ * A budget under two slots cannot be split and stays one shared bound.
  */
 export function withStatementLimit<T extends ClickHouseClient>({
   client,
   maxConcurrent,
   instance,
+  insertShare = DEFAULT_INSERT_SHARE,
   waitTimeoutMs = STATEMENT_WAIT_TIMEOUT_MS,
 }: {
   client: T;
   maxConcurrent: number;
   instance: string;
+  /** Fraction of `maxConcurrent` reserved for inserts; the rest serve reads. */
+  insertShare?: number;
   /** Overridable so a test can prove the bound without spending it. */
   waitTimeoutMs?: number;
 }): T {
-  const maxQueued = Math.max(
-    MIN_QUEUE_DEPTH,
-    maxConcurrent * QUEUE_DEPTH_PER_SLOT,
-  );
-  const limiter = new ConcurrencyLimiter({ maxConcurrent, maxQueued });
+  const { lanes, laneFor } = buildLanes({ maxConcurrent, insertShare });
 
-  registerClickHouseLimiter(instance, () => limiter.stats());
+  registerClickHouseLimiter(instance, () =>
+    lanes.map((l) => ({ lane: l.lane, ...l.limiter.stats() })),
+  );
 
   logger.info(
-    { instance, maxConcurrent, maxQueued },
+    {
+      instance,
+      maxConcurrent,
+      lanes: lanes.map((l) => ({
+        lane: l.lane,
+        maxConcurrent: l.max,
+        maxQueued: l.maxQueued,
+      })),
+    },
     "ClickHouse statement concurrency bounded",
   );
 
@@ -121,10 +223,12 @@ export function withStatementLimit<T extends ClickHouseClient>({
     // chain answer for it.
     if (typeof inner !== "function") continue;
 
+    const { limiter, max } = laneFor(operation);
+
     (limited as Record<string, unknown>)[operation] = (params: unknown) =>
       run({
         limiter,
-        maxConcurrent,
+        maxConcurrent: max,
         instance,
         operation,
         signal: signalOf(params),

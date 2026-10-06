@@ -13,7 +13,10 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => mockLogger,
 }));
 
-import { getClickHouseMaxOpenConnections } from "../connectionPool";
+import {
+  getClickHouseInsertConcurrencyShare,
+  getClickHouseMaxOpenConnections,
+} from "../connectionPool";
 
 // Every knob the resolver reads: the process may really be running inside a
 // deployment that sets some of them (haven exports the server cap), and a
@@ -104,6 +107,51 @@ describe("getClickHouseMaxOpenConnections", () => {
 
       expect(getClickHouseMaxOpenConnections()).toBe(64);
       expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("getClickHouseInsertConcurrencyShare", () => {
+  const original = process.env.CLICKHOUSE_INSERT_CONCURRENCY_SHARE;
+
+  beforeEach(() => {
+    delete process.env.CLICKHOUSE_INSERT_CONCURRENCY_SHARE;
+    mockLogger.warn.mockClear();
+  });
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.CLICKHOUSE_INSERT_CONCURRENCY_SHARE;
+    } else {
+      process.env.CLICKHOUSE_INSERT_CONCURRENCY_SHARE = original;
+    }
+  });
+
+  describe("given the env var is unset", () => {
+    it("returns the default of 0.5", () => {
+      expect(getClickHouseInsertConcurrencyShare()).toBe(0.5);
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the env var holds a share strictly between 0 and 1", () => {
+    it("returns that share", () => {
+      process.env.CLICKHOUSE_INSERT_CONCURRENCY_SHARE = "0.3";
+      expect(getClickHouseInsertConcurrencyShare()).toBe(0.3);
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe.each(["1", "0", "abc"])("given the env var is %j", (raw) => {
+    describe("when the share is resolved", () => {
+      it("falls back to the default and warns", () => {
+        process.env.CLICKHOUSE_INSERT_CONCURRENCY_SHARE = raw;
+        expect(getClickHouseInsertConcurrencyShare()).toBe(0.5);
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          { raw, using: 0.5 },
+          "Invalid CLICKHOUSE_INSERT_CONCURRENCY_SHARE; using default",
+        );
+      });
     });
   });
 });

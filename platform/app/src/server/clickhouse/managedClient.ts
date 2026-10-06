@@ -6,7 +6,10 @@ import { translateClickHouseQueryError } from "~/server/app-layer/clients/clickh
 import { queryWindowed } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
 import { ClickHouseLogger } from "./clickhouseLogger";
-import { getClickHouseMaxOpenConnections } from "./connectionPool";
+import {
+  getClickHouseInsertConcurrencyShare,
+  getClickHouseMaxOpenConnections,
+} from "./connectionPool";
 import {
   incrementClickHouseQueryCount,
   observeClickHouseQueryDuration,
@@ -192,10 +195,12 @@ export function createManagedClickHouseClient({
   return wrapWithDefaultSettings(
     withStatementLimit({
       client: createResilientClickHouseClient({ client: raw, cluster }),
-      // The pool size, so this bounds where the pool used to and capacity is
-      // unchanged. The difference is that the queue in front of it is finite,
-      // timed and counted.
+      // The pool size, split between an insert lane and a read lane and never
+      // exceeded, so total capacity is unchanged. The difference is that the
+      // queues in front of it are finite, timed and counted, and slow inserts
+      // cannot occupy the slots reads need.
       maxConcurrent: maxOpenConnections,
+      insertShare: getClickHouseInsertConcurrencyShare(),
       instance,
     }),
   );

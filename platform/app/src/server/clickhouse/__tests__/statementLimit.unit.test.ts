@@ -3,9 +3,11 @@ import { AcquireAbortedError } from "@langwatch/clickhouse-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClickHouseOverloadedError } from "~/server/app-layer/traces/errors";
 import { CLICKHOUSE_REQUEST_TIMEOUT_MS } from "../managedClient";
+import { clickHouseConcurrencyMetrics } from "../metrics";
 import {
   MIN_QUEUE_DEPTH,
   STATEMENT_WAIT_TIMEOUT_MS,
+  splitStatementBudget,
   withStatementLimit,
 } from "../statementLimit";
 
@@ -65,9 +67,10 @@ describe("withStatementLimit", () => {
       /** @scenario statements are bounded, and the bound is the one that binds */
       it("starts only as many statements as the bound", async () => {
         const driver = deferrableClient();
+        // 4 splits 2 reads / 2 inserts, so the read lane's bound is 2.
         const limited = withStatementLimit({
           client: driver.client,
-          maxConcurrent: 2,
+          maxConcurrent: 4,
           instance,
         });
 
@@ -402,9 +405,12 @@ describe("withStatementLimit", () => {
     describe("when they are issued", () => {
       it("bounds inserts, commands and execs alongside queries", async () => {
         const driver = deferrableClient();
+        // Reads, commands and execs share the read lane; inserts have their own.
+        // With 4 split 2/2, two of the three non-insert statements start and
+        // the third waits behind them.
         const limited = withStatementLimit({
           client: driver.client,
-          maxConcurrent: 2,
+          maxConcurrent: 4,
           instance,
         });
 
@@ -412,18 +418,313 @@ describe("withStatementLimit", () => {
           limited.insert({ table: "spans", values: [] }),
           limited.command({ query: "OPTIMIZE TABLE spans" }),
           limited.exec({ query: "SELECT 1" }),
+          limited.query({ query: "SELECT 2" }),
         ];
         await settleMicrotasks();
 
-        // Two of the three start; the third waits behind them, which is the
-        // point - a write path that ignored the bound would be the one that
-        // rejected live ingest.
-        expect(driver.started).toBe(2);
+        // The insert and two read-lane statements start; the fourth waits for
+        // a read slot - a write path that ignored the bound would be the one
+        // that rejected live ingest.
+        expect(driver.started).toBe(3);
 
         driver.releaseAll();
         await settleMicrotasks();
         driver.releaseAll();
         await Promise.all(inFlight);
+      });
+    });
+  });
+
+  describe("given the insert lane is saturated", () => {
+    describe("when a read is issued", () => {
+      /** @scenario a saturated insert lane does not delay reads */
+      it("starts the read at once", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+        });
+
+        const inserts = Array.from({ length: 4 }, () =>
+          limited.insert({ table: "spans", values: [] }),
+        );
+        await settleMicrotasks();
+        expect(driver.started).toBe(2);
+
+        const read = limited.query({ query: "SELECT 1" });
+        await settleMicrotasks();
+
+        expect(driver.client.query).toHaveBeenCalledTimes(1);
+
+        for (let round = 0; round < 3; round += 1) {
+          driver.releaseAll();
+          await settleMicrotasks();
+        }
+        await Promise.all([...inserts, read]);
+      });
+
+      it("keeps the surplus inserts waiting", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+        });
+
+        const inserts = Array.from({ length: 4 }, () =>
+          limited.insert({ table: "spans", values: [] }),
+        );
+        const read = limited.query({ query: "SELECT 1" });
+        await settleMicrotasks();
+
+        expect(driver.client.insert).toHaveBeenCalledTimes(2);
+
+        for (let round = 0; round < 3; round += 1) {
+          driver.releaseAll();
+          await settleMicrotasks();
+        }
+        await Promise.all([...inserts, read]);
+      });
+    });
+  });
+
+  describe("given the read lane is saturated", () => {
+    describe("when an insert is issued", () => {
+      /** @scenario a saturated read lane does not delay inserts */
+      it("starts the insert at once", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+        });
+
+        const reads = Array.from({ length: 4 }, (_, index) =>
+          limited.query({ query: `SELECT ${index}` }),
+        );
+        await settleMicrotasks();
+        expect(driver.started).toBe(2);
+
+        const insert = limited.insert({ table: "spans", values: [] });
+        await settleMicrotasks();
+
+        expect(driver.client.insert).toHaveBeenCalledTimes(1);
+
+        for (let round = 0; round < 3; round += 1) {
+          driver.releaseAll();
+          await settleMicrotasks();
+        }
+        await Promise.all([...reads, insert]);
+      });
+    });
+  });
+
+  describe("given both lanes are saturated", () => {
+    describe("when many statements of each kind are issued", () => {
+      /** @scenario both lanes together never exceed the connection budget */
+      it("starts no more than the whole budget", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+        });
+
+        const inFlight = [
+          ...Array.from({ length: 10 }, (_, index) =>
+            limited.query({ query: `SELECT ${index}` }),
+          ),
+          ...Array.from({ length: 10 }, () =>
+            limited.insert({ table: "spans", values: [] }),
+          ),
+        ];
+        await settleMicrotasks();
+
+        expect(driver.started).toBe(4);
+
+        for (let round = 0; round < 6; round += 1) {
+          driver.releaseAll();
+          await settleMicrotasks();
+        }
+        await Promise.all(inFlight);
+      });
+    });
+  });
+
+  describe("given an insert share", () => {
+    describe("when the share is set to 0.25 of a budget of 8", () => {
+      it("gives inserts two slots", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 8,
+          insertShare: 0.25,
+          instance,
+        });
+
+        const inserts = Array.from({ length: 5 }, () =>
+          limited.insert({ table: "spans", values: [] }),
+        );
+        await settleMicrotasks();
+
+        expect(driver.started).toBe(2);
+
+        for (let round = 0; round < 4; round += 1) {
+          driver.releaseAll();
+          await settleMicrotasks();
+        }
+        await Promise.all(inserts);
+      });
+    });
+  });
+
+  describe("given a budget of one", () => {
+    describe("when a read and an insert are issued", () => {
+      it("shares the single slot between them", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 1,
+          instance,
+        });
+
+        const inFlight = [
+          limited.insert({ table: "spans", values: [] }),
+          limited.query({ query: "SELECT 1" }),
+        ];
+        await settleMicrotasks();
+
+        expect(driver.started).toBe(1);
+
+        driver.releaseAll();
+        await settleMicrotasks();
+        driver.releaseAll();
+        await Promise.all(inFlight);
+      });
+    });
+  });
+
+  describe("given a saturated insert lane and metrics", () => {
+    describe("when the in-flight gauge is read", () => {
+      it("reports the insert lane at its bound", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+        });
+
+        const inserts = Array.from({ length: 4 }, () =>
+          limited.insert({ table: "spans", values: [] }),
+        );
+        await settleMicrotasks();
+
+        const { values } = await clickHouseConcurrencyMetrics.inFlight.get();
+        const insertLane = values.find(
+          (v) => v.labels.instance === instance && v.labels.lane === "insert",
+        );
+
+        expect(insertLane?.value).toBe(2);
+
+        for (let round = 0; round < 3; round += 1) {
+          driver.releaseAll();
+          await settleMicrotasks();
+        }
+        await Promise.all(inserts);
+      });
+
+      it("reports the read lane idle", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+        });
+
+        const inserts = Array.from({ length: 4 }, () =>
+          limited.insert({ table: "spans", values: [] }),
+        );
+        await settleMicrotasks();
+
+        const { values } = await clickHouseConcurrencyMetrics.inFlight.get();
+        const readLane = values.find(
+          (v) => v.labels.instance === instance && v.labels.lane === "read",
+        );
+
+        expect(readLane?.value).toBe(0);
+
+        for (let round = 0; round < 3; round += 1) {
+          driver.releaseAll();
+          await settleMicrotasks();
+        }
+        await Promise.all(inserts);
+      });
+
+      it("reports the waiting inserts as queued on the insert lane", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 4,
+          instance,
+        });
+
+        const inserts = Array.from({ length: 4 }, () =>
+          limited.insert({ table: "spans", values: [] }),
+        );
+        await settleMicrotasks();
+
+        const { values } = await clickHouseConcurrencyMetrics.queued.get();
+        const insertLane = values.find(
+          (v) => v.labels.instance === instance && v.labels.lane === "insert",
+        );
+
+        expect(insertLane?.value).toBe(2);
+
+        for (let round = 0; round < 3; round += 1) {
+          driver.releaseAll();
+          await settleMicrotasks();
+        }
+        await Promise.all(inserts);
+      });
+    });
+  });
+});
+
+describe("splitStatementBudget", () => {
+  describe.each([
+    { maxConcurrent: 4, insertShare: 0.5, insert: 2, read: 2 },
+    { maxConcurrent: 10, insertShare: 0.3, insert: 3, read: 7 },
+    { maxConcurrent: 2, insertShare: 0.9, insert: 1, read: 1 },
+    { maxConcurrent: 5, insertShare: 0.01, insert: 1, read: 4 },
+  ])("given a budget of $maxConcurrent and a share of $insertShare", ({
+    maxConcurrent,
+    insertShare,
+    insert,
+    read,
+  }) => {
+    describe("when the budget is split", () => {
+      it(`gives ${insert} to inserts and ${read} to reads`, () => {
+        expect(splitStatementBudget({ maxConcurrent, insertShare })).toEqual({
+          insert,
+          read,
+        });
+      });
+
+      it("accounts for the whole budget", () => {
+        const split = splitStatementBudget({ maxConcurrent, insertShare });
+
+        expect((split?.insert ?? 0) + (split?.read ?? 0)).toBe(maxConcurrent);
+      });
+    });
+  });
+
+  describe("given a budget of one", () => {
+    describe("when the budget is split", () => {
+      it("returns null because it cannot be split", () => {
+        expect(
+          splitStatementBudget({ maxConcurrent: 1, insertShare: 0.5 }),
+        ).toBeNull();
       });
     });
   });

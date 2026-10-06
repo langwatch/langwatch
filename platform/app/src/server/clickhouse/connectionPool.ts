@@ -3,6 +3,7 @@ import {
   resolvePoolSize,
 } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
+import { DEFAULT_INSERT_SHARE } from "./statementLimit";
 
 const logger = createLogger("langwatch:clickhouse:connection-pool");
 
@@ -58,4 +59,27 @@ export function getClickHouseMaxOpenConnections(): number {
   }
 
   return decision.size;
+}
+
+/**
+ * Resolve the fraction of this process's statement slots reserved for inserts.
+ *
+ * Read from `CLICKHOUSE_INSERT_CONCURRENCY_SHARE`; the rest of the slots serve
+ * reads (see `./statementLimit.ts`). Anything outside the open interval (0, 1)
+ * is refused rather than clamped: 0 or 1 would hand one kind of work every slot,
+ * which is the starvation the split exists to prevent, so a typo falls back to
+ * the default instead of silently reintroducing it.
+ */
+export function getClickHouseInsertConcurrencyShare(): number {
+  const raw = process.env.CLICKHOUSE_INSERT_CONCURRENCY_SHARE;
+  if (raw === undefined || raw.trim() === "") return DEFAULT_INSERT_SHARE;
+
+  const parsed = Number(raw);
+  if (Number.isFinite(parsed) && parsed > 0 && parsed < 1) return parsed;
+
+  logger.warn(
+    { raw, using: DEFAULT_INSERT_SHARE },
+    "Invalid CLICKHOUSE_INSERT_CONCURRENCY_SHARE; using default",
+  );
+  return DEFAULT_INSERT_SHARE;
 }
