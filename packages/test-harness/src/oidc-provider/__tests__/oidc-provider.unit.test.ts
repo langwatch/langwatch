@@ -187,5 +187,20 @@ describe("the OIDC test provider", () => {
       await served.stop();
       await expect(fetch(served.endpoints.discovery)).rejects.toThrow("fetch failed");
     });
+
+    /** @scenario "The provider is reachable over a loopback port" */
+    it("keeps signInAs, handle and fetch working on the started provider", async () => {
+      const second = await startOidcProvider({ client: CLIENT, subject: SUBJECT });
+      try {
+        second.signInAs(null);
+        const { challenge } = pkce();
+        const back = await authorize({ provider: second, challenge });
+        expect(back.searchParams.get("error")).toBe("access_denied");
+        const viaHandle = await second.handle(new Request(second.endpoints.jwks));
+        expect(viaHandle.status).toBe(200);
+      } finally {
+        await second.stop();
+      }
+    });
   });
 });

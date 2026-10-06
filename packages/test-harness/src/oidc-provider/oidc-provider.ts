@@ -322,7 +322,13 @@ export async function startOidcProvider({
   provider = createOidcProvider({ issuer: origin, client, subject });
 
   return {
-    ...provider,
+    issuer: provider.issuer,
+    client: provider.client,
+    endpoints: provider.endpoints,
+    publicJwk: provider.publicJwk,
+    signInAs: (next) => provider.signInAs(next),
+    handle: (request) => provider.handle(request),
+    fetch: (input, init) => provider.fetch(input, init),
     origin,
     stop: () =>
       new Promise<void>((resolve, reject) => {
