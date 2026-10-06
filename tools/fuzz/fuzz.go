@@ -36,8 +36,17 @@ type Options struct {
 	Root                 string // repository root, for .fuzz output and the UI runner
 }
 
-// Main parses args and runs the fuzzer, returning a process exit code.
-func Main(ctx context.Context, args []string, streams Streams, root string) int {
+// Invocation is what a command line hands Main: the arguments after the
+// program name, where to write, and the repository root.
+type Invocation struct {
+	Args    []string
+	Streams Streams
+	Root    string
+}
+
+// Main parses the invocation's args and runs the fuzzer, returning a process exit code.
+func Main(ctx context.Context, invocation Invocation) int {
+	args, streams, root := invocation.Args, invocation.Streams, invocation.Root
 	if len(args) == 0 {
 		fmt.Fprintln(streams.Err, "usage: fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only AREA] [-reload-every N] [-actions N] [-max-consecutive-errors N] [-url URL]")
 		return 2

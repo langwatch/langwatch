@@ -18,12 +18,6 @@ type Ticker struct {
 	Snapshot func() (done int, detail string)
 }
 
-// StartTicker prints one status line every ProgressInterval until the returned
-// stop is called. tools/workerrun still calls it; new code starts a Ticker.
-func StartTicker(out io.Writer, label string, total int, snapshot func() (done int, detail string)) (stop func()) {
-	return Ticker{Out: out, Label: label, Total: total, Snapshot: snapshot}.Start()
-}
-
 // Start prints one status line every ProgressInterval until the returned stop
 // is called. A nil Out prints nothing.
 func (ticker Ticker) Start() (stop func()) {

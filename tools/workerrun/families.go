@@ -702,13 +702,13 @@ func (run *run) fireAll(ctx context.Context, items []*item) {
 		sent.Go(func() { run.fireWorker(ctx, queue) })
 	}
 	var done atomic.Int64
-	stop := diffkit.StartTicker(run.out, "worker fire:", len(fireable), func() (int, string) {
+	stop := diffkit.Ticker{Out: run.out, Label: "worker fire:", Total: len(fireable), Snapshot: func() (int, string) {
 		count := int(done.Load())
 		if count < len(fireable)/2 {
 			return count, "burst"
 		}
 		return count, "steady"
-	})
+	}}.Start()
 	run.feed(ctx, fireable, feeding{queue: queue, done: &done})
 	close(queue)
 	sent.Wait()
@@ -782,11 +782,11 @@ func (run *run) start(it *item) (time.Time, string) {
 func (run *run) readBack(ctx context.Context, items []*item, firing <-chan struct{}) {
 	slots := make(chan struct{}, run.options.Concurrency)
 	landed := 0
-	stop := diffkit.StartTicker(run.out, "worker landed:", len(items), func() (int, string) {
+	stop := diffkit.Ticker{Out: run.out, Label: "worker landed:", Total: len(items), Snapshot: func() (int, string) {
 		run.mu.Lock()
 		defer run.mu.Unlock()
 		return landed, ""
-	})
+	}}.Start()
 	defer stop()
 	for ctx.Err() == nil {
 		began := time.Now()
