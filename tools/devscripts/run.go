@@ -32,12 +32,20 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	switch command {
 	case "generate-modules":
-		return runGenerateModules(root, rest, stdout, stderr)
+		return runGenerateModules(subcommand{root: root, args: rest, stdout: stdout, stderr: stderr})
 	case "sync-references":
-		return runSyncReferences(root, rest, stdout, stderr)
+		return runSyncReferences(subcommand{root: root, args: rest, stdout: stdout, stderr: stderr})
 	}
 	fmt.Fprintf(stderr, "devscripts: unknown subcommand %q\n", command)
 	return 2
+}
+
+// subcommand is one dispatched subcommand: the workspace root, its remaining
+// arguments and where it writes.
+type subcommand struct {
+	root           string
+	args           []string
+	stdout, stderr io.Writer
 }
 
 // rootFrom takes `--root DIR` out of args. Without it, sync-references uses the

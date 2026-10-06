@@ -3,7 +3,6 @@ package devscripts
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -107,23 +106,31 @@ func expandGlob(root, pattern string) []string {
 	for _, segment := range strings.Split(pattern, "/") {
 		var next []string
 		for _, directory := range directories {
-			if segment != "*" {
-				if candidate := filepath.Join(directory, segment); isDir(candidate) {
-					next = append(next, candidate)
-				}
-				continue
-			}
-			entries, _ := os.ReadDir(directory)
-			for _, entry := range entries {
-				name := entry.Name()
-				if entry.IsDir() && !strings.HasPrefix(name, ".") && name != "node_modules" {
-					next = append(next, filepath.Join(directory, name))
-				}
-			}
+			next = append(next, expandSegment(directory, segment)...)
 		}
 		directories = next
 	}
 	return directories
+}
+
+// expandSegment is one glob segment under directory: the named child when it
+// is a directory, or every visible child directory but node_modules for "*".
+func expandSegment(directory, segment string) []string {
+	if segment != "*" {
+		if candidate := filepath.Join(directory, segment); isDir(candidate) {
+			return []string{candidate}
+		}
+		return nil
+	}
+	var next []string
+	entries, _ := os.ReadDir(directory)
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() && !strings.HasPrefix(name, ".") && name != "node_modules" {
+			next = append(next, filepath.Join(directory, name))
+		}
+	}
+	return next
 }
 
 func workspaceNames(deps any) []string {
@@ -143,26 +150,12 @@ func ReadWorkspaceMembers(root string) ([]WorkspaceMember, error) {
 	byName := map[string]WorkspaceMember{}
 	for _, pattern := range workspaceGlobs(root) {
 		for _, directory := range expandGlob(root, pattern) {
-			data, err := os.ReadFile(filepath.Join(directory, "package.json"))
+			member, ok, err := readWorkspaceMember(directory)
 			if err != nil {
-				continue
+				return nil, err
 			}
-			var manifest struct {
-				Name            string         `json:"name"`
-				Dependencies    any            `json:"dependencies"`
-				DevDependencies any            `json:"devDependencies"`
-				Scripts         map[string]any `json:"scripts"`
-			}
-			if err := json.Unmarshal(data, &manifest); err != nil {
-				return nil, fmt.Errorf("%s: %w", filepath.Join(directory, "package.json"), err)
-			}
-			if manifest.Name == "" {
-				continue
-			}
-			_, checks := manifest.Scripts["typecheck"].(string)
-			byName[manifest.Name] = WorkspaceMember{
-				manifest.Name, directory,
-				workspaceNames(manifest.Dependencies), workspaceNames(manifest.DevDependencies), checks,
+			if ok {
+				byName[member.Name] = member
 			}
 		}
 	}
@@ -172,6 +165,32 @@ func ReadWorkspaceMembers(root string) ([]WorkspaceMember, error) {
 	}
 	sort.Slice(members, func(i, j int) bool { return members[i].Name < members[j].Name })
 	return members, nil
+}
+
+// readWorkspaceMember reads directory's package.json; a directory without one,
+// or one without a name, is not a member.
+func readWorkspaceMember(directory string) (WorkspaceMember, bool, error) {
+	data, err := os.ReadFile(filepath.Join(directory, "package.json"))
+	if err != nil {
+		return WorkspaceMember{}, false, nil
+	}
+	var manifest struct {
+		Name            string         `json:"name"`
+		Dependencies    any            `json:"dependencies"`
+		DevDependencies any            `json:"devDependencies"`
+		Scripts         map[string]any `json:"scripts"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return WorkspaceMember{}, false, fmt.Errorf("%s: %w", filepath.Join(directory, "package.json"), err)
+	}
+	if manifest.Name == "" {
+		return WorkspaceMember{}, false, nil
+	}
+	_, checks := manifest.Scripts["typecheck"].(string)
+	return WorkspaceMember{
+		manifest.Name, directory,
+		workspaceNames(manifest.Dependencies), workspaceNames(manifest.DevDependencies), checks,
+	}, true, nil
 }
 
 func groupMemberDirectories(root string) map[string]bool {
@@ -321,24 +340,28 @@ func firstCycle(edges map[string][]string, dropped map[string]bool) []string {
 func droppedEdges(edges map[string][]string) map[string]bool {
 	dropped := map[string]bool{}
 	for cycle := firstCycle(edges, dropped); cycle != nil; cycle = firstCycle(edges, dropped) {
-		candidates := []string{}
-		for i, node := range cycle[:len(cycle)-1] {
-			candidates = append(candidates, node+"\n"+cycle[i+1])
-		}
-		chosen := candidates[0]
-		for _, candidate := range candidates {
-			trial := map[string]bool{candidate: true}
-			for edge := range dropped {
-				trial[edge] = true
-			}
-			if firstCycle(edges, trial) == nil {
-				chosen = candidate
-				break
-			}
-		}
-		dropped[chosen] = true
+		dropped[edgeToDrop(edges, dropped, cycle)] = true
 	}
 	return dropped
+}
+
+// edgeToDrop is the first edge of cycle whose removal, with those already
+// dropped, leaves no cycle; failing that, the cycle's first edge.
+func edgeToDrop(edges map[string][]string, dropped map[string]bool, cycle []string) string {
+	candidates := []string{}
+	for i, node := range cycle[:len(cycle)-1] {
+		candidates = append(candidates, node+"\n"+cycle[i+1])
+	}
+	for _, candidate := range candidates {
+		trial := map[string]bool{candidate: true}
+		for edge := range dropped {
+			trial[edge] = true
+		}
+		if firstCycle(edges, trial) == nil {
+			return candidate
+		}
+	}
+	return candidates[0]
 }
 
 type deriver struct {
@@ -370,12 +393,7 @@ func (d *deriver) targetsFor(names []string) []string {
 }
 
 func (d *deriver) buildEdges() map[string][]string {
-	edges := map[string][]string{d.group: {}}
-	if exists(d.group) {
-		for _, path := range referencePaths(d.config(d.group), "references") {
-			edges[d.group] = append(edges[d.group], resolvePath(filepath.Dir(d.group), path))
-		}
-	}
+	edges := map[string][]string{d.group: d.groupEdges()}
 	for _, member := range d.members {
 		producer := d.producer(member.Directory)
 		if producer == "" {
@@ -385,15 +403,31 @@ func (d *deriver) buildEdges() map[string][]string {
 		if !d.groupMembers[member.Directory] {
 			targets = d.targetsFor(member.Dependencies)
 		}
-		kept := []string{}
-		for _, edge := range unique(targets) {
-			if edge != producer {
-				kept = append(kept, edge)
-			}
-		}
-		edges[producer] = kept
+		edges[producer] = without(unique(targets), producer)
 	}
 	return edges
+}
+
+func (d *deriver) groupEdges() []string {
+	edges := []string{}
+	if !exists(d.group) {
+		return edges
+	}
+	for _, path := range referencePaths(d.config(d.group), "references") {
+		edges = append(edges, resolvePath(filepath.Dir(d.group), path))
+	}
+	return edges
+}
+
+// without returns items minus every copy of drop, never nil.
+func without(items []string, drop string) []string {
+	kept := []string{}
+	for _, item := range items {
+		if item != drop {
+			kept = append(kept, item)
+		}
+	}
+	return kept
 }
 
 type kind struct {
@@ -454,25 +488,50 @@ func currentReferences(config map[string]any) []string {
 	return current
 }
 
-func (d *deriver) kinds(member WorkspaceMember, isGroup bool, own string, buildTargets, dependencyTargets, consumerTargets []string) []kind {
+// memberTargets is what one member's tsconfigs reference: own is its producer
+// (the group solution for a group member), build the build config's targets
+// with dropped edges removed, dependency every runtime and dev dependency's
+// producer, consumer those plus own.
+type memberTargets struct {
+	isGroup                     bool
+	own                         string
+	build, dependency, consumer []string
+}
+
+func (d *deriver) kinds(member WorkspaceMember, targets memberTargets) []kind {
 	build := filepath.Join(member.Directory, "tsconfig.build.json")
 	var out []kind
-	if own == build || isGroup {
-		out = append(out, kind{build, unique(buildTargets)})
+	if targets.own == build || targets.isGroup {
+		out = append(out, kind{build, unique(targets.build)})
 	}
 	for _, name := range checkRoots {
-		out = append(out, kind{filepath.Join(member.Directory, name), consumerTargets})
+		out = append(out, kind{filepath.Join(member.Directory, name), targets.consumer})
 	}
-	if own != "" && own != build && !isGroup {
-		targets := []string{}
-		for _, target := range dependencyTargets {
-			if target != own {
-				targets = append(targets, target)
-			}
-		}
-		out = append(out, kind{own, targets})
+	if targets.own != "" && targets.own != build && !targets.isGroup {
+		out = append(out, kind{targets.own, without(targets.dependency, targets.own)})
 	}
 	return out
+}
+
+func (d *deriver) targetsOf(member WorkspaceMember, dropped map[string]bool) memberTargets {
+	targets := memberTargets{isGroup: d.groupMembers[member.Directory], own: d.group, build: []string{d.group}}
+	if !targets.isGroup {
+		targets.own = d.producer(member.Directory)
+		targets.build = d.targetsFor(member.Dependencies)
+	}
+	kept := []string{}
+	for _, target := range targets.build {
+		if !dropped[d.producer(member.Directory)+"\n"+target] {
+			kept = append(kept, target)
+		}
+	}
+	targets.build = kept
+	targets.dependency = unique(append(d.targetsFor(member.Dependencies), d.targetsFor(member.DevDependencies)...))
+	targets.consumer = targets.dependency
+	if targets.own != "" {
+		targets.consumer = unique(append([]string{targets.own}, targets.dependency...))
+	}
+	return targets
 }
 
 // DeriveProjects computes every tsconfig's references from the workspace.
@@ -486,27 +545,7 @@ func DeriveProjects(root string, members []WorkspaceMember) []Project {
 	dropped := droppedEdges(d.buildEdges())
 	var projects []Project
 	for _, member := range members {
-		isGroup := d.groupMembers[member.Directory]
-		own := d.group
-		if !isGroup {
-			own = d.producer(member.Directory)
-		}
-		buildTargets := []string{d.group}
-		if !isGroup {
-			buildTargets = d.targetsFor(member.Dependencies)
-		}
-		kept := []string{}
-		for _, target := range buildTargets {
-			if !dropped[d.producer(member.Directory)+"\n"+target] {
-				kept = append(kept, target)
-			}
-		}
-		dependencyTargets := unique(append(d.targetsFor(member.Dependencies), d.targetsFor(member.DevDependencies)...))
-		consumerTargets := dependencyTargets
-		if own != "" {
-			consumerTargets = unique(append([]string{own}, dependencyTargets...))
-		}
-		for _, k := range d.kinds(member, isGroup, own, kept, dependencyTargets, consumerTargets) {
+		for _, k := range d.kinds(member, d.targetsOf(member, dropped)) {
 			projects = append(projects, d.derivedProject(k)...)
 		}
 	}
@@ -599,64 +638,85 @@ func renderBuildSolution(root string, projects []Project) string {
 
 type changedFile struct{ path, before, after string }
 
-func runSyncReferences(root string, args []string, stdout, stderr io.Writer) int {
-	write := slices.Contains(args, "--write")
-	members, err := ReadWorkspaceMembers(root)
+// syncRun is one sync-references invocation and what it has found so far.
+type syncRun struct {
+	command     subcommand
+	write       bool
+	changed     []changedFile
+	undeducible []string
+}
+
+func runSyncReferences(command subcommand) int {
+	run := &syncRun{command: command, write: slices.Contains(command.args, "--write")}
+	members, err := ReadWorkspaceMembers(command.root)
 	if err != nil {
-		fmt.Fprintln(stderr, "sync-references:", err)
-		return 1
+		return run.fail(err)
 	}
-	projects := DeriveProjects(root, members)
-	var changed []changedFile
-	var undeducible []string
+	projects := DeriveProjects(command.root, members)
 	for _, project := range projects {
-		path := relativeReference(root, project.File)
-		data, err := os.ReadFile(project.File)
-		if err != nil {
-			fmt.Fprintln(stderr, "sync-references:", err)
-			return 1
-		}
-		before := string(data)
-		after := RenderReferences(before, project.References)
-		for _, entry := range project.Undeduced {
-			undeducible = append(undeducible, fmt.Sprintf("Undeducible reference in %s: %s. Keep it under langwatchExtraReferences.", path, entry))
-		}
-		if before == after {
-			continue
-		}
-		changed = append(changed, changedFile{path, before, after})
-		if write {
-			if err := os.WriteFile(project.File, []byte(after), 0o644); err != nil {
-				fmt.Fprintln(stderr, "sync-references:", err)
-				return 1
-			}
+		if err := run.syncProject(project); err != nil {
+			return run.fail(err)
 		}
 	}
-	solutionPath := filepath.Join(root, "tsconfig.build.json")
-	solution := renderBuildSolution(root, projects)
-	existing, _ := os.ReadFile(solutionPath)
-	if string(existing) != solution {
-		changed = append(changed, changedFile{"tsconfig.build.json", string(existing), solution})
-		if write {
-			if err := os.WriteFile(solutionPath, []byte(solution), 0o644); err != nil {
-				fmt.Fprintln(stderr, "sync-references:", err)
-				return 1
-			}
-		}
+	if err := run.syncSolution(projects); err != nil {
+		return run.fail(err)
 	}
-	if write {
-		fmt.Fprintf(stdout, "Wrote %d of %d tsconfig files.\n", len(changed), len(projects))
-	} else {
-		for _, file := range changed {
-			fmt.Fprintf(stdout, "%s\n\n", unifiedDiff(file.path, file.before, file.after))
-		}
-	}
-	for _, line := range undeducible {
-		fmt.Fprintln(stdout, line)
-	}
-	fmt.Fprintf(stdout, "%d of %d tsconfig files differ; %d undeducible entries.\n", len(changed), len(projects), len(undeducible))
-	if !write && (len(changed) > 0 || len(undeducible) > 0) {
+	run.report(len(projects))
+	if !run.write && (len(run.changed) > 0 || len(run.undeducible) > 0) {
 		return 1
 	}
 	return 0
+}
+
+func (run *syncRun) fail(err error) int {
+	fmt.Fprintln(run.command.stderr, "sync-references:", err)
+	return 1
+}
+
+func (run *syncRun) syncProject(project Project) error {
+	path := relativeReference(run.command.root, project.File)
+	data, err := os.ReadFile(project.File)
+	if err != nil {
+		return err
+	}
+	before := string(data)
+	after := RenderReferences(before, project.References)
+	for _, entry := range project.Undeduced {
+		run.undeducible = append(run.undeducible, fmt.Sprintf("Undeducible reference in %s: %s. Keep it under langwatchExtraReferences.", path, entry))
+	}
+	return run.record(changedFile{path, before, after}, project.File)
+}
+
+func (run *syncRun) syncSolution(projects []Project) error {
+	solutionPath := filepath.Join(run.command.root, "tsconfig.build.json")
+	solution := renderBuildSolution(run.command.root, projects)
+	existing, _ := os.ReadFile(solutionPath)
+	return run.record(changedFile{"tsconfig.build.json", string(existing), solution}, solutionPath)
+}
+
+// record notes a file whose content would change and, with --write, writes it to target.
+func (run *syncRun) record(file changedFile, target string) error {
+	if file.before == file.after {
+		return nil
+	}
+	run.changed = append(run.changed, file)
+	if !run.write {
+		return nil
+	}
+	return os.WriteFile(target, []byte(file.after), 0o644)
+}
+
+func (run *syncRun) report(projects int) {
+	stdout := run.command.stdout
+	if run.write {
+		fmt.Fprintf(stdout, "Wrote %d of %d tsconfig files.\n", len(run.changed), projects)
+	} else {
+		for _, file := range run.changed {
+			fmt.Fprintf(stdout, "%s\n\n", unifiedDiff(file.path, file.before, file.after))
+		}
+	}
+	for _, line := range run.undeducible {
+		fmt.Fprintln(stdout, line)
+	}
+	fmt.Fprintf(stdout, "%d of %d tsconfig files differ; %d undeducible entries.\n", len(run.changed), projects, len(run.undeducible))
 }

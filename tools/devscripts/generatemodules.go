@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -30,10 +29,16 @@ const browserApp = "apps/ui"
 type Output struct{ Path, Source string }
 
 type catalogue struct {
-	Features []struct{ ID, Root string } `json:"features"`
+	Features []catalogueEntry `json:"features"`
 }
 
+type catalogueEntry struct{ ID, Root string }
+
 type declaration struct{ id, symbol, pkg, specifier string }
+
+// declarationKind is one half the generated lists cover: its file infix
+// ("module" or "web") and the suffix of the symbol it exports.
+type declarationKind struct{ half, suffix string }
 
 type packageJSON struct {
 	Name    string `json:"name"`
@@ -88,9 +93,28 @@ func readManifest(path string) (packageJSON, error) {
 	return manifest, json.Unmarshal(data, &manifest)
 }
 
-func hasDeclarationExport(half string, manifest packageJSON, id, indexPath string) bool {
+// declarationSite is where one catalogue entry's half would live on disk.
+type declarationSite struct {
+	id, packagePath, declarationPath, indexPath string
+}
+
+func siteFor(root string, entry catalogueEntry, kind declarationKind) declarationSite {
+	dir := "browser"
+	if kind.half == "module" {
+		dir = "process"
+	}
+	base := filepath.Join(root, entry.Root, dir)
+	return declarationSite{
+		id:              entry.ID,
+		packagePath:     filepath.Join(base, "package.json"),
+		declarationPath: filepath.Join(base, "src", entry.ID+"."+kind.half+".ts"),
+		indexPath:       filepath.Join(base, "src", "index.ts"),
+	}
+}
+
+func hasDeclarationExport(half string, manifest packageJSON, site declarationSite) bool {
 	if half != "web" {
-		return exists(indexPath)
+		return exists(site.indexPath)
 	}
 	exports, ok := manifest.Exports.(map[string]any)
 	if !ok {
@@ -103,50 +127,49 @@ func hasDeclarationExport(half string, manifest packageJSON, id, indexPath strin
 			target = object["default"]
 		}
 	}
-	return target == "./src/"+id+".web.ts"
+	return target == "./src/"+site.id+".web.ts"
 }
 
-func declarationsFor(root string, cat catalogue, half, suffix string) ([]declaration, error) {
-	dir := "browser"
-	if half == "module" {
-		dir = "process"
-	}
+func declarationsFor(root string, cat catalogue, kind declarationKind) ([]declaration, error) {
 	var out []declaration
 	for _, entry := range cat.Features {
-		base := filepath.Join(root, entry.Root, dir)
-		packagePath := filepath.Join(base, "package.json")
-		declarationPath := filepath.Join(base, "src", entry.ID+"."+half+".ts")
-		indexPath := filepath.Join(base, "src", "index.ts")
-		if !exists(packagePath) || !exists(declarationPath) {
-			continue
-		}
-		manifest, err := readManifest(packagePath)
+		found, ok, err := declarationOf(siteFor(root, entry, kind), kind)
 		if err != nil {
 			return nil, err
 		}
-		if !hasDeclarationExport(half, manifest, entry.ID, indexPath) {
-			continue
+		if ok {
+			out = append(out, found)
 		}
-		symbol := camelCase(entry.ID) + suffix
-		source := indexPath
-		if half == "web" {
-			source = declarationPath
-		}
-		text, err := os.ReadFile(source)
-		if err != nil {
-			return nil, err
-		}
-		if !containsWord(text, symbol, true) {
-			continue
-		}
-		specifier := manifest.Name
-		if half == "web" {
-			specifier += "/declaration"
-		}
-		out = append(out, declaration{entry.ID, symbol, manifest.Name, specifier})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return collate.Compare(out[i].symbol, out[j].symbol) < 0 })
 	return out, nil
+}
+
+// declarationOf reads the declaration a site exports, if it has one.
+func declarationOf(site declarationSite, kind declarationKind) (declaration, bool, error) {
+	if !exists(site.packagePath) || !exists(site.declarationPath) {
+		return declaration{}, false, nil
+	}
+	manifest, err := readManifest(site.packagePath)
+	if err != nil {
+		return declaration{}, false, err
+	}
+	if !hasDeclarationExport(kind.half, manifest, site) {
+		return declaration{}, false, nil
+	}
+	symbol := camelCase(site.id) + kind.suffix
+	source, specifier := site.indexPath, manifest.Name
+	if kind.half == "web" {
+		source, specifier = site.declarationPath, specifier+"/declaration"
+	}
+	text, err := os.ReadFile(source)
+	if err != nil {
+		return declaration{}, false, err
+	}
+	if !containsWord(text, symbol, true) {
+		return declaration{}, false, nil
+	}
+	return declaration{site.id, symbol, manifest.Name, specifier}, true, nil
 }
 
 func listSource(declarations []declaration, constant, half string) string {
@@ -218,25 +241,37 @@ func packageSource(root, manifestPath string, packages []string) (string, error)
 	if !ok {
 		return "", fmt.Errorf("%s: not a JSON object", manifestPath)
 	}
-	dependencies := Object{}
-	for _, member := range manifest {
-		if member.Key == "dependencies" {
-			if existing, ok := member.Value.(Object); ok {
-				dependencies = existing
-			}
-		}
-	}
+	dependencies := existingDependencies(manifest)
 	for _, name := range slices.Compact(slices.Sorted(slices.Values(packages))) {
-		if slices.ContainsFunc(dependencies, func(m Member) bool { return m.Key == name }) {
-			continue
-		}
-		at := slices.IndexFunc(dependencies, func(m Member) bool { return m.Key > name })
-		if at < 0 {
-			at = len(dependencies)
-		}
-		dependencies = slices.Insert(dependencies, at, Member{name, "workspace:*"})
+		dependencies = withWorkspaceDependency(dependencies, name)
 	}
 	return stringifyJS(manifest.Set("dependencies", dependencies)) + "\n", nil
+}
+
+// existingDependencies returns the manifest's last "dependencies" object, or an empty one.
+func existingDependencies(manifest Object) Object {
+	dependencies := Object{}
+	for _, member := range manifest {
+		if member.Key != "dependencies" {
+			continue
+		}
+		if existing, ok := member.Value.(Object); ok {
+			dependencies = existing
+		}
+	}
+	return dependencies
+}
+
+// withWorkspaceDependency inserts name as "workspace:*" in key order unless it is already declared.
+func withWorkspaceDependency(dependencies Object, name string) Object {
+	if slices.ContainsFunc(dependencies, func(m Member) bool { return m.Key == name }) {
+		return dependencies
+	}
+	at := slices.IndexFunc(dependencies, func(m Member) bool { return m.Key > name })
+	if at < 0 {
+		at = len(dependencies)
+	}
+	return slices.Insert(dependencies, at, Member{name, "workspace:*"})
 }
 
 // GenerateModules returns every generated file, in the order the script writes them.
@@ -249,11 +284,11 @@ func GenerateModules(root string) ([]Output, error) {
 	if err := json.Unmarshal(data, &cat); err != nil {
 		return nil, err
 	}
-	servers, err := declarationsFor(root, cat, "module", "ProcessModule")
+	servers, err := declarationsFor(root, cat, declarationKind{half: "module", suffix: "ProcessModule"})
 	if err != nil {
 		return nil, err
 	}
-	webs, err := declarationsFor(root, cat, "web", "Web")
+	webs, err := declarationsFor(root, cat, declarationKind{half: "web", suffix: "Web"})
 	if err != nil {
 		return nil, err
 	}
@@ -286,33 +321,45 @@ func GenerateModules(root string) ([]Output, error) {
 		Output{browserApp + "/package.json", manifest}), nil
 }
 
-func runGenerateModules(root string, args []string, stdout, stderr io.Writer) int {
-	outputs, err := GenerateModules(root)
+func runGenerateModules(command subcommand) int {
+	outputs, err := GenerateModules(command.root)
 	if err != nil {
-		fmt.Fprintln(stderr, "generate-modules:", err)
+		fmt.Fprintln(command.stderr, "generate-modules:", err)
 		return 1
 	}
-	dry := slices.Contains(args, "--dry-run")
-	if slices.Contains(args, "--check") {
-		stale := 0
-		for _, out := range outputs {
-			if onDisk, err := os.ReadFile(filepath.Join(root, out.Path)); err != nil || string(onDisk) != out.Source {
-				fmt.Fprintf(stderr, "generate-modules: %s is stale; run pnpm generate:modules\n", out.Path)
-				stale++
-			}
-		}
-		return min(stale, 1)
+	if slices.Contains(command.args, "--check") {
+		return checkGenerated(command, outputs)
 	}
+	dry := slices.Contains(command.args, "--dry-run")
 	for _, out := range outputs {
-		if dry {
-			fmt.Fprintf(stdout, "Would generate %s (%d lines)\n", out.Path, strings.Count(out.Source, "\n"))
-			continue
-		}
-		if err := os.WriteFile(filepath.Join(root, out.Path), []byte(out.Source), 0o644); err != nil {
-			fmt.Fprintln(stderr, "generate-modules:", err)
+		if err := writeGenerated(command, out, dry); err != nil {
+			fmt.Fprintln(command.stderr, "generate-modules:", err)
 			return 1
 		}
-		fmt.Fprintf(stdout, "Wrote %s\n", out.Path)
 	}
 	return 0
+}
+
+// checkGenerated reports each output that differs from the file on disk, and exits 1 if any does.
+func checkGenerated(command subcommand, outputs []Output) int {
+	stale := 0
+	for _, out := range outputs {
+		if onDisk, err := os.ReadFile(filepath.Join(command.root, out.Path)); err != nil || string(onDisk) != out.Source {
+			fmt.Fprintf(command.stderr, "generate-modules: %s is stale; run pnpm generate:modules\n", out.Path)
+			stale++
+		}
+	}
+	return min(stale, 1)
+}
+
+func writeGenerated(command subcommand, out Output, dry bool) error {
+	if dry {
+		fmt.Fprintf(command.stdout, "Would generate %s (%d lines)\n", out.Path, strings.Count(out.Source, "\n"))
+		return nil
+	}
+	if err := os.WriteFile(filepath.Join(command.root, out.Path), []byte(out.Source), 0o644); err != nil {
+		return err
+	}
+	fmt.Fprintf(command.stdout, "Wrote %s\n", out.Path)
+	return nil
 }

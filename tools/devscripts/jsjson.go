@@ -43,17 +43,25 @@ func decodeOrdered(dec *json.Decoder) (any, error) {
 		return tok, nil
 	}
 	if delim == '[' {
-		list := []any{}
-		for dec.More() {
-			item, err := decodeOrdered(dec)
-			if err != nil {
-				return nil, err
-			}
-			list = append(list, item)
-		}
-		_, err := dec.Token()
-		return list, err
+		return decodeOrderedArray(dec)
 	}
+	return decodeOrderedObject(dec)
+}
+
+func decodeOrderedArray(dec *json.Decoder) (any, error) {
+	list := []any{}
+	for dec.More() {
+		item, err := decodeOrdered(dec)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, item)
+	}
+	_, err := dec.Token()
+	return list, err
+}
+
+func decodeOrderedObject(dec *json.Decoder) (any, error) {
 	object := Object{}
 	for dec.More() {
 		key, err := dec.Token()
@@ -66,7 +74,7 @@ func decodeOrdered(dec *json.Decoder) (any, error) {
 		}
 		object = append(object, Member{Key: key.(string), Value: value})
 	}
-	_, err = dec.Token()
+	_, err := dec.Token()
 	return object, err
 }
 
@@ -79,7 +87,6 @@ func stringifyJS(value any) string {
 }
 
 func writeJS(sb *strings.Builder, value any, indent string) {
-	inner := indent + "  "
 	switch v := value.(type) {
 	case nil:
 		sb.WriteString("null")
@@ -92,32 +99,42 @@ func writeJS(sb *strings.Builder, value any, indent string) {
 	case int:
 		fmt.Fprintf(sb, "%d", v)
 	case []any:
-		if len(v) == 0 {
-			sb.WriteString("[]")
-			return
-		}
-		sb.WriteString("[\n")
-		for i, item := range v {
-			sb.WriteString(inner)
-			writeJS(sb, item, inner)
-			sb.WriteString(separator(i, len(v)))
-		}
-		sb.WriteString(indent + "]")
+		writeJSArray(sb, v, indent)
 	case Object:
-		if len(v) == 0 {
-			sb.WriteString("{}")
-			return
-		}
-		sb.WriteString("{\n")
-		for i, member := range v {
-			sb.WriteString(inner + jsQuote(member.Key) + ": ")
-			writeJS(sb, member.Value, inner)
-			sb.WriteString(separator(i, len(v)))
-		}
-		sb.WriteString(indent + "}")
+		writeJSObject(sb, v, indent)
 	default:
 		panic(fmt.Sprintf("stringifyJS: unsupported %T", value))
 	}
+}
+
+func writeJSArray(sb *strings.Builder, items []any, indent string) {
+	if len(items) == 0 {
+		sb.WriteString("[]")
+		return
+	}
+	inner := indent + "  "
+	sb.WriteString("[\n")
+	for i, item := range items {
+		sb.WriteString(inner)
+		writeJS(sb, item, inner)
+		sb.WriteString(separator(i, len(items)))
+	}
+	sb.WriteString(indent + "]")
+}
+
+func writeJSObject(sb *strings.Builder, object Object, indent string) {
+	if len(object) == 0 {
+		sb.WriteString("{}")
+		return
+	}
+	inner := indent + "  "
+	sb.WriteString("{\n")
+	for i, member := range object {
+		sb.WriteString(inner + jsQuote(member.Key) + ": ")
+		writeJS(sb, member.Value, inner)
+		sb.WriteString(separator(i, len(object)))
+	}
+	sb.WriteString(indent + "}")
 }
 
 func separator(i, n int) string {
