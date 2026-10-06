@@ -104,6 +104,7 @@ Feature: Edit the configuration of a pull-mode ingestion source
     # The explanation sits behind that marker rather than as a paragraph under
     # the fields, where three of them pushed the fields below the fold. See
     # dev/docs/best_practices/copywriting.md.
+    @integration
     Scenario: A locked backfill start says why it is locked
       Given the source has completed at least one pull
       And the source is configured for the usage report
@@ -142,11 +143,13 @@ Feature: Edit the configuration of a pull-mode ingestion source
     # drawer no longer telling a pull-source admin about an ingest secret
     # their source does not have.
 
+    @integration
     Scenario: A pull-mode source is not told its ingest secret is immutable
       When the admin opens the edit form for a pull-mode source
       Then the form does not describe the ingest secret as immutable
       And the form still explains that the source type is immutable
 
+    @integration
     Scenario: A push-mode source is told both are immutable
       Given a push-mode ingestion source
       When the admin opens the edit form for that source
@@ -155,11 +158,13 @@ Feature: Edit the configuration of a pull-mode ingestion source
 
   Rule: The source detail page can edit, not only the source list
 
+    @integration
     Scenario: Editing is reachable from the detail page
       When the admin opens the source detail page
       Then an edit control is offered
       And it opens the same configuration form as the source list
 
+    @integration
     Scenario: A viewer without manage permission cannot edit
       Given an admin holding only the ingestionSources:view permission
       When they open the source detail page
