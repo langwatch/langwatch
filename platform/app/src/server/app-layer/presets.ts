@@ -1319,6 +1319,7 @@ export function initializeDefaultApp(options?: {
     traces: { spans: spanStorage },
     traceSummaryRepository: repositories.traceSummaryFold,
     resolveClickHouseClient,
+    authorization: authorizationService,
   });
 
   // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
@@ -1520,6 +1521,7 @@ export function initializeDefaultApp(options?: {
 
   const registry = new PipelineRegistry({
     eventSourcing: es,
+    authorization: authorizationService,
     repositories,
     redis: redis!,
     broadcast,

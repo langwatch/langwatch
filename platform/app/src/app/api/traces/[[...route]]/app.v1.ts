@@ -613,6 +613,10 @@ export function registerTracesRoutes(
       }
 
       const transcript = await readCodingAgentTranscriptWithProtections({
+        authorization: await authorizeTraceRead({
+          projectId: project.id,
+          route: "api/v1/traces/:traceId/transcript",
+        }),
         projectId: project.id,
         traceId: trace.trace_id,
         occurredAtMs: trace.timestamps.started_at,

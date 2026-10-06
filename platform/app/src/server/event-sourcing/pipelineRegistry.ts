@@ -36,6 +36,11 @@ import { SsoConnectionGuards } from "@ee/sso/sso-connection-guards";
 import type { SsoConnectionRegistrationRepository } from "@ee/sso/sso-connection-registration.repository";
 import { PrismaSsoDomainProofNotificationPort } from "@ee/sso/sso-self-serve-adapters";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
+import {
+  type Authorization,
+  type AuthorizationPurpose,
+  internalActor,
+} from "@langwatch/actor";
 import type {
   IdentityHeadsRepository,
   IdentityReservationRepository,
@@ -86,6 +91,7 @@ import {
 } from "../../../ee/billing/services/instantEvalSpendQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
+import type { AuthorizationService } from "../app-layer/authz/authorization.service";
 import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
@@ -496,6 +502,13 @@ export interface PipelineRepositories {
 
 export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
+  /**
+   * Mints the proof a pipeline's span read is fenced by (ADR-144 block C).
+   * A command or subscriber names its tenant from the envelope it handles;
+   * the registry turns that into an own-only proof at the wiring seam, so
+   * the pure modules never hold a project id where the store wants a proof.
+   */
+  authorization: Pick<AuthorizationService, "authorizeInternal">;
   repositories: PipelineRepositories;
   redis: Redis | Cluster;
   broadcast: BroadcastService;
@@ -583,6 +596,28 @@ export interface PipelineRegistryDeps {
  */
 export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
+
+  /**
+   * The own-only proof one pipeline read is fenced by. `codePath` names the
+   * module reading, `purpose` what it reads for: the event it handles when
+   * it has one, else the entry point.
+   */
+  private authorizeSpanRead({
+    codePath,
+    projectId,
+    purpose,
+  }: {
+    codePath: string;
+    projectId: string;
+    purpose: AuthorizationPurpose;
+  }): Promise<Authorization> {
+    return this.deps.authorization.authorizeInternal({
+      actor: internalActor(codePath),
+      projectId,
+      permission: "traces:view",
+      purpose,
+    });
+  }
 
   /**
    * ADR-051: the trace pipeline's projectMetadata subscriber bootstraps a
@@ -820,8 +855,16 @@ export class PipelineRegistry {
       codingAgentSubscribers: [
         createCodingAgentSpanFactsDispatchSubscriber({
           contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
-          getNormalizedSpanById: (params) =>
-            this.deps.traces.spans.getNormalizedSpanById(params),
+          getNormalizedSpanById: async ({ tenantId, eventId, ...params }) =>
+            this.deps.traces.spans.getNormalizedSpanById({
+              authorization: await this.authorizeSpanRead({
+                codePath:
+                  "event-sourcing/pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber",
+                projectId: tenantId,
+                purpose: { kind: "event", eventId },
+              }),
+              ...params,
+            }),
         }),
       ],
     });
@@ -1416,8 +1459,36 @@ export class PipelineRegistry {
   }) {
     const executeEvaluationCommand = new ExecuteEvaluationCommand({
       monitors: this.deps.monitors,
-      spanStorage: this.deps.traces.spans,
-      traceEvents: this.deps.traces.spans,
+      spanStorage: {
+        getSpansByTraceId: async ({ tenantId, ...params }) =>
+          this.deps.traces.spans.getSpansByTraceId({
+            authorization: await this.authorizeSpanRead({
+              codePath:
+                "event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command",
+              projectId: tenantId,
+              purpose: {
+                kind: "operator",
+                entry: "ExecuteEvaluationCommand.handle",
+              },
+            }),
+            ...params,
+          }),
+      },
+      traceEvents: {
+        getEventsByTraceId: async ({ tenantId, ...params }) =>
+          this.deps.traces.spans.getEventsByTraceId({
+            authorization: await this.authorizeSpanRead({
+              codePath:
+                "event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command",
+              projectId: tenantId,
+              purpose: {
+                kind: "operator",
+                entry: "ExecuteEvaluationCommand.handle",
+              },
+            }),
+            ...params,
+          }),
+      },
       evaluationExecution: this.deps.evaluations.execution,
       costRecorder: this.deps.costRecorder,
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
@@ -1828,8 +1899,19 @@ export class PipelineRegistry {
     const computeRunMetricsCommand = new ComputeRunMetricsCommand({
       traceSummaryStore,
       scheduleRetry: scheduleRetry.fn,
-      deriveScenarioRoleMetrics: (params) =>
-        traceReadDerivation.deriveScenarioRoleMetrics(params),
+      deriveScenarioRoleMetrics: async ({ tenantId, ...params }) =>
+        traceReadDerivation.deriveScenarioRoleMetrics({
+          authorization: await this.authorizeSpanRead({
+            codePath:
+              "event-sourcing/pipelines/simulation-processing/commands/computeRunMetrics.command",
+            projectId: tenantId,
+            purpose: {
+              kind: "operator",
+              entry: "ComputeRunMetricsCommand.handle",
+            },
+          }),
+          ...params,
+        }),
     });
 
     // ECST backfill: FinishRunCommand and RecordEvaluationsCommand load the
@@ -1910,7 +1992,20 @@ export class PipelineRegistry {
           };
         },
       },
-      spans: this.deps.traces.spans,
+      spans: {
+        getSpansByTraceId: async ({ tenantId, ...params }) =>
+          this.deps.traces.spans.getSpansByTraceId({
+            authorization: await this.authorizeSpanRead({
+              codePath: "scenarios/evaluations/runScenarioEvaluations",
+              projectId: tenantId,
+              purpose: {
+                kind: "operator",
+                entry: "runScenarioEvaluations.loadSpans",
+              },
+            }),
+            ...params,
+          }),
+      },
       runEvaluation: (params) =>
         runEvaluation({
           ...params,

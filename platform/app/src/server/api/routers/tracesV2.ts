@@ -1,4 +1,5 @@
 import { on } from "node:events";
+import type { Authorization } from "@langwatch/actor";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
@@ -423,13 +424,13 @@ function hasOwnPromptAttrs(params: Record<string, unknown> | null): boolean {
  * caller can skip the assignment.
  */
 async function enrichLlmSpanWithAncestorPrompt({
-  tenantId,
+  authorization,
   traceId,
   targetSpanId,
   occurredAtMs,
   currentParams,
 }: {
-  tenantId: string;
+  authorization: Authorization;
   traceId: string;
   targetSpanId: string;
   occurredAtMs?: number;
@@ -437,7 +438,7 @@ async function enrichLlmSpanWithAncestorPrompt({
 }): Promise<Record<string, unknown> | null> {
   const app = getApp();
   const allSpans = await app.traces.spans.getSpansByTraceId({
-    tenantId,
+    authorization,
     traceId,
     occurredAtMs,
   });
@@ -985,12 +986,15 @@ const sortSchema = z.object({
 async function enrichSpanDetailFromCodingAgentLogs({
   app,
   span,
+  authorization,
   tenantId,
   traceId,
   occurredAtMs,
 }: {
   app: ReturnType<typeof getApp>;
   span: Span;
+  /** Fences the sibling span read; the log read still keys on the tenant. */
+  authorization: Authorization;
   tenantId: string;
   traceId: string;
   occurredAtMs?: number;
@@ -1003,7 +1007,7 @@ async function enrichSpanDetailFromCodingAgentLogs({
       app.traces.logRecords.getLogsByTraceId(tenantId, traceId, occurredAtMs),
       needsSiblingRefs
         ? app.traces.spans.getSpanSummaryByTraceId({
-            tenantId,
+            authorization,
             traceId,
             occurredAtMs,
           })
@@ -1041,20 +1045,30 @@ async function loadProtectedSpansFull({
   ctx,
 }: {
   input: { projectId: string; traceId: string; occurredAtMs?: number };
-  ctx: { session: unknown; prisma: unknown } & Record<string, unknown>;
+  ctx: {
+    session: unknown;
+    prisma: unknown;
+    authorization?: Authorization;
+  } & Record<string, unknown>;
 }): Promise<SpanDetail[]> {
   const protections = await getUserProtectionsForProject(ctx as never, {
     projectId: input.projectId,
   });
-  return loadSpansFullWithProtections({ ...input, protections });
+  return loadSpansFullWithProtections({
+    ...input,
+    authorization: requireRouteAuthorization(ctx),
+    protections,
+  });
 }
 
 async function loadSpansFullWithProtections({
+  authorization,
   projectId,
   traceId,
   occurredAtMs,
   protections,
 }: {
+  authorization: Authorization;
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
@@ -1063,7 +1077,7 @@ async function loadSpansFullWithProtections({
   const app = getApp();
   const input = { projectId, traceId, occurredAtMs };
   const storedSpans = await app.traces.spans.getSpansByTraceId({
-    tenantId: input.projectId,
+    authorization,
     traceId: input.traceId,
     visibilityCutoffMs: await getVisibilityCutoffMsForProject(input.projectId),
     ...occurredAtFromInput(input),
@@ -1156,17 +1170,20 @@ async function loadTraceLogsWithProtections({
  * passes as every sibling read.
  */
 export async function readCodingAgentTranscriptWithProtections({
+  authorization,
   projectId,
   traceId,
   occurredAtMs,
   protections,
 }: {
+  /** The proof the span read is fenced by; the caller's door mints it. */
+  authorization: Authorization;
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
   protections: Protections;
 }): Promise<CodingAgentTranscript> {
-  const args = { projectId, traceId, occurredAtMs, protections };
+  const args = { authorization, projectId, traceId, occurredAtMs, protections };
   const [spans, logs] = await Promise.all([
     loadSpansFullWithProtections(args),
     loadTraceLogsWithProtections(args),
@@ -1304,9 +1321,9 @@ export const tracesV2Router = createTRPCRouter({
     )
     .permission("traces:view")
     .query(
-      async ({ input }): Promise<Record<string, TraceEventRollup>> =>
+      async ({ input, ctx }): Promise<Record<string, TraceEventRollup>> =>
         getApp().traces.spans.getTraceEventRollupsByTraceIds({
-          tenantId: input.projectId,
+          authorization: requireRouteAuthorization(ctx),
           traceIds: input.traceIds,
           timeRange: input.timeRange,
         }),
@@ -1622,7 +1639,9 @@ export const tracesV2Router = createTRPCRouter({
           visibilityCutoffMs: await getVisibilityCutoffMsForProject(
             input.projectId,
           ),
-          full: input.full,
+          ...(input.full
+            ? { full: true, authorization: requireRouteAuthorization(ctx) }
+            : { full: false }),
         },
       );
       if (!summary) {
@@ -1719,7 +1738,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
       });
       const page = await app.traces.spans.getSpansPaginated({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         traceId: input.traceId,
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
           input.projectId,
@@ -1757,7 +1776,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
       });
       const spans = await app.traces.spans.getSpansSince({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         traceId: input.traceId,
         sinceStartTimeMs: input.sinceStartTimeMs,
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
@@ -1802,7 +1821,7 @@ export const tracesV2Router = createTRPCRouter({
           projectId: input.projectId,
         });
         const page = await app.traces.spans.getSpanSummariesPage({
-          tenantId: input.projectId,
+          authorization: requireRouteAuthorization(ctx),
           traceId: input.traceId,
           limit: input.limit,
           cursor: input.cursor,
@@ -1836,7 +1855,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
       });
       const rows = await app.traces.spans.getSpanSummariesSince({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         traceId: input.traceId,
         sinceUpdatedAtMs: input.sinceUpdatedAtMs,
         ...occurredAtFromInput(input),
@@ -1870,7 +1889,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
       });
       const rows = await app.traces.spans.getSpanSummaryByTraceId({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
@@ -1895,10 +1914,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }): Promise<SpanLangwatchSignals[]> => {
+    .query(async ({ input, ctx }): Promise<SpanLangwatchSignals[]> => {
       const app = getApp();
       const rows = await app.traces.spans.getLangwatchSignalsByTraceId({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
@@ -1951,6 +1970,7 @@ export const tracesV2Router = createTRPCRouter({
       });
       return readCodingAgentTranscriptWithProtections({
         ...input,
+        authorization: requireRouteAuthorization(ctx),
         protections,
       });
     }),
@@ -1978,7 +1998,7 @@ export const tracesV2Router = createTRPCRouter({
       // whose result was never read.
       const [span, rawEvents] = await Promise.all([
         app.traces.spans.getSpanById({
-          tenantId: input.projectId,
+          authorization: requireRouteAuthorization(ctx),
           traceId: input.traceId,
           spanId: input.spanId,
           visibilityCutoffMs: await getVisibilityCutoffMsForProject(
@@ -1987,7 +2007,7 @@ export const tracesV2Router = createTRPCRouter({
           ...hint,
         }),
         app.traces.spans.getSpanEvents({
-          tenantId: input.projectId,
+          authorization: requireRouteAuthorization(ctx),
           traceId: input.traceId,
           spanId: input.spanId,
           ...hint,
@@ -2007,6 +2027,7 @@ export const tracesV2Router = createTRPCRouter({
         ? await enrichSpanDetailFromCodingAgentLogs({
             app,
             span,
+            authorization: requireRouteAuthorization(ctx),
             tenantId: input.projectId,
             traceId: input.traceId,
             occurredAtMs: hint.occurredAtMs,
@@ -2056,7 +2077,7 @@ export const tracesV2Router = createTRPCRouter({
         !hasOwnPromptAttrs(detail.params as Record<string, unknown> | null)
       ) {
         const enriched = await enrichLlmSpanWithAncestorPrompt({
-          tenantId: input.projectId,
+          authorization: requireRouteAuthorization(ctx),
           traceId: input.traceId,
           targetSpanId: input.spanId,
           occurredAtMs: hint.occurredAtMs,
@@ -2111,7 +2132,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
       });
       const rows = await app.traces.spans.getSpanResourcesByTraceId({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
@@ -2166,7 +2187,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
       });
       const events = await app.traces.spans.getTraceEventsByTraceId({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });

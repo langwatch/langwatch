@@ -1,3 +1,4 @@
+import { internalActor } from "@langwatch/actor";
 import { createHash } from "crypto";
 import { z } from "zod";
 import { Prisma } from "~/generated/prisma/client";
@@ -189,6 +190,15 @@ export const sharedTraceRouter = createTRPCRouter({
       }
 
       const app = getApp();
+      // The share link admitted the viewer; the span reads are fenced to the
+      // shared trace's own project and nothing more. A public read never
+      // widens through a grant (ADR-144 block C).
+      const authorization = await app.authorization.authorizeInternal({
+        actor: internalActor("api/routers/sharedTrace"),
+        projectId,
+        permission: "traces:view",
+        purpose: { kind: "route", route: "sharedTrace.get" },
+      });
 
       // Cache lookup happens AFTER the token resolved and protections were
       // computed — never before. Authorization is re-run on every request, so
@@ -236,28 +246,28 @@ export const sharedTraceRouter = createTRPCRouter({
       ] = await Promise.all([
         app.projects.getById(projectId),
         app.traces.spans.getSpanSummaryByTraceId({
-          tenantId: projectId,
+          authorization,
           traceId,
           ...occurredAtHint,
         }),
         app.traces.spans.getSpansByTraceId({
-          tenantId: projectId,
+          authorization,
           traceId,
           visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
           ...occurredAtHint,
         }),
         app.traces.spans.getLangwatchSignalsByTraceId({
-          tenantId: projectId,
+          authorization,
           traceId,
           ...occurredAtHint,
         }),
         app.traces.spans.getSpanResourcesByTraceId({
-          tenantId: projectId,
+          authorization,
           traceId,
           ...occurredAtHint,
         }),
         app.traces.spans.getTraceEventsByTraceId({
-          tenantId: projectId,
+          authorization,
           traceId,
           ...occurredAtHint,
         }),
