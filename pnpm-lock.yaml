@@ -7094,6 +7094,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../evaluation/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -7134,6 +7137,9 @@ importers:
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing

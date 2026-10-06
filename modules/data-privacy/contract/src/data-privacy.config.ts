@@ -1,4 +1,5 @@
 import { Config, type ConfigOf, nodeEnvironment } from "@langwatch/config";
+import { langevalsEndpoint } from "@langwatch/evaluation-contract";
 import { z } from "zod";
 
 /**
@@ -15,6 +16,8 @@ export const dataPrivacyConfig = Config.define((c) => ({
   enforcement: c.env("LANGWATCH_DATA_PRIVACY_ENFORCEMENT", z.string().optional()),
   /** The shared leaf: production decides whether a missing redaction service refuses. */
   nodeEnvironment,
+  /** Evaluation's leaf, held by instance: this module calls Presidio itself (R5, 2026-10-06). */
+  langevalsEndpoint,
 }));
 
 export type DataPrivacyServerConfig = ConfigOf<typeof dataPrivacyConfig>;

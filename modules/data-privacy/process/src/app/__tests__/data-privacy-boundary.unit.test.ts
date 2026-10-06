@@ -5,7 +5,6 @@
  */
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -49,7 +48,6 @@ async function bootWith(scopeOrganizationId: string | null): Promise<DataPrivacy
       projects: createDataPrivacyTestProjects(),
       permissions: permittedAuthz,
       featureFlags: createApiFixture<FeatureFlagApi>(),
-      evaluation: createApiFixture<EvaluationApi>(),
     },
   });
 }

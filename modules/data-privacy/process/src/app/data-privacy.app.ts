@@ -16,7 +16,6 @@ import {
   type ResolvedDataPrivacy,
   type SpanContentDropResult,
 } from "@langwatch/data-privacy-contract";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -25,6 +24,7 @@ import { Secret } from "@langwatch/secrets";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
 import { googleDlpChannels } from "../channels/google-dlp-channels.registry.ts";
+import { presidioChannels } from "../channels/presidio-channels.registry.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
@@ -97,7 +97,6 @@ export class DataPrivacyModule implements DataPrivacyApi {
     projects: ProjectApi,
     featureFlags: FeatureFlagApi,
     permissions: AuthzApi,
-    evaluation: EvaluationApi,
   };
   static readonly config = dataPrivacyConfig;
   /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
@@ -148,7 +147,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
     );
     const metrics = PiiAnalysisMetricsOtelService.create();
     const presidio = PresidioRedactionService.create({
-      evaluation: dependencies.evaluation,
+      presidio: presidioChannels.live.create({ endpoint: config.langevalsEndpoint }),
       metrics,
       timeoutMs: DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
     });

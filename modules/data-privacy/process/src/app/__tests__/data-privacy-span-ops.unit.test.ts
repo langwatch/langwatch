@@ -1,6 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi, PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -40,7 +39,12 @@ async function boot({ enforcement }: { enforcement?: string }) {
     .withModules([dataPrivacyProcessModule])
     .withStores(memoryStores())
     .withConfig({
-      "data-privacy": { googleDlpDisabled: undefined, enforcement, nodeEnvironment: undefined },
+      "data-privacy": {
+        googleDlpDisabled: undefined,
+        enforcement,
+        nodeEnvironment: undefined,
+        langevalsEndpoint: undefined,
+      },
     })
     .provide({
       project: createDataPrivacyTestProjects(),
@@ -48,7 +52,6 @@ async function boot({ enforcement }: { enforcement?: string }) {
         checkScopeLineage: async () => ({ kind: "consistent" }),
       }),
       "feature-flag": createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
-      evaluation: createApiFixture<EvaluationApi>(),
     })
     .boot();
 

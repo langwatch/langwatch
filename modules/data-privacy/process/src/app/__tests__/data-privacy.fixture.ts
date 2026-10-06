@@ -103,7 +103,12 @@ export function createDataPrivacyTestApp({
   return DataPrivacyModule.create({
     repositories: { ...MemoryDataPrivacyRepositories.create(), directory },
     dependencies,
-    config: { googleDlpDisabled: undefined, enforcement: undefined, nodeEnvironment: undefined },
+    config: {
+      googleDlpDisabled: undefined,
+      enforcement: undefined,
+      nodeEnvironment: undefined,
+      langevalsEndpoint: undefined,
+    },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     resources: { own: () => void 0, ownService: () => void 0 },
   });

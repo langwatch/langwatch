@@ -1,6 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi, PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -26,13 +25,13 @@ function process(role: "api" | "worker", googleCredentials?: string) {
         googleDlpDisabled: undefined,
         enforcement: undefined,
         nodeEnvironment: undefined,
+        langevalsEndpoint: undefined,
       },
     })
     .provide({
       project: createDataPrivacyTestProjects(),
       authz: createApiFixture<AuthzApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
-      evaluation: createApiFixture<EvaluationApi>(),
     });
 }
 
