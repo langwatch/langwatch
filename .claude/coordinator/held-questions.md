@@ -98,6 +98,10 @@ recommendation, and "default taken" if a lane proceeded on it.
 - mig-ci D11: a goose number on main's tip is refused (finding, check fails), not merely warned, for PRs into a long-running branch; Prisma timestamps are exempt. Released code-step files are found by their quoted id under modules/ and enterprise/modules/ (tests excluded); helper files a step imports are not frozen. Default taken, held for Alex.
 - mig-ci stamp: the release-PR stamp job runs without `--table-owners` (owner null) and without `--declared` until D3 and mig-declare land. Default taken, held for Alex.
 
+### Peer cut T1 (T1 hand-back, 2026-10-06 night)
+
+- T1-D2-deps The span decoder needs `@langwatch/ksuid` (record id), Node `crypto` and `@opentelemetry/core`'s TraceState. Option (a): add both to trace-contract and move the decoder whole onto a Node-only subpath `@langwatch/trace-contract/otlp-decoding` (the ruling as written). Option (b): move it without the record id, trace adds `id` afterwards (needs an `Omit<NormalizedSpan,"id">` type). Default taken: (a), held for Alex. Also review: new `CodingAgentApi.readSessionGroupsForViewer` (precedent readTranscriptForViewer) and the typed `TraceApi.readSessionGroups` signature.
+
 ### Older numbered questions
 
 - Up to 79 ids in `.claude/coordinator/questions-2026-10-06.md` that no ruling cites (Q11 to Q13, Q29 to Q39, Q43 to Q78, Q86 to Q152, Q155 to Q220); an upper bound, several are coordinator defaults for review.
