@@ -58,4 +58,25 @@ describe("LangyToolErrorCard", () => {
       expect(copied).toContain("You have reached the maximum number of scenarios");
     });
   });
+
+  describe("given a failure that is a bare traceback", () => {
+    const traceback = [
+      "Traceback (most recent call last):",
+      '  File "/app/langwatch_nlp/count.py", line 42, in count_rows',
+      "json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+    ].join("\n");
+
+    /** @scenario "The traceback stays reachable behind the disclosure" */
+    it("keeps it out of the body and reveals the whole traceback behind Show details", async () => {
+      const user = userEvent.setup();
+      renderCard(traceback);
+
+      expect(screen.getByText("This step couldn't be completed.")).toBeTruthy();
+      expect(screen.queryByText(/JSONDecodeError/)).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Show details" }));
+
+      expect(screen.getByText(/JSONDecodeError/).textContent).toBe(traceback);
+    });
+  });
 });

@@ -319,7 +319,6 @@ const LEGACY_UNBOUND: string[] = [
   "specs/langy/langy-github-prs.feature",
   "specs/langy/langy-plan-progress.feature",
   "specs/langy/langy-projection-independent-reactions.feature",
-  "specs/langy/langy-turn-recovery.feature",
 ];
 
 /**

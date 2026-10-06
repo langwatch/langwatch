@@ -23,6 +23,8 @@ export interface LangyRecoveryPolicy {
   delayMs: (attempt: number) => number;
   /** The calm line shown in the message flow while the retry is pending. */
   recoveringMessage: string;
+  /** When set, the line counts down: the whole seconds left until the retry. */
+  countdownMessage?: (secondsLeft: number) => string;
 }
 
 /** Genuinely stuck: show the error card, let the user decide. */
@@ -68,6 +70,18 @@ const TIMEOUT_WAITS = [2_000] as const;
 
 /** A failed spawn is usually transient; give it a moment and one more go. */
 const SPAWN_RETRY_WAITS = [2_000, 6_000] as const;
+
+/** A busy or unreachable agent: each wait is longer than the last. */
+const BUSY_RETRY_WAITS = [5_000, 10_000, 20_000] as const;
+
+function counting({ waits, say }: { waits: readonly number[]; say: string }) {
+  return {
+    attempts: waits.length,
+    delayMs: schedule(waits),
+    recoveringMessage: `${say} Trying again shortly…`,
+    countdownMessage: (secondsLeft: number) => `${say} Trying again in ${secondsLeft}s…`,
+  };
+}
 
 const POLICIES: Record<string, LangyRecoveryPolicy> = {
   // A deploy drained the worker mid-turn. Nothing was lost — the user's message
@@ -116,12 +130,20 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
     recoveringMessage: "Langy is starting up…",
   },
 
-  // ALREADY RETRIED BY THE SERVER — three times, with growing waits, showing a
-  // status line on the live stream the whole while. Reaching the browser at all
-  // means that budget is spent, so retrying here would just double it behind a
-  // spinner. The user gets the card and decides.
-  langy_agent_unavailable: terminal("langy_agent_unavailable"),
-  langy_agent_at_capacity: terminal("langy_agent_at_capacity"),
+  // A rate limit or a temporary failure: a quiet line counts down to the retry
+  // (specs/langy/langy-turn-recovery.feature). Waits grow; once spent, the card.
+  langy_agent_unavailable: {
+    kind: "langy_agent_unavailable",
+    disposition: "auto",
+    retry: true,
+    ...counting({ waits: BUSY_RETRY_WAITS, say: "Langy is temporarily unavailable." }),
+  },
+  langy_agent_at_capacity: {
+    kind: "langy_agent_at_capacity",
+    disposition: "auto",
+    retry: true,
+    ...counting({ waits: BUSY_RETRY_WAITS, say: "Langy is busy right now." }),
+  },
 
   // TERMINAL. The opencode session backing this turn is gone; the manager
   // recycles the worker and the next turn gets a fresh session. Re-driving the

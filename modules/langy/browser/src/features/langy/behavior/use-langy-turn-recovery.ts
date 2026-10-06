@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -136,7 +137,10 @@ export function useLangyTurnRecovery({
   const [pending, setPending] = useState<{
     kind: string;
     attempt: number;
+    delayMs: number;
+    retryAt: number;
   } | null>(null);
+  const secondsLeft = useCountdownSeconds(pending);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -179,7 +183,12 @@ export function useLangyTurnRecovery({
       setPending(null);
       return;
     }
-    setPending({ kind: decision.errorKind, attempt: decision.attempt });
+    setPending({
+      kind: decision.errorKind,
+      attempt: decision.attempt,
+      delayMs: decision.delayMs,
+      retryAt: nowInstant().epochMilliseconds + decision.delayMs,
+    });
     timerRef.current = setTimeout(() => fireRetry(decision.attempt), decision.delayMs);
     // NO CLEANUP, on purpose: an armed timer belongs to the FAILURE, not this effect
     // instance; a re-render killing it is what once wedged `isRecovering` true.
@@ -200,26 +209,63 @@ export function useLangyTurnRecovery({
     });
 
   // MEMOISED so the handle is as stable as the state behind it.
-  return useMemo(() => {
-    if (!pending) {
-      return {
-        isRecovering: false,
-        willAutoRecover,
-        message: null,
-        attempt: 0,
-        attempts: errorKind ? langyRecoveryPolicy(errorKind).attempts : 0,
-        reset,
-      };
-    }
+  return useMemo(
+    () => recoveryHandle({ pending, secondsLeft, willAutoRecover, errorKind, reset }),
+    [pending, secondsLeft, willAutoRecover, errorKind, reset],
+  );
+}
 
-    const policy = langyRecoveryPolicy(pending.kind);
+/** The handle the panel reads: the line (counting down for some kinds) and the budget. */
+function recoveryHandle({
+  pending,
+  secondsLeft,
+  willAutoRecover,
+  errorKind,
+  reset,
+}: {
+  pending: { kind: string; attempt: number; delayMs: number } | null;
+  secondsLeft: number | null;
+  willAutoRecover: boolean;
+  errorKind: string | null;
+  reset: () => void;
+}): LangyTurnRecovery {
+  if (!pending) {
     return {
-      isRecovering: true,
+      isRecovering: false,
       willAutoRecover,
-      message: policy.recoveringMessage,
-      attempt: pending.attempt,
-      attempts: policy.attempts,
+      message: null,
+      attempt: 0,
+      attempts: errorKind ? langyRecoveryPolicy(errorKind).attempts : 0,
       reset,
     };
-  }, [pending, willAutoRecover, errorKind, reset]);
+  }
+  const policy = langyRecoveryPolicy(pending.kind);
+  const seconds = secondsLeft ?? Math.max(1, Math.ceil(pending.delayMs / 1000));
+  return {
+    isRecovering: true,
+    willAutoRecover,
+    message: policy.countdownMessage ? policy.countdownMessage(seconds) : policy.recoveringMessage,
+    attempt: pending.attempt,
+    attempts: policy.attempts,
+    reset,
+  };
+}
+
+/** Whole seconds until the armed retry, ticking once a second; null when none is armed. */
+function useCountdownSeconds(pending: { kind: string; retryAt: number } | null): number | null {
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (!pending || !langyRecoveryPolicy(pending.kind).countdownMessage) {
+      setSecondsLeft(null);
+      return;
+    }
+    const tick = () =>
+      setSecondsLeft(
+        Math.max(1, Math.ceil((pending.retryAt - nowInstant().epochMilliseconds) / 1000)),
+      );
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [pending]);
+  return secondsLeft;
 }

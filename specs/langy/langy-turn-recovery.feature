@@ -34,6 +34,14 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And Langy gives up to an error card once its attempts are exhausted
 
   @unit
+  Scenario: An unreachable agent is retried with a countdown, not an error
+    Given Langy's agent cannot be reached
+    When the turn fails because Langy is unavailable
+    Then the user does not see a red error card
+    And Langy shows a quiet line saying it is unavailable and counting down to the retry
+    And Langy gives up to an error card once its attempts are exhausted
+
+  @unit
   Scenario: A lost session is terminal and is never retried
     Given Langy lost the session backing this conversation
     When the turn fails

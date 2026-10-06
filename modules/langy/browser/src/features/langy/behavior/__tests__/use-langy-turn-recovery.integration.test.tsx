@@ -59,6 +59,7 @@ describe("useLangyTurnRecovery", () => {
       expect(onRetry).not.toHaveBeenCalled();
     });
 
+    /** @scenario "A deploy interrupts the turn and Langy picks it back up" */
     it("re-drives the turn once the wait has passed, through the retry and not a new send", () => {
       const { onRetry } = renderRecovery({ errorKind: "langy_worker_restarting" });
 
@@ -120,4 +121,78 @@ describe("useLangyTurnRecovery", () => {
       expect(onRetry).not.toHaveBeenCalled();
     });
   });
+
+  describe("given a busy agent", () => {
+    /** @scenario "A busy agent is retried with a countdown, not an error" */
+    it("shows a quiet line counting down to the retry, with no error card", () => {
+      expectCountdownToRetry({ kind: "langy_agent_at_capacity", line: "Langy is busy right now." });
+    });
+
+    /** @scenario "A busy agent is retried with a countdown, not an error" */
+    it("waits longer before each further attempt, then gives up to the error card", () => {
+      expectGrowingWaitsThenCard("langy_agent_at_capacity");
+    });
+  });
+
+  describe("given an unreachable agent", () => {
+    /** @scenario "An unreachable agent is retried with a countdown, not an error" */
+    it("shows a quiet line counting down to the retry, with no error card", () => {
+      expectCountdownToRetry({
+        kind: "langy_agent_unavailable",
+        line: "Langy is temporarily unavailable.",
+      });
+    });
+
+    /** @scenario "An unreachable agent is retried with a countdown, not an error" */
+    it("gives up to the error card once its attempts are exhausted", () => {
+      expectGrowingWaitsThenCard("langy_agent_unavailable");
+    });
+  });
 });
+
+function expectCountdownToRetry({ kind, line }: { kind: string; line: string }) {
+  const { renders, result, onRetry } = renderRecovery({ errorKind: kind });
+
+  expect(renders[0]!.willAutoRecover).toBe(true);
+  expect(result.current.isRecovering).toBe(true);
+  expect(result.current.message).toBe(`${line} Trying again in 5s…`);
+
+  act(() => {
+    vi.advanceTimersByTime(2_000);
+  });
+  expect(result.current.message).toBe(`${line} Trying again in 3s…`);
+  expect(onRetry).not.toHaveBeenCalled();
+
+  act(() => {
+    vi.advanceTimersByTime(3_000);
+  });
+  expect(onRetry).toHaveBeenCalledTimes(1);
+  expect(result.current.isRecovering).toBe(false);
+}
+
+function expectGrowingWaitsThenCard(kind: string) {
+  const onRetry = vi.fn();
+  const hook = renderHook(
+    ({ errorId }) =>
+      useLangyTurnRecovery({ errorKind: kind, errorId, sideEffectsObserved: false, onRetry }),
+    { initialProps: { errorId: new Error("attempt 0") } },
+  );
+  const waits: number[] = [];
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    expect(hook.result.current.isRecovering).toBe(true);
+    const started = Date.now();
+    act(() => {
+      while (onRetry.mock.calls.length < attempt) vi.advanceTimersByTime(500);
+    });
+    waits.push(Date.now() - started);
+    hook.rerender({ errorId: new Error(`attempt ${attempt}`) });
+  }
+
+  expect(onRetry).toHaveBeenCalledTimes(3);
+  expect(waits[0]!).toBeLessThan(waits[1]!);
+  expect(waits[1]!).toBeLessThan(waits[2]!);
+  expect(hook.result.current.willAutoRecover).toBe(false);
+  expect(hook.result.current.isRecovering).toBe(false);
+  expect(hook.result.current.message).toBeNull();
+}

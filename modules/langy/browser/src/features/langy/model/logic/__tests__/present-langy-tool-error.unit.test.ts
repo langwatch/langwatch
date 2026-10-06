@@ -29,10 +29,12 @@ describe("presentLangyToolError", () => {
     // lacking the permission — but is also what a key that omits a permission
     // the caller DOES hold looks like. The response cannot separate the two, so
     // the card states the consequence, which is true either way.
+    /** @scenario "A failure card says what went wrong in the user's terms" */
     it("names what the reader cannot do, in plain words, in one sentence", () => {
       expect(present(denial).message).toBe("You can't manage scenarios in this project.");
     });
 
+    /** @scenario "A failure card says what went wrong in the user's terms" */
     it("never headlines the internal permission name", () => {
       const presentation = present(denial);
       expect(presentation.message).not.toContain("scenarios:manage");
@@ -45,6 +47,7 @@ describe("presentLangyToolError", () => {
 
     // They did not issue the key Langy acts through and cannot re-scope it —
     // the system mints it from their own permissions.
+    /** @scenario "A failure card says what went wrong in the user's terms" */
     it("points at the one person who can change it, and offers no link", () => {
       const presentation = present(denial);
       expect(presentation.detail).toBe("Ask whoever manages access for your team if you need it.");
