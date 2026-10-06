@@ -104,7 +104,7 @@ export function langyColumnState({
   model,
   onHistoryErrorAction,
   restoringMessageCount,
-  hasPendingPrompt,
+  pendingPrompt,
   tourCard,
   empty,
 }: {
@@ -115,7 +115,8 @@ export function langyColumnState({
   /** The history card's own retry: re-reading is the whole remedy, no turn re-runs. */
   onHistoryErrorAction: () => void;
   restoringMessageCount: number | null;
-  hasPendingPrompt: boolean;
+  /** A question handed to Langy that has not been sent yet. */
+  pendingPrompt: string | null;
   /** Set while a guided tour runs or its kickoff waits to send; only shown in an empty column. */
   tourCard: LangyColumnState["tourCard"];
   empty: NonNullable<LangyColumnState["empty"]>;
@@ -127,6 +128,7 @@ export function langyColumnState({
     modelSetup: needsSetup
       ? {
           reconnectCodex,
+          queuedPrompt: reconnectCodex ? null : pendingPrompt,
           onComplete: () => {
             void model.refetchResolvedDefault();
             if (!reconnectCodex) return;
@@ -142,7 +144,7 @@ export function langyColumnState({
     },
     restoring: flags.isRestoring ? { messageCount: restoringMessageCount } : null,
     tourCard: flags.isEmpty ? tourCard : null,
-    empty: flags.isEmpty && !hasPendingPrompt && !tourCard ? empty : null,
+    empty: flags.isEmpty && !pendingPrompt && !tourCard ? empty : null,
   };
 }
 

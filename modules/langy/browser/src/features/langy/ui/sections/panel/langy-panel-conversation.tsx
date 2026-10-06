@@ -253,7 +253,12 @@ export function LangyColumnError({
 export interface LangyColumnState {
   showCardGallery: boolean;
   /** No model resolves, or a dead codex session is being signed in again. */
-  modelSetup: { reconnectCodex: boolean; onComplete: () => void } | null;
+  modelSetup: {
+    reconnectCodex: boolean;
+    /** A question waiting for the model, shown above the setup so it does not look lost. */
+    queuedPrompt: string | null;
+    onComplete: () => void;
+  } | null;
   /** A conversation we could not READ is not one with nothing in it: ahead of the empty state. */
   blockingHistoryError: LangyErrorPresentation | null;
   onHistoryErrorAction: (kind: ErrorAction) => void;
@@ -328,13 +333,24 @@ export function LangyConversationBody({
 /** The inline model setup; the provider grid's own description is its only subtitle. */
 function LangyModelSetup({
   reconnectCodex,
+  queuedPrompt,
   onComplete,
 }: {
   reconnectCodex: boolean;
+  queuedPrompt: string | null;
   onComplete: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   return (
     <VStack align="stretch" gap={2} paddingX="18px" paddingTop="18px">
+      {queuedPrompt ? (
+        <VStack align="stretch" gap={1} paddingBottom={2}>
+          <QueuedPrompt prompt={queuedPrompt} reduceMotion={reduceMotion} />
+          <Text alignSelf="flex-end" textStyle="xs" color="fg.muted">
+            Langy sends this once a model is set up.
+          </Text>
+        </VStack>
+      ) : null}
       <Text fontSize="sm" fontWeight="semibold">
         {reconnectCodex ? "Sign in to Codex again" : "Langy needs a model to get started"}
       </Text>

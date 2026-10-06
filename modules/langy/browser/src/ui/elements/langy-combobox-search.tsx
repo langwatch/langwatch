@@ -10,7 +10,7 @@ export function LangyComboboxSearch({ placeholder }: { placeholder: string }) {
       position="sticky"
       top={0}
       zIndex={1}
-      background="bg.panel/96"
+      background="bg.panel"
       padding={1.5}
       borderBottomWidth="1px"
       borderColor="border.muted"

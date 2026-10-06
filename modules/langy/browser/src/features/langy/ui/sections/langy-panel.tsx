@@ -761,7 +761,7 @@ function LangyPanel({
                         model,
                         onHistoryErrorAction: history.refetch,
                         restoringMessageCount: facts.restoringMessageCount,
-                        hasPendingPrompt: !!pendingPrompt,
+                        pendingPrompt,
                         // Before the kickoff message exists: in progress while the tour runs,
                         // settled once it ended and the kickoff only waits to send.
                         tourCard:
