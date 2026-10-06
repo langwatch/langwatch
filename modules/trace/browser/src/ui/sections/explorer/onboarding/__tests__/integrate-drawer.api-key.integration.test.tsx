@@ -74,17 +74,13 @@ describe("IntegrateDrawer tokens", () => {
     it("mints ingestion only for .env and project reads only for the MCP config", async () => {
       renderWithDesignSystem(<IntegrateDrawer open onOpenChange={vi.fn()} />);
 
-      fireEvent.click(
-        await screen.findByRole("button", { name: "Create a personal access token" }),
-      );
+      fireEvent.click(await screen.findByRole("button", { name: "Create a key" }));
       await waitFor(() => expect(screen.getByTestId(".env")).toHaveTextContent(ENV_TOKEN));
       expect(minted.permissions).toEqual([undefined]);
 
       fireEvent.keyDown(window, { key: "m" });
       expect(screen.getByTestId("mcp.json")).not.toHaveTextContent(ENV_TOKEN);
-      fireEvent.click(
-        await screen.findByRole("button", { name: "Create a personal access token" }),
-      );
+      fireEvent.click(await screen.findByRole("button", { name: "Create a key" }));
 
       await waitFor(() => expect(screen.getByTestId("mcp.json")).toHaveTextContent(MCP_TOKEN));
       expect(minted.permissions).toEqual([undefined, PROJECT_READS]);

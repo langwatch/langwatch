@@ -26,6 +26,7 @@ export function ProjectTokenBanner({
       isCreating={minting.isMinting}
       onCreate={create}
       scopeNote={minting.scopeNote}
+      createLabel="Create a key"
     />
   );
 }

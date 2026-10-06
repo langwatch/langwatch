@@ -229,7 +229,7 @@ describe("ProductScreen manual setup", () => {
       minted.tokens = { proj_agent: TEST_TOKEN };
       renderManualSetup(host);
 
-      const create = await screen.findByRole("button", { name: "Create a personal access token" });
+      const create = await screen.findByRole("button", { name: "Create a key" });
       expect(minted.projects).toEqual([]);
       expect(screen.getByLabelText("Your API key").textContent).toContain(
         "<YOUR_LANGWATCH_API_KEY>",
@@ -253,9 +253,7 @@ describe("ProductScreen manual setup", () => {
       const host = new ProductTestHost();
       renderManualSetup(host);
 
-      fireEvent.click(
-        await screen.findByRole("button", { name: "Create a personal access token" }),
-      );
+      fireEvent.click(await screen.findByRole("button", { name: "Create a key" }));
 
       await waitFor(() => expect(minted.projects).toEqual(["proj_agent"]));
       expect(screen.getByLabelText("Your API key").textContent).toContain(
@@ -279,9 +277,7 @@ describe("ProductScreen coding-agent setup", () => {
       minted.tokens = { proj_agent: TEST_TOKEN };
       minted.readTokens = { proj_agent: READS_TOKEN };
       const { rerenderManualSetup } = renderManualSetup(host);
-      fireEvent.click(
-        await screen.findByRole("button", { name: "Create a personal access token" }),
-      );
+      fireEvent.click(await screen.findByRole("button", { name: "Create a key" }));
       await waitFor(() =>
         expect(screen.getByLabelText("Your API key").textContent).toContain(TEST_TOKEN),
       );
@@ -291,7 +287,7 @@ describe("ProductScreen coding-agent setup", () => {
       rerenderManualSetup();
       fireEvent.click(await screen.findByRole("button", { name: "MCP" }));
       const create = await screen.findByRole("button", {
-        name: "Create a personal access token",
+        name: "Create a key",
       });
       fireEvent.click(screen.getByRole("button", { name: "Copy config" }));
       await waitFor(() => expect(clipboard).toHaveLength(1));

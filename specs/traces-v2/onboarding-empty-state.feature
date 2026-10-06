@@ -203,10 +203,10 @@ Rule: Generate access token inside the Integrate drawer
 
   Scenario: Initial state shows the generate-token card
     Then the shared personal access token banner is visible
-    And a "Create a personal access token" button is enabled
+    And a "Create a key" button is enabled
 
   Scenario: Generating creates a project-scoped personal access token
-    When the user clicks "Create a personal access token"
+    When the user clicks "Create a key"
     Then a token is created via `apiKey.create` with key type personal
     And the token name is "Personal access token"
     And the token expires 90 days from now
@@ -230,7 +230,7 @@ Rule: Generate access token inside the Integrate drawer
 
   Scenario: Token failure surfaces a toast
     Given the `apiKey.create` mutation fails
-    When the user clicks "Create a personal access token"
+    When the user clicks "Create a key"
     Then a toast surfaces the error message
     And the generate button returns to its enabled state
 

@@ -12,14 +12,14 @@ Feature: Personal access token on the onboarding setup screens
     Given I may mint a key on the project "acme-agent"
     When I open the manual setup with projectSlug "acme-agent"
     Then the integration info card shows "<YOUR_LANGWATCH_API_KEY>" and has minted nothing
-    When I click "Create a personal access token"
+    When I click "Create a key"
     Then the host mints a personal key with one member grant on that project
     And the token fills the card, is copied from it, and is held in memory only
 
   @integration
   Scenario: Manual setup fills in no token when the mint is refused
     Given I may not mint a key on the project "acme-agent"
-    When I open the manual setup with projectSlug "acme-agent" and click "Create a personal access token"
+    When I open the manual setup with projectSlug "acme-agent" and click "Create a key"
     Then the card still shows "<YOUR_LANGWATCH_API_KEY>" and nothing is copied
 
   @integration

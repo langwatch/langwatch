@@ -93,7 +93,7 @@ describe("the integrate pane", () => {
 
       const title = screen.getByText("Instrument your agents in seconds");
       const tokenCard = screen.getByRole("button", {
-        name: /create a personal access token/i,
+        name: /create a key/i,
       });
       const actions = screen.getByRole("button", {
         name: /see sdk instructions/i,

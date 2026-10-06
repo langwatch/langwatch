@@ -217,7 +217,7 @@ export function ViaMcpClientScreen(): React.ReactElement {
           <Text fontSize="xs" color="fg.muted" lineHeight="tall">
             {hasToken
               ? "Pre-filled with your personal access token. Copy and paste into your app."
-              : "We'll fill in the API key once you create a personal access token."}
+              : "We'll fill in the API key once you create a key."}
           </Text>
         </VStack>
 

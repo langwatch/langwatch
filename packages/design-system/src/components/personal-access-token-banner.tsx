@@ -13,6 +13,8 @@ type PersonalAccessTokenBannerProps = {
   onCreate: () => void;
   /** What this token can do, and only that, shown under the action. */
   scopeNote?: string;
+  /** The action's label before a token exists; defaults to "Create a personal access token". */
+  createLabel?: string;
 };
 
 /**
@@ -24,6 +26,7 @@ export function PersonalAccessTokenBanner({
   isCreating,
   onCreate,
   scopeNote,
+  createLabel,
 }: PersonalAccessTokenBannerProps) {
   return (
     <Box
@@ -67,7 +70,7 @@ export function PersonalAccessTokenBanner({
           onClick={onCreate}
           flexShrink={0}
         >
-          {token ? "Create another" : "Create a personal access token"}
+          {token ? "Create another" : (createLabel ?? "Create a personal access token")}
         </Button>
       </HStack>
       {scopeNote ? (
