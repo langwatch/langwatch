@@ -196,7 +196,7 @@ func SpecDiff(baseBytes, candidateBytes []byte, dir string) ([]openapidiff.Chang
 	if err != nil {
 		return nil, fmt.Errorf("candidate spec: %w", err)
 	}
-	changes, err := openapidiff.Diff(base, candidate, "", "")
+	changes, err := openapidiff.Diff(base, candidate, openapidiff.Scope{})
 	if err != nil {
 		return nil, err
 	}

@@ -33,7 +33,7 @@ func op(id string) map[string]any {
 func TestOrderingAndOperations(t *testing.T) {
 	a := d(map[string]any{"/x": map[string]any{"get": op("x")}}, nil)
 	b := d(map[string]any{"/x": map[string]any{"get": map[string]any{"responses": map[string]any{"200": map[string]any{"description": "ok"}}, "operationId": "x"}}}, nil)
-	r, e := Diff(a, b, "", "")
+	r, e := Diff(a, b, Scope{})
 	if e != nil || len(r) != 0 {
 		t.Fatalf("%v %#v", e, r)
 	}
@@ -46,7 +46,7 @@ func TestOperationFieldsAndComponents(t *testing.T) {
 	x["security"] = []any{map[string]any{"k": []any{}}}
 	x["responses"].(map[string]any)["200"].(map[string]any)["content"] = map[string]any{"application/json": map[string]any{"schema": map[string]any{"$ref": "#/components/schemas/S"}}}
 	b := d(map[string]any{"/new": map[string]any{"get": op("n")}, "/x": map[string]any{"post": x}}, map[string]any{"S": map[string]any{"type": "object"}})
-	r, _ := Diff(a, b, "", "")
+	r, _ := Diff(a, b, Scope{})
 	if len(r) != 4 {
 		t.Fatalf("%#v", r)
 	}
@@ -140,7 +140,7 @@ func TestPathItemMetadataAndEffectiveFields(t *testing.T) {
 		"x-meta":     "after",
 		"get":        candidateOperation,
 	}}, nil)
-	changes, err := Diff(base, candidate, "", "")
+	changes, err := Diff(base, candidate, Scope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +178,7 @@ func TestEffectiveParametersSecurityAndReachableComponents(t *testing.T) {
 	})
 	base["components"].(map[string]any)["securitySchemes"] = map[string]any{"key/name": map[string]any{"type": "apiKey", "in": "header", "name": "x-key"}}
 	candidate["components"].(map[string]any)["securitySchemes"] = map[string]any{"key/name": map[string]any{"type": "http", "scheme": "bearer"}}
-	changes, err := Diff(base, candidate, "/x", "get")
+	changes, err := Diff(base, candidate, Scope{Prefix: "/x", Method: "get"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestPathItemReferenceResolutionAndOAS31BooleanSchemas(t *testing.T) {
 	candidateOperation["responses"].(map[string]any)["200"].(map[string]any)["content"] = map[string]any{"application/json": map[string]any{"schema": map[string]any{"$ref": "#/components/schemas/BooleanSchema"}}}
 	baseOperation["parameters"] = []any{map[string]any{"name": "body", "in": "query", "schema": false}}
 	candidateOperation["parameters"] = []any{map[string]any{"name": "body", "in": "query", "schema": true}}
-	changes, err := Diff(base, candidate, "", "")
+	changes, err := Diff(base, candidate, Scope{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,7 +310,7 @@ func TestNestedPathItemReferenceClosure(t *testing.T) {
 			}},
 		}
 	}
-	changes, err := Diff(makeDocument("old"), makeDocument("new"), "", "")
+	changes, err := Diff(makeDocument("old"), makeDocument("new"), Scope{})
 	if err != nil {
 		t.Fatal(err)
 	}
