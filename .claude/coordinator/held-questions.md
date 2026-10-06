@@ -35,6 +35,12 @@ recommendation, and "default taken" if a lane proceeded on it.
 
 - Q1-upcast How stored `lw.usage.*` events become `lw.entitlement.*` (ruled: rename with an upcast). Eventing has no upcast hook (one type literal per schema, eventSchemas.ts:20-25; projections filter the exact type, projectionRouter.ts:1209,1383; replay discovers by type). Options: (a) a framework upcaster in packages/eventing applied at dispatch, store read and replay; (b) dual-read: legacy schemas beside the new, the process manager and billing's two peer subscribers registered on both types; (c) a ClickHouse step rewriting stored EventType and AggregateType plus a drain of the old queue keys. A pipeline rename also changes queue and dedup keys (queueManager.ts:338-339,359), so in-flight `countMonth` jobs need a drain. Facts: no usage projection reads these events back after delivery; only live subscribers and the process manager do. No recommendation yet; the rename slice waits on this. M1 landed with stored names unchanged.
 
+### Legacy error body (legacy-error-root hand-back, 2026-10-06 night; landed)
+
+- LE-1 Breadth: the root `error` is added only at statuses where a route publishes main's flat body (75 operations, 18 families); unpublished statuses (403 on most of them) get none, where main sent it on every status. Released clients only parse documented statuses. Options: keep (default taken, held for Alex) or every refusal of such a family (one line in packages/api/src/rest/legacy-error.ts).
+- LE-2 Masked 5xx: main sent a HandledError 5xx's code unmasked; the branch masks per §12 and sends "Internal server error". Default taken: keep the mask.
+- LE-3 Other legacy shapes not covered: `{error, kind?, meta?}` on evaluations-legacy, guardrails and dataset evaluate, and the CLI OAuth `{error, error_description}` (about 20 operations). Default taken: leave as they are until apidiff names a client break.
+
 ### Older numbered questions
 
 - Up to 79 ids in `.claude/coordinator/questions-2026-10-06.md` that no ruling cites (Q11 to Q13, Q29 to Q39, Q43 to Q78, Q86 to Q152, Q155 to Q220); an upper bound, several are coordinator defaults for review.
