@@ -118,31 +118,20 @@ Feature: Usage meters, decisions and who learns them
     Then the billable-events meter is read and not the trace meter
 
   # --- Who learns it --------------------------------------------------------------
+  # The ingest doors ask entitlement's assertWithinUsageLimit on every export (Alex,
+  # 2026-10-06); trace folds no limit fact. Billing alerts from usage's fact.
 
-  @unit @trace @unimplemented
-  Scenario: Trace refuses ingest once it learns the limit was reached
-    Given trace has handled a limit_reached event for the organization this month
-    When a trace arrives at OTLP ingest for one of its projects
-    Then the ingest is refused with ERR_PLAN_LIMIT and status 402
-    And the refusal carries the count, the allowance and the plan name from the event
-
-  @unit @trace @unimplemented
+  @integration @trace
   Scenario: The collector door refuses exactly as the OTLP door does
-    Given trace has handled a limit_reached event for the organization this month
-    When a trace arrives at POST /api/collector for one of its projects
-    Then the ingest is refused with ERR_PLAN_LIMIT and status 402
+    Given an organization whose plan's allowance entitlement refuses
+    When a trace arrives at POST /api/collector and at OTLP ingest for one of its projects
+    Then both refuse with ERR_PLAN_LIMIT, status 402 and the same reading
 
-  @unit @trace @unimplemented
-  Scenario: Trace lets ingest through again once the limit is cleared
-    Given trace has handled limit_reached and then limit_cleared for the organization
-    When a trace arrives at OTLP ingest for one of its projects
-    Then the ingest is accepted
-
-  @unit @trace @unimplemented
-  Scenario: Last month's refusal does not refuse this month
-    Given trace holds a refusal for the organization recorded last month
-    When a trace arrives at OTLP ingest for one of its projects this month
-    Then the ingest is accepted
+  @unit @billing
+  Scenario: A reached allowance tells billing to alert
+    Given usage recorded a limit_reached event for the organization
+    When billing handles the event
+    Then billing's plan-limit alert is told the plan, the unit, the count and the allowance
 
   @unit @trace @unimplemented
   Scenario: A redelivered limit event leaves one refusal

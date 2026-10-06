@@ -3,8 +3,12 @@
  * project credential. MUST mount before `/api/collector/*` wildcard dispatcher.
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
-import type { HandledError } from "@langwatch/handled-error";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestProtocolRefusal,
+} from "@langwatch/api/rest";
+import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 import { createLogger, validationMeta } from "@langwatch/observability";
 import {
@@ -113,6 +117,19 @@ function refusalAnswer(refusal: HandledError): CollectorAnswer {
   logger.warn("collector request denied by API key ceiling");
   return answer(ingestDoorRefusalBody(refusal), ingestDoorRefusalStatus(refusal));
 }
+
+/**
+ * The plan limit in main's flat body at both ingest doors: a terminal 402 an SDK stops on.
+ * Every other failure stays on the family's boundary.
+ */
+export const ingestPlanLimitRefusal: RestProtocolRefusal = ({ failure, response }) =>
+  HandledError.isHandled(failure) && failure.code === "ERR_PLAN_LIMIT"
+    ? response.write({
+        status: failure.httpStatus ?? 402,
+        mediaType: PRODUCES_JSON,
+        body: JSON.stringify(ingestDoorRefusalBody(failure)),
+      })
+    : response.decline();
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
@@ -330,7 +347,11 @@ export const collectorRest = defineRestRouter(CollectorApi)
     }),
   )
   .withBodyLimit({ maxBytes: COLLECTOR_MAX_BODY_BYTES, onExceeded: payloadTooLarge })
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: COLLECTOR_PROTOCOL_REASON })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: COLLECTOR_PROTOCOL_REASON,
+    refusal: ingestPlanLimitRefusal,
+  })
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request, response }) =>
     response.write(await collect({ app, request, raw })),

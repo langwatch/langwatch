@@ -8,21 +8,21 @@ Feature: Plan-limit and usage-warning notifications fire correctly
   # usage-limit.service.ts, usage-warning.service.ts, billing-alert-cooldown.service.ts,
   # entitlement/usage-limit-message.service.ts, entitlement/member-classification.service.ts
 
-  @unit @unimplemented
+  @unit
   Scenario: Crossing the plan limit notifies the organization once
     Given an organization that has just crossed its plan's event allowance
-    When the limit check runs
+    When usage records the limit as reached
     Then the organization is notified once
 
-  @unit @unimplemented
+  @unit
   Scenario: A second crossing inside the cooldown does not notify again
     Given an organization notified about its plan limit today
-    When the limit check runs again the same day
+    When the limit is recorded as reached again the same day
     Then no second notification is sent
 
-  @unit @unimplemented
+  @unit
   Scenario: Two concurrent limit checks send one notification, not two
-    Given two workers checking the same organization's limit at the same time
+    Given two deliveries of the same reached limit at the same time
     When both cross the threshold
     Then exactly one notification is recorded
 
