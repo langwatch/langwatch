@@ -34,6 +34,7 @@ import {
   recordSeedControl,
   runStatement,
   selectRows,
+  seedTracesOnTopics,
   selectScalar,
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
@@ -197,6 +198,31 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
   });
 
   describe("when a caller asks for traffic by topic name", () => {
+    /** @scenario "Traffic by topic name" */
+    it("counts the caller's traces per topic name and shows no other project's topic", async () => {
+      const { tenantA: a, tenantB: b } = harness;
+      await seedTracesOnTopics({
+        admin: harness.admin,
+        database: harness.factDatabase,
+        assignments: [
+          { tenantId: a.tenantId, topicId: `${a.tenantId}-topic-1`, traces: 3 },
+          { tenantId: a.tenantId, topicId: `${a.tenantId}-topic-2`, traces: 2 },
+          { tenantId: b.tenantId, topicId: `${b.tenantId}-topic-1`, traces: 4 },
+        ],
+      });
+
+      const rows = await selectRows<{ TopicName: string; traces: string }>(
+        tenantA,
+        `SELECT t.TopicName AS TopicName, count() AS traces FROM ${database}.traces ` +
+          `JOIN ${database}.topics AS t ON traces.TopicId = t.TopicId GROUP BY 1 ORDER BY 1 LIMIT 50`,
+      );
+
+      expect(rows.map((row) => [row.TopicName, Number(row.traces)])).toEqual([
+        [`Topic ${a.tenantId} 1`, 3],
+        [`Topic ${a.tenantId} 2`, 2],
+      ]);
+    });
+
     it("lists only the caller's own project's topics", async () => {
       const rows = await selectRows<{ TopicId: string; TopicName: string }>(
         tenantA,
