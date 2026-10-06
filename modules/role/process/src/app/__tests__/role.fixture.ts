@@ -1,6 +1,5 @@
-import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzAccessBinding, AuthzApi, AuthzScopeRef } from "@langwatch/authz-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -25,18 +24,16 @@ export function testPlan(overrides: Partial<Plan> = {}): Plan {
   };
 }
 
-/** One team as the organization answers it; not a personal workspace unless a test says so. */
-export function testTeam(overrides: Partial<OrganizationTeam> = {}): OrganizationTeam {
+/** One team scope as the authorization boundary resolves it; not personal unless a test says so. */
+export function testTeamScope(
+  overrides: Partial<Extract<AuthzScopeRef, { type: "team" }>> = {},
+): Extract<AuthzScopeRef, { type: "team" }> {
   return {
+    type: "team",
     id: "team-1",
-    name: "Platform",
-    slug: "platform",
     organizationId: "org-1",
     isPersonal: false,
-    ownerUserId: null,
-    archivedAt: null,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
+    name: "Platform",
     ...overrides,
   };
 }
@@ -66,7 +63,6 @@ export function createRoleTestApp(
   input: Readonly<{
     roles?: MemoryRoleRepository;
     permissions?: Partial<AuthzApi>;
-    organizations?: Partial<OrganizationApi>;
     entitlement?: Partial<EntitlementApi>;
   }> = {},
 ): { app: RoleModule; roles: MemoryRoleRepository } {
@@ -77,12 +73,12 @@ export function createRoleTestApp(
     dependencies: {
       // A caller holds every permission unless a test says otherwise (the escalation rule).
       permissions: createApiFixture<AuthzApi>(
-        { findPermissionsBeyondCaller: async () => [], ...input.permissions },
+        {
+          findPermissionsBeyondCaller: async () => [],
+          getScope: async ({ teamId }) => testTeamScope({ id: teamId }),
+          ...input.permissions,
+        },
         "AuthzApi",
-      ),
-      organizations: createApiFixture<OrganizationApi>(
-        { getTeamById: async ({ teamId }) => testTeam({ id: teamId }), ...input.organizations },
-        "OrganizationApi",
       ),
       entitlement: createApiFixture<EntitlementApi>(
         input.entitlement ?? { getActivePlan: async () => testPlan() },

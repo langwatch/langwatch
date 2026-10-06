@@ -183,9 +183,11 @@ export class MemoryAuthzReadRepository extends AuthzReadRepository {
     teamId,
   }: {
     teamId: string;
-  }): Promise<{ organizationId: string } | null> => {
+  }): Promise<{ organizationId: string; isPersonal: boolean; name: string } | null> => {
     const team = this.memory.teams.find((row) => row.id === teamId);
-    return team ? { organizationId: team.organizationId } : null;
+    return team
+      ? { organizationId: team.organizationId, isPersonal: team.isPersonal, name: team.name }
+      : null;
   };
 
   /** A seat-disabled membership confers no grants, exactly as a removed one does. */

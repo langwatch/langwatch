@@ -391,6 +391,26 @@ describe("AuthzService scope lineage cache", () => {
     });
   });
 
+  describe("given a team that is a personal workspace", () => {
+    /** @scenario "A team scope names whether it is a personal workspace" */
+    it("resolves its scope with the personal flag and the workspace name", async () => {
+      const { authz, reader } = makeWorld();
+      reader.findTeamOrganization.mockResolvedValue({
+        organizationId: ORG,
+        isPersonal: true,
+        name: "Ada's workspace",
+      });
+
+      await expect(authz.getScope({ teamId: TEAM })).resolves.toEqual({
+        type: "team",
+        id: TEAM,
+        organizationId: ORG,
+        isPersonal: true,
+        name: "Ada's workspace",
+      });
+    });
+  });
+
   describe("given project records that a held project was archived", () => {
     /** @scenario "An archived project stops resolving on the next request" */
     it("finds no scope on the next ask", async () => {

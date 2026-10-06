@@ -82,7 +82,13 @@ export class AuthzCollectorService {
         return null;
       }
 
-      return { type: "team", id: teamId, organizationId: team.organizationId };
+      return {
+        type: "team",
+        id: teamId,
+        organizationId: team.organizationId,
+        ...(team.isPersonal === undefined ? {} : { isPersonal: team.isPersonal }),
+        ...(team.name === undefined ? {} : { name: team.name }),
+      };
     }
 
     if (organizationId) {

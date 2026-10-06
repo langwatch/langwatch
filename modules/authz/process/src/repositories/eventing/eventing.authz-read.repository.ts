@@ -301,11 +301,11 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     teamId,
   }: {
     teamId: string;
-  }): Promise<{ organizationId: string } | null> => {
+  }): Promise<{ organizationId: string; isPersonal: boolean; name: string } | null> => {
     const team = (await this.database.team.findUnique({
       where: { id: teamId },
-      select: { organizationId: true },
-    })) as { organizationId: string } | null;
+      select: { organizationId: true, isPersonal: true, name: true },
+    })) as { organizationId: string; isPersonal: boolean; name: string } | null;
     return team ?? null;
   };
 

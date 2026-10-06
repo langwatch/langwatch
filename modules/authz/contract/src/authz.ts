@@ -31,6 +31,8 @@ const teamScopeRefSchema = z
     type: z.literal("team"),
     id: z.string(),
     organizationId: z.string(),
+    isPersonal: z.boolean().optional(),
+    name: z.string().optional(),
   })
   .strict();
 
