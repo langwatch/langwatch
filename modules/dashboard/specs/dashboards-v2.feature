@@ -646,14 +646,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC106 Templates library: a ready template creates a board, a coming-soon one cannot
     Then each card shows a preview, the name, the job, the trunk, the number of widgets
       and the agent kinds it suits
-    And "Create board" on a ready template makes a board only the member sees, named after the template, and opens it
+    And "Add to this project" on a ready template makes a board only the member sees, named after the template, and opens it
     And a coming-soon card says how many of its widgets are built and cannot create a board
 
   @integration
   Scenario: AC107c Templates library: each card reads like the prototype's
     Given the templates library
     Then each card shows, in order: the name with its trunk badge, what the board is for,
-      a preview, the agent kinds it suits, then "Create board" with the number of widgets
+      a preview, the agent kinds it suits, then "Add to this project" with the number of widgets
     And the trunk colour is on the badge and the section heading only, not across the card
     And a card that suits many agent kinds shows the first few and folds the rest behind "+N"
     And the cards sit one to a row on a phone, two on a tablet, three on a wide screen
@@ -857,6 +857,68 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a label whose filter is picked shows it is on
 
   # ---------------------------------------------------------------------------
+  # Product direction: templates and widgets hand off to Langy; alerts and reports are actions
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy
+    Given Langy is on for the project and the member may start a conversation
+    When the member adds a ready template to this project
+    Then the new board is made and opened
+    And Langy opens with the template's report prompt as a draft to send, not a sent question
+    And the draft ends with the dashboard period and grain the new board opens on
+    And the new board, with its widgets, is attached as the context
+
+  @integration
+  Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted
+    Given Langy is off or the member may not start a conversation
+    When the member adds a ready template to this project
+    Then the new board is made and opened, and Langy is not asked anything
+
+  @integration
+  Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does
+    Given Langy is available
+    When the member picks a built widget in the "Add a block" picker
+    Then the draft is the one "Ask Langy" on that widget's card gives: its prompt, its name,
+      description and queries, then the dashboard period
+
+  @unit @integration
+  Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget
+    Given Langy is available
+    When the member picks "Set an alert" in a widget's menu
+    Then Langy opens with a draft, not a sent question, asking to set up an alert on that widget:
+      which number to watch, the threshold and where to send it
+    And the draft names the widget and its queries, then the dashboard period
+    # Decision: the automation drawer's graph alerts and reports read builder graphs only, and a
+    # stored widget has no series to watch, so Langy sets them up from the widget's queries
+
+  @unit @integration
+  Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget
+    Given Langy is available
+    When the member picks "Send as a report" in a widget's menu
+    Then Langy opens with a draft, not a sent question, asking to send that widget as a
+      scheduled report: how often and where to send it
+    And the draft names the widget and its queries, then the dashboard period
+
+  @integration
+  Scenario: AC143b Widget menu: without Langy the menu offers no alert or report
+    Given Langy is off or the member may not start a conversation
+    Then a widget's menu offers Edit, Duplicate and Delete only
+
+  @integration
+  Scenario: AC144 Template card: the primary button reads Add to this project
+    Given a ready template's card
+    Then its primary button reads "Add to this project"
+
+  @unit @integration
+  Scenario: AC145 Template card: a template already added shows Added, linking to its board
+    Given this project has a board named after a template, or numbered from 2 after it
+    Then that template's card shows a quiet "Added" link to that board instead of the add button
+    And a board renamed away from the template's name no longer counts as added
+    # Decision: no board column records its template and adding one needs a migration, so the
+    # board is matched by the name it was made with
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -905,3 +967,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 107-109b: "Sidebar menu" → Scenario: AC107 Sidebar menu: each board offers its actions in the prototype's order; Scenario: AC107b Sidebar menu: a board the member cannot manage offers only what they may use; Scenario: AC108 Sidebar menu: Share changes who sees the board; Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets; Scenario: AC109b Sidebar menu: Set as default picks the board the area opens on
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate
   # AC 130-138: "Picker filters: the 'Add a block' picker narrows like the templates library" → Scenario: AC130 Picker filters: the picker offers the library's chips under the search; Scenario: AC131 Picker filters: chips narrow the widgets by trunk, agent kind and readiness; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: sections are branches in trunk order, coloured by trunk; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row's trunk or agent kind label filters the picker
+  # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board

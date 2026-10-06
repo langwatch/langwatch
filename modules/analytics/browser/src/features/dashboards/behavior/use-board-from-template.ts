@@ -1,7 +1,7 @@
 /**
- * A new only-me board filled with widgets at their places, then opened: from a template, or
- * a board's own widgets for "Duplicate". No server procedure copies a board, so both reuse
- * the create and widget writes. A failure is reported and the half-made board removed.
+ * A new only-me board filled with widgets, opened and answered: from a template, or a board's
+ * own widgets for "Duplicate". No server procedure copies a board, so both reuse the create
+ * and widget writes. A failure is reported and the half-made board removed.
  */
 
 import { useState } from "react";
@@ -19,6 +19,13 @@ type BoardSource = {
   name: string;
   description: string | null;
   widgets: () => Promise<readonly BoardTemplateWidget[]>;
+};
+
+/** The board just made and opened, for what follows it, such as a Langy draft. */
+export type CreatedBoard = {
+  id: string;
+  name: string;
+  widgets: readonly BoardTemplateWidget[];
 };
 
 export function useBoardFromTemplate() {
@@ -66,8 +73,8 @@ export function useBoardFromTemplate() {
     source: BoardSource;
     existingNames: readonly string[];
     fallbackTitle: string;
-  }) => {
-    if (creatingId !== void 0) return;
+  }): Promise<CreatedBoard | undefined> => {
+    if (creatingId !== void 0) return void 0;
     setCreatingId(source.id);
     const refresh = () =>
       Promise.all([
@@ -87,6 +94,7 @@ export function useBoardFromTemplate() {
       // Re-read first, so the new board is listed by the time its address opens.
       await refresh();
       host.navigate(dashboardsPath({ projectSlug, dashboardId }));
+      return { id: board.id, name: board.name, widgets };
     } catch (error) {
       host.failed({ error, fallbackTitle });
       if (dashboardId !== void 0) {
@@ -95,6 +103,7 @@ export function useBoardFromTemplate() {
         });
       }
       await refresh();
+      return void 0;
     } finally {
       setCreatingId(void 0);
     }

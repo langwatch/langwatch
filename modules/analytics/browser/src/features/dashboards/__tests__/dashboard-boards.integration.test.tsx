@@ -306,7 +306,7 @@ describe("a member's board", () => {
         "href",
         "/test-project/dashboards/templates",
       );
-      expect(screen.queryByRole("button", { name: /^Create a board from / })).toBeNull();
+      expect(screen.queryByRole("button", { name: / to this project$/ })).toBeNull();
       expect(screen.queryByText(/^Coming soon/)).toBeNull();
       expect(screen.queryByRole("button", { name: /Add a block/ })).toBeNull();
     });
@@ -571,7 +571,10 @@ describe("a member's board", () => {
     });
 
     describe("when the member picks a built widget from a narrowed list", () => {
-      /** @scenario "AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt" */
+      /**
+       * @scenario "AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt"
+       * @scenario "AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does"
+       */
       it("closes the picker, stores the widget and drafts its prompt for Langy", async () => {
         const user = userEvent.setup();
         const { server, host } = openPicker();
@@ -590,6 +593,8 @@ describe("a member's board", () => {
         expect(server.state.widgets.map(({ name }) => name)).toEqual([traffic.question]);
         expect(host.langyAsks).toHaveLength(1);
         expect(host.langyAsks[0]?.draft?.startsWith(traffic.prompt)).toBe(true);
+        expect(host.langyAsks[0]?.draft).toContain(`This widget:\nName: ${traffic.question}`);
+        expect(host.langyAsks[0]?.draft).toContain("Queries (LangWatchQL):");
       });
     });
 

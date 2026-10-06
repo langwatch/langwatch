@@ -74,7 +74,7 @@ export type TemplatePreview =
   | { readonly kind: "image"; readonly src: string }
   | { readonly kind: "layout"; readonly widgets: readonly PreviewWidget[] };
 
-/** One template as the library lists it; `board` is what "Create board" makes. */
+/** One template as the library lists it; `board` is what "Add to this project" makes. */
 export interface LibraryTemplate extends CatalogueItem {
   readonly board: BoardTemplate;
   readonly widgetCount: number;

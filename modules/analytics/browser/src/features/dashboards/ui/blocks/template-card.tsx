@@ -1,12 +1,14 @@
 /**
- * One template in the library: name and trunk badge, its job, a large preview, the agent kinds
- * it suits, and "Create board" with the widget count. A coming-soon one says how far it is
- * built. Given `onFilter`, the trunk badge and agent kind labels toggle the library's filters.
+ * One template in the library: name and trunk badge, its job, a preview, the agent kinds it
+ * suits, and its action with the widget count. Given `onFilter`, the trunk badge and agent
+ * kind labels toggle the library's filters.
  */
 
 import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { Clock, Plus } from "lucide-react";
+import { Check, Clock, Plus } from "lucide-react";
 
+import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
 import {
   type CatalogueFilterPick,
   type CatalogueFilters,
@@ -19,12 +21,15 @@ import { TemplatePreview } from "./template-preview.tsx";
 export function TemplateCard({
   template,
   isCreating,
+  addedHref,
   onCreate,
   filters,
   onFilter,
 }: {
   template: LibraryTemplate;
   isCreating: boolean;
+  /** The address of the board this project already made from the template, if any. */
+  addedHref?: string;
   onCreate: () => void;
   /** The view the labels show as picked; only where the labels filter. */
   filters?: CatalogueFilters;
@@ -69,31 +74,13 @@ export function TemplateCard({
         <AgentKindLabels agentKinds={agentKinds} filters={filters} onFilter={onFilter} />
       </HStack>
       <HStack gap={3} marginTop="auto">
-        {progress ? (
-          <Button
-            size="sm"
-            variant="subtle"
-            colorPalette="gray"
-            aria-label={`Create a board from ${board.name}`}
-            disabled
-          >
-            <Clock size={14} aria-hidden />
-            Coming soon
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            variant="solid"
-            colorPalette="accent"
-            aria-label={`Create a board from ${board.name}`}
-            loading={isCreating}
-            loadingText="Creating…"
-            onClick={onCreate}
-          >
-            <Plus size={14} aria-hidden />
-            Create board
-          </Button>
-        )}
+        <TemplateAction
+          name={board.name}
+          isComingSoon={progress !== void 0}
+          isCreating={isCreating}
+          addedHref={addedHref}
+          onCreate={onCreate}
+        />
         <Text marginLeft="auto" fontSize="12px" color="fg.subtle" textAlign="end">
           {progress
             ? `${progress.built} of ${progress.total} widgets built`
@@ -101,5 +88,72 @@ export function TemplateCard({
         </Text>
       </HStack>
     </VStack>
+  );
+}
+
+/**
+ * "Add to this project", or "Added" linking to the board already made from the template
+ * (AC145), or "Coming soon" while it is not built.
+ */
+function TemplateAction({
+  name,
+  isComingSoon,
+  isCreating,
+  addedHref,
+  onCreate,
+}: {
+  name: string;
+  isComingSoon: boolean;
+  isCreating: boolean;
+  addedHref: string | undefined;
+  onCreate: () => void;
+}) {
+  const host = useAnalyticsHost();
+  if (isComingSoon) {
+    return (
+      <Button
+        size="sm"
+        variant="subtle"
+        colorPalette="gray"
+        aria-label={`Add ${name} to this project`}
+        disabled
+      >
+        <Clock size={14} aria-hidden />
+        Coming soon
+      </Button>
+    );
+  }
+  if (addedHref) {
+    // A real link, so a modified click still opens the board in a new tab.
+    return (
+      <Button asChild size="sm" variant="outline" colorPalette="gray">
+        <a
+          href={addedHref}
+          aria-label={`${name} is added: open its board`}
+          onClick={(event) => {
+            if (opensElsewhere(event)) return;
+            event.preventDefault();
+            host.navigate(addedHref);
+          }}
+        >
+          <Check size={14} aria-hidden />
+          Added
+        </a>
+      </Button>
+    );
+  }
+  return (
+    <Button
+      size="sm"
+      variant="solid"
+      colorPalette="accent"
+      aria-label={`Add ${name} to this project`}
+      loading={isCreating}
+      loadingText="Adding…"
+      onClick={onCreate}
+    >
+      <Plus size={14} aria-hidden />
+      Add to this project
+    </Button>
   );
 }

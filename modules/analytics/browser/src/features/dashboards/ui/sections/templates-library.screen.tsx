@@ -1,7 +1,6 @@
 /**
- * `/[project]/dashboards/templates`: every dashboard template, searchable, narrowed by trunk,
- * agent kind and readiness in one quiet toolbar, and sectioned by trunk. "Create board" makes
- * a board from the template that only the member sees, and opens it.
+ * `/[project]/dashboards/templates`: every template, searchable, filtered and sectioned by trunk.
+ * Adding one makes an only-me board, opens it and drafts its report in Langy (AC140).
  */
 
 import {
@@ -17,8 +16,12 @@ import { SearchInput } from "@langwatch/design-system/search-input";
 import { useId } from "react";
 
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
+import { useBoardPeriod } from "../../behavior/use-board-period.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useTemplateLibraryFilters } from "../../behavior/use-template-library-filters.ts";
+import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
+import { boardPromptDraft, boardSubject } from "../../langy/model/board-langy.ts";
+import { boardFromTemplateId, dashboardsPath } from "../../model/boards.ts";
 import {
   type CatalogueFilterPick,
   type CatalogueFilters,
@@ -39,12 +42,15 @@ import { DashboardsGate } from "./dashboards-gate.tsx";
 function TrunkSection({
   section,
   creatingId,
+  addedHref,
   onCreate,
   filters,
   onFilter,
 }: {
   section: TemplateSection;
   creatingId: string | undefined;
+  /** The board already made from a template, as its address; undefined when none is. */
+  addedHref: (template: LibraryTemplate) => string | undefined;
   onCreate: (template: LibraryTemplate) => void;
   filters: CatalogueFilters;
   onFilter: (pick: CatalogueFilterPick) => void;
@@ -86,6 +92,7 @@ function TrunkSection({
             key={template.board.id}
             template={template}
             isCreating={creatingId === template.board.id}
+            addedHref={addedHref(template)}
             onCreate={() => onCreate(template)}
             filters={filters}
             onFilter={onFilter}
@@ -100,13 +107,24 @@ function TemplatesLibrary() {
   const { filters, setFilters, clearFilters } = useTemplateLibraryFilters();
   const saved = useSavedDashboards();
   const fromTemplate = useBoardFromTemplate();
+  const langy = useLangyAsk();
+  // The library's address carries no period, so this is the one a new board opens on.
+  const { period } = useBoardPeriod();
   const shown = filterCatalogue({ items: TEMPLATE_LIBRARY, filters });
   const counts = catalogueChipCounts({ items: TEMPLATE_LIBRARY, filters });
-  const create = ({ board }: LibraryTemplate) =>
-    void fromTemplate.createFromTemplate({
-      template: board,
+  const create = async ({ board: template }: LibraryTemplate) => {
+    const created = await fromTemplate.createFromTemplate({
+      template,
       existingNames: saved.boards.map(({ name }) => name),
     });
+    if (!created || !langy.enabled || !template.reportPrompt) return;
+    const board = boardSubject({ board: created, widgets: created.widgets });
+    langy.ask(boardPromptDraft({ prompt: template.reportPrompt, board, period }));
+  };
+  const addedHref = ({ board }: LibraryTemplate) => {
+    const dashboardId = boardFromTemplateId({ templateName: board.name, boards: saved.boards });
+    return dashboardId && dashboardsPath({ projectSlug: saved.projectSlug, dashboardId });
+  };
 
   return (
     <VStack
@@ -160,7 +178,8 @@ function TemplatesLibrary() {
             key={section.key}
             section={section}
             creatingId={fromTemplate.creatingId}
-            onCreate={create}
+            addedHref={addedHref}
+            onCreate={(template) => void create(template)}
             filters={filters}
             onFilter={(pick) => setFilters(toggleCatalogueFilter({ filters, pick }))}
           />

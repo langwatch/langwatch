@@ -20,8 +20,8 @@ import TemplatesLibraryScreen from "../ui/sections/templates-library.screen.tsx"
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
 /** Boards and widgets from memory; every call is kept. */
-function inMemoryServer() {
-  const state = { calls: [] as UiProcedureCall[], boards: [] as { id: string; name: string }[] };
+function inMemoryServer({ boards = [] }: { boards?: { id: string; name: string }[] } = {}) {
+  const state = { calls: [] as UiProcedureCall[], boards: [...boards] };
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     state.calls.push(call);
     const input = (call.input ?? {}) as Record<string, unknown>;
@@ -52,15 +52,22 @@ function inMemoryServer() {
   return { state, answer };
 }
 
+const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
+const LANGY_MEMBER = ["analytics:view", "cost:view", "traces:view", "langy:create"];
+
 function openLibrary({
   query = {},
   flags = { release_dashboards: true },
+  permissions,
+  boards,
 }: {
   query?: Record<string, string>;
   flags?: Record<string, boolean>;
+  permissions?: string[];
+  boards?: { id: string; name: string }[];
 } = {}) {
-  const server = inMemoryServer();
-  const host = new StubAnalyticsHost({ flags, route: { params: {}, query } });
+  const server = inMemoryServer({ boards });
+  const host = new StubAnalyticsHost({ flags, permissions, route: { params: {}, query } });
   renderDashboards({ element: <TemplatesLibraryScreen />, host, answer: server.answer });
   return { host, server };
 }
@@ -163,11 +170,60 @@ describe("the templates library", () => {
       const user = userEvent.setup();
       const { host, server } = openLibrary();
 
-      await user.click(screen.getByRole("button", { name: `Create a board from ${READY.name}` }));
+      await user.click(screen.getByRole("button", { name: `Add ${READY.name} to this project` }));
 
       await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-1"]));
       const created = server.state.calls.find(({ path }) => path === "dashboards.create");
       expect(created?.input).toMatchObject({ name: READY.name, visibility: "only_me" });
+    });
+
+    /** @scenario "AC140 Template pick: the new board opens with the template's report drafted in Langy" */
+    it("drafts the template's report in Langy, unsent, with the new board attached", async () => {
+      const user = userEvent.setup();
+      const { host } = openLibrary({ flags: LANGY_ON, permissions: LANGY_MEMBER });
+
+      await user.click(screen.getByRole("button", { name: `Add ${READY.name} to this project` }));
+
+      await waitFor(() => expect(host.langyAsks).toHaveLength(1));
+      const [ask] = host.langyAsks;
+      expect(ask?.question).toBeUndefined();
+      expect(ask?.draft?.startsWith(READY.reportPrompt!)).toBe(true);
+      expect(ask?.draft).toContain("Dashboard period:");
+      expect(ask?.context[0]?.ref).toContain(`dashboard "${READY.name}" (id board-1)`);
+      expect(ask?.context[0]?.ref).toContain(READY.widgets[0]!.name);
+    });
+
+    /** @scenario "AC140b Template pick: without Langy the board is made and nothing is drafted" */
+    it("makes and opens the board but drafts nothing when Langy is not available", async () => {
+      const user = userEvent.setup();
+      const { host } = openLibrary();
+
+      await user.click(screen.getByRole("button", { name: `Add ${READY.name} to this project` }));
+
+      await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-1"]));
+      expect(host.langyAsks).toEqual([]);
+    });
+  });
+
+  describe("given this project already has a board made from a ready template", () => {
+    const READY = TEMPLATE_LIBRARY.find(({ status }) => status === "ready")!.board;
+    const ADDED = { id: "board-9", name: `${READY.name} 2` };
+
+    /** @scenario "AC145 Template card: a template already added shows Added, linking to its board" */
+    it("shows Added as a link to that board instead of the add button", async () => {
+      const user = userEvent.setup();
+      const { host } = openLibrary({ boards: [ADDED] });
+      const card = screen.getByRole("article", { name: READY.name });
+
+      const added = await within(card).findByRole("link", {
+        name: `${READY.name} is added: open its board`,
+      });
+      expect(added).toHaveAttribute("href", "/test-project/dashboards/board-9");
+      expect(added).toHaveTextContent("Added");
+      expect(within(card).queryByRole("button", { name: / to this project$/ })).toBeNull();
+
+      await user.click(added);
+      expect(host.navigations).toEqual(["/test-project/dashboards/board-9"]);
     });
   });
 
@@ -186,7 +242,7 @@ describe("the templates library", () => {
         ),
       ).toBeInTheDocument();
       expect(
-        within(card).getByRole("button", { name: `Create a board from ${SOON.name}` }),
+        within(card).getByRole("button", { name: `Add ${SOON.name} to this project` }),
       ).toBeDisabled();
     });
   });
@@ -194,16 +250,20 @@ describe("the templates library", () => {
   describe("given a ready template's card", () => {
     const READY = TEMPLATE_LIBRARY.find(({ status }) => status === "ready")!;
 
-    /** @scenario "AC107c Templates library: each card reads like the prototype's" */
-    it("shows the name with its trunk badge, the job, the labels and Create board, in order", () => {
+    /**
+     * @scenario "AC107c Templates library: each card reads like the prototype's"
+     * @scenario "AC144 Template card: the primary button reads Add to this project"
+     */
+    it("shows the name with its trunk badge, the job, the labels and Add to this project, in order", () => {
       openLibrary();
 
       const card = screen.getByRole("article", { name: READY.board.name });
       const name = within(card).getByRole("heading", { level: 3, name: READY.board.name });
       const badge = within(card).getByRole("button", { name: `Filter by ${READY.trunk}` });
       const create = within(card).getByRole("button", {
-        name: `Create a board from ${READY.board.name}`,
+        name: `Add ${READY.board.name} to this project`,
       });
+      expect(create).toHaveTextContent("Add to this project");
       const order = [name, badge, create];
       for (const [index, element] of order.slice(1).entries()) {
         const before = order[index]!;

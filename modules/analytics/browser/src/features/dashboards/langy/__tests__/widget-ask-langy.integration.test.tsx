@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  * Ask Langy on a widget card, against an in-memory dashboards and widgets server: the
- * button shows only with Langy, drafts that widget's prompt, and a duplicate keeps it.
+ * button shows only with Langy, drafts that widget's prompt, and a duplicate keeps it; the
+ * widget menu's alert and report actions draft Langy to set them up.
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
@@ -144,6 +145,47 @@ describe("Ask Langy on a widget card", () => {
         await screen.findByRole("button", { name: "Actions for Traffic" }),
       ).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: ASK_TRAFFIC })).toBeNull();
+    });
+  });
+
+  describe("when the member opens a widget's menu with Langy available", () => {
+    /**
+     * @scenario "AC142 Widget menu: Set an alert drafts Langy to alert on that widget"
+     * @scenario "AC143 Widget menu: Send as a report drafts Langy to schedule that widget"
+     */
+    it.each([
+      ["Set an alert", 'Set up an alert on my "Traffic" dashboard widget.'],
+      ["Send as a report", 'Send my "Traffic" dashboard widget as a scheduled report.'],
+    ])("%s drafts Langy to set it up for that widget", async (action, opening) => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const host = openBoard({ server: inMemoryServer() });
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Traffic" }));
+      await user.click(await screen.findByRole("menuitem", { name: action }));
+
+      expect(host.langyAsks).toHaveLength(1);
+      const [request] = host.langyAsks;
+      expect(request?.question).toBeUndefined();
+      expect(request?.draft?.startsWith(opening)).toBe(true);
+      expect(request?.draft).toContain(`- series:\n${SQL}`);
+      expect(request?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
+    });
+  });
+
+  describe("when the member opens a widget's menu without Langy", () => {
+    /** @scenario "AC143b Widget menu: without Langy the menu offers no alert or report" */
+    it("offers Edit, Duplicate and Delete only", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      openBoard({ server: inMemoryServer(), permissions: MEMBER });
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Traffic" }));
+
+      const items = await screen.findAllByRole("menuitem");
+      expect(items.map((item) => item.textContent?.trim())).toEqual([
+        "Edit",
+        "Duplicate",
+        "Delete",
+      ]);
     });
   });
 

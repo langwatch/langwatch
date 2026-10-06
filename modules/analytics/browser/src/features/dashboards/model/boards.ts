@@ -70,3 +70,29 @@ export function templateBoardName({
   ];
   return candidates.find((name) => !taken.has(name)) ?? templateName;
 }
+
+/**
+ * The board this project already made from a template, by the name `templateBoardName`
+ * gives it: no board column records its template, and adding one needs a migration. A
+ * renamed board is no longer matched, so the template can be added again.
+ */
+export function boardFromTemplateId({
+  templateName,
+  boards,
+}: {
+  templateName: string;
+  boards: readonly { id: string; name: string }[];
+}): string | undefined {
+  const prefix = `${templateName} `;
+  const isNumbered = (name: string) => {
+    const suffix = name.slice(prefix.length);
+    const number = Number(suffix);
+    return (
+      name.startsWith(prefix) &&
+      Number.isInteger(number) &&
+      number >= 2 &&
+      String(number) === suffix
+    );
+  };
+  return boards.find(({ name }) => name === templateName || isNumbered(name))?.id;
+}

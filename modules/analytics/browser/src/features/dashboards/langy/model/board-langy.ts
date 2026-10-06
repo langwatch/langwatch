@@ -1,7 +1,7 @@
 /**
  * What a board tells Langy: the self-describing context a question rides with
- * (AC16): which board, what is on it and the period it reads over, and one widget's
- * draft (AC120). Pure.
+ * (AC16): which board, what is on it and the period it reads over, and the drafts
+ * about the board or one widget on it (AC120, AC140, AC142). Pure.
  */
 
 import { Temporal } from "@langwatch/time";
@@ -99,7 +99,7 @@ export function boardQuestion({
   return { question: question.trim(), context: [boardAskContext({ board, period })] };
 }
 
-/** A picker question's prompt with the board's concrete window and grain appended. */
+/** A prompt with the board's concrete window and grain appended. */
 function promptWithWindow({ prompt, period }: { prompt: string; period: BoardPeriod }): string {
   const window =
     `Dashboard period: ${periodText(period)} (UTC). ` +
@@ -108,8 +108,8 @@ function promptWithWindow({ prompt, period }: { prompt: string; period: BoardPer
 }
 
 /**
- * A picker question's prompt, handed over as a composer draft rather than
- * sent: the reader adds the block, then reads and sends it (AC12).
+ * A prompt about the whole board, such as a template's report (AC140), handed over as a
+ * composer draft rather than sent: the reader reads and sends it.
  */
 export function boardPromptDraft({
   prompt,
@@ -199,7 +199,58 @@ export function widgetPromptDraft({
   board: BoardSubject;
   period: BoardPeriod;
 }): AnalyticsLangyAskRequest {
-  const prompt = widget.definition.prompt ?? fallbackPrompt(widget.name);
+  return widgetDraft({
+    prompt: widget.definition.prompt ?? fallbackPrompt(widget.name),
+    widget,
+    board,
+    period,
+  });
+}
+
+/** What a widget's menu asks Langy to set up on it, beside asking about it. */
+export type WidgetSetup = "alert" | "report";
+
+/**
+ * The automation drawer's graph alerts and reports read builder graphs only, so a stored
+ * widget is set up through Langy, which can read its queries.
+ */
+const SETUP_PROMPTS: Readonly<Record<WidgetSetup, (name: string) => string>> = {
+  alert: (name) =>
+    `Set up an alert on my "${name}" dashboard widget. Ask me which number to watch, the ` +
+    "threshold and where to send the alert (Slack, email or webhook), then create it in " +
+    "LangWatch. Base it on the widget's queries below.",
+  report: (name) =>
+    `Send my "${name}" dashboard widget as a scheduled report. Ask me how often and where ` +
+    "to send it (Slack, email or webhook), then set the report up in LangWatch. Base it on " +
+    "the widget's queries below.",
+};
+
+/** A widget menu action as a composer draft (AC142, AC143): what to set up, then the widget. */
+export function widgetSetupDraft({
+  setup,
+  widget,
+  board,
+  period,
+}: {
+  setup: WidgetSetup;
+  widget: WidgetSubject;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  return widgetDraft({ prompt: SETUP_PROMPTS[setup](widget.name), widget, board, period });
+}
+
+function widgetDraft({
+  prompt,
+  widget,
+  board,
+  period,
+}: {
+  prompt: string;
+  widget: WidgetSubject;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
   const draftWith = (sqls: readonly string[]) =>
     promptWithWindow({ prompt: `${prompt}\n\n${widgetBlock({ widget, sqls })}`, period });
   const sqls = widget.definition.queries.map(({ sql }) => sql);

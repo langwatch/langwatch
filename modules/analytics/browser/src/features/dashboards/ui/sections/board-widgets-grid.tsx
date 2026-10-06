@@ -7,6 +7,7 @@
 import type { ChartGridPlacement } from "../../../../model/chart-grid.ts";
 import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-definition.ts";
 import { ChartGrid } from "../../../../ui/sections/chart-grid.tsx";
+import type { WidgetSetup } from "../../langy/model/board-langy.ts";
 import { BOARD_GRID_ROW_HEIGHT_PX, BOARD_MIN_ROW_SPAN } from "../../model/board-grid.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
@@ -25,6 +26,7 @@ export function BoardWidgetsGrid({
   onSave,
   onPlacementsCommit,
   onAskLangy,
+  onSetUp,
 }: {
   projectId: string;
   projectSlug: string;
@@ -43,6 +45,8 @@ export function BoardWidgetsGrid({
   onPlacementsCommit: (placements: ChartGridPlacement[]) => void;
   /** Drafts a widget's prompt in Langy; absent when Langy is not available. */
   onAskLangy?: (widget: BoardWidget) => void;
+  /** Drafts an alert or report on a widget in Langy; absent when Langy is not available. */
+  onSetUp?: (input: { widget: BoardWidget; setup: WidgetSetup }) => void;
 }) {
   const byId = new Map(widgets.map((widget) => [widget.id, widget]));
 
@@ -68,6 +72,7 @@ export function BoardWidgetsGrid({
             onDelete={() => onDelete(widget)}
             onSave={({ draft, onSaved }) => onSave({ widget, draft, onSaved })}
             onAskLangy={onAskLangy && (() => onAskLangy(widget))}
+            onSetUp={onSetUp && ((setup) => onSetUp({ widget, setup }))}
           />
         );
       }}
