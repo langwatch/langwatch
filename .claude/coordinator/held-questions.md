@@ -133,7 +133,10 @@ recommendation, and "default taken" if a lane proceeded on it.
 - AD-1 tRPC rename `agents.testRun`/`agents.testTurn` -> `scenarios.testAgent*` (d9936d6739) has no ruling line; apidiff reports it as spec-trpc-missing. Recommendation: accept as an internal tRPC rename (the UI is the only caller) and add it to the parity rulings. Default taken, held for Alex.
 - AD-2 Live test fixtures (bootLiveApi, bootLiveWorker, api-executable; about 19 files) are refused by the serving gate unless `upgrade` ran on LANGWATCH_TEST_DATABASE_URL; CI skips them. Recommendation: a memoised upgrade spawn in both fixtures, controlled env, no --env-file (handoffs/entry-points-landing.md §11). Default taken, held for Alex.
 
+### ClickHouse shedding and the #8489 port (2026-10-06 night)
+
 - CH-1 ClickHouse overload refusal body (handoffs/clickhouse-shedding.md R1): main answered 503 `{"error":"clickhouse_overloaded","message":"Too many queries in flight"}`; the branch now sheds at main's 20s and max(64, pool x 8) but the §12 masking rule (packages/api/specs/transport-conventions.feature:165) turns the 503 body into `internal_error`. Options: (a) exempt transient overload refusals from masking in packages/api/src/rest/response.ts:846 so the code reads `clickhouse_overloaded` as on main; (b) keep the mask and record the parity gap. Recommendation (a): the code carries no customer data and clients retry on it. No default taken; it overturns a ruling.
+- OTLP-REPORT `TraceApi.otlpReportError` (declared at modules/trace/contract/src/otlp-ingest.rest.ts:56, implemented at modules/trace/process/src/app/trace.app.ts:3469) has no production caller after the #8489 port (4c331265e6): parse failures now log a client warning instead. Options: (a) remove the operation from the trace contract and app; (b) keep it for a future caller. Recommendation (a): an unused contract operation is dead surface. No default taken; removing a contract operation is Alex's call.
 
 ### Older numbered questions
 
