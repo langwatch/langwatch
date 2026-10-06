@@ -8,7 +8,7 @@ import type { AuthzPermission } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import { Hono } from "hono";
 import { generateSpecs } from "hono-openapi";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import {
@@ -3065,13 +3065,14 @@ describe("three families mounted on one host", () => {
       .handle(async ({ app, input }) => app.getById({ id: input.id }))
       .build();
 
-  /** @scenario "One request writes one request-log record" */
-  it("writes exactly one request-handled record for one request", async () => {
+  let host: Hono;
+
+  beforeEach(() => {
     const runtime = createRestRuntime({
       identity: { authenticate: () => ({ actor: null, scope: null }) },
     });
 
-    const host = new Hono();
+    host = new Hono();
 
     for (const namespace of ["prompts", "datasets", "monitors"]) {
       host.route(
@@ -3082,7 +3083,10 @@ describe("three families mounted on one host", () => {
         }),
       );
     }
+  });
 
+  /** @scenario "One request writes one request-log record" */
+  it("writes exactly one request-handled record for one request", async () => {
     const response = await host.request("/api/datasets/dataset-1");
 
     expect(response.status).toBe(200);
@@ -3092,5 +3096,22 @@ describe("three families mounted on one host", () => {
       .filter((row) => row.message === "request handled");
 
     expect(handled).toHaveLength(1);
+  });
+
+  /** @scenario "The request-log record names the endpoint that answered" */
+  it("names the family and endpoint that resolved the request in its one record", async () => {
+    await host.request("/api/datasets/dataset-1");
+
+    const [record] = [...recordedLogs.values()]
+      .flat()
+      .filter((row) => row.message === "request handled");
+
+    expect(record?.fields).toMatchObject({
+      family: "datasets",
+      route: "GET /:id",
+      url: "/api/datasets/dataset-1",
+      statusCode: 200,
+      duration: expect.any(Number),
+    });
   });
 });

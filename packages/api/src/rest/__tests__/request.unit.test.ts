@@ -432,6 +432,35 @@ describe("the size the request body cap is willing to trust", () => {
       });
     });
 
+    describe("when a chunked body exceeds the cap", () => {
+      /** @scenario "A chunked body past the cap is refused without being buffered" */
+      it("refuses it and stops reading at the cap", async () => {
+        let pulled = 0;
+        const chunks = 200;
+        const body = new ReadableStream<Uint8Array>({
+          pull(controller) {
+            if (pulled === chunks) return controller.close();
+
+            pulled += 1;
+            controller.enqueue(new TextEncoder().encode("x".repeat(8)));
+          },
+        });
+        const incoming = new Request(ECHO_URL, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+          // @ts-expect-error: half-duplex streaming request (undici)
+          duplex: "half",
+        });
+
+        const result = await capped({ maxSize: 16, incoming });
+
+        expect(result.status).toBe(413);
+        expect(result.reachedRoute).toBe(false);
+        expect(pulled).toBeLessThan(chunks / 4);
+      });
+    });
+
     describe("when the body exceeds the cap", () => {
       it("refuses it", async () => {
         const result = await capped({

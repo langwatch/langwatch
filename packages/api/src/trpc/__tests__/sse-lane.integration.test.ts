@@ -86,4 +86,18 @@ describe("the live update channel", () => {
 
     await response.body?.cancel();
   });
+
+  /** @scenario "A request carrying no same-site signal is refused" */
+  it("refuses a request with neither a fetch-site header nor an origin", async () => {
+    const { lane, createCaller } = laneOver("subscription");
+
+    const request = new Request("http://api.test/api/sse/traces/watch", {
+      headers: { cookie: "session=1" },
+    });
+
+    const refusal = await refusalOf(lane.answer(request, new Headers()));
+
+    expect(refusal).toBeInstanceOf(LiveStreamCrossSiteBlockedError);
+    expect(createCaller).not.toHaveBeenCalled();
+  });
 });

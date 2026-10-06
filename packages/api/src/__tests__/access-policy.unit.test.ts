@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   anyAuthenticated,
+  apiKeyPermission,
   describeAccessPolicy,
   handlerManagedAuth,
   internalSecret,
+  policyPermissions,
   publicEndpoint,
   requires,
 } from "../access-policy.ts";
+import { getRoutePolicy, registerRoutePolicy } from "../route-registry.ts";
 
 type Equal<Left, Right> =
   (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
@@ -99,5 +102,26 @@ describe("access policy helpers", () => {
       expect(describeAccessPolicy(publicEndpoint("share link"))).toBe("public — share link");
       expect(describeAccessPolicy(internalSecret("cron"))).toBe("internal — cron");
     });
+  });
+});
+
+describe("the route registry for an API-key-ceiling route", () => {
+  /** @scenario "An API-key-ceiling route records its real required permission" */
+  it("records the permission the route requires, not any-authenticated", () => {
+    registerRoutePolicy({
+      method: "get",
+      path: "/api/ceiling-probe",
+      policy: apiKeyPermission("traces:view"),
+      family: "ceiling-probe",
+      credentialClass: "project_api_key",
+      credential: "api_key",
+    });
+
+    const recorded = getRoutePolicy("GET", "/api/ceiling-probe")?.policy;
+
+    expect(recorded).toEqual({ kind: "apiKeyPermission", permission: "traces:view" });
+    expect(policyPermissions(recorded!)).toEqual(["traces:view"]);
+    expect(describeAccessPolicy(recorded!)).toContain("traces:view");
+    expect(describeAccessPolicy(recorded!)).not.toContain("any authenticated");
   });
 });
