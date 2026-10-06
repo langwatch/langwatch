@@ -7,6 +7,7 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import { explainAnyError, UNKNOWN_ERROR_PRESENTATION } from "@langwatch/handled-error/presentation";
 import {
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+  DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
   VERIFICATION_REQUESTED_EVENT_TYPE,
   emptySsoConnection,
@@ -858,5 +859,76 @@ describe("identity lookup, the claims queue and how long a claim waited", () => 
     const queue = await service.findDomainClaimQueue({ operator: OLIVE });
 
     expect(queue.map((claim) => claim.domain)).toEqual(["disputed.example"]);
+  });
+
+  const OPS_ACTOR = { type: "user" as const, id: "user_ops" };
+  const queuedDomains = async () =>
+    (await service.findDomainClaimQueue({ operator: OLIVE })).map((claim) => claim.domain);
+  const disputed = () => {
+    const claimed = claimedAt({ connectionId: "disputed", claimedAtMs: 4_000 });
+    store.ssoConnections.set("disputed", claimed);
+    store.organizationNames.set("org_disputed", "Disputed Co");
+    return claimed;
+  };
+  const decisionData = {
+    connectionId: "disputed",
+    domain: "disputed.example",
+    actor: OPS_ACTOR,
+    source: "self-serve" as const,
+  };
+
+  /** @scenario "An operator still decides a disputed claim, either way" */
+  it("records an operator's approval as hers and takes the claim off the queue", async () => {
+    const claimed = disputed();
+    expect(await queuedDomains()).toEqual(["disputed.example"]);
+
+    const decided = reduceSsoConnection({
+      state: claimed,
+      fact: {
+        type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+        data: { ...decisionData, authority: "platform-operator" },
+        occurredAt: 6_000,
+      },
+    });
+    store.ssoConnections.set("disputed", decided);
+
+    expect(decided.domainClaims).toEqual([
+      expect.objectContaining({ decidedByActorId: OPS_ACTOR.id, authority: "platform-operator" }),
+    ]);
+    expect(await queuedDomains()).toEqual([]);
+  });
+
+  /** @scenario "An operator still decides a disputed claim, either way" */
+  it("records an operator's rejection as hers, and the domain can be claimed again", async () => {
+    const claimed = disputed();
+    expect(await queuedDomains()).toEqual(["disputed.example"]);
+
+    const decided = reduceSsoConnection({
+      state: claimed,
+      fact: {
+        type: DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
+        data: { ...decisionData, note: "Could not reach the domain owner" },
+        occurredAt: 6_000,
+      },
+    });
+    store.ssoConnections.set("disputed", decided);
+
+    expect(decided.domainClaims).toEqual([
+      expect.objectContaining({ decidedByActorId: OPS_ACTOR.id, note: expect.any(String) }),
+    ]);
+    expect(await queuedDomains()).toEqual([]);
+
+    store.ssoConnections.set(
+      "disputed",
+      reduceSsoConnection({
+        state: decided,
+        fact: {
+          type: DOMAIN_CLAIMED_EVENT_TYPE,
+          data: { ...decisionData, actor: ANA },
+          occurredAt: 8_000,
+        },
+      }),
+    );
+    expect(await queuedDomains()).toEqual(["disputed.example"]);
   });
 });

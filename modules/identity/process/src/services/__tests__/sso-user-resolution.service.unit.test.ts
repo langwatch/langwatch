@@ -502,15 +502,22 @@ describe("given a verified local account and a managed SAML connection", () => {
     emailVerification: "unasserted",
   });
 
-  it("links the account and leaves its profile and verification alone", async () => {
+  /** @scenario "A signed SAML assertion links a verified local account" */
+  it("links the account, leaves its profile and verification alone, and reuses the binding on repeat", async () => {
     const { store, service } = createWorld({ owners: [], proved: true, confirmed: true });
     const before = structuredClone(store.users.get(USER_ID));
 
     await expect(service.resolveUser(SAML_ASSERTION)).resolves.toEqual(LINKED);
+    expect(store.users.get(USER_ID)).toEqual(before);
 
+    bind({ store });
+    await expect(service.resolveUser(SAML_ASSERTION)).resolves.toEqual(LINKED);
+
+    expect(store.accounts.get(USER_ID)).toHaveLength(1);
     expect(store.users.get(USER_ID)).toEqual(before);
   });
 
+  /** @scenario "SAML linking refuses unsuitable local identity evidence" */
   it.each(["inactive", "deactivated", "address-held", "subject-held"] as const)(
     "binds nothing and changes nothing for an account that is %s",
     async (kind) => {

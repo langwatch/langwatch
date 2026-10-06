@@ -63,7 +63,7 @@ function harness(options?: {
 }) {
   const user = options?.user === undefined ? samUser() : options.user;
   const accounts = options?.accounts ?? [googleAccount()];
-  const apply = options?.applyCeremonies ?? true;
+  let apply = options?.applyCeremonies ?? true;
   const rows = new Map<string, BackfillIdentifierRow>(
     (options?.presetRows ?? []).map((row) => [row.id, row]),
   );
@@ -153,6 +153,9 @@ function harness(options?: {
   return {
     service,
     rows,
+    landProjection: () => {
+      apply = true;
+    },
     minted,
     carried,
     attachIdentifier,
@@ -252,6 +255,7 @@ describe("the identifier backfill pass", () => {
   });
 
   describe("when the fold-built rows disagree with what the live rows imply", () => {
+    /** @scenario "Pending identity projection does not imply finalized adoption" */
     it("holds the user at migrated with a diff report, never finalizes", async () => {
       const { service, carried } = harness({ applyCeremonies: false });
 
@@ -266,6 +270,19 @@ describe("the identifier backfill pass", () => {
       // secrets stay where they are: carrying them would be writing the
       // identity branch's half of a split the proof has not agreed to.
       expect(carried).toEqual([]);
+    });
+
+    /** @scenario "Pending identity projection does not imply finalized adoption" */
+    it("finalizes on a later pass once the projection has landed", async () => {
+      const { service, landProjection } = harness({ applyCeremonies: false });
+
+      const held = await service.migrateUser({ userId: USER });
+      expect(held.status).toBe("migrated");
+
+      landProjection();
+      const later = await service.migrateUser({ userId: USER });
+
+      expect(later.status).toBe("finalized");
     });
 
     it("a dead-ended email identifier holds the user instead of parking them", async () => {

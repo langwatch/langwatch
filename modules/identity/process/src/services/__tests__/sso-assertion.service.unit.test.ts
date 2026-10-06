@@ -463,6 +463,7 @@ describe("given several different reasons to refuse", () => {
   });
 
   /** @scenario "The asserted domain is not one the connection has proved" */
+  /** @scenario "SAML linking refuses unsuitable local identity evidence" */
   it("says the domain is not verified for this connection", async () => {
     const decision = await serviceOver({ row: connection() }).service.decide({
       providerId: CONNECTION_ID,
