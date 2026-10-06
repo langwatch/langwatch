@@ -166,15 +166,28 @@ Feature: Agent management
     Then the drawer closes
     And "Code Processor" is selected for use
 
-  Scenario: Create new agent from drawer flow
+  # The old "Create new agent from drawer flow" walked three drawers in one
+  # scenario. Each drawer is its own page-level scenario below; the caller
+  # that wires New Agent to the type selector is proven in its own module.
+  @integration
+  Scenario: New Agent in the AgentListDrawer starts the new agent flow
     Given the AgentListDrawer is open
     When I click "New Agent"
-    Then the AgentTypeSelectorDrawer opens
+    Then the caller of the drawer is told to start the new agent flow
+
+  @integration
+  Scenario: Choosing Code Agent in the AgentTypeSelectorDrawer opens the AgentCodeEditorDrawer
+    Given the AgentTypeSelectorDrawer is open
     When I select "Code Agent"
     Then the AgentCodeEditorDrawer opens
-    When I complete the agent configuration and save
-    Then the new agent appears in the AgentListDrawer
-    And I can select it
+
+  @integration
+  Scenario: Saving a new code agent adds it to the project's agents
+    Given the AgentCodeEditorDrawer is open for a new agent
+    When I name the agent and save
+    Then a code agent with that name is created in the project
+    And the agents the AgentListDrawer lists are read again
+    And the editor closes
 
   # ============================================================================
   # Agent type selector drawer

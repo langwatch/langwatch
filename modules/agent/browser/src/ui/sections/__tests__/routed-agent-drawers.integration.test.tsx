@@ -16,6 +16,7 @@ const calls = vi.hoisted(() => ({
   navigate: [] as string[],
   workflowCreated: [] as unknown[],
   agentCreated: [] as unknown[],
+  listInvalidated: [] as unknown[],
 }));
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
@@ -37,7 +38,16 @@ vi.mock("../../../behavior/agent-api.ts", () => {
   });
   return {
     agentApi: {
-      useUtils: () => ({ agents: { getAll: { invalidate: () => Promise.resolve() } } }),
+      useUtils: () => ({
+        agents: {
+          getAll: {
+            invalidate: (input: unknown) => {
+              calls.listInvalidated.push(input);
+              return Promise.resolve();
+            },
+          },
+        },
+      }),
       agents: {
         getAll: { useQuery: () => ({ data: listed.rows, isLoading: false }) },
         getById: { useQuery: () => ({ data: fetched.agent, isLoading: false, isError: false }) },
@@ -134,6 +144,7 @@ afterEach(() => {
   calls.navigate.length = 0;
   calls.workflowCreated.length = 0;
   calls.agentCreated.length = 0;
+  calls.listInvalidated.length = 0;
 });
 
 describe("the connected agent drawer opened by address", () => {
@@ -203,6 +214,21 @@ describe("the agent editors opened by address", () => {
     expect(screen.getByRole("heading", { name: "New Code Agent" })).toBeInTheDocument();
     expect(screen.getByTestId("agent-name-input")).toBeInTheDocument();
     expect(screen.getByTestId("agent-code-preview")).toBeInTheDocument();
+  });
+
+  /** @scenario "Saving a new code agent adds it to the project's agents" */
+  it("creates a code agent, has the project's agent list read again and closes", async () => {
+    render(<RoutedAgentCodeEditorDrawer />, { wrapper });
+    const user = userEvent.setup();
+
+    await user.type(screen.getByTestId("agent-name-input"), "Code Processor");
+    await user.click(screen.getByTestId("save-agent-button"));
+
+    await vi.waitFor(() => expect(drawer.closeDrawer).toHaveBeenCalled());
+    expect(calls.agentCreated).toEqual([
+      expect.objectContaining({ type: "code", name: "Code Processor" }),
+    ]);
+    expect(calls.listInvalidated).toEqual([{ projectId: "project_1" }]);
   });
 
   /** @scenario "Clicking Workflow Agent in the type selector opens the workflow selector drawer" */

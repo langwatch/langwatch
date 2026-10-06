@@ -99,6 +99,18 @@ describe("AgentListDrawer", () => {
     });
   });
 
+  describe("when New Agent is clicked", () => {
+    /** @scenario "New Agent in the AgentListDrawer starts the new agent flow" */
+    it("tells the caller of the drawer to start the new agent flow", () => {
+      const mocks = renderDrawer();
+
+      fireEvent.click(screen.getByTestId("new-agent-button"));
+
+      expect(mocks.onCreateNew).toHaveBeenCalledOnce();
+      expect(mocks.onSelect).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when an agent is clicked", () => {
     /** @scenario "Select agent from drawer" */
     it("hands that agent to the caller and closes the drawer", () => {

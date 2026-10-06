@@ -73,6 +73,29 @@ describe("AgentModule linked workflow operations", () => {
     expect(archived.agent.archivedAt).toBeInstanceOf(Date);
   });
 
+  /** @scenario "A copied workflow agent points at the graph the workflow module copied" */
+  it("points the copied agent at the graph the workflow module returned and leaves the source alone", async () => {
+    const fixture = await setup();
+
+    const copied = await fixture.app.copy({
+      sourceAgentId: "agent_workflow",
+      sourceProjectId: "project_1",
+      targetProjectId: "project_2",
+      actorUserId: "user_1",
+    });
+
+    expect(fixture.copy).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ sourceWorkflowId: "workflow_1", targetProjectId: "project_2" }),
+      { id: "user_1" },
+    );
+    expect(
+      await fixture.repositories.agents.getById({ id: copied.id, projectId: "project_2" }),
+    ).toMatchObject({ workflowId: "workflow_copy", copiedFromAgentId: "agent_workflow" });
+    expect(
+      await fixture.repositories.agents.getById({ id: "agent_workflow", projectId: "project_1" }),
+    ).toMatchObject({ workflowId: "workflow_1", name: "Studio agent" });
+  });
+
   it("removes the copied workflow when persisting its Agent fails", async () => {
     const fixture = await setup();
     const failure = new Error("write refused");

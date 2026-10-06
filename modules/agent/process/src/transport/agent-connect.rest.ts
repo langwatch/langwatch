@@ -15,9 +15,12 @@ import {
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
+  type RestProtocolProducer,
   type RestProtocolRefusal,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+import { createLogger } from "@langwatch/observability";
+import type { ZodType } from "zod";
 
 import {
   type AgentConnectRefusal,
@@ -25,6 +28,7 @@ import {
   pollRefusal,
   registerRefusal,
 } from "../rules/agent-connect-refusal.rules.ts";
+import { describeOutputFailure } from "../rules/connected-agent-output.rules.ts";
 
 export const agentConnectHeaders = defineRestMiddleware(
   "agentConnectHeaders",
@@ -38,6 +42,38 @@ const CONNECT_ACCESS = {
 };
 
 const JSON_MEDIA_TYPE = "application/json";
+
+const logger = createLogger("langwatch:connected-agents:protocol");
+
+/**
+ * The protocol's answer is sent as the App produced it. One that breaks its
+ * schema is logged by endpoint and failure alone, never by content.
+ */
+function protocolAnswer({
+  endpoint,
+  schema,
+  output,
+  response,
+}: {
+  endpoint: string;
+  schema: ZodType;
+  output: unknown;
+  response: RestProtocolProducer<typeof JSON_MEDIA_TYPE>;
+}) {
+  const parsed = schema.safeParse(output);
+  if (!parsed.success) {
+    logger.error(
+      { endpoint, ...describeOutputFailure({ error: parsed.error }) },
+      "connect protocol output broke its schema and was sent as produced",
+    );
+  }
+
+  return response.write({
+    status: 200,
+    mediaType: JSON_MEDIA_TYPE,
+    body: JSON.stringify(output),
+  });
+}
 
 const BECAUSE =
   "The connect protocol's SDKs read a refusal as the refused frame at the body's root.";
@@ -91,10 +127,11 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
       })
       .withMiddleware(agentConnectHeaders)
       .handle(async ({ app, input, response }, credentials) =>
-        response.write({
-          status: 200,
-          mediaType: JSON_MEDIA_TYPE,
-          body: JSON.stringify(await app.registerConnectedAgentInstance(input, credentials)),
+        protocolAnswer({
+          endpoint: "POST /connect/register",
+          schema: agentConnectRegisterOutputSchema,
+          output: await app.registerConnectedAgentInstance(input, credentials),
+          response,
         }),
       )
 
@@ -112,15 +149,14 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
       })
       .withMiddleware(agentConnectHeaders)
       .handle(async ({ app, input, signal, response }, credentials) =>
-        response.write({
-          status: 200,
-          mediaType: JSON_MEDIA_TYPE,
-          body: JSON.stringify(
-            await app.connectPoll(
-              { inFlightCallIds: (input.inFlight ?? "").split(",").filter(Boolean), signal },
-              credentials,
-            ),
+        protocolAnswer({
+          endpoint: "GET /connect/poll",
+          schema: agentConnectPollOutputSchema,
+          output: await app.connectPoll(
+            { inFlightCallIds: (input.inFlight ?? "").split(",").filter(Boolean), signal },
+            credentials,
           ),
+          response,
         }),
       )
 
@@ -143,10 +179,11 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
       })
       .withMiddleware(agentConnectHeaders)
       .handle(async ({ app, input, response }, credentials) =>
-        response.write({
-          status: 200,
-          mediaType: JSON_MEDIA_TYPE,
-          body: JSON.stringify(await app.connectFrames(input, credentials)),
+        protocolAnswer({
+          endpoint: "POST /connect/frames",
+          schema: agentConnectFramesOutputSchema,
+          output: await app.connectFrames(input, credentials),
+          response,
         }),
       )
       .build()
