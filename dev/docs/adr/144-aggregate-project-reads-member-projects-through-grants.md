@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-26, revised 2026-10-06
 
-**Status:** Proposed (v3 awaiting lock; v2 was Accepted)
+**Status:** Accepted (v4, 2026-10-06)
 
 **Builds on:** ADR-166 (grant-scoped data access: a sealed `Authorization`
 proof minted once at the door, carried by hand, applied by the store client),
@@ -410,3 +410,7 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   PR 7536 later; audit matches what exists (the five-minute admin view row
   with kind `aggregate`), the per-trace `trace.viewed` row is deferred with
   its slot kept.
+- v4 (2026-10-06): locked by the captain ("lets go"); status Accepted. The
+  two open forks of v3 were settled by the captain: build on `main` and port
+  later; audit matches the existing admin view row. Implementation starts
+  at block A.
