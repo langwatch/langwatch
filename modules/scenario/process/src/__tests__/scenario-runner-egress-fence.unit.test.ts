@@ -123,6 +123,31 @@ describe("the scenario runner's outbound fence", () => {
     });
   });
 
+  describe("given IS_SAAS is set beside the local-address policy", () => {
+    describe("when IS_SAAS is true and BLOCK_LOCAL_HTTP_CALLS is unset", () => {
+      /** @scenario "TS validator ignores IS_SAAS for SSRF blocking" */
+      it("admits a private IP literal", async () => {
+        await expect(
+          runnerUrlValidator({ IS_SAAS: "true" })("http://10.0.5.3/"),
+        ).resolves.toMatchObject({
+          type: "resolved",
+          resolvedIp: "10.0.5.3",
+        });
+      });
+    });
+
+    describe("when IS_SAAS is false and BLOCK_LOCAL_HTTP_CALLS is true", () => {
+      /** @scenario "TS validator with explicit BLOCK_LOCAL_HTTP_CALLS overrides any IS_SAAS state" */
+      it("refuses a private IP literal", async () => {
+        await expect(
+          runnerUrlValidator({ IS_SAAS: "false", BLOCK_LOCAL_HTTP_CALLS: "true" })(
+            "http://10.0.5.3/",
+          ),
+        ).rejects.toThrow(/private or localhost IP/i);
+      });
+    });
+  });
+
   describe("given the deployment is not SaaS", () => {
     describe("when the runner builds a fetch request", () => {
       /** @scenario "Scenario runner allows self-signed certificates when IS_SAAS is false" */

@@ -12,11 +12,13 @@ import {
   LangyPanelConversationService,
   type LangyPanelConversationMembers,
 } from "../langy-panel-conversation.service.ts";
+import { LangyPanelEgressService } from "../langy-panel-egress.service.ts";
 import {
   LangyPanelLocalService,
   type LangyPanelLocalMembers,
 } from "../langy-panel-local.service.ts";
 import { LangyUiActionPageService } from "../langy-ui-action-page.service.ts";
+import type { LangyService } from "../langy.service.ts";
 
 type UiActions = NonNullable<LangyPanelConversationMembers["uiActions"]>;
 
@@ -65,6 +67,23 @@ describe("LangyPanelConversationService", () => {
     await expect(service.listConversations({ caller, projectId, limit: 30 })).rejects.toMatchObject(
       { code: "langy_not_enabled" },
     );
+  });
+
+  /** @scenario "The demo project refuses Langy on every surface" */
+  it("refuses the panel and the egress allow-list read on the demo project", async () => {
+    const demoAccess = access({ demo: true });
+    const conversations = panel({ access: demoAccess });
+    const egress = LangyPanelEgressService.create({
+      access: demoAccess,
+      langy: createApiFixture<Pick<LangyService, "findEgressAllowlist" | "setEgressAllowlist">>(),
+    });
+
+    await expect(
+      conversations.listConversations({ caller, projectId, limit: 30 }),
+    ).rejects.toMatchObject({ code: "langy_not_enabled" });
+    await expect(egress.getEgressState({ caller, projectId })).rejects.toMatchObject({
+      code: "langy_not_enabled",
+    });
   });
 
   /** @scenario "The conversation list reaches the browser as epoch-millisecond rows" */

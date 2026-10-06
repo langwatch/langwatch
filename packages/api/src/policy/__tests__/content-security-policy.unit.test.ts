@@ -44,3 +44,21 @@ describe("given a production response from the app's browser bundle", () => {
     });
   });
 });
+
+describe("given a development response from the app's browser bundle", () => {
+  const development = browserBundleDefaults({ production: false });
+  const production = browserBundleDefaults({ production: true });
+
+  describe("when the policy headers are read", () => {
+    /** @scenario "Development responses report the production CSP without enforcing it" */
+    it("carries the production policy as report-only and enforces none", () => {
+      const enforced = production.read("Content-Security-Policy");
+
+      expect(development.read("Content-Security-Policy")).toBeUndefined();
+      expect(development.read("Content-Security-Policy-Report-Only")).toBe(
+        enforced?.replace("; upgrade-insecure-requests", ""),
+      );
+      expect(production.read("Content-Security-Policy-Report-Only")).toBeUndefined();
+    });
+  });
+});
