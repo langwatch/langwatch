@@ -461,9 +461,11 @@ push cancels the one still going. It follows `apidiff.yml` and `e2e-ci.yml`:
 
 1. Postgres, ClickHouse and Redis are job services; the secrets are throwaway
    values in the job's environment. Nothing needs a repository secret.
-2. The candidate's own migrations and seed run against them from the checkout
-   (`pnpm prisma:migrate`, `pnpm clickhouse:migrate`, `pnpm prisma:seed`):
-   the state a developer's database is in before a `-no-haven` run. The base
+2. The candidate's own upgrade and seed run against them from the checkout
+   (`pnpm start:prepare:db`, `pnpm prisma:seed`): the state a developer's
+   database is in before a `-no-haven` run. The step names an origin
+   (`BASE_HOST`, `NEXTAUTH_URL`) because the system-migrations pass boots the
+   modules, which refuse a deployment without one. The base
    then boots on the candidate's schema with its migrations skipped, the same
    as every rolling deploy's old release does.
 3. `visualdiff run -no-haven -no-publish -no-baseline` boots both refs on

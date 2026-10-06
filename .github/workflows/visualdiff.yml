@@ -151,7 +151,13 @@ jobs:
       # The candidate's schema and seed, the state a developer's own stack is in:
       # the base boots on it with its migrations skipped (README, "Running in CI").
       # The candidate's api and worker refuse to serve until its upgrade has run.
+      # Its system-migrations pass boots the modules, which refuse a deployment
+      # with no origin (auth: NEXTAUTH_URL, hosted-mcp: BASE_HOST). The stacks
+      # still get their own origins (tools/visualdiff/plan.go).
       - name: Migrate and seed the shared databases
+        env:
+          BASE_HOST: "http://localhost:5560"
+          NEXTAUTH_URL: "http://localhost:5560"
         run: |
           pnpm start:prepare:db
           pnpm prisma:seed
