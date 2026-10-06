@@ -8,7 +8,7 @@ import {
 } from "@langwatch/api/rest";
 /**
  * `/api/scenarios`: scenarios and version history (resolves platformUrl).
- * Answers misses in legacy `{ error }` body; scenarioRestErrorHandler is mount's onError.
+ * Misses answer through the framework's canonical error envelope.
  */
 import { createLogger } from "@langwatch/observability";
 import {

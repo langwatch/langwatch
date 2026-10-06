@@ -5,23 +5,13 @@
  * never appears again, and which organization a mint belongs to.
  * @see enterprise/modules/scim/specs/scim.feature
  */
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { permissionsConferred } from "@langwatch/authz-contract";
 import { ScimTokenNotFoundError } from "@langwatch/enterprise-scim-contract";
-import { HandledError } from "@langwatch/handled-error";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { scimTokenRest, scimTokenRestActor } from "../scim-token.rest.ts";
 import { ScimServiceFake, scimTestApp } from "./support/scim-app.fixture.ts";
-
-const boundaryErrorHandler: RestErrorHandler = (error, context) => {
-  if (HandledError.isHandled(error)) {
-    return context.json({ code: error.code }, (error.httpStatus ?? 500) as ContentfulStatusCode);
-  }
-
-  return context.json({ error: String(error) }, 500);
-};
 
 const MINTED = "9d8ac1f0a9e0f2b8c1d4e6f8a0b2c4d6e8f0a2b4c6d8e0f2a4b6c8d0e2f4a6b8";
 
@@ -70,7 +60,7 @@ function mount(
         resolve: () => ({ actorId: "user_ana", apiKeyId: "key_ana" }),
       },
     ],
-    onError: boundaryErrorHandler,
+    onError: canonicalErrorResponse,
   });
 
   return {
@@ -168,7 +158,7 @@ describe("given the SCIM tokens management family", () => {
       });
 
       expect(response.status).toBe(403);
-      expect(await response.json()).toEqual({ code: "grant_exceeds_caller_permissions" });
+      expect(await response.json()).toMatchObject({ code: "grant_exceeds_caller_permissions" });
       expect(api.findPermissionsBeyondCaller).toHaveBeenCalledWith({
         organizationId: "org_acme",
         caller: { type: "apiKey", id: "key_ana" },
@@ -228,7 +218,7 @@ describe("given the SCIM tokens management family", () => {
       const response = await api.request("/scim_token_gone", { method: "DELETE" });
 
       expect(response.status).toBe(404);
-      expect(await response.json()).toEqual({ code: "scim_token_not_found" });
+      expect(await response.json()).toMatchObject({ code: "scim_token_not_found" });
       expect(api.audited).toEqual([]);
     });
   });

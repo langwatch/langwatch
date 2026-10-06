@@ -150,7 +150,7 @@ describe("given the project's experiments over REST", () => {
       const response = await send("/api/experiments/does-not-exist");
 
       expect(response.status).toBe(404);
-      expect(await response.json()).toMatchObject({ error: "experiment_not_found" });
+      expect(await response.json()).toMatchObject({ code: "experiment_not_found" });
     });
 
     /** @scenario "An experiment in another project is not readable" */
@@ -265,7 +265,7 @@ describe("given the project's experiments over REST", () => {
       const response = await send("/api/experiments", { method: "POST", body: { name: "" } });
 
       expect(response.status).toBe(422);
-      expect(await response.json()).toMatchObject({ error: "validation_error" });
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
       expect(createEvaluationsV3).not.toHaveBeenCalled();
     });
   });

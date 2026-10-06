@@ -5,11 +5,10 @@
  */
 
 import {
-  apiErrorBody,
+  canonicalErrorResponse,
   bindRestMiddleware,
   createRestRuntime,
   type IdempotentRunner,
-  type RestErrorHandler,
   type RestPermissionReach,
 } from "@langwatch/api/rest";
 import { PermissionDeniedError } from "@langwatch/authorization";
@@ -24,12 +23,10 @@ import {
   type GatewayVirtualKeySnakeDto,
   VirtualKeyRevokedError,
 } from "@langwatch/gateway-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { Prisma } from "@langwatch/prisma-client/generated";
 // @vitest-environment node
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { virtualKeyRow } from "../../app/__tests__/gateway-virtual-key.fixture.ts";
@@ -90,23 +87,6 @@ function statefulIdempotency(): IdempotentRunner {
     return { isReplayed: false, status: response.status, response };
   };
 }
-
-/** The canonical `{ type, code, message, ... }` envelope this family publishes. */
-const onError: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    const status = (error.httpStatus ?? 500) as ContentfulStatusCode;
-    return c.json(
-      apiErrorBody({
-        status: status as number,
-        code: error.code,
-        message: error.message,
-        meta: error.meta,
-      }),
-      status,
-    );
-  }
-  return c.json(apiErrorBody({ status: 500, code: "internal_error", message: String(error) }), 500);
-};
 
 /** The key the key door resolves in these tests: an organization key naming no project. */
 const ORGANIZATION_KEY_CALLER: GatewayKeyCaller = {
@@ -194,7 +174,7 @@ function mountFamily({
 
   return runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
-    onError,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(gatewayKeyCaller, () => keyCaller),
       bindRestMiddleware(gatewayVirtualKeyCaller, () => virtualKeyCaller),

@@ -1,3 +1,4 @@
+import { canonicalErrorResponse } from "@langwatch/api/rest";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
 import { createTenantId } from "@langwatch/eventing";
@@ -24,7 +25,6 @@ import {
   createScenarioRestTestRuntime,
   ORGANIZATION_ID,
   PROJECT_ID,
-  scenarioRestTestErrors,
 } from "./scenario-rest.harness.ts";
 
 async function buildEventFamily(
@@ -64,7 +64,7 @@ async function buildEventFamily(
   });
   const mounted = runtime.mount(scenarioEventsRest.router(), {
     app: () => world.app,
-    onError: scenarioRestTestErrors,
+    onError: canonicalErrorResponse,
     facts: [projectFacts],
   });
 
@@ -570,7 +570,7 @@ describe("the scenario-events usage gate", () => {
       const response = await postJson(family, "/api/scenario-events", messageSnapshotEvent());
       expect(response.status).toBe(402);
       expect(response.headers.get("retry-after")).toBeNull();
-      await expect(response.json()).resolves.toMatchObject({ error: "ERR_PLAN_LIMIT" });
+      await expect(response.json()).resolves.toMatchObject({ code: "ERR_PLAN_LIMIT" });
       expect(messageSnapshot).not.toHaveBeenCalled();
     });
 

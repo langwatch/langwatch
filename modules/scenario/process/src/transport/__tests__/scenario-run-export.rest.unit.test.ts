@@ -4,22 +4,12 @@
  */
 import { gzipSync, gunzipSync } from "node:zlib";
 
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { scenarioRunExportRest } from "../scenario-run-export.rest.ts";
-
-const boundaryErrorHandler: RestErrorHandler = (error, context) => {
-  if (HandledError.isHandled(error)) {
-    return context.json({ code: error.code }, (error.httpStatus ?? 500) as ContentfulStatusCode);
-  }
-
-  return context.json({ error: "internal_server_error" }, 500);
-};
 
 function buildApi(permitted = true) {
   const compressed = gzipSync("ScenarioRunId\r\nrun_1\r\n");
@@ -43,7 +33,7 @@ function buildApi(permitted = true) {
   });
   const hono = runtime.mount(scenarioRunExportRest.router(), {
     app: () => app,
-    onError: boundaryErrorHandler,
+    onError: canonicalErrorResponse,
   });
   const download = (projectId = "project_1") =>
     hono.request("http://api.test/api/export/scenario-runs/download", {

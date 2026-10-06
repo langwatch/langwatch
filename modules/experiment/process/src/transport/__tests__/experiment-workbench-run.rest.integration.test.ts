@@ -2,25 +2,12 @@
  * @vitest-environment node
  * Browser workbench runs receive route authorization before their operation.
  */
-import { createRestRuntime, HttpError, type RestErrorHandler } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ExperimentV3RestApi } from "../experiment-v3.rest.ts";
 import { experimentWorkbenchRunRest } from "../experiment-workbench-run.rest.ts";
-
-const refusal: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json({ error: error.code }, (error.httpStatus ?? 500) as ContentfulStatusCode);
-  }
-  if (error instanceof HttpError) {
-    return c.json({ error: error.error }, error.status as ContentfulStatusCode);
-  }
-
-  return c.json({ error: "Internal server error" }, 500);
-};
 
 describe("the workbench run REST family", () => {
   describe("when the caller lacks evaluations:manage on the body project", () => {
@@ -58,7 +45,7 @@ describe("the workbench run REST family", () => {
       });
       const hono = runtime.mount(experimentWorkbenchRunRest.router(), {
         app: () => app,
-        onError: refusal,
+        onError: canonicalErrorResponse,
       });
 
       const response = await hono.request("/api/experiments/abort", {

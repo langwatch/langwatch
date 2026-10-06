@@ -1,10 +1,9 @@
 import {
+  canonicalErrorResponse,
   bindRestMiddleware,
   createRestRuntime,
   projectRestFacts,
-  type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
 /**
  * `POST /api/v1/traces/search`: digest/json formats, evaluations, pagination,
  * the projection DSL and the date axis, all over real services - only
@@ -19,7 +18,6 @@ import {
   type TracesForProjectResult,
   type TraceWithGuardrail,
 } from "@langwatch/trace-contract";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -132,17 +130,6 @@ const DEFAULT_PAGE: TracesForProjectResult = tracePage([TRACE_1, TRACE_2], {
   traceChecks: { "trace-1": [EVAL_1], "trace-2": [] },
 });
 
-const boundaryErrorHandler: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    const serialized = error.serialize();
-    return c.json(
-      { error: serialized.code, ...serialized.meta, reasons: serialized.reasons },
-      (serialized.httpStatus ?? 500) as ContentfulStatusCode,
-    );
-  }
-  return c.json({ error: "internal_server_error" }, 500);
-};
-
 function mount(overrides: Readonly<{ listTraces?: TraceApi["listTraces"] }> = {}) {
   const listTraces: TraceApi["listTraces"] =
     overrides.listTraces ?? vi.fn(async () => DEFAULT_PAGE);
@@ -171,7 +158,7 @@ function mount(overrides: Readonly<{ listTraces?: TraceApi["listTraces"] }> = {}
   const hono = runtime.mount(tracesRest.router(), {
     app: () => stub,
     credential: "project",
-    onError: boundaryErrorHandler,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({
         projectSlug: "project-one",
@@ -197,8 +184,8 @@ type SearchBody = Readonly<{
   traces: Record<string, unknown>[];
   pagination: Record<string, unknown>;
   schema?: Record<string, unknown>;
-  error?: string;
-  reasons?: { code: string; meta: Record<string, unknown> }[];
+  code?: string;
+  meta?: { reasons?: { code: string; meta: Record<string, unknown> }[] };
 }>;
 
 async function bodyOf(res: Response): Promise<SearchBody> {
@@ -484,11 +471,12 @@ describe("POST /search", () => {
       const { send } = mount();
       const res = await send({ startDate: 1000, endDate: 5000, select: ["nonexistent_field"] });
       const body = await bodyOf(res);
-      expect(body.error).toBe("validation_error");
-      expect(body.reasons).toHaveLength(1);
-      expect(body.reasons?.[0]?.code).toBe("schema_failure");
-      expect(body.reasons?.[0]?.meta.field).toBe("select");
-      expect(body.reasons?.[0]?.meta.received).toBe("nonexistent_field");
+      expect(body.code).toBe("validation_error");
+      const reasons = body.meta?.reasons;
+      expect(reasons).toHaveLength(1);
+      expect(reasons?.[0]?.code).toBe("schema_failure");
+      expect(reasons?.[0]?.meta.field).toBe("select");
+      expect(reasons?.[0]?.meta.received).toBe("nonexistent_field");
     });
 
     it("does not query the trace service", async () => {
@@ -672,8 +660,8 @@ describe("POST /search with a trace filter", () => {
       const { send, listTraces } = mount();
       const res = await send({ startDate: 1000, endDate: 5000, filter: "status:" });
       expect(res.status).toBe(422);
-      const body = (await res.json()) as { error: string };
-      expect(body.error).toBe("filter_parse_error");
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe("filter_parse_error");
       expect(listTraces).not.toHaveBeenCalled();
     });
   });
@@ -689,8 +677,8 @@ describe("POST /search with a trace filter", () => {
         filter: "span.attribute.gen_ai.request.model:gpt-5-mini",
       });
       expect(res.status).toBe(422);
-      const body = (await res.json()) as { error: string };
-      expect(body.error).toBe("filter_parse_error");
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe("filter_parse_error");
       expect(listTraces).not.toHaveBeenCalled();
     });
 
@@ -724,10 +712,13 @@ describe("POST /search with a trace filter", () => {
       const { send, listTraces } = mount();
       const res = await send({ startDate: 1000, endDate: 5000, filter: "statuz:error" });
       expect(res.status).toBe(422);
-      const body = (await res.json()) as { error: string; field?: string; knownFields?: string[] };
-      expect(body.error).toBe("filter_field_unknown");
-      expect(body.field).toBe("statuz");
-      expect(body.knownFields).toContain("status");
+      const body = (await res.json()) as {
+        code: string;
+        meta: { field?: string; knownFields?: string[] };
+      };
+      expect(body.code).toBe("filter_field_unknown");
+      expect(body.meta.field).toBe("statuz");
+      expect(body.meta.knownFields).toContain("status");
       expect(listTraces).not.toHaveBeenCalled();
     });
   });
@@ -742,14 +733,13 @@ describe("POST /search with a trace filter", () => {
       });
       expect(res.status).toBe(422);
       const body = (await res.json()) as {
-        error: string;
-        fields: string[];
-        reasons: { meta: { type: string; message: string } }[];
+        code: string;
+        meta: { fields: string[]; reasons: { meta: { type: string; message: string } }[] };
       };
-      expect(body.error).toBe("validation_error");
-      expect(body.fields).toEqual(["filters.evaluations.passed"]);
-      expect(body.reasons[0]?.meta.type).toBe("filter_key_required");
-      expect(body.reasons[0]?.meta.message).toContain("evaluatorVerdict:fail");
+      expect(body.code).toBe("validation_error");
+      expect(body.meta.fields).toEqual(["filters.evaluations.passed"]);
+      expect(body.meta.reasons[0]?.meta.type).toBe("filter_key_required");
+      expect(body.meta.reasons[0]?.meta.message).toContain("evaluatorVerdict:fail");
       expect(listTraces).not.toHaveBeenCalled();
     });
   });

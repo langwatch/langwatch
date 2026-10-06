@@ -5,14 +5,13 @@ import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-con
  * `POST /api/collector` against the COMPOSITION-built app and MODULE-declared
  * transports — proves neither is stubbed. Spec: specs/traces/trace-ingestion-door.feature
  */
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/process";
@@ -22,7 +21,6 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it } from "vitest";
 
 import { TraceModule } from "../../app/trace.app.ts";
@@ -125,20 +123,6 @@ function apiKeyDirectory(
   };
 }
 
-/** The flat body this deployment's boundary publishes for a handled refusal. */
-const renderRefusal: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    const serialized = error.serialize();
-
-    return c.json(
-      { error: serialized.code, message: error.message },
-      serialized.httpStatus as ContentfulStatusCode,
-    );
-  }
-
-  return c.json({ error: "Internal server error" }, 500);
-};
-
 /**
  * The whole trace REST surface this module declares, mounted the way boot
  * mounts it: every declared REST transport, in declaration order, over ONE
@@ -232,7 +216,7 @@ function deployment(access: CollectorAccess = {}) {
           // The collector binds NO transport fact: it is declared public and
           // resolves the project credential inside its handler.
           credential: "public",
-          onError: renderRefusal,
+          onError: canonicalErrorResponse,
         }),
       ]
     : [];

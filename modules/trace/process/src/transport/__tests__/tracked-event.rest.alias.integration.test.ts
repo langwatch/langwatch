@@ -3,8 +3,7 @@
  * Both tracked-event URLs on the in-memory runtime, posted to for real: what a
  * pre-rename SDK release receives is the fact under test, not the declaration.
  */
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TrackedEventInvalidError } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
@@ -19,15 +18,6 @@ import {
 } from "../tracked-event.rest.ts";
 
 const PROJECT_ID = "project-1";
-
-/** Stands in for the process boundary: a handled refusal as a flat `{ error }` at its status. */
-const renderRefusal: RestErrorHandler = (error, context) =>
-  error instanceof HandledError
-    ? new Response(JSON.stringify({ error: error.message }), {
-        status: error.httpStatus,
-        headers: { "content-type": "application/json" },
-      })
-    : context.json({ error: "unhandled" }, 500);
 
 /** Mounts one family and records every event its handler dispatches. */
 function mounted(family: typeof trackedEventRest, options: { rejects: boolean }) {
@@ -54,7 +44,7 @@ function mounted(family: typeof trackedEventRest, options: { rejects: boolean })
   return {
     hono: runtime.mount(family.router(), {
       app: () => app,
-      onError: renderRefusal,
+      onError: canonicalErrorResponse,
     }),
     recorded,
   };

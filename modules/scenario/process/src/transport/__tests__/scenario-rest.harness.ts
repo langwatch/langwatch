@@ -5,14 +5,13 @@ import {
   bindRestMiddleware,
   createRestRuntime,
   projectRestFacts,
-  type RestErrorHandler,
+  UnauthorizedError,
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ResourceOwnership } from "@langwatch/process";
@@ -22,8 +21,6 @@ import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
-import { HTTPException } from "hono/http-exception";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import {
   scenarioExecutorPeers,
@@ -118,7 +115,7 @@ export function createScenarioRestTestRuntime(
     identity: {
       authenticate: () => {
         if (options.authenticated === false) {
-          throw new HTTPException(401, { message: "Unauthenticated" });
+          throw new UnauthorizedError("Unauthenticated");
         }
 
         return {
@@ -137,16 +134,3 @@ export function createScenarioRestTestRuntime(
 
   return { runtime, projectFacts };
 }
-
-export const scenarioRestTestErrors: RestErrorHandler = (error, context) => {
-  if (error instanceof HTTPException) return error.getResponse();
-
-  if (HandledError.isHandled(error)) {
-    return context.json(
-      { error: error.code, message: error.message },
-      (error.httpStatus ?? 500) as ContentfulStatusCode,
-    );
-  }
-
-  return context.json({ error: "internal_server_error" }, 500);
-};

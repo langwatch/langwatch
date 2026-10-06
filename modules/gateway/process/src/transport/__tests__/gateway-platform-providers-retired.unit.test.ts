@@ -1,8 +1,8 @@
 import {
+  canonicalErrorResponse,
   bindRestMiddleware,
   createRestRuntime,
   type IdempotentRunner,
-  type RestErrorHandler,
 } from "@langwatch/api/rest";
 /**
  * The four provider-binding addresses answer 410 on the in-memory runtime.
@@ -14,7 +14,6 @@ import type {
   GatewayKeyCaller,
   GatewayRequestCredential,
 } from "@langwatch/gateway-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -26,18 +25,6 @@ import {
 } from "../gateway-platform.rest.ts";
 
 const PROJECT_ID = "project-1";
-
-/** Honours the error's own status, so a 410 arrives as a 410. */
-const renderError: RestErrorHandler = (error, context) => {
-  if (HandledError.isHandled(error)) {
-    return new Response(JSON.stringify({ error: { code: error.code, message: error.message } }), {
-      status: error.httpStatus,
-      headers: { "content-type": "application/json" },
-    });
-  }
-
-  return context.json({ error: { code: "internal_server_error" } }, 500);
-};
 
 /** Runs the create and stores nothing; enough to satisfy the mount. */
 const runOnce: IdempotentRunner = async ({ handler }) => {
@@ -70,7 +57,7 @@ function mountedPlatform() {
 
   return runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
-    onError: renderError,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(gatewayKeyCaller, (): GatewayKeyCaller => ({
         kind: "project",
@@ -109,7 +96,7 @@ describe("given the published gateway management surface", () => {
 
         expect({ method, path, status: response.status }).toEqual({ method, path, status: 410 });
         await expect(response.json()).resolves.toMatchObject({
-          error: { code: "gateway_provider_bindings_gone" },
+          code: "gateway_provider_bindings_gone",
         });
       }
     });
@@ -117,9 +104,9 @@ describe("given the published gateway management surface", () => {
     /** @scenario "A caller on a retired provider-binding address is told where it went" */
     it("names the model-provider address that replaced the binding", async () => {
       const response = await mountedPlatform().request("/api/gateway/v1/providers");
-      const body = (await response.json()) as { error: { message: string } };
+      const body = (await response.json()) as { message: string };
 
-      expect(body.error.message).toContain("/api/gateway/v1/model-providers");
+      expect(body.message).toContain("/api/gateway/v1/model-providers");
     });
   });
 

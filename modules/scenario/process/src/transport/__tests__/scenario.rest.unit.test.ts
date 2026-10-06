@@ -7,18 +7,16 @@ import {
   createScenarioRestTestApp,
   createScenarioRestTestRuntime,
   PROJECT_ID,
-  scenarioRestTestErrors,
 } from "./scenario-rest.harness.ts";
 
 async function buildScenarioFamily(
   runtimeOptions?: Parameters<typeof createScenarioRestTestRuntime>[0],
-  onError: typeof scenarioRestTestErrors = scenarioRestTestErrors,
 ) {
   const { app } = await createScenarioRestTestApp();
   const { runtime, projectFacts } = createScenarioRestTestRuntime(runtimeOptions);
   const mounted = runtime.mount(createScenarioRest().router(), {
     app: () => app,
-    onError,
+    onError: canonicalErrorResponse,
     facts: [projectFacts, bindRestHeader(scenarioRestSurface, "x-langwatch-surface")],
   });
 
@@ -209,7 +207,7 @@ describe("the scenarios REST declaration", () => {
     it.each(["PUT", "PATCH"])(
       "%s answers 422 naming the field and changes nothing",
       async (method) => {
-        const family = await buildScenarioFamily(undefined, canonicalErrorResponse);
+        const family = await buildScenarioFamily();
         const createdResponse = await createScenario(family, {
           name: "Strict Update",
           situation: "Original situation",
@@ -252,6 +250,6 @@ describe("given an id no scenario in this project carries", () => {
 
     expect(response.status).toBe(404);
     // The code, not the sentence: the sentence is copy the registry owns.
-    await expect(response.json()).resolves.toMatchObject({ error: "scenario_not_found" });
+    await expect(response.json()).resolves.toMatchObject({ code: "scenario_not_found" });
   });
 });

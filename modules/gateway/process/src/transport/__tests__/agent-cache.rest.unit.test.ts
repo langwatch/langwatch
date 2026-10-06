@@ -1,7 +1,6 @@
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 /** Exercises the declaration on its in-memory runtime without external members. */
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -10,19 +9,6 @@ import { GatewayAgentCacheService } from "../../services/gateway-agent-cache.ser
 import { agentCacheRest } from "../agent-cache.rest.ts";
 
 const PROJECT_ID = "project-1";
-
-const renderError: RestErrorHandler = (error, context) => {
-  if (error instanceof Error && error.name === "RequestValidationError") {
-    return context.json({ error: { code: "validation_error" } }, 422);
-  }
-
-  if (HandledError.isHandled(error)) {
-    const status = error.httpStatus === 404 ? 404 : 500;
-    return context.json({ error: { code: error.code, message: error.message } }, status);
-  }
-
-  return context.json({ error: { code: "internal_server_error" } }, 500);
-};
 
 function mountedAgentCache() {
   const service = GatewayAgentCacheService.create({
@@ -43,7 +29,10 @@ function mountedAgentCache() {
     },
   });
 
-  return runtime.mount(agentCacheRest.router(), { app: () => app, onError: renderError });
+  return runtime.mount(agentCacheRest.router(), {
+    app: () => app,
+    onError: canonicalErrorResponse,
+  });
 }
 
 describe("given the mounted agent-cache REST family", () => {
@@ -71,7 +60,7 @@ describe("given the mounted agent-cache REST family", () => {
 
       expect(response.status).toBe(404);
       await expect(response.json()).resolves.toMatchObject({
-        error: { code: "cache_entry_not_found" },
+        code: "cache_entry_not_found",
       });
     });
 

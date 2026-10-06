@@ -1,10 +1,9 @@
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type {
   GovernanceIngestionSource,
   GovernanceRestApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
@@ -55,14 +54,6 @@ const SOURCE: GovernanceIngestionSource = {
   pullSchedule: null,
   createdById: null,
 };
-
-const renderHandled: RestErrorHandler = (error) =>
-  HandledError.isHandled(error)
-    ? new Response(JSON.stringify({ code: error.code, message: error.message }), {
-        status: error.httpStatus,
-        headers: { "content-type": "application/json" },
-      })
-    : new Response(JSON.stringify({ code: "server_error" }), { status: 500 });
 
 type World = {
   source?: GovernanceIngestionSource | null;
@@ -139,7 +130,7 @@ function mountIngest(world: World = {}) {
   const hono = runtime.mount(governanceIngestRest.router(), {
     app: () => app,
     credential: "public",
-    onError: renderHandled,
+    onError: canonicalErrorResponse,
   });
 
   return {
@@ -324,7 +315,8 @@ describe("the ingestion-source receivers", () => {
 
       expect(response.status).toBe(503);
       await expect(response.json()).resolves.toMatchObject({
-        code: "ingestion_receiver_unavailable",
+        code: "internal_error",
+        retryable: true,
       });
       expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
     });

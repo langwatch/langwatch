@@ -4,15 +4,13 @@
  * uses, so a route naming an unserved operation fails here too.
  */
 import {
+  canonicalErrorResponse,
   bindRestMiddleware,
   createRestRuntime,
   ForbiddenError,
   UnauthorizedError,
-  type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
 import { LocalFeatureApis } from "@langwatch/process";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { organizationKeyFacts } from "../organization-management.rest.ts";
 import { teamsRest, TeamManagementApi } from "../team.rest.ts";
@@ -32,53 +30,6 @@ export const EVERY_PERMISSION = ["team:view", "team:manage"] as const;
  * all four viewer scenarios in the spec expect 403 rather than a read.
  */
 export const VIEWER_PERMISSIONS = [] as const;
-
-/**
- * The canonical envelope `api-canonical-error.ts` renders for every mounted
- * family, including its deliberate rewrite of `validation_error` from 422 to
- * 400 — so the tests below assert what a caller really receives.
- */
-const VALIDATION_ERROR_STATUS = 400;
-
-const renderRefusal: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    const status = (
-      error.code === "validation_error" ? VALIDATION_ERROR_STATUS : (error.httpStatus ?? 500)
-    ) as ContentfulStatusCode;
-
-    return status >= 500
-      ? c.json({ status, code: "internal_error", message: "An unknown error occurred" }, status)
-      : c.json({ status, code: error.code, message: error.message }, status);
-  }
-
-  const status = statusOf(error);
-  if (status !== undefined) {
-    return c.json({ status, code: codeOf(status), message: error.message }, status);
-  }
-
-  return c.json({ status: 500, code: "internal_error", message: "An unknown error occurred" }, 500);
-};
-
-/** The code a status-only refusal is published under, as the envelope names them. */
-const CODE_BY_STATUS: Record<number, string> = {
-  400: "bad_request",
-  401: "unauthorized",
-  403: "forbidden",
-  404: "not_found",
-  409: "conflict",
-  422: "unprocessable_entity",
-};
-
-const codeOf = (status: number): string => CODE_BY_STATUS[status] ?? "internal_error";
-
-const statusOf = (error: object): ContentfulStatusCode | undefined => {
-  if (!("status" in error)) return void 0;
-  const status = error.status;
-
-  return typeof status === "number" && status >= 400 && status <= 599
-    ? (status as ContentfulStatusCode)
-    : void 0;
-};
 
 /** What a test may narrow about the credential the door is reached with. */
 export type TeamRestAccess = Readonly<{
@@ -138,7 +89,7 @@ export function mountTeamsRestApplication(
 
   const hono = runtime.mount(teamsRest.router(), {
     app: () => apis.reference(TeamManagementApi),
-    onError: renderRefusal,
+    onError: canonicalErrorResponse,
     facts: [bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: KEY_ID }))],
   });
 

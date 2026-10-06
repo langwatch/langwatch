@@ -5,14 +5,13 @@ import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-con
  * `POST /api/otel/v1/{...}` against the COMPOSITION-built app and
  * MODULE-declared transports — sibling of the collector composition test.
  */
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type * as Observability from "@langwatch/observability";
@@ -24,7 +23,6 @@ import type * as TestHarness from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceModule } from "../../app/trace.app.ts";
@@ -146,20 +144,6 @@ function apiKeyDirectory(
   };
 }
 
-/** The flat body this deployment's boundary publishes for a handled refusal. */
-const renderRefusal: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    const serialized = error.serialize();
-
-    return c.json(
-      { error: serialized.code, message: error.message },
-      serialized.httpStatus as ContentfulStatusCode,
-    );
-  }
-
-  return c.json({ error: "Internal server error" }, 500);
-};
-
 /**
  * The trace REST surface this module declares, mounted the way boot mounts it:
  * the declared transport, over ONE application bound to its own module-API
@@ -256,7 +240,7 @@ function deployment(access: OtlpAccess = {}) {
           // The receiver binds NO transport fact: it is declared public and
           // resolves the project credential inside its handler.
           credential: "public",
-          onError: renderRefusal,
+          onError: canonicalErrorResponse,
         }),
       ]
     : [];
