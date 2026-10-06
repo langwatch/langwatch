@@ -1,7 +1,7 @@
 /**
  * Dashboard auto-refresh: the member's pick, as the `refetchInterval` the dashboard's reads poll
- * on (React Query pauses it in a hidden tab). `refreshedAt` moves on each poll for widgets that
- * run through a mutation or a frame instead of a read.
+ * on (React Query pauses it in a hidden tab). `refreshedAt` moves on each poll, and on
+ * `refreshNow`, for widgets that run through a mutation or a frame instead of a read.
  * @see specs/analytics/dashboard-widget-resilience.feature
  */
 
@@ -66,7 +66,13 @@ export function useDashboardAutoRefresh({ live = false }: { live?: boolean } = {
     refetchInterval,
     gcTime: 0,
   });
-  const refreshedAt = refetchInterval === false || !clock.data ? undefined : clock.data;
+  const refreshedAt = clock.data ? clock.data : undefined;
 
-  return { option, setOption, refetchInterval, refreshedAt };
+  /** Moves `refreshedAt` now, so every widget re-runs, whatever the interval is. */
+  const refreshNow = () => {
+    calls.current = Math.max(calls.current, 1);
+    void clock.refetch();
+  };
+
+  return { option, setOption, refetchInterval, refreshedAt, refreshNow };
 }

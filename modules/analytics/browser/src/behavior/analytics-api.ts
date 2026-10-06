@@ -16,6 +16,7 @@ import type {
   dashboardTrpcRowSchema,
   dashboardTrpcSummarySchema,
   dashboardWidgetTrpcRowSchema,
+  dashboardWidgetTrpcSchema,
   graphDetailSchema,
   graphListItemSchema,
   savedViewTrpc,
@@ -33,6 +34,7 @@ type DashboardRow = WireOf<z.infer<typeof dashboardTrpcRowSchema>>;
 type GraphListItem = WireOf<z.infer<typeof graphListItemSchema>>;
 type GraphDetail = WireOf<z.infer<typeof graphDetailSchema>>;
 type DashboardWidgetRow = WireOf<z.infer<typeof dashboardWidgetTrpcRowSchema>>;
+type DashboardWidget = WireOf<z.infer<typeof dashboardWidgetTrpcSchema>>;
 
 /** The project every analytics procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -178,7 +180,10 @@ type BorrowedProcedures = {
       };
     };
     create: {
-      mutation: { input: ProjectScope & { name: string }; output: DashboardRow };
+      mutation: {
+        input: ProjectScope & { name: string; visibility?: DashboardVisibility };
+        output: DashboardRow;
+      };
     };
     rename: {
       mutation: {
@@ -282,8 +287,10 @@ type BorrowedProcedures = {
           name: string;
           code: string;
           queries: unknown[];
+          description?: string;
+          prompt?: string;
         };
-        output: unknown;
+        output: DashboardWidget;
       };
     };
     update: {

@@ -116,7 +116,12 @@ export const reads = {
   "@langwatch/mail": ["skills/tracing/SKILL.mdx"],
   "@langwatch/mcp-server": ["feature-map.json"],
   "@langwatch/plans": ["packages/prisma-client/prisma/schema.prisma"],
-  "@langwatch/langy-process": ["specs/langy/langy-frame-auth.vectors.json"],
+  "@langwatch/langy-process": [
+    "specs/langy/langy-frame-auth.vectors.json",
+    "apps/ui/src/shell/route-patterns.generated.json",
+  ],
+  "@langwatch/onboarding-browser": ["apps/ui/src/shell/route-patterns.generated.json"],
+  "@langwatch/analytics-browser": ["apps/ui/public/images/dashboards/templates/*"],
   "@langwatch/oxlint-rules": [
     ".oxlintrc.jsonc",
     ".oxlintrc.native.jsonc",
