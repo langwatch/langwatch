@@ -490,6 +490,10 @@ jobs:
       # tsc -b rebuilds a project whose declaration outputs are absent, so
       # caching the stamp without them still runs cold. Same unit nx.json
       # declares as typecheck's outputs.
+      #
+      # The restore key is pinned to the lockfile and the root compiler
+      # options: a snapshot built against other dependency types is never
+      # restored. The source hashes beside it let the next step drop what changed.
       - name: Cache TypeScript incremental build info
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -500,10 +504,46 @@ jobs:
             modules/*/*/dist
             enterprise/modules/*/*/dist
             apps/*/dist
-          key: ${{ runner.os }}-pkg-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+            node_modules/.cache/typecheck-dist
+          key: ${{ runner.os }}-pkg-dist-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.*.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-pkg-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-
-            ${{ runner.os }}-pkg-tsbuildinfo-
+            ${{ runner.os }}-pkg-dist-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.*.json') }}-
+
+      # A restored dist is trusted only where the package and its workspace
+      # dependencies are unchanged since the snapshot: tsc 7 keeps a stale
+      # declaration once read and dependants re-emit it as up to date. Each
+      # changed package's dist and its dependants' are dropped and built cold
+      # (handoff: .claude/handoffs/ci-typecheck-stale-dist.md).
+      - name: Drop restored declarations whose sources changed
+        run: |
+          manifest=node_modules/.cache/typecheck-dist/sources.txt
+          current="$RUNNER_TEMP/typecheck-dist-sources.txt"
+          pnpm ls -r --depth -1 --json | jq -r --arg root "$PWD/" '.[].path | select(startswith($root)) | ltrimstr($root)' | LC_ALL=C sort > "$RUNNER_TEMP/typecheck-packages.txt"
+          while read -r dir; do
+            hash=$(cd "$dir" && find . \( -name node_modules -o -name dist \) -prune -o -type f ! -name '*.tsbuildinfo' -print0 | LC_ALL=C sort -z | xargs -0 -r sha1sum | sha1sum | cut -d' ' -f1)
+            echo "$dir $hash"
+          done < "$RUNNER_TEMP/typecheck-packages.txt" > "$current"
+          if [ ! -f "$manifest" ]; then
+            echo "No snapshot restored; every project builds cold."
+          else
+            changed=$(LC_ALL=C comm -13 <(LC_ALL=C sort "$manifest") <(LC_ALL=C sort "$current") | cut -d' ' -f1)
+            wiped=0
+            if [ -n "$changed" ]; then
+              filters=()
+              for dir in $changed; do filters+=("--filter=...{./$dir}"); done
+              for dir in $(pnpm "${filters[@]}" ls --depth -1 --json | jq -r --arg root "$PWD/" '.[].path | ltrimstr($root)'); do
+                if [[ $dir =~ ^(packages/[^/]+|modules/[^/]+/[^/]+|enterprise/modules/[^/]+/[^/]+|apps/[^/]+)$ ]] && [ -d "$dir/dist" ]; then
+                  rm -rf "$dir/dist"
+                  wiped=$((wiped + 1))
+                fi
+              done
+            fi
+            echo "$(echo "$changed" | wc -w) packages changed since the snapshot; dropped $wiped restored dist directories (them and their dependants)."
+            # ensure:built's outputs live in these dist directories too.
+            if [ "$wiped" -gt 0 ]; then pnpm run ensure:built; fi
+          fi
+          mkdir -p "$(dirname "$manifest")"
+          cp "$current" "$manifest"
 
       # Every declared REST fact must have a binding, or the process that
       # mounts the declaring family refuses at boot. This static pass replaces
@@ -514,15 +554,9 @@ jobs:
 
       # Not --no-bail: one package's failure should not hide the rest, and a
       # migration in flight tends to break several at once. The job still fails.
-      # Two passes. When a restored upstream dist is stale, tsc 7's build
-      # rebuilds that project but checks its dependants against the old
-      # declarations it already read, and reports errors a fresh run does not
-      # have. The first pass brings every dist up to date; the second is the
-      # verdict, and only re-checks the projects the first one failed.
+      # One pass: the step above leaves no stale declaration to re-check against.
       - name: Run typecheck (every workspace package)
-        run: |
-          pnpm run typecheck > /dev/null 2>&1 || echo "First pass failed; re-checking against the rebuilt declarations."
-          pnpm run typecheck
+        run: pnpm run typecheck
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
