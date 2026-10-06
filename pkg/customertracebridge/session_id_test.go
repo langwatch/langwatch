@@ -50,7 +50,7 @@ func TestClientSessionID_perTool(t *testing.T) {
 			if tc.headerID != "" {
 				ctx = WithClientSessionID(ctx, tc.headerID)
 			}
-			got := clientSessionID(ctx, aitrace.AITraceParams{
+			got := clientSessionID(ctx, aitrace.Params{
 				RequestType: tc.reqType,
 				RequestBody: []byte(tc.body),
 			})

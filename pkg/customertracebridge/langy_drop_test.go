@@ -48,7 +48,7 @@ func hexTraceID(id []byte) string {
 
 // emitWith runs one BeginSpan/EndSpan cycle with an optional inbound
 // traceparent, against a plain (mirror-off) emitter, and flushes.
-func emitWith(t *testing.T, traceparent string, params aitrace.AITraceParams) *capturingIngest {
+func emitWith(t *testing.T, traceparent string, params aitrace.Params) *capturingIngest {
 	t.Helper()
 	ingest := startCapturingIngest(t)
 
@@ -80,7 +80,7 @@ func emitWith(t *testing.T, traceparent string, params aitrace.AITraceParams) *c
 // Ordinary gateway traffic (playground, customer API keys, no mirror tier)
 // keeps its standalone root: that trace is the only one such traffic has.
 func TestEndSpan_LangyStandaloneDuplicateIsDropped(t *testing.T) {
-	langyParams := func() aitrace.AITraceParams {
+	langyParams := func() aitrace.Params {
 		p := baseParams()
 		p.MirrorTier = mirrorTierContent
 		return p

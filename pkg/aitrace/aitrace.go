@@ -88,8 +88,8 @@ const (
 	RequestTypeRealtimeSession RequestType = "realtime_session"
 )
 
-// AITraceParams holds data for a customer AI trace.
-type AITraceParams struct {
+// Params holds data for a customer AI trace.
+type Params struct {
 	ProjectID  string
 	Model      string
 	ProviderID ProviderID

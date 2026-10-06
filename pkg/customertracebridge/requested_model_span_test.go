@@ -18,7 +18,7 @@ import (
 // recordSpanForParams comes from emitter_error_suppress_test.go.
 
 func TestEmitter_RequestedModel_StampedOnSpan(t *testing.T) {
-	span := recordSpanForParams(t, aitrace.AITraceParams{
+	span := recordSpanForParams(t, aitrace.Params{
 		ProviderID:     aitrace.ProviderOpenAI,
 		Model:          "gpt-5.6-sol",
 		RequestedModel: "complex",
@@ -39,7 +39,7 @@ func TestEmitter_RequestedModel_StampedOnSpan(t *testing.T) {
 // Most requests name the model they get. Stamping the same value twice would
 // make the attribute mean nothing when it is present.
 func TestEmitter_NoRequestedModel_NoAttribute(t *testing.T) {
-	span := recordSpanForParams(t, aitrace.AITraceParams{
+	span := recordSpanForParams(t, aitrace.Params{
 		ProviderID:   aitrace.ProviderOpenAI,
 		Model:        "gpt-5.6-sol",
 		VirtualKeyID: "vk_1",

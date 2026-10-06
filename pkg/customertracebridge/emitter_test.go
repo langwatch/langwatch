@@ -193,7 +193,7 @@ func TestEmitter_WireResourceIsOriginMarkerOnly(t *testing.T) {
 	spanCtx, _ := e.BeginSpan(ctx, "proj-1", aitrace.RequestTypeChat)
 	// Real usage, or EndSpan classifies the span as a zero-cost probe and the
 	// drop filter keeps it off the wire entirely.
-	e.EndSpan(spanCtx, aitrace.AITraceParams{
+	e.EndSpan(spanCtx, aitrace.Params{
 		Model: "gpt-test",
 		Usage: aitrace.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
 	})
@@ -292,7 +292,7 @@ func TestEmitter_SpeechSpanIsNotSuppressedAsProbe(t *testing.T) {
 	// cost, binary response body so no extractable output. The character
 	// count is the usage measure the cost pipeline prices TTS by.
 	spanCtx, _ := e.BeginSpan(ctx, "proj-1", aitrace.RequestTypeSpeech)
-	e.EndSpan(spanCtx, aitrace.AITraceParams{
+	e.EndSpan(spanCtx, aitrace.Params{
 		Model:        "gpt-4o-mini-tts",
 		RequestType:  aitrace.RequestTypeSpeech,
 		RequestBody:  []byte(`{"model":"gpt-4o-mini-tts","voice":"nova","input":"hello"}`),
@@ -381,7 +381,7 @@ func TestEmitter_TranscriptionSpanCarriesAudioSeconds(t *testing.T) {
 	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
 
 	spanCtx, _ := e.BeginSpan(ctx, "proj-1", aitrace.RequestTypeTranscription)
-	e.EndSpan(spanCtx, aitrace.AITraceParams{
+	e.EndSpan(spanCtx, aitrace.Params{
 		Model:        "scribe_v1",
 		RequestType:  aitrace.RequestTypeTranscription,
 		ResponseBody: []byte(`{"text":"hello world"}`),
@@ -427,7 +427,7 @@ func TestEmitter_ZeroChatProbeStaysSuppressed(t *testing.T) {
 	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
 
 	spanCtx, _ := e.BeginSpan(ctx, "proj-1", aitrace.RequestTypeChat)
-	e.EndSpan(spanCtx, aitrace.AITraceParams{
+	e.EndSpan(spanCtx, aitrace.Params{
 		Model:       "gpt-test",
 		RequestType: aitrace.RequestTypeChat,
 		Usage:       aitrace.Usage{},

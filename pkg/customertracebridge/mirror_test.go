@@ -87,7 +87,7 @@ func attrValue(a *commonpb.KeyValue) string {
 
 // emitOne runs one full BeginSpan/EndSpan cycle through an emitter wired to the
 // given mirror config, and flushes.
-func emitOne(t *testing.T, mirror MirrorConfig, params aitrace.AITraceParams) *capturingIngest {
+func emitOne(t *testing.T, mirror MirrorConfig, params aitrace.Params) *capturingIngest {
 	t.Helper()
 	ingest := startCapturingIngest(t)
 
@@ -122,8 +122,8 @@ func emitOne(t *testing.T, mirror MirrorConfig, params aitrace.AITraceParams) *c
 	return ingest
 }
 
-func baseParams() aitrace.AITraceParams {
-	return aitrace.AITraceParams{
+func baseParams() aitrace.Params {
+	return aitrace.Params{
 		Model:        "gpt-test",
 		Usage:        aitrace.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
 		RequestType:  aitrace.RequestTypeChat,

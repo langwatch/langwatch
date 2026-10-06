@@ -15,8 +15,8 @@ type (
 	AudioTokenSplit = aitrace.AudioTokenSplit
 	// ImageTokenSplit is aitrace.ImageTokenSplit.
 	ImageTokenSplit = aitrace.ImageTokenSplit
-	// AITraceParams is aitrace.AITraceParams.
-	AITraceParams = aitrace.AITraceParams
+	// AITraceParams is aitrace.Params.
+	AITraceParams = aitrace.Params
 )
 
 // The provider identifiers, aliased from pkg/aitrace.

@@ -28,7 +28,7 @@ func findSliceAttr(span sdktrace.ReadOnlySpan, key string) ([]string, bool) {
 
 // @scenario "Virtual-key tags are stamped on the customer span as labels"
 func TestEmitter_VKTags_StampedAsLabels(t *testing.T) {
-	span := recordSpanForParams(t, aitrace.AITraceParams{
+	span := recordSpanForParams(t, aitrace.Params{
 		ProviderID: aitrace.ProviderAnthropic,
 		Model:      "qwen3-14b",
 		VKTags:     []string{"app=nexttrace", "team=offsecops"},
@@ -42,7 +42,7 @@ func TestEmitter_VKTags_StampedAsLabels(t *testing.T) {
 
 // @scenario "A VK without tags stamps no labels attribute"
 func TestEmitter_NoVKTags_NoLabelsAttribute(t *testing.T) {
-	span := recordSpanForParams(t, aitrace.AITraceParams{
+	span := recordSpanForParams(t, aitrace.Params{
 		ProviderID: aitrace.ProviderAnthropic,
 		Model:      "qwen3-14b",
 		Usage:      aitrace.Usage{CompletionTokens: 5},

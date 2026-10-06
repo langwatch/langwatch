@@ -28,7 +28,7 @@ func recordChatSpanForUsage(t *testing.T, u aitrace.Usage) sdktrace.ReadOnlySpan
 	e := &Emitter{tp: tp, tracer: tp.Tracer("test"), propagator: propagation.TraceContext{}}
 
 	ctx, _ := e.BeginSpan(context.Background(), "proj-test", aitrace.RequestTypeChat)
-	e.EndSpan(ctx, aitrace.AITraceParams{
+	e.EndSpan(ctx, aitrace.Params{
 		ProviderID:  aitrace.ProviderOpenAI,
 		Model:       "gpt-realtime",
 		RequestType: aitrace.RequestTypeChat,
