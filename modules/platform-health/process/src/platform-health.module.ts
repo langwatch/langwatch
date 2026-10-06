@@ -8,8 +8,6 @@ import {
 } from "./transport/platform-health-probe.rest.ts";
 import { platformHealthRest } from "./transport/platform-health.rest.ts";
 
-export type { PlatformHealthInfrastructure } from "./app/platform-health.app.ts";
-
 export const platformHealthProcessModule = defineProcessModule("platform-health")
   .withApi(PlatformHealthModule)
   .withTransports(platformHealthRest, platformHealthProbeRest, platformHealthLangyProbeRest)

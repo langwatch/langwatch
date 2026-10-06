@@ -55,7 +55,7 @@ import { PromptVersionService } from "../services/prompt-version.service.ts";
 import { PromptService } from "../services/prompt.service.ts";
 
 /** Who a write is attributed to. */
-export interface PromptCaller {
+interface PromptCaller {
   readonly id: string;
 }
 
@@ -64,7 +64,7 @@ export interface PromptCaller {
  * new prompt is announced, and the read/write engine every method below
  * forwards to.
  */
-export interface PromptInfrastructure {
+interface PromptInfrastructure {
   /**
    * Fires when a project gains a prompt (write, copy or sync). Fire-and-forget:
    * it may not fail a create. Records `prompt_created`, resolving the org admin

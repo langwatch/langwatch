@@ -44,7 +44,7 @@ export type SubsystemProbeOutcome =
  * that self-scopes to one project cannot be re-resolved behind the public
  * boundary. Null when the credential resolves to no project.
  */
-export interface ProbeCredential {
+interface ProbeCredential {
   readonly authToken: string;
   readonly projectId: string | null;
   /** The request that asked for the probe; every canary it sends stops with it. */

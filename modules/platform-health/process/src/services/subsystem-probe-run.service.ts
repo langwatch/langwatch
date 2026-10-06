@@ -20,7 +20,7 @@ export type SubsystemProbeResult = Readonly<
 >;
 
 /** What a probe is asked about, and the caller's request its canaries stop with. */
-export type SubsystemProbeQuery = Readonly<{
+type SubsystemProbeQuery = Readonly<{
   triggerId?: string;
   workflowId?: string;
   signal: AbortSignal | undefined;

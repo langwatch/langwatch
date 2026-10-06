@@ -20,13 +20,13 @@ import {
 
 const logger = createLogger("langwatch:scenario-canary");
 
-export type ScenarioCanaryPeers = Readonly<{
+type ScenarioCanaryPeers = Readonly<{
   scenarios: Pick<ScenarioApi, "launchRun" | "findScenarioRunData">;
   suites: Pick<SuiteApi, "listByIds" | "list">;
 }>;
 
 /** Bounds one boundary await by a real deadline, which the logical clock cannot move. */
-export type DeadlineRace = <T>(options: {
+type DeadlineRace = <T>(options: {
   ms: number;
   work: Promise<T>;
 }) => Promise<{ timedOut: true } | { value: T }>;

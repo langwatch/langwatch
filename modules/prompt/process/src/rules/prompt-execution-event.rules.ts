@@ -24,13 +24,13 @@ const TEMPLATE_INPUT_PLACEHOLDER_RE = /\{\{\s*input\s*\}\}/;
 /** The node id the playground executes. The stream keys its deltas off it. */
 export const PROMPT_NODE_ID = "prompt_node";
 
-export interface PromptRuntimeVariable {
+interface PromptRuntimeVariable {
   identifier: string;
   value?: unknown;
 }
 
 /** A conversation turn as the playground holds it. */
-export interface PromptChatTurn {
+interface PromptChatTurn {
   role: string;
   content: string;
 }

@@ -17,7 +17,6 @@ import {
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import {
-  getLatestConfigVersionSchema,
   PromptApi,
   apiResponsePromptWithVersionDataSchema,
   assignTagInputSchema,
@@ -39,8 +38,6 @@ import {
   updatePromptInputSchema,
 } from "@langwatch/prompt-contract";
 import { z } from "zod";
-
-export const versionInputSchema = getLatestConfigVersionSchema();
 
 // ── the facts the process resolves ───────────────────────────────────────────
 

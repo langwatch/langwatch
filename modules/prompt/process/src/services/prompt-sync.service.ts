@@ -19,7 +19,7 @@ import type { PromptReadService } from "./prompt-read.service.ts";
 import type { PromptWriteService } from "./prompt-write.service.ts";
 import type { VersionedPrompt } from "./prompt.service.ts";
 
-export type ConfigData = z.infer<ReturnType<typeof getLatestConfigVersionSchema>>["configData"];
+type ConfigData = z.infer<ReturnType<typeof getLatestConfigVersionSchema>>["configData"];
 
 /** The local file's config data with the inputs its prompt and messages imply merged in. */
 function mergeInputsIntoConfigData(localConfigData: ConfigData): ConfigData {

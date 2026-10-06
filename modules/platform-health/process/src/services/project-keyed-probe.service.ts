@@ -5,7 +5,7 @@ import type { ScenarioCanaryService } from "./scenario-canary.service.ts";
 import type { SubsystemProbeOutcome, SubsystemProbeService } from "./subsystem-probe.service.ts";
 
 /** Resolves a raw token, project key or API key, to its project as main's TokenResolver did. */
-export type ProbeProjectResolver = (
+type ProbeProjectResolver = (
   input: Readonly<{ token: string; projectId: string | null }>,
 ) => Promise<string | null>;
 

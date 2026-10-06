@@ -46,10 +46,7 @@ function isValidValueForType(value: unknown, type: LlmConfigOutputType): boolean
  * @param type - The configured output type
  * @returns String representation for streaming, or undefined if not formattable
  */
-export function formatOutputForStreaming(
-  value: unknown,
-  type: LlmConfigOutputType,
-): string | undefined {
+function formatOutputForStreaming(value: unknown, type: LlmConfigOutputType): string | undefined {
   if (value === undefined || value === null) {
     return undefined;
   }

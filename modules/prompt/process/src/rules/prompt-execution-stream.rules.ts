@@ -14,7 +14,7 @@ import { extractStreamableOutput, type OutputConfig } from "./prompt-output-form
  * whole current value each time, so a shorter value is a different field
  * winning a race (not a retraction) and is ignored - text empty, total unmoved.
  */
-export function deltaFrom({
+function deltaFrom({
   outputs,
   outputConfigs,
   alreadySent,
