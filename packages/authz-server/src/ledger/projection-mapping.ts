@@ -11,6 +11,7 @@ import type {
 
 import { BindingMissingError } from "../authz-grants.repository";
 import type {
+  GrantCondition,
   GrantEventSource,
   GrantFact,
   LedgerPrincipalType,
@@ -87,6 +88,31 @@ const RESOURCE_KIND_FROM_DB: Record<
  * engine as `kind: undefined`, which reads as a resource grant that names no
  * kind of thing — a share row that matches whichever resource is asked about.
  */
+/** The stored column is JSONB with no schema behind it, so a row's condition
+ *  has to PARSE as one before it becomes a fact: an object that names a type
+ *  the vocabulary lacks, or carries a non-string field, is treated as no
+ *  condition rather than as a window the engine would then widen. */
+export function grantConditionFromDb(
+  value: unknown,
+): GrantCondition | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  const { type, where, from, until } = value as Record<string, unknown>;
+  if (type !== "trace" && type !== "span" && type !== "log") return undefined;
+  const optionalString = (field: unknown): field is string | undefined =>
+    field === undefined || typeof field === "string";
+  if (!optionalString(where) || !optionalString(from) || !optionalString(until)) {
+    return undefined;
+  }
+  return {
+    type,
+    ...(where !== undefined ? { where } : {}),
+    ...(from !== undefined ? { from } : {}),
+    ...(until !== undefined ? { until } : {}),
+  };
+}
+
 function resourceKindFromDb(
   value: string | null,
 ): ResourceGrantTerms["kind"] | undefined {
@@ -116,8 +142,17 @@ export interface GrantRowShape {
   createdByUserId: string | null;
   expiresAt: Date | null;
   maxViews: number | null;
+  /** The shared grant's window (ADR-144); absent on own grants, which is
+   *  what lets the row go straight into a Prisma create. */
+  condition?: GrantCondition;
   occurredAt: Date;
 }
+
+/** A row as storage hands it back: the JSONB column is untyped until
+ *  `grantRowToFact` parses it, so a reader never has to pretend otherwise. */
+export type GrantRowRead = Omit<GrantRowShape, "condition"> & {
+  condition?: unknown;
+};
 
 export function grantFactToRow({
   grant,
@@ -148,12 +183,14 @@ export function grantFactToRow({
         ? new Date(grant.resource.expiresAtMs)
         : null,
     maxViews: grant.resource?.maxViews ?? null,
+    ...(grant.condition !== undefined ? { condition: grant.condition } : {}),
     occurredAt: new Date(grant.occurredAtMs),
   };
 }
 
-export function grantRowToFact(row: GrantRowShape): GrantFact {
+export function grantRowToFact(row: GrantRowRead): GrantFact {
   const resourceKind = resourceKindFromDb(row.resourceKind);
+  const condition = grantConditionFromDb(row.condition);
   return {
     grantId: row.id,
     principal: {
@@ -189,6 +226,7 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
           },
         }
       : {}),
+    ...(condition !== undefined ? { condition } : {}),
     source: row.source as GrantEventSource,
     occurredAtMs: row.occurredAt.getTime(),
   };

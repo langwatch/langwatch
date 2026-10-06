@@ -147,6 +147,7 @@ export class AuthzGrantsWriteProjection
           ? new Date(data.resource.expiresAtMs)
           : null,
         maxViews: data.resource?.maxViews ?? null,
+        ...(data.condition !== undefined ? { condition: data.condition } : {}),
         occurredAt: new Date(event.occurredAt),
       },
     };

@@ -86,6 +86,23 @@ export interface ResourceGrantTerms {
  *  the reducer never imports the enum. */
 export type LegacyBindingRole = "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
 
+/**
+ * ADR-144 / ADR-166: the condition on a SHARED grant - what one project may
+ * read of another. `type` names the store resource the window applies to;
+ * `where` is an OTTL predicate kept as a slot (nothing compiles it in v1, so
+ * the wire refuses a non-empty one); `from` and `until` are ISO instants
+ * bounding the rows by start time. An own grant carries no condition.
+ */
+export const GRANT_CONDITION_TYPES = ["trace", "span", "log"] as const;
+export type GrantConditionType = (typeof GRANT_CONDITION_TYPES)[number];
+
+export type GrantCondition = {
+  type: GrantConditionType;
+  where?: string;
+  from?: string;
+  until?: string;
+};
+
 export interface GrantFact {
   grantId: string;
   principal: LedgerPrincipal;
@@ -94,6 +111,8 @@ export interface GrantFact {
   roleKey: string | null;
   scope: LedgerScope;
   resource?: ResourceGrantTerms;
+  /** Present only on a shared grant (ADR-144); absent on every own grant. */
+  condition?: GrantCondition;
   /**
    * The `role` column an IMPORTED binding carried before the ledger owned it.
    * Set only where `roleKey` is `custom:<id>` and the fact came from a legacy

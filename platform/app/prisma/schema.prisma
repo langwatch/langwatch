@@ -4163,6 +4163,12 @@ model Grant {
   expiresAt       DateTime?
   maxViews        Int?
 
+  // ADR-144 / ADR-166: what a SHARED grant lets its principal reach. Null on
+  // every own grant. Shape: { type: "trace" | "span" | "log", where?: OTTL
+  // (empty in v1), from?: ISO date, until?: ISO date }. Owned by the fold
+  // like every other fact column; the proof minted at the door copies it.
+  condition Json?
+
   occurredAt DateTime // business time of the fact (backfills carry the legacy row's createdAt)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt

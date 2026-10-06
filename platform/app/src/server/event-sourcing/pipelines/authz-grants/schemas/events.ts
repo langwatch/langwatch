@@ -1,4 +1,7 @@
-import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
+import {
+  GRANT_CONDITION_TYPES,
+  GRANT_EVENT_SOURCES,
+} from "@langwatch/authz-server";
 import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
 import {
@@ -102,6 +105,20 @@ export const resourceGrantTermsSchema = z.object({
 });
 
 /**
+ * ADR-144 / ADR-166: the window a SHARED grant opens on another project.
+ * `where` is a slot for the OTTL predicate and nothing compiles it yet, so
+ * the shape refinement below refuses a non-empty one; `from` and `until`
+ * are ISO instants.
+ */
+export const grantConditionSchema = z.object({
+  type: z.enum(GRANT_CONDITION_TYPES),
+  where: z.string().optional(),
+  from: z.string().datetime({ offset: true }).optional(),
+  until: z.string().datetime({ offset: true }).optional(),
+});
+export type GrantConditionWire = z.infer<typeof grantConditionSchema>;
+
+/**
  * The resource tier and every other tier are mutually exclusive shapes, and
  * the split is total: a RESOURCE grant carries its terms and no role (the
  * token's single `permission` IS what it may do), while every other grant
@@ -172,6 +189,8 @@ export const grantAttachedEventSchema = EventSchema.extend({
       roleKey: z.string().min(1).nullable(),
       scope: ledgerScopeSchema,
       resource: resourceGrantTermsSchema.optional(),
+      /** Present only on a shared project-reader grant (ADR-144). */
+      condition: grantConditionSchema.optional(),
       legacyRole: legacyBindingRoleSchema.optional(),
       source: grantEventSourceSchema,
       actor: grantsLedgerActorSchema,
