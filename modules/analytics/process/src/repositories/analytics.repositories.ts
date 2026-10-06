@@ -1,7 +1,9 @@
 import type { LwqlProvisioningDatabase } from "../tasks/lwql-provision.task.ts";
+import type { AnalyticsEvaluationRepository } from "./analytics-persistence.repository.ts";
 import type { AnalyticsRateLimitRepository } from "./analytics-rate-limit.repository.ts";
 import type { AnalyticsRecencyRepository } from "./analytics-recency.repository.ts";
 import type { AnalyticsSessionsRepository } from "./analytics-sessions.repository.ts";
+import type { AnalyticsRepository } from "./analytics.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "./langwatch-ql-app-function-store.repository.ts";
 import type { ClickHouseAdminStatements } from "./langwatch-ql-provisioning.repository.ts";
 
@@ -38,6 +40,12 @@ export type LangWatchQlSupply = Readonly<{
 export interface AnalyticsRepositories {
   /** A raw tenant session, for the ClickHouse reads not yet behind a named repository. */
   readonly sessions: AnalyticsSessionsRepository;
+  /** The timeseries and legacy reads over the analytics tables. */
+  readonly analytics: AnalyticsRepository;
+  /** The evaluation tables, opened with the retention peer's default, which no registry reads. */
+  readonly evaluations: Readonly<{
+    open(input: { defaultRetentionDays: () => number }): AnalyticsEvaluationRepository;
+  }>;
   /** Where the server would keep the app functions, for the checkup's provisioning probe. */
   readonly appFunctionStore: LangWatchQLAppFunctionStoreRepository;
   /** The newest slim-table row per source, which the graph-alert heartbeat reads. */

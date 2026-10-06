@@ -64,11 +64,7 @@ import type {
   AnalyticsRepositories,
   LangWatchQlSupply,
 } from "../repositories/analytics.repositories.ts";
-import {
-  ClickHouseAnalyticsEvaluationRepository,
-  type EvaluationAnalyticsClickHouseClient,
-} from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
-import { ClickHouseAnalyticsRepository } from "../repositories/clickhouse/clickhouse.analytics.repository.ts";
+import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { FilterOptionsClickHouseRepository } from "../repositories/clickhouse/clickhouse.filter-options.repository.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LwqlKeyMapClickHouseRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
@@ -332,14 +328,13 @@ export class AnalyticsModule
   } as const;
 
   static async create(setup: AnalyticsSetup): Promise<AnalyticsModule> {
-    const { sessions, langWatchQl } = setup.repositories;
+    const { sessions, langWatchQl, evaluations } = setup.repositories;
     const resolveClient = (tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> =>
       sessions.resolve(tenantId);
     // Data retention owns the default retention days; a second claim refuses the process.
     const analytics = AnalyticsServiceClass.create({
-      repository: ClickHouseAnalyticsRepository.create({ resolveClient }),
-      evaluationRepository: ClickHouseAnalyticsEvaluationRepository.create({
-        resolveClient,
+      repository: setup.repositories.analytics,
+      evaluationRepository: evaluations.open({
         defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
       }),
     });

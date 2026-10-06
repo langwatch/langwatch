@@ -3,7 +3,7 @@
  * The feature installs: a memory-tier process gets a working `AnalyticsApi` over its registry's
  * memory repositories, reading no process member and naming no repository class here.
  */
-import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { AnalyticsApi, type AnalyticsEvaluationRow } from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -20,6 +20,35 @@ import { describe, expect, it } from "vitest";
 import { analyticsProcessModule } from "../../analytics.module.ts";
 
 const PUBLIC_BASE_URL = "https://app.langwatch.test";
+const OCCURRED_AT_MS = 1_750_000_000_000;
+
+const evaluationRow: AnalyticsEvaluationRow = {
+  tenantId: "project-1",
+  evaluationId: "evaluation-1",
+  version: "2026-06-20",
+  occurredAtMs: OCCURRED_AT_MS,
+  createdAtMs: OCCURRED_AT_MS,
+  updatedAtMs: OCCURRED_AT_MS,
+  evaluatorType: "langevals/llm_answer_match",
+  evaluatorName: "Judge",
+  status: "processed",
+  isGuardrail: false,
+  passed: true,
+  score: 0.9,
+  label: "match",
+  model: null,
+  traceId: "trace-1",
+  userId: null,
+  conversationId: null,
+  customerId: null,
+  origin: null,
+  durationMs: 120,
+  totalCost: null,
+  nonBilledCost: null,
+  attributes: {},
+  startedAtMs: null,
+  completedAtMs: null,
+};
 
 function process(role: "api" | "worker") {
   return createApp({ role })
@@ -72,6 +101,28 @@ describe("analytics app installation", () => {
         expect(app.savedWorkbenchChartPlatformUrl({ projectSlug: "my-project" })).toContain(
           PUBLIC_BASE_URL,
         );
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    it("reads back the evaluation analytics it was given", async () => {
+      const runtime = await process("worker").boot();
+
+      try {
+        const app = runtime.service(AnalyticsApi);
+        await app.upsertEvaluationAnalytics({ row: evaluationRow, appliedEventIds: ["event-1"] });
+
+        await expect(
+          app.findEvaluationAnalytics({ tenantId: "project-1", evaluationId: "evaluation-1" }),
+        ).resolves.toEqual({ row: evaluationRow, appliedEventIds: ["event-1"] });
+        await expect(
+          app.findLastOccurredAt({
+            projectId: "project-1",
+            source: "evaluation",
+            since: Temporal.Instant.fromEpochMilliseconds(0),
+          }),
+        ).resolves.toEqual([Temporal.Instant.fromEpochMilliseconds(OCCURRED_AT_MS)]);
       } finally {
         await runtime.stop();
       }
