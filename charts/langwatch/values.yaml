@@ -487,8 +487,9 @@ app:
     #                                                                                365, r730 after 730
     #   evaluation-inputs/r-indefinite/  evaluation inputs             no            none (kept for ever)
     #
-    # S3 and compatible stores accept oversized writes. Azure refuses them until
-    # you confirm the rules below exist, because the app holds a data-plane key
+    # S3 and compatible stores accept oversized writes. Azure needs you to
+    # confirm the rules below exist (today the trace spool refuses until then;
+    # other kinds follow), because the app holds a data-plane key
     # and cannot read a management-plane policy back. The local filesystem
     # refuses them always. A refused payload stays bounded: a preview or inline.
     ## @param app.dataplane.objectRetentionConfirmed [boolean, default: false] Confirms the Azure container has a lifecycle rule for every prefix in the table above. Emitted as `OBJECT_RETENTION_CONFIRMED`.
