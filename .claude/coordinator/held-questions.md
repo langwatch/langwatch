@@ -31,10 +31,6 @@ recommendation, and "default taken" if a lane proceeded on it.
 - Q-U10 Organization admins see held or archived state: recommendation no (legacy path serves, refusals opaque, record §3.5).
 - Q-U11 Steps carry a required one-line description shown in UI and CLI (SQL steps take the first comment): recommendation yes.
 
-### Entitlement merge (M1 hand-back, 2026-10-06 night)
-
-- Q1-upcast How stored `lw.usage.*` events become `lw.entitlement.*` (ruled: rename with an upcast). Eventing has no upcast hook (one type literal per schema, eventSchemas.ts:20-25; projections filter the exact type, projectionRouter.ts:1209,1383; replay discovers by type). Options: (a) a framework upcaster in packages/eventing applied at dispatch, store read and replay; (b) dual-read: legacy schemas beside the new, the process manager and billing's two peer subscribers registered on both types; (c) a ClickHouse step rewriting stored EventType and AggregateType plus a drain of the old queue keys. A pipeline rename also changes queue and dedup keys (queueManager.ts:338-339,359), so in-flight `countMonth` jobs need a drain. Facts: no usage projection reads these events back after delivery; only live subscribers and the process manager do. No recommendation yet; the rename slice waits on this. M1 landed with stored names unchanged.
-
 ### Legacy error body (legacy-error-root hand-back, 2026-10-06 night; landed)
 
 - LE-1 Breadth: the root `error` is added only at statuses where a route publishes main's flat body (75 operations, 18 families); unpublished statuses (403 on most of them) get none, where main sent it on every status. Released clients only parse documented statuses. Options: keep (default taken, held for Alex) or every refusal of such a family (one line in packages/api/src/rest/legacy-error.ts).
@@ -48,4 +44,4 @@ recommendation, and "default taken" if a lane proceeded on it.
 
 ## Answered (moved to `.claude/coordinator/rulings-2026-10-05.md` when ruled)
 
-None yet since this file was created.
+- Q1-upcast: ruled 2026-10-06 night, option (a), a framework upcaster, accessible in ops and the migrations ledger.
