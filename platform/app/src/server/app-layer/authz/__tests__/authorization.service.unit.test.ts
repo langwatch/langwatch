@@ -1,5 +1,5 @@
 import { AccessNotGrantedError, isSealedAuthorization } from "@langwatch/actor";
-import type { AuthzScopeRef } from "@langwatch/authz";
+import type { AuthzPermission, AuthzScopeRef } from "@langwatch/authz";
 import { describe, expect, it, vi } from "vitest";
 import {
   AUTHORIZATION_MAX_AGE_MS,
@@ -40,15 +40,21 @@ function door({
   allowed = true,
   rows = [] as SharedReadRow[],
   scope = aggregateScope as AuthzScopeRef | null,
-  permissions = ["traces:view", "analytics:view", "project:view"],
+  permissions = [
+    "traces:view",
+    "analytics:view",
+    "project:view",
+  ] as AuthzPermission[],
 } = {}) {
   const deps = {
     authz: {
-      checkDetailed: vi.fn().mockResolvedValue({
-        decision: { allowed },
-        grants: {},
-      }),
-      effectivePermissions: vi.fn().mockResolvedValue(permissions),
+      effectivePermissions: vi
+        .fn()
+        .mockResolvedValue(
+          allowed
+            ? permissions
+            : permissions.filter((each) => each !== "traces:view"),
+        ),
     },
     collector: { resolveScopeRef: vi.fn().mockResolvedValue(scope) },
     sharedReads: { findLiveSharedReads: vi.fn().mockResolvedValue(rows) },
@@ -147,7 +153,10 @@ describe("authorize", () => {
 
   describe("when the permission is one the project-reader role never confers", () => {
     it("mints the own grant alone and never asks for shared reads", async () => {
-      const { service, deps } = door({ rows: [sharedRow()] });
+      const { service, deps } = door({
+        rows: [sharedRow()],
+        permissions: ["traces:view", "traces:manage", "project:view"],
+      });
       const proof = await service.authorize({
         actor: ANA,
         principal: ANA,
@@ -245,7 +254,7 @@ describe("AuthorizationService.authorizeInternal", () => {
           },
         ]);
         expect(proof.expiresAt).toBe(NOW + AUTHORIZATION_MAX_AGE_MS);
-        expect(deps.authz.checkDetailed).not.toHaveBeenCalled();
+        expect(deps.authz.effectivePermissions).not.toHaveBeenCalled();
         expect(deps.sharedReads.findLiveSharedReads).not.toHaveBeenCalled();
       });
 

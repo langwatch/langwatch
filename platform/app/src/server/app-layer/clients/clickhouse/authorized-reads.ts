@@ -32,6 +32,16 @@ export const READ_RESOURCES = {
 export type ReadResource = keyof typeof READ_RESOURCES;
 
 /**
+ * The permissions a route's `.permission()` check mints a proof for. A
+ * route checked under any other permission reads no proof-bearing store,
+ * so minting there would cost an engine pass nothing consumes. Widening
+ * this to every route is the foundation branch's job (PR 7536).
+ */
+export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set(
+  Object.values(READ_RESOURCES),
+);
+
+/**
  * The time columns a marker may name. The window on a shared grant is
  * applied to this column, so it must be the table's own occurrence time.
  */

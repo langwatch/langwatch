@@ -36,6 +36,7 @@ import type { ExperimentService } from "../experiments/experiment.service";
 import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import type { OpsExplainService } from "../ops/opsExplain.service";
 import type { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
+import type { AuthorizationService } from "./authz/authorization.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";
 import type {
@@ -401,6 +402,12 @@ export interface AppDependencies {
    * `getApp().permissions`; nothing composes its own from a client.
    */
   permissions: PermissionsService;
+  /**
+   * ADR-144 block B: the door. A `.permission()` check on a proof-bearing
+   * permission mints the sealed proof through this instance and hands it
+   * to the route as `ctx.authorization`.
+   */
+  authorization: AuthorizationService;
   tokenizer: TokenizerService;
   usage: UsageService;
   planProvider: PlanProvider;

@@ -194,6 +194,7 @@ describe("checkDeclaredPermission", () => {
       const params = paramsFor({ projectId: "proj-1" });
       (params.ctx as { app?: unknown }).app = {
         permissions: { getDecision },
+        authorization: { authorize: vi.fn().mockResolvedValue({}) },
       };
 
       await checkDeclaredPermission({ permission: "traces:view" })(
@@ -557,6 +558,77 @@ describe("declaredServiceAuthorization", () => {
     expect(authzDeclarationOf(middleware)).toMatchObject({
       kind: "service-authorized",
       permissions: ["traces:view"],
+    });
+  });
+});
+
+describe("ADR-144: the proof a trace route carries", () => {
+  const SEALED = { sealed: "proof" };
+  const appWith = (authorize = vi.fn().mockResolvedValue(SEALED)) => ({
+    permissions: {
+      getDecision: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "ADMIN" }),
+    },
+    authorization: { authorize },
+  });
+
+  describe("given a procedure checked under a permission a store reads under", () => {
+    describe("when the check admits the caller", () => {
+      it("mints the proof for the project and names the route as its purpose", async () => {
+        const app = appWith();
+        const params = paramsFor({ projectId: "proj-1" });
+        (params.ctx as { app?: unknown }).app = app;
+
+        await checkDeclaredPermission({ permission: "traces:view" })({
+          ...params,
+          path: "tracesV2.list",
+        } as any);
+
+        expect(app.authorization.authorize).toHaveBeenCalledWith({
+          actor: { type: "user", id: "alice" },
+          principal: { type: "user", id: "alice" },
+          permission: "traces:view",
+          scope: { projectId: "proj-1" },
+          purpose: { kind: "route", route: "tracesV2.list" },
+        });
+        expect((params.ctx as { authorization?: unknown }).authorization).toBe(
+          SEALED,
+        );
+        expect(params.next).toHaveBeenCalled();
+      });
+
+      it("refuses the request when the door disagrees with the check, rather than reading wider", async () => {
+        const app = appWith(
+          vi.fn().mockRejectedValue(new Error("not granted")),
+        );
+        const params = paramsFor({ projectId: "proj-1" });
+        (params.ctx as { app?: unknown }).app = app;
+
+        await expect(
+          checkDeclaredPermission({ permission: "traces:view" })(params as any),
+        ).rejects.toThrow("not granted");
+        expect(params.next).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a procedure checked under a permission no store reads under", () => {
+    describe("when the check admits the caller", () => {
+      it("mints nothing", async () => {
+        const app = appWith();
+        const params = paramsFor({ projectId: "proj-1" });
+        (params.ctx as { app?: unknown }).app = app;
+
+        await checkDeclaredPermission({ permission: "project:manage" })(
+          params as any,
+        );
+
+        expect(app.authorization.authorize).not.toHaveBeenCalled();
+        expect(
+          (params.ctx as { authorization?: unknown }).authorization,
+        ).toBeUndefined();
+      });
     });
   });
 });

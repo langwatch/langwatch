@@ -18,6 +18,8 @@
  * machine-readable half of the declaration: the sweep test walks the router
  * and refuses any procedure whose chain carries none.
  */
+
+import type { Authorization } from "@langwatch/actor";
 import {
   type AuthzDenialReason,
   type AuthzPermission,
@@ -37,6 +39,7 @@ import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Session } from "../../auth";
 import { prisma } from "../../db";
 import { type App, getApp } from "../app";
+import { PROOF_BEARING_PERMISSIONS } from "../clients/clickhouse/authorized-reads";
 import { organizationMfa } from "../identity/runtime";
 import { deploymentOffersTwoStepVerification } from "../identity/signin-method-policy";
 import {
@@ -68,6 +71,8 @@ type MiddlewareParams = {
     app?: App;
     permissionChecked: boolean;
     organizationRole?: OrganizationUserRole | null;
+    /** The proof minted for a proof-bearing permission; see `trpc.ts`. */
+    authorization?: Authorization;
     /**
      * The two-step verification gate's per-request memo (D06). A tRPC batch
      * shares one context, so this is what makes one person cost one query
@@ -82,8 +87,46 @@ type MiddlewareParams = {
     >;
   };
   input: ScopeInput;
+  /** The procedure path tRPC hands every middleware; the proof's purpose. */
+  path?: string;
   next: () => any;
 };
+
+/**
+ * ADR-144 block B: mint the proof for a route that reads a proof-bearing
+ * store. Runs after the permission and the second factor, so the proof is
+ * only ever minted for a request that was admitted. The door evaluates the
+ * same grants the check did, through the same engine, so a disagreement is
+ * a defect and surfaces as a refusal rather than a wider read.
+ */
+async function mintRouteAuthorization({
+  ctx,
+  session,
+  path,
+  permission,
+  scope,
+}: {
+  ctx: MiddlewareParams["ctx"];
+  session: Session;
+  path: string | undefined;
+  permission: AuthzPermission;
+  scope: { tier: string; id: string };
+}): Promise<void> {
+  if (scope.tier !== "project" || !PROOF_BEARING_PERMISSIONS.has(permission)) {
+    return;
+  }
+  const { actor, subject } = principalOfSession({ session });
+  ctx.authorization = await appOf(ctx).authorization.authorize({
+    actor:
+      actor.userId === subject.userId
+        ? { type: "user", id: subject.userId }
+        : { type: "user", id: subject.userId, impersonatorId: actor.userId },
+    principal: { type: "user", id: subject.userId },
+    permission,
+    scope: { projectId: scope.id },
+    purpose: { kind: "route", route: path ?? "unknown" },
+  });
+}
 
 /**
  * The gate's dependencies for this request: the flag, the scope lookup, the
@@ -129,13 +172,14 @@ export const checkDeclaredPermission = ({
 }): DeclaredMiddleware =>
   declareAuthzMiddleware(
     { kind: "permission", permission, via, nondisclosure },
-    async ({ ctx, input, next }: MiddlewareParams) => {
+    async ({ ctx, input, path, next }: MiddlewareParams) => {
       // `publicProcedure` exposes `.permission()` too, so a session is not a
       // given. Answering "unauthenticated" before any id is looked at keeps
       // an anonymous caller from learning anything about the scope.
       if (!ctx.session?.user) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
+      const session = ctx.session;
 
       const scope = requireDeclaredScope({ permission, input, via });
       const { permitted, organizationRole, denialReason } = await appOf(
@@ -187,6 +231,14 @@ export const checkDeclaredPermission = ({
       if (organizationRole !== null) {
         ctx.organizationRole = organizationRole;
       }
+
+      await mintRouteAuthorization({
+        ctx,
+        session,
+        path,
+        permission,
+        scope,
+      });
 
       ctx.permissionChecked = true;
       return next();

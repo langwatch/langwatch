@@ -69,10 +69,24 @@ export function appPermissionsService(): PermissionsService {
   });
 }
 
+/** The stand-in proof the mocked door mints; never a sealed one. */
+export const APP_MOCK_AUTHORIZATION = Object.freeze({
+  mock: "authorization",
+});
+
 export function appPermissionsMock() {
   const permissions = appPermissionsService();
   return {
-    getApp: () => ({ permissions }),
+    getApp: () => ({
+      permissions,
+      // The door is not under test here: a route checked under a
+      // proof-bearing permission gets a stand-in proof so the check's own
+      // behaviour can be asserted. A test of the proof itself hands in an
+      // App of its own through the context slot.
+      authorization: {
+        authorize: async () => APP_MOCK_AUTHORIZATION,
+      },
+    }),
     tryGetApp: () => null,
   };
 }

@@ -184,6 +184,7 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { createAnalyticsService } from "./analytics";
 import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
+import { authorizationServiceFor } from "./authz/checks";
 import { installAuthzEngineGateReporting } from "./authz/engine-gate-reporting";
 import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
 import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
@@ -2186,6 +2187,7 @@ export function initializeDefaultApp(options?: {
     organizations,
     projects,
     permissions: permissionsServiceFor(prisma),
+    authorization: authorizationServiceFor(prisma),
     tokenizer,
     usage,
     planProvider,
@@ -2613,6 +2615,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
     organizations: nullOrganizations,
     projects: nullProjects,
     permissions: permissionsServiceFor(testPrisma),
+    authorization: authorizationServiceFor(testPrisma),
     tokenizer: new TokenizerService(new NullTokenizerClient()),
     usage: new UsageService(
       nullOrganizations,

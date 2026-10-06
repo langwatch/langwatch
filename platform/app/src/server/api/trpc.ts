@@ -37,6 +37,7 @@ interface CreateNextContextOptions {
 }
 
 import { auditLog } from "@ee/audit-log/auditLog";
+import type { Authorization } from "@langwatch/actor";
 import type {
   AuthzPermission,
   DeclarationError,
@@ -122,6 +123,13 @@ interface CreateContextOptions {
     organizationMfa?: unknown;
   };
   permissionChecked?: boolean;
+  /**
+   * ADR-144 block B: the sealed proof a `.permission()` check on a
+   * proof-bearing permission minted for this request. A trace route hands
+   * it by name to the service and on to the store client, which applies
+   * it as the tenant fence. Absent on every other procedure.
+   */
+  authorization?: Authorization;
   publiclyShared?: boolean;
   organizationRole?: OrganizationUserRole | null;
   opsScope?: OpsScope;

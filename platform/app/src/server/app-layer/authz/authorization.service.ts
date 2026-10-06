@@ -40,7 +40,7 @@ export const AUTHORIZATION_MAX_AGE_MS = 5 * 60 * 1000;
 const INTERNAL_SCOPE_CACHE_MS = 60 * 1000;
 
 export type AuthorizationServiceDeps = {
-  authz: Pick<AuthzService, "checkDetailed" | "effectivePermissions">;
+  authz: Pick<AuthzService, "effectivePermissions">;
   collector: Pick<AuthzCollectorService, "resolveScopeRef">;
   sharedReads: Pick<SharedReadsGrantsRepository, "findLiveSharedReads">;
   now?: () => number;
@@ -143,17 +143,16 @@ export class AuthorizationService {
     if (scopeRef?.type !== "project") {
       throw new AccessNotGrantedError(permission);
     }
-    const { decision } = await authz.checkDetailed({
-      principal,
-      permission,
-      scope: scopeRef,
-    });
-    if (!decision.allowed) throw new AccessNotGrantedError(permission);
-
+    // One engine pass: the effective set decides the permission asked for
+    // and is what the own grant carries, so the door does not evaluate the
+    // same grants twice per request.
     const permissions = await authz.effectivePermissions({
       principal,
       scope: scopeRef,
     });
+    if (!permissions.includes(permission)) {
+      throw new AccessNotGrantedError(permission);
+    }
     const own: AuthorizationGrant = {
       projectId: scope.projectId,
       permissions,
