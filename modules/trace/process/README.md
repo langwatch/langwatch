@@ -1003,66 +1003,66 @@ Answers at `/api/collector`.
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/otlp-ingest.rest.ts:318` |
+| Declared at | `src/transport/otlp-ingest.rest.ts:328` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | project                                 |
 
 #### `POST /api/otel/v1/traces` · `ingestOtlpTraces`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:323`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:333`.
 
 Answers at `/api/otel/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:324)
-// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:327)
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:334)
+// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:337)
 ```
 
 #### `POST /:otlpBase{.+}/v1/traces` · `ingestOtlpTracesAlias`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:345`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:355`.
 
 Answers at `/:otlpBase{.+}/v1/traces`.
 
 ```typescript
 type Params = z.infer<typeof otlpTraceAliasParamsSchema>; // ../contract/src/otlp-ingest.rest.ts:11
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:347)
-// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:350)
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:357)
+// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:360)
 ```
 
 #### `POST /:otlpBase{.+}/v1/traces/` · `ingestOtlpTracesAliasSlash`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:360`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:370`.
 
 Answers at `/:otlpBase{.+}/v1/traces/`.
 
 ```typescript
 type Params = z.infer<typeof otlpTraceAliasParamsSchema>; // ../contract/src/otlp-ingest.rest.ts:11
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:362)
-// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:365)
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:372)
+// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:375)
 ```
 
 #### `POST /v1/traces` · `ingestOtlpTracesRootV1`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:375`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:385`.
 
 Answers at `/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:376)
-// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:379)
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:386)
+// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:389)
 ```
 
 #### `POST /v1/traces/` · `ingestOtlpTracesRootV1Slash`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:389`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:399`.
 
 Answers at `/v1/traces/`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:390)
-// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:393)
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:400)
+// Response: "protocol" (inline, src/transport/otlp-ingest.rest.ts:403)
 ```
 
 ### `traceExportRest`
