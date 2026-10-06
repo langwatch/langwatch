@@ -15,15 +15,17 @@ import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type * as Observability from "@langwatch/observability";
 import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import type * as TestHarness from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
@@ -34,6 +36,25 @@ import { TraceCanonicalisationService } from "../../services/trace-canonicalisat
 import type { TraceProcessingCommands } from "../../services/trace-processing-commands.service.ts";
 import { traceProcessModule } from "../../trace.module.ts";
 import { otlpIngestRest } from "../otlp-ingest.rest.ts";
+
+const doorLog = vi.hoisted(() => ({
+  loggerName: "langwatch:otel:v1:traces",
+  lines: [] as { msg?: string; [field: string]: unknown }[],
+}));
+
+// The receiver's logger is built at import; this hands it a capturing one.
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const original = await importOriginal<typeof Observability>();
+  const harness = await vi.importActual<typeof TestHarness>("@langwatch/test-harness");
+  const door = harness.createTestLogger();
+  doorLog.lines = door.lines;
+
+  return {
+    ...original,
+    createLogger: (name: string, options?: Parameters<typeof original.createLogger>[1]) =>
+      name === doorLog.loggerName ? door.logger : original.createLogger(name, options),
+  };
+});
 
 const PROJECT = {
   id: "project-123",
@@ -254,14 +275,33 @@ function deployment(access: OtlpAccess = {}) {
     return new Response(null, { status: 404 });
   };
 
-  return { post, recordedSpans, markedUsed };
+  const postStream = async (path: string, chunks: readonly Uint8Array[]) => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(chunk);
+        controller.close();
+      },
+    });
+    for (const family of mounted) {
+      return family.request(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Auth-Token": TOKEN },
+        body: stream,
+        duplex: "half",
+      } as RequestInit);
+    }
+
+    return new Response(null, { status: 404 });
+  };
+
+  return { post, postStream, recordedSpans, markedUsed };
 }
 
 const NOW = Date.now();
 const NANOS = "000000";
 
-/** One span, in the JSON shape an OTLP exporter posts it. */
-function otlpTraceBody() {
+/** `count` spans, in the JSON shape an OTLP exporter posts them. */
+function otlpTraceBody(count = 1) {
   return {
     resourceSpans: [
       {
@@ -271,17 +311,15 @@ function otlpTraceBody() {
         scopeSpans: [
           {
             scope: { name: "langwatch-exporter", version: "1.0.0" },
-            spans: [
-              {
-                traceId: "b2ca0e1d9f4a4d2ab1c0d3e4f5061728",
-                spanId: "a1b2c3d4e5f60718",
-                name: "chat completion",
-                kind: 3,
-                startTimeUnixNano: `${NOW - 1000}${NANOS}`,
-                endTimeUnixNano: `${NOW}${NANOS}`,
-                attributes: [],
-              },
-            ],
+            spans: Array.from({ length: count }, (_, index) => ({
+              traceId: "b2ca0e1d9f4a4d2ab1c0d3e4f5061728",
+              spanId: `a1b2c3d4e5f6071${index}`,
+              name: "chat completion",
+              kind: 3,
+              startTimeUnixNano: `${NOW - 1000}${NANOS}`,
+              endTimeUnixNano: `${NOW}${NANOS}`,
+              attributes: [],
+            })),
           },
         ],
       },
@@ -357,6 +395,105 @@ describe("given the trace module as a process composes it", () => {
 
       expect(response.status).toBe(401);
       expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("when an exporter named the collector as its base endpoint", () => {
+    /** @scenario "An endpoint that named the collector" */
+    it.each(["/api/collector/api/otel/v1/traces", "/api/collector/v1/traces"])(
+      "serves spans posted to %s as trace ingestion",
+      async (path) => {
+        const { post, recordedSpans } = deployment();
+
+        const response = await post(path, otlpTraceBody());
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ message: "Trace received successfully." });
+        expect(recordedSpans).toHaveLength(1);
+        expect(recordedSpans[0]).toMatchObject({ tenantId: PROJECT.id });
+      },
+    );
+  });
+
+  describe("when an exporter posts spans to the canonical path with a trailing slash", () => {
+    /** @scenario "An endpoint with a stray trailing slash" */
+    it("serves them as trace ingestion", async () => {
+      const { post, recordedSpans } = deployment();
+
+      const response = await post("/api/otel/v1/traces/", otlpTraceBody());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ message: "Trace received successfully." });
+      expect(recordedSpans).toHaveLength(1);
+    });
+  });
+
+  describe("when an exporter streams spans to a misconfigured path", () => {
+    /** @scenario "A streamed payload survives the correction" */
+    it("hands every span of the streamed body to ingestion", async () => {
+      const { postStream, recordedSpans } = deployment();
+      const bytes = new TextEncoder().encode(JSON.stringify(otlpTraceBody(3)));
+      const third = Math.ceil(bytes.byteLength / 3);
+      const chunks = [bytes.slice(0, third), bytes.slice(third, third * 2), bytes.slice(third * 2)];
+
+      const response = await postStream("/v1/traces", chunks);
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ message: "Trace received successfully." });
+      expect(recordedSpans).toHaveLength(3);
+    });
+  });
+
+  describe("when a request arrives on a path that no known misconfiguration produces", () => {
+    /** @scenario "An unrelated path that happens to end in a signal name" */
+    it.each(["/api/gateway/v1/traces", "/api/rum/v1/traces", "/api/ingest/otel/src_123/v1/traces"])(
+      "does not treat %s as ingestion",
+      async (path) => {
+        const { post, recordedSpans, markedUsed } = deployment();
+
+        const response = await post(path, otlpTraceBody());
+
+        expect(response.status).toBe(404);
+        expect(recordedSpans).toHaveLength(0);
+        expect(markedUsed).toHaveLength(0);
+      },
+    );
+
+    /** @scenario "A path naming something other than a signal" */
+    it.each(["/api/otel/v1/traces/v1/profiles", "/api/otel/v1/traces/v2/traces", "/api/collector"])(
+      "does not treat the unknown suffix of %s as ingestion",
+      async (path) => {
+        const { post, recordedSpans, markedUsed } = deployment();
+
+        const response = await post(path, otlpTraceBody());
+
+        expect(response.status).toBe(404);
+        expect(recordedSpans).toHaveLength(0);
+        expect(markedUsed).toHaveLength(0);
+      },
+    );
+  });
+
+  describe("when an exporter posts repeatedly to the same misconfigured path", () => {
+    /** @scenario "A repeated misconfiguration is reported once a window" */
+    it("reports the correction once rather than once per batch", async () => {
+      const { post } = deployment();
+      const misconfiguredPath = "/api/v1/traces";
+
+      for (let batch = 0; batch < 3; batch += 1) {
+        const response = await post(misconfiguredPath, otlpTraceBody());
+        expect(response.status).toBe(200);
+      }
+
+      const reports = doorLog.lines.filter(
+        (line) =>
+          line.msg?.includes("non-canonical path") && line.originalPath === misconfiguredPath,
+      );
+      expect(reports).toHaveLength(1);
+      expect(reports[0]).toMatchObject({
+        projectId: PROJECT.id,
+        canonicalPath: "/api/otel/v1/traces",
+      });
     });
   });
 
