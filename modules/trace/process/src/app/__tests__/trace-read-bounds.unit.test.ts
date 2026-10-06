@@ -10,6 +10,7 @@ import type { Evaluation, TracesForProjectResult } from "@langwatch/trace-contra
 import { TraceIdsTooManyError } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TraceSpanCostSuggestion } from "../../services/span-cost-suggestion.service.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import {
@@ -50,6 +51,7 @@ function harness(tier: "free" | "paid" | "enterprise") {
 
   const app = TraceModule.fromDependencies({
     storedObjects: createApiFixture<StoredObjectApi>(),
+    spanCostSuggestions: createApiFixture<TraceSpanCostSuggestion>(),
     traces: {
       existence: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],

@@ -19,6 +19,7 @@ import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TraceSpanCostSuggestion } from "../../services/span-cost-suggestion.service.ts";
 import { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
@@ -83,6 +84,7 @@ function bootTraceApp(options: {
 
   const app = TraceModule.fromDependencies({
     storedObjects: createApiFixture<StoredObjectApi>(),
+    spanCostSuggestions: createApiFixture<TraceSpanCostSuggestion>(),
     traces: {
       existence: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],

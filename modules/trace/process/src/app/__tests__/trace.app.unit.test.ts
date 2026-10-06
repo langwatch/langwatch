@@ -20,6 +20,7 @@ import type {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TraceSpanCostSuggestion } from "../../services/span-cost-suggestion.service.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import {
@@ -117,6 +118,7 @@ function harness(
 
   const app = TraceModule.fromDependencies({
     storedObjects: createApiFixture<StoredObjectApi>(),
+    spanCostSuggestions: createApiFixture<TraceSpanCostSuggestion>(),
     traces: {
       existence: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],

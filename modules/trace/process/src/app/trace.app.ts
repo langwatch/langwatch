@@ -273,6 +273,10 @@ import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enri
 import { LegacyFilterMatchingService } from "../services/legacy-filter-matching.service.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
+import {
+  SpanCostSuggestionService,
+  type TraceSpanCostSuggestion,
+} from "../services/span-cost-suggestion.service.ts";
 import { SpanCostService } from "../services/span-cost.service.ts";
 import { TraceAiQueryService } from "../services/trace-ai-query.service.ts";
 import { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
@@ -654,6 +658,8 @@ export interface TraceAppDependencies {
   }>;
   topics: TopicApi;
   broadcast: TracesTrpcEmitters;
+  /** The unmapped-model hint the span detail carries; read after the span is protected. */
+  spanCostSuggestions: TraceSpanCostSuggestion;
   evaluations: EvaluationApi;
   /**
    * The Instant Eval peer the Explorer's judged searches run through. Absent
@@ -1077,6 +1083,9 @@ export class TraceModule implements TraceApi, CollectorApp {
       },
       topics: options.topics,
       projects: options.projects,
+      spanCostSuggestions: SpanCostSuggestionService.create({
+        modelProviders: options.modelProviders,
+      }),
       evaluations: options.evaluations,
       ...(options.instantEvals ? { instantEvals: options.instantEvals } : {}),
       codingAgents: options.codingAgents,
@@ -1711,6 +1720,14 @@ export class TraceModule implements TraceApi, CollectorApp {
       })),
       traceReadMapperPorts.spanDisplay,
     );
+
+    spanDetail.costSuggestion = await this.#dependencies.spanCostSuggestions.derive({
+      projectId: input.projectId,
+      model: spanDetail.model ?? null,
+      cost: spanDetail.metrics?.cost,
+      promptTokens: spanDetail.metrics?.promptTokens,
+      completionTokens: spanDetail.metrics?.completionTokens,
+    });
 
     const redactedDetail = redactV2Content(
       spanDetail,

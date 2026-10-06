@@ -18,6 +18,10 @@ export function createTraceAppHarness({
     storedObjects: createApiFixture<TraceAppDependencies["storedObjects"]>({}, "storedObjects"),
     topics: createApiFixture<TraceAppDependencies["topics"]>({}, "topics"),
     broadcast: createApiFixture<TraceAppDependencies["broadcast"]>({}, "broadcast"),
+    spanCostSuggestions: createApiFixture<TraceAppDependencies["spanCostSuggestions"]>(
+      {},
+      "spanCostSuggestions",
+    ),
     evaluations: createApiFixture<TraceAppDependencies["evaluations"]>({}, "evaluations"),
     codingAgents: createApiFixture<TraceAppDependencies["codingAgents"]>({}, "codingAgents"),
     share: createApiFixture<TraceAppDependencies["share"]>({}, "share"),
