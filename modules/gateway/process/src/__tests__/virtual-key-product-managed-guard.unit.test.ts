@@ -17,11 +17,11 @@ const REACHED_TRANSACTION = "REACHED_TRANSACTION";
 /** The stored row carries the columns Prisma always returns, as Prisma returns them. */
 const MINTED_AT = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 
-function vkRow(purpose: "USER" | "LANGY") {
+function vkRow(purpose: "USER" | "LANGY" | "CONNECT") {
   return {
     id: "vk_1",
     organizationId: "org_1",
-    name: purpose === "LANGY" ? "Langy" : "My key",
+    name: { USER: "My key", LANGY: "Langy", CONNECT: "Connect lic-1" }[purpose],
     purpose,
     status: "ACTIVE",
     config: {},
@@ -92,6 +92,27 @@ describe("VirtualKeyService product-managed guard", () => {
         createApiFixture<ProjectApi>(),
       );
 
+      await expect(sut.revoke(mutationInput)).rejects.toMatchObject({
+        code: "virtual_key_not_found",
+      });
+    });
+  });
+
+  describe("given the managed key of a hosted-services license", () => {
+    /** @scenario The managed key is not visible or editable as a customer key */
+    it("is absent from the organization listing, and a customer revoke is refused", async () => {
+      const findMany = vi.fn().mockResolvedValue([]);
+      const sut = createVirtualKeyServiceForTest(
+        mockPrisma(vkRow("CONNECT"), findMany),
+        createApiFixture<ProjectApi>(),
+      );
+
+      await sut.getAll("org_1");
+
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ purpose: "USER" }) }),
+      );
+      await expect(sut.findById("vk_1", "org_1")).resolves.toBeNull();
       await expect(sut.revoke(mutationInput)).rejects.toMatchObject({
         code: "virtual_key_not_found",
       });
