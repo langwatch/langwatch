@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { TestUserApi } from "../../app/__tests__/support/test-user-api.ts";
 import { IdTokenIssuerRefusalChannel } from "../../channels/http/http.id-token-issuer-refusal.channel.ts";
+import { OAuthProfileEmailChannel } from "../../channels/http/http.oauth-profile-email.channel.ts";
 import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
 import { MemoryAuthSessionRepository } from "../../repositories/memory/memory.auth-session.repository.ts";
 import { MemoryAuthDatabase } from "../../repositories/memory/memory.auth.database.ts";
@@ -95,6 +96,8 @@ describe("a session idle past its organization's window", () => {
           revokeBrowserSession: async () => {},
           idTokenIssuerRefusals: IdTokenIssuerRefusalChannel.create(),
           connectionIssuers: { findIssuersForConnection: async () => [] },
+          oauthProfileEmails: OAuthProfileEmailChannel.create(),
+          governingConnections: { findGoverningConnections: async () => [] },
           deriveQueryCacheKey: () => "key",
           now: () => SIGNED_IN_AT,
         });

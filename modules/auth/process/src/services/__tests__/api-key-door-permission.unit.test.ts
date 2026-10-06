@@ -59,7 +59,11 @@ const organizationTokens = new Map<string, OrganizationApiKeyResolution>([
   ],
 ]);
 
-const apiKeys: Pick<ApiKeyApi, "findResolvedToken" | "resolveOrganizationToken" | "markUsed"> = {
+const apiKeys: Pick<
+  ApiKeyApi,
+  "findResolvedToken" | "resolveOrganizationToken" | "markUsed" | "getOrgProjects"
+> = {
+  getOrgProjects: () => Promise.resolve([]),
   findResolvedToken: ({ token }) => Promise.resolve(projectTokens.get(token) ?? null),
   resolveOrganizationToken: ({ token }) =>
     Promise.resolve(

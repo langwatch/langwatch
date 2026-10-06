@@ -517,11 +517,16 @@ export class ProjectInvalidCredentialsError extends HandledError {
 export class ProjectRequiredError extends HandledError {
   declare readonly code: "project_required";
 
-  constructor() {
+  /** `projects`: the ones the key reaches, so a caller can pick one (Q30). */
+  constructor(input: { projects?: readonly { id: string; name: string }[] } = {}) {
     super(
       "project_required",
       "This API key is not bound to a single project, so the request has to name one. Send the project id in the X-Project-Id header, or pass --project <id|slug> to the CLI.",
-      { httpStatus: 400, fault: "customer" },
+      {
+        httpStatus: 400,
+        fault: "customer",
+        ...(input.projects ? { meta: { projects: input.projects } } : {}),
+      },
     );
 
     this.name = "ProjectRequiredError";

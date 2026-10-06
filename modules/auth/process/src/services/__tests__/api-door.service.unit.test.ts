@@ -60,6 +60,7 @@ const refuseEverything = () => Promise.reject(new Error("an identified caller as
 const peers: ApiDoorPeers = {
   sessions: { verifyBrowserSession: refuseEverything, resolveBrowserSession: refuseEverything },
   apiKeys: {
+    getOrgProjects: () => Promise.resolve([]),
     findResolvedToken: ({ token }: ApiKeyTokenResolutionInput) =>
       Promise.resolve(projectTokens.get(token) ?? null),
     resolveOrganizationToken: ({ token }) =>

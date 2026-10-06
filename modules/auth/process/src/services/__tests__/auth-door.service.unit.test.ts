@@ -13,6 +13,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { IdTokenIssuerRefusalChannel } from "../../channels/http/http.id-token-issuer-refusal.channel.ts";
+import { OAuthProfileEmailChannel } from "../../channels/http/http.oauth-profile-email.channel.ts";
 import { AuthDoorService, type AuthDoorDeps } from "../auth-door.service.ts";
 
 const loggerSpies = vi.hoisted(() => ({
@@ -60,6 +61,8 @@ function door(overrides: Partial<AuthDoorDeps> = {}) {
     revokeBrowserSession,
     idTokenIssuerRefusals: IdTokenIssuerRefusalChannel.create(),
     connectionIssuers: { findIssuersForConnection: async () => [] },
+    oauthProfileEmails: OAuthProfileEmailChannel.create(),
+    governingConnections: { findGoverningConnections: async () => [] },
     deriveQueryCacheKey: ({ sessionId, impersonatorId, epoch }) =>
       `key-for-${sessionId}-${impersonatorId}-${epoch}`,
     // Two epochs and a day in: the server's clock alone names the epoch.
@@ -424,6 +427,89 @@ describe("given a single sign-on callback whose ID token the engine refused for 
   describe("when the logger notes a refusal outside any request", () => {
     it("ignores the line", () => {
       expect(() => IdTokenIssuerRefusalChannel.create().note([issRefusal(RECEIVED)])).not.toThrow();
+    });
+  });
+});
+
+describe("given an OAuth sign-in Better Auth would not link to the account holding its address", () => {
+  const NOT_LINKED_AT = `${BASE_URL}/auth/error?error=account_not_linked`;
+  const callback = () => new Request(`${BASE_URL}/api/auth/callback/google?code=c&state=s`);
+
+  /** Better Auth maps the provider's profile in the callback, then refuses the link. */
+  function doorRefusingLink({
+    governing,
+    location = NOT_LINKED_AT,
+  }: {
+    governing: Record<string, string[]>;
+    location?: string;
+  }) {
+    const oauthProfileEmails = OAuthProfileEmailChannel.create();
+    const google = oauthProfileEmails.capturing({ clientId: "google" });
+    const asked: string[] = [];
+    const handler = vi.fn(async () => {
+      await google.mapProfileToUser({ email: "andrei@acme.com", sub: "g-1" });
+      return new Response(null, { status: 302, headers: { location } });
+    });
+    const { service } = door({
+      betterAuth: async () => ({ handler }),
+      oauthProfileEmails,
+      governingConnections: {
+        findGoverningConnections: async ({ email }) => {
+          asked.push(email);
+          return governing[email] ?? [];
+        },
+      },
+    });
+    return { service, asked };
+  }
+
+  describe("when an organization's connection governs the provider's address", () => {
+    /** @scenario "Signing in with the wrong method explains what to do and names the right method" */
+    it("names that connection in error_description on the redirect to the error page", async () => {
+      const { service, asked } = doorRefusingLink({
+        governing: { "andrei@acme.com": ["ssoc_acme"] },
+      });
+
+      const response = await service.betterAuthHandshake(callback());
+      const target = new URL(response.headers.get("location") ?? "");
+
+      expect(asked).toEqual(["andrei@acme.com"]);
+      expect(target.pathname).toBe("/auth/error");
+      expect(target.searchParams.get("error")).toBe("account_not_linked");
+      expect(target.searchParams.get("error_description")).toBe("ssoc_acme");
+    });
+  });
+
+  describe("when no connection governs the address", () => {
+    /** @scenario "Recovery works the same when the org's required method is not yet known" */
+    it("leaves the redirect naming no connection", async () => {
+      const { service } = doorRefusingLink({ governing: {} });
+
+      const response = await service.betterAuthHandshake(callback());
+
+      expect(response.headers.get("location")).toBe(NOT_LINKED_AT);
+    });
+  });
+
+  describe("when the redirect is some other refusal", () => {
+    it("asks nobody who governs the address", async () => {
+      const { service, asked } = doorRefusingLink({
+        governing: { "andrei@acme.com": ["ssoc_acme"] },
+        location: `${BASE_URL}/auth/error?error=DIFFERENT_EMAIL_NOT_ALLOWED`,
+      });
+
+      await service.betterAuthHandshake(callback());
+
+      expect(asked).toEqual([]);
+    });
+  });
+
+  describe("when a profile is mapped outside any request", () => {
+    it("keeps nothing", async () => {
+      const channel = OAuthProfileEmailChannel.create();
+      await channel.capturing({}).mapProfileToUser({ email: "andrei@acme.com" });
+
+      expect(channel.findEmail()).toBeUndefined();
     });
   });
 });
