@@ -74,3 +74,60 @@ Feature: The clickhouse-table-ownership lint rule
     Given only a module's test files select from a table another module writes
     When the clickhouse-table-ownership rule runs over the workspace
     Then it reports no foreign reader for that module
+
+  @unit
+  Scenario: A table name imported from a sibling file is still access
+    Given a repository inserts into a table named by a constant it imports from a relative file
+    When the clickhouse-table-ownership rule runs over the workspace
+    Then it reports the access as if the name were written inline
+
+  @unit
+  Scenario: A table name imported through a re-export is still access
+    Given a repository inserts into a table named by a constant a barrel re-exports
+    When the clickhouse-table-ownership rule runs over the workspace
+    Then it reports the access as if the name were written inline
+
+  @unit
+  Scenario: A table name imported from another module's package is that module's table
+    Given the analytics module selects from a table named by a constant imported from the trace module's package
+    When the clickhouse-table-ownership rule runs over the workspace
+    Then it reports that analytics reads the table, owned by trace
+
+  @unit
+  Scenario: Constants that import each other do not loop
+    Given two files whose constants re-export each other
+    When the clickhouse-table-ownership rule runs over the workspace
+    Then the rule finishes and resolves the constant that is defined
+
+  @unit
+  Scenario: A table only a materialised view fills belongs to the module writing the view's source
+    Given a materialised view copies a table the trace module writes into a second table
+    And no module inserts into the second table
+    When the clickhouse-table-ownership rule runs over the workspace
+    Then the second table is owned by trace
+    And it reports no table without an owner
+
+  @unit
+  Scenario: A foreign module reading a view-fed table is still a foreign read
+    Given a table filled only by a materialised view over a table trace writes
+    And the analytics module selects from the view-fed table
+    When the clickhouse-table-ownership rule runs over the workspace
+    Then it reports that analytics reads the table, owned by trace
+
+  @unit
+  Scenario: A view-fed table a module also inserts into keeps that writer as owner
+    Given a table filled by a materialised view and also inserted into by the analytics module
+    When the clickhouse-table-ownership rule runs over the workspace
+    Then the analytics module owns the table
+
+  @unit
+  Scenario: A view a later migration drops feeds nothing
+    Given a migration drops the materialised view that filled a table
+    When the clickhouse-table-ownership rule runs over the workspace
+    Then it reports the table as having no module owner
+
+  @unit
+  Scenario: A view whose source has no owner leaves its target without one
+    Given a materialised view over a table no module writes
+    When the clickhouse-table-ownership rule runs over the workspace
+    Then it reports the view's target as having no module owner

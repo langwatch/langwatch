@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   clickhouseTables,
+  clickhouseViewFeeds,
   collectClickhouseOwnershipFindings,
   lintClickhouseTableOwnershipAt,
 } from "../src/policies/persistence/clickhouse-table-ownership.ts";
@@ -131,6 +132,91 @@ export function query(): string {
 
       expect(workspace.messages()).toEqual(["analytics reads trace_summaries, owned by trace."]);
     });
+
+    /** @scenario "A table name imported from a sibling file is still access" */
+    it("resolves a table named by a constant imported from a relative file", () => {
+      const workspace = fixture();
+      workspace.write(
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.mapper.ts",
+        `export const SUMMARIES_TABLE = "trace_summaries" as const;\n`,
+      );
+      workspace.write(
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
+        `import { SUMMARIES_TABLE as TABLE } from "./trace-summary.mapper.ts";
+export async function store(client: { insert: (options: unknown) => Promise<void> }) {
+  await client.insert({ table: TABLE, values: [], format: "JSONEachRow" });
+}
+`,
+      );
+
+      expect(workspace.messages()).toEqual([]);
+    });
+
+    /** @scenario "A table name imported through a re-export is still access" */
+    it("follows a constant through a barrel that re-exports it", () => {
+      const workspace = fixture();
+      workspace.write(
+        "modules/trace/process/src/tables/names.ts",
+        `export const SUMMARIES_TABLE = "trace_summaries";\n`,
+      );
+      workspace.write("modules/trace/process/src/tables/index.ts", `export * from "./names.ts";\n`);
+      workspace.write(
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
+        `import { SUMMARIES_TABLE } from "../../tables/index.ts";
+export const sql = \`INSERT INTO \${SUMMARIES_TABLE} (TenantId) VALUES ({tenantId:String})\`;
+`,
+      );
+
+      expect(workspace.messages()).toEqual([]);
+    });
+
+    /** @scenario "A table name imported from another module's package is that module's table" */
+    it("keeps an imported constant naming another module's table a foreign read", () => {
+      const workspace = fixture();
+      workspace.write(
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
+        writer("trace_summaries"),
+      );
+      workspace.write(
+        "modules/trace/contract/package.json",
+        JSON.stringify({ name: "@fixture/trace-contract", exports: { ".": "./src/index.ts" } }),
+      );
+      workspace.write(
+        "modules/trace/contract/src/index.ts",
+        `export const SUMMARIES_TABLE = "trace_summaries" as const;\n`,
+      );
+      workspace.write(
+        "modules/analytics/process/src/repositories/clickhouse/summary.mapper.ts",
+        `import { SUMMARIES_TABLE } from "@fixture/trace-contract";
+export function query(): string {
+  return \`SELECT TenantId FROM \${SUMMARIES_TABLE}\`;
+}
+`,
+      );
+
+      expect(workspace.messages()).toEqual(["analytics reads trace_summaries, owned by trace."]);
+    });
+
+    /** @scenario "Constants that import each other do not loop" */
+    it("terminates on files whose constants import each other", () => {
+      const workspace = fixture();
+      workspace.write(
+        "modules/trace/process/src/a.ts",
+        `export * from "./b.ts";\nexport const A = "trace_summaries";\n`,
+      );
+      workspace.write(
+        "modules/trace/process/src/b.ts",
+        `export * from "./a.ts";\nexport const B = "trace_summaries";\n`,
+      );
+      workspace.write(
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
+        `import { B } from "../../a.ts";
+export const sql = \`INSERT INTO \${B} (TenantId) VALUES (1)\`;
+`,
+      );
+
+      expect(workspace.messages()).toEqual([]);
+    });
   });
 
   describe("given two modules write one table", () => {
@@ -170,6 +256,86 @@ export function query(): string {
       );
 
       expect(workspace.messages()).toEqual(["Table trace_summaries has no module owner."]);
+    });
+  });
+
+  describe("given a materialised view feeds a table", () => {
+    const VIEW = `-- +goose Up
+CREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.trace_rollup (TenantId String) ENGINE = MergeTree;
+CREATE MATERIALIZED VIEW IF NOT EXISTS \${CLICKHOUSE_DATABASE}.trace_rollup_mv
+TO \${CLICKHOUSE_DATABASE}.trace_rollup
+AS SELECT TenantId
+FROM \${CLICKHOUSE_DATABASE}.trace_summaries
+GROUP BY TenantId;
+`;
+
+    function workspaceWithView() {
+      const workspace = fixture();
+      workspace.migration("00002_create_rollup.sql", VIEW);
+      workspace.write(
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
+        writer("trace_summaries"),
+      );
+
+      return workspace;
+    }
+
+    /** @scenario "A table only a materialised view fills belongs to the module writing the view's source" */
+    it("gives the view's target the owner of the view's source", () => {
+      const workspace = workspaceWithView();
+      workspace.write(
+        "modules/trace/process/src/repositories/clickhouse/trace-rollup.repository.ts",
+        reader("trace_rollup"),
+      );
+
+      expect(workspace.messages()).toEqual([]);
+    });
+
+    /** @scenario "A foreign module reading a view-fed table is still a foreign read" */
+    it("still reports another module reading the view's target", () => {
+      const workspace = workspaceWithView();
+      workspace.write(
+        "modules/analytics/process/src/repositories/clickhouse/rollup.mapper.ts",
+        reader("trace_rollup"),
+      );
+
+      expect(workspace.messages()).toEqual(["analytics reads trace_rollup, owned by trace."]);
+    });
+
+    /** @scenario "A view-fed table a module also inserts into keeps that writer as owner" */
+    it("keeps a direct writer as the owner over the view's source", () => {
+      const workspace = workspaceWithView();
+      workspace.write(
+        "modules/analytics/process/src/repositories/clickhouse/rollup.repository.ts",
+        writer("trace_rollup"),
+      );
+
+      expect(workspace.messages()).toEqual([]);
+    });
+
+    /** @scenario "A view a later migration drops feeds nothing" */
+    it("stops following a view a later migration drops", () => {
+      const workspace = workspaceWithView();
+      workspace.migration(
+        "00003_drop_rollup_view.sql",
+        `-- +goose Up
+DROP VIEW IF EXISTS \${CLICKHOUSE_DATABASE}.trace_rollup_mv;
+`,
+      );
+
+      expect(workspace.messages()).toEqual(["Table trace_rollup has no module owner."]);
+      expect(clickhouseViewFeeds(workspace.root).size).toBe(0);
+    });
+
+    /** @scenario "A view whose source has no owner leaves its target without one" */
+    it("leaves the target unowned when no module writes the source", () => {
+      const workspace = fixture();
+      workspace.migration("00002_create_rollup.sql", VIEW);
+
+      expect(workspace.messages()).toEqual([
+        "Table trace_rollup has no module owner.",
+        "Table trace_summaries has no module owner.",
+      ]);
     });
   });
 
