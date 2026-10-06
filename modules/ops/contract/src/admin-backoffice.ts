@@ -1,3 +1,7 @@
+import {
+  DATASET_ATTACHMENT_DEFAULT_MAX_BYTES,
+  DATASET_ATTACHMENT_OVERRIDE_CEILING_BYTES,
+} from "@langwatch/plans";
 import { z } from "zod";
 
 import { adminAuditRequestSchema, adminResourceNameSchema } from "./admin.ts";
@@ -48,9 +52,13 @@ export const adminOperationInputSchema = z.object({
   req: adminAuditRequestSchema,
 });
 
+const BYTES_PER_MEBIBYTE = 1024 * 1024;
+
 /** The smallest and largest per-file dataset limit an operator can give an organization, in MB. */
-export const ORGANIZATION_DATASET_ATTACHMENT_MIN_MB = 20;
-export const ORGANIZATION_DATASET_ATTACHMENT_MAX_MB = 1024;
+export const ORGANIZATION_DATASET_ATTACHMENT_MIN_MB =
+  DATASET_ATTACHMENT_DEFAULT_MAX_BYTES / BYTES_PER_MEBIBYTE;
+export const ORGANIZATION_DATASET_ATTACHMENT_MAX_MB =
+  DATASET_ATTACHMENT_OVERRIDE_CEILING_BYTES / BYTES_PER_MEBIBYTE;
 
 /** An organization's per-file dataset limit as the back office writes it: null clears it. */
 export const organizationDatasetAttachmentMaxMbSchema = z

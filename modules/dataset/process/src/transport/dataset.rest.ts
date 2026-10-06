@@ -14,6 +14,7 @@ import {
   DatasetApi,
   DatasetAttachmentTooLargeError,
   datasetAttachmentUploadSchema,
+  datasetDisplayRecordCount,
   datasetRestArchivedSchema,
   datasetRestAttachmentFieldsSchema,
   datasetRestAttachmentQuerySchema,
@@ -166,7 +167,7 @@ export function createDatasetRest(): DatasetRestDeclaration {
             columnTypes: dataset.columnTypes,
             createdAt: dataset.createdAt,
             updatedAt: dataset.updatedAt,
-            recordCount: dataset.recordCount,
+            recordCount: datasetDisplayRecordCount(dataset),
             platformUrl: datasetUrl(app, project.projectSlug, dataset.id),
           })),
         };

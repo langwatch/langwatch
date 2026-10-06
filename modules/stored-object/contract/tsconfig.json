@@ -25,6 +25,9 @@
     },
     {
       "path": "../../../packages/module/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/plans/tsconfig.build.json"
     }
   ]
 }

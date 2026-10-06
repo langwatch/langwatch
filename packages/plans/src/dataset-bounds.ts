@@ -1,7 +1,6 @@
 /**
- * Every dataset size limit, derived from two numbers: the largest file an
- * image or file cell accepts, and how many such files one row is sized for.
- * The request-bounds registry quotes the defaults; an organization whose
+ * Every dataset size limit, derived from the largest file an image or file cell
+ * accepts and how many such files one row is sized for. An organization whose
  * per-file limit was raised gets the same derivation over its own number.
  */
 

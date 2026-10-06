@@ -9,7 +9,7 @@ import {
   datasetRecordInputSchema,
   newDatasetEntriesSchema,
 } from "./dataset.ts";
-import type { Dataset, DatasetNameResult, DatasetSummary } from "./dataset.ts";
+import type { DatasetNameResult, DatasetSummaryWire, DatasetWire } from "./dataset.ts";
 
 /**
  * The outer validation shell is the registry's enterprise ceiling; the
@@ -153,9 +153,9 @@ export type DatasetApiUpsertInput = DatasetApiUpsertBaseInput & DatasetApiUpsert
 /** Studio read/write outputs. Two (getAll, getById) are the transport's
  * shape: getAll excludes pagination, getById answers null instead of throwing.
  */
-export type DatasetApiGetAllOutput = DatasetSummary[];
-export type DatasetApiGetByIdOutput = Dataset | null;
-export type DatasetApiUpsertOutput = Dataset;
+export type DatasetApiGetAllOutput = DatasetSummaryWire[];
+export type DatasetApiGetByIdOutput = DatasetWire | null;
+export type DatasetApiUpsertOutput = DatasetWire;
 export type DatasetApiValidateNameOutput = DatasetNameResult;
 
 /** The next free name itself — the copy dialog puts it straight in the field. */

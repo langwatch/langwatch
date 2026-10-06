@@ -243,6 +243,22 @@ describe("the mounted dataset REST family", () => {
       );
     });
 
+    describe("given a dataset whose rows were prepared from an uploaded file", () => {
+      /** @scenario "List datasets counts the rows of a dataset built from an uploaded file" */
+      it("answers the number of rows the file held", async () => {
+        const { send } = mount({
+          listDatasets: vi.fn(async () => ({
+            data: [{ ...dataset, contentLayout: "s3_jsonl", rowCount: 10, recordCount: 0 }],
+            pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
+          })) as never,
+        });
+
+        const response = await send("GET", "/api/dataset");
+
+        await expect(response.json()).resolves.toMatchObject({ data: [{ recordCount: 10 }] });
+      });
+    });
+
     /** @scenario "List datasets with page and limit parameters" */
     it("passes the page window through and links each row into the platform", async () => {
       const { send, stub } = mount();

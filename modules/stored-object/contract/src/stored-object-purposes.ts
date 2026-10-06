@@ -2,6 +2,11 @@
  * What each stored-object purpose allows: whether a caller may upload it, its
  * byte limit, and the permission its files are read behind (ADR-158 §3, §5).
  */
+import {
+  DATASET_ATTACHMENT_DEFAULT_MAX_BYTES,
+  DATASET_ATTACHMENT_OVERRIDE_CEILING_BYTES,
+  resolveRequestBound,
+} from "@langwatch/plans";
 
 const MIB = 1024 * 1024;
 
@@ -28,10 +33,16 @@ export interface StoredObjectPurposePolicy {
 }
 
 /** The dataset attachment limit an organization answers when it sets nothing. */
-export const DATASET_ATTACHMENT_PURPOSE_DEFAULT_BYTES = 20 * MIB;
+export const DATASET_ATTACHMENT_PURPOSE_DEFAULT_BYTES = DATASET_ATTACHMENT_DEFAULT_MAX_BYTES;
 
 /** The highest dataset attachment limit an organization can be raised to. */
-export const DATASET_ATTACHMENT_PURPOSE_CEILING_BYTES = 1024 * MIB;
+export const DATASET_ATTACHMENT_PURPOSE_CEILING_BYTES = DATASET_ATTACHMENT_OVERRIDE_CEILING_BYTES;
+
+/** How many uploads one caller may start in a minute. */
+export const STORED_OBJECT_UPLOADS_PER_MINUTE = resolveRequestBound(
+  "datasetAttachmentUploadsPerMinute",
+  "FREE",
+);
 
 export const STORED_OBJECT_PURPOSES: Readonly<Record<string, StoredObjectPurposePolicy>> = {
   [DATASET_ATTACHMENT_PURPOSE]: {

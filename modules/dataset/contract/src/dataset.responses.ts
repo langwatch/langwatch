@@ -3,14 +3,14 @@
  */
 import { z } from "zod";
 
-import { datasetRecordSchema, datasetSchema } from "./dataset.ts";
+import { datasetRecordSchema, datasetWireSchema } from "./dataset.ts";
 
 /**
  * `datasetRecord.getAll`/`download`: the dataset's fields, flattened,
  * plus `datasetRecords` and whether the read was truncated. Kept as its
  * own schema (historical, flattened) so a Dataset field can't drift the two apart.
  */
-export const datasetRecordEditorReadSchema = datasetSchema.safeExtend({
+export const datasetRecordEditorReadSchema = datasetWireSchema.safeExtend({
   datasetRecords: z.array(datasetRecordSchema),
   /** True whenever the dataset holds a row that `datasetRecords` leaves out. */
   truncated: z.boolean(),
@@ -23,7 +23,7 @@ export const datasetRecordEditorReadSchema = datasetSchema.safeExtend({
 /** `datasetRecord.getHead`: the first entries plus the authoritative total. */
 export const datasetRecordHeadReadSchema = z
   .object({
-    dataset: datasetSchema.safeExtend({ datasetRecords: z.array(datasetRecordSchema) }),
+    dataset: datasetWireSchema.safeExtend({ datasetRecords: z.array(datasetRecordSchema) }),
     total: z.number().int().nonnegative(),
   })
   .strict();

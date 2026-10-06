@@ -19,6 +19,12 @@ Feature: Dataset REST API
     And each dataset includes id, name, slug, columnTypes, and record count
     And the archived dataset is not included
 
+  @unit @regression
+  Scenario: List datasets counts the rows of a dataset built from an uploaded file
+    Given a dataset whose rows were prepared from an uploaded file
+    When I call GET /api/dataset
+    Then that dataset's recordCount is the number of rows the file held
+
   @integration
   Scenario: List datasets with page and limit parameters
     Given the project has 15 datasets

@@ -125,6 +125,19 @@ export const datasetSchema = z
   .strict();
 export type Dataset = z.infer<typeof datasetSchema>;
 
+/**
+ * A dataset as the browser reads it. The stored size is a bigint, which JSON
+ * cannot carry, so it crosses as a number: no dataset comes near 2^53 bytes.
+ */
+export const datasetWireSchema = z.strictObject({
+  ...datasetSchema.shape,
+  sizeBytes: z
+    .bigint()
+    .nullable()
+    .transform((size) => (size === null ? null : Number(size))),
+});
+export type DatasetWire = z.infer<typeof datasetWireSchema>;
+
 export const datasetRecordSchema = z
   .object({
     id: z.string().min(1),
@@ -141,6 +154,12 @@ export const datasetSummarySchema = datasetSchema.safeExtend({
   recordCount: z.number().int().nonnegative(),
 });
 export type DatasetSummary = z.infer<typeof datasetSummarySchema>;
+
+/** One row of the dataset list as the browser reads it. */
+export const datasetSummaryWireSchema = datasetWireSchema.safeExtend({
+  recordCount: z.number().int().nonnegative(),
+});
+export type DatasetSummaryWire = z.infer<typeof datasetSummaryWireSchema>;
 
 export const datasetPaginationSchema = z.object({
   page: z.number().int().positive(),
