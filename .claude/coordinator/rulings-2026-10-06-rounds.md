@@ -178,3 +178,12 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Meters (Q69-4): a SIXTH subject channel, meters, with its own twin; usage reporting and the prices sync read it.
 - Connected invoicing (Q69-4): STAYS one channel beside the subjects, as connectedInvoicing over the shared client.
 - Stripe types (Q69-2 default): DOMAIN shapes; rewrite the subscription item calculator and seat-quote rules over billing's own shapes, and the subscriptions channel answers domain shapes (not the recommended keep-Stripe-types).
+
+## Alex, 2026-10-07 (early): upgrade quality bar
+
+- Skills: upgrades and migrations get skills good enough that agents write the right step automatically (lane upgrade-skills-docs).
+- Tests: upgrade and migration paths get solid, secure, extensive end-to-end tests.
+- Logging: clear console logging around upgrades, and first-run logging that guides the caller through what is happening without UI access.
+- Docs and env vars: operator docs and migration env vars updated to the new behaviour (lane upgrade-skills-docs).
+- The PR body and issue #8493 stay in sync with every batch.
+- At most 15 to 20 more questions tonight, prioritised to unblock nearly-ready lanes.
