@@ -18,6 +18,14 @@ export function dashboardsPath({
   return dashboardId === void 0 ? area : `${area}/${encodeURIComponent(dashboardId)}`;
 }
 
+/** The templates library's segment; the route table ranks it above a board id, so none takes it. */
+export const TEMPLATES_SEGMENT = "templates";
+
+/** The address of the templates library. */
+export function dashboardTemplatesPath({ projectSlug }: { projectSlug: string }): string {
+  return `${dashboardsPath({ projectSlug })}/${TEMPLATES_SEGMENT}`;
+}
+
 /**
  * The board `/[project]/dashboards` opens: the member's first own board, else
  * the first they can see; undefined when they can see none.

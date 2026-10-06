@@ -1,8 +1,7 @@
 /**
- * One board: its header, the ask bar, and its stored widgets on the grid, or
- * the blank-board state with the template strip. Every widget is editable;
- * "Add chart" opens the widget drawer, the footer "Add a block" the question
- * picker.
+ * One board: its header, the ask bar, and its stored widgets on the grid, or the
+ * blank-board state with the template strip. Every widget is editable; "Add chart"
+ * opens the widget drawer, the footer "Add a block" the question picker.
  */
 
 import { Box, Spinner, VStack } from "@chakra-ui/react";
@@ -27,7 +26,7 @@ import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { boardSubject } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
-import { BOARD_TEMPLATES } from "../../templates/index.ts";
+import { TEMPLATE_LIBRARY } from "../../model/template-library.ts";
 import { AddBlockCard, BlankBoard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
@@ -123,9 +122,9 @@ function OpenBoard({ board }: { board: SavedBoard }) {
       )}
       {boardWidgets.status === "success" && widgets.length === 0 && (
         <BlankBoard
-          templates={BOARD_TEMPLATES}
+          templates={TEMPLATE_LIBRARY}
           creatingTemplateId={fromTemplate.creatingId}
-          onOpenTemplate={(template) =>
+          onOpenTemplate={({ board: template }) =>
             void fromTemplate.createFromTemplate({
               template,
               existingNames: saved.boards.map(({ name }) => name),

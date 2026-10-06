@@ -587,6 +587,66 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       newest first, with when each happened
 
   # ---------------------------------------------------------------------------
+  # Templates library
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: AC100 Templates library: the sidebar opens the library
+    Given the dashboards flag is on and a member is on a dashboards page
+    Then "Templates" is the last item under Saved dashboards
+    And it opens /[project]/dashboards/templates
+    And it is marked as the current page while the library is open
+
+  @integration
+  Scenario: AC100b Templates library: the library is behind the dashboards gate
+    Given the dashboards flag is off for the project
+    When a member opens /[project]/dashboards/templates
+    Then they see the not-found page
+
+  @unit @integration
+  Scenario: AC101 Templates library: every template is listed by trunk, ready ones first
+    Given the member opens the templates library with no search and no filters
+    Then they see "Dashboard templates" and a one-line introduction
+    And every catalogue template is listed once, in sections Profit, Growth, Protect and Foundation
+    And inside each section the templates that can be made today come before those coming soon
+    And each section header, card accent and trunk badge carries its trunk's colour
+
+  @unit
+  Scenario: AC102 Templates library: search matches name, job, widget questions and agent kinds
+    When the member searches the library
+    Then a template is listed when its name, its job, one of its widgets' questions
+      or one of its agent kinds contains the search, ignoring case
+
+  @unit
+  Scenario: AC103 Templates library: filter chips narrow by trunk, agent kind and readiness
+    Given filter chips for each trunk, each agent kind, Ready and Coming soon, each with "All"
+    When the member picks chips
+    Then picking several chips in one group shows templates matching any of them
+    And chips in different groups all apply together
+    And "All" clears that group
+    And a template that names no agent kind suits every agent kind
+    And each chip counts the templates it would show with the search and the other groups applied
+
+  @unit @integration
+  Scenario: AC104 Templates library: the search and filters are kept in the address
+    When the member searches or picks a chip
+    Then the address carries the search and the picked chips
+    And opening that address shows the same view
+
+  @integration
+  Scenario: AC105 Templates library: no match says so and offers to clear the filters
+    Given a search and filters that match no template
+    Then the library says no template matches
+    And clearing the filters shows every template again
+
+  @integration
+  Scenario: AC106 Templates library: a ready template creates a board, a coming-soon one cannot
+    Then each card shows a preview, the name, the job, the trunk, the number of widgets
+      and the agent kinds it suits
+    And "Create board" on a ready template makes the same board as picking it on a blank board, and opens it
+    And a coming-soon card says how many of its widgets are built and cannot create a board
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -628,3 +688,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 49: "What users ask: asked again" → Scenario: AC49 What users ask: Asked again shows misread conversations and returning users
   # AC 60-71: "Where my agent breaks" and "Release check" widgets are built from the prototype's cards → Scenario: AC60 to Scenario: AC71
   # AC 80-93: "The boards preloaded for one agent kind are built" (By customer, Call quality, Field accuracy, Outputs users keep, Risk sign-off) → Scenario: AC80 By customer: the board groups by the first key the traces carry; Scenario: AC80b By customer: no grouping key says what to send; Scenario: AC81 By customer: conversations by customer with each one's share; Scenario: AC82 By customer: one row per customer with pass rate, the period before and AI cost; Scenario: AC83 By customer: pass rate on the newest prompt version against the one before; Scenario: AC84 By customer: spend by customer, top six; Scenario: AC85 Call quality: reply time by stage; Scenario: AC86 Call quality: calls not ended and repeated sentences; Scenario: AC87 Field accuracy: accuracy per field and document type; Scenario: AC88 Field accuracy: share sent to human review; Scenario: AC89 Outputs users keep: drop-off after generation; Scenario: AC90 Risk sign-off: sign-off status; Scenario: AC91 Risk sign-off: policy checks with their margin; Scenario: AC92 Risk sign-off: review queue; Scenario: AC93 Risk sign-off: change log
+  # AC 100-106: "Templates library" → Scenario: AC100 Templates library: the sidebar opens the library; Scenario: AC100b Templates library: the library is behind the dashboards gate; Scenario: AC101 Templates library: every template is listed by trunk, ready ones first; Scenario: AC102 Templates library: search matches name, job, widget questions and agent kinds; Scenario: AC103 Templates library: filter chips narrow by trunk, agent kind and readiness; Scenario: AC104 Templates library: the search and filters are kept in the address; Scenario: AC105 Templates library: no match says so and offers to clear the filters; Scenario: AC106 Templates library: a ready template creates a board, a coming-soon one cannot

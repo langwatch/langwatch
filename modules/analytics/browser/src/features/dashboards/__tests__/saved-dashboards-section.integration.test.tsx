@@ -1,6 +1,7 @@
 /**
  * @vitest-environment jsdom
  * @see modules/dashboard/specs/dashboards-v1.feature
+ * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
 import type { UiProcedureCall } from "@langwatch/browser-host/testing-transport";
@@ -135,6 +136,33 @@ describe("the saved-dashboards list in the sidebar", () => {
         await user.click(screen.getByRole("button", { name: "Actions for Latency" }));
         expect(await screen.findByRole("menuitem", { name: "Rename" })).toBeInTheDocument();
         expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
+      });
+    });
+
+    describe("when the member looks for templates", () => {
+      /** @scenario "AC100 Templates library: the sidebar opens the library" */
+      it("offers Templates last, opening the library", async () => {
+        const { host } = renderSection();
+        await within(await mine()).findByRole("link", { name: /Latency/ });
+
+        const links = screen.getAllByRole("link");
+        const templates = links.at(-1);
+        expect(templates).toHaveTextContent("Templates");
+        expect(templates).toHaveAttribute("href", "/test-project/dashboards/templates");
+        expect(templates).not.toHaveAttribute("aria-current");
+
+        fireEvent.click(templates!);
+        expect(host.navigations).toEqual(["/test-project/dashboards/templates"]);
+      });
+
+      /** @scenario "AC100 Templates library: the sidebar opens the library" */
+      it("marks Templates as the current page while the library is open", () => {
+        renderSection({ activeDashboardId: "templates" });
+
+        expect(screen.getByRole("link", { name: /Templates/ })).toHaveAttribute(
+          "aria-current",
+          "page",
+        );
       });
     });
 

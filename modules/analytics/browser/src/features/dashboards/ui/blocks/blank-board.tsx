@@ -4,18 +4,12 @@
  * compact footer on a non-empty board.
  */
 
-import { Box, Button, Grid, Text, VStack } from "@chakra-ui/react";
-import {
-  Activity,
-  DollarSign,
-  FlaskConical,
-  Gauge,
-  type LucideIcon,
-  Plus,
-  TriangleAlert,
-} from "lucide-react";
+import { Box, Button, Grid, Text, VStack } from "@langwatch/design-system/primitives";
+import { Plus } from "lucide-react";
 
-import type { BoardTemplateId, TemplateProgress } from "../../templates/index.ts";
+import type { LibraryTemplate } from "../../model/template-library.ts";
+import type { BoardTemplateId } from "../../templates/index.ts";
+import { TemplateCard } from "./template-card.tsx";
 
 /** The compact footer below a board's widgets, opening the question picker. */
 export function AddBlockCard({
@@ -65,102 +59,15 @@ export function AddBlockCard({
   );
 }
 
-/** A template as its card shows it. */
-export interface TemplateCard {
-  readonly id: BoardTemplateId;
-  readonly name: string;
-  readonly description: string;
-  /** A user-facing line for what the board shows; falls back to `description`. */
-  readonly summary?: string;
-  /** The question-tree trunk the template serves; picks its icon. */
-  readonly trunk?: string;
-  /** Set while some of its widgets have no code: shown, and cannot be made yet. */
-  readonly comingSoon?: TemplateProgress;
-}
-
-/** The Flight Deck's gauge; every other template takes its trunk's icon. */
-const TEMPLATE_ICONS: Readonly<Partial<Record<BoardTemplateId, LucideIcon>>> = { cockpit: Gauge };
-
-const TRUNK_ICONS: Readonly<Partial<Record<string, LucideIcon>>> = {
-  Profit: DollarSign,
-  Growth: Activity,
-  Protect: TriangleAlert,
-  Foundation: FlaskConical,
-};
-
-function TemplateButton({
-  template,
-  isCreating,
-  onOpen,
-}: {
-  template: TemplateCard;
-  isCreating: boolean;
-  onOpen: () => void;
-}) {
-  const Icon = TEMPLATE_ICONS[template.id] ?? TRUNK_ICONS[template.trunk ?? ""] ?? Gauge;
-  const progress = template.comingSoon;
-  const subtitle = progress
-    ? `Coming soon: ${progress.built} of ${progress.total} widgets built`
-    : (template.summary ?? template.description);
-  return (
-    <Button
-      variant="outline"
-      height="auto"
-      justifyContent="flex-start"
-      gap={3}
-      paddingX={4}
-      paddingY={3}
-      borderRadius="xl"
-      borderColor="border"
-      background="bg.panel"
-      boxShadow="0 1px 2px rgb(16 16 32 / 0.03)"
-      fontWeight="normal"
-      minWidth={0}
-      overflow="hidden"
-      title={template.description}
-      _hover={{
-        borderColor: "teal.solid/50",
-        background: "bg.panel",
-        boxShadow: "0 2px 8px rgb(16 16 32 / 0.06)",
-      }}
-      loading={isCreating}
-      loadingText={`Creating ${template.name}…`}
-      disabled={progress !== void 0}
-      onClick={onOpen}
-    >
-      <Box
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        boxSize={8}
-        flexShrink={0}
-        borderRadius="md"
-        background="bg.muted"
-        color="teal.solid"
-      >
-        <Icon size={16} strokeWidth={2.1} aria-hidden />
-      </Box>
-      <VStack align="start" gap={0} minWidth={0} flex="1">
-        <Text fontSize="13px" lineHeight="1.375" fontWeight="medium" color="fg" truncate>
-          {template.name}
-        </Text>
-        <Text fontSize="12px" lineHeight="1.625" color="fg.subtle" lineClamp={2}>
-          {subtitle}
-        </Text>
-      </VStack>
-    </Button>
-  );
-}
-
-export function TemplateStrip<Template extends TemplateCard>({
+function TemplateStrip({
   templates,
   creatingId,
   onOpen,
 }: {
-  templates: readonly Template[];
+  templates: readonly LibraryTemplate[];
   /** The template a board is being made from; its card shows it is busy. */
   creatingId: BoardTemplateId | undefined;
-  onOpen: (template: Template) => void;
+  onOpen: (template: LibraryTemplate) => void;
 }) {
   return (
     <VStack align="stretch" gap={2}>
@@ -174,13 +81,13 @@ export function TemplateStrip<Template extends TemplateCard>({
       >
         Start from a template
       </Text>
-      <Grid templateColumns="repeat(auto-fill, minmax(260px, 1fr))" gap={2}>
+      <Grid templateColumns="repeat(auto-fill, minmax(280px, 1fr))" gap={3}>
         {templates.map((template) => (
-          <TemplateButton
-            key={template.id}
+          <TemplateCard
+            key={template.board.id}
             template={template}
-            isCreating={creatingId === template.id}
-            onOpen={() => onOpen(template)}
+            isCreating={creatingId === template.board.id}
+            onCreate={() => onOpen(template)}
           />
         ))}
       </Grid>
@@ -189,14 +96,14 @@ export function TemplateStrip<Template extends TemplateCard>({
 }
 
 /** Everything a blank board shows under its header. */
-export function BlankBoard<Template extends TemplateCard>({
+export function BlankBoard({
   templates,
   creatingTemplateId,
   onOpenTemplate,
 }: {
-  templates: readonly Template[];
+  templates: readonly LibraryTemplate[];
   creatingTemplateId: BoardTemplateId | undefined;
-  onOpenTemplate: (template: Template) => void;
+  onOpenTemplate: (template: LibraryTemplate) => void;
 }) {
   return (
     <VStack align="stretch" gap={5}>

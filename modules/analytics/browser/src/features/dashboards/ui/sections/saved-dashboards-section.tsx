@@ -1,14 +1,14 @@
 /**
  * The "Saved dashboards" list navigation draws in the sidebar, lent through
  * `withCapabilities` (§3.4 rule 7): analytics keeps the reads and writes.
- * Grouped Mine, Team, Organisation; only stored boards are listed.
+ * Grouped Mine, Team, Organisation; only stored boards are listed, then the templates library.
  */
 
 import { Box, IconButton, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { UiSavedDashboardsProps } from "@langwatch/browser-host/declarations";
 import type { DashboardVisibility } from "@langwatch/dashboard-contract";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Building2, type LucideIcon, Plus, Star, Users } from "lucide-react";
+import { Building2, LayoutTemplate, type LucideIcon, Plus, Star, Users } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
@@ -18,7 +18,7 @@ import {
   boardVisibilityGroups,
   canManageBoard,
 } from "../../model/board-visibility.ts";
-import { dashboardsPath } from "../../model/boards.ts";
+import { dashboardsPath, dashboardTemplatesPath, TEMPLATES_SEGMENT } from "../../model/boards.ts";
 import { SavedDashboardRow } from "../blocks/saved-dashboard-row.tsx";
 
 const GROUP_LABEL_STYLE = {
@@ -110,6 +110,14 @@ export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsP
           ))}
         </BoardGroup>
       ))}
+      <VStack as="ul" aria-label="Templates" align="stretch" gap={0.5} margin={0} padding={0}>
+        <SavedDashboardRow
+          name="Templates"
+          href={dashboardTemplatesPath({ projectSlug })}
+          icon={<RowIcon icon={LayoutTemplate} />}
+          isActive={activeDashboardId === TEMPLATES_SEGMENT}
+        />
+      </VStack>
       <ConfirmDialog
         open={pendingDelete !== void 0}
         onOpenChange={(isOpen) => {
