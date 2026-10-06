@@ -240,7 +240,7 @@ export const HOW_DO_I_TEMPLATE = sectionTemplate({
     }),
     widget({
       key: "thumbs-down",
-      name: "Improve responses: thumbs-down traces",
+      name: "Improve responses: traces reviewers voted down",
       code: table.THUMBS_DOWN_CODE,
       queries: { summary: deck.FEEDBACK_SUMMARY_SQL, traces: sql.THUMBS_DOWN_SQL },
       layout: half({ side: "right", gridRow: TABLE_ROWS, rowSpan: TABLE_ROWS }),

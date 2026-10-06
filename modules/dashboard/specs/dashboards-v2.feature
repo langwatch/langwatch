@@ -153,6 +153,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then each template widget stores a query that asks whether its source sent data in the last 90 days
     And the widget runs that query only when its own queries return nothing
 
+  @unit
+  Scenario: AC14 Reviewer thumbs are named as reviewer thumbs
+    Given a template widget that reads thumbs from the annotations table
+    Then its name, summary, subtitle and labels say the thumbs come from reviewers in LangWatch
+    And none of them call those thumbs feedback from users
+    # Decision: the Flight Deck's "User feedback" title stays, as dashboards-v1 AC4 pins it;
+    # its empty face no longer says the thumbs come from users
+
   # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
@@ -177,3 +185,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 11: "Existing boards are unaffected" → Scenario: AC11 Existing boards are unaffected
   # AC 12: "A picked question adds its widget and seeds Langy" (added by langwatch/tasks#911: the picker adds widgets and drafts Langy, no longer only asks) → Scenario: AC12 A picked question adds its widget and seeds Langy; Scenario: AC12b Without Langy a picked question still adds its widget; Scenario: AC12c A failed add keeps the picker open and does not seed Langy
   # AC 13: "An empty widget tells a quiet period from a missing source" (added by langwatch/tasks#911: no rows no longer means not connected) → Scenario: AC13 A quiet period does not ask the member to connect a source; Scenario: AC13b A source that was never set up shows its setup step; Scenario: AC13c Every template widget checks its own source
+  # AC 14: "Reviewer thumbs are named as reviewer thumbs" (added by langwatch/tasks#911: the annotations table holds reviewer thumbs, not user feedback) → Scenario: AC14 Reviewer thumbs are named as reviewer thumbs

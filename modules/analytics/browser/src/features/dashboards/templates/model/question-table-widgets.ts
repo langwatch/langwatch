@@ -155,17 +155,17 @@ export const SLOWEST_MODELS_CODE = widgetCode({
 });
 
 export const THUMBS_DOWN_CODE = widgetCode({
-  summary: "Share of negative feedback, then the latest traces users gave a thumbs down.",
-  subtitle: "The answers users rejected, newest first",
+  summary: "Share of reviewer thumbs down, then the latest traces reviewers voted down.",
+  subtitle: "Thumbs from people reviewing traces in LangWatch, newest first",
   source: "feedback",
   parts: [NUMBERS, DATES, TABLE, TRACE_LINK, HEADLINE],
   queries: ["summary", "traces"],
   body: `  const up = num(summary.data[0]?.thumbs_up);
   const down = num(summary.data[0]?.thumbs_down);
   if (up + down === 0) return <Panel><CallToAction /></Panel>;
-  const label = count(down) + " of " + count(up + down) + " votes were thumbs down";
+  const label = count(down) + " of " + count(up + down) + " reviewer votes were thumbs down";
   if (traces.data.length === 0) {
-    return <Panel><Note color={C.green}>No thumbs down in this period</Note></Panel>;
+    return <Panel><Note color={C.green}>No reviewer thumbs down in this period</Note></Panel>;
   }
   const when = (value) =>
     utc(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric" });

@@ -135,7 +135,7 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
   },
   feedback: {
     title: "Collect feedback",
-    line: "Thumbs and annotations from your users, tracked over time next to quality and cost.",
+    line: "Thumbs from people reviewing traces in LangWatch, tracked over time next to quality and cost.",
     icon: CHAT_ICON,
     button: "Collect feedback",
     quiet: "No reviewer thumbs in this period.",
