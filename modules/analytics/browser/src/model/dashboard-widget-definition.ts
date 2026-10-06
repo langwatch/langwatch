@@ -23,6 +23,8 @@ const MAX_CODE_LENGTH = 200_000;
 const MAX_WIDGET_NAME_LENGTH = 200;
 /** What the card's info tip says: a few sentences, never a document. */
 const MAX_WIDGET_DESCRIPTION_LENGTH = 2_000;
+/** What Langy is drafted with: a paragraph of instructions, never a document. */
+const MAX_WIDGET_PROMPT_LENGTH = 2_000;
 
 /**
  * Every author-declared parameter name starting with this prefix is rejected — the prefix,
@@ -140,12 +142,15 @@ export const dashboardWidgetDescriptionSchema = z
   .string()
   .min(1)
   .max(MAX_WIDGET_DESCRIPTION_LENGTH);
+/** Optional like the description: widgets saved before it, and Langy-made ones, carry none. */
+export const dashboardWidgetPromptSchema = z.string().min(1).max(MAX_WIDGET_PROMPT_LENGTH);
 
 export const dashboardWidgetDefinitionSchema = z.object({
   version: z.literal(DASHBOARD_WIDGET_DEFINITION_VERSION),
   code: dashboardWidgetCodeSchema,
   queries: dashboardWidgetQueriesSchema,
   description: dashboardWidgetDescriptionSchema.optional(),
+  prompt: dashboardWidgetPromptSchema.optional(),
 });
 
 export type DashboardWidgetQueryParameterDeclaration = z.infer<

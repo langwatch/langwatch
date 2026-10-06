@@ -489,12 +489,13 @@ export class DashboardModule implements DashboardApi {
         code: input.code,
         queries: input.queries,
         ...(input.description === undefined ? {} : { description: input.description }),
+        ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
       },
       viewer: input.viewer,
     });
   }
 
-  /** A widget's name, its code, its queries or its description. */
+  /** A widget's name, its code, its queries, its description or its prompt. */
   updateDashboardWidget(
     input: {
       projectId: string;
@@ -512,6 +513,7 @@ export class DashboardModule implements DashboardApi {
         ...(input.code === undefined ? {} : { code: input.code }),
         ...(input.queries === undefined ? {} : { queries: input.queries }),
         ...(input.description === undefined ? {} : { description: input.description }),
+        ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
       },
     });
   }

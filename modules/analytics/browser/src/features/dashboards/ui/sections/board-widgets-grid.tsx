@@ -24,6 +24,7 @@ export function BoardWidgetsGrid({
   onDelete,
   onSave,
   onPlacementsCommit,
+  onAskLangy,
 }: {
   projectId: string;
   projectSlug: string;
@@ -40,6 +41,8 @@ export function BoardWidgetsGrid({
     onSaved: () => void;
   }) => void;
   onPlacementsCommit: (placements: ChartGridPlacement[]) => void;
+  /** Drafts a widget's prompt in Langy; absent when Langy is not available. */
+  onAskLangy?: (widget: BoardWidget) => void;
 }) {
   const byId = new Map(widgets.map((widget) => [widget.id, widget]));
 
@@ -64,6 +67,7 @@ export function BoardWidgetsGrid({
             onDuplicate={() => onDuplicate(widget)}
             onDelete={() => onDelete(widget)}
             onSave={({ draft, onSaved }) => onSave({ widget, draft, onSaved })}
+            onAskLangy={onAskLangy && (() => onAskLangy(widget))}
           />
         );
       }}

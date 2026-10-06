@@ -50,6 +50,7 @@ export function useBoardFromTemplate() {
           code: definition.code,
           queries: definition.queries,
           description: definition.description,
+          prompt: definition.prompt,
         });
         return { graphId: created.id, ...layout };
       }),

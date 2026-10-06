@@ -52,6 +52,7 @@ export const dashboardWidgetTrpcTransport: TrpcRouterDeclaration<
         code: input.code,
         queries: input.queries,
         ...(input.description === undefined ? {} : { description: input.description }),
+        ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
       }),
     ),
   )

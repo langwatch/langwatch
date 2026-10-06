@@ -61,6 +61,8 @@ export interface DashboardWidgetDefinitionInput {
   readonly queries: readonly DashboardWidgetQuery[];
   /** What the card's info tip says; a widget without one shows no tip. */
   readonly description?: string;
+  /** What Langy is drafted with when asked about the widget; Langy falls back without one. */
+  readonly prompt?: string;
 }
 
 /** The callable analytics capability shared by process peers. */

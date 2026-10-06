@@ -24,7 +24,8 @@ import { useBoardPeriod } from "../../behavior/use-board-period.ts";
 import { useBoardVisibility } from "../../behavior/use-board-visibility.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
-import { boardSubject } from "../../langy/model/board-langy.ts";
+import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
+import { boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
 import { TEMPLATE_LIBRARY } from "../../model/template-library.ts";
 import { AddBlockCard, BlankBoard } from "../blocks/blank-board.tsx";
@@ -73,6 +74,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const [openedAt] = useState(() => nowInstant().epochMilliseconds);
   const widgets = boardWidgets.widgetsOn(board.id);
   const subject = boardSubject({ board, widgets });
+  const langy = useLangyAsk();
   const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
 
   return (
@@ -151,6 +153,11 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 void boardWidgets.saveWidget({ widgetId: widget.id, draft, onSaved })
               }
               onPlacementsCommit={(placements) => void boardWidgets.commitPlacements(placements)}
+              onAskLangy={
+                langy.enabled
+                  ? (widget) => langy.ask(widgetPromptDraft({ widget, board: subject, period }))
+                  : undefined
+              }
             />
             <AddBlockCard compact onClick={picker.open} />
           </VStack>

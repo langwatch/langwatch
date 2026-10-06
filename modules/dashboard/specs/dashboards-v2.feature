@@ -726,6 +726,43 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then each spans at least 3 rows
 
   # ---------------------------------------------------------------------------
+  # Ask Langy about a widget
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available
+    Given a board with widgets
+    When Langy is on for the project and the member may start a conversation
+    Then each card header shows an "Ask Langy" button between the info icon and the widget menu
+    And when Langy is off or the member may not start a conversation, no card shows it
+
+  @unit @integration
+  Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period
+    Given a widget with a stored prompt, a description and named queries
+    When the member clicks its "Ask Langy" button
+    Then Langy opens with a draft to send, not a sent question
+    And the draft starts with the widget's prompt
+    And then names the widget, its description and each query with its LangWatchQL
+    And ends with the dashboard period and grain
+    And the open board is attached as the context
+    And long LangWatchQL is cut with a marker so the draft stays within 6000 characters
+    # Decision: Langy has no widget context kind; the widget rides in the draft text
+
+  @unit
+  Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback
+    Given a widget saved before prompts existed, or made by Langy
+    When the member asks Langy about it
+    Then the draft starts with a prompt asking Langy to answer the widget's name over the
+      dashboard period and quote the real numbers
+
+  @unit @integration
+  Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate
+    Given a widget built from the catalogue
+    Then its stored definition carries the prompt the picker drafts, naming the views it reads
+    And editing its code keeps the prompt
+    And duplicating it copies the prompt
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -771,3 +808,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 110-113: "Widget description: the description moves from the stored code to an info tip on the card" → Scenario: AC110 Widget description: a built widget carries its description, not in its code; Scenario: AC111 Widget description: the card shows the description behind an info icon; Scenario: AC112 Widget description: a widget without a description has no info icon; Scenario: AC113 Widget description: the description is stored and kept when the code is edited
   # AC 114-116: "Widget fit: a short card keeps its empty face usable" → Scenario: AC114 Widget fit: the empty face fits a short card; Scenario: AC115 Widget fit: a widget is never shorter than its title and one-row empty face; Scenario: AC116 Widget fit: every built widget is at least the minimum height
   # AC 107-109b: "Sidebar menu" → Scenario: AC107 Sidebar menu: each board offers its actions in the prototype's order; Scenario: AC107b Sidebar menu: a board the member cannot manage offers only what they may use; Scenario: AC108 Sidebar menu: Share changes who sees the board; Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets; Scenario: AC109b Sidebar menu: Set as default picks the board the area opens on
+  # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate

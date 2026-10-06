@@ -35,6 +35,7 @@ const graphOf = (input: DashboardWidgetDefinitionInput): Prisma.InputJsonValue =
   code: input.code,
   queries: [...input.queries],
   ...(input.description === undefined ? {} : { description: input.description }),
+  ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
 });
 
 export class PrismaDashboardWidgetRepository
@@ -144,7 +145,8 @@ export class PrismaDashboardWidgetRepository
       if (
         input.code !== undefined ||
         input.queries !== undefined ||
-        input.description !== undefined
+        input.description !== undefined ||
+        input.prompt !== undefined
       ) {
         data.graph = await this.#mergeDefinitionUpdate({
           tx,
@@ -188,12 +190,14 @@ export class PrismaDashboardWidgetRepository
       throw new DashboardWidgetDefinitionInvalidError(current.id, { reasons: [parsed.error] });
     }
     const definition = parsed.data;
-    // An edit of code or queries keeps the description the widget was saved with.
+    // An edit of code or queries keeps the description and prompt the widget was saved with.
     const description = input.description ?? definition.description;
+    const prompt = input.prompt ?? definition.prompt;
     return graphOf({
       code: input.code ?? definition.code,
       queries: input.queries ?? definition.queries,
       ...(description === undefined ? {} : { description }),
+      ...(prompt === undefined ? {} : { prompt }),
     });
   }
 

@@ -13,11 +13,14 @@ const MAX_QUERY_SQL_LENGTH = 50_000;
 const MAX_PARAMETERS_PER_QUERY = 32;
 const MAX_PARAMETER_VALUE_LENGTH = 4_000;
 const MAX_DESCRIPTION_LENGTH = 2_000;
+const MAX_PROMPT_LENGTH = 2_000;
 
 const dashboardWidgetNameSchema = z.string().min(1).max(MAX_WIDGET_NAME_LENGTH);
 const dashboardWidgetCodeSchema = z.string().min(1).max(MAX_CODE_LENGTH);
 /** What the widget card's info tip says. */
 const dashboardWidgetDescriptionSchema = z.string().min(1).max(MAX_DESCRIPTION_LENGTH);
+/** What Langy is drafted with when asked about the widget. */
+const dashboardWidgetPromptSchema = z.string().min(1).max(MAX_PROMPT_LENGTH);
 
 const dashboardWidgetQueryParameterSchema = z.object({
   name: z.string().min(1).max(MAX_QUERY_NAME_LENGTH).regex(QUERY_NAME_PATTERN),
@@ -42,6 +45,7 @@ export const createDashboardWidgetSchema = z.object({
   code: dashboardWidgetCodeSchema,
   queries: dashboardWidgetQueriesSchema,
   description: dashboardWidgetDescriptionSchema.optional(),
+  prompt: dashboardWidgetPromptSchema.optional(),
 });
 
 export const updateDashboardWidgetSchema = z
@@ -75,6 +79,7 @@ export const dashboardWidgetResourceSchema = z.object({
     code: z.string(),
     queries: z.array(dashboardWidgetQuerySchema),
     description: z.string().optional(),
+    prompt: z.string().optional(),
   }),
   createdAt: z.string(),
   updatedAt: z.string(),

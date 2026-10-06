@@ -53,6 +53,35 @@ describe("DashboardModule dashboard widgets", () => {
     await expect(dashboard.listDashboardWidgets({ projectId: "project-1" })).resolves.toEqual([]);
   });
 
+  /** @scenario "AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate" */
+  it("stores a widget's Langy prompt and keeps it when its code is edited", async () => {
+    const dashboard = createDashboardTestApp();
+    const created = await dashboard.createDashboardWidget({
+      projectId: "project-1",
+      name: "Usage",
+      code: "export default () => null;",
+      queries: [],
+      prompt: "How much traffic did my agent get?",
+    });
+
+    await dashboard.updateDashboardWidget({
+      projectId: "project-1",
+      id: created.id,
+      code: "export default () => <div />;",
+      queries: [],
+    });
+
+    expect(created.definition.prompt).toBe("How much traffic did my agent get?");
+    await expect(
+      dashboard.getDashboardWidget({ projectId: "project-1", id: created.id }),
+    ).resolves.toMatchObject({
+      definition: {
+        code: "export default () => <div />;",
+        prompt: "How much traffic did my agent get?",
+      },
+    });
+  });
+
   /** @scenario "AC113 Widget description: the description is stored and kept when the code is edited" */
   it("stores a widget's description and keeps it when its code is edited", async () => {
     const dashboard = createDashboardTestApp();

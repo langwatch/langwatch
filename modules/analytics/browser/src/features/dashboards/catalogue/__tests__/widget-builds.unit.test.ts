@@ -1,7 +1,7 @@
 /**
  * Every built catalogue widget stores a definition the widget schema accepts, reads
  * every query its code asks for, sends an empty face to an allowlisted setup page,
- * carries its description outside its code and is tall enough for its empty face.
+ * carries its description and Langy prompt outside its code, and fits its empty face.
  */
 
 import { NAVIGABLE_TARGETS } from "@langwatch/analytics-contract/chart-frame-protocol";
@@ -16,6 +16,7 @@ import {
   CATALOGUE_WIDGETS,
   IMPLEMENTED_WIDGET_IDS,
   implementedWidget,
+  PICKER_SECTIONS,
 } from "../index.ts";
 
 const built = IMPLEMENTED_WIDGET_IDS.flatMap((id) => implementedWidget(id) ?? []);
@@ -68,6 +69,17 @@ describe("given every built catalogue widget", () => {
       expect(definition.description, key).toBe(`${subtitle}\n\n${why}`);
       expect(definition.code, key).not.toContain(`>${subtitle}</div>`);
       expect(definition.code, key).not.toContain("color: C.faint, marginBottom: 8");
+    }
+  });
+
+  /** @scenario "AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate" */
+  it("stores the prompt the picker drafts, naming the views its queries read", () => {
+    const pickerPrompts = new Map(
+      PICKER_SECTIONS.flatMap(({ questions }) => questions).map(({ id, prompt }) => [id, prompt]),
+    );
+    for (const { key, definition } of built) {
+      expect(definition.prompt, key).toBe(pickerPrompts.get(key));
+      expect(() => dashboardWidgetDefinitionSchema.parse(definition), key).not.toThrow();
     }
   });
 

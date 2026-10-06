@@ -13,6 +13,7 @@ import {
   dashboardWidgetDefinitionSchema,
   dashboardWidgetDescriptionSchema,
   dashboardWidgetNameSchema,
+  dashboardWidgetPromptSchema,
   dashboardWidgetQueriesSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { defineTrpcContract } from "@langwatch/module";
@@ -78,6 +79,7 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
       code: dashboardWidgetCodeSchema,
       queries: dashboardWidgetQueriesSchema,
       description: dashboardWidgetDescriptionSchema.optional(),
+      prompt: dashboardWidgetPromptSchema.optional(),
     }),
   )
   .withOutput(dashboardWidgetTrpcSchema)

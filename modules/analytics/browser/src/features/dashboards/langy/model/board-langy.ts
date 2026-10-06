@@ -1,6 +1,7 @@
 /**
  * What a board tells Langy: the self-describing context a question rides with
- * (AC16): which board, what is on it and the period it reads over. Pure.
+ * (AC16): which board, what is on it and the period it reads over, and one widget's
+ * draft (AC120). Pure.
  */
 
 import { Temporal } from "@langwatch/time";
@@ -121,6 +122,90 @@ export function boardPromptDraft({
 }): AnalyticsLangyAskRequest {
   return {
     draft: promptWithWindow({ prompt, period }),
+    context: [boardAskContext({ board, period })],
+  };
+}
+
+/**
+ * Langy's composer declares no length, so a widget draft keeps itself readable: long
+ * LangWatchQL is cut to share what room is left under this bound between the queries.
+ */
+export const MAX_WIDGET_DRAFT_LENGTH = 6_000;
+
+/** A widget as a draft reads it: its name and the stored parts that explain it. */
+export interface WidgetSubject {
+  readonly name: string;
+  readonly definition: {
+    readonly prompt?: string;
+    readonly description?: string;
+    readonly queries: readonly { readonly name: string; readonly sql: string }[];
+  };
+}
+
+/** Older and Langy-made widgets store no prompt, so ask the widget's own question. */
+function fallbackPrompt(name: string): string {
+  return (
+    `Answer "${name}" for this dashboard widget, using its queries below over the ` +
+    "dashboard period at the dashboard grain. Quote the real numbers from the query " +
+    "results. If a query returns no rows, say plainly that there is no data for the " +
+    "dashboard period rather than guessing."
+  );
+}
+
+function truncated({ sql, room }: { sql: string; room: number }): string {
+  if (sql.length <= room) return sql;
+  const marker = (cut: number) => `\n-- [truncated: ${cut} more characters]`;
+  const kept = Math.max(room - marker(sql.length).length, 0);
+  return `${sql.slice(0, kept)}${marker(sql.length - kept)}`;
+}
+
+/** Each query's SQL within `room` in all: short ones whole, the rest share what is left. */
+function fittedSql({ sqls, room }: { sqls: readonly string[]; room: number }): string[] {
+  const byLength = sqls
+    .map((sql, index) => ({ sql, index }))
+    .toSorted((a, b) => a.sql.length - b.sql.length);
+  const fitted: string[] = [];
+  let left = room;
+  for (const [position, { sql, index }] of byLength.entries()) {
+    const share = Math.floor(left / (byLength.length - position));
+    fitted[index] = truncated({ sql, room: share });
+    left -= Math.min(sql.length, share);
+  }
+  return fitted;
+}
+
+function widgetBlock({ widget, sqls }: { widget: WidgetSubject; sqls: readonly string[] }) {
+  const { description, queries } = widget.definition;
+  return [
+    "This widget:",
+    `Name: ${widget.name}`,
+    ...(description ? [`Description: ${description}`] : []),
+    ...(queries.length > 0 ? ["Queries (LangWatchQL):"] : []),
+    ...queries.map(({ name }, index) => `- ${name}:\n${sqls[index] ?? ""}`),
+  ].join("\n");
+}
+
+/**
+ * One widget's prompt as a composer draft, as picking a widget gives (AC121): its prompt
+ * or a fallback, its name, description and queries, then the board's window. Langy has
+ * no widget context kind, so the widget rides in the text beside the board context.
+ */
+export function widgetPromptDraft({
+  widget,
+  board,
+  period,
+}: {
+  widget: WidgetSubject;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  const prompt = widget.definition.prompt ?? fallbackPrompt(widget.name);
+  const draftWith = (sqls: readonly string[]) =>
+    promptWithWindow({ prompt: `${prompt}\n\n${widgetBlock({ widget, sqls })}`, period });
+  const sqls = widget.definition.queries.map(({ sql }) => sql);
+  const room = MAX_WIDGET_DRAFT_LENGTH - draftWith([]).length;
+  return {
+    draft: draftWith(fittedSql({ sqls, room })),
     context: [boardAskContext({ board, period })],
   };
 }

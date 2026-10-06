@@ -63,6 +63,7 @@ export function useBoardWidgets() {
           code: widget.definition.code,
           queries: widget.definition.queries,
           description: widget.definition.description,
+          prompt: widget.definition.prompt,
         });
         const placements = widgetsOn(dashboardId).map(({ placement }) => placement);
         const slot = duplicateSlot({ placements, original: widget.placement });
@@ -97,6 +98,7 @@ export function useBoardWidgets() {
               code: widget.definition.code,
               queries: widget.definition.queries,
               description: widget.definition.description,
+              prompt: widget.definition.prompt,
             });
             return { graphId: created.id, ...slots[index]! };
           }),
