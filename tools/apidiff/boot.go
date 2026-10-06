@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -548,6 +549,11 @@ type bootState struct {
 	// processesMu guards processes: a worker respawn appends from its own
 	// goroutine while teardown may be killing.
 	processesMu sync.Mutex
+	// abort stops the run with a cause when a worker dies for good; nil
+	// outside `run`. tornDown is set when teardown starts, so killing the
+	// workers is not read as their dying.
+	abort    context.CancelCauseFunc
+	tornDown atomic.Bool
 	// havenSlugs are the stacks this run started, in order. The teardown
 	// destroys these and nothing else.
 	havenSlugs []string
@@ -1477,16 +1483,80 @@ func (state *bootState) startWorker(ctx context.Context, instance *Instance) err
 // refused database connection there left a whole run with no projections.
 var workerRespawnWindow = 5 * time.Minute
 
-// respawnOnEarlyExit restarts a worker once when it dies during its own boot.
+// workerLogTail is how many trailing log lines a dead worker's stop prints.
+const workerLogTail = 100
+
+// workerDeathError is why a run stopped: a side's worker exited again after
+// its one restart, so nothing on that side would ever project.
+type workerDeathError struct {
+	side    string
+	logPath string
+}
+
+func (dead *workerDeathError) Error() string {
+	return fmt.Sprintf("the %s worker exited again after its one restart; stopping (log %s)", dead.side, dead.logPath)
+}
+
+// workerLogPath is where an instance's worker writes, named by its side.
+func workerLogPath(workRoot, instanceName string) string {
+	return filepath.Join(workRoot, "logs", instanceName+"-worker.log")
+}
+
+// respawnOnEarlyExit restarts a worker once when it dies during its own boot,
+// then watches the restart: a second exit stops the run (workerDied).
 func (state *bootState) respawnOnEarlyExit(ctx context.Context, command *exec.Cmd, process instanceProcess) {
 	started := time.Now()
 	if err := command.Wait(); err == nil || ctx.Err() != nil || time.Since(started) > workerRespawnWindow {
 		return
 	}
 	state.logf("%s exited during boot; starting it once more", process.logName)
-	if _, _, err := state.spawn(ctx, process); err != nil {
+	second, _, err := state.spawn(ctx, process)
+	if err != nil {
 		state.logf("%s restart: %v", process.logName, err)
+		state.workerDied(process)
+		return
 	}
+	_ = second.Wait()
+	if ctx.Err() == nil && !state.tornDown.Load() {
+		state.workerDied(process)
+	}
+}
+
+// workerDied names the side, prints the last lines of its worker log and
+// cancels the run with a workerDeathError, which the caller turns into exit 2.
+func (state *bootState) workerDied(process instanceProcess) {
+	side := strings.TrimSuffix(process.logName, "-worker")
+	label := "branch"
+	if side == "main" {
+		label = "base (main)"
+	}
+	logPath := filepath.Join(state.workRoot, "logs", process.logName+".log")
+	state.logf("%s worker exited a second time; stopping the run. Last %d lines of %s:\n%s",
+		label, workerLogTail, logPath, tailLines(logPath, workerLogTail))
+	if state.abort != nil {
+		state.abort(&workerDeathError{side: label, logPath: logPath})
+	}
+}
+
+// tailLines reads the last count lines of a file, or says why it cannot.
+func tailLines(path string, count int) string {
+	file, err := os.Open(path)
+	if err != nil {
+		return "(no log: " + err.Error() + ")"
+	}
+	defer file.Close()
+	const window = 256 << 10
+	info, err := file.Stat()
+	if err != nil {
+		return "(no log: " + err.Error() + ")"
+	}
+	buffer := make([]byte, min(info.Size(), window))
+	read, err := file.ReadAt(buffer, info.Size()-int64(len(buffer)))
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "(no log: " + err.Error() + ")"
+	}
+	lines := strings.Split(strings.TrimRight(string(buffer[:read]), "\n"), "\n")
+	return strings.Join(lines[max(0, len(lines)-count):], "\n")
 }
 
 // instanceProcess is one process an instance runs on its composed env.
@@ -1579,6 +1649,7 @@ func (state *bootState) teardown() {
 // booted instances share one state, and whichever runs second finds it done.
 func (state *bootState) teardownOnceOnly() {
 	defer phaseDone(state.stderr, "teardown", time.Now())
+	state.tornDown.Store(true)
 	if state.infraDone != nil {
 		<-state.infraDone
 	}

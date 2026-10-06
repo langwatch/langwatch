@@ -175,7 +175,7 @@ jobs:
           # comment has already been posted.
           exit 0
 
-      - name: Upload apidiff report + ledger
+      - name: Upload apidiff report, ledger and worker logs
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -183,6 +183,7 @@ jobs:
           path: |
             ${{ runner.temp }}/apidiff-report.json
             ${{ runner.temp }}/apidiff-ledger.json
+            ${{ runner.temp }}/apidiff-run/logs/*.log
           if-no-files-found: warn
           retention-days: 14
 

@@ -52,6 +52,8 @@ func (values *stringSlice) Set(value string) error {
 type probeFlags struct {
 	a             string
 	b             string
+	workerLogA    string
+	workerLogB    string
 	keys          Keys
 	timeout       time.Duration
 	settleTimeout time.Duration
@@ -218,12 +220,13 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	probe.parity = parity
 
 	// The child processes inherit this context; canceling it kills them.
-	bootCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	bootCtx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	parity.state.abort = cancel
 	booting := time.Now()
 	booted, err := parity.boot(bootCtx)
 	if err != nil {
-		fmt.Fprintln(out.stderr, "boot:", err)
+		fmt.Fprintln(out.stderr, "boot:", workerDeathOr(bootCtx, err))
 		return exitError
 	}
 	defer booted.Teardown()
@@ -247,7 +250,30 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 
 	probe.adoptBooted(booted, boot, out.stderr)
 	probe.onOperationDone = findingsHook(findings, boot.BranchDir, out.stderr)
-	return probePipeline(ctx, probe, out)
+	code = probePipeline(bootCtx, probe, out)
+	if dead := workerDeath(bootCtx); dead != nil {
+		fmt.Fprintln(out.stderr, "apidiff:", dead)
+		return exitError
+	}
+	return code
+}
+
+// workerDeath is the worker death that canceled the run, or nil.
+func workerDeath(ctx context.Context) *workerDeathError {
+	var dead *workerDeathError
+	if errors.As(context.Cause(ctx), &dead) {
+		return dead
+	}
+	return nil
+}
+
+// workerDeathOr prefers the worker death that canceled the run over the
+// context error it left behind.
+func workerDeathOr(ctx context.Context, err error) error {
+	if dead := workerDeath(ctx); dead != nil {
+		return dead
+	}
+	return err
 }
 
 // finishParityOnly ends a -parity-only run: the inventories, then the verdict.
@@ -265,6 +291,8 @@ func (probe *probeFlags) adoptBooted(booted *Booted, boot BootConfig, stderr io.
 	probe.a = booted.A.URL
 	probe.b = booted.B.URL
 	probe.runDir = booted.WorkRoot
+	probe.workerLogA = workerLogPath(booted.WorkRoot, booted.A.Name)
+	probe.workerLogB = workerLogPath(booted.WorkRoot, booted.B.Name)
 	probe.scenarios.mailA, probe.scenarios.mailB = booted.A.MailURL, booted.B.MailURL
 	probe.activateEntitlement = booted.ActivateEntitlement
 	if boot.UseHaven {
@@ -426,6 +454,10 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 	selected := SelectOperations(operations, probe.filter())
 	fmt.Fprintf(out.stderr, "probing %d operations (lockstep, %d modules at once)\n", len(selected), max(probe.concurrency, 1))
 	result := ProbeAll(ctx, probe.probeOptions(client, specs, out.stderr), operations)
+	if result.Fatal != "" {
+		fmt.Fprintln(out.stderr, "apidiff:", result.Fatal)
+		return exitError
+	}
 
 	verdict := runVerdict{report: BuildReport(changes, result), probe: probe}
 	verdict.ledger = BuildScopedLedger(operations, verdict.report, probe.ledgerOptions(baseline))
@@ -453,6 +485,8 @@ func (probe *probeFlags) probeOptions(client *http.Client, specs *fetchedSpecs, 
 		ActivateEntitlement: probe.activateEntitlement,
 		ModuleOf:            probe.moduleOf(),
 		Concurrency:         probe.concurrency,
+		WorkerLogA:          probe.workerLogA,
+		WorkerLogB:          probe.workerLogB,
 	}
 }
 
