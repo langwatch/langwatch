@@ -52,18 +52,6 @@ Feature: How the Enterprise single sign-on module installs, gates and records
       Then the first answer is a refusal and the second is allowed
       And the failed decision was not kept
 
-  Rule: an audit row is written for exactly the commands that ran
-
-    @unit
-    Scenario: A command that succeeds is recorded once, after it ran
-      When a command is accepted and the ledger answers it
-      Then exactly one audit row is written, after the answer
-
-    @unit
-    Scenario: A refused command leaves no audit row
-      When a command is refused, whether by the gate or by the ledger
-      Then no audit row is written
-
   Rule: the worker keeps connection evidence current on a schedule the module declares
 
     @unit

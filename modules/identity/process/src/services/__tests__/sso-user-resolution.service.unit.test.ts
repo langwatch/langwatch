@@ -495,6 +495,30 @@ describe("given a password account whose address is confirmed", () => {
   });
 });
 
+describe("given a person who signs in today through the provider the deployment brokers", () => {
+  describe("when their organization cuts over to a connection it registered itself", () => {
+    /** @scenario "Moving from the brokered provider to a direct one does not mint a second account" */
+    it("links the new subject to the account they already had and creates none", async () => {
+      const { store, service } = createWorld({ owners: [], proved: true, confirmed: true });
+      store.accounts.set(USER_ID, [
+        {
+          id: "account-brokered",
+          provider: "auth0",
+          issuer: "https://brokered.example/",
+          providerAccountId: "auth0|legacy-subject",
+          createdAtMs: 0,
+        },
+      ]);
+
+      await expect(service.resolveUser(UNASSERTED_ASSERTION)).resolves.toEqual(LINKED);
+
+      expect([...store.users.values()].filter((user) => user.email === EMAIL)).toHaveLength(1);
+      expect(store.users.size).toBe(1);
+      expect(store.accounts.get(USER_ID)?.map((row) => row.id)).toEqual(["account-brokered"]);
+    });
+  });
+});
+
 describe("given a verified local account and a managed SAML connection", () => {
   const SAML_ASSERTION = assertion({
     protocol: "saml",

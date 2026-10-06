@@ -196,6 +196,7 @@ describe("given somebody arriving through a live connection on a domain it prove
   });
 
   describe("when the answer is that they join automatically", () => {
+    /** @scenario "Authenticated user on a proved admitting SSO connection joins its organization" */
     it("makes them a member, with the grant that membership is worth", async () => {
       const parts = serviceOver({ row: connection({ arrivalPolicy: "admit" }) });
 
