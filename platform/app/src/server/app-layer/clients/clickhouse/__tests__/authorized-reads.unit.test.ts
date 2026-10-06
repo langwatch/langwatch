@@ -18,6 +18,8 @@ import {
   fenceFor,
   StatementScopeError,
   tenantScope,
+  tenantScopeKey,
+  tenantSet,
 } from "../authorized-reads";
 
 const NOW = 1_800_000_000_000;
@@ -104,6 +106,41 @@ describe("AuthorizedClickHouse", () => {
           tenantScope_s1_until: NOW + 5000,
         });
         expect(sent.format).toBe("JSONEachRow");
+      });
+
+      it("applies the set without a window where a subquery asks for the set alone", () => {
+        const fence = fenceFor({ authorization: proof(), reads: "traces" });
+        const { query, queryParams } = expandStatement({
+          query: `SELECT 1 FROM t WHERE ${tenantScope("OccurredAt")} AND x IN (SELECT x FROM evals WHERE ${tenantSet()})`,
+          queryParams: {},
+          fence,
+        });
+        expect(query).toContain(
+          "(SELECT x FROM evals WHERE (TenantId IN ({tenantScope_all:Array(String)})))",
+        );
+        expect(queryParams.tenantScope_all).toEqual([AGG, A, B]);
+      });
+
+      it("refuses a statement whose only marker is the set, since the window would never apply", () => {
+        const fence = fenceFor({ authorization: proof(), reads: "traces" });
+        expect(() =>
+          expandStatement({
+            query: `SELECT 1 FROM t WHERE ${tenantSet()}`,
+            queryParams: {},
+            fence,
+          }),
+        ).toThrow(
+          expect.objectContaining({ violation: { kind: "missing-marker" } }),
+        );
+      });
+
+      it("keys a cache on who is in scope and under which window", () => {
+        expect(
+          tenantScopeKey({ authorization: proof(), reads: "traces" }),
+        ).toBe(`${AGG}|${A}@${NOW - 1000}-|${B}@0-${NOW + 5000}`);
+        expect(
+          tenantScopeKey({ authorization: proof(), reads: "analytics" }),
+        ).toBe(AGG);
       });
 
       it("applies the same fence at every marker, inside subqueries too", () => {

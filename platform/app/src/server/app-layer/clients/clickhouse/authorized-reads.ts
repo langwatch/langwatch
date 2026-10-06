@@ -56,6 +56,7 @@ export type TenantScopeTimeColumn = (typeof TENANT_SCOPE_TIME_COLUMNS)[number];
 export const TENANT_SCOPE_PARAM_PREFIX = "tenantScope";
 
 const MARKER = /\{\{tenantScope:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
+const SET_MARKER = /\{\{tenantSet\}\}/g;
 
 /**
  * A tenant predicate written by hand. `TenantId` as a projected column or a
@@ -69,6 +70,38 @@ const HAND_WRITTEN_TENANT_PREDICATE =
 /** The marker a repository writes where its tenant predicate used to go. */
 export function tenantScope(column: TenantScopeTimeColumn): string {
   return `{{tenantScope:${column}}}`;
+}
+
+/**
+ * The set-only marker: every tenant the proof names, with no window. For a
+ * subquery on a side table - an evaluation, an annotation, a span attribute
+ * lookup - whose own timestamp is not the trace's. The window is applied
+ * once, on the primary table's occurrence time, by a `tenantScope` marker
+ * the statement must still carry.
+ */
+export function tenantSet(): string {
+  return "{{tenantSet}}";
+}
+
+/**
+ * A stable key for the fence a proof allows, for a cache keyed on who is in
+ * scope. Two proofs that fence the same tenants under the same windows share
+ * an entry; an aggregate and one of its members never do.
+ */
+export function tenantScopeKey({
+  authorization,
+  reads,
+}: {
+  authorization: Authorization;
+  reads: ReadResource;
+}): string {
+  const fence = fenceFor({ authorization, reads });
+  return [
+    ...fence.own,
+    ...fence.shared.map(
+      (window) => `${window.projectId}@${window.from}-${window.until ?? ""}`,
+    ),
+  ].join("|");
 }
 
 export type StatementScopeViolation =
@@ -90,7 +123,7 @@ export class StatementScopeError extends Error {
 function describe(violation: StatementScopeViolation): string {
   switch (violation.kind) {
     case "missing-marker":
-      return "Statement carries no {{tenantScope:<TimeColumn>}} marker, so the proof cannot be applied to it.";
+      return "Statement carries no {{tenantScope:<TimeColumn>}} marker, so the window on a shared grant would never be applied. A {{tenantSet}} marker alone is not enough.";
     case "unknown-time-column":
       return `Marker names "${violation.column}", which is not a time column the window can be applied to.`;
     case "hand-written-tenant-predicate":
@@ -142,6 +175,23 @@ export function fenceExpression({
     parts.push(`(${clauses.join(" AND ")})`);
   });
   return { sql: `(${parts.join(" OR ")})`, params };
+}
+
+/** The set-only form: every tenant in the fence, no window. */
+export function setExpression(fence: TenantFence): {
+  sql: string;
+  params: Record<string, unknown>;
+} {
+  const param = `${TENANT_SCOPE_PARAM_PREFIX}_all`;
+  return {
+    sql: `(TenantId IN ({${param}:Array(String)}))`,
+    params: {
+      [param]: [
+        ...fence.own,
+        ...fence.shared.map((window) => window.projectId),
+      ],
+    },
+  };
 }
 
 /**
@@ -231,21 +281,28 @@ export function expandStatement({
       throw new StatementScopeError({ kind: "reserved-param", param });
     }
   }
-  if (HAND_WRITTEN_TENANT_PREDICATE.test(query.replace(MARKER, " "))) {
+  const bare = query.replace(MARKER, " ").replace(SET_MARKER, " ");
+  if (HAND_WRITTEN_TENANT_PREDICATE.test(bare)) {
     throw new StatementScopeError({ kind: "hand-written-tenant-predicate" });
   }
   let merged: Record<string, unknown> = { ...queryParams };
-  let markers = 0;
-  const expanded = query.replace(MARKER, (_match, column: string) => {
-    if (!isTimeColumn(column)) {
-      throw new StatementScopeError({ kind: "unknown-time-column", column });
-    }
-    markers += 1;
-    const expression = fenceExpression({ fence, column });
-    merged = { ...merged, ...expression.params };
-    return expression.sql;
-  });
-  if (markers === 0) throw new StatementScopeError({ kind: "missing-marker" });
+  let windowed = 0;
+  const expanded = query
+    .replace(MARKER, (_match, column: string) => {
+      if (!isTimeColumn(column)) {
+        throw new StatementScopeError({ kind: "unknown-time-column", column });
+      }
+      windowed += 1;
+      const expression = fenceExpression({ fence, column });
+      merged = { ...merged, ...expression.params };
+      return expression.sql;
+    })
+    .replace(SET_MARKER, () => {
+      const expression = setExpression(fence);
+      merged = { ...merged, ...expression.params };
+      return expression.sql;
+    });
+  if (windowed === 0) throw new StatementScopeError({ kind: "missing-marker" });
   return { query: expanded, queryParams: merged };
 }
 
