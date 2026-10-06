@@ -10,6 +10,7 @@ import { APP_ERROR_CODES } from "../codes";
 import {
   explainHandledError,
   explainSerializedError,
+  PROVIDER_CONFIG_PROBLEMS,
   UNKNOWN_ERROR_PRESENTATION,
 } from "../presentation";
 import type { HandledErrorShape } from "../readHandledError";
@@ -833,6 +834,68 @@ describe("explainHandledError", () => {
         expect(title.endsWith("."), `${code} title`).toBe(false);
       }
     });
+  });
+});
+
+describe("provider_config_invalid", () => {
+  const explain = (meta: Record<string, unknown>) =>
+    explainHandledError(shape({ code: "provider_config_invalid", meta }))
+      .description;
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("tells a provider with no API key to add the key", () => {
+    expect(
+      explain({ problem: "api_key_missing", model: "gpt-5.6-terra" }),
+    ).toBe(
+      "This model provider is enabled with no API key saved, so the request never reached it. Add the API key in Settings → Model Providers.",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("tells a provider with no endpoint to add the endpoint", () => {
+    expect(explain({ problem: "endpoint_missing" })).toBe(
+      "This model provider has no endpoint URL saved, so there was nowhere to send the request. Add the endpoint in Settings → Model Providers.",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("names the model that has no deployment", () => {
+    expect(
+      explain({ problem: "deployment_missing", model: "gpt-5.6-terra" }),
+    ).toBe(
+      "This model provider has no deployment mapped for gpt-5.6-terra. Add the deployment mapping in Settings → Model Providers.",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("says when the provider has no API for the request", () => {
+    expect(explain({ problem: "operation_unsupported" })).toBe(
+      "This model provider does not support this kind of request. Pick a model from a provider that does.",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("keeps the model sentence for the remainder and for an unknown problem", () => {
+    const remainder =
+      "No provider on this project is configured for gpt-5.6-terra. Add it to one in Settings → Model Providers.";
+
+    expect(
+      explain({ problem: "model_not_served", model: "gpt-5.6-terra" }),
+    ).toBe(remainder);
+    expect(explain({ problem: "something_new", model: "gpt-5.6-terra" })).toBe(
+      remainder,
+    );
+    expect(explain({ model: "gpt-5.6-terra" })).toBe(remainder);
+  });
+
+  it("lists every problem the gateway can name", () => {
+    expect([...PROVIDER_CONFIG_PROBLEMS].sort()).toEqual([
+      "api_key_missing",
+      "deployment_missing",
+      "endpoint_missing",
+      "model_not_served",
+      "operation_unsupported",
+    ]);
   });
 });
 

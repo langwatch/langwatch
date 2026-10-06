@@ -375,6 +375,93 @@ describe("explainLangyError", () => {
     });
   });
 
+  describe("given an agent failure the gateway stopped for an incomplete provider", () => {
+    const gatewayReason = (meta: Record<string, unknown>) =>
+      domain({
+        code: "langy_agent_errored",
+        httpStatus: 502,
+        reasons: [{ kind: "provider_config_invalid", meta }],
+      });
+
+    describe("when the provider has no API key saved", () => {
+      /** @scenario A provider with no API key saved reads as a key to add */
+      it("says so, and offers the provider settings instead of a retry", () => {
+        const presentation = explainLangyError(
+          gatewayReason({ problem: "api_key_missing", model: "gpt-5.6-terra" }),
+        );
+
+        expect(presentation.kind).toBe("provider_config_invalid");
+        expect(presentation.description).toBe(
+          "This model provider is enabled with no API key saved, so the request never reached it. Add the API key in Settings → Model Providers.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Open model providers",
+          kind: "configure-model",
+        });
+      });
+    });
+
+    describe("when the reason carries more than the client asked for", () => {
+      /** @scenario The card never repeats what the gateway or the provider wrote */
+      it("keeps only the enumerated problem and a model id", () => {
+        const presentation = explainLangyError(
+          gatewayReason({
+            problem: "api_key_missing",
+            model: "gpt-5.6-terra",
+            message: "Incorrect API key provided: sk-proj-abc",
+            provider: "openai",
+            tips: ["anything"],
+          }),
+        );
+
+        expect(presentation.meta).toEqual({
+          problem: "api_key_missing",
+          model: "gpt-5.6-terra",
+        });
+      });
+
+      /** @scenario The card never repeats what the gateway or the provider wrote */
+      it("drops a model that does not read as a model id", () => {
+        const presentation = explainLangyError(
+          gatewayReason({
+            problem: "deployment_missing",
+            model: "gpt <script>alert(1)</script>",
+          }),
+        );
+
+        expect(presentation.meta).toEqual({ problem: "deployment_missing" });
+        expect(presentation.description).toBe(
+          "This model provider has no deployment mapped for that model. Add the deployment mapping in Settings → Model Providers.",
+        );
+      });
+    });
+
+    describe("when the reason sits beneath another one", () => {
+      /** @scenario A provider with no API key saved reads as a key to add */
+      it("is still found", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "chain_exhausted",
+                reasons: [
+                  {
+                    kind: "provider_config_invalid",
+                    meta: { problem: "endpoint_missing" },
+                  },
+                ],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("provider_config_invalid");
+        expect(presentation.description).toContain("no endpoint URL saved");
+      });
+    });
+  });
+
   describe("given an agent failure whose model no provider serves", () => {
     describe("when the failure is explained", () => {
       /** @scenario A model with no provider connected reads as a model to change */

@@ -24,41 +24,49 @@ import PeoplePage from "~/pages/governance/people";
 import { DepartmentPicker } from "../DepartmentPicker";
 import { useDepartmentColumn } from "../useDepartmentColumn";
 
-const { ffEnabled, departmentList, assignments, mutations } = vi.hoisted(
-  () => ({
-    ffEnabled: { current: true },
-    departmentList: {
-      current: [{ id: "dept_mkt", name: "Marketing" }] as Array<{
+const {
+  ffEnabled,
+  canViewGovernance,
+  departmentQueriesEnabled,
+  departmentList,
+  assignments,
+  mutations,
+} = vi.hoisted(() => ({
+  ffEnabled: { current: true },
+  canViewGovernance: { current: true },
+  /** Whether each department query asked the server, in call order. */
+  departmentQueriesEnabled: { current: [] as boolean[] },
+  departmentList: {
+    current: [{ id: "dept_mkt", name: "Marketing" }] as Array<{
+      id: string;
+      name: string;
+    }>,
+  },
+  assignments: {
+    current: {
+      users: [] as Array<{
         id: string;
         name: string;
+        departmentId: string | null;
+      }>,
+      teams: [] as Array<{
+        id: string;
+        name: string;
+        departmentId: string | null;
+      }>,
+      projects: [] as Array<{
+        id: string;
+        name: string;
+        departmentId: string | null;
       }>,
     },
-    assignments: {
-      current: {
-        users: [] as Array<{
-          id: string;
-          name: string;
-          departmentId: string | null;
-        }>,
-        teams: [] as Array<{
-          id: string;
-          name: string;
-          departmentId: string | null;
-        }>,
-        projects: [] as Array<{
-          id: string;
-          name: string;
-          departmentId: string | null;
-        }>,
-      },
-    },
-    mutations: {
-      assignUser: vi.fn(async () => ({})),
-      assignTeam: vi.fn(async () => ({})),
-      assignProject: vi.fn(async () => ({})),
-    },
-  }),
-);
+  },
+  mutations: {
+    assignUser: vi.fn(async () => ({})),
+    assignTeam: vi.fn(async () => ({})),
+    assignProject: vi.fn(async () => ({})),
+  },
+}));
 
 vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: ffEnabled.current, isLoading: false }),
@@ -71,7 +79,8 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     // The page hides its write controls without `governance:manage`, and this
     // test is about what an admin sees.
     hasAnyPermission: () => true,
-    hasPermission: () => true,
+    hasPermission: (permission: string) =>
+      permission !== "governance:view" || canViewGovernance.current,
     hasOrgPermission: () => true,
   }),
 }));
@@ -132,10 +141,16 @@ vi.mock("~/utils/api", () => {
     }),
     departments: {
       list: {
-        useQuery: () => ({ data: departmentList.current, isLoading: false }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+          departmentQueriesEnabled.current.push(options?.enabled !== false);
+          return { data: departmentList.current, isLoading: false };
+        },
       },
       assignments: {
-        useQuery: () => ({ data: assignments.current, isLoading: false }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+          departmentQueriesEnabled.current.push(options?.enabled !== false);
+          return { data: assignments.current, isLoading: false };
+        },
       },
       create: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },
       rename: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },
@@ -231,6 +246,7 @@ describe("department assignment UI", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ffEnabled.current = true;
+    canViewGovernance.current = true;
     departmentList.current = [{ id: "dept_mkt", name: "Marketing" }];
     assignments.current = { users: [], teams: [], projects: [] };
   });
@@ -335,6 +351,35 @@ describe("department assignment UI", () => {
         teamId: "team_platform",
         departmentId: "dept_eng",
       });
+    });
+  });
+
+  describe("given a member without the governance:view grant", () => {
+    /** @scenario The department lists are not requested without the grant to read them */
+    it("asks for neither the departments nor their assignments", () => {
+      function Harness() {
+        useDepartmentColumn("org-1");
+        return null;
+      }
+      canViewGovernance.current = false;
+      departmentQueriesEnabled.current = [];
+
+      renderWithChakra(<Harness />);
+
+      expect(departmentQueriesEnabled.current).toEqual([false, false]);
+    });
+
+    it("asks for both once the grant is held", () => {
+      function Harness() {
+        useDepartmentColumn("org-1");
+        return null;
+      }
+      canViewGovernance.current = true;
+      departmentQueriesEnabled.current = [];
+
+      renderWithChakra(<Harness />);
+
+      expect(departmentQueriesEnabled.current).toEqual([true, true]);
     });
   });
 

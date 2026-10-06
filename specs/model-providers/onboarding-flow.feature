@@ -264,3 +264,44 @@ Feature: Onboarding Flow
     Given a disabled OpenAI provider at an organization whose default models carry no EMBEDDINGS
     When the provider is turned back on
     Then EMBEDDINGS is added to the organization's default models
+
+  # ============================================================================
+  # One write per save
+  # ============================================================================
+  #
+  # A save is one write that enables the provider and carries its credentials
+  # and scope together. A write that only switches the provider on would create
+  # a project-scoped provider that is enabled and holds no key, and its success
+  # would complete the step before the credentials are stored, leaving Langy
+  # calling a provider with no API key.
+  #
+  # Bindings: platform/app/src/features/onboarding/components/sections/model-provider/__tests__/ModelProviderSetup.single-save.integration.test.tsx
+
+  @integration
+  Scenario: The first save stores the credentials that were entered
+    Given a new organization with no "openai" provider
+    When I enter an API key and a base URL and click "Save"
+    Then exactly one provider write is sent
+    And it carries the API key, the base URL and the scope the form chose
+
+  @integration
+  Scenario: No enabled provider is ever stored without its credentials
+    Given a new organization with no "openai" provider
+    When I enter an API key and a base URL and click "Save"
+    Then no write switches the provider on without credentials
+
+  @integration
+  Scenario: The step completes only after the credentials are stored
+    Given a new organization with no "openai" provider
+    When I enter an API key and a base URL and click "Save"
+    Then the step reports completion once
+    And the stored provider already holds the API key at that moment
+
+  @integration
+  Scenario: Switching providers before saving carries nothing over
+    Given the provider grid in the Langy panel
+    When I pick "Custom, OpenAI-compatible" and type a base URL
+    And I pick "Codex (OpenAI account)" and then "OpenAI"
+    And I enter only the OpenAI API key and click "Save"
+    Then exactly one provider write is sent, for "openai"
+    And neither the key check nor the write carries the base URL typed for the custom provider
