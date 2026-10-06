@@ -24,8 +24,9 @@ query in the product), tasks#867 (two-project organisation key e2e), PR 7536
 > trace read mints one **`Authorization` proof** (ADR-166) that lists the
 > aggregate as an own grant and each member as a shared grant, and the
 > ClickHouse client adds the tenant set from that proof. Only **organisation
-> admins** may open it, every trace opened is **audit-logged** against the
-> grant that allowed it, and the **strictest member privacy policy** applies.
+> admins** may open it, every visit is **audit-logged** the way admin
+> workspace views are today, and the **strictest member privacy policy**
+> applies.
 
 ## Context
 
@@ -92,7 +93,7 @@ A, B and D have no dependency on each other and start first.
 | D | `Project.kind = "aggregate"` with `Project.aggregateRule`; admin only; owns no credential, no ingest, no prompts, experiments or monitors | | `modules/project`, governance enterprise module |
 | E | Reconciler turns the rule into block A grants and keeps them true on four triggers | A, D | governance enterprise module via the authz commands |
 | F | Trace list, detail, summary and analytics routes mint the proof and stop passing `projectId` below the door | B, C | `modules/trace` transports |
-| G | Strictest member privacy policy; one `trace.viewed` audit row per trace opened, naming the grant | B | governance enterprise module |
+| G | Strictest member privacy policy; the existing five-minute admin view audit row, with a new kind `aggregate` | B | governance enterprise module |
 
 Left for later with the slot kept: the OTTL `where` compiler, signed baggage
 on ingest, `findReaders` for evaluation fan-out, and `prisma.as(authorization)`
@@ -191,14 +192,16 @@ on the Postgres side.
    navigation; Observe shows Analytics and Traces. Annotations on member
    traces are out of scope. (Block D.)
 
-9. **Strictest member privacy policy, every trace opened audited against
-   its grant.** The effective privacy policy of an aggregate read is the most
+9. **Strictest member privacy policy, audited like admin workspace views
+   today.** The effective privacy policy of an aggregate read is the most
    restrictive across the own and shared grants in the proof, matching the
-   query API precedent. Opening a member trace writes one `trace.viewed`
-   audit row naming the actor, the aggregate, the owning project, the trace
-   and the `via` grant id, once per trace and not per span (ADR-166's shape).
-   The existing five-minute `AdminWorkspaceViewAuditService` banner row is
-   kept for the list view with a new kind `aggregate`. (Block G.)
+   query API precedent. Any read of the aggregate (list, detail, summary,
+   analytics) writes one row through the existing
+   `AdminWorkspaceViewAuditService` with a new kind `aggregate`, deduplicated
+   per actor and aggregate for five minutes, exactly as personal and team
+   workspace views are audited now. A per-trace `trace.viewed` row naming
+   the `via` grant (ADR-166's shape) is deferred: the proof already carries
+   the grant id, so the slot is kept. (Block G.)
 
 10. **Build on `main`, port into the feature layout.** The seven blocks ship
     on `main` under ADR-166's names: `Authorization`, `authorize`,
@@ -245,7 +248,7 @@ on the Postgres side.
 | Reconciler is idempotent | Two runs, or a replay, produce the same grant ids and no duplicate rows | reconciler test comparing ledger state after two runs |
 | Rule changes converge | Removing a project from an explicit rule revokes its grant; a new personal project under `all-personal` is attached on creation | reconciler trigger tests |
 | Data stored once | The aggregate's own tenant id holds zero spans; billing counts unchanged | ingest route test returns 403 for kind `aggregate`; `trace-usage.service` test unchanged |
-| Every trace opened is audited | Opening a member trace writes one `trace.viewed` row naming the grant | audit service test |
+| Every visit is audited | Any aggregate read writes one admin view audit row of kind `aggregate`, deduplicated for five minutes | audit service test |
 | Strictest policy wins | With members at policies A (loose) and B (strict), the aggregate read applies B | privacy policy read test |
 | Plain projects unchanged | A plain project's trace list through the new path returns the same rows as before | golden test on an existing fixture |
 
@@ -272,7 +275,7 @@ on the Postgres side.
 | Route and tRPC guard for admins only | Yes | Large: personal data exposure | Automated: guard tests for admin, member, Developer seat, external |
 | Reconciler emitting ledger events | Partly: revocation marks rows | Medium | Automated: idempotency and convergence tests; nightly sweep as detection |
 | Ingest refusal for kind `aggregate` | Yes | Small | Automated: route test |
-| Audit row per trace opened | Yes | Medium: compliance evidence | Automated: service test |
+| Admin view audit row of kind `aggregate` | Yes | Medium: compliance evidence | Automated: service test |
 | Navigation hiding Test, Build, Online Evals | Yes | Small | None; detection by the UI contract spec |
 
 ## Schema
@@ -339,6 +342,11 @@ PROJECT`, `scopeType = PROJECT`, `roleKey = "project-reader"`, `source =
   hand so a missing one is a type error, not a runtime surprise.
 - **Run the aggregate's online evaluations on member traces in v1.** Doubles
   evaluation cost per trace and needs `findReaders`; deferred.
+- **One audit row per trace opened, naming the grant.** ADR-166's shape and
+  the better compliance answer, but no read in the product is audited per
+  row today, and it adds a write to every trace detail request. Deferred;
+  the proof carries the grant id so the row can be added without a schema
+  change.
 - **Per-row privacy policy.** Correct per trace but mixes redaction levels in
   one list and slows the query; strictest-wins matches the query API.
 - **Aggregate with its own API key and traces.** Muddies "data stored once"
@@ -349,7 +357,7 @@ PROJECT`, `scopeType = PROJECT`, `roleKey = "project-reader"`, `source =
 Positive: one shared grant and one proof unblock three callers and the
 ADR-166 migration; the company-wide view appears automatically for every new
 personal project; the trace repositories lose their hand-written tenants;
-every trace opened is audited against the grant that allowed it; no data is
+every visit is audited the same way admin workspace views are; no data is
 duplicated; the hidden governance project stays untouched.
 
 Negative: the ledger gains one row per (aggregate, member) pair, so an
@@ -395,10 +403,10 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
 - v3 (2026-10-06): rebuilt on ADR-166 after the captain pointed at the
   grant-scoped data access design. Replaces the `tenantIds[]` reads with
   the sealed `Authorization` proof and the store client; adds
-  `Grant.condition`; audits per trace opened against the grant; splits the
-  work into seven blocks with a port plan into the feature layout. Status
-  back to Proposed until the captain locks. Decided by the captain in this
-  revision: the admin's rule attaches the grants, owners do not share by
-  hand. Awaiting the captain: build on `main` now and port (recommended)
-  or wait for PR 7536; audit per trace opened naming the grant
-  (recommended) or keep only the five-minute banner row.
+  `Grant.condition`; splits the work into seven blocks with a port plan
+  into the feature layout. Status back to Proposed until the captain locks.
+  Decided by the captain in this revision: the admin's rule attaches the
+  grants, owners do not share by hand; build on `main` now and port into
+  PR 7536 later; audit matches what exists (the five-minute admin view row
+  with kind `aggregate`), the per-trace `trace.viewed` row is deferred with
+  its slot kept.

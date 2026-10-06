@@ -6,8 +6,8 @@ Feature: An aggregate project reads its member projects
   which projects it reads, a reconciler turns that rule into one shared
   project-reader grant per member, and every trace read carries a sealed
   authorization proof that the store client turns into the tenant set. Only
-  organisation admins may open it, every trace opened is audit-logged against
-  the grant that allowed it, and the strictest member privacy policy wins.
+  organisation admins may open it, every visit is audit-logged the way admin
+  workspace views are today, and the strictest member privacy policy wins.
   Decisions: ADR-144 (this feature), ADR-166 (the proof and the store client).
 
   The sections below follow the seven building blocks of ADR-144 v3.
@@ -290,16 +290,21 @@ Feature: An aggregate project reads its member projects
     Then the strict policy's redaction applies to every row
 
   @integration
-  Scenario: Opening a member trace is audited against its grant
+  Scenario: Any read of the aggregate writes the admin view audit row
     Given an aggregate project with one member holding one trace
-    When ana opens that trace from the aggregate
-    Then one trace-viewed audit row exists naming ana, the aggregate, the member, the trace and the grant it came through
-    And opening the same trace again within the hour writes no second row
-    And opening a second trace writes its own row
+    When ana opens the aggregate's trace list and then that trace within five minutes
+    Then one audit row of kind aggregate exists for ana and that project
+    And no row names the trace or the member
 
   @integration
-  Scenario: Listing the aggregate writes the five-minute banner row
+  Scenario: The audit row repeats after the five-minute window
     Given an aggregate project
     When ana opens its trace list twice within five minutes
     Then one audit row of kind aggregate exists for ana and that project
     And a list read ten minutes later writes a second row
+
+  @integration
+  Scenario: Audit rows for personal and team workspace views are unchanged
+    Given ana opens sam's personal workspace
+    Then one audit row of kind personal exists, as before
+    And no row of kind aggregate exists
