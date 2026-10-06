@@ -29,6 +29,10 @@ type Set struct {
 	Format string
 	// Render turns a free key into the name fragment the suggested rename uses.
 	Render func(key int64) string
+	// ReleaseKeysTaken marks a set whose database keeps one row per key, so a
+	// key a release line already used is taken whether or not anything has
+	// released it yet (goose; rethink F10). Prisma records full names instead.
+	ReleaseKeysTaken bool
 }
 
 // Sets are the ordered migration directories in this repository.
@@ -61,8 +65,9 @@ var Sets = []Set{
 			"platform/app/src/server/clickhouse/migrations",
 			"langwatch/src/server/clickhouse/migrations",
 		},
-		Key:    regexp.MustCompile(`^(\d{5})_.*\.sql$`),
-		Format: "NNNNN_name.sql",
-		Render: func(key int64) string { return fmt.Sprintf("%05d", key) },
+		Key:              regexp.MustCompile(`^(\d{5})_.*\.sql$`),
+		Format:           "NNNNN_name.sql",
+		Render:           func(key int64) string { return fmt.Sprintf("%05d", key) },
+		ReleaseKeysTaken: true,
 	},
 }

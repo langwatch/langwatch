@@ -49,7 +49,7 @@ type comparedRefs struct {
 
 // input reads one migration set at every ref the check compares.
 func (r Repo) input(ctx context.Context, set Set, refs comparedRefs) (Input, error) {
-	in := Input{Set: set, BaseRef: refs.base}
+	in := Input{Set: set, BaseRef: refs.base, ReleasedRefs: refs.released}
 	var err error
 	if in.Base, err = r.entriesAtAny(ctx, refs.base, set); err != nil {
 		return Input{}, err

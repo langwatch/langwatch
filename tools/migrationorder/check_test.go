@@ -18,6 +18,15 @@ func setNamed(t *testing.T, name string) migrationorder.Set {
 	return migrationorder.Sets[index]
 }
 
+// @scenario "Migrations numbered above everything on main pass"
+// @scenario "A migration numbered below the newest on main fails"
+// @scenario "Two PRs that picked the same number"
+// @scenario "Two migrations in one PR share a key"
+// @scenario "A PR changes a migration that already merged"
+// @scenario "A migration is added with no ordering key"
+// @scenario "Migrations already on main are never judged"
+// @scenario "A new migration shares a key with a released migration the PR ports"
+// @scenario "A ported migration differs from the copy main released"
 func TestCheck(t *testing.T) {
 	clickhouse := setNamed(t, "ClickHouse")
 	prisma := setNamed(t, "Prisma")

@@ -92,3 +92,40 @@ Feature: Migration order check
     When the migration-order workflow runs
     Then no comment is attempted
     And the check still fails with the reason in the job log
+
+  # Goose keeps one row per version, so two files at one version cannot both
+  # run, whether or not a release carries either yet (rethink F10, plan D11).
+  Scenario: A PR into a long-running branch takes a goose number main already used
+    Given the PR targets a branch other than main
+    And main's newest commit carries ClickHouse migration 00101, which no release has shipped yet
+    When the PR adds a different ClickHouse migration numbered 00101
+    Then the check fails
+    And the comment says main already took that goose number
+    And the renumbering it offers lands above main's newest goose number
+
+  Scenario: A Prisma timestamp main used for another name is not a collision
+    Given the PR targets a branch other than main
+    And main carries a Prisma migration timestamped 20261002090000
+    When the PR adds a different Prisma migration with the same timestamp
+    Then the goose-number rule does not apply, because Prisma records each migration by its full name
+
+  # A code step a release manifest names has run on real installs: its file is
+  # frozen exactly as a merged migration is (rethink 6.5 point 2).
+  Scenario: A PR changes the file of a code step a release manifest names
+    Given a release manifest on the base branch names the code step "topic:seed-clusters"
+    And a module file on the base branch declares that step id
+    When the PR modifies, renames or deletes that file
+    Then the check fails
+    And the comment says the release shipped the step and a released step cannot change
+    And the comment gives the git checkout that restores it
+
+  Scenario: A code step no release manifest names yet may still change
+    Given a module file declares the code step "topic:seed-clusters"
+    And no release manifest names that step
+    When the PR modifies that file
+    Then the check passes
+
+  Scenario: A release manifest that is not valid JSON stops the check
+    Given a release manifest on the base branch is not valid JSON
+    When the migration-order check runs
+    Then it exits with the could-not-read status, naming the manifest
