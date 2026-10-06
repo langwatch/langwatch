@@ -608,7 +608,6 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
 
       expect(live.map((row) => row.processId)).toEqual(["recent"]);
     });
-
   });
 
   describe("when declared steps are registered", () => {
