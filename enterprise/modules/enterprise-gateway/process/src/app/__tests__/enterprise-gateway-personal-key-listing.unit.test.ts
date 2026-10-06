@@ -225,7 +225,7 @@ describe("given personal virtual keys held by two members", () => {
       expect(asked).toEqual(["virtualKeys:viewOtherPersonal"]);
     });
 
-    /** @scenario "Existing org admins automatically gain virtualKeys:viewOtherPersonal on migrate" */
+    /** @scenario "Existing org admins hold virtualKeys:viewOtherPersonal from the role template, with no migration" */
     it("lists another member's keys from a binding that carries no permission list", async () => {
       const before = structuredClone(admin.bindings);
 

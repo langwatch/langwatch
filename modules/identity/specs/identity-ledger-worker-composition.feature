@@ -6,40 +6,22 @@ Feature: The identity and directory-sync ledgers compose from a Prisma client al
 
   # WHY THIS EXISTS
   #
-  # Four identity pipelines run on the shared `event-sourcing/jobs` queue:
-  # identity (D01 identifiers plus D06 two-step verification on the same
-  # aggregate), sso-connections, scim-sync and join-requests. Until now all
-  # four reached the packaged worker as DEFINITIONS the platform application
-  # built and handed over, because every projection store and guard
-  # repository lived in `platform/app/src/server/app-layer/identity`.
-  #
-  # Two of the four need nothing else. Read one dependency at a time, the
-  # identity ledger is the `Identifier` head and its cursor, the
-  # `MfaEnrollment` head, the address lock, and the legacy `User` columns the
-  # cross-population collision guard consults — all Postgres. The
-  # directory-sync ledger is one `ScimSyncState` row serving both the fold and
-  # its guards. So both compose from a typed Prisma client and nothing else.
-  #
-  # The other two do not, and are deliberately out of scope here: the
-  # connection ledger's teardown port revokes a torn-down connection's
-  # directory tokens through the SCIM service, and the join ledger's lifecycle
-  # port sends the reminder and the expiry notice through the mailer. Neither
-  # the directory service nor an outbound mail gateway is something this
-  # process can compose today.
+  # Identity's ledgers once reached the packaged worker as definitions the
+  # platform application built and handed over. The identity module now
+  # declares its own: the identity ledger (identifiers plus two-step
+  # verification), the join-request ledger and the SSO connection ledger, each
+  # handing its commands back to the module through ConnectedIdentityEventing.
+  # The directory-sync ledger is SCIM's and is declared by that module.
 
-  Rule: The worker builds the two Postgres-only ledgers itself
+  Rule: The identity module declares its own ledgers
 
     @unit
-    Scenario: The worker mounts the identity and directory-sync ledgers itself
-      Given a worker process holding one Prisma client
-      When it composes its durable graph
-      Then it mounts the identity ledger and the directory-sync ledger
-      And it mounts the connection and join ledgers only when the application hands them over
-      # A graph carrying a proper subset of the four routes a proper subset of
-      # their keys, and an unroutable job on this queue is redelivered forever
-      # rather than dropped. That is why the composition that claims the queue
-      # is the one that mounts every pipeline, and why a partial graph asks
-      # for no consumers at all.
+    Scenario: The identity module declares its identity, join-request and SSO connection ledgers itself
+      Given a process that installs the identity module
+      When it composes the module's eventing
+      Then identity declares the identity, join-request and SSO connection ledgers
+      And each hands its commands back to the module as the process connects it
+      And the directory-sync ledger is not among them, because SCIM declares it
 
     @unit
     Scenario: The worker builds the identity ledger from its own client

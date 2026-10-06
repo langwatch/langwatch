@@ -54,17 +54,17 @@ Feature: Composing the join-request ledger in a background worker
     Then nothing is sent
 
   @unit
-  Scenario: Both graphs send one reminder, worded identically
+  Scenario: Identity sends the reminder in the mail package's own wording
     Given a join request that has waited a week
-    When the reminder is rendered
-    Then it is byte-for-byte the message the application renders
-    And it links at the deployment's own members area and decides nothing
+    When identity sends the reminder to an administrator
+    Then the mail is the join-request reminder the mail package renders, subject included
+    And it links at the deployment's own members settings and decides nothing
 
   @unit
-  Scenario: Both graphs send one lapse notice, worded identically
+  Scenario: Identity sends the lapse notice in the mail package's own wording
     Given a join request nobody answered
-    When the lapse notice is rendered
-    Then it is byte-for-byte the message the application renders
+    When identity sends the lapse notice to the requester
+    Then the mail is the join-request lapse notice the mail package renders, subject included
     And it names nobody and gives no reason
 
   @unit

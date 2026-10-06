@@ -212,11 +212,11 @@ Feature: Going live with your own identity provider, without asking us
     And arrivals are turned away
 
   @unit
-  Scenario: A connection registered before the question keeps what it did
-    Given a connection whose history carries no answer
-    When anything asks who it admits
-    Then it answers with what allowsJit already said
-    And nothing about its behaviour changed
+  Scenario: A connection registered before the question turns new arrivals away
+    Given a connection whose history carries no answer, though allowsJit says it admits
+    When a new user arrives through it
+    Then the connection answers that it turns arrivals away
+    And the arrival is refused, because allowsJit is no fallback for an unanswered policy
 
   @unit
   Scenario: Saying it out loud is a fact even where the behaviour is the same

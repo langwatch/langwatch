@@ -357,33 +357,24 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And an Auth0 subject naming no known upstream derives nothing
     And deleting the Auth0 Account row detaches the derived identifier with it
 
-  # The derivation is a prediction: it states the native identity the broker's
-  # subject implies, so the native callback resolves before any native sign-in
-  # has happened. When one does happen, better-auth writes the real Account
-  # row and the prediction has been overtaken — but it does not stand down on
-  # its own. Its source broker row is still live, so the orphan compensation
-  # never reaches it, and it holds the provider subject against the identifier
-  # the real row implies, which carries that row's own business time and so is
-  # a different identifier entirely.
-  #
-  # Unretired, that is permanent: the attach loses the subject on every pass,
-  # the parity diff never clears, the user never finalizes, and their secrets
-  # are never carried across, so they sit on the legacy path indefinitely.
-  # This was 64 users on cloud, all of them Google or GitHub — exactly the
-  # upstreams the broker's subjects can be unfolded into.
+  # Adoption keeps each legacy row's own provider and issuer (ADR-101 §6): an
+  # Auth0 row stays an Auth0 identifier, and a native Google row, when there
+  # is one, is its own identifier. Nothing is predicted from a broker subject,
+  # so nothing has to retire a prediction later.
   @unit
-  Scenario: A real native account retires the derived identifier that predicted it
-    Given "sam" holds an Auth0 row naming a Google identity, adopted in an earlier pass
+  Scenario: Each account row is adopted under its own issuer, beside a real native row
+    Given "sam" holds an Auth0 row naming a Google identity
     And "sam" has since signed in with Google directly, so a real Google Account row exists
     When the identity backfill migrates "sam"
-    Then the derived identifier is detached and the real row's identifier holds the subject
-    And "sam" finalizes rather than being held on a collision that never clears
+    Then the Auth0 row and the Google row each plan one identifier under the row's own provider and issuer
+    And no identifier is derived from the Auth0 subject
 
   @unit
-  Scenario: A derived identifier with no real row behind it is left alone
-    Given "sam" holds only the Auth0 row and the identifier derived from it
+  Scenario: An Auth0 row with nothing beside it plans one identifier under its own issuer
+    Given "sam" holds only the Auth0 row
     When the identity backfill migrates "sam"
-    Then nothing is detached, because that identifier is still the only thing asserting the subject
+    Then one Auth0 identifier is planned under that row's own issuer, beside the email
+    And no Google identifier is derived from its subject
 
   # The READ fork (ADR-101 §5). `User.email` is a legacy column answering a
   # question identity now owns, so a finalized user's email comes from their
@@ -493,12 +484,11 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And an operator rollback closes it again
 
   @unit
-  Scenario: Identifier backfill automatically includes every user
+  Scenario: The identifier backfill waits for enrollment and migrates one user per tenant
     Given the installation is cloud
-    And the identifier backfill is enrolled automatically
-    When a migration pass computes its user cohort
-    Then every user is in the cohort
-    And organization membership is not read
+    When the migration runner reads the identifier backfill
+    Then it is not enrolled automatically and does not run on its own on self-hosted
+    And each tenant the runner hands it is one user, migrated alone
 
 
   @unit @regression
@@ -517,12 +507,11 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And a fresh refused or waiting user is not adopted
 
   @unit @regression
-  Scenario: User-targeted automatic adoption preserves per-user scope and leases
-    Given the identifier backfill is enrolled automatically
-    When a user-targeted adoption pass runs
-    Then it attempts the arriving user's migration without enrollment
-    And it never scans the other users
-    And an adoption pass cannot bypass another pass's user lease
+  Scenario: Adopting an arriving SSO user migrates that user alone
+    Given the identifier backfill is not enrolled automatically
+    When an SSO arrival adopts the user it admitted
+    Then that user's migration runs without enrollment
+    And no other user is migrated
 
   @unit @regression
   Scenario: Pending identity projection does not imply finalized adoption

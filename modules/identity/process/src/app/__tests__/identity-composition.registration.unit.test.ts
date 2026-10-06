@@ -2,10 +2,20 @@
  * Identity's commands reach the senders its own eventing modules hand over as the process
  * connects each pipeline (ARCHITECTURE.md §9): the App registers nothing itself.
  */
-import { IDENTITY_PIPELINE_NAME, JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
-import { describe, expect, it } from "vitest";
+import { SCIM_SYNC_PIPELINE_NAME } from "@langwatch/enterprise-scim-contract";
+import {
+  IDENTITY_PIPELINE_NAME,
+  JOIN_REQUEST_PIPELINE_NAME,
+  SSO_CONNECTION_PIPELINE_NAME,
+} from "@langwatch/identity-contract";
+import { describe, expect, it, vi } from "vitest";
 
 import { ConnectedIdentityEventing } from "../../eventing/identity-command-senders.store.ts";
+import { identityEventing } from "../../eventing/identity.pipeline.ts";
+import { joinRequestEventing } from "../../eventing/join-request.pipeline.ts";
+import { ssoConnectionEventing } from "../../eventing/sso-connection.pipeline.ts";
+import { identityPipelineEventing } from "../../eventing/user-identity.pipeline.ts";
+import { identityProcessModule } from "../../identity.module.ts";
 
 const IDENTITY_VERBS = [
   "attachIdentifier",
@@ -97,6 +107,39 @@ describe("ConnectedIdentityEventing", () => {
       await expect(
         eventing.resolvePipelineCommand({ pipeline: IDENTITY_PIPELINE_NAME, command: "dropTable" }),
       ).resolves.toEqual({ kind: "unregistered" });
+    });
+  });
+});
+
+describe("given identity's process module", () => {
+  describe("when a process composes the module's eventing", () => {
+    /** @scenario "The identity module declares its identity, join-request and SSO connection ledgers itself" */
+    it("declares the three ledgers beside its maintenance sweeps, and no directory-sync ledger", () => {
+      const eventing = identityProcessModule.eventing;
+      const declarations = eventing && "declarations" in eventing ? eventing.declarations : [];
+
+      expect(declarations).toEqual([
+        identityEventing,
+        identityPipelineEventing,
+        joinRequestEventing,
+        ssoConnectionEventing,
+      ]);
+      expect(
+        [identityPipelineEventing, joinRequestEventing, ssoConnectionEventing].map(
+          (ledger) => ledger.pipeline,
+        ),
+      ).toEqual([IDENTITY_PIPELINE_NAME, JOIN_REQUEST_PIPELINE_NAME, SSO_CONNECTION_PIPELINE_NAME]);
+      expect(identityEventing.pipeline).not.toBe(SCIM_SYNC_PIPELINE_NAME);
+    });
+
+    /** @scenario "The identity module declares its identity, join-request and SSO connection ledgers itself" */
+    it("hands each ledger's commands back to the module as the process connects it", () => {
+      for (const ledger of [identityPipelineEventing, joinRequestEventing, ssoConnectionEventing]) {
+        const connectPipeline = vi.fn();
+        const commands = {};
+        ledger.connect?.({ app: { connectPipeline }, commands } as never);
+        expect(connectPipeline).toHaveBeenCalledWith({ pipeline: ledger.pipeline, commands });
+      }
     });
   });
 });

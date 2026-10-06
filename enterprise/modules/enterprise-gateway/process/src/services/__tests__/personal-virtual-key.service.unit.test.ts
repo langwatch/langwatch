@@ -1,6 +1,7 @@
 import {
   NoEligibleProvidersError,
   type PersonalVirtualKey,
+  type RoutingPolicy,
 } from "@langwatch/enterprise-gateway-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -53,7 +54,7 @@ class MemoryPolicies {
   update = vi.fn();
   setDefault = vi.fn();
   delete = vi.fn();
-  findDefaultForUser = vi.fn(async () => null);
+  findDefaultForUser = vi.fn(async (): Promise<RoutingPolicy | null> => null);
 }
 
 function setup({ eligible = 1, held = [gatewayKey()] } = {}) {
@@ -146,5 +147,63 @@ describe("PersonalVirtualKeyService", () => {
         label: "laptop",
       }),
     ).resolves.toBe(false);
+  });
+});
+
+describe("given a member with no default personal key yet", () => {
+  describe("when they ask for their default personal key", () => {
+    /** @scenario "Any member can mint their own default personal VK, scoped to their personal project" */
+    it("mints it on their personal project with their team's default policy, and answers the secret", async () => {
+      const issuer = new MemoryIssuer();
+      const teamDefault: RoutingPolicy = {
+        id: "policy_team_default",
+        organizationId: "organization",
+        name: "Team default",
+        description: null,
+        modelProviderIds: ["provider_openai"],
+        modelAliases: {},
+        defaultModel: null,
+        policyRules: {},
+        isDefault: true,
+        createdAtMs: 1,
+        updatedAtMs: 1,
+        createdById: null,
+        updatedById: null,
+        scopes: [],
+      };
+      const policies = new MemoryPolicies();
+      policies.findDefaultForUser.mockResolvedValue(teamDefault);
+      const service = PersonalVirtualKeyService.create({
+        keys: createApiFixture<GatewayApi>({ findPersonalVirtualKeys: async () => [] }),
+        providers: createApiFixture<ModelProviderApi>({ countEnabledInScopes: async () => 1 }),
+        issuer,
+        organizations: new MemoryOrganizations(),
+        policies,
+        gatewayBaseUrl: "https://gateway.example.com",
+      });
+
+      const issued = await service.ensureDefault({
+        userId: "user",
+        organizationId: "organization",
+      });
+
+      expect(policies.findDefaultForUser).toHaveBeenCalledWith({
+        organizationId: "organization",
+        personalTeamId: "team",
+      });
+      expect(issuer.issue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user",
+          organizationId: "organization",
+          personalProjectId: "project",
+          routingPolicyId: "policy_team_default",
+        }),
+      );
+      expect(issued).toMatchObject({
+        secret: "secret",
+        baseUrl: "https://gateway.example.com",
+        routingPolicyId: "policy_team_default",
+      });
+    });
   });
 });

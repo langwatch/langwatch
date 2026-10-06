@@ -11,7 +11,7 @@ const PERMISSION = "virtualKeys:viewOtherPersonal";
 
 describe("given the role templates read when a binding is checked", () => {
   describe("when the binding is an admin binding", () => {
-    /** @scenario "Existing org admins automatically gain virtualKeys:viewOtherPersonal on migrate" */
+    /** @scenario "Existing org admins hold virtualKeys:viewOtherPersonal from the role template, with no migration" */
     it("confers viewOtherPersonal at the organization and on the team admin template", () => {
       expect(
         permissionsConferred({ role: "ADMIN", scopeType: "ORGANIZATION", customPermissions: [] }),
