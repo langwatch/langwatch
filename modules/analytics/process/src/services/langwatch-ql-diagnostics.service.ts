@@ -80,6 +80,16 @@ function appFunctionDiagnostics({
       meta: { columns: appFunctions.unresolvedKeys },
     });
   }
+  const skipped = appFunctions.skippedJudgements ?? {};
+  const skippedTexts = Object.values(skipped).reduce((total, count) => total + count, 0);
+  if (skippedTexts > 0) {
+    diagnostics.push({
+      code: "INSTANT_EVAL_SKIPPED",
+      message:
+        "Some rows are null because their text could not be judged. Run the query again, ask for less text per row, or check that judging is switched on for this project.",
+      meta: { texts: skippedTexts, reasons: skipped },
+    });
+  }
 
   return diagnostics;
 }

@@ -271,12 +271,13 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     When conversation hydrates
     Then the rendered conversation holds the text from those messages
 
-  @unit @unimplemented
+  @unit
   Scenario: Questions that leave no room for text are refused before anything is judged
     Given eval questions that alone fill the judge's state
     When the statement is hydrated
     Then it fails with instant_eval_questions_too_long and nothing is sent to the judge
 
+  # Needs the judge's limits in hydration; held, lwql-sync-eval handoff.
   @unit @unimplemented
   Scenario: A conversation over the judge's budget is measured with the judge's own ratio
     Given a conversation that fits four bytes a token but not the judge's denser ratio
@@ -295,7 +296,7 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
   # Failure
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: A cancelled query keeps the judgements it made
     Given a judged query whose caller cancels after one row was answered
     When hydration returns
@@ -315,7 +316,7 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     When the caller cancels after the first chunk
     Then no further chunk is read
 
-  @unit @unimplemented
+  @unit
   Scenario: A judged query reports the time its judging took
     Given a statement whose eval calls take longer than the database read
     When the query answers

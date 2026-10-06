@@ -53,6 +53,7 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
@@ -203,6 +204,8 @@ type AnalyticsDependencies = Readonly<{
   traces: typeof TraceApi;
   /** The owner of the platform retention default an evaluation row is stamped with. */
   retention: typeof DataRetentionApi;
+  /** Holds the budget, judges a synchronous query's eval columns and records the spend. */
+  instantEvals: typeof InstantEvalApi;
 }>;
 
 type LwqlProvisioningOperations = Readonly<{
@@ -325,6 +328,8 @@ export class AnalyticsModule
     /** Every app-function value is one of this peer's traces, rendered by it. */
     traces: TraceApi,
     retention: DataRetentionApi,
+    /** Judges a query's eval columns: the one accepted cycle (Alex, 2026-10-06, "Judge cycle"). */
+    instantEvals: InstantEvalApi,
   };
   static readonly config = analyticsServerConfig;
   /** The restricted identity's password and the PostgreSQL reader's (ADR-132). */
@@ -400,6 +405,7 @@ export class AnalyticsModule
       executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,
       hydration,
+      judging: setup.dependencies.instantEvals,
     });
     setup.resources.own("Analytics LangWatchQL identity", () => langWatchQL.close());
     const app = new AnalyticsModule(
@@ -587,9 +593,11 @@ export class AnalyticsModule
    * windows first. An empty scope still runs, and reads zero rows.
    */
   async runLangWatchQLForKey(
-    input: Readonly<{ reach: LangWatchQLKeyReach } & LangWatchQLStatementRequest>,
+    input: Readonly<
+      { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLStatementRequest
+    >,
   ): Promise<LangWatchQLQueryResult> {
-    const { reach, sql, parameters, timeWindow, granularitySeconds } = input;
+    const { reach, sql, parameters, timeWindow, granularitySeconds, signal } = input;
     const { projects, protections } = await this.#queryScope.resolve({ reach });
     for (const project of projects) {
       await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
@@ -602,6 +610,7 @@ export class AnalyticsModule
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
       ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
+      ...(signal ? { signal } : {}),
       isInstantEvalsEnabled:
         statementMightCallEvalFunction(sql) && (await this.#isInstantEvalsEnabledFor({ projects })),
     });

@@ -66,6 +66,8 @@ export interface LangWatchQLAppFunctionDiagnosticsInput {
   readonly rowsReturned: number;
   readonly valueTruncations: readonly { column: string; function: string; values: number }[];
   readonly unresolvedKeys: readonly { column: string; function: string; keys: number }[];
+  /** Texts the judge skipped, by reason; absent when the statement judged nothing. */
+  readonly skippedJudgements?: Readonly<Record<string, number>>;
 }
 
 /** One of a block's table references, resolved to the view it names. */

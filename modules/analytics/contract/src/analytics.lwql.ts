@@ -36,6 +36,7 @@ export const LWQL_DIAGNOSTIC_CODES = [
   "APP_FUNCTION_VALUE_TRUNCATED",
   "APP_FUNCTION_UNRESOLVED_KEYS",
   "APP_FUNCTION_RESULT_TRUNCATED",
+  "INSTANT_EVAL_SKIPPED",
 ] as const;
 export const langWatchQLDiagnosticCodeSchema = z.enum(LWQL_DIAGNOSTIC_CODES);
 export type LangWatchQLDiagnosticCode = z.infer<typeof langWatchQLDiagnosticCodeSchema>;
@@ -214,6 +215,8 @@ export type LangWatchQLRunContext = Readonly<{
   timeWindow?: LangWatchQLTimeWindow;
   granularitySeconds?: number;
   onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+  /** The caller's request, as main's query took it: a hang-up stops judging (eval-functions). */
+  signal?: AbortSignal;
 }>;
 
 /** Input shared by every restricted LangWatchQL execution surface. */

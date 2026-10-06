@@ -20,6 +20,7 @@ import {
   type LangWatchQLSchema,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -29,7 +30,14 @@ import type {
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import type { LangWatchQLAppFunctionDiagnosticsInput } from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
 import { DEFAULT_LWQL_HYDRATION_LIMITS } from "../rules/langwatch-ql-hydration-assembly.rules.ts";
-import { langWatchQLExtractionCalls } from "../rules/langwatch-ql-hydration-plan.rules.ts";
+import {
+  langWatchQLExtractionCalls,
+  langWatchQLExtractionPlan,
+} from "../rules/langwatch-ql-hydration-plan.rules.ts";
+import {
+  langWatchQLJudgedColumns,
+  langWatchQLJudgementCalls,
+} from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { appendDefaultRowLimit } from "../rules/langwatch-ql-row-limit.rules.ts";
@@ -97,6 +105,13 @@ export interface LangWatchQLServiceDependencies {
    * the database's own answer, which then comes back as the database gave it.
    */
   readonly hydration?: Pick<LangWatchQLHydrationService, "hydrate">;
+  /**
+   * Judges the eval columns once hydration left their text in place (Alex, 2026-10-06, "Judge
+   * cycle"). Absent only in a suite that judges nothing; an eval column then keeps its text.
+   */
+  readonly judging?: Pick<InstantEvalApi, "judgeQuery">;
+  /** Milliseconds on a monotonic clock, for the elapsed time hydration and judging add. */
+  readonly stopwatch?: () => number;
 }
 
 export class LangWatchQLService {
@@ -104,6 +119,7 @@ export class LangWatchQLService {
   private readonly catalog: LwqlCatalogue;
   private readonly limits: LangWatchQLResultLimits;
   private readonly now: () => Instant;
+  private readonly stopwatch: () => number;
   private readonly validation = LangWatchQLValidationService.create();
 
   /** Releases the transport the executor holds, where it holds one. */
@@ -116,6 +132,7 @@ export class LangWatchQLService {
     this.catalog = deps.catalog ?? LWQL_CATALOG;
     this.limits = deps.limits ?? DEFAULT_LWQL_RESULT_LIMITS;
     this.now = deps.now ?? nowInstant;
+    this.stopwatch = deps.stopwatch ?? (() => performance.now());
   }
 
   static create(deps: LangWatchQLServiceDependencies): LangWatchQLService {
@@ -328,6 +345,7 @@ export class LangWatchQLService {
     granularitySeconds,
     onBudgetOverflow,
     isInstantEvalsEnabled,
+    signal,
   }: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate): Promise<LangWatchQLQueryResult> {
     const projectIds = projects.map((project) => project.id);
     const validation = this.validate({
@@ -368,6 +386,7 @@ export class LangWatchQLService {
       sql,
       validation,
       granularity,
+      ...(signal ? { signal } : {}),
     });
   }
 
@@ -405,46 +424,96 @@ export class LangWatchQLService {
   }
 
   /**
-   * Replaces each extraction call's key with its value, as main's query did; an eval column
-   * keeps what the database answered until the query judges (held, lwql-sync-eval).
+   * Replaces each app-function key with its value, then has the eval columns judged on the text
+   * left in place, as main's query did. A cancel fails the query once the spend is recorded.
    */
   private async hydrateExtraction({
     projects,
     protections,
     validation,
     execution,
+    signal,
   }: {
     readonly projects: readonly LangWatchQLCaller[];
     readonly protections: LangWatchQLProtections;
     readonly validation: ValidatedLangWatchQL;
     readonly execution: Pick<LangWatchQLQueryResult, "columns" | "rows">;
+    readonly signal?: AbortSignal;
   }): Promise<
     Pick<LangWatchQLQueryResult, "columns" | "rows"> & {
       readonly appFunctions?: LangWatchQLAppFunctionDiagnosticsInput;
     }
   > {
-    const calls = langWatchQLExtractionCalls(validation.appFunctions);
-    const { hydration } = this.deps;
-    if (!hydration || calls.length === 0) return execution;
+    const { hydration, judging } = this.deps;
+    const judgements = judging ? langWatchQLJudgementCalls(validation.appFunctions) : [];
+    const calls =
+      judgements.length > 0
+        ? langWatchQLExtractionPlan(validation.appFunctions)
+        : langWatchQLExtractionCalls(validation.appFunctions);
+    if (!hydration || (calls.length === 0 && judgements.length === 0)) return execution;
     const hydrated = await hydration.hydrate({
       projectIds: projects.map((project) => project.id),
       protections,
       calls,
       columns: execution.columns,
       rows: execution.rows,
+      ...(signal ? { signal } : {}),
     });
+    const judged = await this.judge({ projects, judgements, rows: hydrated.rows, signal });
 
     return {
-      columns: hydrated.columns,
-      rows: hydrated.rows,
+      columns: langWatchQLJudgedColumns({
+        columns: hydrated.columns,
+        appFunctions: judgements.length > 0 ? validation.appFunctions : [],
+      }),
+      rows: judged.rows,
       appFunctions: {
         isTruncatedByBytes: hydrated.isTruncatedByBytes,
         maxHydratedBytes: DEFAULT_LWQL_HYDRATION_LIMITS.maxHydratedBytes,
-        rowsReturned: hydrated.rows.length,
+        rowsReturned: judged.rows.length,
         valueTruncations: hydrated.valueTruncations,
         unresolvedKeys: hydrated.unresolvedKeys,
+        ...(judged.skipped ? { skippedJudgements: judged.skipped } : {}),
       },
     };
+  }
+
+  /**
+   * The eval columns judged by instant-eval, which holds the budget and records the spend. The
+   * gate admits an eval call for one project only, which is what gives the spend its owner.
+   */
+  private async judge({
+    projects,
+    judgements,
+    rows,
+    signal,
+  }: {
+    readonly projects: readonly LangWatchQLCaller[];
+    readonly judgements: ReturnType<typeof langWatchQLJudgementCalls>;
+    readonly rows: readonly Record<string, unknown>[];
+    readonly signal?: AbortSignal;
+  }): Promise<{
+    rows: readonly Record<string, unknown>[];
+    skipped?: Readonly<Record<string, number>>;
+  }> {
+    const [project, ...others] = projects;
+    if (!this.deps.judging || judgements.length === 0) return { rows };
+    if (!project || others.length > 0) {
+      throw new Error("an eval function reached execution outside a single-project scope");
+    }
+    const judged = await this.deps.judging.judgeQuery({
+      projectId: project.id,
+      judgements,
+      rows,
+      ...(signal ? { signal } : {}),
+    });
+    if (judged.cancellation) {
+      throw signal?.reason instanceof Error
+        ? signal.reason
+        : new DOMException("The query was cancelled", "AbortError");
+    }
+
+    return { rows: judged.rows, skipped: judged.skipped };
   }
 
   private async executeValidated({
@@ -454,6 +523,7 @@ export class LangWatchQLService {
     sql,
     validation,
     granularity,
+    signal,
   }: {
     readonly executor: LangWatchQLExecutorRepository;
     readonly projects: readonly LangWatchQLCaller[];
@@ -461,6 +531,7 @@ export class LangWatchQLService {
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
+    readonly signal?: AbortSignal;
   }): Promise<LangWatchQLQueryResult> {
     // The resolved record plus the step this run was bucketed at, when the
     // statement declares the parameter. Built unconditionally and omitted when
@@ -484,7 +555,18 @@ export class LangWatchQLService {
     // Refused rather than cut: a body that looks whole but is missing its tail is the worse
     // failure for an analytics caller. The row count is already bounded by the LIMIT above.
     this.assertResultWithinByteCeiling(execution.rows);
-    const answer = await this.hydrateExtraction({ projects, protections, validation, execution });
+    const hydrationStartedMs = this.stopwatch();
+    const answer = await this.hydrateExtraction({
+      projects,
+      protections,
+      validation,
+      execution,
+      ...(signal ? { signal } : {}),
+    });
+    // The database's own time plus what hydration spent reading and judging: a judged query
+    // that took three seconds must not report the sixty milliseconds ClickHouse saw of it.
+    const elapsedMs =
+      execution.statistics.elapsedMs + Math.round(this.stopwatch() - hydrationStartedMs);
 
     // The facts the walk recorded, plus what actually came back. Both halves
     // are needed and neither is re-derived: a rule about the query's shape
@@ -505,7 +587,7 @@ export class LangWatchQLService {
         tables: validation.tables,
         rowsReturned: answer.rows.length,
         rowsRead: execution.statistics.rowsRead,
-        elapsedMs: execution.statistics.elapsedMs,
+        elapsedMs,
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
@@ -517,7 +599,7 @@ export class LangWatchQLService {
       columns: answer.columns,
       rows: answer.rows,
       // Hydration can drop trailing rows at its own ceiling: the count is what the caller received.
-      statistics: { ...execution.statistics, rowsReturned: answer.rows.length },
+      statistics: { ...execution.statistics, elapsedMs, rowsReturned: answer.rows.length },
       diagnostics,
       followsTimeWindow: validation.followsTimeWindow,
       followsGranularity: granularity.followsGranularity,

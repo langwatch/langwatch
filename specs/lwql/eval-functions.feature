@@ -23,8 +23,10 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     statement, reads the text through the extraction functions and asks the classifier.
     Its judging is specified in modules/instant-eval/specs/instant-eval-pipeline.feature,
     classifier.feature and instant-eval-cost.feature.
-  - The synchronous judging scenarios below are @unimplemented until analytics reaches the
-    judge without a new peer cycle (.claude/coordinator/held-questions.md, lwql-sync-eval).
+  - Analytics reaches the judge through InstantEvalApi.judgeQuery, which holds the budget,
+    judges and records the spend once (Alex, 2026-10-06, "Judge cycle": one accepted cycle).
+    Cutting a conversation to the judge's budget is @unimplemented: hydration does not yet
+    know the judge's limits.
 
   Background:
     Given a project whose credential holds analytics:view
@@ -88,14 +90,14 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     Then the judged column holds the conversation text
     And no classifier was called
 
-  @unit @unimplemented
+  @unit
   Scenario: The judged column carries the probability, not the conversation key
     Given a conversation the classifier answers with a probability of 0.9
     When a statement projecting eval(conversation(ConversationId), 'The customer sounds annoyed') AS annoyed is hydrated
     Then the column holds 0.9
     And the column type is reported as Nullable(Float64)
 
-  @unit @unimplemented
+  @unit
   Scenario: Three questions over one text cost one classifier request per row
     Given a statement projecting eval, eval_score and eval_category over the same conversation expression
     When the statement is hydrated over one row
@@ -103,20 +105,20 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And that request carried three questions
     And each column holds the answer to its own question
 
-  @unit @unimplemented
+  @unit
   Scenario: Two different texts in one statement are two requests per row
     Given a statement projecting an eval over the conversation and an eval over the trace digest
     When the statement is hydrated over one row
     Then the classifier received two requests
 
-  @unit @unimplemented
+  @unit
   Scenario: An eval over a plain column is judged on the column's own text and reads no trace
     Given a statement selecting eval(CapturedOutput, 'The answer is an apology') AS apology
     When the statement is hydrated
     Then the classifier was asked about the column's own text
     And no trace was read
 
-  @unit @unimplemented
+  @unit
   Scenario: Each eval function reports the answer its kind names
     Given a classifier answering a probability of 0.8, a level distribution and a category distribution
     When the four eval functions are hydrated
@@ -273,7 +275,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
   # Budget, failure and cost
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: A query whose text volume exceeds the per-query budget is refused
     Given a statement whose rows would send more tokens than the per-query budget allows
     When it is executed
@@ -281,14 +283,14 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And the refusal names the estimated tokens and the budget
     And the remediation tells the caller to run the statement as a job
 
-  @unit @unimplemented
+  @unit
   Scenario: A classifier that fails for the whole query is a platform refusal
     Given a classifier that refuses every request
     When a statement calling eval is executed
     Then it is refused with instant_eval_classifier_unavailable
     And the fault is recorded as the provider's
 
-  @unit @unimplemented
+  @unit
   Scenario: A row the classifier could not judge is skipped rather than guessed
     Given a classifier that refuses one row of five and answers the rest
     When the statement is hydrated
@@ -296,14 +298,14 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And the result carries the INSTANT_EVAL_SKIPPED diagnostic naming one row
     And the other four rows hold their answers
 
-  @unit @unimplemented
+  @unit
   Scenario: A statement that judges nothing resolves no gate and builds no classifier
     Given a statement that calls no eval function
     When it is executed
     Then the project's Instant Evals gate is never resolved
     And no classifier is built for the query
 
-  @unit @unimplemented
+  @unit
   Scenario: A text the classifier failed on is skipped, not reported as a missing key
     Given a classifier that drops one text of two and answers the other
     When the statement is hydrated
@@ -311,7 +313,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And the result reports one skipped judgement naming the classifier failure
     And no key is reported as unresolved, because both keys found their text
 
-  @unit @unimplemented
+  @unit
   Scenario: A cancelled query stops judging instead of paying out the rest
     Given a query being judged row by row
     When the caller cancels it
@@ -319,13 +321,13 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And the cancellation reaches the request already in flight
     And the query fails as cancelled rather than answering with null columns
 
-  @unit @unimplemented
+  @unit
   Scenario: A query that judged nothing reports no spend
     Given a statement whose every key resolved to no text
     When it is executed
     Then no spend record is reported
 
-  @unit @unimplemented
+  @unit
   Scenario: One spend record is reported per query
     Given a statement that judged three conversations
     When it is executed
@@ -334,6 +336,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And its cost is the classifier's own cost
     And the customer price carries the platform markup
 
+  # Needs the judge's limits in hydration; held, lwql-sync-eval handoff.
   @unit @unimplemented
   Scenario: A conversation past the judge's budget is cut through the bounded renderer, keeping both ends
     Given an eval over a conversation far longer than the judge's budget
@@ -343,6 +346,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And it names how many turns were dropped from the middle
     And the cell reports itself truncated
 
+  # Needs the judge's limits in hydration; held, lwql-sync-eval handoff.
   @unit @unimplemented
   Scenario: A conversation inside the judge's budget is sent whole and not marked truncated
     Given an eval over a conversation smaller than the judge's budget

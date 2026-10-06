@@ -9,6 +9,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -76,6 +77,7 @@ function process(role: "api" | "worker") {
       entitlement: createApiFixture<EntitlementApi>(),
       trace: createApiFixture<TraceApi>(),
       "data-retention": createApiFixture<DataRetentionApi>(),
+      "instant-eval": createApiFixture<InstantEvalApi>(),
     });
 }
 

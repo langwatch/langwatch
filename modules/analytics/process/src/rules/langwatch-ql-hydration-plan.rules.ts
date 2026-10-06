@@ -83,7 +83,7 @@ export function langWatchQLExtractionPlan(
 
 /**
  * The extraction calls of a plan, eval calls left as the database answered: what the
- * synchronous query hydrates until it judges (held, lwql-sync-eval).
+ * synchronous query hydrates when nothing is wired to judge them.
  */
 export function langWatchQLExtractionCalls(
   calls: readonly LangWatchQLAppFunctionCall[],

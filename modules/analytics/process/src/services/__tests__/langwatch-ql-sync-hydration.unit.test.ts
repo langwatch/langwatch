@@ -162,7 +162,7 @@ describe("LangWatchQLService.executeForProjects with an extraction function", ()
   });
 
   describe("when the statement judges", () => {
-    it("leaves the eval column as the database answered it until the query judges", async () => {
+    it("leaves the eval column as the database answered it when nothing judges", async () => {
       const service = serviceOver({ keys: ["thread-a"] });
 
       const result = await service.executeForProjects({
