@@ -175,16 +175,16 @@ export type LookupInvitationExpiry = z.infer<typeof lookupInvitationExpirySchema
 /** Whoever asked: the impersonator when there is one. */
 export type IdentityLookupOperator = Readonly<{ userId: string }>;
 
-/**
- * The platform operator's identity lookup (D05). Every operation records the
- * act before it gates, and refuses a non-operator with the generic `not_found`.
- */
 /** A domain a person proved through a verified or primary identifier. */
 export interface VerifiedUserDomain {
   userId: string;
   domain: string;
 }
 
+/**
+ * The platform operator's identity lookup (D05). The door admits only ops:manage
+ * at the platform and hides the surface from everyone else; every act is recorded.
+ */
 export interface IdentityLookupApi {
   lookupAddress(input: {
     address: string;
@@ -230,6 +230,12 @@ export interface IdentityLookupApi {
     inviteId: string;
     operator: IdentityLookupOperator;
   }): Promise<LookupInvitationExpiry>;
+  /** A caller the door refused (Q51): recorded within a shared stranger budget, never thrown. */
+  recordRefusedLookup(input: {
+    operator: IdentityLookupOperator;
+    action: string;
+    args: Readonly<Record<string, string | null>>;
+  }): Promise<void>;
 }
 
 export const IdentityLookupApi = moduleApi<IdentityLookupApi>()("identity");

@@ -29,6 +29,8 @@ const SUITE = nanoid(8)
 const IDP_ENTITY_ID = `https://idp-${SUITE}.saml-linking-test.example/entity`;
 const IDP_SSO_URL = `https://idp-${SUITE}.saml-linking-test.example/sso`;
 
+/** Identity's identifier backfill, as the runner and the arrival both key its per-tenant state. */
+const D01_MIGRATION = "identity-d01-identifier-backfill";
 const organizationIds: string[] = [];
 const connectionIds: string[] = [];
 const userIds: string[] = [];
@@ -282,8 +284,8 @@ describe.skipIf(!liveStoresConfigured)("signed SAML sessions of existing and new
     expect(remaining).toEqual([expect.objectContaining({ id: historical.id, identifierId: null })]);
   });
 
-  /** D01 finalized is not asserted: no arrival path persists it, so the scenario stays unbound. */
-  it("records the generated identifier on the first session of a fresh address", async () => {
+  /** @scenario "A fresh SAML callback adopts identity before its first session is used" */
+  it("adopts a fresh address, records D01 finalized and the generated identifier on its first session", async () => {
     const connection = await connect({ label: "fresh" });
     const email = `newcomer@${connection.domain}`;
 
@@ -292,9 +294,21 @@ describe.skipIf(!liveStoresConfigured)("signed SAML sessions of existing and new
     userIds.push(user.id);
     expect(first.session?.user.id).toBe(user.id);
     const identifier = await samlIdentifierOf({ userId: user.id, connection });
+    const d01 = { migrationName: D01_MIGRATION, tenantId: user.id };
+    await vi.waitFor(
+      async () => {
+        const row = await prisma.systemMigrationTenantState.findUnique({
+          where: { migrationName_tenantId: d01 },
+        });
+        if (row?.status !== "finalized")
+          throw new Error("D01 is not finalized for the arrival yet");
+      },
+      { timeout: 30_000, interval: 250 },
+    );
     const again = await signIn({ connection, email });
 
     expect(again.session?.user.id).toBe(user.id);
+    expect(await prisma.systemMigrationTenantState.count({ where: d01 })).toBe(1);
     expect((await sessionsOf({ userId: user.id })).map((s) => s.identifierId)).toEqual([
       identifier.id,
       identifier.id,
