@@ -5,14 +5,21 @@ import "github.com/langwatch/langwatch/pkg/aitrace"
 // The customer trace bridge in pkg reads these, and pkg imports nothing from
 // services, so they are defined in pkg/aitrace and aliased here.
 type (
-	ProviderID      = aitrace.ProviderID
-	RequestType     = aitrace.RequestType
-	Usage           = aitrace.Usage
+	// ProviderID is aitrace.ProviderID.
+	ProviderID = aitrace.ProviderID
+	// RequestType is aitrace.RequestType.
+	RequestType = aitrace.RequestType
+	// Usage is aitrace.Usage.
+	Usage = aitrace.Usage
+	// AudioTokenSplit is aitrace.AudioTokenSplit.
 	AudioTokenSplit = aitrace.AudioTokenSplit
+	// ImageTokenSplit is aitrace.ImageTokenSplit.
 	ImageTokenSplit = aitrace.ImageTokenSplit
-	AITraceParams   = aitrace.AITraceParams
+	// AITraceParams is aitrace.AITraceParams.
+	AITraceParams = aitrace.AITraceParams
 )
 
+// The provider identifiers, aliased from pkg/aitrace.
 const (
 	ProviderOpenAI      = aitrace.ProviderOpenAI
 	ProviderAnthropic   = aitrace.ProviderAnthropic
@@ -31,6 +38,7 @@ const (
 	ProviderOpenAICodex = aitrace.ProviderOpenAICodex
 )
 
+// The request types, aliased from pkg/aitrace.
 const (
 	RequestTypeChat            = aitrace.RequestTypeChat
 	RequestTypeMessages        = aitrace.RequestTypeMessages
