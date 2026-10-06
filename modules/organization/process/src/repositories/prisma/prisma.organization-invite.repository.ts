@@ -173,6 +173,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
         teamAssignments: toInviteJson(input.teamAssignments),
         role: input.role,
         status: "PENDING",
+        requestedBy: input.requestedBy ?? null,
       },
     });
 
@@ -192,6 +193,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
         teamAssignments: toInviteJson(input.teamAssignments),
         role: input.role,
         status: "PAYMENT_PENDING",
+        requestedBy: input.requestedBy ?? null,
         subscriptionId: input.subscriptionId,
       },
     });

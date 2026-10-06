@@ -74,6 +74,7 @@ export interface CreateAdminInviteInput {
   organizationId: string;
   teamIds: string;
   teamAssignments?: TeamAssignmentInput[];
+  requestedBy?: string | null;
 }
 
 /**

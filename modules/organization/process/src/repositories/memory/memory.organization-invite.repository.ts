@@ -371,7 +371,7 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
       teamIds: input.teamIds,
       teamAssignments: (input.teamAssignments ?? null) as OrganizationJsonValue | null,
       role: input.role,
-      requestedBy: null,
+      requestedBy: input.requestedBy ?? null,
       subscriptionId: input.subscriptionId,
       acceptedByUserId: null,
       acceptedViaIdentifierId: null,

@@ -40,6 +40,8 @@ export type OrganizationInvitationsCreateInput = Readonly<{
     teams?: readonly Readonly<{ teamId: string; role: string; customRoleId?: string }>[];
     role: OrganizationUserRole;
   }>[];
+  /** The user recorded as the sender of every invitation in the batch. */
+  requestedBy?: string;
   /**
    * Chosen by the transport that asked, never by the composition: a batch naming a team
    * outside the organization is refused under `strict` and filtered under `lenient`.
@@ -177,6 +179,7 @@ export class OrganizationInvitationsService implements OrganizationInvitations {
         ...(invite.teamIds === undefined ? {} : { teamIds: invite.teamIds }),
         ...(invite.teams === undefined ? {} : { teams: invite.teams.map((team) => ({ ...team })) }),
       })),
+      ...(input.requestedBy === undefined ? {} : { requestedBy: input.requestedBy }),
       // Whichever mode the transport asked for. The composition deliberately
       // picks none: hard-coding one here is what made the management API
       // accept a batch naming a team outside the organization and answer 201

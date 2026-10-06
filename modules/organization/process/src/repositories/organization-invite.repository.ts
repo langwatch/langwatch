@@ -15,6 +15,8 @@ export type WriteInviteInput = {
   teamIds: string;
   teamAssignments?: unknown;
   role: OrganizationUserRole;
+  /** The user who sent it; null for an invitation a service created. */
+  requestedBy?: string | null;
 };
 
 /** One listed invitation, with the admin who asked for it. */

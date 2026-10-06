@@ -234,6 +234,7 @@ export class InviteCreationService {
         ? { teamAssignments: input.teamAssignments }
         : {}),
       role: input.role,
+      requestedBy: input.requestedBy ?? null,
     });
   }
 
@@ -305,11 +306,14 @@ export class InviteCreationService {
     organizationId,
     invites,
     user,
+    requestedBy,
     validation,
   }: {
     organizationId: string;
     invites: CreateInvitesInviteInput[];
     user?: PlanProviderUser;
+    /** The user the invitations are recorded as sent by; none for a service. */
+    requestedBy?: string;
     validation: "strict" | "lenient";
   }): Promise<{
     organization: Organization & { members: OrganizationUser[] };
@@ -345,7 +349,7 @@ export class InviteCreationService {
       (transaction) =>
         this.persistInvites({
           transaction,
-          invites: validInvites,
+          invites: validInvites.map((invite) => ({ ...invite, requestedBy: requestedBy ?? null })),
           organization,
           isStrict,
         }),
