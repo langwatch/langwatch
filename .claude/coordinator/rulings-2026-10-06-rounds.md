@@ -97,3 +97,4 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Floor rules (Q-U5): BOTH rules (floor refusal and background re-run)
 - Org admins (Q-U10): NO org surface; platform operators only
 - Inline eval (regression found 2026-10-06 late; instant-eval-billing :210, eval-functions.feature): RESTORE synchronous judging as main had it. Analytics calls an InstantEvalApi judge operation from the query path, holds queryTokenBudget around it and records spend; main's 15 removed eval-functions scenarios and its instantEvalQueries tests come back; the sync path also hydrates extraction (conversation()). The branch's "a query never judges" spec rewrite (0e1bd32357) had no ruling and is reverted.
+- Adopt account (Auth 32, Q150): ONE new UserApi.adoptUnconfirmedAccount that confirms the address and drops pre-proof credentials in one transaction; auth calls it from completeVerification.
