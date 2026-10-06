@@ -125,7 +125,14 @@ const rolePermissionListSchema = z.array(z.string());
 
 export class AuthzService extends AuthzServiceContract {
   static create(options: AuthzServiceOptions): AuthzService {
-    const collector = AuthzCollectorService.create({ reader: options.repository });
+    const scopeLineage = AuthzScopeLineageService.create({
+      repository: options.repository,
+      cacheEnabled: options.cacheEnabled,
+    });
+    const collector = AuthzCollectorService.create({
+      reader: options.repository,
+      lineage: scopeLineage,
+    });
 
     return new AuthzService({
       collector,
@@ -134,7 +141,7 @@ export class AuthzService extends AuthzServiceContract {
         listing: options.listing,
       }),
       snapshots: AuthzGrantSnapshotService.create(collector, options),
-      scopeLineage: AuthzScopeLineageService.create({ repository: options.repository }),
+      scopeLineage,
       options,
     });
   }
