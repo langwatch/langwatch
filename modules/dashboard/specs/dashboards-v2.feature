@@ -236,6 +236,102 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Langy drafts the widget's prompt when it is picked (AC12); the template's report prompt is drafted on create next
 
   # ---------------------------------------------------------------------------
+  # Flight Deck cockpit and Running costs widgets, from the prototype's cards
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: AC20 Flight Deck: This period sets four figures against the period before
+    Given the "This period" widget on a board
+    Then it shows the share of ended conversations that were resolved and the conversations
+    And it shows the share of checks passing and the AI cost per resolved conversation
+    And each figure shows its change from the equally long period before
+    And checks leave out guardrails and the outcome judge
+    And without outcomes the resolved figure says it is not measured and offers to add a judge
+
+  @unit
+  Scenario: AC21 Flight Deck: An outcome is the outcome judge's label or the outcome a trace sends
+    Given a conversation whose last trace the "Conversation Outcome Judge" labelled
+    And another whose last trace sends "outcome" in its metadata
+    Then the cockpit and cost widgets count each conversation once, the sent outcome first
+    And the outcome is dated by its trace, not by when the judge ran
+    # Decision: the judge name is the dev seed's; a project's own judge needs the same name
+
+  @unit
+  Scenario: AC22 Flight Deck: Needs attention names the one problem to look at first
+    Given the "Needs attention" widget on a board
+    Then it names the customer or topic whose pass rate fell most, beyond noise
+    And failing that, the failure reason that grew most
+    And failing that, a judge whose verdicts drifted from the reviewers' thumbs
+    And failing that, the step whose errors most often reach the user
+    And it says "Nothing got worse in this period." when none of them holds
+
+  @unit
+  Scenario: AC23 Flight Deck: Top request it cannot serve names a topic, a count and an example
+    Given conversations that ended as a capability gap in the period
+    Then the widget names the topic with the most of them, how many, and one request with its trace
+
+  @unit
+  Scenario: AC24 Flight Deck: An outcome widget tells a quiet period from a missing judge
+    Given an outcome widget with no outcomes in the board's period
+    When the project sent an outcome in the last 90 days
+    Then the widget says there were no outcomes in this period
+    When it never did
+    Then the widget says how to send outcomes and offers to add a judge
+
+  @unit
+  Scenario: AC25 Flight Deck: Resolved per day marks model and prompt changes
+    Given the resolved-per-day widget on a board
+    Then it draws the conversations resolved per bucket and their share of those that ended
+    And it marks each model and prompt version first seen in the period on its bucket
+
+  @unit
+  Scenario: AC26 Flight Deck: Task success is the share of calls that got the job done, per language
+    Given a voice agent's calls with an outcome
+    Then the widget shows, per language from the trace metadata, the share that were resolved
+    And calls without an outcome are left out
+
+  @unit
+  Scenario: AC27 Flight Deck: Accepted, edited or regenerated reads each output's action
+    Given traces that send "output_action" in their metadata
+    Then the widget shows per bucket the share accepted, edited, regenerated and ignored
+    # Missing in LangWatch: a first-class output action event; the metadata key is the dev seed's
+
+  @unit
+  Scenario: AC28 Running costs: Spend shows the period, the cost per success and the month forecast
+    Given the "Spend" widget on a board
+    Then it shows trace and evaluator cost against the period before
+    And it shows the cost per resolved conversation
+    And it shows the month to date run on to month end at the last 7 days' pace
+    # Missing in LangWatch: a project budget, so the prototype's budget figure is not shown
+
+  @unit
+  Scenario: AC29 Running costs: Production vs testing splits spend by where it came from
+    Given the "Production vs testing" widget on a board
+    Then it splits spend per bucket by trace origin into production, evaluations, simulations and experiments
+    And evaluator runs count as evaluations
+    And it says what share of the spend is test traffic
+
+  @unit
+  Scenario: AC30 Running costs: Wasted spend counts each production trace once
+    Given the "Wasted spend" widget on a board
+    Then a trace whose root span failed counts its whole cost as failed
+    And a trace that called one tool three times or more counts its share of repeated spans
+    And a trace that recovered counts each failed LLM call at its successful calls' price
+    And the widget shows the total as a share of production spend
+
+  @unit
+  Scenario: AC31 Running costs: Cost per call shows speech as not priced
+    Given the "Cost per call with speech vendors" widget on a board
+    Then it shows the LLM cost per call from production traces
+    And it shows speech as not priced, since LangWatch has no speech vendor rates
+
+  @unit
+  Scenario: AC32 Running costs: Cost per document is production cost per production trace
+    Given the "Cost per document" widget on a board
+    Then it shows the cost per document overall and per model, with model changes marked
+    And it shows the second half of the period against the first, and the cheapest model
+
+  # ---------------------------------------------------------------------------
   # Answer quality and What users ask widgets
   # ---------------------------------------------------------------------------
 
