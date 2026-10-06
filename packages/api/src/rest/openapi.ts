@@ -373,6 +373,54 @@ export function documentedResponses(
   return responses;
 }
 
+/** The fields of main's flat error body, `{ error, message? }` (response.ts `errorSchema`). */
+const MAIN_FLAT_ERROR_FIELDS: ReadonlySet<string> = new Set(["error", "message"]);
+
+/**
+ * The refusal statuses at which a route publishes main's flat error body, read from the very
+ * answers its document publishes, so what is sent there cannot drift from what is published.
+ */
+export async function flatErrorStatuses(
+  route: RestTransportRoute<unknown>,
+): Promise<ReadonlySet<number>> {
+  const statuses = new Set<number>();
+
+  for (const [status, answer] of Object.entries(documentedAnswers(route))) {
+    if (Number(status) < 400) continue;
+
+    const schema = await publishedJsonSchema(answer.content["application/json"]?.schema);
+    if (isMainFlatErrorBody(schema)) statuses.add(Number(status));
+  }
+
+  return statuses;
+}
+
+/** A published schema as JSON Schema: a resolver's own conversion, or the object itself. */
+async function publishedJsonSchema(schema: unknown): Promise<unknown> {
+  if (!isRecord(schema) || typeof schema.toJSONSchema !== "function") return schema;
+
+  try {
+    return await (schema.toJSONSchema as () => unknown)();
+  } catch {
+    return undefined;
+  }
+}
+
+/** An object requiring a root string `error`, with no field main's flat body lacks. */
+function isMainFlatErrorBody(schema: unknown): boolean {
+  if (!isRecord(schema) || !isRecord(schema.properties)) return false;
+
+  const error = schema.properties.error;
+  const required = Array.isArray(schema.required) ? schema.required : [];
+
+  return (
+    isRecord(error) &&
+    error.type === "string" &&
+    required.includes("error") &&
+    Object.keys(schema.properties).every((field) => MAIN_FLAT_ERROR_FIELDS.has(field))
+  );
+}
+
 /** The reason phrase each documented status is published with. */
 const RESPONSE_DESCRIPTIONS: Readonly<Record<number, string>> = {
   400: "Bad Request",

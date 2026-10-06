@@ -803,6 +803,31 @@ export function canonicalErrorFor(
   };
 }
 
+/** Main's `error` for any 5xx whose body it masked. */
+const MAIN_INTERNAL_ERROR = "Internal server error";
+
+/**
+ * Main's root `error` for a refusal answered as `code` at `status` (origin/main error-handler.ts,
+ * `determineErrorResponse`): a handled error's code, a sentence error's sentence, "Conflict" for
+ * an unchecked unique violation, and main's internal sentence wherever a 5xx is masked.
+ */
+export function legacyErrorOf({
+  failure,
+  code,
+  status,
+}: {
+  failure: unknown;
+  code: string;
+  status: number;
+}): string {
+  if (status >= 500 && code === FALLBACK_ERROR_CODE) return MAIN_INTERNAL_ERROR;
+  if (HandledError.isHandled(failure)) return code;
+  if (isUniqueViolation(failure)) return "Conflict";
+  if (isStatusCarryingError(failure)) return failure.error;
+
+  return code;
+}
+
 /**
  * The envelope for a handled error: its own code, status, meta and reason chain, except a
  * 5xx whose class does not declare the fault the caller's, which answers the opaque body

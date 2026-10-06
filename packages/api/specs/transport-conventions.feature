@@ -270,3 +270,36 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Given a route that declares an array body
       When it names no field, or a field its path or query already declares
       Then the declaration is refused where it is written, naming the route or the field
+
+  Rule: A route that publishes main's flat error body also sends main's root error (Alex, 2026-10-06, night)
+
+    @integration
+    Scenario: A handled refusal at a status published flat carries its code as the root error
+      Given a route that publishes main's flat { error, message } body at 422
+      When its handler throws a handled error at 422
+      Then the body is the canonical envelope with a root error equal to the handled error's code
+      And the body satisfies the schema the route publishes for 422
+
+    @integration
+    Scenario: A sentence refusal at a status published flat carries its sentence as the root error
+      Given a route that publishes main's flat body at 404
+      When its handler throws an HTTP error carrying a sentence at 404
+      Then the body is the canonical envelope with a root error equal to that sentence
+
+    @integration
+    Scenario: A masked 5xx published flat carries main's internal error sentence
+      Given a route that publishes main's flat body at 500
+      When its handler throws an unexpected error
+      Then the body is the masked envelope with the root error "Internal server error"
+
+    @integration
+    Scenario: A refusal raised at the door on a route published flat carries the root error
+      Given a route that publishes main's flat body at 401
+      When the door refuses the credential
+      Then the 401 body carries the refusal's root error beside the envelope
+
+    @integration
+    Scenario: A refusal at a status not published flat stays the canonical envelope alone
+      Given a route that publishes the canonical envelope at 409 and nothing at 403
+      When it refuses at 409 or at 403
+      Then the body carries no root error
