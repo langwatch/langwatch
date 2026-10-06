@@ -1,5 +1,6 @@
 import {
   AgentRegisterRefusedError,
+  AgentSessionUnknownError,
   type AgentApi,
   type AgentConnectRegisterOutput,
 } from "@langwatch/agent-contract";
@@ -99,9 +100,63 @@ describe("registerConnectedAgentInstance", () => {
     });
 
     expect(response.status).toBe(status);
-    const body = (await response.json()) as { code: string; meta?: { frame?: unknown } };
-    expect(body.code).toBe("agent_register_refused");
-    expect(body.meta?.frame).toEqual(refusedFrame);
+    expect(await response.json()).toEqual({ frame: refusedFrame });
+  });
+
+  it("answers a body that is no register frame with main's protocol_invalid frame at 422", async () => {
+    const registerConnectedAgentInstance = vi.fn();
+    const { hono } = buildApi({
+      application: createApiFixture<AgentApi>({ registerConnectedAgentInstance }),
+    });
+
+    const response = await hono.request("/api/v1/agents/connect/register", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ type: "hello" }),
+    });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual({
+      frame: {
+        type: "refused",
+        protocol: 1,
+        code: "protocol_invalid",
+        message: "The body must be a register frame with protocol 1.",
+      },
+    });
+    expect(registerConnectedAgentInstance).not.toHaveBeenCalled();
+  });
+
+  it("answers a poll's credential refusal as the refused frame at the body's root", async () => {
+    const { hono } = buildApi({
+      application: createApiFixture<AgentApi>({
+        connectPoll: async () => {
+          throw new AgentRegisterRefusedError({ reason: "api_key_invalid", message: "Refused" });
+        },
+      }),
+    });
+
+    const response = await hono.request("/api/v1/agents/connect/poll", { headers });
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      frame: { type: "refused", protocol: 1, code: "api_key_invalid", message: "Refused" },
+    });
+  });
+
+  it("leaves an unknown instance token to the boundary, as main never framed it", async () => {
+    const { hono } = buildApi({
+      application: createApiFixture<AgentApi>({
+        connectPoll: async () => {
+          throw new AgentSessionUnknownError();
+        },
+      }),
+    });
+
+    const response = await hono.request("/api/v1/agents/connect/poll", { headers });
+
+    expect(response.status).toBe(410);
+    expect(await response.json()).toMatchObject({ code: "agent_session_unknown" });
   });
 
   it("answers a registered frame and instance token with HTTP 200", async () => {
@@ -153,7 +208,7 @@ describe("registerConnectedAgentInstance", () => {
   describe("given an instance registered over HTTP", () => {
     describe("when it posts a body that carries no ack, result or deregister frame", () => {
       /** @scenario "A frames body the endpoint does not take is refused as a protocol frame" */
-      it("answers the framework validation envelope", async () => {
+      it("answers main's protocol_invalid frame at 422", async () => {
         const { hono, framesSpy } = buildApi();
 
         const response = await hono.request("/api/v1/agents/connect/frames", {
@@ -161,9 +216,16 @@ describe("registerConnectedAgentInstance", () => {
           headers,
           body: JSON.stringify({ frames: [{ type: "ping" }] }),
         });
-        const body = (await response.json()) as { error?: string; target?: string };
 
-        expect(body).toMatchObject({ code: "validation_error", meta: { target: "json" } });
+        expect(response.status).toBe(422);
+        expect(await response.json()).toEqual({
+          frame: {
+            type: "refused",
+            protocol: 1,
+            code: "protocol_invalid",
+            message: "The body must carry ack, result and deregister frames under frames.",
+          },
+        });
         expect(framesSpy).not.toHaveBeenCalled();
       });
     });

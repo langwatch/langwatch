@@ -13,9 +13,18 @@ import {
 import {
   defineRestMiddleware,
   defineRestRouter,
+  documentedResponses,
   MANAGEMENT_API_VERSION,
+  type RestProtocolRefusal,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+
+import {
+  type AgentConnectRefusal,
+  framesRefusal,
+  pollRefusal,
+  registerRefusal,
+} from "../rules/agent-connect-refusal.rules.ts";
 
 export const agentConnectHeaders = defineRestMiddleware(
   "agentConnectHeaders",
@@ -27,6 +36,24 @@ const CONNECT_ACCESS = {
   reason:
     "The connected-session protocol authenticates its declared credential facts and throws typed refusals.",
 };
+
+const JSON_MEDIA_TYPE = "application/json";
+
+const BECAUSE =
+  "The connect protocol's SDKs read a refusal as the refused frame at the body's root.";
+
+function frameRefusal(refusalOf: (failure: Error) => AgentConnectRefusal): RestProtocolRefusal {
+  return ({ failure, response }) => {
+    const refusal = refusalOf(failure);
+    if (refusal.kind === "declined") return response.decline();
+
+    return response.write({
+      status: refusal.status,
+      mediaType: JSON_MEDIA_TYPE,
+      body: JSON.stringify(refusal.body),
+    });
+  };
+}
 
 export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
   protocol: "rest";
@@ -46,7 +73,11 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
       .post("/connect/register", "registerConnectedAgentInstance")
       .withInput(agentConnectRegisterInputSchema)
       .withAccess(CONNECT_ACCESS)
-      .withOutput(agentConnectRegisterOutputSchema)
+      .withResponse("protocol", {
+        produces: JSON_MEDIA_TYPE,
+        because: BECAUSE,
+        refusal: frameRefusal(registerRefusal),
+      })
       .withBodyLimit({
         maxBytes: relayCaps.frameBytes,
         onExceeded: () =>
@@ -56,39 +87,68 @@ export function createAgentConnectRest(relayMaxPayloadMb?: number): Readonly<{
         summary: "Register this process's agents",
         description:
           "Returns a registered frame and instance token, or refuses at the status of the reason.",
+        responses: documentedResponses({ 200: agentConnectRegisterOutputSchema }),
       })
       .withMiddleware(agentConnectHeaders)
-      .handle(({ app, input }, credentials) =>
-        app.registerConnectedAgentInstance(input, credentials),
+      .handle(async ({ app, input, response }, credentials) =>
+        response.write({
+          status: 200,
+          mediaType: JSON_MEDIA_TYPE,
+          body: JSON.stringify(await app.registerConnectedAgentInstance(input, credentials)),
+        }),
       )
 
       .get("/connect/poll", "pollConnectedAgentInstance")
       .withQuery(agentConnectPollQuerySchema)
       .withAccess(CONNECT_ACCESS)
-      .withOutput(agentConnectPollOutputSchema)
+      .withResponse("protocol", {
+        produces: JSON_MEDIA_TYPE,
+        because: BECAUSE,
+        refusal: frameRefusal(pollRefusal),
+      })
       .withDocs({
         summary: "Wait for call and cancel frames while refreshing this instance's presence",
+        responses: documentedResponses({ 200: agentConnectPollOutputSchema }),
       })
       .withMiddleware(agentConnectHeaders)
-      .handle(({ app, input, signal }, credentials) =>
-        app.connectPoll(
-          { inFlightCallIds: (input.inFlight ?? "").split(",").filter(Boolean), signal },
-          credentials,
-        ),
+      .handle(async ({ app, input, signal, response }, credentials) =>
+        response.write({
+          status: 200,
+          mediaType: JSON_MEDIA_TYPE,
+          body: JSON.stringify(
+            await app.connectPoll(
+              { inFlightCallIds: (input.inFlight ?? "").split(",").filter(Boolean), signal },
+              credentials,
+            ),
+          ),
+        }),
       )
 
       .post("/connect/frames", "postConnectedAgentFrames")
       .withInput(agentConnectFramesInputSchema)
       .withAccess(CONNECT_ACCESS)
-      .withOutput(agentConnectFramesOutputSchema)
+      .withResponse("protocol", {
+        produces: JSON_MEDIA_TYPE,
+        because: BECAUSE,
+        refusal: frameRefusal(framesRefusal),
+      })
       .withBodyLimit({
         maxBytes: relayCaps.frameBytes,
         onExceeded: () =>
           new AgentPayloadTooLargeError({ what: "result", limitBytes: relayCaps.frameBytes }),
       })
-      .withDocs({ summary: "Accept this instance's acknowledgements, results and deregistration" })
+      .withDocs({
+        summary: "Accept this instance's acknowledgements, results and deregistration",
+        responses: documentedResponses({ 200: agentConnectFramesOutputSchema }),
+      })
       .withMiddleware(agentConnectHeaders)
-      .handle(({ app, input }, credentials) => app.connectFrames(input, credentials))
+      .handle(async ({ app, input, response }, credentials) =>
+        response.write({
+          status: 200,
+          mediaType: JSON_MEDIA_TYPE,
+          body: JSON.stringify(await app.connectFrames(input, credentials)),
+        }),
+      )
       .build()
   );
 }

@@ -250,8 +250,8 @@ export class AgentRegisterRefusedError extends HandledError {
     super("agent_register_refused", message, {
       httpStatus: REFUSAL_STATUSES[reason],
       fault: "customer",
-      // `frame` is the refused frame the connect protocol's clients read off
-      // the response body; the REST boundary spreads `meta` onto it.
+      // `frame` is the refused frame the connect protocol's clients read at
+      // the response body's root; the connect routes' protocol refusal writes it.
       meta: { reason, ...meta, frame },
       ...remediation("agent_register_refused"),
     });
