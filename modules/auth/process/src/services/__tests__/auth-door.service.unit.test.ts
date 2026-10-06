@@ -98,6 +98,25 @@ describe("AuthDoorService", () => {
       );
     });
 
+    /** @scenario "Every public auth entrance resolves its caller the same way" */
+    it("states the resolved caller on an account registration too, not the one it claimed", async () => {
+      const world = door();
+      const request = new Request(`${BASE_URL}/api/auth/sign-up/email`, {
+        method: "POST",
+        headers: {
+          origin: BASE_URL,
+          "content-type": "application/json",
+          "x-forwarded-for": "10.9.9.9, 203.0.113.8",
+        },
+        body: JSON.stringify({ email: "new@acme.com", password: "hunter2hunter2", name: "New" }),
+      });
+      ClientAddress.classifyByAddress().handle({ request, socketAddress: "198.51.100.11" });
+
+      await world.service.betterAuthHandshake(request);
+
+      expect(world.handler.mock.calls[0]![0].headers.get("x-forwarded-for")).toBe("198.51.100.11");
+    });
+
     it("strips the claim when no caller could be resolved, so it cannot pick a bucket", async () => {
       const world = door();
 

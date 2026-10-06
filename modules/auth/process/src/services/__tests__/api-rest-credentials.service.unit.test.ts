@@ -221,14 +221,18 @@ describe("the organization door", () => {
       expect((refusal as Error).message).not.toMatch(/project|organization/i);
     });
 
-    it("tells a project key from it, naming the class the endpoint needs", async () => {
-      expect(
-        await refusalCode(
-          door.identifyOrganization({
-            request: request({ authorization: "Bearer sk-lw-project" }),
-          }),
-        ),
-      ).toBe("credential_class_mismatch");
+    /** @scenario "A project key on an organization endpoint is told exactly that" */
+    it("tells a project key from it, naming the class the endpoint needs and the one presented", async () => {
+      const refusal = await door
+        .identifyOrganization({ request: request({ authorization: "Bearer sk-lw-project" }) })
+        .then(
+          () => new Error("the door admitted the request"),
+          (error: unknown) => error,
+        );
+
+      expect(refusal).toMatchObject({ code: "credential_class_mismatch", httpStatus: 401 });
+      expect((refusal as Error).message).toMatch(/requires an organization API key/);
+      expect((refusal as Error).message).toMatch(/a project key was presented/);
     });
   });
 });

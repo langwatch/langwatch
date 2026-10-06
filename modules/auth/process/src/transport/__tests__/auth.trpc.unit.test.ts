@@ -416,4 +416,77 @@ describe("the signed-out front door", () => {
       expect(getPriorSession.mock.calls[0]?.[0].headers.get("cookie")).toBeNull();
     });
   });
+  describe("when one visitor asks the sign-in router about a different address every time", () => {
+    /** @scenario "Asking about address after address from one place is eventually refused" */
+    it("answers until the visitor's hour is spent, then refuses with the wait and asks the router no more", async () => {
+      const spent = new Map<string, number>();
+      isWithinBudget.mockImplementation(async ({ key, max }) => {
+        const used = (spent.get(key) ?? 0) + 1;
+        spent.set(key, used);
+        return used <= max ? { allowed: true } : { allowed: false, retryAfterSeconds: 1800 };
+      });
+      route.mockResolvedValue({
+        outcome: "route_to_signup",
+        methodSet: [],
+        reasonCode: "identifier_unknown",
+      });
+
+      for (let asked = 0; asked < 200; asked += 1) {
+        await visitor.route({ identifier: `person-${asked}@acme.com`, breakGlass: undefined });
+      }
+      await expect(
+        visitor.route({ identifier: "person-200@acme.com", breakGlass: undefined }),
+      ).rejects.toMatchObject({
+        cause: { code: "auth_rate_limited", meta: { retryAfterSeconds: 1800 } },
+      });
+
+      expect(new Set(isWithinBudget.mock.calls.map(([call]) => call.key))).toEqual(
+        new Set(["auth.route:203.0.113.7"]),
+      );
+      expect(route).toHaveBeenCalledTimes(200);
+    });
+  });
+
+  describe("when each public entrance decides whose budget a request spends", () => {
+    const entrances = {
+      route: (caller: typeof visitor) =>
+        caller.route({ identifier: "ana@acme.com", breakGlass: undefined }),
+      requestSignUpVerification: (caller: typeof visitor) =>
+        caller.requestSignUpVerification({ email: "ana@acme.com" }),
+      inviteLanding: (caller: typeof visitor) => caller.inviteLanding({ inviteCode: "code-1" }),
+      requestFreshInvite: (caller: typeof visitor) =>
+        caller.requestFreshInvite({ inviteCode: "code-1" }),
+    };
+
+    /** @scenario "Every public auth entrance resolves its caller the same way" */
+    it.each(Object.keys(entrances) as (keyof typeof entrances)[])(
+      "%s counts the caller the process resolved, never one a header claims or a shared hop",
+      async (entrance) => {
+        route.mockResolvedValue({
+          outcome: "route_to_signup",
+          methodSet: [],
+          reasonCode: "identifier_unknown",
+        });
+        assertSignUpOrigin.mockResolvedValue(undefined);
+        requestNewAccountVerification.mockResolvedValue({ sent: true });
+        readInviteLanding.mockResolvedValue({
+          organizationName: "Acme",
+          inviterName: "Ana",
+          alreadyAccepted: false,
+        });
+        requestFreshInvite.mockResolvedValue(undefined);
+        const claim = { "x-forwarded-for": "10.9.9.9", origin: "http://localhost:18560" };
+
+        await entrances[entrance](router.createCaller({ address: "203.0.113.7", headers: claim }));
+        await entrances[entrance](router.createCaller({ address: "198.51.100.9", headers: claim }));
+        await entrances[entrance](router.createCaller({ headers: claim }));
+
+        expect(isWithinBudget.mock.calls.map(([call]) => call.key)).toEqual([
+          `auth.${entrance}:203.0.113.7`,
+          `auth.${entrance}:198.51.100.9`,
+          `auth.${entrance}:unknown`,
+        ]);
+      },
+    );
+  });
 });

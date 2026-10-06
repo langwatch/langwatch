@@ -175,3 +175,62 @@ describe("an organization that caps CLI sessions but sets no browser window", ()
     });
   });
 });
+
+describe("sessions that record nothing about what they proved", () => {
+  describe("when no organization requires two-step verification and each is used", () => {
+    /** @scenario "Landing the change signs nobody out" */
+    it("ends and refuses none of them, and answers them as it answers one that recorded a method", async () => {
+      const world = await worldWithAnIdleSessionPastItsWindow({
+        idleTimeoutMinutes: 0,
+        idleForMinutes: 30 * 24 * 60,
+      });
+      const at = world.memory.sessions.get("session-sam")!.createdAt;
+      const people = [
+        { id: "sam", amr: undefined },
+        { id: "ana", amr: [] },
+        { id: "bo", amr: ["pwd"] },
+      ] as const;
+      for (const { id, amr } of people) {
+        world.memory.sessions.set(`session-${id}`, {
+          id: `session-${id}`,
+          userId: id,
+          sessionToken: `token-${id}`,
+          impersonating: null,
+          createdAt: at,
+          updatedAt: at,
+          lastSeenAt: at,
+          ...(amr ? { amr } : {}),
+        });
+      }
+
+      const resolved = await Promise.all(
+        people.map(({ id }) =>
+          world.service.resolveBrowserSession({
+            verified: {
+              session: { id: `session-${id}`, expiresAt: world.verified.session.expiresAt },
+              user: { id, name: null, email: null, image: null },
+            },
+          }),
+        ),
+      );
+
+      expect(resolved.map((answer) => answer.kind)).toEqual([
+        "signed_in",
+        "signed_in",
+        "signed_in",
+      ]);
+      expect(people.map(({ id }) => world.memory.sessions.has(`session-${id}`))).toEqual([
+        true,
+        true,
+        true,
+      ]);
+      const shapes = resolved.map((answer) =>
+        answer.kind === "signed_in"
+          ? { expires: answer.session.expires, ...answer.session.user, id: "", email: "" }
+          : answer,
+      );
+      expect(shapes[0]).toEqual(shapes[2]);
+      expect(shapes[1]).toEqual(shapes[2]);
+    });
+  });
+});
