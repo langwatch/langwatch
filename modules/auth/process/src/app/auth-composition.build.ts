@@ -56,6 +56,7 @@ import type { PasswordResetMailChannel } from "../channels/password-reset-mail.c
 import { MemoryBetterAuthSecondaryStorageRepository } from "../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisBetterAuthSecondaryStorageRepository } from "../repositories/redis/redis.better-auth-secondary-storage.repository.ts";
+import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
 import { openingSsoProviderConfigs } from "../rules/sso-provider-config.rules.ts";
 import type { AuthLifecycleNoticeService } from "../services/auth-lifecycle-notice.service.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
@@ -113,6 +114,7 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
     passkeysEnabled: boolean;
     isSaas: boolean;
     localPasswords: boolean;
+    mountedSocialMethodIds: readonly string[];
   }): ModuleBetterAuthFederation {
     return new ModuleBetterAuthFederation(options);
   }
@@ -125,6 +127,7 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
       passkeysEnabled: boolean;
       isSaas: boolean;
       localPasswords: boolean;
+      mountedSocialMethodIds: readonly string[];
     },
   ) {
     super();
@@ -142,6 +145,7 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
       offersPasskeys: () => this.deployment.passkeysEnabled,
       issuesOwnPasswords: () => this.deployment.localPasswords,
       selfHosted: () => !this.deployment.isSaas,
+      mountedSocialMethodIds: () => this.deployment.mountedSocialMethodIds,
     }).resolvePolicy();
   }
 
@@ -466,6 +470,7 @@ export async function buildBetterAuth(
       passkeysEnabled: identity.passkeysEnabled,
       isSaas: options.isSaas,
       localPasswords: options.localPasswords,
+      mountedSocialMethodIds: mountedSocialMethodIds({ configuration: options.signInProviders }),
     }),
     identity: IdentityBetterAuthCeremonies.create(options.identityApi),
     invites: options.organizations,

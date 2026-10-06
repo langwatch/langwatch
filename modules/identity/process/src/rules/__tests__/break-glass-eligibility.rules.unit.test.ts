@@ -18,6 +18,7 @@ const policyOf = ({
     offersPasskeys: () => false,
     issuesOwnPasswords: () => issuesOwnPasswords,
     selfHosted: () => false,
+    mountedSocialMethodIds: () => [],
   });
 
 describe("passwordDoorMounted", () => {

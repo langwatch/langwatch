@@ -518,6 +518,8 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       offersPasskeys: () => setup.dependencies.auth.offersPasskeys(),
       issuesOwnPasswords: () => setup.dependencies.auth.issuesOwnPasswords(),
       selfHosted: () => !setup.config.isSaas,
+      // No AuthApi read carries auth's mounted social set yet (restore-auth-rows, Risks R1).
+      mountedSocialMethodIds: () => [],
     });
     const passwordDoor = passwordDoorMounted(signInMethodPolicy);
     const holderCanWalkIn = breakGlassEligibility(

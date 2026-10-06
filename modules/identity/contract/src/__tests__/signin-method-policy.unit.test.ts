@@ -5,6 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AUTH0_BRIDGE_METHODS } from "../auth0-bridge.ts";
 import {
   LOCAL_METHOD_SET,
   PASSKEY_METHOD,
@@ -20,6 +21,7 @@ const resolveAuthProvider = vi.fn<() => Promise<string>>();
 let selfHosted = true;
 let offersPasskeys = false;
 let issuesOwnPasswords = false;
+let mountedSocial: string[] = [];
 
 const inputs: SignInMethodPolicyInputs = {
   resolveAuthProvider: () => resolveAuthProvider(),
@@ -27,6 +29,7 @@ const inputs: SignInMethodPolicyInputs = {
   offersPasskeys: () => offersPasskeys,
   issuesOwnPasswords: () => issuesOwnPasswords,
   selfHosted: () => selfHosted,
+  mountedSocialMethodIds: () => mountedSocial,
 };
 
 /**
@@ -45,6 +48,7 @@ describe("the instance sign-in method policy", () => {
     selfHosted = true;
     offersPasskeys = false;
     issuesOwnPasswords = false;
+    mountedSocial = [];
   });
   describe("given a self-hosted installation configured with a single OAuth provider", () => {
     beforeEach(() => {
@@ -218,6 +222,79 @@ describe("the instance sign-in method policy", () => {
       });
 
       expect(decision.methodSet.map((method) => method.id)).toEqual(["password"]);
+    });
+  });
+
+  describe("given social providers mounted on their credentials", () => {
+    const offeredIds = async () =>
+      (await SignInMethodPolicyService.create(inputs).resolvePolicy()).defaultMethods.map(
+        ({ id }) => id,
+      );
+
+    beforeEach(() => {
+      federationLicensed.mockResolvedValue(true);
+      resolveAuthProvider.mockResolvedValue("google");
+    });
+
+    /** @scenario "Every social provider this deployment mounted is offered by name" */
+    it("offers each mounted provider under its own name, once, however many ways it was named", async () => {
+      mountedSocial = ["google"];
+
+      expect(await offeredIds()).toEqual(["google"]);
+    });
+
+    /** @scenario "Social providers mount on their credentials, not on the provider env" */
+    it("offers every mounted provider behind the named one, and lands a typo in email mode", async () => {
+      mountedSocial = ["google", "github"];
+
+      expect(await offeredIds()).toEqual(["google", "github"]);
+      expect(await offeredIds()).not.toContain("gitlab");
+
+      resolveAuthProvider.mockResolvedValue("email");
+
+      expect(await offeredIds()).toEqual(["password"]);
+    });
+  });
+
+  describe("given a deployment whose provider is the Auth0 broker", () => {
+    const offeredIds = async () =>
+      (await SignInMethodPolicyService.create(inputs).resolvePolicy()).defaultMethods.map(
+        ({ id }) => id,
+      );
+
+    beforeEach(() => {
+      licensedStore(true);
+    });
+
+    /** @scenario "SaaS shows the broker's social connections as their own buttons" */
+    it("offers the brokered connections as branded methods ahead of the generic one on SaaS only", async () => {
+      selfHosted = false;
+
+      expect(await offeredIds()).toEqual([
+        "auth0-google",
+        "auth0-github",
+        "auth0-microsoft",
+        "auth0",
+      ]);
+      expect(
+        AUTH0_BRIDGE_METHODS.map(({ methodId, connection }) => [methodId, connection]),
+      ).toEqual([
+        ["auth0-google", "google-oauth2"],
+        ["auth0-github", "github"],
+        ["auth0-microsoft", "windowslive"],
+      ]);
+
+      selfHosted = true;
+
+      expect(await offeredIds()).toEqual(["auth0"]);
+    });
+
+    /** @scenario "A natively mounted provider takes over its own bridge button" */
+    it("puts a natively mounted provider in its bridge slot and keeps the other branded methods", async () => {
+      selfHosted = false;
+      mountedSocial = ["google"];
+
+      expect(await offeredIds()).toEqual(["google", "auth0-github", "auth0-microsoft", "auth0"]);
     });
   });
 });

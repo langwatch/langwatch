@@ -1,3 +1,4 @@
+import { auth0BridgeRailIds } from "./auth0-bridge.ts";
 import type { SignInMethod, SignInMethodPolicy } from "./signin-routing.ts";
 
 /**
@@ -27,6 +28,8 @@ export interface SignInMethodPolicyInputs {
   issuesOwnPasswords(): boolean;
   /** Whether this is a self-hosted deployment, which auto-redirects on its sole connection. */
   selfHosted(): boolean;
+  /** The social providers better-auth mounted, by the id the rail dials, in rail order. */
+  mountedSocialMethodIds(): readonly string[];
 }
 
 /** The credential form. Local by definition: this deployment authenticates. */
@@ -44,6 +47,19 @@ export const PASSKEY_METHOD: SignInMethod = {
   kind: "passkey",
   connectionId: null,
 };
+
+const federatedMethod = (id: string): SignInMethod => ({
+  id,
+  kind: "federated",
+  connectionId: null,
+});
+
+/** The first method under each id, in order: two sources can name the same provider. */
+function dedupeById(methods: readonly SignInMethod[]): SignInMethod[] {
+  return methods.filter(
+    (method, index) => methods.findIndex(({ id }) => id === method.id) === index,
+  );
+}
 
 /** The instance's local method set — the break-glass and fallback door. */
 export const LOCAL_METHOD_SET: readonly SignInMethod[] = [PASSWORD_METHOD];
@@ -100,6 +116,18 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
     const federated = federationLicensed
       ? await SignInMethodPolicyService.findFederatedMethods(this.inputs.resolveAuthProvider)
       : [];
+    // Every mounted social provider follows the named one, but only once the named one resolved:
+    // a provider typo lands in email mode and must not lock credential users out (ADR-027).
+    const social =
+      federated.length === 0 ? [] : this.inputs.mountedSocialMethodIds().map(federatedMethod);
+    // The Auth0 connection bridge leads on SaaS (D09); a native provider takes its own slot.
+    const bridge =
+      federated[0]?.id === "auth0" && !this.inputs.selfHosted()
+        ? auth0BridgeRailIds({ mountedSocialMethodIds: social.map(({ id }) => id) }).map(
+            federatedMethod,
+          )
+        : [];
+    const federatedMethods = dedupeById([...bridge, ...federated, ...social]);
     // Offered alongside whatever else answers, never instead of it: somebody
     // without a passkey on THIS device must still find the way they used last
     // time. It is appended, so the order the screen renders does not move.
@@ -108,10 +136,10 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
     // A deployment that federates AND issues its own passwords offers both:
     // the federated method leads, and the password stands behind it (D09).
     const local =
-      federated.length === 0 || this.inputs.issuesOwnPasswords() ? LOCAL_METHOD_SET : [];
+      federatedMethods.length === 0 || this.inputs.issuesOwnPasswords() ? LOCAL_METHOD_SET : [];
 
     return {
-      defaultMethods: [...federated, ...local, ...passkeys],
+      defaultMethods: [...federatedMethods, ...local, ...passkeys],
       // NOT the passkeys. Break-glass works from any machine, which a
       // credential bound to one device does not — this line has to agree
       // with `PASSKEY_METHOD`'s own definition.

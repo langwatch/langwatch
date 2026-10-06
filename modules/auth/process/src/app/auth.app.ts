@@ -88,6 +88,7 @@ import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.aut
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
+import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
@@ -310,6 +311,9 @@ export class AuthModule implements AuthApiContract {
     return this.#issuesOwnPasswords;
   }
 
+  /** The social providers this deployment mounted, by the id the rail dials; set at boot. */
+  #mountedSocialMethodIds: readonly string[] = [];
+
   /** This deployment's answer to {@link AuthModule.findDialableIdentityProviderOrigins}. */
   #dialableIdentityProviderOrigins: string[] = [];
 
@@ -490,6 +494,7 @@ export class AuthModule implements AuthApiContract {
             offersPasskeys: () => config.passkeysEnabled,
             issuesOwnPasswords: () => config.localPasswords,
             selfHosted: () => !config.isSaas,
+            mountedSocialMethodIds: () => app.#mountedSocialMethodIds,
           }).resolvePolicy();
           return policy.defaultMethods;
         },
@@ -530,6 +535,7 @@ export class AuthModule implements AuthApiContract {
       into: setup.secrets.into,
       baseUrl: config.sessionUrl ?? "",
     });
+    app.#mountedSocialMethodIds = mountedSocialMethodIds({ configuration: signInProviders });
     const auth0ManagementSecret = await setup.secrets.into(
       AuthModule.secrets.auth0ManagementSecret,
       (value) => value,
