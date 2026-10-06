@@ -6,6 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { UiAnalytics } from "@langwatch/browser-host/analytics";
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { uiSlots } from "@langwatch/browser-host/slots";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { render } from "@testing-library/react";
@@ -52,7 +53,7 @@ const DEFAULT_ORGANIZATION: OrganizationReading = {
 export class FakeOrganizationHost extends OrganizationHostApi {
   readonly downloads: OrganizationDownload[] = [];
   readonly successes: OrganizationSuccessNotice[] = [];
-  readonly overlays: { name: string | null; props?: Record<string, unknown> }[] = [];
+  readonly overlays: { name: string | null; props?: object }[] = [];
   readonly failures: OrganizationFailureNotice[] = [];
   readonly navigations: string[] = [];
   readonly queries: Record<string, string | undefined>[] = [];
@@ -128,8 +129,8 @@ export class FakeOrganizationHost extends OrganizationHostApi {
     return (this.options.flags ?? new Set<string>()).has(flag);
   }
 
-  openOverlay(name: string, props?: Record<string, unknown>): void {
-    this.overlays.push({ name, props });
+  openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.overlays.push({ name: drawer.key, props });
   }
 
   closeOverlay(): void {

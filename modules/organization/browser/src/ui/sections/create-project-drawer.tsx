@@ -3,6 +3,7 @@
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Heading } from "@langwatch/design-system/primitives";
+import type { UiCreateProjectDrawerProps } from "@langwatch/organization-contract";
 import type React from "react";
 
 import { api } from "../../behavior/organization-api.ts";
@@ -29,24 +30,7 @@ export function CreateProjectDrawer({
   defaultTeamId,
   organizationId: organizationIdProp,
   onCreated,
-}: {
-  open?: boolean;
-  onClose?: () => void;
-  navigateOnCreate?: boolean;
-  defaultTeamId?: string;
-  /**
-   * Required for creating projects in a different organization via the dropdown
-   * menu. When the reader clicks "New Project" under Org B while viewing Org A,
-   * this is what puts the project in Org B rather than in the current context.
-   */
-  organizationId?: string;
-  /**
-   * Fires on successful creation (before the drawer closes) so embedding
-   * surfaces without an ambient project — the CLI authorize page — can adopt
-   * the new project, for example by selecting it in a picker once lists refresh.
-   */
-  onCreated?: (result: { projectSlug: string }) => void;
-}): React.ReactElement {
+}: UiCreateProjectDrawerProps): React.ReactElement {
   const { organization: currentOrganization } = useOrganizationTeamProject();
   const host = useOrganizationHost();
   const toaster = useOrganizationToaster();

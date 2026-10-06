@@ -17,6 +17,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import type { UiPersonDrawerProps } from "@langwatch/organization-contract";
 import { Ban, Trash2, Undo2 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
@@ -34,7 +35,7 @@ import { SecondFactorCell } from "../elements/second-factor-cell.tsx";
 import { MemberAccessEditor } from "./member-access-editor.tsx";
 import { PersonIdentityRow } from "./person-identity-row.tsx";
 
-export function PersonDrawer({ open = true, userId }: { open?: boolean; userId?: string }) {
+export function PersonDrawer({ open = true, userId }: UiPersonDrawerProps) {
   const { closeDrawer } = useDrawer();
   const { organization, hasPermission } = useOrganizationTeamProject();
   const organizationId = organization?.id ?? "";

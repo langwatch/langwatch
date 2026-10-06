@@ -3,6 +3,7 @@
 import type {
   UiAuthenticationOverviewCardProps,
   UiDirectorySummaryProps,
+  UiDrawerToken,
 } from "@langwatch/browser-host/declarations";
 import { createContext, useContext } from "react";
 import type { ComponentType, ReactNode } from "react";
@@ -133,8 +134,8 @@ export abstract class OrganizationHostApi {
   /** Whether a feature flag is on. Fail-closed while it is still arriving. */
   abstract isFeatureEnabled(flag: string): boolean;
 
-  /** Opens one of the application's overlays, by the name its address uses. */
-  abstract openOverlay(name: string, props?: Record<string, unknown>): void;
+  /** Opens an overlay by its owner's token; the address carries the token's wire name. */
+  abstract openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void;
 
   /** Closes whatever overlay is open. */
   abstract closeOverlay(): void;

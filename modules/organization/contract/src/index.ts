@@ -38,3 +38,4 @@ export * from "./ui-scope.ts";
 export * from "./scope-graph.ts";
 export * from "./seat-limit.events.ts";
 export * from "./sign-up-policy.ts";
+export * from "./organization-drawers.ts";

@@ -10,6 +10,7 @@ import {
   useUiDeployment,
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useLent } from "@langwatch/browser-host/lent";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { ProjectSwitcherToken, type ProjectSwitcherProps } from "@langwatch/project-contract";
@@ -47,7 +48,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
       /** Whether this deployment can send the invitation rather than only mint a link. */
       hasEmailProvider: boolean;
       isFeatureEnabled: (flag: string) => boolean;
-      openOverlay: (name: string, props?: Record<string, unknown>) => void;
+      openOverlay: <Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>) => void;
       closeOverlay: () => void;
       succeeded: (notice: OrganizationSuccessNotice) => void;
       route: OrganizationRouteReading;
@@ -105,8 +106,8 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
     return this.deps.isFeatureEnabled(flag);
   }
 
-  openOverlay(name: string, props?: Record<string, unknown>): void {
-    this.deps.openOverlay(name, props);
+  openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.deps.openOverlay(drawer, props);
   }
 
   closeOverlay(): void {
@@ -214,7 +215,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
         isPlanLoading: facts.isPlanLoading,
         hasEmailProvider: deployment.hasEmailProvider,
         isFeatureEnabled: (flag) => session.isFeatureEnabled(flag),
-        openOverlay: (name, props) => openDrawer(name, props),
+        openOverlay: (drawer, props) => openDrawer(drawer, props),
         closeOverlay: () => closeDrawer(),
         succeeded: (notice) => feedback.succeeded(notice),
         route: { params: reading.params, query: reading.query },

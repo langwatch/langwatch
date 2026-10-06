@@ -16,6 +16,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { CreateProjectDrawerToken } from "@langwatch/organization-contract";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -439,7 +440,7 @@ function TeamFormProjects({ team }: { team: TeamWithProjectsAndMembers }): React
       <Button
         variant="outline"
         size="sm"
-        onClick={() => openDrawer("createProject", { defaultTeamId: team.id })}
+        onClick={() => openDrawer(CreateProjectDrawerToken, { defaultTeamId: team.id })}
       >
         <Plus size={20} />
         Add new project

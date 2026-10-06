@@ -18,6 +18,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
+import { InviteMemberDrawerToken, PersonDrawerToken } from "@langwatch/organization-contract";
 import { Ban, MoreVertical, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ComponentProps } from "react";
 
@@ -218,7 +219,7 @@ function PeopleList({
           joinRequests={people.joinRequests}
           canDeleteMember={people.canDeleteMember}
           canDisableMember={people.canDisableMember}
-          onOpenPerson={(userId) => people.openDrawer("person", { userId })}
+          onOpenPerson={(userId) => people.openDrawer(PersonDrawerToken, { userId })}
           onSetDisabled={people.setMemberDisabled}
           onRequestRemoval={people.setConfirmingRemoval}
           onViewInviteLink={people.viewInviteLink}
@@ -526,13 +527,13 @@ function PeopleHeader({
             <HStack gap={2}>
               <InlineInviteBox
                 onStartTyping={(email) =>
-                  onInvite("inviteMember", email ? { initialEmail: email } : undefined)
+                  onInvite(InviteMemberDrawerToken, email ? { initialEmail: email } : undefined)
                 }
               />
               <Button
                 size="sm"
                 colorPalette="orange"
-                onClick={() => onInvite("inviteMember")}
+                onClick={() => onInvite(InviteMemberDrawerToken)}
                 data-testid="members-invite-open"
               >
                 <Plus size={14} />
