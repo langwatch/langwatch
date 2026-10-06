@@ -2,12 +2,6 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   type CodingAgentSessionLookupInput,
-  type TranscriptLogRecord,
-  buildCodingAgentTranscript,
-  contentAttrKeys,
-  type LogContentKey,
-  logContentKeys,
-  shouldFilterCodingAgentSpan,
   CodingAgentApi as CodingAgentApiToken,
   type CodingAgentPullRequestUsageRead,
   type CodingAgentViewer,
@@ -25,7 +19,6 @@ import {
   type CodingAgentSessionListRow,
   type CodingAgentSessionsListInput,
   type CodingAgentSessionCursor,
-  type CodingAgentSpanFilterInput,
   type CodingAgentUsageCount,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
@@ -46,7 +39,7 @@ import { ValidationError } from "@langwatch/handled-error";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
-import { type SpanDetail, TraceApi } from "@langwatch/trace-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import {
@@ -278,29 +271,6 @@ export class CodingAgentModule implements CodingAgentApi {
 
   contributeReceivedSpan(input: CodingAgentReceivedSpan): Promise<void> {
     return this.contributeSpanFacts(liftSpanContribution(input));
-  }
-
-  /** Pure derivation, no session store read: which log fields an event name captures. */
-  logContentKeys(eventName: string): readonly LogContentKey[] {
-    return logContentKeys(eventName);
-  }
-
-  /** Pure derivation, no session store read: which attribute keys an event name captures. */
-  contentAttrKeys(eventName: string): readonly string[] {
-    return contentAttrKeys(eventName);
-  }
-
-  /** Pure derivation, no session store read: whether a span is coding-agent noise. */
-  shouldFilterSpan(input: CodingAgentSpanFilterInput): boolean {
-    return shouldFilterCodingAgentSpan(input);
-  }
-
-  /** Pure derivation, no session store read: folds spans and logs into a transcript. */
-  buildTranscript(input: {
-    spans: SpanDetail[];
-    logs: TranscriptLogRecord[];
-  }): CodingAgentTranscript {
-    return buildCodingAgentTranscript(input);
   }
 
   findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null> {

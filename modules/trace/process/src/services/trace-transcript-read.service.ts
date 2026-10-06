@@ -3,7 +3,10 @@
  * logs as other trace reads.
  */
 
-import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
+import {
+  buildCodingAgentTranscript,
+  type CodingAgentTranscript,
+} from "@langwatch/coding-agent-contract";
 import type { Protections, Span, SpanDetail, TraceLogRecordDto } from "@langwatch/trace-contract";
 
 import type { TraceLogRecordReadRow } from "#app/trace.app";
@@ -48,13 +51,6 @@ type TraceTranscriptReads = Readonly<{
     traceId: string;
     occurredAtMs?: number;
   }): Promise<TraceLogRecordReadRow[]>;
-  codingAgentLogContentKeys(
-    eventName: string,
-  ): readonly { key: string; category: "input" | "output" | "both" }[];
-  buildCodingAgentTranscript(input: {
-    spans: SpanDetail[];
-    logs: TraceLogRecordReadRow[];
-  }): unknown;
 }>;
 
 /**
@@ -128,13 +124,6 @@ async function loadTraceLogsWithProtections({
       },
       protections,
       visibilityCutoffMs,
-      codingAgents: {
-        logContentKeys: (eventName) =>
-          reads.codingAgentLogContentKeys(eventName).map((entry) => ({
-            key: entry.key,
-            category: entry.category,
-          })),
-      },
       derivedAttrPrefixes: ports.derivedAttrPrefixes,
     }),
   );
@@ -174,9 +163,13 @@ export class TraceTranscriptReadService {
       loadTraceLogsWithProtections(args),
     ]);
 
-    return reads.buildCodingAgentTranscript({
+    return buildCodingAgentTranscript({
       spans,
-      logs,
-    }) as CodingAgentTranscript;
+      logs: logs.map((row) => ({
+        timestampMs: row.timeUnixMs,
+        attributes: row.attributes,
+        serviceName: row.resourceAttributes["service.name"] ?? null,
+      })),
+    });
   }
 }

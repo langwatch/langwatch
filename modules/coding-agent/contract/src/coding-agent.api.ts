@@ -1,14 +1,12 @@
 import { moduleApi } from "@langwatch/module";
-import type { SpanDetail } from "@langwatch/trace-contract";
 
-import type { LogContentKey } from "./coding-agent-log-content.ts";
 import type { ContributeSpanFactsCommandData } from "./coding-agent-processing.events.ts";
 import type { CodingAgentReceivedSpan } from "./coding-agent-span-admission.ts";
 import type {
   CodingAgentTracePullRequestInput,
   CodingAgentTracePullRequestLink,
 } from "./coding-agent-trace-pull-request.ts";
-import type { CodingAgentTranscript, TranscriptLogRecord } from "./coding-agent-transcript.ts";
+import type { CodingAgentTranscript } from "./coding-agent-transcript.ts";
 import type {
   CodingAgentSessionLookupInput,
   CodingAgentGithubConnection,
@@ -36,13 +34,6 @@ export type CodingAgentCallerScope =
 /** Who a viewer-scoped read is answered for. */
 export type CodingAgentViewer = { readonly id: string };
 
-/** The input `shouldFilterSpan` decides from: no store read, no session lookup. */
-export type CodingAgentSpanFilterInput = {
-  scopeName: string | null | undefined;
-  spanName: string;
-  attributeKeys: readonly string[];
-};
-
 /**
  * One read of a pull request's usage rollup, as it is written down. Never the
  * contributors themselves: how many projects fed it says how wide the read
@@ -69,13 +60,6 @@ export interface CodingAgentUsageCount {
 }
 
 export interface CodingAgentApi {
-  logContentKeys(eventName: string): readonly LogContentKey[];
-  contentAttrKeys(eventName: string): readonly string[];
-  shouldFilterSpan(input: CodingAgentSpanFilterInput): boolean;
-  buildTranscript(input: {
-    spans: SpanDetail[];
-    logs: TranscriptLogRecord[];
-  }): CodingAgentTranscript;
   findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null>;
   findSessionForTrace(input: {
     projectId: string;

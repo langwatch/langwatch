@@ -1,4 +1,4 @@
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import type { shouldFilterCodingAgentSpan } from "@langwatch/coding-agent-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -102,11 +102,8 @@ class SpanIngestionTally {
   }
 }
 
-/**
- * The coding-agent contract, holding only what the ingest path reads: no
- * store, no session lookup.
- */
-export type CodingAgentIngestFilter = Pick<CodingAgentApi, "shouldFilterSpan">;
+/** The ingest path's coding-agent span filter: the contract's pure rule, swappable in tests. */
+export type CodingAgentIngestFilter = { shouldFilterSpan: typeof shouldFilterCodingAgentSpan };
 
 /** What the producer is told, naming the field it has to fix. */
 function unstorableSpanTimeMessage({ field }: UnstorableSpanTime): string {

@@ -7,7 +7,11 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
  */
 import type { PrincipalRef } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { CodingAgentApi, type CodingAgentTranscript } from "@langwatch/coding-agent-contract";
+import {
+  CodingAgentApi,
+  type CodingAgentTranscript,
+  shouldFilterCodingAgentSpan,
+} from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -783,9 +787,8 @@ type TraceReaderCompositionOptions = {
    */
   ingestAuthz?: Pick<AuthzApi, "hasApiKeyPermission"> | undefined;
   /**
-   * The one question the INGEST path asks Coding Agent: whether a span is
-   * one a coding agent emits about itself, which the receiver drops. Narrow
-   * and separate from the whole `codingAgents` peer below.
+   * Whether a span is one a coding agent emits about itself, which the receiver
+   * drops. Defaults to the coding-agent contract's pure rule; tests swap it.
    */
   ingestCodingAgents?: CodingAgentIngestFilter | undefined;
   evaluations: TraceAppDependencies["evaluations"];
@@ -1079,7 +1082,9 @@ export class TraceModule implements TraceApi, CollectorApp {
       // command sender across both, so a span posted to `/api/collector` and the
       // same span exported over OTLP are one record, not two.
       ingestion: TraceIngestionService.create({
-        codingAgents: options.ingestCodingAgents ?? options.codingAgents,
+        codingAgents: options.ingestCodingAgents ?? {
+          shouldFilterSpan: shouldFilterCodingAgentSpan,
+        },
         codingAgentSpanFilterEnabled: CODING_AGENT_SPAN_FILTER_ENABLED,
         dedup: options.dedup,
         commands: TraceComposedIngressCommand.create(options.commands),
@@ -2228,7 +2233,6 @@ export class TraceModule implements TraceApi, CollectorApp {
       logRecords: this.#dependencies.traces.logRecords,
       logger,
       traceCanonicalisation: this.#dependencies.traces.canonicalisation,
-      codingAgents: this.#dependencies.codingAgents,
     }).enrichCodingAgentSpansFromLogs({
       tenantId: input.projectId,
       traceId: input.traceId,
@@ -2247,33 +2251,11 @@ export class TraceModule implements TraceApi, CollectorApp {
       modelCallRefs: input.modelCallRefs,
       logRows: input.logRows,
       traceCanonicalisation: this.#dependencies.traces.canonicalisation,
-      codingAgents: this.#dependencies.codingAgents,
     });
   }
 
   mapCodingAgentSummaryRows(rows: SpanSummaryRow[]): ClaudeSpanRef[] {
     return mapSummaryRowsToClaudeRefs(rows);
-  }
-
-  codingAgentLogContentKeys(eventName: string): readonly {
-    key: string;
-    category: "input" | "output" | "both";
-  }[] {
-    return this.#dependencies.codingAgents.logContentKeys(eventName);
-  }
-
-  buildCodingAgentTranscript(input: {
-    spans: SpanDetail[];
-    logs: TraceLogRecordReadRow[];
-  }): unknown {
-    return this.#dependencies.codingAgents.buildTranscript({
-      spans: input.spans,
-      logs: input.logs.map((row) => ({
-        timestampMs: row.timeUnixMs,
-        attributes: row.attributes,
-        serviceName: row.resourceAttributes["service.name"] ?? null,
-      })),
-    });
   }
 
   // Legacy content reads live on the cohesive content service.

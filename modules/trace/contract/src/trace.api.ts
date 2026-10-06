@@ -396,11 +396,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
     logRows: TraceLogRecordDto[];
   }): Span;
   mapCodingAgentSummaryRows(rows: SpanSummaryRow[]): unknown;
-  codingAgentLogContentKeys(eventName: string): readonly {
-    key: string;
-    category: "input" | "output" | "both";
-  }[];
-  buildCodingAgentTranscript(input: { spans: SpanDetail[]; logs: TraceLogRecordDto[] }): unknown;
   getLogsByTraceId(input: {
     tenantId: string;
     traceId: string;

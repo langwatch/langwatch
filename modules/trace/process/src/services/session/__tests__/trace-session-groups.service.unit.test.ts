@@ -49,22 +49,6 @@ class TestCodingAgentApi {
     throw new Error("Not used by session group tests: readSessionEventsPage.");
   }
 
-  logContentKeys(): never {
-    throw new Error("Not used by session group tests: logContentKeys.");
-  }
-
-  contentAttrKeys(): never {
-    throw new Error("Not used by session group tests: contentAttrKeys.");
-  }
-
-  shouldFilterSpan(): never {
-    throw new Error("Not used by session group tests: shouldFilterSpan.");
-  }
-
-  buildTranscript(): never {
-    throw new Error("Not used by session group tests: buildTranscript.");
-  }
-
   findSessionForTrace(): never {
     throw new Error("Not used by session group tests: findSessionForTrace.");
   }

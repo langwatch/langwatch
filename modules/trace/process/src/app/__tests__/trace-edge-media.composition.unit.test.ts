@@ -79,7 +79,7 @@ function compose({
       fallbackVisibilityDays: 14,
     },
     annotations: createApiFixture<AnnotationApi>(),
-    codingAgents: createApiFixture<CodingAgentApi>({ shouldFilterSpan: () => false }),
+    codingAgents: createApiFixture<CodingAgentApi>(),
     dataRetention: createApiFixture<DataRetentionApi>(),
     evaluations: createApiFixture<EvaluationApi>(),
     logs: createApiFixture<LogApi>(),
