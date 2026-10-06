@@ -6,6 +6,7 @@ import {
   tenantScopeKey,
 } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { TenantEvalSummary } from "~/server/app-layer/evaluations/repositories/evaluation-run.repository";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
@@ -599,11 +600,14 @@ export class TraceListService {
     const items = visibleRows.map((row) => mapToTraceListItem(row));
     const traceIds = items.map((item) => item.traceId);
 
-    const evaluations = await this.evaluationRunService.findSummariesByTraceIds(
-      ownProjectOf(params.authorization),
-      traceIds,
-      params.timeRange.from,
-    );
+    const evaluations = evaluationsByListedTrace({
+      rows: visibleRows,
+      evaluations: await this.evaluationRunService.findSummariesByTraceIds({
+        authorization: params.authorization,
+        traceIds,
+        since: params.timeRange.from,
+      }),
+    });
 
     // Tease input/output/error previews and user-authored labels of items
     // beyond the caller's visibility window — existence and counts stay
@@ -1428,6 +1432,33 @@ export function parseLabels(raw: string | undefined): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * The evaluations of each listed trace, keyed by trace id for the page.
+ *
+ * The read is fenced by the proof, so on an aggregate it returns every
+ * tenant's evaluations under the listed ids, and two members may hold the
+ * same id (ADR-144 v4.1). Each evaluation is matched to the listed row by
+ * tenant and trace id together, so an evaluation of one member's trace never
+ * decorates another's row of the same id. The page's map is still keyed by
+ * trace id alone, which is what the client reads: on a collision it carries
+ * both rows' evaluations under the one id.
+ */
+function evaluationsByListedTrace({
+  rows,
+  evaluations,
+}: {
+  rows: readonly TraceListRow[];
+  evaluations: readonly TenantEvalSummary[];
+}): Record<string, EvalSummary[]> {
+  const listed = new Set(rows.map((row) => `${row.tenantId}:${row.traceId}`));
+  const byTrace: Record<string, EvalSummary[]> = {};
+  for (const { tenantId, ...summary } of evaluations) {
+    if (!listed.has(`${tenantId}:${summary.traceId}`)) continue;
+    (byTrace[summary.traceId] ??= []).push(summary);
+  }
+  return byTrace;
 }
 
 /** Keep this normalization in lockstep with `cursorSortExpression` in the CH repository. */

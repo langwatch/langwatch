@@ -16,12 +16,12 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildSlimTimeseriesQuery } from "~/server/app-layer/analytics/query-builders/slim-timeseries-query";
 import type { AnalyticsTimeseriesBuilderInput } from "~/server/app-layer/analytics/types";
-import { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
 import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsRow,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import { traceAnalyticsRepositoryFor } from "~/test-utils/traceAnalyticsRepository";
 import { getTestClickHouseClient } from "../../../event-sourcing/__tests__/integration/testContainers";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import { buildTimeseriesQuery } from "../aggregation-builder";
@@ -147,7 +147,7 @@ describe("analytics metadata filters", () => {
       format: "JSONEachRow",
       clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
     });
-    await new TraceAnalyticsClickHouseRepository(async () => ch).upsertBatch(
+    await traceAnalyticsRepositoryFor(async () => ch).upsertBatch(
       TRACES.map((trace) => ({ row: traceAnalyticsRow(trace) })),
     );
     await ch.exec({ query: "SYSTEM FLUSH ASYNC INSERT QUEUE" });

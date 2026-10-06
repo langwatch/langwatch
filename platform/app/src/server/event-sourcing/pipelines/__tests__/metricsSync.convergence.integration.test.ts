@@ -15,11 +15,10 @@
  * @see specs/features/suites/trace-role-cost-accumulation.feature
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
-import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { ownProof } from "~/test-utils/authorizationProofs";
 import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
+import { traceSummaryStoreFor } from "~/test-utils/traceSummaryRepository";
 import type { AggregateType } from "../../";
 import { definePipeline } from "../../";
 import { getTestClickHouseClient } from "../../__tests__/integration/testContainers";
@@ -38,7 +37,7 @@ import { SpanCostService } from "../trace-processing/projections/services/span-c
 import { SpanStorageMapProjection } from "../trace-processing/projections/spanStorage.mapProjection";
 import { SpanAppendStore } from "../trace-processing/projections/spanStorage.store";
 import { TraceSummaryFoldProjection } from "../trace-processing/projections/traceSummary.foldProjection";
-import { TraceSummaryStore } from "../trace-processing/projections/traceSummary.store";
+import type { TraceSummaryStore } from "../trace-processing/projections/traceSummary.store";
 import type { TraceProcessingEvent } from "../trace-processing/schemas/events";
 import type { OtlpSpan } from "../trace-processing/schemas/otlp";
 
@@ -137,11 +136,7 @@ describe.skipIf(!hasTestcontainers)(
           spanStorageRepositoryFor(async () => clickHouseClient),
         ).repository,
       );
-      traceSummaryStore = new TraceSummaryStore(
-        new TraceSummaryService(
-          new TraceSummaryClickHouseRepository(async () => clickHouseClient),
-        ).repository,
-      );
+      traceSummaryStore = traceSummaryStoreFor(async () => clickHouseClient);
 
       const noopFoldSubscriber = () => ({
         fold: "traceSummary",

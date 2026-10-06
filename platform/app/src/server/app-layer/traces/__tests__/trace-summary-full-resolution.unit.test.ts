@@ -111,9 +111,10 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         upsert: vi.fn(),
       } as never);
 
-      const result = await service.getByTraceId("proj-1", "trace-1", {
-        full: true,
+      const result = await service.getByTraceId({
         authorization: ownProof({ projectId: "proj-1" }),
+        traceId: "trace-1",
+        full: true,
       });
 
       expect(result.computedInput).toBe("preview-input…");
@@ -147,9 +148,10 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
           },
         );
 
-        const result = await service.getByTraceId("proj-1", "trace-1", {
-          full: true,
+        const result = await service.getByTraceId({
           authorization: ownProof({ projectId: "proj-1" }),
+          traceId: "trace-1",
+          full: true,
         });
 
         expect(result.computedInput).toBe(fullInput);
@@ -171,7 +173,10 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
           },
         );
 
-        const result = await service.getByTraceId("proj-1", "trace-1");
+        const result = await service.getByTraceId({
+          authorization: ownProof({ projectId: "proj-1" }),
+          traceId: "trace-1",
+        });
 
         expect(result.computedInput).toBe("preview-input…");
         expect(spanRepo.getNormalizedSpansByTraceId).not.toHaveBeenCalled();
@@ -197,9 +202,10 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         },
       );
 
-      const result = await service.getByTraceId("proj-1", "trace-1", {
-        full: true,
+      const result = await service.getByTraceId({
         authorization: ownProof({ projectId: "proj-1" }),
+        traceId: "trace-1",
+        full: true,
       });
 
       expect(result.computedInput).toBe("preview-input…");
@@ -230,9 +236,10 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         },
       );
 
-      const result = await service.getByTraceId("proj-1", "trace-1", {
-        full: true,
+      const result = await service.getByTraceId({
         authorization: ownProof({ projectId: "proj-1" }),
+        traceId: "trace-1",
+        full: true,
       });
 
       expect(result.computedInput).toBe("preview-input…");
@@ -257,9 +264,10 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         },
       );
 
-      const result = await service.getByTraceId("proj-1", "trace-1", {
-        full: true,
+      const result = await service.getByTraceId({
         authorization: ownProof({ projectId: "proj-1" }),
+        traceId: "trace-1",
+        full: true,
       });
 
       expect(result.computedInput).toBe("preview-input…");

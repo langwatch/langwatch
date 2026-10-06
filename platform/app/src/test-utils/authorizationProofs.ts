@@ -11,6 +11,7 @@ import {
   fenceFor,
   type ReadResource,
 } from "~/server/app-layer/clients/clickhouse/authorized-reads";
+import type { FoldReadAuthorizer } from "~/server/event-sourcing/pipelines/trace-processing/projections/foldReadAuthorization";
 
 const TEST_ACTOR = { type: "user", id: "test-user" } as const;
 const TEST_ORGANIZATION_ID = "test-organization";
@@ -40,6 +41,10 @@ export function ownProof({
     purpose: { kind: "route", route: "test" },
   });
 }
+
+/** The authorizer a fold store is handed in a test: an own proof per read. */
+export const ownProofAuthorizer: FoldReadAuthorizer = async ({ projectId }) =>
+  ownProof({ projectId });
 
 /**
  * An aggregate's proof: own on the aggregate, one shared grant per member

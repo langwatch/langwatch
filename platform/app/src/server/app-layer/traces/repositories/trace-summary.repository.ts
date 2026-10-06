@@ -1,5 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
+import type { Authorization } from "@langwatch/actor";
 import type { TraceSummaryData } from "../types";
 
 export interface FindByTraceIdOptions {
@@ -22,6 +23,15 @@ export interface FindByTraceIdOptions {
   window?: { fromMs: number; toMs: number };
 }
 
+/**
+ * A single-trace summary read. The proof fences the tenants the read may
+ * see (ADR-144 block C); the repository never names one of its own.
+ */
+export type FindByTraceIdParams = {
+  authorization: Authorization;
+  traceId: string;
+} & FindByTraceIdOptions;
+
 export interface TraceSummaryRepository {
   upsert(
     data: TraceSummaryData,
@@ -35,20 +45,14 @@ export interface TraceSummaryRepository {
       retentionDays?: number;
     }>,
   ): Promise<void>;
-  findByTraceId(
-    tenantId: string,
-    traceId: string,
-    options?: FindByTraceIdOptions,
-  ): Promise<TraceSummaryData | null>;
+  findByTraceId(params: FindByTraceIdParams): Promise<TraceSummaryData | null>;
 }
 
 export class NullTraceSummaryRepository implements TraceSummaryRepository {
   async upsert(_data: TraceSummaryData, _tenantId: string): Promise<void> {}
 
   async findByTraceId(
-    _tenantId: string,
-    _traceId: string,
-    _options?: FindByTraceIdOptions,
+    _params: FindByTraceIdParams,
   ): Promise<TraceSummaryData | null> {
     return null;
   }

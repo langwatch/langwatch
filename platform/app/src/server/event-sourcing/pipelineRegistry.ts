@@ -598,11 +598,12 @@ export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
   /**
-   * The own-only proof one pipeline read is fenced by. `codePath` names the
-   * module reading, `purpose` what it reads for: the event it handles when
-   * it has one, else the entry point.
+   * The own-only proof one pipeline read is fenced by: a span read, or a
+   * fold store's read-back of the summary or analytics row it wrote.
+   * `codePath` names the module reading, `purpose` what it reads for: the
+   * event it handles when it has one, else the entry point.
    */
-  private authorizeSpanRead({
+  private authorizeTraceRead({
     codePath,
     projectId,
     purpose,
@@ -660,7 +661,15 @@ export class PipelineRegistry {
     // siblings migrated with the reactor retirement (ADR-098) and are
     // likewise implemented but unregistered, pending that same decision.
     const traceSummaryStore = this.cached<TraceSummaryData>(
-      new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
+      new TraceSummaryStore({
+        repository: this.deps.repositories.traceSummaryFold,
+        authorize: (params) =>
+          this.authorizeTraceRead({
+            codePath:
+              "event-sourcing/pipelines/trace-processing/projections/traceSummary.store",
+            ...params,
+          }),
+      }),
       "trace_summaries",
     );
 
@@ -857,7 +866,7 @@ export class PipelineRegistry {
           contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
           getNormalizedSpanById: async ({ tenantId, eventId, ...params }) =>
             this.deps.traces.spans.getNormalizedSpanById({
-              authorization: await this.authorizeSpanRead({
+              authorization: await this.authorizeTraceRead({
                 codePath:
                   "event-sourcing/pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber",
                 projectId: tenantId,
@@ -1462,7 +1471,7 @@ export class PipelineRegistry {
       spanStorage: {
         getSpansByTraceId: async ({ tenantId, ...params }) =>
           this.deps.traces.spans.getSpansByTraceId({
-            authorization: await this.authorizeSpanRead({
+            authorization: await this.authorizeTraceRead({
               codePath:
                 "event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command",
               projectId: tenantId,
@@ -1477,7 +1486,7 @@ export class PipelineRegistry {
       traceEvents: {
         getEventsByTraceId: async ({ tenantId, ...params }) =>
           this.deps.traces.spans.getEventsByTraceId({
-            authorization: await this.authorizeSpanRead({
+            authorization: await this.authorizeTraceRead({
               codePath:
                 "event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command",
               projectId: tenantId,
@@ -1715,7 +1724,15 @@ export class PipelineRegistry {
         // 00056) rather than re-folding the event log. The wrapper still earns
         // its keep — it keeps the steady state off ClickHouse entirely.
         traceAnalyticsStore: this.cached<TraceAnalyticsData>(
-          new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
+          new TraceAnalyticsStore({
+            repository: this.deps.repositories.traceAnalytics,
+            authorize: (params) =>
+              this.authorizeTraceRead({
+                codePath:
+                  "event-sourcing/pipelines/trace-processing/projections/traceAnalytics.store",
+                ...params,
+              }),
+          }),
           "trace_analytics",
         ),
         traceSummaryStore,
@@ -1901,7 +1918,7 @@ export class PipelineRegistry {
       scheduleRetry: scheduleRetry.fn,
       deriveScenarioRoleMetrics: async ({ tenantId, ...params }) =>
         traceReadDerivation.deriveScenarioRoleMetrics({
-          authorization: await this.authorizeSpanRead({
+          authorization: await this.authorizeTraceRead({
             codePath:
               "event-sourcing/pipelines/simulation-processing/commands/computeRunMetrics.command",
             projectId: tenantId,
@@ -1995,7 +2012,7 @@ export class PipelineRegistry {
       spans: {
         getSpansByTraceId: async ({ tenantId, ...params }) =>
           this.deps.traces.spans.getSpansByTraceId({
-            authorization: await this.authorizeSpanRead({
+            authorization: await this.authorizeTraceRead({
               codePath: "scenarios/evaluations/runScenarioEvaluations",
               projectId: tenantId,
               purpose: {

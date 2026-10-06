@@ -53,10 +53,8 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceRequestCollectionService } from "~/server/app-layer/traces/trace-request-collection.service";
-import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { type AggregateType, definePipeline } from "~/server/event-sourcing";
 import {
   getTestClickHouseClient,
@@ -73,12 +71,12 @@ import { RecordSpanCommand } from "~/server/event-sourcing/pipelines/trace-proce
 import { SpanStorageMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.mapProjection";
 import { SpanAppendStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
-import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { EventStoreClickHouse } from "~/server/event-sourcing/stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
 import { makeQueueName } from "~/server/queues/makeQueueName";
 import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
+import { traceSummaryStoreFor } from "~/test-utils/traceSummaryRepository";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const otlpRoot = require("@opentelemetry/otlp-transformer/build/src/generated/root");
@@ -275,10 +273,8 @@ describe.skipIf(!shouldRun)(
           spanStorageRepositoryFor(async () => clickHouseClient),
         ).repository,
       );
-      const traceSummaryStore = new TraceSummaryStore(
-        new TraceSummaryService(
-          new TraceSummaryClickHouseRepository(async () => clickHouseClient),
-        ).repository,
+      const traceSummaryStore = traceSummaryStoreFor(
+        async () => clickHouseClient,
       );
 
       const pipelineName = `trace_nlpgo_e2e_${Date.now()}_${Math.random()

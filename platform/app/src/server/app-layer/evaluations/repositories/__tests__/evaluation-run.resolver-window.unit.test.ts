@@ -8,11 +8,12 @@
  * costing whole seconds per lookup for evaluations scheduled minutes earlier.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   type ResolvedRetention,
 } from "~/server/data-retention/retentionPolicy.schema";
-import { EvaluationRunClickHouseRepository } from "../evaluation-run.clickhouse.repository";
+import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
 
 function createCapturingClient(
   resolverResponses: Array<string | number | null>,
@@ -54,7 +55,7 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
     it("resolves from the windowed probe and never scans unbounded", async () => {
       const scheduledAtMs = Date.now() - 60_000;
       const { client, queries } = createCapturingClient([scheduledAtMs]);
-      const repo = new EvaluationRunClickHouseRepository({
+      const repo = evaluationRunRepositoryFor({
         resolveClient: async () => client as never,
       });
 
@@ -91,7 +92,7 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
         null,
         oldScheduledAtMs,
       ]);
-      const repo = new EvaluationRunClickHouseRepository({
+      const repo = evaluationRunRepositoryFor({
         resolveClient: async () => client as never,
       });
 
@@ -131,7 +132,7 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
     it("still bounds the heavy read when the resolver finds nothing", async () => {
       // Both resolver phases miss: the evaluation is not in the table.
       const { client, queries } = createCapturingClient([null, null]);
-      const repo = new EvaluationRunClickHouseRepository({
+      const repo = evaluationRunRepositoryFor({
         resolveClient: async () => client as never,
       });
 
@@ -150,7 +151,7 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
     /** @scenario "A fallback read is floored at the tenant's retention horizon" */
     it("leaves the miss open-ended above, so future-scheduled runs stay findable", async () => {
       const { client, queries } = createCapturingClient([null, null]);
-      const repo = new EvaluationRunClickHouseRepository({
+      const repo = evaluationRunRepositoryFor({
         resolveClient: async () => client as never,
       });
 
@@ -170,7 +171,7 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
         null,
         oldScheduledAtMs,
       ]);
-      const repo = new EvaluationRunClickHouseRepository({
+      const repo = evaluationRunRepositoryFor({
         resolveClient: async () => client as never,
         // `evaluation_runs` is a traces-category table, so `traces` is the
         // field the floor reads; the other two are named rather than cast away

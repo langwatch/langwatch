@@ -2,11 +2,12 @@ import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 
 import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
+import { ownProjectIdOf } from "../clients/clickhouse/authorized-reads";
 import type { BlobStore } from "./blob-store.service";
 import { TraceNotFoundError } from "./errors";
 import type { SpanStorageRepository } from "./repositories/span-storage.repository";
 import type {
-  FindByTraceIdOptions,
+  FindByTraceIdParams,
   TraceSummaryRepository,
 } from "./repositories/trace-summary.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
@@ -28,15 +29,24 @@ export interface TraceSummaryFullResolutionDeps {
 }
 
 /**
- * Resolve offloaded (ADR-022) input/output back to the full value. Only
- * meaningful on single-trace reads with full-resolution deps supplied at
- * construction; never used by list reads. The re-read of the trace's spans
- * is a proof-bearing read (ADR-144 block C), so asking for it means carrying
- * the proof.
+ * A single-trace summary read. The proof fences the tenants the read may see
+ * (ADR-144 block C); the summary row, the full read's span re-read and the
+ * offloaded bodies are all read for it.
  */
-type FullResolutionOption =
-  | { full: true; authorization: Authorization }
-  | { full?: false };
+export type GetByTraceIdParams = FindByTraceIdParams & {
+  /**
+   * Read-side visibility gate: summaries that occurred before this cutoff
+   * get computed input/output/error teaser-redacted. Omitted/null = ungated
+   * (internal callers).
+   */
+  visibilityCutoffMs?: number | null;
+  /**
+   * Resolve offloaded (ADR-022) input/output back to the full value. Only
+   * meaningful on single-trace reads with full-resolution deps supplied at
+   * construction; never used by list reads.
+   */
+  full?: boolean;
+};
 
 export class TraceSummaryService {
   private readonly logger = createLogger(
@@ -52,26 +62,15 @@ export class TraceSummaryService {
     await this.repository.upsert(data, tenantId);
   }
 
-  async getByTraceId(
-    tenantId: string,
-    traceId: string,
-    options?: FindByTraceIdOptions & {
-      /**
-       * Read-side visibility gate: summaries that occurred before this
-       * cutoff get computed input/output/error teaser-redacted.
-       * Omitted/null = ungated (internal callers).
-       */
-      visibilityCutoffMs?: number | null;
-    } & FullResolutionOption,
-  ): Promise<TraceSummaryData> {
-    const result = await this.repository.findByTraceId(
-      tenantId,
-      traceId,
-      options,
-    );
-    if (!result) throw new TraceNotFoundError(traceId);
+  async getByTraceId({
+    visibilityCutoffMs,
+    full,
+    ...read
+  }: GetByTraceIdParams): Promise<TraceSummaryData> {
+    const result = await this.repository.findByTraceId(read);
+    if (!result) throw new TraceNotFoundError(read.traceId);
 
-    const cutoff = options?.visibilityCutoffMs;
+    const cutoff = visibilityCutoffMs;
     if (cutoff !== null && cutoff !== undefined && result.occurredAt < cutoff) {
       // Gated reads get a teaser regardless — resolving the full value only
       // to redact it would be a wasted spans + event_log read.
@@ -90,10 +89,9 @@ export class TraceSummaryService {
       };
     }
 
-    if (options?.full && this.fullResolutionDeps) {
+    if (full && this.fullResolutionDeps) {
       return await this.withFullIO({
-        tenantId,
-        authorization: options.authorization,
+        authorization: read.authorization,
         summary: result,
       });
     }
@@ -105,13 +103,15 @@ export class TraceSummaryService {
    * restored. Any failure — spans read, event_log read, a stale ref — falls
    * back to the stored preview: a degraded header read must never become a
    * failed one.
+   *
+   * The offloaded bodies live under a project id, outside ClickHouse, so
+   * they are resolved for the proof's own project: on an aggregate a member's
+   * offloaded body is not found and the stored preview is returned.
    */
   private async withFullIO({
-    tenantId,
     authorization,
     summary,
   }: {
-    tenantId: string;
     authorization: Authorization;
     summary: TraceSummaryData;
   }): Promise<TraceSummaryData> {
@@ -126,7 +126,7 @@ export class TraceSummaryService {
         });
       const { recomputedInput, recomputedOutput, anyResolved } =
         await resolveOffloadedTraces({
-          projectId: tenantId,
+          projectId: ownProjectIdOf({ authorization, reads: "traces" }),
           normalizedSpans,
           blobStore: deps.blobStore,
           ioExtractionService: deps.ioExtractionService,
@@ -144,7 +144,7 @@ export class TraceSummaryService {
       };
     } catch (error) {
       this.logger.warn(
-        { error, tenantId, traceId: summary.traceId },
+        { error, traceId: summary.traceId },
         "full-resolution summary read failed; returning stored preview",
       );
       return summary;

@@ -1,9 +1,11 @@
+import type { Authorization } from "@langwatch/actor";
 import { EvaluationNotFoundError } from "./errors";
 import type {
   EvaluationRunRepository,
   GetByEvaluationIdParams,
+  TenantEvalSummary,
 } from "./repositories/evaluation-run.repository";
-import type { EvalSummary, EvaluationRunData } from "./types";
+import type { EvaluationRunData } from "./types";
 
 export class EvaluationRunService {
   constructor(readonly repository: EvaluationRunRepository) {}
@@ -27,11 +29,11 @@ export class EvaluationRunService {
     return this.repository.findByTraceId(tenantId, traceId);
   }
 
-  async findSummariesByTraceIds(
-    tenantId: string,
-    traceIds: string[],
-    since: number,
-  ): Promise<Record<string, EvalSummary[]>> {
-    return this.repository.findSummariesByTraceIds(tenantId, traceIds, since);
+  async findSummariesByTraceIds(params: {
+    authorization: Authorization;
+    traceIds: string[];
+    since: number;
+  }): Promise<TenantEvalSummary[]> {
+    return this.repository.findSummariesByTraceIds(params);
   }
 }

@@ -7,6 +7,7 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import { ownProofAuthorizer } from "~/test-utils/authorizationProofs";
 import { EvaluationRunStore } from "../../../evaluation-processing/projections/evaluationRun.store";
 import {
   type NormalizedSpan,
@@ -87,8 +88,9 @@ describe("trace-pipeline projection stores retention stamping", () => {
     it("stamps trace_summaries with the platform default", async () => {
       const upsert = vi.fn().mockResolvedValue(undefined);
       const store = new TraceSummaryStore({
-        upsert,
-      } as unknown as TraceSummaryRepository);
+        repository: { upsert } as unknown as TraceSummaryRepository,
+        authorize: ownProofAuthorizer,
+      });
 
       await store.store(
         { traceId: "trace_1", spanCount: 1 } as TraceSummaryData,

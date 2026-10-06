@@ -1,5 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
+import type { Authorization } from "@langwatch/actor";
 import type { EvalSummary, EvaluationRunData } from "../types";
 
 /**
@@ -44,12 +45,25 @@ export interface EvaluationRunRepository {
     tenantId: string,
     traceId: string,
   ): Promise<EvaluationRunData[]>;
-  findSummariesByTraceIds(
-    tenantId: string,
-    traceIds: string[],
-    since: number,
-  ): Promise<Record<string, EvalSummary[]>>;
+  /**
+   * The slim evaluations of a page of listed traces, read through the proof
+   * (ADR-144 block C). Each row names the tenant it was read from: an
+   * aggregate lists several, and two of them may hold the same trace id, so
+   * the id alone does not say whose evaluation it is.
+   */
+  findSummariesByTraceIds(params: {
+    authorization: Authorization;
+    traceIds: string[];
+    /** Lower bound on `ScheduledAt`, ms since epoch: the list's own window. */
+    since: number;
+  }): Promise<TenantEvalSummary[]>;
 }
+
+/** A listed trace's evaluation with the tenant it was read from. */
+export type TenantEvalSummary = EvalSummary & {
+  tenantId: string;
+  traceId: string;
+};
 
 export class NullEvaluationRunRepository implements EvaluationRunRepository {
   async upsert(_data: EvaluationRunData, _tenantId: string): Promise<void> {}
@@ -67,11 +81,7 @@ export class NullEvaluationRunRepository implements EvaluationRunRepository {
     return [];
   }
 
-  async findSummariesByTraceIds(
-    _tenantId: string,
-    _traceIds: string[],
-    _since: number,
-  ): Promise<Record<string, EvalSummary[]>> {
-    return {};
+  async findSummariesByTraceIds(): Promise<TenantEvalSummary[]> {
+    return [];
   }
 }

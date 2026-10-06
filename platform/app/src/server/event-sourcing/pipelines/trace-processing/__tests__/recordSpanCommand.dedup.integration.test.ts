@@ -17,10 +17,9 @@
 
 import crypto from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
-import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
+import { traceSummaryStoreFor } from "~/test-utils/traceSummaryRepository";
 import type { AggregateType } from "../../../";
 import { definePipeline } from "../../../";
 import {
@@ -44,7 +43,6 @@ import {
 import { SpanStorageMapProjection } from "../projections/spanStorage.mapProjection";
 import { SpanAppendStore } from "../projections/spanStorage.store";
 import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
-import { TraceSummaryStore } from "../projections/traceSummary.store";
 import type { TraceProcessingEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
 
@@ -171,11 +169,7 @@ function createDeduplicationTestPipeline(): PipelineWithCommandHandlers<
       spanStorageRepositoryFor(async () => clickHouseClient),
     ).repository,
   );
-  const traceSummaryStore = new TraceSummaryStore(
-    new TraceSummaryService(
-      new TraceSummaryClickHouseRepository(async () => clickHouseClient),
-    ).repository,
-  );
+  const traceSummaryStore = traceSummaryStoreFor(async () => clickHouseClient);
 
   const pipelineDefinition = definePipeline<TraceProcessingEvent>()
     .withName(pipelineName)

@@ -1,4 +1,9 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
+import {
+  type AuthorizedClickHouse,
+  tenantScope,
+} from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import { RESOLVER_RECENT_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
@@ -10,10 +15,11 @@ import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import { capSerializedInputs, capText } from "../evaluation-column-caps";
-import type { EvalSummary, EvaluationRunData } from "../types";
+import type { EvaluationRunData } from "../types";
 import type {
   EvaluationRunRepository,
   GetByEvaluationIdParams,
+  TenantEvalSummary,
 } from "./evaluation-run.repository";
 
 const TABLE_NAME = "evaluation_runs" as const;
@@ -67,12 +73,20 @@ export class EvaluationRunClickHouseRepository
   implements EvaluationRunRepository
 {
   private readonly resolveClient: ClickHouseClientResolver;
+  /**
+   * The proof-fenced reader for the reads a trace page reaches (ADR-144
+   * block C). The per-evaluation and per-trace reads still resolve the
+   * tenant's own client by id; they are converted with their callers.
+   */
+  private readonly clickhouse: AuthorizedClickHouse;
 
   constructor({
     resolveClient,
+    clickhouse,
     retentionResolver,
   }: {
     resolveClient: ClickHouseClientResolver;
+    clickhouse: AuthorizedClickHouse;
     /**
      * Bounds the ScheduledAt resolver's fallback to this tenant's own retention
      * horizon. Optional so existing construction sites keep working on the
@@ -81,6 +95,7 @@ export class EvaluationRunClickHouseRepository
     retentionResolver?: RetentionPolicyResolver;
   }) {
     this.resolveClient = resolveClient;
+    this.clickhouse = clickhouse;
     this.retentionFloor = createRetentionFloorService(retentionResolver);
   }
 
@@ -525,23 +540,29 @@ export class EvaluationRunClickHouseRepository
     }
   }
 
-  async findSummariesByTraceIds(
-    tenantId: string,
-    traceIds: string[],
-    since: number,
-  ): Promise<Record<string, EvalSummary[]>> {
-    if (traceIds.length === 0) return {};
-
-    EventUtils.validateTenantId(
-      { tenantId },
-      "EvaluationRunClickHouseRepository.findSummariesByTraceIds",
-    );
+  /**
+   * The fence is the only tenant predicate, in the outer scope and in the
+   * dedup subquery alike, on `ScheduledAt`, the table's partition column
+   * (migration 00002). The window on a shared grant applies to the
+   * evaluation's own time, which is what the list's `since` bounds too.
+   */
+  async findSummariesByTraceIds({
+    authorization,
+    traceIds,
+    since,
+  }: {
+    authorization: Authorization;
+    traceIds: string[];
+    since: number;
+  }): Promise<TenantEvalSummary[]> {
+    if (traceIds.length === 0) return [];
 
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = this.clickhouse.as(authorization, { reads: "traces" });
       const result = await client.query({
         query: `
           SELECT
+            TenantId,
             EvaluationId,
             EvaluatorId,
             EvaluatorType,
@@ -553,24 +574,25 @@ export class EvaluationRunClickHouseRepository
             Passed,
             Label
           FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
+          WHERE ${tenantScope("ScheduledAt")}
             AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
             AND TraceId IN ({traceIds:Array(String)})
             AND (TenantId, EvaluationId, UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("ScheduledAt")}
                 AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
                 AND TraceId IN ({traceIds:Array(String)})
               GROUP BY TenantId, EvaluationId
             )
           ORDER BY UpdatedAt DESC
         `,
-        query_params: { tenantId, traceIds, since },
+        query_params: { traceIds, since },
         format: "JSONEachRow",
       });
 
       interface SlimRow {
+        TenantId: string;
         EvaluationId: string;
         EvaluatorId: string;
         EvaluatorType: string;
@@ -585,38 +607,29 @@ export class EvaluationRunClickHouseRepository
 
       const rows = await result.json<SlimRow>();
 
-      const byTrace: Record<string, EvalSummary[]> = {};
-
-      // Dedup is now enforced by the IN-tuple subquery — no JS-side `seen` set.
-      for (const row of rows) {
+      // Dedup is enforced by the IN-tuple subquery; no JS-side `seen` set.
+      return rows.flatMap((row): TenantEvalSummary[] => {
         const traceId = row.TraceId;
-        if (!traceId) continue;
-
-        const summary: EvalSummary = {
-          evaluationId: row.EvaluationId,
-          evaluatorId: row.EvaluatorId,
-          evaluatorType: row.EvaluatorType,
-          evaluatorName: row.EvaluatorName,
-          traceId,
-          isGuardrail: !!row.IsGuardrail,
-          status: row.Status as EvalSummary["status"],
-          score: row.Score,
-          passed: row.Passed === null ? null : !!row.Passed,
-          label: row.Label,
-        };
-
-        const arr = byTrace[traceId];
-        if (arr) {
-          arr.push(summary);
-        } else {
-          byTrace[traceId] = [summary];
-        }
-      }
-
-      return byTrace;
+        if (!traceId) return [];
+        return [
+          {
+            tenantId: row.TenantId,
+            evaluationId: row.EvaluationId,
+            evaluatorId: row.EvaluatorId,
+            evaluatorType: row.EvaluatorType,
+            evaluatorName: row.EvaluatorName,
+            traceId,
+            isGuardrail: !!row.IsGuardrail,
+            status: row.Status as TenantEvalSummary["status"],
+            score: row.Score,
+            passed: row.Passed === null ? null : !!row.Passed,
+            label: row.Label,
+          },
+        ];
+      });
     } catch (error) {
       logger.warn(
-        { tenantId, traceIdCount: traceIds.length, error },
+        { traceIdCount: traceIds.length, error },
         "Failed to find evaluation summaries by trace IDs in ClickHouse",
       );
       throw error;

@@ -1632,21 +1632,17 @@ export const tracesV2Router = createTRPCRouter({
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
-      const summary = await app.traces.summary.getByTraceId(
-        input.projectId,
-        input.traceId,
-        {
-          ...(input.occurredAtMs !== undefined
-            ? { occurredAtMs: input.occurredAtMs }
-            : {}),
-          visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-            input.projectId,
-          ),
-          ...(input.full
-            ? { full: true, authorization: requireRouteAuthorization(ctx) }
-            : { full: false }),
-        },
-      );
+      const summary = await app.traces.summary.getByTraceId({
+        authorization: requireRouteAuthorization(ctx),
+        traceId: input.traceId,
+        ...(input.occurredAtMs !== undefined
+          ? { occurredAtMs: input.occurredAtMs }
+          : {}),
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
+        full: input.full,
+      });
       if (!summary) {
         throw new TraceNotFoundError(input.traceId);
       }

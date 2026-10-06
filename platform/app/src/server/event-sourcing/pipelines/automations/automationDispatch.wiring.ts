@@ -114,14 +114,26 @@ export function buildAutomationDispatchPorts({
   // Shared trace fold store — dispatch re-reads it for the settle confirm.
   // RedisCachedFoldStore takes a standalone `Redis` client; a Cluster
   // client falls back to the uncached store.
+  // The dispatch reads committed fold state outside a fold step, so the
+  // store's read proof names the dispatch as the reader (ADR-144 block C).
+  const uncachedTraceSummaryStore = new TraceSummaryStore({
+    repository: traceSummaryRepository,
+    authorize: ({ projectId, purpose }) =>
+      authorization.authorizeInternal({
+        actor: internalActor(
+          "event-sourcing/pipelines/automations/automationDispatch.wiring",
+        ),
+        projectId,
+        permission: "traces:view",
+        purpose,
+      }),
+  });
   const traceSummaryStore: FoldProjectionStore<TraceSummaryData> =
     redis && !(redis instanceof Cluster)
-      ? new RedisCachedFoldStore(
-          new TraceSummaryStore(traceSummaryRepository),
-          redis,
-          { keyPrefix: "trace_summaries" },
-        )
-      : new TraceSummaryStore(traceSummaryRepository);
+      ? new RedisCachedFoldStore(uncachedTraceSummaryStore, redis, {
+          keyPrefix: "trace_summaries",
+        })
+      : uncachedTraceSummaryStore;
 
   const traceReadDerivation = new TraceReadDerivationService(traces.spans);
 

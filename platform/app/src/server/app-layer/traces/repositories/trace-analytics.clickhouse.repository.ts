@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
@@ -16,6 +17,11 @@ import {
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import {
+  type AuthorizedClickHouse,
+  type TenantScopedReader,
+  tenantScope,
+} from "../../clients/clickhouse/authorized-reads";
 import { queryWindowed } from "../../clients/clickhouse/windowed-read";
 import type { TraceAnalyticsRepository } from "./trace-analytics.repository";
 
@@ -162,7 +168,22 @@ function toClickHouseRecord(
 export class TraceAnalyticsClickHouseRepository
   implements TraceAnalyticsRepository
 {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  /**
+   * Writes resolve the tenant's own client by the row's tenant id, the way
+   * the projection hands it over. Reads never name a tenant: they go through
+   * the authorized client, which fences every statement by the proof
+   * (ADR-144 block C).
+   */
+  constructor(
+    private readonly deps: {
+      resolveClient: ClickHouseClientResolver;
+      clickhouse: AuthorizedClickHouse;
+    },
+  ) {}
+
+  private reader(authorization: Authorization): TenantScopedReader {
+    return this.deps.clickhouse.as(authorization, { reads: "traces" });
+  }
 
   async upsert(
     row: TraceAnalyticsRow,
@@ -175,7 +196,7 @@ export class TraceAnalyticsClickHouseRepository
     );
 
     try {
-      const client = await this.resolveClient(row.tenantId);
+      const client = await this.deps.resolveClient(row.tenantId);
       await client.insert({
         table: TABLE_NAME,
         values: [toClickHouseRecord(row, retentionDays, appliedEventIds)],
@@ -221,7 +242,7 @@ export class TraceAnalyticsClickHouseRepository
     }
 
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = await this.deps.resolveClient(tenantId);
       await client.insert({
         table: TABLE_NAME,
         values: entries.map(({ row, retentionDays, appliedEventIds }) =>
@@ -279,21 +300,22 @@ export class TraceAnalyticsClickHouseRepository
    * this read must not do that (again, see {@link queryLatestVersion}), so the
    * bound is threaded through as plain fromMs/toMs and rendered by the query
    * builder into the OUTER scope alone.
+   *
+   * This is the fold's read-back, not the trace page: no route reads
+   * `trace_analytics` per trace. It still reads through the proof (ADR-144
+   * block C) under `traces:view`, the permission the row's trace is viewed
+   * under, so the fence is the only tenant predicate in the statement and
+   * the fold's own-only proof keeps the read on the row the fold wrote.
    */
   async findByTraceIdWithApplied({
-    tenantId,
+    authorization,
     traceId,
     window,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "TraceAnalyticsClickHouseRepository.findByTraceIdWithApplied",
-    );
-
     try {
       return await queryWindowed<{
         row: TraceAnalyticsRow;
@@ -308,7 +330,7 @@ export class TraceAnalyticsClickHouseRepository
         isEmpty: (result) => result === null,
         run: async (fragment) =>
           await this.queryLatestVersion({
-            tenantId,
+            authorization,
             traceId,
             window: fragment
               ? { fromMs: fragment.fromMs, toMs: fragment.toMs }
@@ -322,7 +344,7 @@ export class TraceAnalyticsClickHouseRepository
       // rolling ahead of migration 00056, every read throwing
       // UNKNOWN_IDENTIFIER — surfaces as an untraceable line.
       logger.warn(
-        { tenantId, traceId, error },
+        { traceId, error },
         "Failed to read back trace analytics row",
       );
       throw error;
@@ -403,15 +425,15 @@ export class TraceAnalyticsClickHouseRepository
    * the IN-tuple.
    */
   private async queryLatestVersion({
-    tenantId,
+    authorization,
     traceId,
     window,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
-    const client = await this.resolveClient(tenantId);
+    const client = this.reader(authorization);
 
     const partitionFilter =
       window !== undefined
@@ -422,17 +444,18 @@ export class TraceAnalyticsClickHouseRepository
       query: `
         SELECT *
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("OccurredAt")}
           AND TraceId = {traceId:String}
           ${partitionFilter}
           AND (TenantId, TraceId, UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantScope("OccurredAt")}
               AND TraceId = {traceId:String}
             GROUP BY TenantId, TraceId
           )
         ORDER BY
+          TenantId ASC,
           LastEventOccurredAt DESC,
           SpanCount DESC,
           length(AppliedEventIds) DESC,
@@ -441,7 +464,6 @@ export class TraceAnalyticsClickHouseRepository
         LIMIT 1
       `,
       query_params: {
-        tenantId,
         traceId,
         ...(window !== undefined
           ? { from: window.fromMs, to: window.toMs }

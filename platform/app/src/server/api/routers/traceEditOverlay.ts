@@ -1,3 +1,4 @@
+import { type Authorization, internalActor } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
@@ -5,6 +6,7 @@ import { redactPatchForViewer } from "~/server/traces/edit-overlay/redactTraceEd
 import { restoreWithheldEdits } from "~/server/traces/edit-overlay/restoreWithheldTraceEdits";
 import { traceEditOverlayPatchSchema } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import type { Protections } from "~/server/traces/protections";
+import { requireRouteAuthorization } from "../authorization";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
@@ -19,11 +21,12 @@ const logger = createLogger("langwatch:api:trace-edit-overlay");
  * must not open it.
  */
 async function isTraceWindowRedacted({
-  projectId,
+  authorization,
   traceId,
   protections,
 }: {
-  projectId: string;
+  /** Fences the summary read (ADR-144 block C). */
+  authorization: Authorization;
   traceId: string;
   protections: Protections;
 }): Promise<boolean> {
@@ -32,19 +35,42 @@ async function isTraceWindowRedacted({
     return false;
   }
   try {
-    const summary = await getApp().traces.summary.getByTraceId(
-      projectId,
+    const summary = await getApp().traces.summary.getByTraceId({
+      authorization,
       traceId,
-      { visibilityCutoffMs, full: false },
-    );
+      visibilityCutoffMs,
+      full: false,
+    });
     return summary.redactedByVisibilityWindow === true;
   } catch (error) {
     logger.warn(
-      { error, projectId, traceId },
+      { error, traceId },
       "trace summary unreadable; withholding corrected content",
     );
     return true;
   }
+}
+
+/**
+ * The proof the correction's own summary read is fenced by. A reviewer
+ * holds annotation permissions, not trace ones, so the write procedures
+ * mint no proof of their own: the server reads the summary for the project
+ * the correction belongs to, own-only, to decide what the plan's window
+ * withholds. The read widens through no grant, the same as before.
+ */
+function authorizeOverlaySummaryRead({
+  projectId,
+  route,
+}: {
+  projectId: string;
+  route: string;
+}): Promise<Authorization> {
+  return getApp().authorization.authorizeInternal({
+    actor: internalActor("api/routers/traceEditOverlay"),
+    projectId,
+    permission: "traces:view",
+    purpose: { kind: "route", route },
+  });
 }
 
 /**
@@ -74,7 +100,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
         projectId: input.projectId,
       });
       const isWindowRedacted = await isTraceWindowRedacted({
-        projectId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         traceId: input.traceId,
         protections,
       });
@@ -128,7 +154,10 @@ export const traceEditOverlayRouter = createTRPCRouter({
         projectId: input.projectId,
       });
       const isWindowRedacted = await isTraceWindowRedacted({
-        projectId: input.projectId,
+        authorization: await authorizeOverlaySummaryRead({
+          projectId: input.projectId,
+          route: "traceEditOverlay.upsert",
+        }),
         traceId: input.traceId,
         protections,
       });

@@ -14,9 +14,10 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
+import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
 import { getTestClickHouseClient } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import type { EvaluationRunData } from "../../types";
-import { EvaluationRunClickHouseRepository } from "../evaluation-run.clickhouse.repository";
 
 const tenantId = `test-eval-resolve-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
@@ -59,7 +60,7 @@ beforeAll(async () => {
   const rawClient = getTestClickHouseClient();
   if (!rawClient) throw new Error("ClickHouse test container not available");
   ch = rawClient;
-  repo = new EvaluationRunClickHouseRepository({
+  repo = evaluationRunRepositoryFor({
     resolveClient: async () => ch,
   });
 
@@ -116,7 +117,7 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
         return Reflect.get(target, prop, receiver);
       },
     }) as ClickHouseClient;
-    const recordingRepo = new EvaluationRunClickHouseRepository({
+    const recordingRepo = evaluationRunRepositoryFor({
       resolveClient: async () => recordingClient,
     });
 
@@ -151,7 +152,7 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
         return Reflect.get(target, prop, receiver);
       },
     }) as ClickHouseClient;
-    const recordingRepo = new EvaluationRunClickHouseRepository({
+    const recordingRepo = evaluationRunRepositoryFor({
       resolveClient: async () => recordingClient,
     });
 

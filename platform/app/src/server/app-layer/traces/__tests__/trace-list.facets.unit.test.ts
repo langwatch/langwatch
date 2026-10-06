@@ -41,7 +41,7 @@ function fakeRepository() {
 function serviceWith(repository: ReturnType<typeof fakeRepository>) {
   return new TraceListService(
     repository as never,
-    { findSummariesByTraceIds: vi.fn().mockResolvedValue({}) } as never,
+    { findSummariesByTraceIds: vi.fn().mockResolvedValue([]) } as never,
     { getNamesByIds: vi.fn().mockResolvedValue(new Map()) } as never,
   );
 }

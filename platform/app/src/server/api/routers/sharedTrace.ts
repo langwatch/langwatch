@@ -226,7 +226,9 @@ export const sharedTraceRouter = createTRPCRouter({
       // the same generic NOT_FOUND as a bad token.
       let summary;
       try {
-        summary = await app.traces.summary.getByTraceId(projectId, traceId, {
+        summary = await app.traces.summary.getByTraceId({
+          authorization,
+          traceId,
           visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
         });
       } catch (error) {

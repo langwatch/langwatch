@@ -579,13 +579,20 @@ export function initializeDefaultApp(options?: {
     dataRetentionPolicyRepo,
   );
 
+  // One repository serves the drawer header and the fold's read-back: reads
+  // go through the authorized client, writes resolve the tenant's own.
+  const traceSummaryRepository = clickhouseEnabled
+    ? new TraceSummaryClickHouseRepository({
+        resolveClient: resolveClickHouseClient,
+        clickhouse: authorizedClickHouse,
+      })
+    : new NullTraceSummaryRepository();
   const traceSummary = traced(
-    new TraceSummaryService(
-      clickhouseEnabled
-        ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
-        : new NullTraceSummaryRepository(),
-      { spanStorageRepository, blobStore, ioExtractionService },
-    ),
+    new TraceSummaryService(traceSummaryRepository, {
+      spanStorageRepository,
+      blobStore,
+      ioExtractionService,
+    }),
     "TraceSummaryService",
   );
   const evaluationRuns = traced(
@@ -593,6 +600,7 @@ export function initializeDefaultApp(options?: {
       clickhouseEnabled
         ? new EvaluationRunClickHouseRepository({
             resolveClient: resolveClickHouseClient,
+            clickhouse: authorizedClickHouse,
             retentionResolver: retentionPolicyCache,
           })
         : new NullEvaluationRunRepository(),
@@ -983,9 +991,7 @@ export function initializeDefaultApp(options?: {
     experimentIdLookup: clickhouseEnabled
       ? new ExperimentIdLookupClickHouseRepository(resolveClickHouseClient)
       : new NullExperimentIdLookupRepository(),
-    traceSummaryFold: clickhouseEnabled
-      ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
-      : traceSummary.repository,
+    traceSummaryFold: traceSummaryRepository,
     canonicalLogStorage: clickhouseEnabled
       ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
       : new NullCanonicalLogRecordRepository(),
@@ -1013,7 +1019,10 @@ export function initializeDefaultApp(options?: {
       ? new TraceAnalyticsRollupClickHouseRepository(resolveClickHouseClient)
       : new NullTraceAnalyticsRollupRepository(),
     traceAnalytics: clickhouseEnabled
-      ? new TraceAnalyticsClickHouseRepository(resolveClickHouseClient)
+      ? new TraceAnalyticsClickHouseRepository({
+          resolveClient: resolveClickHouseClient,
+          clickhouse: authorizedClickHouse,
+        })
       : new NullTraceAnalyticsRepository(),
     evaluationAnalyticsRollup: clickhouseEnabled
       ? new EvaluationAnalyticsRollupClickHouseRepository(

@@ -3,15 +3,36 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import {
+  type FoldReadAuthorizer,
+  foldReadPurpose,
+} from "./foldReadAuthorization";
 
 /**
  * Thin FoldProjectionStore adapter for trace summaries.
  * Delegates directly to TraceSummaryRepository (no mapper needed — projection uses camelCase types).
+ *
+ * Writes name the tenant from the store context, the way the fold hands it
+ * over. The read is fenced by a proof (ADR-144 block C): the store asks
+ * `authorize` for an own-only one on the context's tenant, so the fold reads
+ * back exactly the row it wrote.
  */
 export class TraceSummaryStore
   implements FoldProjectionStore<TraceSummaryData>
 {
-  constructor(private readonly repo: TraceSummaryRepository) {}
+  private readonly repo: TraceSummaryRepository;
+  private readonly authorize: FoldReadAuthorizer;
+
+  constructor({
+    repository,
+    authorize,
+  }: {
+    repository: TraceSummaryRepository;
+    authorize: FoldReadAuthorizer;
+  }) {
+    this.repo = repository;
+    this.authorize = authorize;
+  }
 
   /**
    * Persists a single trace summary. Skips empty traces (spanCount 0) and
@@ -81,13 +102,16 @@ export class TraceSummaryStore
     // retries a windowed miss without the window, which lands on the
     // repository's resolve-OccurredAt path — so correctness never depends on
     // the width, and no layer runs a second recovery ladder.
-    return await this.repo.findByTraceId(
-      String(context.tenantId),
-      aggregateId,
-      context.readWindow !== undefined
+    return await this.repo.findByTraceId({
+      authorization: await this.authorize({
+        projectId: String(context.tenantId),
+        purpose: foldReadPurpose({ context, entry: "TraceSummaryStore.get" }),
+      }),
+      traceId: aggregateId,
+      ...(context.readWindow !== undefined
         ? { window: context.readWindow }
-        : undefined,
-    );
+        : {}),
+    });
   }
 }
 

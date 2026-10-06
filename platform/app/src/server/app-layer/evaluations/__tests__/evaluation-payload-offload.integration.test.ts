@@ -26,6 +26,7 @@ import path from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
@@ -48,6 +49,7 @@ import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
+import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
 import { getTestClickHouseClient } from "../../../event-sourcing/__tests__/integration/testContainers";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
@@ -58,7 +60,6 @@ import {
   resolveInputsMarker,
   STORED_OBJECT_MARKER_KEY,
 } from "../evaluation-inputs-offload";
-import { EvaluationRunClickHouseRepository } from "../repositories/evaluation-run.clickhouse.repository";
 import type { EvaluationRunData } from "../types";
 
 // Route the stored-objects repository (which resolves its client internally)
@@ -169,7 +170,7 @@ beforeAll(async () => {
     clickhouseClientModule.getClickHouseClientForTenant,
   ).mockResolvedValue(ch);
 
-  evalRepo = new EvaluationRunClickHouseRepository({
+  evalRepo = evaluationRunRepositoryFor({
     resolveClient: async () => ch,
   });
   eventRepo = new EventRepositoryClickHouse(async () => ch);

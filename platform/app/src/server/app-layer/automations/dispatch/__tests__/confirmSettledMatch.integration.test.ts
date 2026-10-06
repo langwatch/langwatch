@@ -11,10 +11,10 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
 import type { TriggerSummary } from "../../repositories/trigger.repository";
 import {
   type ConfirmSettledMatchDeps,
@@ -143,7 +143,7 @@ beforeAll(async () => {
   const client = getTestClickHouseClient();
   if (!client) throw new Error("ClickHouse test container not available");
   ch = client;
-  const repository = new EvaluationRunClickHouseRepository({
+  const repository = evaluationRunRepositoryFor({
     resolveClient: async () => ch,
   });
   deps = {
