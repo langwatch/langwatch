@@ -197,6 +197,10 @@ import type { z } from "zod";
 
 import { tokenCounterChannels } from "../channels/token-counter-channels.registry.ts";
 import { traceLegacySpoolChannels } from "../channels/trace-legacy-spool-channels.registry.ts";
+import {
+  buildTraceIngestSourceBillingPipeline,
+  type TraceIngestSourceBillingPipeline,
+} from "../eventing/trace-ingest-source-billing.pipeline.ts";
 import type { TraceProcessingPipelineDefinition } from "../eventing/trace-processing-projections.pipeline.ts";
 import { TraceProcessingRuntimeAdapter } from "../eventing/trace-processing-runtime.pipeline.ts";
 import {
@@ -296,6 +300,7 @@ import {
 import { TraceExportDownloadService } from "../services/trace-export-download.service.ts";
 import { TraceExportService } from "../services/trace-export.service.ts";
 import { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
+import { TraceIngestSourceBillingService } from "../services/trace-ingest-source-billing.service.ts";
 import {
   TraceIngestionService,
   TraceIngressCommand,
@@ -691,6 +696,8 @@ export interface TraceAppDependencies {
    * reaches it: absent members raise by name, never admit a caller.
    */
   ingestCredential?: TraceIngestCredentialService;
+  /** Trace's fold of governance's billing fact; its pipeline folds, the OTLP door reads. */
+  ingestSourceBilling?: TraceIngestSourceBillingService;
   /**
    * Where an ingested span goes. Absent on a process that composed no receiver,
    * and then the ingestion doors refuse by name rather than answering 200 to
@@ -951,6 +958,9 @@ export class TraceModule implements TraceApi, CollectorApp {
     const blobResolutionDeps = { blobStore: options.blobStore, ioExtractionService };
     const spanStorageRepository = options.repositories.spanStorage;
     const editOverlay = TraceEditOverlayService.create(options.repositories.editOverlay);
+    const ingestSourceBilling = TraceIngestSourceBillingService.create({
+      repository: options.repositories.ingestSourceBilling,
+    });
     // ADR-022: media extraction first, then the whole-payload spool over 256 KB, as main ordered.
     const edgeSpool = TraceEdgeSpoolService.create({
       spool: options.blobStore,
@@ -1102,9 +1112,11 @@ export class TraceModule implements TraceApi, CollectorApp {
             ingestCredential: TraceIngestCredentialService.create({
               apiKeys: options.apiKeys,
               authz: options.ingestAuthz ?? options.protections.authz,
+              sourceBilling: ingestSourceBilling,
             }),
           }
         : {}),
+      ingestSourceBilling,
       publicBaseUrl: options.publicBaseUrl,
       scenarioRoleMetrics: ScenarioRoleMetricsDerivationService.create({
         spans: options.repositories.derivationSpans,
@@ -1218,6 +1230,15 @@ export class TraceModule implements TraceApi, CollectorApp {
   /** Binds the milestone senders the worker's project-metadata subscriber records through. */
   connectProjectMilestones(commands: EventingCommands<TraceProjectMilestonesDefinition>): void {
     this.#milestones?.connect(commands);
+  }
+
+  /** trace_ingest_source_billing: folds governance's billing fact from trace's side (§9, Q82). */
+  ingestSourceBillingPipeline(): TraceIngestSourceBillingPipeline {
+    const billing = this.#dependencies.ingestSourceBilling;
+    if (!billing) {
+      throw new TraceCapabilityUnavailableError("this process", "the ingest source billing fold");
+    }
+    return buildTraceIngestSourceBillingPipeline({ billing });
   }
 
   #contentReader: TraceContentReadService;

@@ -87,7 +87,7 @@ Feature: Core OTLP protection applies Enterprise policy without owning it
     When the backfill runs
     Then every organization holding an enabled coding-assistant config records its billing facts
 
-  # Unimplemented: trace does not yet fold the billing fact or read it at ingest (handoffs/port-otlp-fact-fold.md); every receiver answers 503 for an ingestion-source key.
+  # Unimplemented: trace folds the fact and builds the policy at ingest, but no receiver test drives a real key through it yet (handoffs/otlp-trace-fold.md).
   @unimplemented @integration
   Scenario: An ingestion-source key reaches every receiver with Governance's policy
     Given a copilot_vscode ingestion-source key
@@ -96,8 +96,7 @@ Feature: Core OTLP protection applies Enterprise policy without owning it
     And it stamps source, origin and organization, and the non-billable marker on traces and logs only
     And non-Copilot scopes are dropped from traces and metrics but not from logs
 
-  # Unimplemented: trace does not yet fold the billing fact (handoffs/port-otlp-fact-fold.md).
-  @unimplemented @unit
+  @unit
   Scenario: Trace folds the billing fact and an absent row is non-billable
     Given governance recorded a billing fact for an organization's source
     When trace folds it into its own projection
