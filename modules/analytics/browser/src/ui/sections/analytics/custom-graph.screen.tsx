@@ -341,6 +341,14 @@ function AnalyticsCustomGraphContent({
   const [debouncedCustomAPIInput, setDebouncedCustomAPIInput] = useDebounceValue<
     CustomAPICallData | undefined
   >(undefined, 400);
+  // A trailing fire after unmount sets state on a torn-down tree (see fields-filters.tsx).
+  useEffect(
+    () => () => {
+      setDebouncedCustomGraphInput.cancel();
+      setDebouncedCustomAPIInput.cancel();
+    },
+    [setDebouncedCustomGraphInput, setDebouncedCustomAPIInput],
+  );
 
   useEffect(() => {
     const parsedFormData = JSON.parse(formData) as CustomGraphFormData;
