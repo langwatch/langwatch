@@ -62,8 +62,14 @@ const passthroughIdempotency: IdempotentRunner = async ({ handler }) => {
   return { isReplayed: false, status: response.status, response };
 };
 
-/** The family over one `WebhookAppDependencies` cut the test supplies. */
-export function mountWebhookRest(dependencies: Partial<WebhookAppDependencies> = {}) {
+/**
+ * The family over one `WebhookAppDependencies` cut the test supplies; `idempotency` swaps the
+ * pass-through ledger.
+ */
+export function mountWebhookRest(
+  dependencies: Partial<WebhookAppDependencies> = {},
+  { idempotency = passthroughIdempotency }: { idempotency?: IdempotentRunner } = {},
+) {
   const app = WebhookModule.fromDependencies({ ...unreachableDependencies(), ...dependencies });
 
   const runtime = createRestRuntime({
@@ -73,7 +79,7 @@ export function mountWebhookRest(dependencies: Partial<WebhookAppDependencies> =
         scope: { tier: "organization", id: ORGANIZATION_ID },
       }),
     },
-    idempotency: passthroughIdempotency,
+    idempotency,
   });
 
   const hono = runtime.mount(webhookRest.router(), {

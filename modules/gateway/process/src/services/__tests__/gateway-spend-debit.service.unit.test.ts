@@ -310,6 +310,39 @@ describe("GatewaySpendDebitService", () => {
     });
   });
 
+  describe("given a forwarded call and an Instant Eval outcome under one managed key", () => {
+    /** @scenario Forwarded calls are metered under the customer organization */
+    it("debits the same budgets, each row naming the customer organization", async () => {
+      const { debits, resolver, ledger } = harness({
+        budgets: [
+          resolved({ id: "b-org", scopeType: "ORGANIZATION" }),
+          resolved({ id: "b-key", scopeType: "VIRTUAL_KEY" }),
+        ],
+      });
+      const managed = { organization_id: "org-customer", virtual_key_id: "vk-managed" };
+
+      await debits.write(payload({ ...managed, gateway_request_id: "forwarded-1" }));
+      await debits.write(
+        payload({
+          ...managed,
+          gateway_request_id: "instant-eval:run-1",
+          model: "jev",
+          model_provider_id: "",
+        }),
+      );
+
+      expect(resolver.asked).toHaveLength(2);
+      expect(resolver.asked[0]).toMatchObject({
+        organizationId: "org-customer",
+        virtualKeyId: "vk-managed",
+      });
+      expect(resolver.asked[1]).toEqual(resolver.asked[0]);
+      const [forwarded, instantEval] = ledger.batches;
+      expect(forwarded?.map((row) => row.budgetId)).toEqual(["b-org", "b-key"]);
+      expect(instantEval?.map((row) => row.budgetId)).toEqual(["b-org", "b-key"]);
+    });
+  });
+
   describe("given a failed outcome", () => {
     it("records a guardrail refusal apart from a provider error", async () => {
       const { debits, ledger } = harness({ budgets: [resolved({ id: "b" })] });

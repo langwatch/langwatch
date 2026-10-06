@@ -73,15 +73,18 @@ function suppliedMembers(
 function pricedSpend({
   requestId,
   runId,
+  virtualKeyId,
 }: {
   requestId: string;
   runId?: string;
+  virtualKeyId?: string;
 }): GatewayPricedSpend {
   return {
     requestId,
     projectId: TENANT,
     organizationId: `org-${run}`,
     teamId: `team-${run}`,
+    ...(virtualKeyId ? { virtualKeyId } : {}),
     requestType: "instant_eval",
     model: "jev",
     rateVersion: "instant_eval@0.8x1.3",
@@ -97,7 +100,7 @@ function pricedSpend({
 async function ledgerRowsFor(requestId: string) {
   const result = await client.query({
     query: `
-      SELECT Status, RequestType, Model, OrganizationId, TokensInput, CostNanoUSD, Metadata
+      SELECT Status, RequestType, Model, OrganizationId, VirtualKeyId, TokensInput, CostNanoUSD, Metadata
       FROM gateway_spend FINAL
       WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String}`,
     query_params: { tenantId: TENANT, requestId },
@@ -108,6 +111,7 @@ async function ledgerRowsFor(requestId: string) {
     RequestType: string;
     Model: string;
     OrganizationId: string;
+    VirtualKeyId: string;
     TokensInput: number | string;
     CostNanoUSD: number | string;
     Metadata: string;
@@ -177,6 +181,44 @@ describe.skipIf(!enabled)("the spend record of an Instant Eval outcome (real Cli
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ Status: "confirmed", RequestType: "instant_eval" });
       expect(JSON.parse(rows[0]?.Metadata ?? "{}").instant_eval).not.toHaveProperty("run_id");
+    });
+  });
+
+  describe("given a call forwarded under a license's managed key", () => {
+    /** @scenario Forwarded calls are metered under the customer organization */
+    it("holds the row under the customer organization and the managed key", async () => {
+      const requestId = `forwarded-${run}`;
+      const managedKey = `vk-managed-${run}`;
+
+      await protocol.recordPricedSpend({
+        ...pricedSpend({ requestId, virtualKeyId: managedKey }),
+        requestType: "chat",
+        model: "gpt-5-mini",
+      });
+
+      const [row] = await ledgerRowsFor(requestId);
+      expect(row).toMatchObject({
+        Status: "confirmed",
+        RequestType: "chat",
+        OrganizationId: `org-${run}`,
+        VirtualKeyId: managedKey,
+      });
+    });
+
+    /** @scenario A classify call is judged and metered under the customer organization */
+    it("holds an Instant Eval row of request type instant_eval under the same key", async () => {
+      const requestId = `instanteval-hosted-${run}`;
+      const managedKey = `vk-managed-${run}`;
+
+      await protocol.recordPricedSpend(pricedSpend({ requestId, virtualKeyId: managedKey }));
+
+      const [row] = await ledgerRowsFor(requestId);
+      expect(row).toMatchObject({
+        RequestType: "instant_eval",
+        OrganizationId: `org-${run}`,
+        VirtualKeyId: managedKey,
+      });
+      expect(Number(row?.CostNanoUSD)).toBe(CUSTOMER_PRICE_NANO_USD);
     });
   });
 });

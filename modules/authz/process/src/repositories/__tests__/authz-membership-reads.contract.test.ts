@@ -45,6 +45,7 @@ type MembershipFixture = Readonly<{
     revoked?: boolean;
     expiresAt?: Instant;
   }) => Promise<void>;
+  enable: (userId: string) => Promise<void>;
   close: () => Promise<void>;
 }>;
 
@@ -111,6 +112,11 @@ function memoryMembershipFixture(): MembershipFixture {
         createdAt: at(T0),
       });
       return projectId;
+    },
+    enable: async (userId) => {
+      const key = memory.membershipKey(organizationId, userId);
+      const membership = memory.memberships.get(key);
+      if (membership) memory.memberships.set(key, { ...membership, disabled: false });
     },
     grant: async ({ userId, grantId, revoked = false, expiresAt }) => {
       memory.grants.push({
@@ -219,6 +225,12 @@ async function postgresMembershipFixture(): Promise<MembershipFixture> {
         },
       });
       return projectId;
+    },
+    enable: async (userId) => {
+      await database.organizationUser.update({
+        where: { userId_organizationId: { userId, organizationId } },
+        data: { disabledAt: null },
+      });
     },
     grant: async ({ userId, grantId, revoked = false, expiresAt }) => {
       await database.grant.create({
@@ -358,6 +370,50 @@ describe.each(backends)("given the membership reads on the $name backend", (back
           repositories.admissions.readAdmissionMarker({ organizationId, userId }),
         ).resolves.toEqual({ found: false });
       }
+    });
+
+    /** @scenario Concurrent SSO admission completion claims one notification */
+    it("lets only one of two completions racing for the same admission claim it", async () => {
+      const { repositories, organizationId, member, grant } = await open();
+      const grantId = id("grant");
+      const userId = await member({ pendingSsoGrantId: grantId });
+      await grant({ userId, grantId, expiresAt: FAR_FUTURE });
+      const complete = () =>
+        repositories.admissions.completeAdmission({ organizationId, userId, grantId });
+
+      const claims = await Promise.all([complete(), complete()]);
+
+      expect(claims.toSorted()).toEqual([false, true]);
+      await expect(
+        repositories.admissions.readAdmissionMarker({ organizationId, userId }),
+      ).resolves.toEqual({ found: false });
+    });
+
+    /** @scenario Inactive members cannot complete pending SSO admission */
+    it.each([
+      ["a disabled member", "disabled"],
+      ["a deactivated user", "deactivated"],
+    ] as const)("leaves the admission of %s pending", async (_case, standing) => {
+      const { repositories, organizationId, member, grant, enable } = await open();
+      const grantId = id("grant");
+      const userId = await member({
+        pendingSsoGrantId: grantId,
+        disabled: standing === "disabled",
+      });
+      await grant({ userId, grantId, expiresAt: FAR_FUTURE });
+      if (standing === "deactivated") {
+        await repositories.userStandings.recordDeactivated({ userId, at: at(T0) });
+      }
+
+      await expect(
+        repositories.admissions.completeAdmission({ organizationId, userId, grantId }),
+      ).resolves.toBe(false);
+
+      if (standing === "disabled") await enable(userId);
+      else await repositories.userStandings.recordReactivated({ userId, at: at(T0 + 1) });
+      await expect(
+        repositories.admissions.readAdmissionMarker({ organizationId, userId }),
+      ).resolves.toEqual({ found: true, grantId, occurredAtMs: T0 });
     });
   });
 

@@ -18,6 +18,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi, GatewayPricedSpend } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
+  INSTANT_EVAL_REQUEST_TYPE,
   InstantEvalApi,
   type InstantEvalActor,
   InstantEvalMemoryJudgeInProductionError,
@@ -38,6 +39,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantEvalProcessModule } from "../../instant-eval.module.ts";
+import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";
@@ -548,6 +550,57 @@ describe("given a hosted Connect call judged on LangWatch Cloud", () => {
           costNanoUsd: 4_000_000_000,
         }),
       ]);
+    });
+  });
+
+  describe("when a classify call is judged and its spend recorded under the managed key", () => {
+    /** @scenario A classify call is judged and metered under the customer organization */
+    it("answers verdicts and input tokens, then records an instant_eval row at the list rate", async () => {
+      const recorded: GatewayPricedSpend[] = [];
+      const gateway: Partial<GatewayApi> = {
+        recordPricedSpend: async (input) => {
+          recorded.push(input);
+          return { status: "recorded" };
+        },
+      };
+
+      const judgement = await withInstallation(
+        { classifier: "memory", judgeKey: null, gateway },
+        async (api) => {
+          const judged = await api.classify({
+            projectId: PROJECT,
+            text: "Thank you for your patience while we looked into it.",
+            questions: [{ id: "polite", kind: "boolean", instructions: "is it polite?" }],
+          });
+          const { costUsd, priceUsd } = api.priceOf({ inputTokens: judged.inputTokens });
+          await api.recordSpendForHostedCalls({
+            projectId: PROJECT,
+            virtualKeyId: "vk-managed",
+            inputTokens: judged.inputTokens,
+            requests: 1,
+            costUsd,
+            priceUsd,
+            occurredAt: HOSTED_SPEND.occurredAt,
+          });
+          return judged;
+        },
+      );
+
+      expect(judgement.verdicts.map((verdict) => verdict.questionId)).toEqual(["polite"]);
+      expect(judgement.inputTokens).toBeGreaterThan(0);
+      const listPriceNanoUsd =
+        (judgement.inputTokens / 1_000_000) *
+        INSTANT_EVAL_PRICING.usdPerMillionInputTokens *
+        INSTANT_EVAL_PRICING.markup *
+        1_000_000_000;
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0]).toMatchObject({
+        organizationId: ORGANIZATION,
+        virtualKeyId: "vk-managed",
+        requestType: INSTANT_EVAL_REQUEST_TYPE,
+        inputTokens: judgement.inputTokens,
+      });
+      expect(Math.abs((recorded[0]?.costNanoUsd ?? 0) - listPriceNanoUsd)).toBeLessThanOrEqual(2);
     });
   });
 
