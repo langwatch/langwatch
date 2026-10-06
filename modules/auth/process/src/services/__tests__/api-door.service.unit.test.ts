@@ -47,6 +47,7 @@ const projectTokens = new Map<string, ResolvedApiKeyCredential>([
   ["sk-lw-unowned", projectKey("key-unowned", null)],
   ["sk-lw-unattended-run", { ...projectKey("key-run", null), isUnattendedRunKey: true }],
   ["legacy-key", { type: "legacyProjectKey", project: PROJECT }],
+  ["sk-lw-ingest", { ...projectKey("key-ingest", null), ingestionTemplateId: "template-1" }],
 ]);
 const organizationTokens = new Map<string, OrganizationApiKeyResolution>([
   ["sk-lw-org-owned", organizationKey("key-org-owned", "user-2")],
@@ -191,6 +192,33 @@ describe("the key doors' actor", () => {
       expect(
         await actorThrough(identities.organization, { authorization: "Bearer sk-lw-org-unowned" }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("the project door's admitted key kinds", () => {
+  function authenticate(headers: Record<string, string>) {
+    return identities.project.authenticate({
+      request: new Request("http://localhost/api/agents/connect/register", { headers }),
+      permission: "scenarios:manage",
+      permissions: ["scenarios:manage"],
+      keyKinds: ["api_key"],
+    });
+  }
+
+  describe("given an ingestion key on a route admitting only API keys", () => {
+    it("refuses key_type_not_allowed before its permission is asked", async () => {
+      await expect(
+        authenticate({ authorization: "Bearer sk-lw-ingest", "x-project-id": "project-1" }),
+      ).rejects.toMatchObject({ code: "key_type_not_allowed", httpStatus: 403 });
+    });
+  });
+
+  describe("given a person's CLI access token on a route admitting only API keys", () => {
+    it("refuses key_type_not_allowed before its permission is asked", async () => {
+      await expect(authenticate({ authorization: "Bearer lw_at_bound" })).rejects.toMatchObject({
+        code: "key_type_not_allowed",
+      });
     });
   });
 });

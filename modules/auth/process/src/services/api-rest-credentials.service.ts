@@ -15,6 +15,7 @@ import {
   type ApiKeyApi,
   type ResolvedOrganizationApiKeyToken,
 } from "@langwatch/api-key-contract";
+import { assertKeyKind, keyCredentialOf, type RestKeyKind } from "@langwatch/api/rest";
 import {
   PermissionDeniedError,
   type AuthzPermission,
@@ -103,9 +104,14 @@ export class ApiRestCredentialsService {
   async authenticate(input: {
     request: Request;
     permission: AuthzPermission;
+    /** The key kinds the route admits (E7): refused once the key resolves, before permission. */
+    keyKinds?: readonly RestKeyKind[];
   }): Promise<ApiProjectCredential> {
     const person = await this.#cliAccessCredential(input.request);
     if (person) {
+      if (input.keyKinds) {
+        assertKeyKind({ key: keyCredentialOf(person.resolved), admitted: input.keyKinds });
+      }
       const allowed = await this.authz.hasProjectPermission({
         userId: person.actsAsPerson.userId,
         projectId: person.project.id,
@@ -121,6 +127,9 @@ export class ApiRestCredentialsService {
 
     const resolved = await this.apiKeys.findResolvedToken(credentials);
     if (!resolved) throw await this.unresolvedProjectRefusal(credentials);
+    if (input.keyKinds) {
+      assertKeyKind({ key: keyCredentialOf(resolved), admitted: input.keyKinds });
+    }
 
     if (resolved.type === "apiKey") {
       const allowed = await this.isWithinCeiling({ resolved, permission: input.permission });

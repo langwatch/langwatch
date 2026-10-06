@@ -102,8 +102,15 @@ export class ApiDoorService {
 
   #projectDoor(): RestIdentity {
     return {
-      authenticate: async ({ request, permission }) =>
-        projectCaller(request, await this.#credentials.authenticate({ request, permission })),
+      authenticate: async ({ request, permission, keyKinds }) =>
+        projectCaller(
+          request,
+          await this.#credentials.authenticate({
+            request,
+            permission,
+            ...(keyKinds ? { keyKinds } : {}),
+          }),
+        ),
       identify: async ({ request }) =>
         projectCaller(request, await this.#credentials.identify({ request })),
     };
