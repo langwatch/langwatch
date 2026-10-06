@@ -32,17 +32,29 @@ const TWIN_B = `proof-twin-b-${run}`;
 const TWIN_TRACE_ID = `twin-${run}`;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const NOW = Date.now();
-const TODAY = NOW - 60 * 60 * 1000;
-const YESTERDAY = TODAY - DAY_MS;
-const B_WINDOW = {
-  from: TODAY - 10 * 60 * 1000,
-  until: TODAY + 10 * 60 * 1000,
-};
-
+/**
+ * The clock every proof and row is minted against. Taken once the containers
+ * are up, not at import: a proof expires AUTHORIZATION_MAX_AGE_MS after its
+ * `now`, and a cold shard can spend longer than that starting ClickHouse.
+ */
+let NOW: number;
+let TODAY: number;
+let YESTERDAY: number;
+let B_WINDOW: { from: number; until: number };
 /** The full read window every scenario lists over. */
-const WINDOW = { from: YESTERDAY - DAY_MS, to: NOW + DAY_MS };
+let WINDOW: { from: number; to: number };
 const PLAIN_TRACES = 40;
+
+function takeClock(): void {
+  NOW = Date.now();
+  TODAY = NOW - 60 * 60 * 1000;
+  YESTERDAY = TODAY - DAY_MS;
+  B_WINDOW = {
+    from: TODAY - 10 * 60 * 1000,
+    until: TODAY + 10 * 60 * 1000,
+  };
+  WINDOW = { from: YESTERDAY - DAY_MS, to: NOW + DAY_MS };
+}
 
 let ch: ClickHouseClient;
 let repo: TraceListClickHouseRepository;
@@ -164,6 +176,7 @@ async function walkOneRowPerPage(
 
 beforeAll(async () => {
   const containers = await startTestContainers();
+  takeClock();
   ch = containers.clickHouseClient;
   repo = new TraceListClickHouseRepository(
     new AuthorizedClickHouse({ resolveClient: async () => ch }),

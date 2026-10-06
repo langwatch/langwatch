@@ -47,11 +47,23 @@ const B_TODAY_TRACE = `b-today-trace-${run}`;
 const PLAIN_TRACE = `plain-trace-${run}`;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const NOW = Date.now();
-const TODAY = NOW - 60 * 60 * 1000;
-const YESTERDAY = TODAY - DAY_MS;
+/**
+ * The clock every proof and row is minted against. Taken once the containers
+ * are up, not at import: a proof expires AUTHORIZATION_MAX_AGE_MS after its
+ * `now`, and a cold shard can spend longer than that starting ClickHouse.
+ */
+let NOW: number;
+let TODAY: number;
+let YESTERDAY: number;
 /** The evaluation summaries read is bounded below like the list window is. */
-const SINCE = YESTERDAY - DAY_MS;
+let SINCE: number;
+
+function takeClock(): void {
+  NOW = Date.now();
+  TODAY = NOW - 60 * 60 * 1000;
+  YESTERDAY = TODAY - DAY_MS;
+  SINCE = YESTERDAY - DAY_MS;
+}
 
 let ch: ClickHouseClient;
 let summaries: TraceSummaryClickHouseRepository;
@@ -201,6 +213,7 @@ const aggregateReadsAandB = () =>
 
 beforeAll(async () => {
   const containers = await startTestContainers();
+  takeClock();
   ch = containers.clickHouseClient;
   const resolveClient = async () => ch;
   const clickhouse = new AuthorizedClickHouse({ resolveClient });
