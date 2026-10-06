@@ -4,6 +4,9 @@
  * keeps one stable address, so a saved password-manager login persists across worktrees.
  */
 
+/** The local-dev admin's fixed id; other seeds add this account to what they create. */
+export const LOCAL_DEV_ADMIN_USER_ID = "local-dev-admin-user";
+
 /** The domain every seeded account uses unless SEED_EMAIL_DOMAIN overrides it. */
 export const DEFAULT_SEED_EMAIL_DOMAIN = "mail.langwatch.localhost";
 

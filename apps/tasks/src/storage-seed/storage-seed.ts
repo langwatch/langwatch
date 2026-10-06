@@ -37,6 +37,7 @@ import {
 import { seedDemoPlatform } from "./seed-demo-platform.ts";
 import {
   buildAdminUserUpsertArgs,
+  LOCAL_DEV_ADMIN_USER_ID,
   resolveSeedEmailDomain,
   seedEmailAddress,
 } from "./seed-identity.ts";
@@ -56,7 +57,7 @@ const PROJECT_ID = "local-dev-project";
 const PROJECT_SLUG = "local-dev-project";
 const PROJECT_NAME = "Local Dev Project";
 
-const ADMIN_USER_ID = "local-dev-admin-user";
+const ADMIN_USER_ID = LOCAL_DEV_ADMIN_USER_ID;
 const ADMIN_LOCAL_PART = "admin";
 const ADMIN_PASSWORD = "LocalHavenAdmin!2026";
 const ADMIN_NAME = "Haven Local Admin";
