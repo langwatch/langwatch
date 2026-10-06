@@ -100,7 +100,7 @@ export class OtlpUnsupportedEncodingError extends HandledError {
         httpStatus: 400,
         fault: "customer",
         tips: [
-          "Send the body uncompressed, or with gzip, deflate or br encoding.",
+          "Send the body uncompressed, or with gzip, deflate, br or zstd encoding.",
         ],
       },
     );

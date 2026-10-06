@@ -10,8 +10,7 @@
  * shape and must therefore share a single hardened parser. Specifically:
  *
  *   - decompression: gzip / deflate / brotli / zstd, chosen by the body's
- *     magic bytes first and Content-Encoding second (most production OTel
- *     collectors enable gzip by default; some send zstd or mislabel the body)
+ *     magic bytes first and Content-Encoding second
  *   - protobuf + JSON: most production collectors emit protobuf for size,
  *     so JSON-only parsing silently fails them
  *   - JSON-then-protobuf fallback path (for reasonable-looking JSON that
@@ -110,6 +109,13 @@ function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
   return encoding in DECOMPRESSORS;
 }
 
+const GZIP_MAGIC = Buffer.from([0x1f, 0x8b]);
+const ZSTD_MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd]);
+
+function startsWith(buf: Buffer, magic: Buffer): boolean {
+  return buf.subarray(0, magic.length).equals(magic);
+}
+
 /**
  * The encoding a body's leading bytes announce, or null when they announce none.
  *
@@ -119,16 +125,8 @@ function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
  * header-driven.
  */
 function sniffEncoding(buf: Buffer): SupportedEncoding | null {
-  if (buf.length >= 2 && buf[0] === 0x1f && buf[1] === 0x8b) return "gzip";
-  if (
-    buf.length >= 4 &&
-    buf[0] === 0x28 &&
-    buf[1] === 0xb5 &&
-    buf[2] === 0x2f &&
-    buf[3] === 0xfd
-  ) {
-    return "zstd";
-  }
+  if (startsWith(buf, GZIP_MAGIC)) return "gzip";
+  if (startsWith(buf, ZSTD_MAGIC)) return "zstd";
   return null;
 }
 
@@ -238,8 +236,9 @@ async function readWireBody(req: Request): Promise<Buffer> {
  *
  * Throws on unsupported encodings, and on a body that passes
  * {@link OTLP_MAX_BODY_BYTES} either on the wire or on expanding — the caller
- * decides how to respond. Decompression is bounded by zlib itself, so an
- * oversized body stops being written the moment it crosses the line.
+ * decides how to respond. Decompression is bounded by each decoder's
+ * `maxOutputLength`, so an oversized body stops being written the moment it
+ * crosses the line.
  */
 export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
   // The body has to be read before the encoding is known, because the encoding
