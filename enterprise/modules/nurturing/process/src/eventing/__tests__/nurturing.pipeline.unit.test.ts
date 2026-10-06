@@ -18,7 +18,12 @@ import {
   GUIDED_ONBOARDING_RECORDED_EVENT_VERSION,
   type GuidedOnboardingRecordedEventData,
 } from "@langwatch/onboarding-contract";
+import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import {
+  FIRST_TRACE_RECORDED_EVENT_TYPE,
+  TRACE_RECEIVED_EVENT_TYPE,
+} from "@langwatch/trace-contract";
 import {
   USER_AGGREGATE_TYPE,
   USER_DEACTIVATED_EVENT_TYPE,
@@ -381,6 +386,121 @@ describe("nurturing's guidedOnboardingTurnFailed peer subscriber", () => {
       const uuids = posthog.tracked.map(({ uuid }) => uuid);
       expect(posthog.tracked).toHaveLength(2);
       expect(new Set(uuids).size).toBe(2);
+    });
+  });
+});
+
+const MORNING = 1_791_280_800_000;
+const NEXT_DAY = 1_791_334_800_000;
+
+/** Trace's own fact for a project's trace, as its project_milestones pipeline records it. */
+function traceFact({ type, occurredAt }: { type: string; occurredAt: number }): Event {
+  return {
+    id: `evt-${type}-${occurredAt}`,
+    aggregateId: "project-1",
+    aggregateType: "trace_project",
+    tenantId: createTenantId("project-1"),
+    createdAt: occurredAt,
+    occurredAt,
+    type,
+    version: "2026-10-01",
+    data: {
+      tenantId: "project-1",
+      projectId: "project-1",
+      userId: "admin-1",
+      sdkLanguage: "python",
+      sdkFramework: "openai",
+      occurredAt,
+    },
+    idempotencyKey: `project-1:${type}:${occurredAt}`,
+  } as Event;
+}
+
+/** Scenario's finished-run fact against a connected agent, carrying the organization's admin. */
+function runFinishedFact({ runId, occurredAt }: { runId: string; occurredAt: number }): Event {
+  return {
+    id: `evt-run-${runId}`,
+    aggregateId: runId,
+    aggregateType: "simulation_run",
+    tenantId: createTenantId("project-1"),
+    createdAt: occurredAt,
+    occurredAt,
+    type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+    version: "2026-10-01",
+    data: {
+      scenarioRunId: runId,
+      scenarioId: "scenario-1",
+      target: { type: "connected", referenceId: "agent-1" },
+      results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+      status: "SUCCESS",
+      organizationAdmin: { userId: "admin-1", onboardingVariant: "guided" },
+      occurredAt,
+    },
+    idempotencyKey: `${runId}:finished`,
+  } as Event;
+}
+
+const activeDays = (posthog: { tracked: readonly { event: string }[] }) =>
+  posthog.tracked.filter(({ event }) => event === "project_active_day");
+
+describe("nurturing's project active day, derived from trace and scenario facts", () => {
+  describe("when a project's first trace and later traces arrive on one UTC day", () => {
+    /** @scenario "the first signal of the day tracks the project's active day" */
+    /** @scenario "subsequent signals the same day do not re-track" */
+    it("tracks project_active_day once, against the admin, with the source", async () => {
+      const { posthog, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(traceFact({ type: FIRST_TRACE_RECORDED_EVENT_TYPE, occurredAt: MORNING }));
+      await deliverFact(
+        traceFact({ type: TRACE_RECEIVED_EVENT_TYPE, occurredAt: MORNING + 1_000 }),
+      );
+      await deliverFact(
+        traceFact({ type: TRACE_RECEIVED_EVENT_TYPE, occurredAt: MORNING + 2_000 }),
+      );
+      await settle();
+
+      expect(activeDays(posthog)).toEqual([
+        {
+          userId: "admin-1",
+          event: "project_active_day",
+          properties: { source: "trace", projectId: "project-1" },
+        },
+      ]);
+    });
+  });
+
+  describe("when the same project signals again after midnight UTC", () => {
+    /** @scenario "the first signal of the next UTC day tracks again" */
+    it("tracks project_active_day once more for the new day", async () => {
+      const { posthog, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(traceFact({ type: TRACE_RECEIVED_EVENT_TYPE, occurredAt: MORNING }));
+      await deliverFact(traceFact({ type: TRACE_RECEIVED_EVENT_TYPE, occurredAt: NEXT_DAY }));
+      await settle();
+
+      expect(activeDays(posthog)).toHaveLength(2);
+    });
+  });
+
+  describe("when a succeeded scenario run is the day's first signal", () => {
+    /** @scenario "a succeeded scenario run against a connected agent is a signal of the day" */
+    it("tracks project_active_day with the source scenario_run and the experiment property", async () => {
+      const { posthog, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(runFinishedFact({ runId: "run-1", occurredAt: MORNING }));
+      await deliverFact(runFinishedFact({ runId: "run-2", occurredAt: MORNING + 1_000 }));
+      await settle();
+
+      expect(activeDays(posthog)).toEqual([
+        {
+          userId: "admin-1",
+          event: "project_active_day",
+          properties: expect.objectContaining({
+            source: "scenario_run",
+            "$feature/experiment_onboarding_langy_guided": "guided",
+          }),
+        },
+      ]);
     });
   });
 });

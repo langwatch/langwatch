@@ -11,7 +11,10 @@ import type {
   EvaluationRanEventData,
 } from "@langwatch/evaluation-contract";
 import type { ExperimentRanEventData } from "@langwatch/experiment-contract";
-import type { GuidedOnboardingRecordedEventData } from "@langwatch/onboarding-contract";
+import type {
+  GuidedOnboardingRecordedEventData,
+  OnboardingVariant,
+} from "@langwatch/onboarding-contract";
 import type {
   IntegrationMethodChosenEventData,
   InviteAcceptedEventData,
@@ -24,6 +27,7 @@ import {
   type SimulationRunFinishedEventData,
   UNGRADED_RUN_STATUSES,
 } from "@langwatch/scenario-contract";
+import { Temporal } from "@langwatch/time";
 import type {
   FirstTraceRecordedEventData,
   TraceReceivedEventData,
@@ -348,6 +352,25 @@ export function scenarioRunSucceededSignal({
   ];
 }
 
+/** The project's active day by a succeeded run against a connected agent, as the run's admin. */
+export function scenarioRunActiveDaySignal({
+  data,
+  tenantId,
+}: TenantEvent<SimulationRunFinishedEventData>): NurturingSignal[] {
+  const { organizationAdmin: admin, occurredAt } = data;
+  if (!isConnectedAgentRunSucceeded(data) || !admin || occurredAt === undefined) return [];
+  return [
+    projectActiveDaySignal({
+      source: "scenario_run",
+      tenantId,
+      projectId: tenantId,
+      userId: admin.userId,
+      occurredAt,
+      onboardingVariant: admin.onboardingVariant,
+    }),
+  ];
+}
+
 /** The organization a finished run was counted against, as nurturing's own store holds it. */
 type CountedRunOrganization = Readonly<{
   adminUserId: string | null;
@@ -397,6 +420,52 @@ export function firstTraceRecordedSignal({
     userId,
     projectId,
     ...sdk,
+  };
+}
+
+const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
+
+/** What an application signal tells nurturing about the project's day, as its owner raised it. */
+type ActiveDaySignal = Readonly<{
+  source: "trace" | "scenario_run";
+  tenantId: string;
+  projectId: string;
+  /** The organization's admin. */
+  userId: string;
+  occurredAt: number;
+  /** When the organization was created, in epoch milliseconds; absent where the owner did not say. */
+  organizationCreatedAt?: number | null;
+  onboardingVariant?: OnboardingVariant | null;
+}>;
+
+/**
+ * The project's active day: keyed by the project and the UTC day of the signal, so delivery's
+ * claim lets the first signal of each day through and no other (main's once-per-day marker).
+ */
+export function projectActiveDaySignal({
+  source,
+  tenantId,
+  projectId,
+  userId,
+  occurredAt,
+  organizationCreatedAt,
+  onboardingVariant,
+}: ActiveDaySignal): NurturingSignal {
+  const day = Temporal.Instant.fromEpochMilliseconds(occurredAt).toString().slice(0, 10);
+  const daysSinceSignup =
+    organizationCreatedAt == null
+      ? null
+      : Math.max(0, Math.floor((occurredAt - organizationCreatedAt) / DAY_MILLISECONDS));
+  return {
+    kind: "project_active_day",
+    sourceEventId: `${projectId}:${day}`,
+    tenantId,
+    occurredAt,
+    userId,
+    projectId,
+    source,
+    daysSinceSignup,
+    onboardingVariant,
   };
 }
 

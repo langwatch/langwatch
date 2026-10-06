@@ -51,11 +51,6 @@ export interface ProjectMetadataSubscriberDeps {
   bootstrapTopicClustering?: (projectId: string) => Promise<void>;
   /** Records the first and later traces as trace's own events (§9); a failure is only logged. */
   milestones: Pick<TraceProjectMilestonesService, "recordFirstTrace" | "recordTraceReceived">;
-  /**
-   * Marks the project active for the day of this trace, once a day. Injected
-   * so trace never imports billing's process package (structurally typed).
-   */
-  trackActiveDay?: (input: { projectId: string; occurredAt: number }) => Promise<void>;
 }
 
 /**
@@ -248,8 +243,6 @@ export function createProjectMetadataHandler(
     const { tenantId, state: foldState } = context;
 
     if (!isRealFirstIngest(foldState)) return;
-
-    await deps.trackActiveDay?.({ projectId: tenantId, occurredAt: event.occurredAt });
 
     try {
       await syncProjectMetadata({ deps, source: event, tenantId, foldState });
