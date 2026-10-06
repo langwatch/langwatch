@@ -743,7 +743,10 @@ describe("the projects REST family", () => {
    * outright (`refuseBaseKeyToApiToken`) — {@link ProjectManagementApi} carries none.
    */
   describe("given a caller holding an organization API token", () => {
-    /** @scenario "An API key principal cannot read the base key" */
+    /**
+     * @scenario "An API key principal cannot read the base key"
+     * @scenario "The REST project-key routes stay refused"
+     */
     it("refuses the base key however much the token holds on that project", async () => {
       const findWithTeam = vi.fn(async () => projectWithTeam());
       const { send } = mountProjectRest({
@@ -786,6 +789,7 @@ describe("the projects REST family", () => {
   });
 
   describe("when an organization API token asks for the base key to be rotated", () => {
+    /** @scenario "The REST project-key routes stay refused" */
     it("refuses, and hands back nothing that could authenticate", async () => {
       const { send } = mountProjectRest({
         app: { findWithTeam: vi.fn(async () => projectWithTeam()) },

@@ -116,6 +116,25 @@ describe("binding a server to a contract at runtime", () => {
       /no implementation for procedure "archive"/,
     );
   });
+
+  /** @scenario "A tRPC procedure with no access declaration fails the sweep" */
+  it("refuses to mount a procedure that was selected but never given an access decision, naming it", () => {
+    const decided = defineTrpcRouter(ReviewApi, contract)
+      .procedure("getById")
+      .withPermission("annotations:view")
+      .handle(async () => ({ id: "annotation-1", comment: "read" }));
+
+    // `archive` is selected and stops there: no permission, no public reason, no handler.
+    decided.procedure("archive");
+
+    const declaration: {
+      router(factory: TrpcProcedureFactory<object>, app: () => ReviewApi): object;
+    } = Reflect.apply(Reflect.get(decided, "build"), decided, []);
+
+    expect(() => declaration.router(inertRuntime, () => ({}) as ReviewApi)).toThrow(
+      /tRPC router "review" has no implementation for procedure "archive"/,
+    );
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

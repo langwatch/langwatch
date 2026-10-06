@@ -862,7 +862,10 @@ describe("GET /api/experiments/runs/:runId/results", () => {
 });
 
 describe("POST /api/experiments/abort", () => {
-  /** @scenario "Aborting a run reads its progress fold and refuses another project's run" */
+  /**
+   * @scenario "Aborting a run reads its progress fold and refuses another project's run"
+   * @scenario "A resource id from the body is verified against the authenticated tenant"
+   */
   it("answers 404 for a run another project owns, and stops nothing", async () => {
     const { abortRun, abort, aborts } = await harness({
       redis: true,
