@@ -17,7 +17,7 @@ import {
   type LogRedactionService,
   prepareCanonicalLogRecords,
 } from "~/server/event-sourcing/pipelines/log-processing/canonicalLog";
-import { ownProof } from "~/test-utils/authorizationProofs";
+import { aggregateProof, ownProof } from "~/test-utils/authorizationProofs";
 import {
   startTestContainers,
   stopTestContainers,
@@ -38,6 +38,16 @@ const timeRange = {
 };
 
 const SESSION_ALPHA = `${tag}-sess-alpha`;
+/**
+ * An aggregate over two members that each hold a trace under the same id,
+ * in sessions of their own. The id alone cannot tell their previews apart.
+ */
+const TWIN_AGGREGATE = `${tag}-twin-aggregate`;
+const TWIN_MEMBER_X = `${tag}-twin-x`;
+const TWIN_MEMBER_Y = `${tag}-twin-y`;
+const TWIN_TRACE_ID = `${tag}-twin-trace`;
+const TWIN_SESSION_X = `${tag}-twin-sess-x`;
+const TWIN_SESSION_Y = `${tag}-twin-sess-y`;
 const SESSION_BETA = `${tag}-sess-beta`;
 
 function traceSummaryRow(overrides: Record<string, unknown> = {}) {
@@ -288,6 +298,31 @@ beforeAll(async () => {
       OccurredAt: new Date(baseMs - 10_000),
       TotalCost: 100,
     }),
+    // The twin members: one trace id in two tenants, each in its own session.
+    {
+      ...sessionTrace({
+        sessionId: TWIN_SESSION_X,
+        traceId: TWIN_TRACE_ID,
+        occurredAtMs: baseMs - 20_000,
+        cost: 1,
+        promptTokens: 10,
+        completionTokens: 5,
+        computedInput: "twin prompt of member x",
+      }),
+      TenantId: TWIN_MEMBER_X,
+    },
+    {
+      ...sessionTrace({
+        sessionId: TWIN_SESSION_Y,
+        traceId: TWIN_TRACE_ID,
+        occurredAtMs: baseMs - 10_000,
+        cost: 1,
+        promptTokens: 10,
+        completionTokens: 5,
+        computedInput: "twin prompt of member y",
+      }),
+      TenantId: TWIN_MEMBER_Y,
+    },
   ]);
 
   await insertSessionLog({
@@ -495,6 +530,30 @@ describe("SessionGroupsClickHouseRepository", () => {
       expect(current.rows.map((row) => row.conversationId)).toContain(
         sessionId,
       );
+    });
+  });
+
+  describe("given two members holding the same trace id in sessions of their own", () => {
+    it("keeps each session's own preview", async () => {
+      const page = await repository.findSessionGroups(
+        query({
+          authorization: aggregateProof({
+            projectId: TWIN_AGGREGATE,
+            members: [
+              { projectId: TWIN_MEMBER_X, from: 0 },
+              { projectId: TWIN_MEMBER_Y, from: 0 },
+            ],
+            now: baseMs,
+          }),
+        }),
+      );
+
+      const x = page.rows.find((row) => row.conversationId === TWIN_SESSION_X);
+      const y = page.rows.find((row) => row.conversationId === TWIN_SESSION_Y);
+      expect(x?.lastTraceId).toBe(TWIN_TRACE_ID);
+      expect(y?.lastTraceId).toBe(TWIN_TRACE_ID);
+      expect(x?.input).toBe("twin prompt of member x");
+      expect(y?.input).toBe("twin prompt of member y");
     });
   });
 

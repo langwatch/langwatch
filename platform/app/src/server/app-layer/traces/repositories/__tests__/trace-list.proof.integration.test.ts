@@ -17,6 +17,7 @@ import {
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import { TraceListClickHouseRepository } from "../trace-list.clickhouse.repository";
+import type { TraceListCursor } from "../trace-list.repository";
 
 const run = nanoid();
 const AGGREGATE = `proof-aggregate-${run}`;
@@ -24,6 +25,11 @@ const MEMBER_A = `proof-member-a-${run}`;
 const MEMBER_B = `proof-member-b-${run}`;
 const OUTSIDER = `proof-outsider-${run}`;
 const PLAIN = `proof-plain-${run}`;
+/** A second aggregate whose two members hold one trace id each, the same id. */
+const TWIN_AGGREGATE = `proof-twin-aggregate-${run}`;
+const TWIN_A = `proof-twin-a-${run}`;
+const TWIN_B = `proof-twin-b-${run}`;
+const TWIN_TRACE_ID = `twin-${run}`;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.now();
@@ -121,6 +127,41 @@ async function listTraceIds(
   return page.rows.map((row) => row.traceId);
 }
 
+const rowKey = (row: { tenantId: string; traceId: string }) =>
+  `${row.tenantId}:${row.traceId}`;
+
+/**
+ * Walk the list one row per page through the keyset cursor, the way the
+ * service pages: one sentinel row past the page tells whether more follow.
+ */
+async function walkOneRowPerPage(
+  authorization: ReturnType<typeof ownProof>,
+): Promise<string[]> {
+  const seen: string[] = [];
+  let cursor: TraceListCursor | undefined;
+  for (let guard = 0; guard < 20; guard++) {
+    const page = await repo.findAll({
+      authorization,
+      timeRange: WINDOW,
+      sort: { column: "OccurredAt", direction: "desc" },
+      limit: 2,
+      cursor,
+    });
+    const row = page.rows[0];
+    if (!row) break;
+    seen.push(rowKey(row));
+    if (page.rows.length < 2) break;
+    // The OccurredAt sort reads the storage anchor column, so the cursor
+    // carries that value rather than the span-timing `occurredAt`.
+    cursor = {
+      sortValue: row.storageAnchorMs ?? row.occurredAt,
+      tenantId: row.tenantId,
+      traceId: row.traceId,
+    };
+  }
+  return seen;
+}
+
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
@@ -144,6 +185,11 @@ beforeAll(async () => {
     }),
     summaryRow({ tenantId: OUTSIDER, traceId: "out-1", occurredAt: TODAY + 3 }),
     summaryRow({ tenantId: OUTSIDER, traceId: "out-2", occurredAt: TODAY + 4 }),
+    // The twin members: one trace id, two tenants, identical sort values.
+    summaryRow({ tenantId: TWIN_A, traceId: TWIN_TRACE_ID, occurredAt: TODAY }),
+    summaryRow({ tenantId: TWIN_B, traceId: TWIN_TRACE_ID, occurredAt: TODAY }),
+    summaryRow({ tenantId: TWIN_A, traceId: "twin-a-only", occurredAt: TODAY }),
+    summaryRow({ tenantId: TWIN_B, traceId: "twin-b-only", occurredAt: TODAY }),
     ...Array.from({ length: PLAIN_TRACES }, (_, i) =>
       summaryRow({
         tenantId: PLAIN,
@@ -234,6 +280,53 @@ describe("TraceListClickHouseRepository through the proof", () => {
         );
         expect(ids).toContain("a-1");
         expect(ids).not.toContain("a-yesterday");
+      });
+    });
+  });
+
+  describe("given two members holding the same trace id", () => {
+    const twinProof = () =>
+      aggregateProof({
+        projectId: TWIN_AGGREGATE,
+        members: [
+          { projectId: TWIN_A, from: 0 },
+          { projectId: TWIN_B, from: 0 },
+        ],
+        now: NOW,
+      });
+
+    describe("when the aggregate pages through them one row at a time", () => {
+      it("hands out both rows exactly once across the pages", async () => {
+        const seen = await walkOneRowPerPage(twinProof());
+
+        expect(seen).toHaveLength(4);
+        expect(new Set(seen).size).toBe(seen.length);
+        expect(seen).toEqual(
+          expect.arrayContaining([
+            `${TWIN_A}:${TWIN_TRACE_ID}`,
+            `${TWIN_B}:${TWIN_TRACE_ID}`,
+            `${TWIN_A}:twin-a-only`,
+            `${TWIN_B}:twin-b-only`,
+          ]),
+        );
+      });
+    });
+
+    describe("when the aggregate lists them on one page", () => {
+      it("returns a row per tenant, each carrying its own tenant", async () => {
+        const page = await repo.findAll({
+          authorization: twinProof(),
+          timeRange: WINDOW,
+          sort: { column: "OccurredAt", direction: "desc" },
+          limit: 10,
+          offset: 0,
+        });
+        const twins = page.rows.filter((row) => row.traceId === TWIN_TRACE_ID);
+        expect(twins.map(rowKey).sort()).toEqual([
+          `${TWIN_A}:${TWIN_TRACE_ID}`,
+          `${TWIN_B}:${TWIN_TRACE_ID}`,
+        ]);
+        expect(page.totalHits).toBe(4);
       });
     });
   });

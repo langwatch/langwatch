@@ -112,6 +112,34 @@ describe("TraceListClickHouseRepository.findAll (unit)", () => {
     });
   });
 
+  describe("when the query carries a keyset cursor", () => {
+    it("breaks sort ties on the tenant and the trace id together, since two members may hold one trace id", async () => {
+      const { repo, queries } = makeRepo();
+
+      await repo.findAll(
+        baseQuery({
+          cursor: {
+            sortValue: 1_500,
+            tenantId: "tenant-1",
+            traceId: "trace-a",
+          },
+        }),
+      );
+
+      const pageQuery = queries.find(isPageQuery)!;
+      expect(pageQuery).toContain(
+        "(TenantId, TraceId) > ({cursorTenantId:String}, {cursorTraceId:String})",
+      );
+      expect(pageQuery).not.toMatch(/AND TraceId > \{cursorTraceId/);
+      expect(
+        occurrences({
+          haystack: pageQuery,
+          needle: "TenantId ASC, TraceId ASC",
+        }),
+      ).toBe(2);
+    });
+  });
+
   describe("when the query carries a user filter", () => {
     it("keeps it out of the dedup so a trace cannot answer to both sides of it", async () => {
       const { repo, queries } = makeRepo();

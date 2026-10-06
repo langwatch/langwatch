@@ -71,6 +71,19 @@ interface ClickHouseSessionGroupRow {
   SessionWarningCount: number | string;
   SessionSpans: number | string;
   LastTraceId: string;
+  /** The tenant of `LastTraceId`: an aggregate reads several, and two may hold one trace id. */
+  LastTenantId: string;
+}
+
+/** The map key of a trace's previews: the id alone is not unique across the tenants an aggregate reads. */
+function previewKey({
+  TenantId,
+  TraceId,
+}: {
+  TenantId: string;
+  TraceId: string;
+}): string {
+  return `${TenantId}:${TraceId}`;
 }
 
 function isLiveUpperBound(timeRange: { to: number; live?: boolean }): boolean {
@@ -166,7 +179,8 @@ export class SessionGroupsClickHouseRepository
           countIf(ContainsErrorStatus) AS SessionErrorCount,
           countIf(BlockedByGuardrail AND NOT ContainsErrorStatus) AS SessionWarningCount,
           sum(SpanCount) AS SessionSpans,
-          argMax(TraceId, (OccurredAt, UpdatedAt)) AS LastTraceId
+          argMax(TraceId, (OccurredAt, UpdatedAt)) AS LastTraceId,
+          argMax(TenantId, (OccurredAt, UpdatedAt)) AS LastTenantId
         FROM ${TABLE_NAME}
         WHERE ${baseWhere}
           AND ${CONVERSATION_ID_EXPR} != ''
@@ -296,6 +310,8 @@ export class SessionGroupsClickHouseRepository
     timeRange: { from: number; to: number; live?: boolean };
     traceIds: string[];
   }): Promise<Map<string, { input: string | null; output: string | null }>> {
+    // Keyed by tenant and trace id: the ids are read across every tenant the
+    // proof fences, and two of those may hold the same id (ADR-144 v4.1).
     const previews = new Map<
       string,
       { input: string | null; output: string | null }
@@ -307,7 +323,7 @@ export class SessionGroupsClickHouseRepository
     const client = this.clickhouse.as(args.authorization, { reads: "traces" });
     const result = await client.query({
       query: `
-        SELECT TraceId, ComputedInput, ComputedOutput
+        SELECT TenantId, TraceId, ComputedInput, ComputedOutput
         FROM ${TABLE_NAME}
         WHERE ${baseWhere}
           AND TraceId IN {previewTraceIds:Array(String)}
@@ -324,12 +340,13 @@ export class SessionGroupsClickHouseRepository
     });
 
     const rows = await result.json<{
+      TenantId: string;
       TraceId: string;
       ComputedInput: string | null;
       ComputedOutput: string | null;
     }>();
     for (const row of rows) {
-      previews.set(row.TraceId, {
+      previews.set(previewKey(row), {
         input: row.ComputedInput ?? null,
         output: row.ComputedOutput ?? null,
       });
@@ -343,7 +360,9 @@ export class SessionGroupsClickHouseRepository
   ): SessionGroupRow {
     const contextSize = Number(row.MaxContextSizeTokens);
     const services = row.SessionServices ?? [];
-    const preview = previews.get(row.LastTraceId);
+    const preview = previews.get(
+      previewKey({ TenantId: row.LastTenantId, TraceId: row.LastTraceId }),
+    );
     return {
       conversationId: row.ConversationId,
       traceCount: Number(row.TraceCount),

@@ -22,13 +22,19 @@ export interface TraceListSort {
 
 /**
  * Keyset cursor for the trace list. The sort value is normalized to a finite
- * number by the repository; TraceId is the unique tie-breaker that turns every
- * supported sort into a total order.
+ * number by the repository; the tenant and trace id together are the unique
+ * tie-breaker that turns every supported sort into a total order. The trace
+ * id alone is not one: an aggregate project reads several tenants, and two of
+ * them may hold the same trace id (ADR-144 v4.1).
  */
 export interface TraceListCursor {
   sortValue: number;
+  tenantId: string;
   traceId: string;
 }
+
+/** A listed trace with the tenant it was read from, which names it on an aggregate. */
+export type TraceListRow = TraceSummaryData & { tenantId: string };
 
 export interface TraceListQuery {
   /** The proof the read is fenced by; the reader applies its tenant set. */
@@ -44,7 +50,7 @@ export interface TraceListQuery {
 }
 
 export interface TraceListPage {
-  rows: TraceSummaryData[];
+  rows: TraceListRow[];
   totalHits: number;
 }
 

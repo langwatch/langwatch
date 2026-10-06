@@ -1211,6 +1211,9 @@ export const tracesV2Router = createTRPCRouter({
         cursor: z
           .object({
             sortValue: z.number().finite(),
+            // Absent on a cursor minted before the tenant was carried; the
+            // service reads such a cursor as the project's own tenant.
+            tenantId: z.string().min(1).optional(),
             traceId: z.string().min(1),
           })
           .optional(),

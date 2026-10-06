@@ -40,6 +40,7 @@ import type {
   EventMetricValues,
   TraceListCursor,
   TraceListRepository,
+  TraceListRow,
   TraceListSort,
   TraceListSortColumn,
 } from "./repositories/trace-list.repository";
@@ -124,7 +125,12 @@ interface ListParams {
   /** 1-based offset compatibility for non-cursor callers. */
   page?: number;
   pageSize: number;
-  cursor?: TraceListCursor;
+  /**
+   * The keyset cursor a previous page handed back. One minted before the
+   * cursor carried its tenant is read as the project the proof was minted
+   * for, which is the only tenant a plain project ever lists.
+   */
+  cursor?: Omit<TraceListCursor, "tenantId"> & { tenantId?: string };
   filterWhere?: { sql: string; params: Record<string, unknown> };
   /** Origins left out on top of the filter, see `explorerHiddenOrigins`. */
   hiddenOrigins?: readonly string[];
@@ -574,7 +580,14 @@ export class TraceListService {
       // Read one sentinel row so `nextCursor` is exact without guessing from
       // totalHits (which may change under a live range between requests).
       limit: params.pageSize + 1,
-      cursor: params.cursor,
+      cursor: params.cursor
+        ? {
+            sortValue: params.cursor.sortValue,
+            tenantId:
+              params.cursor.tenantId ?? ownProjectOf(params.authorization),
+            traceId: params.cursor.traceId,
+          }
+        : undefined,
       offset,
       filterWhere: withHiddenOrigins(params.filterWhere, params.hiddenOrigins),
     });
@@ -1419,7 +1432,7 @@ export function parseLabels(raw: string | undefined): string[] {
 
 /** Keep this normalization in lockstep with `cursorSortExpression` in the CH repository. */
 function cursorForTraceRow(
-  row: TraceSummaryData,
+  row: TraceListRow,
   sortColumn: TraceListSortColumn,
 ): TraceListCursor {
   let sortValue: number;
@@ -1456,6 +1469,7 @@ function cursorForTraceRow(
 
   return {
     sortValue: Number.isFinite(sortValue) ? sortValue : 0,
+    tenantId: row.tenantId,
     traceId: row.traceId,
   };
 }

@@ -8,7 +8,6 @@ import { isStorageAnchoredVersion } from "~/server/event-sourcing/pipelines/trac
 import type { FacetQuery } from "../facet-registry";
 import { EVENT_METRIC_SEP } from "../query-language/eventMetrics";
 import { scopeTraceFilterToTable } from "../trace-filter-scope";
-import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type {
   BatchedFacetResult,
@@ -19,6 +18,7 @@ import type {
   TraceListPage,
   TraceListQuery,
   TraceListRepository,
+  TraceListRow,
 } from "./trace-list.repository";
 
 const TABLE_NAME = "trace_summaries" as const;
@@ -179,12 +179,15 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         : `toFloat64(coalesce(${rawSortExpression}, 0))`;
     const sortDir = query.sort.direction === "asc" ? "ASC" : "DESC";
     const cursorComparison = query.sort.direction === "asc" ? ">" : "<";
+    // The tie-break is the (tenant, trace id) pair: an aggregate project
+    // reads several tenants and two of them may hold the same trace id, so
+    // the id alone would skip or repeat a row across pages (ADR-144 v4.1).
     const cursorClause = query.cursor
       ? `AND (
               ${sortExpression} ${cursorComparison} {cursorSortValue:Float64}
               OR (
                 ${sortExpression} = {cursorSortValue:Float64}
-                AND TraceId > {cursorTraceId:String}
+                AND (TenantId, TraceId) > ({cursorTenantId:String}, {cursorTraceId:String})
               )
             )`
       : "";
@@ -367,12 +370,13 @@ export class TraceListClickHouseRepository implements TraceListRepository {
               -- share timestamps, costs, token counts, and durations; without
               -- a unique tie-breaker ClickHouse may return tied rows in a
               -- different order on adjacent requests, causing duplicates and
-              -- omissions between pages.
-              ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
+              -- omissions between pages. The tenant comes before the trace id
+              -- because the id is only unique within a tenant.
+              ORDER BY ${sortExpression} ${sortDir}, TenantId ASC, TraceId ASC
               LIMIT {limit:UInt32}
               OFFSET {offset:UInt32}
             )
-          ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
+          ORDER BY ${sortExpression} ${sortDir}, TenantId ASC, TraceId ASC
           LIMIT {limit:UInt32}
         )
       `,
@@ -383,6 +387,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           ...(query.cursor
             ? {
                 cursorSortValue: query.cursor.sortValue,
+                cursorTenantId: query.cursor.tenantId,
                 cursorTraceId: query.cursor.traceId,
               }
             : {}),
@@ -407,7 +412,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
 
     return {
-      rows: rows.map((row) => this.toTraceSummaryData(row)),
+      rows: rows.map((row) => this.toTraceListRow(row)),
       totalHits,
     };
   }
@@ -1129,8 +1134,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return mapFacetRows(rows);
   }
 
-  private toTraceSummaryData(row: ClickHouseSummaryRow): TraceSummaryData {
+  private toTraceListRow(row: ClickHouseSummaryRow): TraceListRow {
     return {
+      tenantId: row.TenantId,
       traceId: row.TraceId,
       spanCount: row.SpanCount,
       totalDurationMs: Number(row.TotalDurationMs),
