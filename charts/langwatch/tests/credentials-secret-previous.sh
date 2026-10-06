@@ -54,7 +54,7 @@ env_entry_in() {
 }
 
 PREVIOUS="CREDENTIALS_SECRET_PREVIOUS"
-OLD_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+OLD_KEY="$(printf '0123456789abcdef%.0s' 1 2 3 4)"
 
 # Every template that runs the app image and is given CREDENTIALS_SECRET.
 PROCESSES=(
