@@ -2,6 +2,7 @@
  * Pure shaping of the data a run loads: dataset rows and columns, and the keys
  * loaded targets are cached under.
  */
+import { DATASET_PAGE_LIMIT_MAX } from "@langwatch/dataset-contract";
 
 /** The column type a parameter value writes into the dataset. */
 function parameterColumnType(value: string | number | boolean): string {
@@ -162,4 +163,27 @@ export function workflowLoadKey(target: {
  */
 export function promptLoadKey(target: { promptId?: string; promptVersionNumber?: number }): string {
   return `${target.promptId ?? ""}@${target.promptVersionNumber ?? "latest"}`;
+}
+
+/** The bytes one row holds, as the JSON it is stored and sent as. */
+export function rowBytesOf(entry: Record<string, unknown>): number {
+  return Buffer.byteLength(JSON.stringify(entry) ?? "");
+}
+
+/** The bytes one page of a saved dataset is sized to hold while a run reads it. */
+const SAVED_DATASET_PAGE_TARGET_BYTES = 8 * 1024 * 1024;
+
+/**
+ * How many rows a run asks for per page of a saved dataset: as many as fit the
+ * page target at the size of the largest sampled row, so a dataset of large
+ * rows is read a few at a time and one of small rows in full pages.
+ */
+export function savedDatasetPageRows(sample: Record<string, unknown>[]): number {
+  if (sample.length === 0) return DATASET_PAGE_LIMIT_MAX;
+  const largestRowBytes = Math.max(1, ...sample.map(rowBytesOf));
+
+  return Math.min(
+    DATASET_PAGE_LIMIT_MAX,
+    Math.max(1, Math.floor(SAVED_DATASET_PAGE_TARGET_BYTES / largestRowBytes)),
+  );
 }

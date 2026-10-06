@@ -65,8 +65,8 @@ Feature: The API process routes its three ClickHouse reads by the right id
     Scenario: An install holding only private routes reports no shared endpoint
       Given a deployment configured with private routes alone
       When the process asks for the shared endpoint
-      Then it answers that there is none
-      And the caller decides what to compose, rather than discovering it at the first query
+      Then it refuses by name, because no client answers it
+      And no endpoint is opened to find that out
 
   Rule: An organization metered in events is counted, not reported unknown
 

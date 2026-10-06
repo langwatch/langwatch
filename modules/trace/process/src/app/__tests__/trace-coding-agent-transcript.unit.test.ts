@@ -41,4 +41,26 @@ describe("TraceModule.readCodingAgentTranscript", () => {
       expect(transcript).toMatchObject({ entries: [] });
     });
   });
+
+  describe("given the log records of a trace", () => {
+    /** @scenario "the transcript is derived from the canonical log read the trace module is composed with" */
+    it("reads them from the composed log read, for the project and trace asked", async () => {
+      const { app, getSpansByTraceId, getLogsByTraceId } = createTranscriptApp(
+        new TestCodingAgentService(),
+        { resolve: async () => openProtections },
+      );
+      getSpansByTraceId.mockResolvedValue([]);
+      getLogsByTraceId.mockResolvedValue([]);
+
+      await app.readCodingAgentTranscript({
+        projectId: PROJECT_ID,
+        traceId: TRACE_ID,
+        viewerUserId: "viewer-1",
+      });
+
+      expect(getLogsByTraceId).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: PROJECT_ID, traceId: TRACE_ID }),
+      );
+    });
+  });
 });

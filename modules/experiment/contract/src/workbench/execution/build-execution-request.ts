@@ -342,7 +342,9 @@ export const buildExecutionRequest = ({
       inline: dataset.inline,
       datasetId: dataset.datasetId,
       columns: dataset.columns ?? [],
-      savedRecords: dataset.savedRecords,
+      // A saved dataset is read on the server by its id, every row of it, so
+      // the page's copy of its rows is not sent.
+      savedRecords: dataset.type === "saved" && dataset.datasetId ? undefined : dataset.savedRecords,
     },
     targets: state.targets.map(targetOnTheWire),
     evaluators: state.evaluators.map(evaluatorOnTheWire),

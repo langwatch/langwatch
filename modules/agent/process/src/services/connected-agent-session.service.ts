@@ -17,7 +17,7 @@ import {
   type RegisterFrame,
   type RegisteredFrame,
   type ResultFrame,
-  type AgentConnectCredentials,
+  type AgentConnectCaller,
   relayPayloadCaps,
   type InstanceGone,
   type ReplyNudge,
@@ -37,17 +37,12 @@ import {
   resultKey,
 } from "../rules/connected-agent-keys.rules.ts";
 import type { AgentService } from "./agent.service.ts";
-import {
-  type ConnectedAgentCredentials,
-  type ResolvedConnectCredential,
-} from "./connected-agent-credential.service.ts";
 import { ConnectedAgentLastSeenService } from "./connected-agent-last-seen.service.ts";
 import { ConnectedAgentRegistrationService } from "./connected-agent-registration.service.ts";
 import type { ConnectedAgentRuntime, InstanceMeta } from "./connected-agent-runtime.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:session");
 
-/** The headers a transport authenticates with, however it carries them. */
 /** One registered instance, as both transports see it. */
 export interface SessionInfo {
   principalId: string;
@@ -61,7 +56,6 @@ export interface SessionInfo {
 export interface SessionCoreOptions {
   runtime: ConnectedAgentRuntime;
   agents: AgentService;
-  credentials: ConnectedAgentCredentials;
   publicBaseUrl: string;
   /** The app replicas of this deployment, for the no-Redis refusal. */
   replicaCount: number;
@@ -78,7 +72,6 @@ export class AgentSessionService {
   readonly runtime: ConnectedAgentRuntime;
   readonly #agents: AgentService;
   readonly #lastSeen: ConnectedAgentLastSeenService;
-  readonly #credentials: ConnectedAgentCredentials;
   readonly #publicBaseUrl: string;
   readonly #replicaCount: number;
   readonly #relayMaxPayloadMb: number | undefined;
@@ -90,7 +83,6 @@ export class AgentSessionService {
     this.runtime = options.runtime;
     this.#agents = options.agents;
     this.#lastSeen = ConnectedAgentLastSeenService.create(options.agents);
-    this.#credentials = options.credentials;
     this.#publicBaseUrl = options.publicBaseUrl.replace(/\/+$/, "");
     this.#replicaCount = options.replicaCount;
     this.#relayMaxPayloadMb = options.relayMaxPayloadMb;
@@ -119,27 +111,10 @@ export class AgentSessionService {
     });
   }
 
-  /** The project credential behind the request, or the refusal. */
-  async authenticate({
-    authorization,
-    projectId,
-  }: AgentConnectCredentials): Promise<ResolvedConnectCredential> {
-    const header = authorization ?? "";
-    const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
-    if (!token) {
-      throw new AgentRegisterRefusedError({
-        reason: "api_key_invalid",
-        message: "Send the API key as Authorization: Bearer <key>.",
-      });
-    }
-
-    return this.#credentials.resolve({ token, projectId: projectId ?? null });
-  }
-
   /** Upserts the rows of a register frame and records the instance as live. */
   async registerInstance(input: {
     frame: RegisterFrame;
-    resolved: ResolvedConnectCredential;
+    resolved: AgentConnectCaller;
     heartbeatIntervalMs: number;
   }): Promise<{ session: SessionInfo; registered: RegisteredFrame }> {
     return this.#registrations.registerInstance(input);

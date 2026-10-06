@@ -1,5 +1,6 @@
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Link } from "@langwatch/browser-host/link";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
 import { Alert, Field, Icon, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { ExternalLink } from "lucide-react";
@@ -19,6 +20,7 @@ import {
   type UsageStyle,
 } from "../../behavior/types.ts";
 import { extractJoinInsteadNames, formatJoinInsteadNames } from "../../model/join-instead.ts";
+import { joinOriginOf } from "../../model/join-origin.ts";
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import { IconCheckboxCardGroup } from "../elements/forms/icon-checkbox-card-group.tsx";
 import { IconRadioCardGroup } from "../elements/forms/icon-radio-card-group.tsx";
@@ -63,6 +65,11 @@ const OrganizationScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
   // name reaches the browser before the domain is proved.
   const joinLookup = onboardingApi.joinRequests.lookup.useQuery();
   const joinOffers = useOnboardingHost().joinOffers();
+  // A request made on behalf of `langwatch login`'s device page lands a Developer (ADR-171 v6).
+  const { query } = useRouter();
+  const origin = joinOriginOf({
+    returnTo: typeof query.return_to === "string" ? query.return_to : null,
+  });
 
   return (
     <VStack gap={5} align="stretch" w="full" minW="0">
@@ -73,6 +80,7 @@ const OrganizationScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
           <JoinOffer
             dismissLabel="Create a new organization instead"
             currentOrganizationId={null}
+            origin={origin}
           />
         </Suspense>
       ))}

@@ -128,7 +128,11 @@ const subjects = execFileSync(
   // Not a project of the workspace graph: it emits the published artefact under
   // the pinned sdk toolchain and deliberately inherits none of the repo's
   // options, which is what its own comment says and why it extends nothing.
-  .filter((file) => file !== "packages/ksuid/tsconfig.publish.json")
+  .filter(
+    (file) =>
+      file !== "packages/ksuid/tsconfig.publish.json" &&
+      file !== "packages/webhook-verify/tsconfig.publish.json",
+  )
   .filter((file) => !NON_MEMBER_PREFIXES.some((prefix) => file.startsWith(prefix)))
   .filter((file) => !isSolution(file));
 

@@ -16,7 +16,7 @@ import {
   IngestionKeySourceNotAllowedError,
   type GovernanceRestApi,
 } from "@langwatch/enterprise-governance-contract";
-import type { PlanProvider } from "@langwatch/entitlement-contract";
+import { EnterprisePlanRequiredError, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { TeamNotFoundError } from "@langwatch/organization-contract";
@@ -32,6 +32,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { cliDoorRefusal } from "../../rules/governance-cli-answer.rules.ts";
 import type { DefaultGovernanceAiToolCatalogService } from "../../services/ai-tool-catalog.service.ts";
 import { GovernanceCliAccessService } from "../../services/governance-cli-access.service.ts";
 import { GovernanceCliActivityService } from "../../services/governance-cli-activity.service.ts";
@@ -79,6 +80,7 @@ type World = {
   >;
   sources?: Partial<Pick<IngestionSourceService, "list" | "getById">>;
   templates?: Partial<Pick<IngestionTemplateService, "listForUser">>;
+  setupState?: Partial<Pick<DefaultGovernanceSetupStateService, "resolve">>;
   users?: Partial<Pick<UserApi, "findById">>;
   organizations?: Partial<Pick<OrganizationApi, "isMember">>;
   projects?: Partial<Pick<ProjectApi, "findLiveByRef">>;
@@ -143,18 +145,12 @@ function mountCli(world: World = {}) {
   const ingestionKeys = createApiFixture<
     Pick<PersonalIngestionKeyService, "issueForProject" | "mint" | "list" | "getPersonalKeyState">
   >(world.ingestionKeys, "ingestionKeys");
-  const plans = (): PlanProvider => ({
-    getActivePlan: vi.fn().mockResolvedValue({ type: world.planType ?? "ENTERPRISE" }),
-  });
 
   const cli = GovernanceCliService.create({
     access: GovernanceCliAccessService.create({
       sessions: { revokeCliTokens: revoke },
       users,
       organizations,
-      plans,
-      permittedOnOrganization: () => Promise.resolve(world.permittedOnOrganization ?? true),
-      publicBaseUrl: "https://app.test",
     }),
     credentials: GovernanceCliCredentialService.create({
       personalKeys,
@@ -194,7 +190,7 @@ function mountCli(world: World = {}) {
     ),
     budgets,
     setupState: createApiFixture<Pick<DefaultGovernanceSetupStateService, "resolve">>(
-      {},
+      world.setupState,
       "setupState",
     ),
     templates: createApiFixture<Pick<IngestionTemplateService, "listForUser">>(
@@ -222,8 +218,21 @@ function mountCli(world: World = {}) {
     "GovernanceRestApi",
   );
 
+  // As composed: governance's door with main's CLI refusal wire, auth's plan port behind it.
   const runtime = createRestRuntime({
-    identity: CliTokenIdentity.create({ verify: world.verify ?? (() => Promise.resolve(HOLDER)) }),
+    identity: CliTokenIdentity.create({
+      verify: world.verify ?? (() => Promise.resolve(HOLDER)),
+      permitted: () => ({
+        permitted: world.permittedOnOrganization ?? true,
+        organizationRole: null,
+      }),
+      refusal: cliDoorRefusal({ publicBaseUrl: "https://app.test" }),
+    }),
+    entitlements: {
+      holds: async () => isEnterpriseTier(world.planType ?? "ENTERPRISE"),
+      refusal: ({ feature }) =>
+        new EnterprisePlanRequiredError(feature ?? "This operation requires an Enterprise plan"),
+    },
   });
   const hono = runtime.mount(governanceCliRest.router(), {
     app: () => app,
@@ -773,5 +782,124 @@ describe("the CLI credential routes' tenancy boundary", () => {
       expect(ensure).not.toHaveBeenCalled();
       expect(api.revoke).toHaveBeenCalledWith({ userId: USER_ID, tokenKeys: [TOKEN_KEY] });
     });
+  });
+});
+
+describe("the CLI license gate (Q31: main's order and body)", () => {
+  const SETUP = {
+    hasPersonalVKs: false,
+    hasRoutingPolicies: false,
+    hasIngestionSources: true,
+    hasAnomalyRules: false,
+    hasRecentActivity: false,
+    hasApplicationTraces: false,
+    governanceActive: true,
+  };
+
+  /** @scenario GET /api/auth/cli/governance/status returns 402 for non-enterprise */
+  it("answers governance status with main's 402 body, byte for byte", async () => {
+    const resolve = vi.fn().mockResolvedValue(SETUP);
+    const api = mountCli({ planType: "FREE", setupState: { resolve } });
+
+    const response = await api.get("/api/auth/cli/governance/status");
+
+    expect(response.status).toBe(402);
+    await expect(response.text()).resolves.toBe(
+      '{"error":"payment_required","error_description":"Ingestion sources require an Enterprise plan","upgrade_url":"https://app.test/settings/subscription"}',
+    );
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  /** @scenario GET /api/auth/cli/governance/ingest/sources returns 402 for non-enterprise */
+  it("answers the sources list with the upgrade page inline and reads no source", async () => {
+    const list = vi.fn().mockResolvedValue([]);
+    const api = mountCli({ planType: "FREE", sources: { list } });
+
+    const response = await api.get("/api/auth/cli/governance/ingest/sources");
+
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toEqual({
+      error: "payment_required",
+      error_description: "Ingestion sources require an Enterprise plan",
+      upgrade_url: "https://app.test/settings/subscription",
+    });
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  /** @scenario GET /api/auth/cli/governance/ingest/sources/:id/events returns 402 for non-enterprise */
+  it("answers a source's events with the activity monitor's plan refusal", async () => {
+    const response = await mountCli({ planType: "FREE" }).get(
+      "/api/auth/cli/governance/ingest/sources/src-123/events",
+    );
+
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toEqual({
+      error: "payment_required",
+      error_description: "The activity monitor requires an Enterprise plan",
+      upgrade_url: "https://app.test/settings/subscription",
+    });
+  });
+
+  /** @scenario GET /api/auth/cli/governance/ingest/sources/:id/health returns 402 for non-enterprise */
+  it("answers a source's health with the ingestion sources' plan refusal", async () => {
+    const response = await mountCli({ planType: "FREE" }).get(
+      "/api/auth/cli/governance/ingest/sources/src-123/health",
+    );
+
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toEqual({
+      error: "payment_required",
+      error_description: "Ingestion sources require an Enterprise plan",
+      upgrade_url: "https://app.test/settings/subscription",
+    });
+  });
+
+  /** @scenario 401 fires before 402 — unauthenticated requests don't leak plan info */
+  it("refuses an anonymous caller at the door before the plan is asked", async () => {
+    const response = await mountCli({ planType: "FREE" }).get(
+      "/api/auth/cli/governance/status",
+      {},
+    );
+    const body = await response.text();
+
+    expect(response.status).toBe(401);
+    expect(JSON.parse(body)).toMatchObject({ code: "missing_credentials" });
+    expect(body).not.toContain("payment_required");
+  });
+
+  /** @scenario 402 fires before 403 — a non-enterprise member without the permission sees the plan refusal */
+  it.each([
+    "/api/auth/cli/governance/ingest/sources",
+    "/api/auth/cli/governance/ingest/sources/src-123/events",
+    "/api/auth/cli/governance/ingest/sources/src-123/health",
+  ])("answers %s with the plan refusal, not the permission one", async (path) => {
+    const response = await mountCli({ planType: "FREE", permittedOnOrganization: false }).get(path);
+
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toMatchObject({ error: "payment_required" });
+  });
+
+  /** @scenario An enterprise member without the permission is refused in the CLI body */
+  it.each([
+    ["/api/auth/cli/governance/ingest/sources", "ingestionSources:view"],
+    ["/api/auth/cli/governance/ingest/sources/src-123/events", "activityMonitor:view"],
+    ["/api/auth/cli/governance/ingest/sources/src-123/health", "activityMonitor:view"],
+  ])("answers %s with main's 403 body naming %s", async (path, permission) => {
+    const response = await mountCli({ permittedOnOrganization: false }).get(path);
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe(
+      `{"error":"forbidden","error_description":"Missing required permission '${permission}' on this organization"}`,
+    );
+  });
+
+  /** @scenario Enterprise org passes the gate cleanly */
+  it("answers an Enterprise organization's status with its setup flags", async () => {
+    const api = mountCli({ setupState: { resolve: vi.fn().mockResolvedValue(SETUP) } });
+
+    const response = await api.get("/api/auth/cli/governance/status");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ setup: SETUP });
   });
 });

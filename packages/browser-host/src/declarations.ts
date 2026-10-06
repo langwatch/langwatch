@@ -180,6 +180,8 @@ export type UiJoinOfferProps = {
   onDismissed?: () => void;
   /** A lower-priority prompt, shown only once the join decision resolves to nothing. */
   fallback?: ReactNode;
+  /** Where a request made from here comes from (ADR-171 v6); `cli` lands a Developer seat. */
+  origin?: "web" | "cli";
 };
 
 /** What the backoffice license drawer hands the Billing section of a linked license. */

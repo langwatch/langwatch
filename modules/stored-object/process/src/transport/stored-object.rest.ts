@@ -17,6 +17,7 @@ import {
   storedObjectsDeleteOutputSchema,
   storedObjectsGetInputSchema,
   storedObjectsGetOutputSchema,
+  STORED_OBJECT_UPLOADS_PER_MINUTE,
 } from "@langwatch/stored-object-contract";
 import { z } from "zod";
 
@@ -45,6 +46,7 @@ export const storedObjectRest = defineRestRouter(StoredObjectApi)
   .post("/uploads", "createStoredObjectUpload")
   .withInput(storedObjectsCreateUploadInputSchema)
   .withPermission("project:update")
+  .withRateLimit({ requests: STORED_OBJECT_UPLOADS_PER_MINUTE, seconds: 60 })
   .withOutput(storedObjectsCreateUploadOutputSchema)
   .withDocs({ tags: ["Stored Objects"], summary: "Create a stored-object upload" })
   .handle(async ({ app, input, scope }) =>

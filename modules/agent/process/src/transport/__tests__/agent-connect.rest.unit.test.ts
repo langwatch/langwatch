@@ -4,8 +4,13 @@ import {
   type AgentApi,
   type AgentConnectRegisterOutput,
 } from "@langwatch/agent-contract";
-import type { RestCaller } from "@langwatch/api/hosting";
-import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import {
+  KeyKindRefusedError,
+  ProjectMissingCredentialsError,
+  ProjectRequiredError,
+} from "@langwatch/api";
+import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
+import { createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
 /**
@@ -14,16 +19,18 @@ import { Hono } from "hono";
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
+import { createAgentConnectRest } from "../agent-connect.rest.ts";
+import { connectCredentialsFact, connectDoor } from "./agent-connect-door.fixture.ts";
 
 function buildApi({
   relayMaxPayloadMb,
   application,
-}: { relayMaxPayloadMb?: number; application?: AgentApi } = {}) {
+  refusal,
+}: { relayMaxPayloadMb?: number; application?: AgentApi; refusal?: Error } = {}) {
   const framesSpy = vi.fn(async () => ({ accepted: 1 }));
   const app = application ?? createApiFixture<AgentApi>({ connectFrames: framesSpy });
   const runtime = createRestRuntime({
-    identity: { authenticate: (): RestCaller => ({ actor: null, scope: null }) },
+    identity: connectDoor(refusal ? { refusal } : {}),
   } as never);
   const hono = new Hono();
   hono.route(
@@ -31,13 +38,7 @@ function buildApi({
     runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), {
       app: () => app,
       onError: canonicalErrorResponse,
-      facts: [
-        bindRestMiddleware(agentConnectHeaders, (context) => ({
-          authorization: context.req.header("authorization"),
-          projectId: context.req.header("x-project-id"),
-          instanceToken: context.req.header("x-agent-instance-token"),
-        })),
-      ],
+      facts: [connectCredentialsFact],
     }),
   );
   return {
@@ -47,6 +48,11 @@ function buildApi({
     framesSpy,
   };
 }
+
+const REACHABLE = [
+  { id: "project_a", name: "Project A" },
+  { id: "project_b", name: "Project B" },
+];
 
 const headers = {
   "content-type": "application/json",
@@ -67,6 +73,49 @@ const registerBody = {
   },
   agents: [{ name: "agent", environment: "test" }],
 };
+
+describe("the connect routes' door", () => {
+  /** @scenario "A register refusal answers at the HTTP status of its reason" */
+  /** @scenario "The HTTP transport refuses the same credentials as the socket" */
+  it.each([
+    ["no bearer token", new ProjectMissingCredentialsError(), "api_key_invalid", 401],
+    [
+      "a key that names several projects",
+      new ProjectRequiredError({ projects: REACHABLE }),
+      "project_required",
+      400,
+    ],
+    ["an ingestion key", new KeyKindRefusedError("ingestion_key"), "key_type_not_allowed", 403],
+    [
+      "a key without scenarios:manage",
+      new ApiKeyPermissionDeniedError("scenarios:manage"),
+      "permission_denied",
+      403,
+    ],
+  ] as const)("answers %s as the %s frame at its status", async (_name, refusal, code, status) => {
+    const { hono } = buildApi({ refusal });
+
+    const response = await hono.request("/api/v1/agents/connect/register", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(registerBody),
+    });
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ frame: { type: "refused", code } });
+  });
+
+  /** @scenario "A key that reaches several projects must name one" */
+  it("lists the projects the key reaches on its project_required frame", async () => {
+    const { hono } = buildApi({ refusal: new ProjectRequiredError({ projects: REACHABLE }) });
+
+    const response = await hono.request("/api/v1/agents/connect/poll", { headers });
+
+    expect(await response.json()).toMatchObject({
+      frame: { code: "project_required", meta: { projects: REACHABLE } },
+    });
+  });
+});
 
 describe("registerConnectedAgentInstance", () => {
   /** @scenario "A register refusal answers at the HTTP status of its reason" */
@@ -201,8 +250,16 @@ describe("registerConnectedAgentInstance", () => {
     expect(response.status).toBe(200);
     expect(connectFrames).toHaveBeenCalledExactlyOnceWith(
       { frames: [frame] },
-      { authorization: headers.authorization, instanceToken: "ait_test" },
+      {
+        caller: {
+          principalId: "user:user_test",
+          project: { id: "project_test", slug: "test-project" },
+          userId: "user_test",
+        },
+        instanceToken: "ait_test",
+      },
     );
+    expect(JSON.stringify(connectFrames.mock.calls)).not.toContain("do-not-forward");
   });
 
   describe("given an instance registered over HTTP", () => {

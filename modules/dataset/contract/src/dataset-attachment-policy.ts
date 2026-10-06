@@ -4,12 +4,18 @@
  * @see specs/datasets/dataset-attachments.feature
  */
 import {
+  DATASET_ATTACHMENT_DEFAULT_MAX_BYTES,
+} from "@langwatch/plans";
+import {
   DATASET_ATTACHMENT_PURPOSE,
   REFUSED_ATTACHMENT_MEDIA_TYPES,
 } from "@langwatch/stored-object-contract";
 
-/** The largest file a dataset cell accepts. Matches the NLP engine's own cap. */
-export const DATASET_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
+/**
+ * The largest file a dataset cell accepts when the organization sets nothing.
+ * A request with a project in reach asks for the organization's own limit.
+ */
+export const DATASET_ATTACHMENT_MAX_BYTES = DATASET_ATTACHMENT_DEFAULT_MAX_BYTES;
 
 /** The media type used when the upload declares none. */
 export const DATASET_ATTACHMENT_DEFAULT_MEDIA_TYPE = "application/octet-stream";
@@ -17,9 +23,13 @@ export const DATASET_ATTACHMENT_DEFAULT_MEDIA_TYPE = "application/octet-stream";
 /** Headroom over a file cap for the multipart framing, so a file of exactly the cap passes. */
 export const DATASET_ATTACHMENT_MULTIPART_SLACK_BYTES = 1024 * 1024;
 
-/** The body cap the deprecated attachment upload route applies to the whole multipart request. */
+/**
+ * The body cap the deprecated attachment upload route declares for the whole
+ * multipart request. A posted file is held in memory, so the route stops at
+ * the default per-file limit; a larger file goes to a signed upload address.
+ */
 export const DATASET_ATTACHMENT_REQUEST_MAX_BYTES =
-  DATASET_ATTACHMENT_MAX_BYTES + DATASET_ATTACHMENT_MULTIPART_SLACK_BYTES;
+  DATASET_ATTACHMENT_DEFAULT_MAX_BYTES + DATASET_ATTACHMENT_MULTIPART_SLACK_BYTES;
 
 /** The declared media type without its parameters, lower-cased, or the default when absent. */
 export function normalizeAttachmentMediaType(declared: string | undefined | null): string {
@@ -44,6 +54,8 @@ export function datasetAttachmentAcceptance(input: {
   purpose: string;
   mediaType: string;
   byteLength: number;
+  /** The per-file limit the organization answers. */
+  maxBytes: number;
 }): DatasetAttachmentVerdict {
   if (input.purpose !== DATASET_ATTACHMENT_PURPOSE)
     return { accepted: false, refusal: "wrong_purpose" };
@@ -52,7 +64,7 @@ export function datasetAttachmentAcceptance(input: {
   if (imageRefused || isRefusedAttachmentMediaType(mediaType)) {
     return { accepted: false, refusal: "type_refused" };
   }
-  if (input.byteLength > DATASET_ATTACHMENT_MAX_BYTES)
+  if (input.byteLength > input.maxBytes)
     return { accepted: false, refusal: "too_large" };
   return { accepted: true };
 }

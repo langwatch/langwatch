@@ -91,8 +91,10 @@ import {
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
   membersInvitedSignal,
+  projectActiveDaySignal,
   promptCreatedSignal,
   scenarioCreatedSignal,
+  scenarioRunActiveDaySignal,
   scenarioRunSucceededSignal,
   sessionStartedSignal,
   signedUpSignal,
@@ -137,6 +139,11 @@ export function buildNurturingPipeline(deps: {
     tenantId: string;
   }) => Promise<NurturingSignal[]>;
 }): NurturingPipeline {
+  /** The project's first application signal of the UTC day; delivery's claim drops the rest. */
+  const deliverActiveDay = (input: Parameters<typeof projectActiveDaySignal>[0]) => {
+    const signal = projectActiveDaySignal(input);
+    return deps.deliver({ key: nurturingSignalKey(signal), signal });
+  };
   return definePipeline({
     name: NURTURING_PIPELINE_NAME,
     aggregate: defineAggregate({ type: NURTURING_SIGNAL_AGGREGATE_TYPE }),
@@ -309,6 +316,9 @@ export function buildNurturingPipeline(deps: {
         for (const signal of scenarioRunSucceededSignal({ data, ...context })) {
           await deps.deliver({ key: nurturingSignalKey(signal), signal });
         }
+        for (const signal of scenarioRunActiveDaySignal({ data, ...context })) {
+          await deps.deliver({ key: nurturingSignalKey(signal), signal });
+        }
       },
     })
     .withPeerSubscriber("simulationRunFinished", {
@@ -323,17 +333,19 @@ export function buildNurturingPipeline(deps: {
     .withPeerSubscriber("firstTraceRecorded", {
       eventType: FIRST_TRACE_RECORDED_EVENT_TYPE,
       data: firstTraceRecordedEventDataSchema,
-      handle: (data, { aggregateId }) => {
+      handle: async (data, { aggregateId }) => {
         const signal = firstTraceRecordedSignal({ data, aggregateId });
-        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+        await deps.deliver({ key: nurturingSignalKey(signal), signal });
+        await deliverActiveDay({ source: "trace", ...data });
       },
     })
     .withPeerSubscriber("traceReceived", {
       eventType: TRACE_RECEIVED_EVENT_TYPE,
       data: traceReceivedEventDataSchema,
-      handle: (data, { aggregateId }) => {
+      handle: async (data, { aggregateId }) => {
         const signal = traceReceivedSignal({ data, aggregateId });
-        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+        await deps.deliver({ key: nurturingSignalKey(signal), signal });
+        await deliverActiveDay({ source: "trace", ...data });
       },
     })
     .withCommand("recordSignal", RecordNurturingSignalCommand)

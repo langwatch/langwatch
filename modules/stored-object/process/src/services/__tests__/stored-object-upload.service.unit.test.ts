@@ -143,6 +143,63 @@ describe("StoredObjectService uploads", () => {
     });
   });
 
+  describe("when the dataset module names a 40 MB limit for the caller's organization", () => {
+    /** @scenario "The dataset module raises the attachment limit for an organization" */
+    it("answers an address for a 30 MB attachment", async () => {
+      const { service } = fixture();
+
+      const created = await service.createUpload({
+        projectId: PROJECT_ID,
+        purpose: "dataset_attachment",
+        filename: "scan.png",
+        mediaType: "image/png",
+        byteLength: 30 * MIB,
+        maxBytes: 40 * MIB,
+      });
+
+      expect(created.method).toBe("PUT");
+    });
+
+    it("still refuses a file over the named limit", async () => {
+      const { service } = fixture();
+
+      await expect(
+        service.createUpload({
+          projectId: PROJECT_ID,
+          purpose: "dataset_attachment",
+          filename: "scan.png",
+          mediaType: "image/png",
+          byteLength: 41 * MIB,
+          maxBytes: 40 * MIB,
+        }),
+      ).rejects.toMatchObject({
+        code: "upload_too_large",
+        meta: { maximumUploadBytes: 40 * MIB },
+      });
+    });
+  });
+
+  describe("when the dataset module names a limit above the purpose's ceiling", () => {
+    /** @scenario "A raised attachment limit never passes the purpose's ceiling" */
+    it("holds the upload to the ceiling", async () => {
+      const { service } = fixture();
+
+      await expect(
+        service.createUpload({
+          projectId: PROJECT_ID,
+          purpose: "dataset_attachment",
+          filename: "scan.png",
+          mediaType: "image/png",
+          byteLength: 1024 * MIB + 1,
+          maxBytes: 4 * 1024 * MIB,
+        }),
+      ).rejects.toMatchObject({
+        code: "upload_too_large",
+        meta: { maximumUploadBytes: 1024 * MIB },
+      });
+    });
+  });
+
   describe("when a dataset import is declared far larger than an attachment may be", () => {
     /** @scenario "A dataset import may be far larger than an attachment" */
     it("answers an address to put the file to", async () => {

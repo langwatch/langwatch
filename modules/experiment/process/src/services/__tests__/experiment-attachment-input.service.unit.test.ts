@@ -1,3 +1,4 @@
+import { DATASET_ATTACHMENT_MAX_BYTES } from "@langwatch/dataset-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   StoredObjectNotFoundError,
@@ -23,7 +24,7 @@ const columnTypes =
 type StoredFile = { mediaType: string; bytes: Buffer; purpose?: string };
 
 /** A stored-object double answering one file for every id, and what it was asked. */
-function setup(stored: StoredFile | null = null) {
+function setup(stored: StoredFile | null = null, maxBytes = DATASET_ATTACHMENT_MAX_BYTES) {
   const reads: { projectId: string; id: string }[] = [];
   const closed: boolean[] = [];
   const storedObjects = createApiFixture<StoredObjectApi>(
@@ -63,7 +64,11 @@ function setup(stored: StoredFile | null = null) {
     "storedObjects",
   );
   const links = MemoryExperimentAttachmentLinkChannel.create();
-  const attachments = ExperimentAttachmentInputService.create({ storedObjects, links });
+  const attachments = ExperimentAttachmentInputService.create({
+    storedObjects,
+    links,
+    limits: { maxBytesFor: async () => maxBytes },
+  });
 
   return { attachments, links, reads, closed };
 }
@@ -213,7 +218,13 @@ describe("given a row with an address on the public internet", () => {
         shouldFetchExternal: true,
       });
 
-      expect(links.asked).toEqual([{ url: "https://example.com/shot.jpg", columnType: "image" }]);
+      expect(links.asked).toEqual([
+        {
+          url: "https://example.com/shot.jpg",
+          columnType: "image",
+          maxBytes: DATASET_ATTACHMENT_MAX_BYTES,
+        },
+      ]);
       expect(resolved.picture).toBe(`data:image/jpeg;base64,${PNG_BYTES.toString("base64")}`);
     });
   });
@@ -288,6 +299,49 @@ describe("given a row with no attachment", () => {
           shouldFetchExternal: true,
         }),
       ).resolves.toBe(inputs);
+    });
+  });
+});
+
+describe("given an organization whose file limit is lower than a stored file", () => {
+  describe("when a row that maps the file is resolved", () => {
+    /** @scenario "A stored file above the organization's file limit fails the cell" */
+    it("refuses the read and names the organization's limit", async () => {
+      const { attachments } = setup({ mediaType: "application/pdf", bytes: PDF_BYTES }, 4);
+
+      await expect(
+        attachments.resolveInputs({
+          projectId: PROJECT_ID,
+          inputs: { document: `/api/files/${PROJECT_ID}/obj-2/quarter.pdf` },
+          columnTypeOfInput: columnTypes({ document: "file" }),
+          shouldFetchExternal: false,
+        }),
+      ).rejects.toMatchObject({ code: "dataset_attachment_too_large", meta: { maxBytes: 4 } });
+    });
+  });
+});
+
+describe("given an organization whose file limit was raised", () => {
+  describe("when an agent's file input names a public address", () => {
+    /** @scenario "An organization with a raised file limit reads a file the default limit refuses" */
+    it("asks the address for the file at the raised limit", async () => {
+      const raised = 4 * DATASET_ATTACHMENT_MAX_BYTES;
+      const { attachments, links } = setup(null, raised);
+      links.seed({
+        url: "https://example.com/scan.pdf",
+        attachment: { mediaType: "application/pdf", bytes: PDF_BYTES },
+      });
+
+      await attachments.resolveInputs({
+        projectId: PROJECT_ID,
+        inputs: { document: "https://example.com/scan.pdf" },
+        columnTypeOfInput: columnTypes({ document: "file" }),
+        shouldFetchExternal: true,
+      });
+
+      expect(links.asked).toEqual([
+        { url: "https://example.com/scan.pdf", columnType: "file", maxBytes: raised },
+      ]);
     });
   });
 });

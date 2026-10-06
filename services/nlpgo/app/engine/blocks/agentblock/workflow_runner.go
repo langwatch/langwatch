@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -88,6 +89,10 @@ type WorkflowRunRequest struct {
 	// ThreadID groups Studio runs into a single conversation in trace
 	// metadata. Mirrors langwatch_nlp commit ac986cc3c. Optional.
 	ThreadID string
+	// MaxAttachmentBytes is the per-file attachment limit of the calling run,
+	// sent as X-LangWatch-Max-Attachment-Bytes so a workflow run this call
+	// starts fetches attachments under the same limit. 0 sends no header.
+	MaxAttachmentBytes int64
 	// TimeoutMS asks for LESS time than the operator allows; it can never
 	// buy more. 0 (and any negative) means the runner's own ceiling.
 	TimeoutMS int
@@ -193,6 +198,9 @@ func (r *WorkflowRunner) Execute(ctx context.Context, req WorkflowRunRequest) (*
 	}
 	if req.ThreadID != "" {
 		httpReq.Header.Set("X-LangWatch-Thread-Id", req.ThreadID)
+	}
+	if req.MaxAttachmentBytes > 0 {
+		httpReq.Header.Set("X-LangWatch-Max-Attachment-Bytes", strconv.FormatInt(req.MaxAttachmentBytes, 10))
 	}
 
 	start := time.Now()

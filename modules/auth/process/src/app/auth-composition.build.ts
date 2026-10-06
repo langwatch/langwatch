@@ -17,7 +17,6 @@ import {
 import {
   IdentityVerificationExpiredError,
   SignInMethodPolicyService,
-  organizationConnectionsOf,
   sealedProviderConfigCipher,
   type IdentityApi,
   type RoutingDecision,
@@ -516,10 +515,16 @@ export async function buildBetterAuth(
     signUpVerification: options.signUpProofs ?? AbsentSignUpVerification.create(logger),
     sendResetPassword: options.sendResetPassword,
     signInLockout: options.signInLockout,
-    findGoverningConnections: async ({ email }) =>
-      signInRouting === null
-        ? []
-        : organizationConnectionsOf(await signInRouting({ identifier: email, breakGlass: false })),
+    findGoverningConnections: async ({ email }) => {
+      if (signInRouting === null) return [];
+      const decision = await signInRouting({ identifier: email, breakGlass: false });
+      if (decision.outcome !== "redirect_to_connection") return [];
+      return decision.methodSet.flatMap((method) =>
+        method.connectionId === null
+          ? []
+          : [{ connectionId: method.connectionId, methodId: method.id }],
+      );
+    },
     signUpPolicy: options.organizations,
     credentialGuard: CredentialSessionGuard.create(
       CredentialSignInPolicyService.create({

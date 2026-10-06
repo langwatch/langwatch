@@ -1,4 +1,3 @@
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
  * `/api/organizations` against the real composed application over the module's own
@@ -6,10 +5,11 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
  * @see specs/organizations/organizations-provisioning-rest-api.feature
  */
 import {
-  createCanonicalFamilyErrorHandler,
-  createRestRuntime,
-  UnauthorizedError,
-} from "@langwatch/api/rest";
+  OrganizationInvalidCredentialsError,
+  OrganizationMissingCredentialsError,
+} from "@langwatch/api";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -72,9 +72,9 @@ function mountProvisioning(app: OrganizationModule) {
   const runtime = createRestRuntime({
     identity: {
       identify: ({ request }) => {
-        if (request.headers.get("Authorization") !== `Bearer ${INSTANCE_KEY}`) {
-          throw new UnauthorizedError("Invalid credential");
-        }
+        const presented = request.headers.get("Authorization");
+        if (presented === null) throw new OrganizationMissingCredentialsError();
+        if (presented !== `Bearer ${INSTANCE_KEY}`) throw new OrganizationInvalidCredentialsError();
         return { actor: { type: "api_key", id: "instance-admin" } as const, scope: null };
       },
       authenticate: () => {
@@ -84,11 +84,19 @@ function mountProvisioning(app: OrganizationModule) {
   });
   const hono = runtime.mount(organizationsProvisioningRest.router(), { app: () => app, onError });
 
-  const send = (path: string, init: { method?: string; body?: unknown } = {}) =>
+  const send = (
+    path: string,
+    init: { method?: string; body?: unknown; credential?: string | null } = {},
+  ) =>
     hono.fetch(
       new Request(`http://api.test${path}`, {
         method: init.method ?? "GET",
-        headers: { Authorization: `Bearer ${INSTANCE_KEY}`, "Content-Type": "application/json" },
+        headers: {
+          ...(init.credential === null
+            ? {}
+            : { Authorization: `Bearer ${init.credential ?? INSTANCE_KEY}` }),
+          "Content-Type": "application/json",
+        },
         ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
       }),
     );
@@ -237,6 +245,32 @@ describe("given an organization created with the instance administrator's key", 
       const response = await send("/api/organizations/organization-that-does-not-exist");
 
       expect(response.status).toBe(404);
+    });
+  });
+
+  describe("when the organizations are listed without the instance key", () => {
+    /** @scenario "Listing organizations requires the instance key" */
+    it("refuses a missing credential and a foreign one, and lists both with the key", async () => {
+      const { send, provisioned } = await created();
+      await send("/api/organizations", {
+        method: "POST",
+        body: { name: "Beta", slug: "beta" },
+      });
+
+      const missing = await send("/api/organizations", { credential: null });
+      expect(missing.status).toBe(401);
+      expect(await missing.json()).toMatchObject({ code: "missing_credentials" });
+
+      const foreign = await send("/api/organizations", { credential: "not-the-instance-key" });
+      expect(foreign.status).toBe(401);
+      expect(await foreign.json()).toMatchObject({ code: "invalid_credentials" });
+
+      const listed = (await (await send("/api/organizations")).json()) as {
+        organizations: { slug: string }[];
+      };
+      expect(listed.organizations.map((organization) => organization.slug).toSorted()).toEqual(
+        [provisioned.organization.slug, "beta"].toSorted(),
+      );
     });
   });
 

@@ -31,6 +31,7 @@ import type { AgentCallInput, AgentCallContext, AgentCallResult } from "./connec
 import type {
   AgentCallSignal,
   AgentConnection,
+  AgentConnectAdmission,
   AgentConnectCredentials,
   AgentConnectFramesInput,
   AgentConnectPollInput,
@@ -51,10 +52,7 @@ export interface AgentApi {
     agents: readonly { id: string; type: string }[];
   }): Promise<Map<string, AgentPresence>>;
   call(input: AgentCallInput, context: AgentCallContext): Promise<AgentCallResult>;
-  acceptConnection(
-    connection: AgentConnection,
-    credentials: AgentConnectCredentials,
-  ): Promise<void>;
+  acceptConnection(connection: AgentConnection, admission: AgentConnectAdmission): Promise<void>;
   connectRegister(
     body: unknown,
     credentials: AgentConnectCredentials,

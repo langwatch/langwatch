@@ -105,6 +105,7 @@ describe("ApiKeyTokenResolutionService", () => {
 
     describe("given an expired key", () => {
       /** @scenario "A revoked or expired key cannot authenticate" */
+      /** @scenario "The run's key stops working after the run ends" */
       it("refuses it", async () => {
         const { service } = serviceWith({
           row: storedKey({ expiresAt: new Date(Date.now() - 1000) }),

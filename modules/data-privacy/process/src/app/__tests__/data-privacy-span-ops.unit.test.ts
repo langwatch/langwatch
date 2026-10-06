@@ -67,6 +67,8 @@ async function dropInputForProject(app: DataPrivacyApi): Promise<void> {
 describe("given a peer handing a span to the data-privacy API", () => {
   describe("when the project's policy drops input content", () => {
     /** @scenario "A peer drops a span's content through the data-privacy API" */
+    /** @scenario "The content drop composes from the policy service alone" */
+    /** @scenario "The composed path removes a dropped category's content" */
     it("strips the content and stamps the dropped-category marker", async () => {
       const { app, stop } = await boot({});
       try {
@@ -105,6 +107,7 @@ describe("given a peer handing a span to the data-privacy API", () => {
 
   describe("when the span carries an email address", () => {
     /** @scenario "A peer redacts a span through the data-privacy API" */
+    /** @scenario "The privacy graph builds end to end from what the process already holds" */
     it("redacts the address in place", async () => {
       const { app, stop } = await boot({});
       try {

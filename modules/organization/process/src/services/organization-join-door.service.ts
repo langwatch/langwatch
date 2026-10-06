@@ -4,8 +4,10 @@
  * shapes — the requester's address withheld from the organization until membership.
  */
 
+import { seatForJoiner } from "@langwatch/identity-contract";
 import type {
   JoinRequestAdmitted,
+  JoinRequestApiOrigin,
   JoinRequestAutomaticJoins,
   JoinRequestFiled,
   JoinRequestJoining,
@@ -65,10 +67,13 @@ export class OrganizationJoinDoorService {
   }
 
   /** Walk in where the organization asked for that; a null organization is the ordinary case. */
-  async admitAutomatically(input: Readonly<{ userId: string }>): Promise<JoinRequestAdmitted> {
+  async admitAutomatically(
+    input: Readonly<{ userId: string; origin?: JoinRequestApiOrigin }>,
+  ): Promise<JoinRequestAdmitted> {
     return this.deps.joinRequests.joinAutomaticallyIfAdmitted({
       userId: input.userId,
       verifiedEmail: await this.deps.directory.findVerifiedEmail(input),
+      ...(input.origin === undefined ? {} : { origin: input.origin }),
     });
   }
 
@@ -105,12 +110,13 @@ export class OrganizationJoinDoorService {
   }
 
   async file(
-    input: Readonly<{ userId: string; organizationId: string }>,
+    input: Readonly<{ userId: string; organizationId: string; origin?: JoinRequestApiOrigin }>,
   ): Promise<JoinRequestFiled> {
     return this.deps.joinRequests.request({
       userId: input.userId,
       verifiedEmail: await this.deps.directory.findVerifiedEmail({ userId: input.userId }),
       organizationId: input.organizationId,
+      ...(input.origin === undefined ? {} : { origin: input.origin }),
     });
   }
 
@@ -125,6 +131,7 @@ export class OrganizationJoinDoorService {
    */
   async listPending(input: Readonly<{ organizationId: string }>): Promise<JoinRequestPending> {
     const pending = await this.deps.joinRequests.pendingForOrganization(input);
+    const { joinerRole } = await this.deps.joinRequests.readJoining(input);
     const names = await this.deps.directory.listUserNames({
       userIds: pending.map((request) => request.userId),
     });
@@ -135,6 +142,7 @@ export class OrganizationJoinDoorService {
       userId: request.userId,
       name: nameById.get(request.userId) ?? UNNAMED_COLLEAGUE,
       domain: request.domain,
+      seat: seatForJoiner({ origin: request.origin, joinerRole }),
     }));
   }
 

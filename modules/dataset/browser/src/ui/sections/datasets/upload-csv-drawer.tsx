@@ -10,7 +10,7 @@ import type {
   DatasetRecordEntry,
   InMemoryDataset,
 } from "@langwatch/dataset-contract";
-import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
+import { formatDatasetRowLimit } from "@langwatch/dataset-contract";
 import {
   Alert,
   Box,
@@ -37,6 +37,7 @@ import {
 } from "react-papaparse";
 
 import { PresignedUploadFailedError } from "../../../behavior/stored-object-upload.ts";
+import { useDatasetLimits } from "../../../behavior/use-dataset-limits.ts";
 import { useDatasetImportTransport } from "../../../behavior/use-stored-object-upload.ts";
 import { parseHeaderColumns } from "../../../model/parse-header-columns.ts";
 import { readableDate } from "../../../model/readable-date.ts";
@@ -378,21 +379,23 @@ async function proposeDatasetName({
 }
 
 /**
- * The rejected-PUT fallback: parse the file in the browser, guarded on `MAX_FILE_SIZE_BYTES`
- * (over it, stop with a message; the CORS detail stays in the log).
+ * The rejected-PUT fallback: parse the file in the browser, guarded on the size one request
+ * carries inline (over it, stop with a message; the CORS detail stays in the log).
  */
 async function fallbackParseOf({
   file,
+  maxBytes,
   proposeName,
 }: {
   file: File;
+  maxBytes: number;
   proposeName: (filename: string) => Promise<string>;
 }): Promise<
   | { kind: "too-large"; message: string }
   | { kind: "parsed"; dataset: InMemoryDataset }
   | { kind: "failed"; message: string }
 > {
-  if (file.size > MAX_FILE_SIZE_BYTES) {
+  if (file.size > maxBytes) {
     return {
       kind: "too-large",
       message:
@@ -489,6 +492,7 @@ function uploadReadinessOf(input: {
   isParsingHeader: boolean;
   uploadedDataset: InMemoryDataset | undefined;
   sizeError: string | null;
+  maxRows: number;
 }): { canUpload: boolean; fileError: string | undefined } {
   if (input.enableDirectUpload) {
     return {
@@ -497,10 +501,10 @@ function uploadReadinessOf(input: {
     };
   }
   const rowCount = input.uploadedDataset?.datasetRecords.length ?? 0;
-  if (rowCount > MAX_ROWS_LIMIT) {
+  if (rowCount > input.maxRows) {
     return {
       canUpload: false,
-      fileError: `Sorry, the max number of rows accepted for datasets is currently ${MAX_ROWS_LIMIT} rows. Please reduce the number of rows or contact support.`,
+      fileError: `One upload accepts up to ${formatDatasetRowLimit(input.maxRows)} rows. Split the file into smaller ones, or contact support.`,
     };
   }
   return { canUpload: rowCount > 0, fileError: input.sizeError ?? undefined };
@@ -573,6 +577,7 @@ export function UploadCSVForm({
   const projectId = project?.id;
   const trpcUtils = datasetClient.useUtils();
   const router = useRouter();
+  const limits = useDatasetLimits(projectId);
   const importTransport = useDatasetImportTransport();
 
   // The raw file from the dropzone. The direct-upload path streams this as-is
@@ -705,11 +710,15 @@ export function UploadCSVForm({
   };
 
   /**
-   * Rejected-PUT fallback only. Guarded on `MAX_FILE_SIZE_BYTES`: over the
+   * Rejected-PUT fallback only. Guarded on the size one request carries inline: over the
    * limit, stop with a message instead of parsing; CORS detail stays in the log.
    */
   const runFallbackParseAndDrawer = async (file: File) => {
-    const outcome = await fallbackParseOf({ file, proposeName: proposeValidName });
+    const outcome = await fallbackParseOf({
+      file,
+      maxBytes: limits.inlineReadBytes,
+      proposeName: proposeValidName,
+    });
     setIsUploading(false);
     if (outcome.kind === "parsed") {
       setUploadedDataset(outcome.dataset);
@@ -746,6 +755,7 @@ export function UploadCSVForm({
     isParsingHeader,
     uploadedDataset,
     sizeError,
+    maxRows: limits.rowsMax,
   });
 
   return (

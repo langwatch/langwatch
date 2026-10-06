@@ -120,6 +120,7 @@ Feature: Process outbox lease hardening
     Then each empty poll doubles the interval to the next poll, up to 30 seconds
     And a notification drains at once and returns the poll to its base interval
     And a poll that leases a message returns the poll to its base interval
+    And a poll that fails grows the interval like an empty one, never returning it to its base
 
   @unit @notify-on-insert
   Scenario: A commit that inserted no intent does not nudge the outbox

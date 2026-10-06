@@ -15,7 +15,7 @@ import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualizatio
 import { createLangWatchQLService } from "@langwatch/analytics-process/testing";
 import { bindRestMiddleware, createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import { PermissionDeniedError } from "@langwatch/authorization";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createDashboardTestAnalytics,
@@ -53,12 +53,14 @@ const DEFINITION = {
 function mountKey({
   repositories,
   projectId = "project-1",
+  pathProjectId = projectId,
   held = EVERY_PERMISSION,
   enabled = true,
   protections = FULLY_PERMITTED,
 }: {
   repositories: DashboardRepositories;
   projectId?: string;
+  pathProjectId?: string;
   held?: readonly string[];
   enabled?: boolean;
   protections?: LangWatchQLProtections;
@@ -101,7 +103,7 @@ function mountKey({
     ],
     onError: canonicalErrorResponse,
   });
-  const base = `/api/v1/projects/${projectId}/analytics/charts`;
+  const base = `/api/v1/projects/${pathProjectId}/analytics/charts`;
 
   const send = async ({
     path = "",
@@ -306,6 +308,23 @@ describe("given the saved workbench chart REST family", () => {
       expect((await home.read(id)).json).toEqual(before);
     });
 
+    /** @scenario "A path naming another project reaches nothing" */
+    it("refuses a path naming another project with 403 scope_input_mismatch", async () => {
+      const repositories = MemoryDashboardRepositories.create();
+      const id = await seededChart(repositories);
+      const stranger = mountKey({
+        repositories,
+        projectId: "project-2",
+        pathProjectId: "project-1",
+      });
+
+      const answers = [await stranger.list(), await stranger.read(id)];
+
+      expect(answers.map((answer) => [answer.status, answer.json.code])).toEqual(
+        Array(2).fill([403, "scope_input_mismatch"]),
+      );
+    });
+
     /** @scenario "Placing an unknown chart id is refused as not found, indistinguishable from a foreign one" */
     it("answers a foreign chart id and an id that never existed identically", async () => {
       const repositories = MemoryDashboardRepositories.create();
@@ -325,6 +344,33 @@ describe("given the saved workbench chart REST family", () => {
 
       expect(foreign.status).toBe(404);
       expect(unknown).toEqual(foreign);
+    });
+  });
+
+  describe("when a stored definition does not match the versioned schema", () => {
+    /** @scenario "A stored definition this build cannot read is refused, not returned as data" */
+    it("refuses the read and the listing as an internal error, returning no stored payload", async () => {
+      const repositories = MemoryDashboardRepositories.create();
+      const id = await seededChart(repositories);
+      const stored = (await repositories.dashboards.findSavedWorkbenchChart({
+        projectId: "project-1",
+        chartId: id,
+      }))!;
+      const unreadable = { ...stored, definition: { version: 99, sql: "SELECT SECRET_PAYLOAD" } };
+      vi.spyOn(repositories.dashboards, "findSavedWorkbenchChart").mockResolvedValue(
+        unreadable as never,
+      );
+      vi.spyOn(repositories.dashboards, "findAllSavedWorkbenchCharts").mockResolvedValue([
+        unreadable as never,
+      ]);
+      const key = mountKey({ repositories });
+
+      const answers = [await key.read(id), await key.list()];
+
+      expect(answers.map((answer) => [answer.status, answer.json.code])).toEqual(
+        Array(2).fill([500, "internal_error"]),
+      );
+      expect(JSON.stringify(answers)).not.toContain("SECRET_PAYLOAD");
     });
   });
 

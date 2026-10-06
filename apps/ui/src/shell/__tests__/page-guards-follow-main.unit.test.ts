@@ -131,6 +131,14 @@ describe("given the pages main guarded", () => {
     expect(accessFor({ page, grants, flagsOn: false })).toEqual({ kind: "not-found" });
   });
 
+  /** @scenario "The pages stay closed when they are not released" */
+  it.each(["pages/[project]/sessions", "pages/[project]/pull-requests"])(
+    "the project coding-agent page %s is not found while its release is off",
+    (page) => {
+      expect(accessFor({ page, grants: [], flagsOn: false })).toEqual({ kind: "not-found" });
+    },
+  );
+
   describe("when a module's own spec names the guard", () => {
     /** What a neighbouring grant and the page's own grant each get, per page. */
     const accessWithAndWithout = ({

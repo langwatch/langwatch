@@ -13,6 +13,7 @@ import type {
 import { assertRouteScopePermission } from "../access/access.ts";
 import { OrganizationMissingCredentialsError, SurfaceUnconfiguredError } from "../errors.ts";
 import type { RestCaller, RestIdentity } from "../hosting/api-door.ts";
+import type { RestProtocolRefusal } from "./response-kind.ts";
 
 /** What the caller presented: the whole `Authorization` header, whose format the owner reads. */
 export type CliTokenPresented = Readonly<{ authorization: string }>;
@@ -35,18 +36,25 @@ export class CliTokenIdentity implements RestIdentity {
    * permission behind a door without it is refused at mount, naming the route.
    */
   readonly authorize?: NonNullable<RestIdentity["authorize"]>;
+  /** The owner's wire for the refusals raised behind this door, where a route keeps none (Q31). */
+  readonly refusal?: RestProtocolRefusal;
 
   private constructor(options: Parameters<typeof CliTokenIdentity.create>[0]) {
     this.#verify = options.verify;
     this.#permitted = options.permitted;
+    if (options.refusal) this.refusal = options.refusal;
 
     if (options.permitted) this.authorize = (input) => this.#authorize(input);
   }
 
-  /** `permitted` asks authz for the token's person; without it the door only identifies. */
+  /**
+   * `permitted` asks authz for the token's person; without it the door only identifies.
+   * `refusal` writes the door's, the plan's and the permission's refusals in the owner's wire.
+   */
   static create(options: {
     verify: (presented: CliTokenPresented) => Promise<CliTokenHolder>;
     permitted?: CliTokenPermissionQuestion;
+    refusal?: RestProtocolRefusal;
   }): CliTokenIdentity {
     return new CliTokenIdentity(options);
   }

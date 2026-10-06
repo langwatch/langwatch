@@ -256,6 +256,8 @@ describe("the projects REST family over the application the composition builds",
         recordProjectCreated: { send: recorded },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
         recordPresenceSettingChanged: { send: async () => undefined },
+        recordProjectMoved: { send: async () => undefined },
+        recordProjectArchived: { send: async () => undefined },
       });
     });
 

@@ -13,7 +13,7 @@ from typing import (
     Tuple,
     Union,
 )
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
 from coolname import generate_slug
@@ -28,6 +28,10 @@ from langwatch.types import Money
 from langwatch.utils.auth import build_request_headers
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.initialization import ensure_setup
+from langwatch.utils.log_results_batching import (
+    is_payload_too_large,
+    send_log_results_in_parts,
+)
 from langwatch.state import get_instance
 from langwatch.dataset.dataset_api_service import DatasetApiService
 
@@ -351,7 +355,7 @@ class BatchEvaluation:
 
             # Start a new thread to send the batch
             thread = threading.Thread(
-                target=BatchEvaluation.post_results,
+                target=BatchEvaluation.post_results_in_parts,
                 args=(langwatch.get_api_key(), body),
             )
             thread.start()
@@ -362,9 +366,17 @@ class BatchEvaluation:
             self.last_sent = time.time()
 
     @classmethod
+    def post_results_in_parts(cls, api_key: str, body: dict):
+        """Send one batch, as several requests when it is too large for one."""
+        send_log_results_in_parts(
+            body, post=lambda part: cls.post_results(api_key, part)
+        )
+
+    @classmethod
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception(lambda error: not is_payload_too_large(error)),
         reraise=True,
     )
     def post_results(cls, api_key: str, body: dict):

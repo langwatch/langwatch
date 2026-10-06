@@ -1,4 +1,4 @@
-import type { SignUpEnrollment } from "@langwatch/auth-contract";
+import { isSafeReturnToPath, type SignUpEnrollment } from "@langwatch/auth-contract";
 import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -81,6 +81,7 @@ async function spendSignUpLink({
 /** Asks for a confirmation link to the address; `null` when none went out. */
 async function requestSignUpLink({
   email,
+  callbackUrl,
   request,
   decide,
   resolveEnrollment,
@@ -89,6 +90,8 @@ async function requestSignUpLink({
   onAlreadyRegistered,
 }: {
   email: string;
+  /** Rides on the emailed link, so a sign-up finished in a fresh tab lands where this one went. */
+  callbackUrl: string | undefined;
   request: RequestSignUpVerification;
   decide: Decide;
   resolveEnrollment: ResolveEnrollment;
@@ -97,7 +100,7 @@ async function requestSignUpLink({
   onAlreadyRegistered: (email: string) => void;
 }): Promise<"link_sent" | "unconfirmed" | null> {
   try {
-    const result = await request({ email });
+    const result = await request({ email, ...(callbackUrl ? { callbackUrl } : {}) });
     if (!result.sent) {
       // No link can be mailed here, so the password step comes straight away.
       onUnconfirmed();
@@ -160,7 +163,9 @@ async function resendLink({
  */
 export function VerificationFirstSignUp() {
   const query = useSearchParams();
-  const callbackUrl = query?.get("callbackUrl") ?? undefined;
+  // Arrived on the query string, so held to a path on this site before it is followed or mailed.
+  const requestedCallbackUrl = query?.get("callbackUrl");
+  const callbackUrl = isSafeReturnToPath(requestedCallbackUrl) ? requestedCallbackUrl : undefined;
   const verifyToken = query?.get("verify");
   // Carried in the FRAGMENT, so the address the log-in door hands over never
   // travelled on a request line. Read at first paint because the field it
@@ -241,6 +246,7 @@ export function VerificationFirstSignUp() {
   const sendTo = (email: string) =>
     requestSignUpLink({
       email,
+      callbackUrl,
       request: requestVerification.mutateAsync,
       decide,
       resolveEnrollment,

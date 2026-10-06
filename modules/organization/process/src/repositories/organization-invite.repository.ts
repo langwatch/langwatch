@@ -118,6 +118,16 @@ export abstract class OrganizationInviteRepository {
     email: string;
   }): Promise<OrganizationInvite>;
   /**
+   * The oldest pending, unexpired invite on ONE address, in any organization
+   * (ADR-171 v6). One address per read: the tenancy guard admits a
+   * subject-bounded read on invitations only as a single-address `findFirst`.
+   */
+  abstract findOldestPendingInviteForAddress(input: { address: string }): Promise<{
+    inviteCode: string;
+    organizationName: string;
+    role: OrganizationUserRole;
+  } | null>;
+  /**
    * Claims a pending invite for one acceptor, conditional on the (status,
    * code, expiry) the caller read. Answers how many rows moved; zero means
    * somebody else's accept won the race.

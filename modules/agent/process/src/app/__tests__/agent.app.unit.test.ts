@@ -1,5 +1,4 @@
 import { PROTOCOL_VERSION } from "@langwatch/agent-contract";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -32,20 +31,6 @@ describe("AgentModule connected views", () => {
         relayMaxPayloadMb: void 0,
         publicBaseUrl: "https://langwatch.test",
       },
-      apiKeys: createApiFixture<ApiKeyApi>({
-        findResolvedToken: async () => ({
-          type: "legacyProjectKey",
-          project: {
-            id: projectId,
-            name: "Project",
-            slug: "project",
-            teamId: "team_1",
-            organizationId: "org_1",
-            isPersonal: false,
-            ownerUserId: null,
-          },
-        }),
-      }),
     });
     const services = resources.sealServices();
     onTestFinished(async () => {
@@ -78,7 +63,13 @@ describe("AgentModule connected views", () => {
           },
         ],
       },
-      { authorization: "Bearer sk-lw-test", projectId },
+      {
+        caller: {
+          project: { id: projectId, slug: "project" },
+          principalId: `legacy-project:${projectId}`,
+          userId: null,
+        },
+      },
     );
     expect(registered.frame.type).toBe("registered");
 

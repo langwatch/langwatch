@@ -33,7 +33,7 @@ const USER_BACKOFFICE_INCLUDE = {
 } as const;
 
 /**
- * Private Prisma/React-Admin adapter for the Ops backoffice surface.
+ * Private Prisma/React-Admin adapter for the Ops instance admin surface.
  */
 export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
   private constructor(private readonly database: AdminDatabase) {

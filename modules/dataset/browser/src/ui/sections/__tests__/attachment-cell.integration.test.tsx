@@ -1,4 +1,4 @@
-import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import { DATASET_DEFAULT_LIMITS, type DatasetColumnType } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment jsdom
  * The real EditableCell over a DatasetTableContext that mounts AttachmentCell.
@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { StoredObjectUploadTransport } from "../../../behavior/stored-object-upload.ts";
+import type { DatasetAttachmentUploadTransport } from "../../../behavior/attachment-upload.ts";
 import "@testing-library/jest-dom/vitest";
 
 import {
@@ -23,9 +23,9 @@ import { renderDatasetImage } from "../../elements/render-dataset-image.tsx";
 import { AttachmentCell } from "../attachment-cell.tsx";
 
 const fetchMock = vi.fn();
-const createUpload = vi.fn<StoredObjectUploadTransport["createUpload"]>();
-const confirmUpload = vi.fn<StoredObjectUploadTransport["confirmUpload"]>();
-const uploadTransport: StoredObjectUploadTransport = { createUpload, confirmUpload };
+const createUpload = vi.fn<DatasetAttachmentUploadTransport["createUpload"]>();
+const confirmUpload = vi.fn<DatasetAttachmentUploadTransport["confirmUpload"]>();
+const uploadTransport: DatasetAttachmentUploadTransport = { createUpload, confirmUpload };
 vi.mock("../stored-object/stored-object-image.tsx", async () => {
   const { ExternalImage } = await import("@langwatch/design-system/external-image");
   return {
@@ -35,7 +35,11 @@ vi.mock("../stored-object/stored-object-image.tsx", async () => {
   };
 });
 vi.mock("../../../behavior/use-stored-object-upload.ts", () => ({
-  useStoredObjectUploadTransport: () => uploadTransport,
+  useDatasetAttachmentUploadTransport: () => uploadTransport,
+}));
+const limits = { ...DATASET_DEFAULT_LIMITS };
+vi.mock("../../../behavior/use-dataset-limits.ts", () => ({
+  useDatasetLimits: () => limits,
 }));
 const setCellValue = vi.fn();
 
@@ -152,6 +156,7 @@ describe("AttachmentCell", () => {
     createUpload.mockReset();
     confirmUpload.mockReset();
     setCellValue.mockReset();
+    limits.attachmentBytes = DATASET_DEFAULT_LIMITS.attachmentBytes;
     vi.stubGlobal("fetch", fetchMock);
   });
 
@@ -225,7 +230,7 @@ describe("AttachmentCell", () => {
       expect(await screen.findByRole("img")).toHaveAttribute("src", `/minted${storedPicture.url}`);
 
       expect(createUpload).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: "proj-1", purpose: "dataset_attachment" }),
+        expect.objectContaining({ projectId: "proj-1", filename: "cat.png", mediaType: "image/png" }),
       );
       const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(url).toBe("https://storage.example/obj-1");
@@ -295,6 +300,29 @@ describe("AttachmentCell", () => {
       const message = await screen.findByTestId("attachment-upload-error");
       expect(message).toHaveTextContent(/too large/i);
       expect(createUpload).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the organization's limit was raised above the size of the file", () => {
+    /** @scenario "A cell takes a file above 20 MB when my organization's limit was raised" */
+    it("uploads the file and fills the cell", async () => {
+      const user = userEvent.setup();
+      limits.attachmentBytes = 40 * 1024 * 1024;
+      storesAs(storedDocument);
+      renderCell({ dataType: "file" });
+
+      const large = documentFile();
+      Object.defineProperty(large, "size", { value: 21 * 1024 * 1024 });
+      await user.upload(fileInput(), large);
+
+      await waitFor(() =>
+        expect(setCellValue).toHaveBeenCalledWith(
+          expect.objectContaining({ value: storedDocument.url }),
+        ),
+      );
+      expect(createUpload).toHaveBeenCalledWith(
+        expect.objectContaining({ filename: "report.pdf", byteLength: 21 * 1024 * 1024 }),
+      );
     });
   });
 

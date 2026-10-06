@@ -238,34 +238,73 @@ class TestDatasetApiService:
     class TestGetDataset:
         """get_dataset()"""
 
+        @staticmethod
+        def _paged_httpx(*, dataset, records):
+            """An httpx double answering the records page and the datasets list."""
+            mock_httpx = MagicMock()
+
+            def get(url, params=None):
+                if url.endswith("/records"):
+                    return httpx.Response(
+                        200,
+                        json={
+                            "data": records,
+                            "pagination": {
+                                "page": 1,
+                                "limit": params["limit"],
+                                "total": len(records),
+                                "totalPages": 1,
+                            },
+                        },
+                    )
+                if url == "/api/v1/dataset":
+                    return httpx.Response(
+                        200,
+                        json={
+                            "data": [{**dataset, "recordCount": len(records)}],
+                            "pagination": {
+                                "page": 1,
+                                "limit": params["limit"],
+                                "total": 1,
+                                "totalPages": 1,
+                            },
+                        },
+                    )
+                raise AssertionError(f"unexpected GET {url}")
+
+            mock_httpx.get.side_effect = get
+            return mock_httpx
+
         def test_returns_dataset_with_entries(self):
             """@integration Scenario: Get dataset returns dataset with entries"""
-            mock_httpx = MagicMock()
             data = [
-                {"id": f"r{i}", "entry": {"input": f"val{i}"}} for i in range(5)
+                {"id": f"r{i}", "datasetId": "ds_1", "entry": {"input": f"val{i}"}}
+                for i in range(5)
             ]
-            mock_httpx.get.return_value = _json_response(
-                {"datasetId": "ds_1", "name": "my-dataset", "slug": "my-dataset", "data": data}
+            mock_httpx = self._paged_httpx(
+                dataset={"id": "ds_1", "name": "my-dataset", "slug": "my-dataset"},
+                records=data,
             )
             svc = DatasetApiService(_make_mock_client(mock_httpx))
             result = svc.get_dataset("my-dataset")
             assert len(result["data"]) == 5
+            assert result["id"] == "ds_1"
+            assert "recordCount" not in result
 
         def test_gets_dataset_by_id(self):
             """@integration Scenario: Get dataset by ID works the same as by slug"""
-            mock_httpx = MagicMock()
-            mock_httpx.get.return_value = _json_response(
-                {
-                    "datasetId": "dataset_xyz",
-                    "name": "my-data",
-                    "slug": "my-data",
-                    "data": [{"id": "r1", "entry": {"input": "val"}}],
-                }
+            mock_httpx = self._paged_httpx(
+                dataset={"id": "dataset_xyz", "name": "my-data", "slug": "my-data"},
+                records=[
+                    {"id": "r1", "datasetId": "dataset_xyz", "entry": {"input": "val"}}
+                ],
             )
             svc = DatasetApiService(_make_mock_client(mock_httpx))
             result = svc.get_dataset("dataset_xyz")
             assert result["slug"] == "my-data"
-            mock_httpx.get.assert_called_once_with("/api/v1/dataset/dataset_xyz")
+            assert mock_httpx.get.call_args_list[0].args == (
+                "/api/v1/dataset/dataset_xyz/records",
+            )
 
         def test_raises_dataset_not_found_error(self):
             """@integration Scenario: Get non-existent dataset raises an error"""

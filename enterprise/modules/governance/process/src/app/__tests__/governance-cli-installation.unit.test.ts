@@ -62,6 +62,8 @@ function restHost() {
     },
     bearers: () => closed,
     audit: { record: async () => {} },
+    // The process's plan port, as the api surface supplies it; the CLI plane asks it (Q31).
+    entitlements: { holds: async () => true },
   });
 }
 

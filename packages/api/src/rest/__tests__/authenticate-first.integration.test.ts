@@ -132,6 +132,7 @@ function upload(): FormData {
 describe("a request authenticated before its body is parsed", () => {
   describe("given a JSON route whose body fails its schema", () => {
     /** @scenario "A refused credential is answered before the body is validated" */
+    /** @scenario "A REST request is parsed before its credential is resolved" */
     it("answers 401 to a caller presenting no credential, not 422", async () => {
       const { hono, calls } = notesApp();
 
@@ -154,6 +155,7 @@ describe("a request authenticated before its body is parsed", () => {
     });
 
     /** @scenario "A refused credential is answered before the body is validated" */
+    /** @scenario "A REST request is parsed before its credential is resolved" */
     it("answers 422 to an authenticated caller", async () => {
       const response = await notesApp().hono.request(
         "/api/v1/notes",

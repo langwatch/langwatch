@@ -208,3 +208,17 @@ Feature: Shared organization service
     Given the process binds the signed-in person with a name, an email and an image
     When organization parses the person for a procedure
     Then it reads the name and the email and leaves the image out
+
+  @integration
+  Scenario: The per-file dataset limit an operator stored is read back in bytes
+    Given an organization whose largest dataset file is stored as 100 MB
+    When the organization's dataset limits are read
+    Then the per-file limit answers 104857600 bytes
+    And an organization with nothing stored, or an unknown one, answers no limit
+
+  @unit
+  Scenario: The memory organization store answers the per-file dataset limit the same way
+    Given a memory organization whose largest dataset file is 100 MB
+    When the organization's dataset limits are read
+    Then the per-file limit answers 104857600 bytes
+    And an organization with nothing stored, or an unknown one, answers no limit

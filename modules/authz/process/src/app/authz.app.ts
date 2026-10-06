@@ -227,6 +227,7 @@ export class AuthzModule implements AuthzApi {
       listing: repositories.listing,
       bindings: repositories.bindings,
       epoch,
+      lineageEpochs: repositories.lineageEpochs,
       isOnEngine: (organizationId) => cutover.isOn({ organizationId }),
       findEngineCutoverAt: (organizationId) => cutover.findFinalizedAt({ organizationId }),
       platformOperators,
@@ -254,6 +255,7 @@ export class AuthzModule implements AuthzApi {
       authzAuditTrailStore: repositories.auditTrail,
       sessionVersions,
       userStandings,
+      scopeLineage: permissions,
     });
     const migration = LegacyImportAuthzGrantMigration.create({
       store: repositories.migration,

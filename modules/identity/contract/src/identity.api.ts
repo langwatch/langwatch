@@ -60,7 +60,11 @@ import type {
   RequestJoinCommandData,
   WithdrawJoinCommandData,
 } from "./join-request-commands.ts";
-import type { JoinRequestAggregateState, JoinRequestFactInput } from "./join-request.ts";
+import type {
+  JoinRequestAggregateState,
+  JoinRequestFactInput,
+  JoinRequestOrigin,
+} from "./join-request.ts";
 import type { VerifiedEmailsResolution } from "./matchable-emails.ts";
 import type {
   ConfirmMfaCommandData,
@@ -642,11 +646,15 @@ export interface JoinRequestsApi {
   joinAutomaticallyIfAdmitted(args: {
     userId: string;
     verifiedEmail: string | null;
+    /** Where the arrival was made (ADR-171 v6); absent is `web`. */
+    origin?: JoinRequestOrigin;
   }): Promise<{ organization: JoinOffer | null }>;
   request(args: {
     userId: string;
     verifiedEmail: string | null;
     organizationId: string;
+    /** Where the ask was made (ADR-171 v6); absent is `web`. */
+    origin?: JoinRequestOrigin;
   }): Promise<{ joinRequestId: string; state: "PENDING" | "APPROVED" }>;
   withdraw(args: { joinRequestId: string; userId: string }): Promise<void>;
   approve(args: {

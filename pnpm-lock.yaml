@@ -6367,6 +6367,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
@@ -11375,6 +11378,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -13856,6 +13862,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
       zod:
         specifier: 'catalog:'
         version: 4.6.5

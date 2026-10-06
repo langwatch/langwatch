@@ -16,6 +16,12 @@ import {
   DatasetPlanLimitError,
   DatasetValidationError,
 } from "./errors";
+import {
+  DATASETS_PAGE_LIMIT,
+  PageSizer,
+  isPageTooLarge,
+  suggestedLimitOf,
+} from "./paged-records";
 import { tracer } from "./tracing";
 import {
   type Dataset,
@@ -164,9 +170,9 @@ export class DatasetService {
   }
 
   /**
+   * Gets a dataset with all its entries, read page by page so its size is not bound by one
+   * response. A server without the records endpoint is asked for it in one request instead.
    * @param slugOrId - The slug or ID of the dataset
-   * @param _options - Optional configuration
-   * @returns The dataset with metadata and entries
    */
   async getDataset<T extends Record<string, unknown> = Record<string, unknown>>(
     slugOrId: string,
@@ -174,21 +180,15 @@ export class DatasetService {
   ): Promise<Dataset<T>> {
     this.config.logger.debug(`Fetching dataset: ${slugOrId}`);
 
-    const response = await this.asResponseEnvelope(
-      this.config.langwatchApiClient.GET("/api/v1/dataset/{slugOrId}", {
-        params: {
-          path: {
-            slugOrId,
-          },
-        },
-      }) as Promise<{ data?: unknown; error?: unknown; response: { status: number } }>,
-    );
-
-    const data = this.unwrapResponse<GetDatasetApiResponse>(
-      response,
-      `fetch dataset "${slugOrId}"`,
-      slugOrId,
-    );
+    // No records page means either the dataset does not exist or the server has no records
+    // endpoint: the single request tells the two apart. A server that sends no dataset with
+    // its pages is asked for it through the datasets list, then through the single request.
+    const read = await this.readAllRecords(slugOrId);
+    const metadata =
+      read && (read.dataset ?? (await this.findDatasetMetadata(slugOrId, read.records)));
+    const data = metadata
+      ? { ...metadata, data: read.records }
+      : await this.getDatasetInline(slugOrId);
 
     const entries: DatasetEntry<T>[] = data.data.map((item) => ({
       id: item.id,
@@ -210,6 +210,141 @@ export class DatasetService {
       updatedAt: data.updatedAt,
       entries,
     };
+  }
+
+  /** The dataset and its entries in one response. */
+  private async getDatasetInline(slugOrId: string): Promise<GetDatasetApiResponse> {
+    const response = await this.asResponseEnvelope(
+      this.config.langwatchApiClient.GET("/api/v1/dataset/{slugOrId}", {
+        params: {
+          path: {
+            slugOrId,
+          },
+        },
+      }) as Promise<{ data?: unknown; error?: unknown; response: { status: number } }>,
+    );
+
+    return this.unwrapResponse<GetDatasetApiResponse>(
+      response,
+      `fetch dataset "${slugOrId}"`,
+      slugOrId,
+    );
+  }
+
+  /**
+   * Reads every record of a dataset in order, one page at a time, with the dataset a page
+   * names. Answers `null` when the records endpoint answers 404. A page refused as too large
+   * is asked for again with the size the refusal suggests, or half the rows, down to one.
+   */
+  private async readAllRecords(
+    slugOrId: string,
+  ): Promise<{ records: DatasetRecordResponse[]; dataset?: DatasetMetadata } | null> {
+    const records: DatasetRecordResponse[] = [];
+    let dataset: DatasetMetadata | undefined;
+    const sizer = new PageSizer();
+
+    for (;;) {
+      const limit = sizer.limit;
+      const page = await this.readRecordsPage(slugOrId, sizer.pageAfter(records.length), limit);
+      if (page === "missing") return null;
+      if ("refused" in page) {
+        sizer.shrinkAfterRefusal({ suggested: page.suggestedLimit, rowsRead: records.length });
+        continue;
+      }
+
+      const rows = page.data ?? [];
+      for (const row of rows) records.push(row);
+      dataset ??= page.dataset;
+
+      const total = page.pagination?.total;
+      const readAll = typeof total === "number" && records.length >= total;
+      if (rows.length < limit || readAll) return { records, dataset };
+
+      sizer.accept({
+        rowsRead: records.length,
+        pageRows: rows.length,
+        pageBytes: JSON.stringify(rows).length,
+      });
+    }
+  }
+
+  /**
+   * One page of records. Answers `"missing"` on a 404, and the refusal when the server
+   * refuses the page for its size and it holds more than one row.
+   */
+  private async readRecordsPage(
+    slugOrId: string,
+    page: number,
+    limit: number,
+  ): Promise<ListRecordsApiResponse | "missing" | { refused: true; suggestedLimit?: number }> {
+    const response = await this.asResponseEnvelope(
+      this.config.langwatchApiClient.GET("/api/v1/dataset/{slugOrId}/records", {
+        params: { path: { slugOrId }, query: { page, limit } },
+      }),
+    );
+    if (!response.error && response.data !== undefined) {
+      return response.data as ListRecordsApiResponse;
+    }
+
+    const status = response.response.status;
+    if (status === 404) return "missing";
+    if (limit > 1 && isPageTooLarge({ status, error: response.error })) {
+      return { refused: true, suggestedLimit: suggestedLimitOf(response.error) };
+    }
+    this.handleApiError(`fetch dataset "${slugOrId}"`, response.error, status, slugOrId);
+  }
+
+  /**
+   * The dataset's metadata from the datasets list, or `undefined` when it is not listed. The
+   * records name their dataset by id, which settles a slug that is another dataset's id.
+   */
+  private async findDatasetMetadata(
+    slugOrId: string,
+    records: DatasetRecordResponse[],
+  ): Promise<DatasetMetadata | undefined> {
+    const datasetId = records[0]?.datasetId;
+
+    for (let page = 1; ; page++) {
+      const response = await this.asResponseEnvelope(
+        this.config.langwatchApiClient.GET("/api/v1/dataset", {
+          params: { query: { page, limit: DATASETS_PAGE_LIMIT } },
+        }),
+      );
+      if (response.response.status === 404) return undefined;
+
+      const list = this.unwrapResponse<ListDatasetsApiResponse>(
+        response,
+        `fetch dataset "${slugOrId}"`,
+      );
+      const datasets = list.data ?? [];
+      const match = datasets.find((dataset) =>
+        datasetId ? dataset.id === datasetId : dataset.id === slugOrId || dataset.slug === slugOrId,
+      );
+      if (match) return match;
+
+      const totalPages = list.pagination?.totalPages;
+      if (datasets.length === 0 || typeof totalPages !== "number" || page >= totalPages) {
+        return undefined;
+      }
+    }
+  }
+
+  /** Whether a dataset exists, without reading its entries. */
+  private async datasetExists(slugOrId: string): Promise<boolean> {
+    try {
+      await this.listRecords(slugOrId, { page: 1, limit: 1 });
+      return true;
+    } catch (error) {
+      if (!(error instanceof DatasetNotFoundError)) throw error;
+    }
+
+    try {
+      await this.getDatasetInline(slugOrId);
+      return true;
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError) return false;
+      throw error;
+    }
   }
 
   /**
@@ -507,7 +642,7 @@ export class DatasetService {
    */
   private async _uploadReplace(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
     try {
-      await this.getDataset(slugOrId);
+      if (!(await this.datasetExists(slugOrId))) throw new DatasetNotFoundError(slugOrId);
       await this._deleteAllRecords(slugOrId);
       return await this.uploadFile(slugOrId, file);
     } catch (error) {
@@ -522,17 +657,7 @@ export class DatasetService {
    * Error strategy: if dataset exists, throw 409; if not found, create from file.
    */
   private async _uploadError(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
-    let datasetExists = false;
-    try {
-      await this.getDataset(slugOrId);
-      datasetExists = true;
-    } catch (error) {
-      if (!(error instanceof DatasetNotFoundError)) {
-        throw error;
-      }
-    }
-
-    if (datasetExists) {
+    if (await this.datasetExists(slugOrId)) {
       throw new DatasetApiError(`Dataset already exists: ${slugOrId}`, 409, "upload");
     }
 

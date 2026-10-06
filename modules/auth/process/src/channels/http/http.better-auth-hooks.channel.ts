@@ -297,8 +297,13 @@ export const afterUserCreate = async ({
   }
 };
 
-/** The organization connections that govern an address (D04), asked of the sign-in router. */
-export type FindGoverningConnections = (input: { email: string }) => Promise<readonly string[]>;
+/**
+ * The organization connections that govern an address (D04), asked of the sign-in router, each
+ * with the METHOD it is dialled by: a grandfathered connection is reached through the broker.
+ */
+export type FindGoverningConnections = (input: {
+  email: string;
+}) => Promise<readonly { connectionId: string; methodId: string }[]>;
 
 /**
  * A native social button pressed by somebody whose organization's connection governs their
@@ -315,8 +320,18 @@ async function bounceNativeProviderToConnection({
   findGoverningConnections: FindGoverningConnections;
 }): Promise<void> {
   if (!isNativeSocialProvider(account.providerId)) return;
-  const [connectionId] = await findGoverningConnections({ email });
-  if (connectionId === undefined) return;
+  const [governing] = await findGoverningConnections({ email });
+  if (governing === undefined) return;
+  const { connectionId, methodId } = governing;
+  // Only a connection that dials itself: the error route dials the id this refusal carries, and
+  // a brokered connection has no door under it. The legacy guard below refuses those instead.
+  if (methodId !== connectionId) {
+    logger.info(
+      { userId: account.userId, attemptedProvider: account.providerId, connectionId, methodId },
+      "Left a native social sign-in to the legacy guard: the connection is reached through the broker",
+    );
+    return;
+  }
 
   logger.info(
     { userId: account.userId, attemptedProvider: account.providerId, connectionId },

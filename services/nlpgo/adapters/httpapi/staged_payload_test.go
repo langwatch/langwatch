@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
 
 // given various candidate staged-payload URLs
@@ -231,5 +233,46 @@ func TestOpenStagedPayload_RefusesWrongKeyAndTampering(t *testing.T) {
 	}
 	if _, err := openStagedPayload(sealed, "not-a-key"); err == nil {
 		t.Error("a malformed key must be refused")
+	}
+}
+
+// @scenario "A staged body is accepted up to the same size as a direct request body"
+func TestMaxStagedPayloadBytesIsTheRequestBodyCap(t *testing.T) {
+	if maxStagedPayloadBytes != app.DefaultMaxRequestBodyBytes {
+		t.Fatalf("maxStagedPayloadBytes = %d, want the request body cap %d", maxStagedPayloadBytes, app.DefaultMaxRequestBodyBytes)
+	}
+	if maxStagedPayloadBytes != 280668856 {
+		t.Fatalf("maxStagedPayloadBytes = %d, want 280668856", maxStagedPayloadBytes)
+	}
+}
+
+// given a store that declares a body longer than the limit
+// when fetchStagedPayload reads the response
+// then it refuses on the declared length, before reading the body
+func TestFetchStagedPayload_DeclaredOverLimitIsRefusedUnread(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", "64")
+		_, _ = w.Write(bytes.Repeat([]byte("x"), 64))
+	}))
+	defer srv.Close()
+
+	if _, err := fetchStagedPayload(context.Background(), srv.Client(), srv.URL, 16); err == nil {
+		t.Fatal("expected a declared 64-byte body to be refused under a 16-byte limit")
+	}
+}
+
+// given a request body with and without a declared length
+// when readAllSized reads it
+// then the whole body comes back either way
+func TestReadAllSized(t *testing.T) {
+	want := bytes.Repeat([]byte("abc"), 5000)
+	for _, declared := range []int64{-1, 0, 10, int64(len(want)), int64(len(want)) * 2} {
+		got, err := readAllSized(bytes.NewReader(want), declared)
+		if err != nil {
+			t.Fatalf("declared=%d: %v", declared, err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("declared=%d: body differs (%d bytes, want %d)", declared, len(got), len(want))
+		}
 	}
 }

@@ -7,6 +7,7 @@
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
+import { datasetLimitsSchema } from "./dataset-limits.ts";
 import {
   datasetApiCopyInputSchema,
   datasetApiDatasetInputSchema,
@@ -20,12 +21,14 @@ import {
 } from "./dataset.schemas.ts";
 import {
   appendStoredObjectToDatasetInputSchema,
+  createDatasetAttachmentUploadInputSchema,
+  datasetAttachmentUploadSchema,
   createDatasetFromStoredObjectInputSchema,
   datasetImportAppendedSchema,
   datasetImportStartedSchema,
   datasetNameResultSchema,
-  datasetSchema,
-  datasetSummarySchema,
+  datasetSummaryWireSchema,
+  datasetWireSchema,
   retryNormalizeInputSchema,
   uploadProcessingSchema,
 } from "./dataset.ts";
@@ -37,7 +40,7 @@ export const datasetTrpc = defineTrpcContract("dataset")
   /** Creates a dataset, or replaces an existing one's columns and entries. */
   .mutation("upsert")
   .withInput(datasetApiUpsertBaseInputSchema.and(datasetApiUpsertTargetInputSchema))
-  .withOutput(datasetSchema)
+  .withOutput(datasetWireSchema)
 
   /** The slug a proposed name would get, and whether it is available. */
   .query("validateDatasetName")
@@ -47,12 +50,12 @@ export const datasetTrpc = defineTrpcContract("dataset")
   /** Every dataset in the project, for the list and picker surfaces. */
   .query("getAll")
   .withInput(datasetApiProjectInputSchema)
-  .withOutput(z.array(datasetSummarySchema))
+  .withOutput(z.array(datasetSummaryWireSchema))
 
   /** One dataset by id or slug; an archived or missing one reads as null. */
   .query("getById")
   .withInput(datasetApiDatasetInputSchema)
-  .withOutput(datasetSchema.nullable())
+  .withOutput(datasetWireSchema.nullable())
 
   /** Archives a dataset, or restores one the caller just archived. */
   .mutation("deleteById")
@@ -62,7 +65,7 @@ export const datasetTrpc = defineTrpcContract("dataset")
   /** The trace and thread mapping a dataset is filled from. */
   .mutation("updateMapping")
   .withInput(datasetApiUpdateMappingInputSchema)
-  .withOutput(datasetSchema)
+  .withOutput(datasetWireSchema)
 
   /** The next free name for a proposed one. */
   .query("findNextName")
@@ -72,7 +75,7 @@ export const datasetTrpc = defineTrpcContract("dataset")
   /** The same dataset in another project, records and all. */
   .mutation("copy")
   .withInput(datasetApiCopyInputSchema)
-  .withOutput(datasetSchema)
+  .withOutput(datasetWireSchema)
 
   /** A new dataset from a confirmed `dataset_import` file, prepared in the background (ADR-158). */
   .mutation("createFromStoredObject")
@@ -83,6 +86,16 @@ export const datasetTrpc = defineTrpcContract("dataset")
   .mutation("appendStoredObject")
   .withInput(appendStoredObjectToDatasetInputSchema)
   .withOutput(datasetImportAppendedSchema)
+
+  /** The size limits the project's organization answers, for the browser's own checks. */
+  .query("getLimits")
+  .withInput(datasetApiProjectInputSchema)
+  .withOutput(datasetLimitsSchema)
+
+  /** The signed upload a file for an image or file cell is sent to. */
+  .mutation("createAttachmentUpload")
+  .withInput(createDatasetAttachmentUploadInputSchema)
+  .withOutput(datasetAttachmentUploadSchema)
 
   /** A dataset whose preparation failed or stalled, prepared again from the same stored file. */
   .mutation("retryNormalize")

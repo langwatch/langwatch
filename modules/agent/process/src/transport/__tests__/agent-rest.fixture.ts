@@ -6,6 +6,7 @@ import {
   defineRestMiddleware,
   projectRestFacts,
   canonicalErrorResponse,
+  recordProjectCredential,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
@@ -20,9 +21,10 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
-import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
+import { createAgentConnectRest } from "../agent-connect.rest.ts";
 import { agentLegacyRest } from "../agent-legacy.rest.ts";
 import { agentCallerKey, createAgentRest } from "../agent.rest.ts";
+import { CONNECT_TEST_CREDENTIAL, connectCredentialsFact } from "./agent-connect-door.fixture.ts";
 
 // Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
 // fact - a mount binds a declared fact by name, not by object identity.
@@ -80,10 +82,11 @@ export async function buildAgentApps(
   // declared permission is granted unless `denyPermission` names it.
   const runtime = createRestRuntime({
     identity: {
-      authenticate: ({ permission }): RestCaller => {
+      authenticate: ({ permission, request }): RestCaller => {
         if (options.denyPermission === permission) {
           throw new ForbiddenTestError();
         }
+        recordProjectCredential(request, CONNECT_TEST_CREDENTIAL);
         return {
           actor: { type: "user", id: options.viewerUserId ?? "user_test" },
           scope: { tier: "project", id: PROJECT_ID },
@@ -95,11 +98,6 @@ export async function buildAgentApps(
     projectSlug: PROJECT_SLUG,
     viewerUserId: options.viewerUserId ?? null,
     actorId: "user_test",
-  }));
-  const connectFacts = bindRestMiddleware(agentConnectHeaders, (context) => ({
-    authorization: context.req.header("authorization"),
-    projectId: context.req.header("x-project-id"),
-    instanceToken: context.req.header("x-agent-instance-token"),
   }));
 
   const hono = new Hono();
@@ -120,7 +118,7 @@ export async function buildAgentApps(
     runtime.mount(createAgentConnectRest(options.relayMaxPayloadMb).router(), {
       app: agents,
       onError,
-      facts: [connectFacts],
+      facts: [connectCredentialsFact],
     }),
   );
   hono.route(

@@ -12,29 +12,21 @@ import { memorySessionState } from "@langwatch/process-stores";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AgentService } from "../services/agent.service.ts";
-import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
 import type { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
-import { AgentSessionService } from "../services/connected-agent-session.service.ts";
 import { createConnectedAgentFixture, createLongPollFixture } from "./connected-agent.fixture.ts";
 
 const projectId = "project_poll_lifecycle";
 const instanceId = "inst_poll_lifecycle";
 
-const credentials = { authorization: "Bearer sk-lw-test", projectId };
 const resolved = {
   project: { id: projectId, slug: "poll-lifecycle" },
   principalId: "key:test",
   userId: null,
 };
+const credentials = { caller: resolved };
 
 const fakeAgents = createConnectedAgentFixture();
-const fakeCredentials: ConnectedAgentCredentials = {
-  resolve: async () => {
-    throw new Error("Credential lookup is not configured for this test");
-  },
-};
-
 function registeringAgentService(): AgentService {
   return createConnectedAgentFixture();
 }
@@ -87,7 +79,6 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
   describe("when an instance received a call by poll", () => {
     /** @scenario "A result posted over HTTP answers the dispatcher" */
     it("answers the dispatcher's outcome once it posts an ack and a result", async () => {
-      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
         store: memorySessionState(),
@@ -95,7 +86,6 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
       const transport = createLongPollFixture({
         runtime,
         agents: registeringAgentService(),
-        credentials: fakeCredentials,
         publicBaseUrl: "https://example.test",
         replicaCount: 1,
         pollWaitMs: 2_000,
@@ -124,7 +114,6 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
   describe("when the relay request is aborted for an instance that acknowledged by poll", () => {
     /** @scenario "A cancel reaches a polling instance" */
     it("answers the next poll with a cancel frame for that call", async () => {
-      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
         store: memorySessionState(),
@@ -132,7 +121,6 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
       const transport = createLongPollFixture({
         runtime,
         agents: registeringAgentService(),
-        credentials: fakeCredentials,
         publicBaseUrl: "https://example.test",
         replicaCount: 1,
         pollWaitMs: 2_000,
@@ -171,7 +159,6 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
   describe("when an instance registered over HTTP posts a deregister frame", () => {
     /** @scenario "A deregister posted over HTTP retires the instance at once" */
     it("is no longer live and the token answers agent_session_unknown", async () => {
-      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
         store: memorySessionState(),
@@ -179,7 +166,6 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
       const transport = createLongPollFixture({
         runtime,
         agents: registeringAgentService(),
-        credentials: fakeCredentials,
         publicBaseUrl: "https://example.test",
         replicaCount: 1,
         pollWaitMs: 200,
@@ -204,7 +190,6 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
   describe("when a poll names an instance token the platform does not know", () => {
     /** @scenario "A poll with an unknown instance token asks the process to register again" */
     it("answers agent_session_unknown with status 410", async () => {
-      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
       const { transport } = build();
 
       const error = await transport
@@ -222,7 +207,6 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
     /** @scenario "A process that stops polling goes offline after the presence TTL" */
     it("fails a call dispatched to its agent with agent_offline", async () => {
       let now = Date.now();
-      vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
       const store = memorySessionState({ now: () => now });
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
@@ -233,7 +217,6 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
       const transport = createLongPollFixture({
         runtime,
         agents: registeringAgentService(),
-        credentials: fakeCredentials,
         publicBaseUrl: "https://example.test",
         replicaCount: 1,
         pollWaitMs: 20,
@@ -258,7 +241,6 @@ function build() {
   const transport = createLongPollFixture({
     runtime,
     agents: fakeAgents,
-    credentials: fakeCredentials,
     publicBaseUrl: "https://example.test",
     replicaCount: 1,
   });

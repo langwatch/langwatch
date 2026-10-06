@@ -4,6 +4,7 @@
  */
 
 import {
+  type AgentConnectCaller,
   AgentRegisterRefusedError,
   type ConnectedAgentScope,
   DEFAULT_CALL_TIMEOUT_MS,
@@ -28,7 +29,6 @@ import {
   normalizeParameterSchema,
 } from "../rules/connected-agent-parameter-spec.rules.ts";
 import type { AgentService } from "./agent.service.ts";
-import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
 import type { ConnectedAgentRuntime, InstanceMeta } from "./connected-agent-runtime.service.ts";
 import type { SessionInfo } from "./connected-agent-session.service.ts";
 
@@ -65,7 +65,7 @@ export class ConnectedAgentRegistrationService {
     heartbeatIntervalMs,
   }: {
     frame: RegisterFrame;
-    resolved: ResolvedConnectCredential;
+    resolved: AgentConnectCaller;
     heartbeatIntervalMs: number;
   }): Promise<{ session: SessionInfo; registered: RegisteredFrame }> {
     const projectId = resolved.project.id;

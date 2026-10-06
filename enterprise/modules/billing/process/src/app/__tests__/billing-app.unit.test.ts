@@ -169,6 +169,34 @@ describe("the installed billing application", () => {
       expect(asked).toEqual([ACME]);
     });
 
+    /** @scenario "A deployment that bills composes the real subscription services" */
+    it("answers renewals, seat changes and a signed delivery from the composed services", async () => {
+      const { app } = billingApp({
+        isSaas: true,
+        stripeSecretKey: "sk_test_unused",
+        webhookSecret: "whsec_fixture",
+        commitUsdCents: 100_00,
+      });
+      const payload = JSON.stringify({
+        id: "evt_2",
+        object: "event",
+        type: "account.application.deauthorized",
+        data: { object: { id: "ca_1", object: "application" } },
+      });
+      const signature = Stripe.webhooks.generateTestHeaderString({
+        payload,
+        secret: "whsec_fixture",
+      });
+
+      await expect(app.renewConnectedTerm(renewal(250_00), STAFF)).rejects.toMatchObject({
+        code: "connected_billing_commit_mismatch",
+      });
+      await expect(app.invoicePendingSeatChanges()).resolves.toBeUndefined();
+      await expect(
+        app.receiveStripeWebhook({ rawBody: new TextEncoder().encode(payload), signature }),
+      ).resolves.toEqual({ received: true });
+    });
+
     /** @scenario "The Billing section shows a seat change until billing decides it" */
     it("shows a recorded seat change as awaiting, then as not onboarded once a pass decided it", async () => {
       const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });

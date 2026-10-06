@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { AuthzPermission } from "@langwatch/authorization";
-import {
-  governanceCliRefusalAnswers,
-  type GovernanceCliRefusalAnswer,
-  type GovernanceCliRequest,
+import type {
+  GovernanceCliRefusalAnswer,
+  GovernanceCliRequest,
 } from "@langwatch/enterprise-governance-contract";
 
 import { refuse } from "../rules/governance-cli-answer.rules.ts";
@@ -11,19 +9,14 @@ import type {
   GovernanceCliAccessApi,
   GovernanceCliAdmission,
   GovernanceCliCaller,
-  GovernanceCliEnterpriseFeature,
 } from "./governance-cli-access.service.ts";
 
-type GovernanceCliGateRefusal = Extract<GovernanceCliRefusalAnswer, { status: 402 | 403 }>;
+type GovernanceCliGateRefusal = Extract<GovernanceCliRefusalAnswer, { status: 403 }>;
 
 type GovernanceCliAdmitInput = GovernanceCliRequest &
-  Readonly<{
-    feature?: GovernanceCliEnterpriseFeature;
-    permission?: AuthzPermission;
-    requireActiveMembership?: boolean;
-  }>;
+  Readonly<{ requireActiveMembership?: boolean }>;
 
-/** The door every CLI route walks first: admit the caller or answer the refusal. */
+/** The seat check every CLI route walks after the door: admit the caller or answer the refusal. */
 export class GovernanceCliGateService {
   #access: GovernanceCliAccessApi;
 
@@ -53,25 +46,6 @@ function admissionResult(
         refusal: refuse(
           "forbidden",
           "Your access to this organization has ended. Run `langwatch login` to sign in again.",
-          403,
-        ),
-      };
-    case "payment-required":
-      return {
-        refusal: {
-          status: 402,
-          body: governanceCliRefusalAnswers[402].parse({
-            error: "payment_required",
-            error_description: result.errorMessage,
-            upgrade_url: result.upgradeUrl,
-          }),
-        },
-      };
-    case "forbidden":
-      return {
-        refusal: refuse(
-          "forbidden",
-          `Missing required permission '${result.permission}' on this organization`,
           403,
         ),
       };

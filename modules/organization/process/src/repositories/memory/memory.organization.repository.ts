@@ -31,6 +31,8 @@ import type {
 } from "./memory.organization.database.ts";
 
 /** In-memory `OrganizationRepository`, for tests and a memory-backed boot. */
+const BYTES_PER_MEBIBYTE = 1024 * 1024;
+
 export class MemoryOrganizationRepository extends OrganizationRepository {
   private constructor(private readonly memory: MemoryOrganizationDatabase) {
     super();
@@ -132,6 +134,13 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       pricingModel: organization ? (organization.pricingModel ?? "SEAT_EVENT") : null,
       currency: organization ? (organization.currency ?? "USD") : "EUR",
     };
+  }
+
+  async getDatasetLimits({ organizationId }: { organizationId: string }): Promise<{
+    attachmentMaxBytes: number | null;
+  }> {
+    const megabytes = this.memory.organizations.get(organizationId)?.datasetAttachmentMaxMb ?? null;
+    return { attachmentMaxBytes: megabytes === null ? null : megabytes * BYTES_PER_MEBIBYTE };
   }
 
   async isInstantEvalsOptedIn({ organizationId }: { organizationId: string }): Promise<boolean> {

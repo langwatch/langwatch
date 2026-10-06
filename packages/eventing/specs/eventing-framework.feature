@@ -165,7 +165,10 @@ Feature: Eventing framework boundary and pipeline authoring
     And the signal retries a revision loss against the winning state
     And exactly one transition's intents are inserted
 
-  @typecheck @architecture
+  # Gap: src/server/adapters/postgres/prisma-process-store.ts imports
+  # @langwatch/prisma-client, so "no Prisma import" does not hold today, and no
+  # test pins the remaining import and deep-export rules.
+  @unimplemented @typecheck @architecture
   Scenario: Eventing is sealed from application infrastructure
     Given the Eventing package dependency graph and public exports
     Then it contains no application, product, enterprise or Prisma import

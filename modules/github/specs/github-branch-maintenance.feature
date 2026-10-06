@@ -81,10 +81,10 @@ Feature: GitHub branch linkage maintenance
 
   @unit
   Scenario: The worker composes the branch sweep from the feature package
-    Given a worker graph composed with the process database
-    When the GitHub feature installs
-    Then it registers the branch maintenance pipeline
-    And the pipeline's prune reaps the outbox rows of this graph's own process store
+    Given the maintenance pipeline built from the sweep and the process store
+    When its prune intent runs
+    Then it prunes stale branch bookkeeping
+    And it reaps the outbox rows of the branch recheck process from that process store
 
   @unit
   Scenario: A worker without GitHub App credentials names the missing capability

@@ -53,6 +53,7 @@ function invitationStub(create: OrganizationInvitations["create"]): Organization
   return {
     create,
     revoke: unreachable("revoke"),
+    findPendingForAddresses: unreachable("findPendingForAddresses"),
     assertSendAllowed: unreachable("assertSendAllowed"),
     resend: unreachable("resend"),
     extend: unreachable("extend"),
@@ -201,6 +202,7 @@ describe("OrganizationInvitationDoorService.create", () => {
       const invitations = invitationStub(create);
       const door = OrganizationInvitationDoorService.create({
         invitations,
+        directory: { findProvenAddresses: async () => [] },
         joinRequests: null,
         signals: { trackServerEvent: () => {} } as never,
         lifecycle: { membersInvited: () => {}, inviteAccepted: () => {} },

@@ -62,6 +62,28 @@ describe("given a process that installed the audit log", () => {
       }
     });
 
+    /** @scenario "An installation with no Enterprise module still records management writes" */
+    it("records and reads back with the audit log module as the only installed module", async () => {
+      const runtime = await process("api").boot();
+
+      try {
+        const app = runtime.service(AuditLogApi);
+
+        await expect(app.record(command)).resolves.toMatchObject({ id: expect.any(String) });
+        await expect(
+          app.listEntityHistory({
+            projectId: "project-1",
+            actionPrefix: "agents.",
+            entityId: "agent-1",
+            argumentNames: ["id"],
+            limit: 10,
+          }),
+        ).resolves.toHaveLength(1);
+      } finally {
+        await runtime.stop();
+      }
+    });
+
     /** @scenario "Entity history stays inside the requested project and action family" */
     it("answers nothing for another project or another action family", async () => {
       const runtime = await process("api").boot();

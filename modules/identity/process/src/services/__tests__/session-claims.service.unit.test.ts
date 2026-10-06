@@ -147,4 +147,131 @@ describe("SessionClaimsService.claimsForMint", () => {
       expect(claims.amr).toEqual(["oidc", "mfa", "otp"]);
     });
   });
+
+  /** @scenario An enterprise callback records the exact accepted account */
+  it.each([
+    ["auth0", "auth0|sam"],
+    ["okta", "okta-user-sam"],
+  ])("records the exact %s identifier and selects no other", async (provider, subject) => {
+    const own = head({
+      identifierId: `idf_${provider}`,
+      providerId: provider,
+      providerAccountId: subject,
+    });
+    const claims = await serviceOver([
+      own,
+      head({
+        identifierId: "idf_other_subject",
+        providerId: provider,
+        providerAccountId: "someone-else",
+        attachedAtMs: 9_000,
+      }),
+      head({
+        identifierId: "idf_other_provider",
+        providerId: "elsewhere",
+        providerAccountId: subject,
+        attachedAtMs: 9_000,
+      }),
+    ]).claimsForMint({
+      userId: USER,
+      path: `/oauth2/callback/${provider}`,
+      callback: { ...evidence, providerAccountId: subject },
+    });
+
+    expect(claims.identifierId).toBe(`idf_${provider}`);
+  });
+
+  /** @scenario A stored MFA assertion cannot speak for a later callback */
+  it("attributes a callback with no ID token to its account and records no methods", async () => {
+    const auth0 = head({
+      identifierId: "idf_auth0",
+      providerId: "auth0",
+      providerAccountId: "auth0|sam",
+    });
+    const claims = await serviceOver([auth0]).claimsForMint({
+      userId: USER,
+      path: "/oauth2/callback/auth0",
+      callback: { providerAccountId: "auth0|sam", assertedFactors: [], verifiedTokenClaims: false },
+    });
+
+    expect(claims).toEqual({ identifierId: "idf_auth0", amr: [] });
+  });
+
+  /** @scenario Simultaneous provider callbacks cannot exchange evidence */
+  it("keeps each overlapping mint to its own provider subject and factors", async () => {
+    const service = serviceOver([
+      head({ identifierId: "idf_auth0", providerId: "auth0", providerAccountId: "auth0|sam" }),
+      head({ identifierId: "idf_okta", providerId: "okta", providerAccountId: "okta-other" }),
+    ]);
+
+    const [auth0, okta] = await Promise.all([
+      service.claimsForMint({
+        userId: USER,
+        path: "/oauth2/callback/auth0",
+        callback: {
+          providerAccountId: "auth0|sam",
+          assertedFactors: ["otp"],
+          verifiedTokenClaims: true,
+        },
+      }),
+      service.claimsForMint({
+        userId: USER,
+        path: "/oauth2/callback/okta",
+        callback: {
+          providerAccountId: "okta-other",
+          assertedFactors: [],
+          verifiedTokenClaims: false,
+        },
+      }),
+    ]);
+
+    expect(auth0).toEqual({ identifierId: "idf_auth0", amr: ["oidc", "otp"] });
+    expect(okta).toEqual({ identifierId: "idf_okta", amr: [] });
+  });
+
+  /** @scenario Unbound token claims earn no authentication credit */
+  it.each([
+    {
+      unsafe: "the callback provider does not guarantee token verification",
+      path: "/oauth2/callback/auth0",
+      accountId: "ada-subject",
+      identifierId: "idf_auth0",
+    },
+    {
+      unsafe: "the claims are requested for a different callback provider",
+      path: "/oauth2/callback/okta",
+      accountId: "ada-subject",
+      identifierId: null,
+    },
+    {
+      unsafe: "the token subject differs from the accepted provider account",
+      path: "/oauth2/callback/auth0",
+      accountId: "another-subject",
+      identifierId: null,
+    },
+  ])("credits no methods when $unsafe", async ({ path, accountId, identifierId }) => {
+    const claims = await serviceOver([
+      head({ identifierId: "idf_auth0", providerId: "auth0" }),
+    ]).claimsForMint({
+      userId: USER,
+      path,
+      callback: {
+        providerAccountId: accountId,
+        assertedFactors: ["otp"],
+        verifiedTokenClaims: false,
+      },
+    });
+
+    expect(claims).toEqual({ identifierId, amr: [] });
+  });
+
+  /** @scenario Unbound token claims earn no authentication credit */
+  it("credits nothing for a callback path that carries no evidence from this request", async () => {
+    const claims = await serviceOver([head({ providerId: "auth0" })]).claimsForMint({
+      userId: USER,
+      path: "/oauth2/callback/auth0",
+    });
+
+    expect(claims).toEqual({ identifierId: null, amr: [] });
+  });
 });

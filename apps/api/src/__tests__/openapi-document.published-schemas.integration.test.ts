@@ -106,6 +106,14 @@ describe("the generated OpenAPI document", () => {
       expect(publishes({ family: "/api/scenarios", property: "testSuiteId" })).toBe(true);
       expect(requiredNames("/api/scenarios").has("testSuiteId")).toBe(false);
     });
+
+    /** @scenario "The scenario answers read the model and turn fields as optional" */
+    it("lists the model and turn fields as required in none of them", () => {
+      for (const property of ["simulatorModel", "judgeModel", "maxTurns", "minTurns"]) {
+        expect(publishes({ family: "/api/scenarios", property }), property).toBe(true);
+        expect(requiredNames("/api/scenarios").has(property), property).toBe(false);
+      }
+    });
   });
 
   describe("given the suite answers", () => {

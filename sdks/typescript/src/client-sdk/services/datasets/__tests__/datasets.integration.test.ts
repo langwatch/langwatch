@@ -177,10 +177,16 @@ describe("Feature: Dataset TypeScript SDK", () => {
         const records = Array.from({ length: 5 }, (_, i) => recordFixture({ id: `rec-${i}` }));
 
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`, () => {
             return HttpResponse.json({
-              ...datasetMetadata(),
               data: records,
+              pagination: { page: 1, limit: 16, total: 5, totalPages: 1 },
+            });
+          }),
+          http.get(`${TEST_ENDPOINT}/api/v1/dataset`, () => {
+            return HttpResponse.json({
+              data: [{ ...datasetMetadata(), recordCount: 5 }],
+              pagination: { page: 1, limit: 1000, total: 1, totalPages: 1 },
             });
           }),
         );
@@ -201,6 +207,12 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when the API responds with 404", () => {
       beforeEach(() => {
         server.use(
+          http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`, () => {
+            return HttpResponse.json(
+              { error: "Not Found", message: "Dataset not found" },
+              { status: 404 },
+            );
+          }),
           http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, () => {
             return HttpResponse.json(
               { error: "Not Found", message: "Dataset not found" },
@@ -654,13 +666,6 @@ describe("Feature: Dataset TypeScript SDK", () => {
           deleteCallCount = 0;
 
           server.use(
-            // getDataset returns the dataset
-            http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, () => {
-              return HttpResponse.json({
-                ...datasetMetadata(),
-                data: [],
-              });
-            }),
             // First listRecords call returns records; second returns empty
             http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`, () => {
               if (deleteCallCount === 0) {
@@ -708,10 +713,10 @@ describe("Feature: Dataset TypeScript SDK", () => {
       describe("when the dataset exists", () => {
         beforeEach(() => {
           server.use(
-            http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, () => {
+            http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`, () => {
               return HttpResponse.json({
-                ...datasetMetadata(),
                 data: [],
+                pagination: { page: 1, limit: 1, total: 0, totalPages: 0 },
               });
             }),
           );
@@ -732,6 +737,12 @@ describe("Feature: Dataset TypeScript SDK", () => {
       describe("when the dataset does not exist", () => {
         beforeEach(() => {
           server.use(
+            http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`, () => {
+              return HttpResponse.json(
+                { error: "Not Found", message: "Dataset not found" },
+                { status: 404 },
+              );
+            }),
             http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, () => {
               return HttpResponse.json(
                 { error: "Not Found", message: "Dataset not found" },

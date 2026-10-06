@@ -90,6 +90,7 @@ describe("ApiKeyService.revokeCliLoginKeyForLogout", () => {
   describe("given jane's laptop and desktop each hold a login key and a claude_code key", () => {
     /** @scenario Logging out retires the session's ingest keys and leaves another session's live */
     /** @scenario Logout retires the ingest keys this session minted */
+    /** @scenario Logout revokes the copilot_app ingest key */
     it("revokes the laptop's login key as user, its ingest key as session, and leaves the desktop's live", async () => {
       const { service, row } = janesTwoMachines();
 

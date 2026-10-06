@@ -108,6 +108,7 @@ function requestJoin(): { command: JoinRequestCommand; facts: JoinRequestFactInp
     matchedVia: "verified-identifier-domain" as const,
     expiresAtMs: T0 + 1_000,
     notifyAdmins: true,
+    origin: "web" as const,
   };
   return {
     command: { type: REQUEST_JOIN_COMMAND_TYPE, data },
@@ -122,6 +123,7 @@ function requestJoin(): { command: JoinRequestCommand; facts: JoinRequestFactInp
           matchedVia: "verified-identifier-domain",
           expiresAtMs: T0 + 1_000,
           notifyAdmins: true,
+          origin: "web",
           actor: ACTOR,
         },
       },

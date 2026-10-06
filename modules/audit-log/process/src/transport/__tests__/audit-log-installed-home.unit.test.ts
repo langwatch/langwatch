@@ -205,6 +205,7 @@ describe("given the audit log installed over memory repositories", () => {
 
   describe("when somebody reads the strip after touching entities", () => {
     /** @scenario "the home strip lists what the caller touched, newest first and each once" */
+    /** @scenario "Hydrates items with entity name and updatedAt" */
     /** @scenario "Extracts prompt IDs from prompts.update actions" */
     /** @scenario "Extracts workflow IDs from workflow.update actions" */
     /** @scenario "Extracts dataset IDs from dataset.update actions" */

@@ -123,13 +123,12 @@ Feature: Recent Items Backend
   Scenario: Hydrates items with entity name and updatedAt
     Given I have an audit log entry for action "workflow.update" with args:
       | workflowId | workflow-789 |
-    And a workflow exists with id "workflow-789" and name "Test Workflow" and icon "🧪" and updatedAt "2024-01-15T10:30:00Z"
+    And a workflow exists with id "workflow-789" and name "Test Workflow"
     When I request recent items with limit 12
     Then I should receive an item with:
-      | type      | workflow             |
-      | name      | Test Workflow        |
-      | icon      | 🧪                   |
-      | updatedAt | 2024-01-15T10:30:00Z |
+      | type | workflow                     |
+      | name | Test Workflow                |
+      | href | /<org>/studio/workflow-789   |
 
   # Deleted entities
   Scenario: Excludes soft-deleted prompts from results

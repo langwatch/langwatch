@@ -80,3 +80,10 @@ Feature: Declared response kinds
     When the door, the plan or the permission refuses the request
     Then the refusal writes the answer in that route's wire
     And a refusal it declines answers on the family's boundary
+
+  @unit
+  Scenario: A door writes the refusals raised behind it in its owner's wire
+    Given a door built with a refusal of its own (Alex, 2026-10-06, Q31)
+    When the door, the plan or the permission refuses a route behind it that keeps no refusal
+    Then the door's refusal writes the answer in its owner's wire
+    And a route that keeps a refusal of its own answers in that one instead

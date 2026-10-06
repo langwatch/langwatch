@@ -62,6 +62,12 @@ import type {
   TargetExecutionContext,
   TargetContext,
 } from "./types.ts";
+import {
+  describeRefusedEntry,
+  endsTheRun,
+  halveLogResultsBody,
+  splitLogResultsBody,
+} from "./log-results-batching.ts";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;
@@ -1107,27 +1113,61 @@ export class Experiment {
       },
     };
 
-    // Fire and forget (with error logging)
-    this.pendingFlush = langwatchFetch(`${this.endpoint}/api/v1/evaluations/batch/log_results`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...buildRequestHeaders({ apiKey: this.apiKey }),
-      },
-      body: JSON.stringify(body),
-    })
-      .then((response) => {
-        if (!response.ok) {
-          this.logger.error(`Failed to send batch: ${response.status}`);
-        }
-      })
-      .catch((error) => {
-        this.logger.error("Failed to send batch:", error);
-      });
+    // Fire and forget (with error logging). Requests go out one after another, so the parts
+    // of a batch arrive in order and the request that ends the run arrives last.
+    const parts = splitLogResultsBody(body);
+    this.pendingFlush = (this.pendingFlush ?? Promise.resolve()).then(async () => {
+      for (const part of parts) {
+        await this.postLogResults(part);
+      }
+    });
 
     // Clear batch
     this.batch = { dataset: [], evaluations: [], targets: [] };
     this.lastSentMs = Date.now();
+  }
+
+  /**
+   * Posts one log_results request. A request the server refuses as too large is cut in two
+   * and sent again. When a single entry is refused, the error names it and its size.
+   */
+  private async postLogResults(body: LogResultsRequest): Promise<void> {
+    try {
+      const response = await langwatchFetch(
+        `${this.endpoint}/api/v1/evaluations/batch/log_results`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...buildRequestHeaders({ apiKey: this.apiKey }),
+          },
+          body: JSON.stringify(body),
+        },
+      );
+      if (response.ok) return;
+
+      if (response.status !== 413) {
+        this.logger.error(`Failed to send batch: ${response.status}`);
+        return;
+      }
+
+      const halves = halveLogResultsBody(body);
+      if (halves) {
+        for (const half of halves) {
+          await this.postLogResults(half);
+        }
+        return;
+      }
+
+      this.logger.error(
+        `Failed to send batch: ${describeRefusedEntry(body)}, and LangWatch refused it as too large for one request (HTTP 413). It was not logged. Make the row's entry, output or evaluation inputs smaller, for example by sending images as URLs.`,
+      );
+      if (endsTheRun(body) && body.dataset.length + body.evaluations.length > 0) {
+        await this.postLogResults({ ...body, dataset: [], evaluations: [] });
+      }
+    } catch (error) {
+      this.logger.error("Failed to send batch:", error);
+    }
   }
 
   /**

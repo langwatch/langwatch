@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
 import { MemoryDatasetRecordRepository } from "../../repositories/memory/memory.dataset-record.repository.ts";
@@ -27,6 +28,7 @@ function serviceOver(repositoryOverrides: Partial<MemoryDatasetRepository> = {})
     records: MemoryDatasetRecordRepository.create({ database }),
     requestBounds: createDatasetTestRequestBounds(),
     attachments: createDatasetTestAttachments(),
+    inlineAttachments: createDatasetTestInlineAttachments(),
   });
 }
 

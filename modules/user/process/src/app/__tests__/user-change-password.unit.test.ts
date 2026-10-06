@@ -29,6 +29,7 @@ describe("changing an existing password", () => {
       app = createUserTestApp({ dependencies: { auth } });
     });
 
+    /** @scenario "Credential password hashes never leave the user feature" */
     it("replaces the password and ends every other session", async () => {
       const created = await app.createCredentialUser({
         name: "Sam",
@@ -36,7 +37,7 @@ describe("changing an existing password", () => {
         passwordHash: "hashed:first",
       });
 
-      await app.changeOwnPassword({
+      const outcome = await app.changeOwnPassword({
         userId: created.id,
         caller: owner(created.id),
         currentPassword: "first",
@@ -48,6 +49,7 @@ describe("changing an existing password", () => {
         userId: created.id,
         keepSessionId: "sess-1",
       });
+      expect(JSON.stringify(outcome ?? null)).not.toContain("hashed:");
     });
   });
 

@@ -48,10 +48,9 @@ export class AuthzDecisionService {
     grants: CollectedGrants;
   }> {
     const organizationId = scopeOrganizationId(scope);
-    const [grants, resourceGrants, ownerGrants] = await Promise.all([
-      this.snapshots.collectCached({ principal, organizationId }),
+    const [{ grants, ownerGrants }, resourceGrants] = await Promise.all([
+      this.snapshots.collectWithOwnerCeiling({ principal, organizationId }),
       this.snapshots.findResourceGrantsFor(scope),
-      this.snapshots.findOwnerGrantsFor({ principal, organizationId }),
     ]);
     const decision = this.engine.decideWithCeiling({
       keyGrants: grants,
@@ -79,10 +78,9 @@ export class AuthzDecisionService {
     scope: AuthzScopeRef;
   }): Promise<AuthzPermission[]> {
     const organizationId = scopeOrganizationId(scope);
-    const [grants, resourceGrants, ownerGrants] = await Promise.all([
-      this.snapshots.collectCached({ principal, organizationId }),
+    const [{ grants, ownerGrants }, resourceGrants] = await Promise.all([
+      this.snapshots.collectWithOwnerCeiling({ principal, organizationId }),
       this.snapshots.findResourceGrantsFor(scope),
-      this.snapshots.findOwnerGrantsFor({ principal, organizationId }),
     ]);
     const demo = this.snapshots.findDemoProjectId();
 

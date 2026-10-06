@@ -577,10 +577,14 @@ export class OrganizationMembershipService {
     organizationId,
     userId,
     admittedBy,
+    seat,
+    origin,
   }: {
     organizationId: string;
     userId: string;
     admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
+    seat?: "MEMBER" | "DEVELOPER";
+    origin?: "web" | "cli";
   }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
     const grantId = newAuthzGrantId();
     const admission = await this.repo.createMembership({
@@ -588,6 +592,8 @@ export class OrganizationMembershipService {
       userId,
       pendingAdmissionId: grantId,
       via: admissionVia(admittedBy),
+      ...(seat === undefined ? {} : { seat }),
+      ...(origin === undefined ? {} : { origin }),
     });
     if (admission.outcome !== "created" || !admittedBy || admission.seat === "DEVELOPER") {
       return admission;

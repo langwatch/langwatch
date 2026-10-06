@@ -113,6 +113,10 @@ export abstract class OrganizationRepository {
   abstract getPricing(input: {
     organizationId: string;
   }): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }>;
+  /** Null when no per-file dataset limit is set, and for an unknown organization. */
+  abstract getDatasetLimits(input: {
+    organizationId: string;
+  }): Promise<{ attachmentMaxBytes: number | null }>;
   /** An unknown organization reads as not opted in. */
   abstract isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean>;
   /** First write wins: the moment and member that gave the agreement are kept. */

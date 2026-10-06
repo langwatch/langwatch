@@ -58,10 +58,10 @@ Feature: Agents package boundary
 
   @integration @rest
   Scenario: Legacy REST is documented as deprecated
-    Given the Agents REST compatibility interface is mounted
-    When the OpenAPI document is generated
-    Then every legacy Agents operation is marked deprecated
-    And its documentation directs new clients to the Agents RPC interface
+    Given the Agents REST compatibility interface is declared
+    When its route declarations are read
+    Then the family is deprecated and names /api/v1/agents as its successor
+    And every legacy Agents operation is kept out of the published OpenAPI document
     And the legacy operation remains functional
 
   @unit @openapi @typecheck

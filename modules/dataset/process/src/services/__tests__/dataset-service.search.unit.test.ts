@@ -1,4 +1,5 @@
 import {
+  DATASET_DEFAULT_LIMITS,
   datasetSchema,
   DatasetChunkCountMissingError,
   DatasetTooLargeToSearchError,
@@ -10,24 +11,31 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
+  createDatasetTestRequestBoundsWith,
 } from "../../app/__tests__/dataset.fixture.ts";
 import type { DatasetChunkRepository } from "../../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
 import {
-  DATASET_SEARCH_MAX_BYTES,
-  DATASET_SEARCH_MAX_ROWS,
   DATASET_SEARCH_SCAN_BATCH,
 } from "../../rules/dataset-search.rules.ts";
 import { DatasetContentService } from "../dataset-content.service.ts";
+import type { DatasetRequestBoundsService } from "../dataset-request-bounds.service.ts";
 import { DatasetService } from "../dataset.service.ts";
+
+const DATASET_SEARCH_MAX_ROWS = DATASET_DEFAULT_LIMITS.rowsMax;
+const DATASET_SEARCH_MAX_BYTES = DATASET_DEFAULT_LIMITS.wholeReadBytes;
 
 let activeDataset: Dataset;
 let activeStorage: DatasetChunkRepository;
 
-const makeService = (overrides: { recordRepository?: Partial<DatasetRecordRepository> }) => {
+const makeService = (overrides: {
+  recordRepository?: Partial<DatasetRecordRepository>;
+  requestBounds?: DatasetRequestBoundsService;
+}) => {
   const repository = createApiFixture<DatasetRepository>(
     {
       findById: async () => activeDataset,
@@ -54,8 +62,9 @@ const makeService = (overrides: { recordRepository?: Partial<DatasetRecordReposi
     repository,
     records,
     content,
-    requestBounds: createDatasetTestRequestBounds(),
+    requestBounds: overrides.requestBounds ?? createDatasetTestRequestBounds(),
     attachments: createDatasetTestAttachments(),
+    inlineAttachments: createDatasetTestInlineAttachments(),
   });
 };
 
@@ -503,14 +512,16 @@ describe("dataset search (s3_jsonl)", () => {
       it("refuses on the bytes it reads when nothing recorded a size to judge", async () => {
         // sizeBytes null, offsets lack byteSize, recorded total stuck at zero;
         // bound by bytes actually scanned.
-        const wideRow = { text: `escalation ${"x".repeat(30 * 1024 * 1024)}` };
+        const wideRow = { text: `escalation ${"x".repeat(3 * 1024 * 1024)}` };
         const { readChunk } = mockChunks({
           0: [wideRow],
           1: [wideRow],
           2: [wideRow],
           3: [wideRow],
         });
-        const service = makeService({});
+        const service = makeService({
+          requestBounds: createDatasetTestRequestBoundsWith({ wholeReadBytes: 10 * 1024 * 1024 }),
+        });
 
         await expect(
           searchPage({
@@ -525,7 +536,7 @@ describe("dataset search (s3_jsonl)", () => {
             search: "escalation",
           }),
         ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
-        // Four chunks of 30 MB pass 100 MB on the fourth, and nothing could see
+        // Four chunks pass the limit on the fourth, and nothing could see
         // that coming, so the fourth is read before it is refused. Overshooting
         // by the one chunk that carried the total over is the cost of measuring;
         // reading all four and returning a page would be the bug.

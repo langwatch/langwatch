@@ -33,6 +33,7 @@ import type { RestIdentity } from "../hosting/api-door.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
 import type { RestDoorCredential } from "./declaration.ts";
+import type { RestProtocolRefusal } from "./response-kind.ts";
 import {
   DECLARED_ANSWER,
   ENDPOINT_ROUTE,
@@ -1109,15 +1110,18 @@ export function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+/** A REST door; one may write every refusal raised behind it in its family's own wire (Q31). */
+export type RestDoor = RestIdentity & Readonly<{ refusal?: RestProtocolRefusal }>;
+
 export interface RestCredentialBinding {
   readonly credential: RestDoorCredential;
-  resolveIdentity(): RestIdentity;
+  resolveIdentity(): RestDoor;
 }
 
 /** Binds a module-owned credential to its own declared REST families. */
 export function bindRestCredential(
   credential: RestDoorCredential,
-  resolveIdentity: () => RestIdentity,
+  resolveIdentity: () => RestDoor,
 ): RestCredentialBinding {
   return Object.freeze({ credential, resolveIdentity });
 }

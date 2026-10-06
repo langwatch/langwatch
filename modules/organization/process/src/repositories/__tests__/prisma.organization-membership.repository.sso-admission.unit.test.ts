@@ -133,3 +133,33 @@ describe("given an organization that never changed the setting", () => {
     });
   });
 });
+
+describe("given a Full-seat organization and a join request made from the terminal (ADR-171 v6)", () => {
+  describe("when identity hands the decided Developer seat and the origin", () => {
+    /** @scenario A request made from the terminal lands as a Developer when approved */
+    it("writes the decided seat, never reads the setting, and audits where it came from", async () => {
+      arrange({ joinerRole: OrganizationUserRole.MEMBER });
+
+      await expect(
+        repository.createMembership({
+          userId: "user_sam",
+          organizationId: "org_acme",
+          pendingAdmissionId: "rolebinding_pending",
+          via: "join-request-approved",
+          seat: "DEVELOPER",
+          origin: "cli",
+        }),
+      ).resolves.toEqual({ outcome: "created", seat: "DEVELOPER" });
+
+      expect(organizationFindUnique).not.toHaveBeenCalled();
+      expect(auditLogCreate).toHaveBeenCalledWith({
+        data: {
+          action: "organization.member.admitted",
+          userId: "user_sam",
+          organizationId: "org_acme",
+          metadata: { seat: "DEVELOPER", via: "join-request-approved", origin: "cli" },
+        },
+      });
+    });
+  });
+});

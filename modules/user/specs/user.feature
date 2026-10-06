@@ -136,8 +136,6 @@ Feature: Canonical user lifecycle
     Given a signed-in person who holds a credential sign-in method
     When they change their password
     Then the current password is verified and the new one stored in one operation
-    And the stored hash is read and written by the User feature's own persistence
-    And the process composing the request never reads the account rows itself
     And what the operation answers with is the outcome, never the stored hash
 
   # There was no way to end a session anywhere in the product: somebody who

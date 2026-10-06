@@ -64,6 +64,7 @@ describe("RunKeyMintService", () => {
   });
 
   /** @scenario "A workflow run calls LangWatch with a key minted for that run, never the project key" */
+  /** @scenario "The run's key stops working after the run ends" */
   /** @scenario "Every call a run makes back into LangWatch acts as the user who started it" */
   it("mints a restricted, project-bound key owned by the starter that expires in 15 minutes", async () => {
     const { service, created } = createService(["traces:create", "evaluations:manage"]);

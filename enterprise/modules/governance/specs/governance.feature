@@ -12,13 +12,10 @@ Feature: Enterprise governance package boundary
 
     @unit
     Scenario: A new governance subject is deliberate
-      Given modules/catalogue.json declares every subject governance owns
-      And the governance feature.json selects only its layout version
-      When governance source introduces a module for a subject the catalogue withholds
-      Then architecture lint reports the module and names the feature that owns the subject
-      And adding that subject to the governance feature.json is refused in its own right
-      And it does not suppress the violation it was written to legitimise
-      And the boundary ADR and feature specification describe any catalogue expansion
+      Given modules/catalogue.json declares the subjects each module owns
+      When governance source claims a subject another module owns
+      Then lint reports the claim, names the owning module and offers the move
+      And a file claiming only governance's own subject is left alone
 
   @unit
   Scenario: A pull schedule is validated portably

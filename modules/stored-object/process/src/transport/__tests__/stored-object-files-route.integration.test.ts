@@ -237,6 +237,7 @@ describe("given the /api/files family", () => {
 
   describe("when the caller presents a browser session and no API key", () => {
     /** @scenario "GET /api/files/:id refuses a session cookie, since REST authenticates with API keys only" */
+    /** @scenario "A byte endpoint does not accept a session in place of a key" */
     it("answers 401 and reads nothing", async () => {
       const read = vi.fn(async () => availableRead());
       const api = mount({ read });
@@ -271,6 +272,7 @@ describe("given the /api/files family", () => {
 
   describe("when the caller presents a project API key and no session", () => {
     /** @scenario "GET /api/files/:id authenticates via API key header when no session cookie is present" */
+    /** @scenario "An API key alone authenticates a byte endpoint" */
     it("accepts the key scoped to the owning project and never consults a user permission", async () => {
       const permissionCheck = vi.fn<StoredObjectFileGate["assertProjectPermission"]>(
         async () => undefined,

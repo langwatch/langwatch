@@ -125,6 +125,7 @@ type AuthzMemoryCutoverRow = {
  */
 export class AuthzMemoryStore {
   readonly epochs = new Map<string, number>();
+  readonly lineageEpochs = new Map<string, number>();
   readonly sessionVersions = new Map<string, number>();
   readonly cutovers = new Map<string, AuthzMemoryCutoverRow>();
   readonly userStandings = new Map<string, AuthzMemoryUserStandingRow>();
@@ -184,6 +185,7 @@ export class AuthzMemoryStore {
 
   reset(): void {
     this.epochs.clear();
+    this.lineageEpochs.clear();
     this.sessionVersions.clear();
     this.cutovers.clear();
     this.userStandings.clear();

@@ -84,6 +84,21 @@ describe("invoicing the seat changes licensing recorded", () => {
       });
     });
 
+    /** @scenario "Seat invoices are never paid from the usage commit" */
+    it("owes the seat invoice in full and leaves the usage commit untouched", async () => {
+      const { invoicing, store, service } = harness();
+
+      await service.invoicePendingSeatChanges();
+
+      expect(invoicing.raised).toHaveLength(1);
+      expect(invoicing.raised[0]?.lines).toHaveLength(1);
+      expect(invoicing.raised[0]?.lines[0]?.amountCents).toBe(239_344);
+      expect(store.connectedBillingAccounts.get("org-1")).toMatchObject({
+        commitUsdCents: 1_000_000,
+        usageSubscriptionId: "sub_1",
+      });
+    });
+
     /** @scenario "The seat invoice is its own invoice in the currency of the seat contract" */
     it("raises the invoice in the currency of the seat contract", async () => {
       const { invoicing, service } = harness({ accounts: [account({ seatCurrency: "EUR" })] });

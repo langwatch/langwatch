@@ -1,5 +1,9 @@
 import type { IdentityApi } from "@langwatch/identity-contract";
-import type { JoinRequestAdmitted, JoinRequestJoining } from "@langwatch/organization-contract";
+import type {
+  JoinRequestAdmitted,
+  JoinRequestApiOrigin,
+  JoinRequestJoining,
+} from "@langwatch/organization-contract";
 
 /** One waiting join request, as the ledger folds it. */
 export type OrganizationJoinRequestState = Readonly<{
@@ -7,6 +11,7 @@ export type OrganizationJoinRequestState = Readonly<{
   userId: string;
   organizationId: string;
   domain: string;
+  origin: JoinRequestApiOrigin;
   createdAtMs: number;
   expiresAtMs: number | null;
   resolvedAtMs: number | null;
@@ -24,7 +29,11 @@ export interface OrganizationJoinRequests {
   ): Promise<unknown>;
   dismissOffer(input: Readonly<{ userId: string; verifiedEmail: string | null }>): Promise<void>;
   joinAutomaticallyIfAdmitted(
-    input: Readonly<{ userId: string; verifiedEmail: string | null }>,
+    input: Readonly<{
+      userId: string;
+      verifiedEmail: string | null;
+      origin?: JoinRequestApiOrigin;
+    }>,
   ): Promise<JoinRequestAdmitted>;
   automaticJoinsForOrganization(
     input: Readonly<{ organizationId: string }>,
@@ -36,7 +45,12 @@ export interface OrganizationJoinRequests {
     input: Readonly<{ organizationId: string }>,
   ): Promise<readonly OrganizationJoinRequestState[]>;
   request(
-    input: Readonly<{ userId: string; verifiedEmail: string | null; organizationId: string }>,
+    input: Readonly<{
+      userId: string;
+      verifiedEmail: string | null;
+      organizationId: string;
+      origin?: JoinRequestApiOrigin;
+    }>,
   ): Promise<Readonly<{ joinRequestId: string; state: "PENDING" | "APPROVED" }>>;
   withdraw(input: Readonly<{ joinRequestId: string; userId: string }>): Promise<void>;
   approve(

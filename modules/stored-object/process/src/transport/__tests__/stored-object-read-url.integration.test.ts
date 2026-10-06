@@ -87,6 +87,7 @@ function installed() {
         throw new Error("The signed read asks no credential of the door.");
       },
     },
+    rateLimiter: { check: async () => ({ allowed: true }) },
   }).mount(storedObjectRest.router(), { app: () => app, onError: renderHandled });
 
   return {
@@ -105,6 +106,7 @@ function sealOf(claims: Record<string, unknown>): string {
 describe("storedObjects.getReadUrl and the signed content route", () => {
   describe("given a session viewer with the object's permission", () => {
     /** @scenario "A signed-in viewer gets a read URL that serves the object's bytes" */
+    /** @scenario "The browser reads stored media through a URL tRPC minted" */
     it("mints a same-origin URL that serves the bytes", async () => {
       const { session, fetch } = installed();
 

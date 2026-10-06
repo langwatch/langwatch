@@ -3099,6 +3099,15 @@
           "documentation": "How the domain was matched: `verified-identifier-domain` or `sso-connection-domain`."
         },
         {
+          "name": "origin",
+          "columnName": "origin",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Where the request was made: `web` or `cli` (ADR-171 v6). A request from\nthe terminal lands a Developer seat whatever the joiner seat says."
+        },
+        {
           "name": "expiresAt",
           "columnName": "expiresAt",
           "type": "DateTime",
@@ -3764,6 +3773,15 @@
           "isList": false,
           "isOptional": true,
           "documentation": ""
+        },
+        {
+          "name": "datasetAttachmentMaxMb",
+          "columnName": "datasetAttachmentMaxMb",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The largest file a dataset image or file cell accepts for this\norganization, in mebibytes. Null means the default. Set by an operator\nfrom the back office only; every other dataset size limit scales with it."
         },
         {
           "name": "maxSessionDurationDays",

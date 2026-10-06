@@ -50,6 +50,13 @@ Feature: AuthZ package boundary
     Then it receives the AuthZ service, the grants service, the migration and the pipeline
     And nothing is dispatched and no audit row is written by the build itself
 
+  @unit
+  Scenario: A process with no database composes no AuthZ service
+    Given a process with command dispatch and no database
+    When the live AuthZ install runs
+    Then the install is refused naming the database it cannot supply
+    And no AuthZ service is composed
+
   @unit @observability
   Scenario: AuthZ counts on the process registry
     Given a process composes the AuthZ adapter

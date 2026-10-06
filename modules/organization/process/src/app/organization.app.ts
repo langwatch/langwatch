@@ -38,6 +38,7 @@ import {
   type OrganizationInviteAccepted,
   type OrganizationPendingInviteApplied,
   type JoinRequestMine,
+  type JoinRequestApiOrigin,
   type JoinRequestFiled,
   type JoinRequestPending,
   type JoinRequestJoiningChanged,
@@ -120,6 +121,7 @@ import {
   type OrganizationServerConfig,
   type PricingModel,
   type PendingInvitationForCaller,
+  type PendingInvitationsForCaller,
   type SignUpVerdict,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
@@ -427,6 +429,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     application.#invitationDoor = infrastructure.invitations
       ? OrganizationInvitationDoorService.create({
           invitations: infrastructure.invitations,
+          directory: infrastructure.directory,
           joinRequests: infrastructure.joinRequests,
           signals: infrastructure.signals,
           lifecycle: infrastructure.lifecycle,
@@ -616,6 +619,13 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#signUpPolicy?.checkSignUp(input) ?? { allowed: true, via: "open" };
   }
 
+  /** Every invitation waiting on the caller's proven addresses, in any organization. */
+  async listPendingInvitationsForCaller(
+    by: OrganizationCaller,
+  ): Promise<PendingInvitationsForCaller> {
+    return this.#invitations().listPendingForCaller({ userId: by.id });
+  }
+
   /** The invitation waiting for a caller who belongs to no organization yet. */
   async getPendingInvitation(by: OrganizationCaller): Promise<PendingInvitationForCaller> {
     return (
@@ -694,6 +704,12 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     organizationId: string;
   }): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }> {
     return this.#dependencies.organizations.getPricing(input);
+  }
+
+  getDatasetLimits(input: {
+    organizationId: string;
+  }): Promise<{ attachmentMaxBytes: number | null }> {
+    return this.#dependencies.organizations.getDatasetLimits(input);
   }
 
   isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean> {
@@ -916,6 +932,8 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       organizationId: string;
       userId: string;
       admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
+      seat?: "MEMBER" | "DEVELOPER";
+      origin?: JoinRequestApiOrigin;
     }>,
   ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
     return this.#dependencies.membership.createMembership(input);
@@ -1884,7 +1902,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   }
 
   async fileJoinRequest(
-    input: Readonly<{ userId: string; organizationId: string }>,
+    input: Readonly<{ userId: string; organizationId: string; origin?: JoinRequestApiOrigin }>,
   ): Promise<JoinRequestFiled> {
     return this.#joinRequests().file(input);
   }
@@ -1939,7 +1957,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#joinRequests().dismissOffer(input);
   }
 
-  async admitAutomatically(input: Readonly<{ userId: string }>): Promise<JoinRequestAdmitted> {
+  async admitAutomatically(
+    input: Readonly<{ userId: string; origin?: JoinRequestApiOrigin }>,
+  ): Promise<JoinRequestAdmitted> {
     return this.#joinRequests().admitAutomatically(input);
   }
 

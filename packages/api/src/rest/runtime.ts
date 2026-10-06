@@ -100,6 +100,7 @@ import {
   restRateLimitKey,
   storeRestAnswer,
   tracerMiddleware,
+  type RestDoor,
   type RestRawAnswer,
   type RestRawBody,
   type RestTransportMiddlewareBinding,
@@ -140,12 +141,12 @@ const ROUTE_FILES = "endpointFiles" as const;
 /** Everything the process supplies for the path to run. */
 export type RestRuntimeMembers = Readonly<{
   /** The family's own door: the one every route falls back to. */
-  identity: RestIdentity;
+  identity: RestDoor;
   /**
    * One door per credential kind a ROUTE may raise for itself. A route naming a
    * kind this table does not open is refused at mount, by kind.
    */
-  doors?: Partial<Readonly<Record<RestDoorCredential, RestIdentity>>>;
+  doors?: Partial<Readonly<Record<RestDoorCredential, RestDoor>>>;
   /** Where every route that declared an action leaves its row. */
   audit?: RestAuditSink;
   /** Only a family whose routes carry a check of their own supplies these. */
@@ -302,13 +303,18 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
   };
 }
 
-/** The protocol route a request reached, when that route renders its own refusals. */
-const refusingRoutes = new WeakMap<Context, RestTransportRoute<unknown>>();
+/** The route a request reached and the refusal it answers in, when it renders its own. */
+type RouteRefusalScope = Readonly<{
+  route: RestTransportRoute<unknown>;
+  refusal: RestProtocolRefusal;
+}>;
+
+const refusingRoutes = new WeakMap<Context, RouteRefusalScope>();
 
 /** Marks the request as one whose every refusal the route's protocol renders. */
-function protocolRefusalScope(route: RestTransportRoute<unknown>): MiddlewareHandler {
+function protocolRefusalScope(refusing: RouteRefusalScope): MiddlewareHandler {
   return async (context, next) => {
-    refusingRoutes.set(context, route);
+    refusingRoutes.set(context, refusing);
     await next();
   };
 }
@@ -320,11 +326,11 @@ function protocolRefusalScope(route: RestTransportRoute<unknown>): MiddlewareHan
  */
 function protocolRefusals(onError: ErrorHandler): ErrorHandler {
   return (error, context) => {
-    const route = refusingRoutes.get(context);
-    const refusal = route ? routeRefusal(route) : undefined;
+    const refusing = refusingRoutes.get(context);
 
-    if (!route || !refusal) return onError(error, context);
+    if (!refusing) return onError(error, context);
 
+    const { route, refusal } = refusing;
     const result = refusal({ failure: error, response: refusalProducer() });
     if (isDeclined(result)) return onError(error, context);
 
@@ -332,9 +338,18 @@ function protocolRefusals(onError: ErrorHandler): ErrorHandler {
   };
 }
 
-/** The refusal a protocol route declared, or the one a `responds()` route keeps its wire with. */
-function routeRefusal(route: RestTransportRoute<unknown>): RestProtocolRefusal | undefined {
-  return route.response?.refusal ?? route.refusal;
+/**
+ * The refusal a protocol route declared, the one a `responds()` route keeps its wire with,
+ * or else its door's: the owner's wire for every route behind that door (Q31).
+ */
+function routeRefusal({
+  route,
+  door,
+}: {
+  route: RestTransportRoute<unknown>;
+  door: RestDoor;
+}): RestProtocolRefusal | undefined {
+  return route.response?.refusal ?? route.refusal ?? door.refusal;
 }
 
 /**
@@ -640,6 +655,7 @@ function routeStack<Api>({
   const documents = documented && publishable;
   const credential = route.credential ?? declaration.credential;
   const door = authenticateMiddleware({ route, credential, ports });
+  const refusal = routeRefusal({ route, door: doorOf({ credential, ports }) });
 
   // Ahead of the validators: they read the body to parse it, and a stream
   // read once cannot be drained again to measure it.
@@ -662,7 +678,7 @@ function routeStack<Api>({
       : [];
 
   return [
-    ...(routeRefusal(route) ? [protocolRefusalScope(route)] : []),
+    ...(refusal ? [protocolRefusalScope({ route, refusal })] : []),
     versionContext({ route, family, version, status }),
     ...(documents
       ? [
@@ -760,8 +776,8 @@ const earlyFacts = new WeakMap<Context, ReadonlyMap<string, unknown>>();
 
 /**
  * Credential, then body, then what the body names (Alex, 2026-09-30): a public route's
- * credential facts refuse before its body is capped, parsed or validated. A guarded route's
- * facts stay after its authorisation, which reads the parsed input.
+ * credential facts refuse before its body is capped, parsed or validated. A capped door route
+ * resolves them here too, since the cap replaces the request its door recorded the credential on.
  */
 function credentialFacts({
   route,
@@ -772,7 +788,7 @@ function credentialFacts({
 }): MiddlewareHandler[] {
   const early = (route.middleware ?? []).filter((fact) => fact.source === undefined);
 
-  if (route.access?.kind !== "public" || early.length === 0) return [];
+  if (early.length === 0 || (route.access?.kind !== "public" && !route.bodyLimit)) return [];
 
   return [
     async (context, next) => {
@@ -1883,7 +1899,7 @@ function doorOf({
 }: {
   credential: RestDoorCredential;
   ports: RestRuntimeMembers;
-}): RestIdentity {
+}): RestDoor {
   return ports.doors?.[credential] ?? ports.identity;
 }
 

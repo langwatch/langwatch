@@ -72,19 +72,16 @@ Feature: Coding agent transcript over REST and CLI
     Then the request fails with a not found error
 
   # The transcript is derived from a trace's log records, and canonical
-  # `log_records` is the only table still taking writes. A deployment whose API
-  # process composes no read of it derives from the legacy table alone, so
-  # every trace ingested since the cutover would come back as an empty
-  # transcript — "this agent did nothing", which is a different and wrong fact.
-  # So the door is registered only where that read exists, and is honestly
-  # absent where it does not.
+  # `log_records` is the only table still taking writes. The trace module cannot
+  # be composed without its canonical log read, so the transcript door is always
+  # served and always derives from that read; an empty transcript is then a
+  # statement about the agent, never about a missing read.
 
-  @integration
-  Scenario: the transcript is not served without the canonical log read it derives from
-    Given a process that composed no canonical log read
-    When the mounted paths are enumerated
-    Then the transcript URL is not served
-    And the trace's log-record read refuses by name rather than answering an empty set
+  @coding-agent @unit
+  Scenario: the transcript is derived from the canonical log read the trace module is composed with
+    Given a trace module composed with its canonical log read
+    When a trace's transcript is read
+    Then the log records come from that read, for that project and trace
 
   @unit
   Scenario: the CLI prints a trace transcript

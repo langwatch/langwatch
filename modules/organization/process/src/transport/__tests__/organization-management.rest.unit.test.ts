@@ -6,10 +6,14 @@
  * @see specs/organizations/organization-members-rest-api.feature
  */
 import {
+  OrganizationInvalidCredentialsError,
+  OrganizationMissingCredentialsError,
+} from "@langwatch/api";
+import {
   bindRestMiddleware,
   createCanonicalFamilyErrorHandler,
   createRestRuntime,
-  UnauthorizedError,
+  MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -32,9 +36,9 @@ const onError = createCanonicalFamilyErrorHandler({
 
 function mount(app: Partial<OrganizationApi>) {
   const admit = (request: Request) => {
-    if (request.headers.get("Authorization") !== `Bearer ${CREDENTIAL}`) {
-      throw new UnauthorizedError("Invalid credential");
-    }
+    const presented = request.headers.get("Authorization");
+    if (presented === null) throw new OrganizationMissingCredentialsError();
+    if (presented !== `Bearer ${CREDENTIAL}`) throw new OrganizationInvalidCredentialsError();
     return {
       actor: { type: "user" as const, id: "user-owner" },
       scope: { tier: "organization" as const, id: ORGANIZATION_ID },
@@ -54,11 +58,19 @@ function mount(app: Partial<OrganizationApi>) {
     facts: [bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: "key-1" }))],
   });
 
-  return (path: string, init: { method?: string; body?: unknown } = {}) =>
+  return (
+    path: string,
+    init: { method?: string; body?: unknown; credential?: string | null } = {},
+  ) =>
     hono.fetch(
       new Request(`http://api.test${path}`, {
         method: init.method ?? "GET",
-        headers: { Authorization: `Bearer ${CREDENTIAL}`, "Content-Type": "application/json" },
+        headers: {
+          ...(init.credential === null
+            ? {}
+            : { Authorization: `Bearer ${init.credential ?? CREDENTIAL}` }),
+          "Content-Type": "application/json",
+        },
         ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
       }),
     );
@@ -110,6 +122,74 @@ describe("given the /api/organization family", () => {
     });
   });
 
+  describe("when the organization is fetched with no authorization header", () => {
+    /** @scenario "Fetching the organization without credentials is refused" */
+    it("answers 401 before the application is asked anything", async () => {
+      const getSettings = vi.fn(async () => settings);
+      const send = mount({ getSettings });
+
+      const response = await send("/api/organization", { credential: null });
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({ code: "missing_credentials" });
+      expect(getSettings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the organization has single sign-on configured", () => {
+    const withSso = { ...settings, ssoDomain: "acme.test", ssoProvider: "okta" };
+
+    /** @scenario "Single sign-on fields are not exposed" */
+    it("answers a profile with neither the domain nor the provider", async () => {
+      const send = mount({ getSettings: async () => withSso });
+
+      const body = await (await send("/api/organization")).json();
+
+      expect(body).not.toHaveProperty("ssoDomain");
+      expect(body).not.toHaveProperty("ssoProvider");
+    });
+
+    /** @scenario "Single sign-on fields are not exposed" */
+    it("never hands an update's single sign-on fields on to the application", async () => {
+      const updateSettings = vi.fn(async () => ({ traceShareRevocationRequired: false }));
+      const send = mount({ updateSettings, getSettings: async () => withSso });
+
+      const response = await send("/api/organization", {
+        method: "PATCH",
+        body: { presenceEnabled: false, ssoDomain: "evil.test", ssoProvider: "evil" },
+      });
+
+      expect(updateSettings).toHaveBeenCalledTimes(1);
+      expect(updateSettings).toHaveBeenCalledWith(
+        { organizationId: ORGANIZATION_ID, presenceEnabled: false },
+        { id: "user-owner" },
+      );
+      expect(await response.json()).not.toHaveProperty("ssoDomain");
+    });
+  });
+
+  describe("when the organization is fetched through each version namespace", () => {
+    const send = mount({ getSettings: async () => settings });
+
+    /** @scenario "The organization endpoint answers on its dated and latest paths" */
+    it("names the dated version stable and the latest, bare and unknown paths as they are", async () => {
+      const dated = await send(`/api/organization/${MANAGEMENT_API_VERSION}`);
+      expect(dated.status).toBe(200);
+      expect(dated.headers.get("X-API-Version")).toBe(MANAGEMENT_API_VERSION);
+      expect(dated.headers.get("X-API-Version-Status")).toBe("stable");
+
+      const latest = await send("/api/organization/latest");
+      expect(latest.status).toBe(200);
+      expect(latest.headers.get("X-API-Version-Status")).toBe("latest");
+
+      const bare = await send("/api/organization");
+      expect(bare.status).toBe(200);
+      expect(bare.headers.get("X-API-Version-Status")).toBe("latest");
+
+      expect((await send("/api/organization/not-a-version")).status).toBe(404);
+    });
+  });
+
   describe("when the organization's name is updated to an empty string", () => {
     /** @scenario "An empty organization name is refused" */
     it("refuses with validation_error and writes nothing", async () => {
@@ -140,6 +220,72 @@ describe("given the /api/organization family", () => {
         { organizationId: ORGANIZATION_ID, presenceEnabled: false },
         { id: "user-owner" },
       );
+    });
+  });
+
+  describe("when a member's access breakdown is fetched", () => {
+    const binding = (
+      id: string,
+      scopeType: "PROJECT" | "TEAM" | "ORGANIZATION",
+      scopeId: string,
+    ) => ({
+      id,
+      role: "MEMBER",
+      customRoleName: null,
+      scopeType,
+      scopeId,
+      scopeName: scopeId,
+      permissions: ["traces:view"],
+    });
+
+    /** @scenario "A member's access breakdown spans teams and projects" */
+    it("answers the role, group bindings and direct bindings on every scope, each with its source", async () => {
+      const getMemberAccessBreakdown = vi.fn(async () => ({
+        user: {
+          id: "user-1",
+          name: "user-1",
+          email: "user-1@acme.test",
+          orgRole: "MEMBER" as const,
+          orgRolePermissions: ["organization:view"],
+        },
+        groups: [
+          {
+            id: "group-1",
+            name: "Core",
+            slug: "core",
+            scimSource: null,
+            bindings: [binding("b-team", "TEAM", "team-1")],
+          },
+        ],
+        directBindings: [
+          binding("b-org", "ORGANIZATION", ORGANIZATION_ID),
+          binding("b-project", "PROJECT", "project-1"),
+        ],
+      }));
+      const send = mount({
+        getMember: async () => ({ ...member("user-1", null), teams: [] }),
+        getMemberAccessBreakdown,
+      });
+
+      const response = await send("/api/organization/members/user-1/access");
+
+      expect(response.status).toBe(200);
+      expect(getMemberAccessBreakdown).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: "user-1" }),
+      );
+      const body = (await response.json()) as {
+        user: { orgRole: string };
+        groups: { name: string; bindings: { scopeType: string }[] }[];
+        directBindings: { scopeType: string }[];
+      };
+      expect(body.user.orgRole).toBe("MEMBER");
+      expect(body.groups.map((group) => [group.name, group.bindings[0]?.scopeType])).toEqual([
+        ["Core", "TEAM"],
+      ]);
+      expect(body.directBindings.map((entry) => entry.scopeType)).toEqual([
+        "ORGANIZATION",
+        "PROJECT",
+      ]);
     });
   });
 

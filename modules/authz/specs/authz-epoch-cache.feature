@@ -66,6 +66,14 @@ Feature: The grants cache and its epoch
     And neither check answers from an older reading
 
   @unit
+  Scenario: A key and its owner are read from one storage head when nothing is held
+    Given the grants cache is off for "acme"
+    And alice owns an API key and has just been demoted on the storage head being cut over to
+    When the key is checked during the cutover
+    Then the key's grants and alice's are read from the same storage head
+    And the key is capped at her new role
+
+  @unit
   Scenario: A held answer is never served indefinitely
     Given alice's grants were read once and nothing in "acme" has changed
     When enough time passes
@@ -123,8 +131,9 @@ Feature: The grants cache and its epoch
   # ═══ Where a scope sits ═══════════════════════════════════════════════
 
   # A project's team and organization change only when it moves or is
-  # archived, and nothing tells authorization when that happens, so a held
-  # lineage is bounded by age alone.
+  # archived. Project records both as facts; authz moves the organization's
+  # lineage signal from its own side, and a held lineage is checked against
+  # it before it answers. The minute stays as a backstop.
   @unit
   Scenario: A scope's lineage is read at most once a minute
     Given project "chatbot" has been resolved to its team and organization once
@@ -137,6 +146,38 @@ Feature: The grants cache and its epoch
     Given project "chatbot" could not be found
     When it is asked about again
     Then the lineage is read afresh
+
+  @unit
+  Scenario: A moved project's lineage is read afresh on the next request
+    Given project "chatbot" has been resolved to its team and organization once
+    When project records that "chatbot" moved to another team
+    And authz moves its organization's lineage signal
+    Then the next ask of where "chatbot" sits reads the lineage afresh, within the minute
+
+  @unit
+  Scenario: An archived project stops resolving on the next request
+    Given project "chatbot" has been resolved to its team and organization once
+    When project records that "chatbot" was archived
+    And authz moves its organization's lineage signal
+    Then the next ask of where "chatbot" sits finds no scope
+
+  @unit
+  Scenario: Project's moved and archived facts move the organization's lineage signal
+    Given authz subscribes to project's lifecycle facts
+    When project records a project-moved or a project-archived fact
+    Then the lineage signal of the fact's organization moves once per fact
+
+  @unit
+  Scenario: A lineage signal that cannot be read holds no lineage
+    Given the lineage signal cannot be read
+    When where "chatbot" sits is asked twice
+    Then the lineage is read both times
+
+  @unit
+  Scenario: A lineage signal that cannot be moved is retried
+    Given the lineage signal cannot be moved
+    When project records that "chatbot" was archived
+    Then authz's subscriber fails, so the delivery is retried
 
   @unit
   Scenario: Turning the grants cache off stops holding lineage too

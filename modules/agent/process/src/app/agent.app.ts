@@ -25,6 +25,7 @@ import {
   type RegisterConnectedAgentInput,
   type HttpAgentTestInput,
   type AgentConnection,
+  type AgentConnectAdmission,
   type AgentConnectCredentials,
   type AgentConnectFramesInput,
   type AgentConnectPollInput,
@@ -60,7 +61,6 @@ import {
   type AgentPage,
   type AgentOverview,
 } from "@langwatch/agent-contract";
-import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
@@ -112,7 +112,6 @@ export class AgentModule implements AgentApi {
   static readonly contract = AgentApi;
   static readonly config = agentServerConfig;
   static readonly dependencies = {
-    apiKeys: ApiKeyApi,
     auditLog: AuditLogApi,
     /** Voice agents are written only where `release_voice_agents_enabled` is on (AC29). */
     featureFlags: FeatureFlagApi,
@@ -172,9 +171,6 @@ export class AgentModule implements AgentApi {
 
     const connected = ConnectedAgentService.create({
       agents: this.#agents,
-      apiKeys: dependencies.apiKeys,
-      authz: dependencies.permissions,
-      projects: dependencies.projects,
       sessionState: repositories.sessionState,
       config,
       publicBaseUrl: this.#publicBaseUrl,
@@ -466,11 +462,9 @@ export class AgentModule implements AgentApi {
     return this.#httpTesting.execute(input);
   }
 
-  acceptConnection(
-    connection: AgentConnection,
-    credentials: AgentConnectCredentials,
-  ): Promise<void> {
-    return this.#connections().acceptConnection(connection, credentials);
+  acceptConnection(connection: AgentConnection, admission: AgentConnectAdmission): Promise<void> {
+    this.#connections().acceptConnection(connection, admission);
+    return Promise.resolve();
   }
   async call(input: AgentCallInput, context: AgentCallContext): Promise<AgentCallResult> {
     const agent = await this.#agents.getById({ id: input.id, projectId: input.projectId });

@@ -75,6 +75,7 @@ describe("DefaultGovernanceSetupStateService", () => {
     });
   });
 
+  /** @scenario setupState returns boolean OR for nav-promotion signal */
   it("activates governance for any persisted governance feature", async () => {
     const state = await DefaultGovernanceSetupStateService.create({
       repository: new FixedSetupRepository({

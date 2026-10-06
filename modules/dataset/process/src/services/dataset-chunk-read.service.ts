@@ -1,9 +1,10 @@
-import type { Dataset } from "@langwatch/dataset-contract";
+import type { Dataset, DatasetRecord, DatasetWithRecords } from "@langwatch/dataset-contract";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import { isChunkLine } from "../rules/dataset-chunk-lines.rules.ts";
+import { entryBytesOf } from "../rules/dataset-row-limits.rules.ts";
 
-/** Reads named rows out of a dataset stored as s3_jsonl chunks. */
+/** Reads rows out of a dataset stored as s3_jsonl chunks, one chunk in memory at a time. */
 export class DatasetChunkReadService {
   private constructor() {}
 
@@ -38,5 +39,42 @@ export class DatasetChunkReadService {
     }
 
     return entries;
+  }
+
+  /**
+   * Every row in order until the byte budget is spent. The read stops at the
+   * first row that does not fit, and reports rows left out instead of skipping it.
+   */
+  async readWithinBudget({
+    dataset,
+    limitBytes,
+    storage,
+    toRecord,
+  }: {
+    dataset: Dataset;
+    limitBytes: number;
+    storage: DatasetChunkRepository;
+    toRecord: (line: unknown) => DatasetRecord;
+  }): Promise<DatasetWithRecords> {
+    const { projectId } = dataset;
+    const records: DatasetRecord[] = [];
+    let bytes = 0;
+    let rowsSeen = 0;
+    for (let index = 0; index < (dataset.chunkCount ?? 0); index++) {
+      const lines = await storage.readChunk({ projectId, datasetId: dataset.id, index });
+      for (const line of lines) {
+        rowsSeen += 1;
+        const record = toRecord(line);
+        bytes += entryBytesOf(record.entry);
+        if (bytes > limitBytes) {
+          const totalRows = Math.max(dataset.rowCount ?? 0, rowsSeen);
+
+          return { dataset, records, truncated: true, totalRows };
+        }
+        records.push(record);
+      }
+    }
+
+    return { dataset, records, truncated: false, totalRows: records.length };
   }
 }

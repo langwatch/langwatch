@@ -11,6 +11,7 @@ import { createMetricProcessingPipeline } from "../metric.pipeline.ts";
 
 describe("metric command lanes", () => {
   describe("when the shard count comes from configuration", () => {
+    /** @scenario "Producer and consumer clamp one lane count" */
     it("clamps to 1-128 and always returns a bounded non-empty lane", () => {
       expect(resolveMetricCommandShardCount("0")).toBe(1);
       expect(resolveMetricCommandShardCount("1000")).toBe(128);
@@ -69,6 +70,7 @@ describe("metric command lanes", () => {
   });
 
   describe("when commands are registered on the real pipeline", () => {
+    /** @scenario "Producer and consumer clamp one lane count" */
     it("installs bounded lane routing", () => {
       const store = { append: async () => undefined };
       const pipeline = createMetricProcessingPipeline({

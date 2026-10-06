@@ -96,6 +96,25 @@ describe("cli-api — auth contract", () => {
     });
   });
 
+  describe("when the server answers 402 with the plan refusal", () => {
+    /** @scenario "CLI surfaces the upgrade URL in stderr on 402" */
+    it("names the plan in the message and puts the upgrade URL on its own line", async () => {
+      const { fetchImpl } = spyFetch(
+        status(402, {
+          error: "payment_required",
+          error_description: "Ingestion sources require an Enterprise plan",
+          upgrade_url: "https://app.test/settings/subscription",
+        }),
+      );
+      const failure = await listIngestionSources(baseCfg(), { fetchImpl }).catch(
+        (error: unknown) => error as { status: number; code: string; message: string },
+      );
+      expect(failure).toMatchObject({ status: 402, code: "payment_required" });
+      expect(failure.message).toContain("Ingestion sources require an Enterprise plan");
+      expect(failure.message.split("\n")).toContain("    https://app.test/settings/subscription");
+    });
+  });
+
   describe("when the access token has aged out but the session is alive", () => {
     it("refreshes before sending when the recorded expiry has passed", async () => {
       const cfg = {

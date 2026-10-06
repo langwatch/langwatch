@@ -53,14 +53,79 @@ export class AuthzGrantSnapshotService {
     principal: AuthzPrincipalRef;
     organizationId: string;
   }): Promise<CollectedGrants> {
-    const { epoch } = this.options;
-    const cacheEnabled = this.options.cacheEnabled?.() ?? false;
-    if (!cacheEnabled || !epoch || principal.type === "anonymous") {
+    const epoch = await this.findServingEpoch({ principal, organizationId });
+    if (epoch === null) {
       return this.collector.collectGrants({ principal, organizationId });
     }
 
-    const currentEpoch = await epoch.findEpoch({ organizationId });
-    if (currentEpoch === null) {
+    return this.collectAtEpoch({ principal, organizationId, epoch });
+  }
+
+  /**
+   * The principal's snapshot and, for an api key, its owner's ceiling, read as one: on one
+   * epoch when the cache serves, else on ONE storage pass, so a legacy/ledger cutover between
+   * the two reads cannot pair a current key with a stale owner that fails to cap it.
+   */
+  async collectWithOwnerCeiling({
+    principal,
+    organizationId,
+    ceiling = true,
+  }: {
+    principal: AuthzPrincipalRef;
+    organizationId: string;
+    ceiling?: boolean;
+  }): Promise<{ grants: CollectedGrants; ownerGrants: CollectedGrants | null }> {
+    const epoch = await this.findServingEpoch({ principal, organizationId });
+    const collect =
+      epoch === null
+        ? this.onePassCollect({ organizationId })
+        : (subject: AuthzPrincipalRef) =>
+            this.collectAtEpoch({ principal: subject, organizationId, epoch });
+    const [grants, ownerGrants] = await Promise.all([
+      collect(principal),
+      ceiling
+        ? this.findOwnerPrincipal({ principal }).then((owner) => (owner ? collect(owner) : null))
+        : Promise.resolve(null),
+    ]);
+
+    return { grants, ownerGrants };
+  }
+
+  async findResourceGrantsFor(scope: AuthzScopeRef): Promise<readonly ResourceGrant[] | undefined> {
+    if (scope.type !== "resource") {
+      return void 0;
+    }
+
+    return this.collector.collectResourceGrants({ scope });
+  }
+
+  /** The organization's epoch when the cache may serve this principal, else null. */
+  private async findServingEpoch({
+    principal,
+    organizationId,
+  }: {
+    principal: AuthzPrincipalRef;
+    organizationId: string;
+  }): Promise<number | null> {
+    const { epoch } = this.options;
+    const cacheEnabled = this.options.cacheEnabled?.() ?? false;
+    if (!cacheEnabled || !epoch || principal.type === "anonymous") {
+      return null;
+    }
+
+    return epoch.findEpoch({ organizationId });
+  }
+
+  private async collectAtEpoch({
+    principal,
+    organizationId,
+    epoch: currentEpoch,
+  }: {
+    principal: AuthzPrincipalRef;
+    organizationId: string;
+    epoch: number;
+  }): Promise<CollectedGrants> {
+    if (principal.type === "anonymous") {
       return this.collector.collectGrants({ principal, organizationId });
     }
 
@@ -95,36 +160,29 @@ export class AuthzGrantSnapshotService {
     return grants;
   }
 
-  async findOwnerGrantsFor({
-    principal,
+  private onePassCollect({
     organizationId,
   }: {
-    principal: AuthzPrincipalRef;
     organizationId: string;
-  }): Promise<CollectedGrants | null> {
+  }): (subject: AuthzPrincipalRef) => Promise<CollectedGrants> {
+    const reader = this.collector.beginPass();
+
+    return (subject) =>
+      this.collector.collectGrants({ principal: subject, organizationId, reader });
+  }
+
+  private async findOwnerPrincipal({
+    principal,
+  }: {
+    principal: AuthzPrincipalRef;
+  }): Promise<AuthzPrincipalRef | null> {
     if (principal.type !== "apiKey") {
       return null;
     }
 
     const owner = await this.collector.findApiKeyOwner({ apiKeyId: principal.id });
-    if (!owner?.userId) {
-      return null;
-    }
 
-    const ownerPrincipal: AuthzPrincipalRef = {
-      type: "user",
-      id: owner.userId,
-    };
-
-    return this.collectCached({ principal: ownerPrincipal, organizationId });
-  }
-
-  async findResourceGrantsFor(scope: AuthzScopeRef): Promise<readonly ResourceGrant[] | undefined> {
-    if (scope.type !== "resource") {
-      return void 0;
-    }
-
-    return this.collector.collectResourceGrants({ scope });
+    return owner?.userId ? { type: "user", id: owner.userId } : null;
   }
 
   private pruneCache(): void {

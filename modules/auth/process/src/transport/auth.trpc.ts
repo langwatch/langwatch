@@ -131,7 +131,10 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
       refusal: "Too many signup attempts. Please try again later.",
     });
 
-    return app.requestNewAccountVerification({ email: input.email });
+    return app.requestNewAccountVerification({
+      email: input.email,
+      ...(input.callbackUrl === undefined ? {} : { callbackUrl: input.callbackUrl }),
+    });
   })
 
   /**

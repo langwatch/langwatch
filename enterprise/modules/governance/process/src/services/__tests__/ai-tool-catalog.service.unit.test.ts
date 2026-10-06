@@ -59,12 +59,14 @@ function world(member: { departmentId: string | null } = { departmentId: null })
 
 describe("DefaultGovernanceAiToolCatalogService", () => {
   describe("given a fresh organization", () => {
+    /** @scenario "A member's first portal load of a zero-row organization returns the provisioned catalog" */
     it("provisions the complete canonical starter catalogue on the member's first list", async () => {
       const { catalogue } = world();
 
       const tiles = await catalogue.findForMember({ organizationId: ORG, userId: "user" });
 
       expect(tiles).toHaveLength(AI_TOOL_STARTER_TILES.length);
+      expect(tiles.every(({ enabled }) => enabled)).toBe(true);
     });
 
     it("keeps Cursor direct OTLP disabled regardless of stored config", async () => {

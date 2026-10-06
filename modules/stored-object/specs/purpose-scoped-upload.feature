@@ -54,6 +54,25 @@ Feature: Upload a file for a purpose
     Then the upload is refused as too large
     And I am told the largest size a dataset attachment can be
 
+  # The owning module knows the organization; this module does not. A dataset
+  # asks for an attachment upload with the organization's own per-file limit.
+  @unit
+  Scenario: The dataset module raises the attachment limit for an organization
+    Given the dataset module asks for a dataset attachment upload with a 40 MB limit
+    When the file is declared as 30 MB
+    Then I get back an address to put the file to
+
+  @unit
+  Scenario: A raised attachment limit never passes the purpose's ceiling
+    Given the dataset module asks for a dataset attachment upload with a limit above 1 GB
+    When the file is declared larger than 1 GB
+    Then the upload is refused as too large
+    And I am told 1 GB is the largest size
+
+  @unit
+  Scenario: Asking for upload addresses is rate limited
+    Then one caller may ask for 600 upload addresses a minute
+
   @unit
   Scenario: A dataset import may be far larger than an attachment
     When I ask to upload a 2 GB CSV file as a dataset import

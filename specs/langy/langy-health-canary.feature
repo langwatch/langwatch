@@ -272,11 +272,11 @@ Feature: A Langy health check that sends a real greeting and says what broke
     Then the response carries "Cache-Control: no-store"
 
   @unit
-  Scenario: The Langy probe is declared public like its sibling health probes
-    Given the health-checks app is loaded
-    When the route registry is read for GET /api/health/langy
-    Then its policy is public, the key being authenticated in-handler
-    And it matches the policy of GET /api/health/scenarios
+  Scenario: The Langy probe is declared behind the project key door, unlike its public sibling probes
+    Given the Langy probe is declared
+    When its route declaration is read for GET /api/health/langy
+    Then its credential is the project key and the permission it asks is langy:create
+    And the probes of the other subsystems are declared as public routes
 
   # ---------------------------------------------------------------------------
   # Live proof — against a running stack, before the monitor is trusted

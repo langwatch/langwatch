@@ -20,6 +20,8 @@ import {
   PROJECT_CREATED_EVENT_TYPE,
   PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE,
   PROJECT_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
+  PROJECT_MOVED_EVENT_TYPE,
+  PROJECT_ARCHIVED_EVENT_TYPE,
   type ProjectCreatedEventData,
   projectCreatedEventDataSchema,
 } from "@langwatch/project-contract";
@@ -31,6 +33,8 @@ import {
   RecordProjectCreatedCommand,
   RecordProjectLegacyKeyRevokedCommand,
   RecordProjectPresenceSettingChangedCommand,
+  RecordProjectMovedCommand,
+  RecordProjectArchivedCommand,
 } from "../project-lifecycle.commands.ts";
 import type { RecordProjectCreatedCommandData } from "../project-lifecycle.events.ts";
 import { buildProjectLifecyclePipeline } from "../project-lifecycle.pipeline.ts";
@@ -69,6 +73,36 @@ describe("project's lifecycle pipeline", () => {
     expect(event?.type).toBe(PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE);
     expect(event?.aggregateId).toBe("project_1");
     expect(event?.data).toEqual(data);
+  });
+
+  /** @scenario "A project moved to another team is recorded as project's fact" */
+  it("records a move with both teams, keyed on its moment", async () => {
+    const data = { ...CREATED, fromTeamId: "team_alpha", toTeamId: "team_beta" };
+    const [event] = await new RecordProjectMovedCommand().handle({
+      tenantId: createTenantId("project_1"),
+      aggregateId: "project_1",
+      type: RecordProjectMovedCommand.schema.type,
+      data,
+    });
+
+    expect(event?.type).toBe(PROJECT_MOVED_EVENT_TYPE);
+    expect(event?.aggregateId).toBe("project_1");
+    expect(event?.data).toEqual(data);
+    expect(event?.idempotencyKey).toBe(`project_1:moved:${CREATED.occurredAt}`);
+  });
+
+  /** @scenario "An archived project is recorded as project's fact" */
+  it("records an archive with the project's organization, keyed on its moment", async () => {
+    const [event] = await new RecordProjectArchivedCommand().handle({
+      tenantId: createTenantId("project_1"),
+      aggregateId: "project_1",
+      type: RecordProjectArchivedCommand.schema.type,
+      data: CREATED,
+    });
+
+    expect(event?.type).toBe(PROJECT_ARCHIVED_EVENT_TYPE);
+    expect(event?.data).toEqual(CREATED);
+    expect(event?.idempotencyKey).toBe(`project_1:archived:${CREATED.occurredAt}`);
   });
 
   describe("when a project's presence setting is recorded", () => {
@@ -168,6 +202,8 @@ describe("given organization records a newly created personal workspace", () => 
       recordProjectCreated: lifecycle.commands.recordProjectCreated,
       recordProjectLegacyKeyRevoked: lifecycle.commands.recordProjectLegacyKeyRevoked,
       recordPresenceSettingChanged: lifecycle.commands.recordPresenceSettingChanged,
+      recordProjectMoved: lifecycle.commands.recordProjectMoved,
+      recordProjectArchived: lifecycle.commands.recordProjectArchived,
     });
     eventing.register(createdListener(heard));
 

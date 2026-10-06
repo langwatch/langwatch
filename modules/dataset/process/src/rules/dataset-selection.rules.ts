@@ -1,5 +1,6 @@
 import type { DatasetEntrySelection, DatasetRecord } from "@langwatch/dataset-contract";
 
+import { entryBytesOf } from "./dataset-row-limits.rules.ts";
 import { stripNullBytes } from "./dataset-sanitize.rules.ts";
 
 /** The url-safe name a dataset is addressed by. */
@@ -48,25 +49,23 @@ export function selectDatasetRecords(
   return [records[index]!];
 }
 
-/** Records up to a byte budget, and whether the budget cut the list short. */
+/**
+ * Records up to a byte budget, in order, and whether the budget left any out.
+ * The same rule on every storage layout: a row is kept while the rows before
+ * it and the row itself fit, and the first row that does not fit ends the read.
+ */
 export function limitDatasetRecordsByBytes(
   records: DatasetRecord[],
-  limitMb: number | null,
+  limitBytes: number,
 ): { records: DatasetRecord[]; truncated: boolean } {
-  if (limitMb === null) {
-    return { records, truncated: false };
-  }
-
-  const limitBytes = limitMb * 1024 * 1024;
   let bytes = 0;
   const result: DatasetRecord[] = [];
   for (const record of records) {
-    const recordBytes = JSON.stringify(record.entry).length;
-    if (bytes + recordBytes >= limitBytes) {
+    bytes += entryBytesOf(record.entry);
+    if (bytes > limitBytes) {
       return { records: result, truncated: true };
     }
 
-    bytes += recordBytes;
     result.push(record);
   }
 
