@@ -10,7 +10,7 @@ import {
 } from "../jobEnvelope.ts";
 import { createTenantId } from "../storage.ts";
 import { TieredBlobStore } from "../tieredBlobStore.ts";
-import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore, mintTestUri } from "./blob-test-doubles.ts";
 
 /**
  * Decode failures: classification comes from error TYPE, never message text,
@@ -32,6 +32,7 @@ describe("jobEnvelope decode failures", () => {
     const tieredBlobs = new TieredBlobStore({
       redisBlobs,
       objectStoreFor: () => objectStore,
+      mintUri: mintTestUri,
       resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
       s3ThresholdBytes,
     });

@@ -9,7 +9,7 @@ import {
 } from "../jobEnvelope.ts";
 import { createTenantId } from "../storage.ts";
 import { TieredBlobStore } from "../tieredBlobStore.ts";
-import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
+import { InMemoryJobBlobStore, InMemoryObjectStore, mintTestUri } from "./blob-test-doubles.ts";
 
 const PROJECT = createTenantId("project-1");
 
@@ -26,6 +26,7 @@ function blobStore(): TieredBlobStore {
   return new TieredBlobStore({
     redisBlobs: new InMemoryJobBlobStore(),
     objectStoreFor: () => new InMemoryObjectStore(),
+    mintUri: mintTestUri,
     resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
   });
 }

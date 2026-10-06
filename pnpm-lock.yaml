@@ -16415,9 +16415,6 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
-      '@langwatch/stored-object-contract':
-        specifier: workspace:*
-        version: link:../../modules/stored-object/contract
       '@langwatch/task':
         specifier: workspace:*
         version: link:../task

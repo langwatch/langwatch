@@ -28,7 +28,6 @@
   "dependencies": {
     "@langwatch/config": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "catalog:",

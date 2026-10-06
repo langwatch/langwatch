@@ -15,8 +15,8 @@ function assertRuleResult(rule: "groupBy" | "identify", value: string): string {
   return value;
 }
 
-function validateDependencies<Payload extends Record<string, unknown>>(
-  dependencies: GroupQueueDependencies<Payload>,
+function validateDependencies<Payload extends Record<string, unknown>, Destination>(
+  dependencies: GroupQueueDependencies<Payload, Destination>,
 ): void {
   const concurrency = dependencies.policy?.globalConcurrency;
   if (concurrency !== undefined && (!Number.isSafeInteger(concurrency) || concurrency <= 0)) {
@@ -39,7 +39,7 @@ function validateDependencies<Payload extends Record<string, unknown>>(
   }
 }
 
-function runtimeDefinition<Payload extends Record<string, unknown>>({
+function runtimeDefinition<Payload extends Record<string, unknown>, Destination>({
   definition,
   process,
   processBatch,
@@ -48,7 +48,7 @@ function runtimeDefinition<Payload extends Record<string, unknown>>({
   definition: GroupQueueDefinition<Payload>;
   process: GroupQueueRuntimeDefinition<Payload>["process"];
   processBatch?: GroupQueueRuntimeDefinition<Payload>["processBatch"];
-  dependencies: GroupQueueDependencies<Payload>;
+  dependencies: GroupQueueDependencies<Payload, Destination>;
 }): GroupQueueRuntimeDefinition<Payload> {
   return {
     name: definition.transportName,
@@ -67,14 +67,15 @@ function runtimeDefinition<Payload extends Record<string, unknown>>({
   };
 }
 
-function processorOptions<Payload extends Record<string, unknown>>(
-  dependencies: GroupQueueDependencies<Payload>,
+function processorOptions<Payload extends Record<string, unknown>, Destination>(
+  dependencies: GroupQueueDependencies<Payload, Destination>,
   consumerEnabled: boolean,
 ) {
   return {
     consumerEnabled,
     objectStoreFor: dependencies.objectStoreFor,
     resolveStorageDestination: dependencies.resolveStorageDestination,
+    mintUri: dependencies.mintUri,
     activity: dependencies.activity,
     context: dependencies.context,
     failures: dependencies.failures,
@@ -84,13 +85,13 @@ function processorOptions<Payload extends Record<string, unknown>>(
   };
 }
 
-export class GroupQueueProducer<Payload extends Record<string, unknown>> {
+export class GroupQueueProducer<Payload extends Record<string, unknown>, Destination = unknown> {
   readonly definition: GroupQueueDefinition<Payload>;
-  readonly #processor: GroupQueueProcessor<Payload>;
+  readonly #processor: GroupQueueProcessor<Payload, Destination>;
 
   constructor(
     definition: GroupQueueDefinition<Payload>,
-    dependencies: GroupQueueDependencies<Payload>,
+    dependencies: GroupQueueDependencies<Payload, Destination>,
   ) {
     validateDependencies(dependencies);
     this.definition = definition;
@@ -138,13 +139,13 @@ export class GroupQueueProducer<Payload extends Record<string, unknown>> {
   }
 }
 
-export class GroupQueueConsumer<Payload extends Record<string, unknown>> {
+export class GroupQueueConsumer<Payload extends Record<string, unknown>, Destination = unknown> {
   readonly definition: GroupQueueDefinition<Payload>;
-  readonly #dependencies: GroupQueueDependencies<Payload>;
+  readonly #dependencies: GroupQueueDependencies<Payload, Destination>;
 
   constructor(
     definition: GroupQueueDefinition<Payload>,
-    dependencies: GroupQueueDependencies<Payload>,
+    dependencies: GroupQueueDependencies<Payload, Destination>,
   ) {
     validateDependencies(dependencies);
     this.definition = definition;
@@ -153,14 +154,14 @@ export class GroupQueueConsumer<Payload extends Record<string, unknown>> {
 
   handle(
     handler: (payload: Payload, context: GroupQueueHandlerContext) => Promise<void>,
-  ): RunningGroupQueueConsumer<Payload> {
+  ): RunningGroupQueueConsumer<Payload, Destination> {
     return this.start({ each: handler });
   }
 
   handleBatch(options: {
     each: (payload: Payload, context: GroupQueueHandlerContext) => Promise<void>;
     batch: (payloads: Payload[], context: GroupQueueHandlerContext) => Promise<void>;
-  }): RunningGroupQueueConsumer<Payload> {
+  }): RunningGroupQueueConsumer<Payload, Destination> {
     if (!this.definition.coalescing) {
       throw new Error(
         `Group Queue "${this.definition.name}" must define coalescing before registering a batch handler`,
@@ -172,7 +173,7 @@ export class GroupQueueConsumer<Payload extends Record<string, unknown>> {
   private start(handlers: {
     each: (payload: Payload, context: GroupQueueHandlerContext) => Promise<void>;
     batch?: (payloads: Payload[], context: GroupQueueHandlerContext) => Promise<void>;
-  }): RunningGroupQueueConsumer<Payload> {
+  }): RunningGroupQueueConsumer<Payload, Destination> {
     const abort = new AbortController();
     const context = (delivery?: JobDelivery): GroupQueueHandlerContext => ({
       attempt: delivery?.attempt ?? 1,
@@ -203,11 +204,14 @@ export class GroupQueueConsumer<Payload extends Record<string, unknown>> {
   }
 }
 
-export class RunningGroupQueueConsumer<Payload extends Record<string, unknown>> {
-  readonly #processor: GroupQueueProcessor<Payload>;
+export class RunningGroupQueueConsumer<
+  Payload extends Record<string, unknown>,
+  Destination = unknown,
+> {
+  readonly #processor: GroupQueueProcessor<Payload, Destination>;
   readonly #abort: AbortController;
 
-  constructor(processor: GroupQueueProcessor<Payload>, abort: AbortController) {
+  constructor(processor: GroupQueueProcessor<Payload, Destination>, abort: AbortController) {
     this.#processor = processor;
     this.#abort = abort;
   }

@@ -7,12 +7,7 @@ import { BLOB_BACKSTOP_TTL_SECONDS, MAX_BLOB_BYTES } from "./blobConstants.ts";
 import { blobNamespaceId, blobObjectPath, legacyBlobObjectPath } from "./blobKeys.ts";
 import type { JobBlobStore } from "./jobEnvelope.ts";
 import { gqBlobDecodeCapExceededTotal } from "./metrics.ts";
-import {
-  mintUriForDestination,
-  type ObjectStore,
-  type ProjectStorageDestination,
-  type TenantId,
-} from "./storage.ts";
+import type { MintStorageUri, ObjectStore, TenantId } from "./storage.ts";
 
 export type { ObjectStore } from "./storage.ts";
 
@@ -103,24 +98,26 @@ function isObjectMissingError(err: unknown): boolean {
  * Tenant-namespaced dual-tier blob store: Redis for mid-size bodies,
  * stored-objects for large ones. Dependencies injected for isolated testing.
  */
-export class TieredBlobStore {
+export class TieredBlobStore<Destination = unknown> {
   private readonly redisBlobs: JobBlobStore;
   // Per-project so the s3/file tier resolves each tenant's BYOC bucket and
   // credentials (the stored-objects S3Driver is projectId-scoped).
   private readonly objectStoreFor: (projectId: string) => ObjectStore;
-  private readonly resolveDestination: (projectId: string) => Promise<ProjectStorageDestination>;
+  private readonly resolveDestination: (projectId: string) => Promise<Destination>;
+  private readonly mintStorageUri: MintStorageUri<Destination>;
   private readonly s3ThresholdBytes: number;
   private readonly queueName?: string;
   private readonly logger?: Logger;
   // Per-project storage destination, cached for the process lifetime. BYOC
   // bucket changes are rare deliberate migrations, picked up on the next worker
   // restart (deploys are frequent); a failed resolve is not cached.
-  private readonly destinationCache = new Map<TenantId, Promise<ProjectStorageDestination>>();
+  private readonly destinationCache = new Map<TenantId, Promise<Destination>>();
 
   constructor(deps: {
     redisBlobs: JobBlobStore;
     objectStoreFor: (projectId: string) => ObjectStore;
-    resolveDestination: (projectId: string) => Promise<ProjectStorageDestination>;
+    resolveDestination: (projectId: string) => Promise<Destination>;
+    mintUri: MintStorageUri<Destination>;
     s3ThresholdBytes?: number;
     /** Optional queue name for the decode-cap-exceeded counter. */
     queueName?: string;
@@ -130,6 +127,7 @@ export class TieredBlobStore {
     this.redisBlobs = deps.redisBlobs;
     this.objectStoreFor = deps.objectStoreFor;
     this.resolveDestination = deps.resolveDestination;
+    this.mintStorageUri = deps.mintUri;
     this.s3ThresholdBytes = deps.s3ThresholdBytes ?? S3_TIER_THRESHOLD_BYTES;
     this.queueName = deps.queueName;
     this.logger = deps.logger;
@@ -145,7 +143,7 @@ export class TieredBlobStore {
     }
   }
 
-  private resolveDestinationCached(projectId: TenantId): Promise<ProjectStorageDestination> {
+  private resolveDestinationCached(projectId: TenantId): Promise<Destination> {
     let cached = this.destinationCache.get(projectId);
     if (!cached) {
       cached = this.resolveDestination(projectId).catch((err: unknown) => {
@@ -169,11 +167,10 @@ export class TieredBlobStore {
     legacy?: boolean;
   }): Promise<string> {
     const destination = await this.resolveDestinationCached(projectId);
-    return mintUriForDestination({
+    return this.mintStorageUri({
       destination,
-      objectPath: legacy
-        ? legacyBlobObjectPath({ projectId, hash })
-        : blobObjectPath({ projectId, hash }),
+      tenantId: projectId,
+      key: legacy ? legacyBlobObjectPath({ projectId, hash }) : blobObjectPath({ projectId, hash }),
     });
   }
 

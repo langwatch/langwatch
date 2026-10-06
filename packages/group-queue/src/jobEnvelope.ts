@@ -322,7 +322,7 @@ export function assertPayloadWithinCap(
   }
 }
 
-export async function encodeJobEnvelope({
+export async function encodeJobEnvelope<Destination>({
   jobData,
   tieredBlobs,
   projectId,
@@ -332,7 +332,7 @@ export async function encodeJobEnvelope({
   logger,
 }: {
   jobData: Record<string, unknown>;
-  tieredBlobs?: TieredBlobStore;
+  tieredBlobs?: TieredBlobStore<Destination>;
   projectId?: TenantId;
   compression?: CompressionCodec;
   payloadCodec?: "json" | "msgpack";
@@ -389,14 +389,14 @@ export async function encodeJobEnvelope({
   );
 }
 
-export async function decodeJobEnvelope({
+export async function decodeJobEnvelope<Destination>({
   value,
   tieredBlobs,
   readMode = "get",
   parsed,
 }: {
   value: string;
-  tieredBlobs?: TieredBlobStore;
+  tieredBlobs?: TieredBlobStore<Destination>;
   /**
    * `"get"` = worker hot path, refreshes the blob's backstop TTL. `"peek"` =
    * non-worker inspection (ops dashboard), does NOT refresh — so a repeatedly-
