@@ -5,9 +5,11 @@ import {
   ClickHouseClientFactory,
   ClickHouseConfigService,
   ClickHouseConnectionService,
+  ClickHouseManagedClientTelemetry,
+  ClickHouseOverloadErrorFactory,
   ClickHouseQueryClient,
   ClickHouseShutdownService,
-  ConcurrencyLimiter,
+  ClickHouseStatementAdmission,
   detectColdScan,
   RetryPolicy,
   routingDriver,
@@ -17,11 +19,14 @@ import {
   type StatementMetrics,
   type WindowedReadMetrics,
   type ClickHouseClientCreationInput,
+  type ClickHouseStatementOperation,
+  type LimiterStats,
   type TenantDirectory,
 } from "@langwatch/clickhouse-client";
 import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "@langwatch/eventing";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { counter, histogram } from "@langwatch/observability/metrics";
+import { counter, histogram, observableGauge } from "@langwatch/observability/metrics";
 
 import type { ClickHouseConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
@@ -80,6 +85,98 @@ function clickHouseWindowedReadMetrics(): WindowedReadMetrics {
   return { record: ({ table, outcome }) => total.inc({ table, outcome }) };
 }
 
+/** The statement bound fronts every endpoint the routed client reaches, so it reports as one. */
+const STATEMENT_BOUND_INSTANCE = "routed";
+
+/**
+ * Main's refusal for a statement no slot freed for in time (origin/main traces/errors.ts). A
+ * package may not import the trace contract's twin; both answer the one registered code.
+ */
+class ClickHouseOverloadedError extends HandledError {
+  declare readonly code: "clickhouse_overloaded";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super("clickhouse_overloaded", "Too many queries in flight", {
+      httpStatus: 503,
+      fault: "platform",
+      retryable: true,
+      ...remediation("clickhouse_overloaded"),
+      reasons: options.reasons,
+    });
+    this.name = "ClickHouseOverloadedError";
+  }
+}
+
+class OverloadedRefusal extends ClickHouseOverloadErrorFactory {
+  create({ cause }: { cause: unknown }): unknown {
+    return new ClickHouseOverloadedError({ reasons: cause instanceof Error ? [cause] : [] });
+  }
+}
+
+const limiterProbes = new Map<string, () => LimiterStats>();
+
+observableGauge(
+  {
+    name: "clickhouse_statements_in_flight",
+    description: "ClickHouse statements this process currently has in flight",
+  },
+  (observer) => {
+    for (const [instance, stats] of limiterProbes) observer.observe(stats().inFlight, { instance });
+  },
+);
+
+observableGauge(
+  {
+    name: "clickhouse_statements_queued",
+    description: "ClickHouse statements waiting for a concurrency slot in this process",
+  },
+  (observer) => {
+    for (const [instance, stats] of limiterProbes) observer.observe(stats().queued, { instance });
+  },
+);
+
+/** Slot waits, refusals and the queue, under main's names (origin/main clickhouse/metrics.ts). */
+class StatementBoundTelemetry extends ClickHouseManagedClientTelemetry {
+  private readonly wait = histogram({
+    name: "clickhouse_statement_wait_seconds",
+    description: "Time a ClickHouse statement waited for a concurrency slot",
+  });
+  private readonly shed = counter({
+    name: "clickhouse_statements_shed_total",
+    description: "ClickHouse statements refused because the concurrency wait queue was full",
+  });
+
+  registerLimiter({ instance, stats }: { instance: string; stats: () => LimiterStats }): void {
+    limiterProbes.set(instance, stats);
+  }
+
+  unregisterLimiter(instance: string): void {
+    limiterProbes.delete(instance);
+  }
+
+  observeStatementWait({
+    instance,
+    operation,
+    seconds,
+  }: {
+    instance: string;
+    operation: ClickHouseStatementOperation;
+    seconds: number;
+  }): void {
+    this.wait.observe(seconds, { instance, operation });
+  }
+
+  incrementStatementsShed({
+    instance,
+    operation,
+  }: {
+    instance: string;
+    operation: ClickHouseStatementOperation;
+  }): void {
+    this.shed.inc({ instance, operation });
+  }
+}
+
 /**
  * The routed client, and the close that shuts every endpoint it opened. The
  * tenant guard is outermost, so a statement that cannot name its tenant is
@@ -119,6 +216,16 @@ export function buildClickHouse(options: {
     detectColdScan,
   });
 
+  const telemetry = new StatementBoundTelemetry();
+  const admission = new ClickHouseStatementAdmission({
+    instance: STATEMENT_BOUND_INSTANCE,
+    maxConcurrent: config.maxConcurrentStatements ?? configuration.poolSizing.size,
+    telemetry,
+    overloadErrorFactory: new OverloadedRefusal(),
+    logger: createLogger("langwatch:clickhouse:statement-limit"),
+  });
+  telemetry.registerLimiter({ instance: STATEMENT_BOUND_INSTANCE, stats: () => admission.stats() });
+
   const client = new ClickHouseQueryClient({
     driver: routingDriver(connection),
     tenantGuard: new TenantGuard(),
@@ -135,9 +242,7 @@ export function buildClickHouse(options: {
         }),
     }),
     reporter,
-    limiter: new ConcurrencyLimiter({
-      maxConcurrent: config.maxConcurrentStatements ?? configuration.poolSizing.size,
-    }),
+    limiter: admission,
     privateRoutes: new Map(
       (config.privateRoutes ?? []).map((route) => [route.organizationId, route.url]),
     ),
@@ -145,6 +250,9 @@ export function buildClickHouse(options: {
 
   return {
     value: client,
-    close: () => ClickHouseShutdownService.create().shutdown(connection),
+    close: () => {
+      telemetry.unregisterLimiter(STATEMENT_BOUND_INSTANCE);
+      return ClickHouseShutdownService.create().shutdown(connection);
+    },
   };
 }

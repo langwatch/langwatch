@@ -3,13 +3,16 @@
  * once, what happens to the surplus, and who may stop waiting. A deferrable
  * driver stands in for the vendor client, since instant statements never wait.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ClickHouseClientCreationInput } from "../connection.ts";
 import {
   ClickHouseManagedClientTelemetry,
   ClickHouseOverloadErrorFactory,
+  ClickHouseStatementAdmission,
+  DEFAULT_CLICKHOUSE_REQUEST_TIMEOUT_MS,
   DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
+  DEFAULT_STATEMENT_WAIT_TIMEOUT_MS,
   withClickHouseStatementLimit,
   type ClickHouseStatementOperation,
   type ClickHouseVendorClient,
@@ -232,6 +235,65 @@ describe("given a statement waiting for a slot", () => {
 
       driver.releaseAll();
       await admitted;
+    });
+  });
+});
+
+describe("given a bound of a few slots, and a bound of many", () => {
+  describe("when the wait queue is sized for each", () => {
+    /** @scenario the wait queue is sized from the bound, never below its floor */
+    it("holds eight statements per slot, and never fewer than 64", () => {
+      const queueFor = (maxConcurrent: number) =>
+        new ClickHouseStatementAdmission({
+          instance: "test",
+          maxConcurrent,
+          telemetry: new SilentTelemetry(),
+          overloadErrorFactory: new OverloadFactory(),
+        }).maxQueued;
+
+      expect(queueFor(2)).toBe(64);
+      expect(queueFor(20)).toBe(160);
+    });
+  });
+});
+
+describe("given a statement waiting for a slot that never frees", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("when the wait bound elapses", () => {
+    /** @scenario a statement that waits too long is refused, not left waiting */
+    it("refuses it as overload, counts it as shed, and leaves the running statement alone", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const driver = deferrableClient();
+      const telemetry = new SilentTelemetry();
+      const limited = withClickHouseStatementLimit({
+        client: driver.client,
+        input: input(1),
+        telemetry,
+        overloadErrorFactory: new OverloadFactory(),
+      });
+
+      const running = limited.query({ query: "SELECT 1" });
+      const waiting = limited.query({ query: "SELECT 2" }).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      await vi.advanceTimersByTimeAsync(DEFAULT_STATEMENT_WAIT_TIMEOUT_MS);
+
+      expect(await waiting).toBeInstanceOf(OverloadedError);
+      expect(telemetry.shed).toEqual(["query"]);
+      expect(driver.started).toBe(1);
+
+      driver.releaseAll();
+      await expect(running).resolves.toEqual({ ok: true });
+    });
+
+    /** @scenario a statement that waits too long is refused, not left waiting */
+    it("is shorter than the time one statement may spend on the wire", () => {
+      expect(DEFAULT_STATEMENT_WAIT_TIMEOUT_MS).toBe(20_000);
+      expect(DEFAULT_STATEMENT_WAIT_TIMEOUT_MS).toBeLessThan(DEFAULT_CLICKHOUSE_REQUEST_TIMEOUT_MS);
     });
   });
 });

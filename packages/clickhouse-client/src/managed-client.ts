@@ -212,6 +212,134 @@ export interface ClickHouseStatementLimitOptions<Client extends ClickHouseVendor
   statementWaitTimeoutMs?: number | undefined;
 }
 
+export interface ClickHouseStatementAdmissionOptions {
+  instance: string;
+  maxConcurrent: number;
+  telemetry: ClickHouseManagedClientTelemetry;
+  overloadErrorFactory: ClickHouseOverloadErrorFactory;
+  logger?: ClickHouseManagedClientLogger | undefined;
+  statementQueueDepthPerSlot?: number | undefined;
+  minimumStatementQueueDepth?: number | undefined;
+  statementWaitTimeoutMs?: number | undefined;
+}
+
+/**
+ * Main's statement bound (origin/main statementLimit.ts): `maxConcurrent` slots, a wait queue of
+ * max(64, slots x 8) and a 20s wait. A statement refused for want of a slot throws the process's
+ * overload error; once admitted, its own errors pass through untouched.
+ */
+export class ClickHouseStatementAdmission {
+  readonly maxQueued: number;
+  private readonly limiter: ConcurrencyLimiter;
+  private readonly timeoutMs: number;
+
+  constructor(private readonly options: ClickHouseStatementAdmissionOptions) {
+    this.maxQueued = Math.max(
+      options.minimumStatementQueueDepth ?? DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
+      options.maxConcurrent *
+        (options.statementQueueDepthPerSlot ?? DEFAULT_STATEMENT_QUEUE_DEPTH_PER_SLOT),
+    );
+    this.timeoutMs = options.statementWaitTimeoutMs ?? DEFAULT_STATEMENT_WAIT_TIMEOUT_MS;
+    this.limiter = new ConcurrencyLimiter({
+      maxConcurrent: options.maxConcurrent,
+      maxQueued: this.maxQueued,
+    });
+    options.logger?.info(
+      {
+        instance: options.instance,
+        maxConcurrent: options.maxConcurrent,
+        maxQueued: this.maxQueued,
+      },
+      "ClickHouse statement concurrency bounded",
+    );
+  }
+
+  stats(): LimiterStats {
+    return this.limiter.stats();
+  }
+
+  /** Runs `task` once a slot is free, or refuses it as overloaded when none frees in time. */
+  async run<T>({
+    operation,
+    signal,
+    task,
+  }: {
+    operation: ClickHouseStatementOperation;
+    signal?: AbortSignalLike | undefined;
+    task: () => Promise<T>;
+  }): Promise<T> {
+    const { instance, telemetry } = this.options;
+    const startedAt = performance.now();
+    let admitted = false;
+    const wait = armStatementWait({
+      limiter: this.limiter,
+      maxConcurrent: this.options.maxConcurrent,
+      signal,
+      timeoutMs: this.timeoutMs,
+    });
+    try {
+      return await this.limiter.run({
+        signal: wait.signal,
+        task: () => {
+          admitted = true;
+          wait.dispose();
+          telemetry.observeStatementWait({
+            instance,
+            operation,
+            seconds: (performance.now() - startedAt) / 1_000,
+          });
+          return task();
+        },
+      });
+    } catch (error) {
+      if (admitted) throw error;
+      throw this.refusal({ error, timedOut: wait.hasTimedOut(), operation, startedAt });
+    } finally {
+      wait.dispose();
+    }
+  }
+
+  /**
+   * What a statement that never got a slot throws: an overload error, counted as
+   * shed, when the queue was full or the wait timed out; otherwise its own error.
+   */
+  private refusal({
+    error,
+    timedOut,
+    operation,
+    startedAt,
+  }: {
+    error: unknown;
+    timedOut: boolean;
+    operation: ClickHouseStatementOperation;
+    startedAt: number;
+  }): unknown {
+    const { instance, telemetry, overloadErrorFactory, logger } = this.options;
+    if (error instanceof QueueFullError) {
+      telemetry.incrementStatementsShed({ instance, operation });
+      logger?.warn(
+        { instance, operation, maxQueued: this.maxQueued },
+        "Refused a ClickHouse statement: concurrency wait queue full",
+      );
+      return overloadErrorFactory.create({ cause: error });
+    }
+    if (timedOut) {
+      telemetry.incrementStatementsShed({ instance, operation });
+      logger?.warn(
+        {
+          instance,
+          operation,
+          waitedMs: Math.round(performance.now() - startedAt),
+          timeoutMs: this.timeoutMs,
+        },
+        "Refused a ClickHouse statement: waited too long for a slot",
+      );
+      return overloadErrorFactory.create({ cause: error });
+    }
+    return error;
+  }
+}
+
 const STATEMENT_METHODS: readonly ClickHouseStatementOperation[] = [
   "query",
   "insert",
@@ -240,81 +368,24 @@ function boundStatementMethod({
   return [(params: unknown) => run({ operation, params, task: () => method.call(target, params) })];
 }
 
-/** How many statements may wait for a slot: a floor, or a depth per open connection. */
-function statementQueueDepth<Client extends ClickHouseVendorClient>(
-  options: ClickHouseStatementLimitOptions<Client>,
-): number {
-  return Math.max(
-    options.minimumStatementQueueDepth ?? DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
-    options.input.maxOpenConnections *
-      (options.statementQueueDepthPerSlot ?? DEFAULT_STATEMENT_QUEUE_DEPTH_PER_SLOT),
-  );
-}
-
-/**
- * What a statement that never got a slot throws: an overload error, counted as
- * shed, when the queue was full or the wait timed out; otherwise its own error.
- */
-function shedStatementError<Client extends ClickHouseVendorClient>({
-  error,
-  timedOut,
-  operation,
-  startedAt,
-  timeoutMs,
-  maxQueued,
-  options,
-}: {
-  error: unknown;
-  timedOut: boolean;
-  operation: ClickHouseStatementOperation;
-  startedAt: number;
-  timeoutMs: number;
-  maxQueued: number;
-  options: ClickHouseStatementLimitOptions<Client>;
-}): unknown {
-  const { input, telemetry, overloadErrorFactory, logger } = options;
-  if (error instanceof QueueFullError) {
-    telemetry.incrementStatementsShed({ instance: input.instance, operation });
-    logger?.warn(
-      { instance: input.instance, operation, maxQueued },
-      "Refused a ClickHouse statement: concurrency wait queue full",
-    );
-    return overloadErrorFactory.create({ cause: error });
-  }
-  if (timedOut) {
-    telemetry.incrementStatementsShed({ instance: input.instance, operation });
-    logger?.warn(
-      {
-        instance: input.instance,
-        operation,
-        waitedMs: Math.round(performance.now() - startedAt),
-        timeoutMs,
-      },
-      "Refused a ClickHouse statement: waited too long for a slot",
-    );
-    return overloadErrorFactory.create({ cause: error });
-  }
-  return error;
-}
-
 /** Bounds every vendor statement method while preserving the caller's cancellation signal. */
 export function withClickHouseStatementLimit<Client extends ClickHouseVendorClient>(
   options: ClickHouseStatementLimitOptions<Client>,
 ): Client {
-  const { client, input, telemetry, logger } = options;
-  const timeoutMs = options.statementWaitTimeoutMs ?? DEFAULT_STATEMENT_WAIT_TIMEOUT_MS;
-  const maxQueued = statementQueueDepth(options);
-  const limiter = new ConcurrencyLimiter({
+  const { client, input, telemetry } = options;
+  const admission = new ClickHouseStatementAdmission({
+    instance: input.instance,
     maxConcurrent: input.maxOpenConnections,
-    maxQueued,
+    telemetry,
+    overloadErrorFactory: options.overloadErrorFactory,
+    logger: options.logger,
+    statementQueueDepthPerSlot: options.statementQueueDepthPerSlot,
+    minimumStatementQueueDepth: options.minimumStatementQueueDepth,
+    statementWaitTimeoutMs: options.statementWaitTimeoutMs,
   });
-  telemetry.registerLimiter({ instance: input.instance, stats: () => limiter.stats() });
-  logger?.info(
-    { instance: input.instance, maxConcurrent: input.maxOpenConnections, maxQueued },
-    "ClickHouse statement concurrency bounded",
-  );
+  telemetry.registerLimiter({ instance: input.instance, stats: () => admission.stats() });
 
-  const run = async ({
+  const run = ({
     operation,
     params,
     task,
@@ -322,39 +393,7 @@ export function withClickHouseStatementLimit<Client extends ClickHouseVendorClie
     operation: ClickHouseStatementOperation;
     params: unknown;
     task: () => Promise<unknown>;
-  }): Promise<unknown> => {
-    const startedAt = performance.now();
-    let admitted = false;
-    const wait = armStatementWait({ limiter, input, params, timeoutMs });
-    try {
-      return await limiter.run({
-        signal: wait.signal,
-        task: () => {
-          admitted = true;
-          wait.dispose();
-          telemetry.observeStatementWait({
-            instance: input.instance,
-            operation,
-            seconds: (performance.now() - startedAt) / 1_000,
-          });
-          return task();
-        },
-      });
-    } catch (error) {
-      if (admitted) throw error;
-      throw shedStatementError({
-        error,
-        timedOut: wait.hasTimedOut(),
-        operation,
-        startedAt,
-        timeoutMs,
-        maxQueued,
-        options,
-      });
-    } finally {
-      wait.dispose();
-    }
-  };
+  }): Promise<unknown> => admission.run({ operation, signal: signalOf(params), task });
 
   let closePromise: Promise<void> | undefined;
   return new Proxy(client, {
@@ -449,19 +488,19 @@ interface ArmedWait {
   dispose(): void;
 }
 
+/** Arms the wait deadline only when every slot is taken; a free slot waits for nothing. */
 function armStatementWait({
   limiter,
-  input,
-  params,
+  maxConcurrent,
+  signal,
   timeoutMs,
 }: {
   limiter: ConcurrencyLimiter;
-  input: ClickHouseClientCreationInput;
-  params: unknown;
+  maxConcurrent: number;
+  signal: AbortSignalLike | undefined;
   timeoutMs: number;
 }): ArmedWait {
-  const signal = signalOf(params);
-  if (limiter.stats().inFlight < input.maxOpenConnections) return unarmedWait(signal);
+  if (limiter.stats().inFlight < maxConcurrent) return unarmedWait(signal);
 
   const controller = new AbortController();
   let timedOut = false;

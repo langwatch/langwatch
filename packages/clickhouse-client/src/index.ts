@@ -54,6 +54,7 @@ export {
   ClickHouseManagedClientLogger,
   ClickHouseManagedClientTelemetry,
   ClickHouseOverloadErrorFactory,
+  ClickHouseStatementAdmission,
   ClickHouseVendorClientFactory,
   createVendorClientResiliencePolicy,
   createResilientVendorClient,
@@ -70,6 +71,7 @@ export {
 } from "./managed-client.ts";
 export type {
   ClickHouseManagedClientOptions,
+  ClickHouseStatementAdmissionOptions,
   ClickHouseStatementLimitOptions,
   ClickHouseStatementOperation,
   ClickHouseVendorClient,

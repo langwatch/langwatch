@@ -48,6 +48,12 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
     And the refusal is counted so the operator can see the platform shedding
 
   @unit
+  Scenario: the wait queue is sized from the bound, never below its floor
+    Given a bound of a few slots, and a bound of many
+    When the platform sizes the wait queue for each
+    Then each queue holds eight statements per slot, and never fewer than 64
+
+  @unit
   Scenario: a caller that gives up stops waiting
     Given a statement is waiting for a slot
     When the caller abandons the request
