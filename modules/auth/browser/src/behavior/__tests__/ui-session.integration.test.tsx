@@ -278,19 +278,18 @@ describe("given a screen that asks what the reader may do", () => {
       await waitFor(() =>
         expect(view.getByTestId("answers").textContent).toContain("datasets:view=true"),
       );
-      expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(2);
+      expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(1);
     });
 
-    it("asks separately about the resolved project and organization", async () => {
+    it("asks once, about the resolved project, as main did (scope knot Q2)", async () => {
       const { transport, callsTo } = recordingTransport();
 
       const view = renderSession({ transport, authClient: signedInAsJane });
 
       await waitFor(() => expect(view.getByTestId("user").textContent).toBe(JANE));
-      await waitFor(() => expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(2));
+      await waitFor(() => expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(1));
       expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE).map((call) => call.input)).toEqual([
         { projectId: "proj-app" },
-        { organizationId: "org-acme" },
       ]);
     });
   });
