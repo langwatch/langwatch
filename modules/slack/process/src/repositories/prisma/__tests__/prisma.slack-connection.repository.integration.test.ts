@@ -234,9 +234,9 @@ describe.skipIf(!databaseUrl)("PrismaSlackConnectionRepository", () => {
         projectId,
       });
 
-      await expect(connections.delete({ id: row.id, organizationId })).rejects.toThrow(
-        /foreign key/i,
-      );
+      await expect(connections.delete({ id: row.id, organizationId })).rejects.toMatchObject({
+        code: "P2014",
+      });
       await expect(connections.findById({ id: row.id })).resolves.toHaveLength(1);
 
       await claims.delete({ connectionId: row.id, claimantId: "trigger-1", projectId });

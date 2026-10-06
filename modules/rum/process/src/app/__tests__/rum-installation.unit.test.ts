@@ -1,15 +1,26 @@
 // @vitest-environment node
-import { RumApi } from "@langwatch/rum-contract";
-import { createTestLogger } from "@langwatch/test-harness";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import type * as observabilityModule from "@langwatch/observability";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { rumProcessModule } from "../../rum.module.ts";
-import {
-  COLLECTOR_ENDPOINT,
-  exportWith,
-  rumInstallation,
-  TELEMETRY_ENDPOINT,
-} from "./rum.fixture.ts";
+const logged = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}));
+
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof observabilityModule>()),
+  createLogger: () => logged,
+}));
+
+// `isolate: false`: a sibling may have loaded the module with the real logger already.
+vi.resetModules();
+
+const { RumApi } = await import("@langwatch/rum-contract");
+const { rumProcessModule } = await import("../../rum.module.ts");
+const { COLLECTOR_ENDPOINT, exportWith, rumInstallation, TELEMETRY_ENDPOINT } =
+  await import("./rum.fixture.ts");
 
 function stubCollector() {
   const collector = vi.fn(
@@ -29,10 +40,14 @@ function sentTo(collector: ReturnType<typeof stubCollector>) {
 
 const report = { body: exportWith(1), session: "s", forwardedFor: undefined };
 
-const deprecationWarnings = (lines: ReturnType<typeof createTestLogger>["lines"]) =>
-  lines.filter((line) => line.level === 40 && String(line.msg).includes("deprecated"));
+const deprecations = () =>
+  logged.warn.mock.calls.filter(([, message]) => String(message).includes("deprecated"));
 
 describe("rum app installation", () => {
+  beforeEach(() => {
+    logged.warn.mockClear();
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -52,13 +67,11 @@ describe("rum app installation", () => {
     /** @scenario "rum's own collector variables win over the deprecated ones" */
     it("forwards to rum's collector with rum's headers and warns about nothing", async () => {
       const collector = stubCollector();
-      const { logger, lines } = createTestLogger();
       const runtime = await rumInstallation({
         collectorEndpoint: COLLECTOR_ENDPOINT,
         collectorHeaders: "Authorization=Bearer rum",
         telemetryEndpoint: TELEMETRY_ENDPOINT,
-        telemetryHeaders: { Authorization: "Bearer otel" },
-        logger,
+        telemetryHeaders: "Authorization=Bearer otel",
       }).boot();
 
       await runtime.service(RumApi).ingestBrowserTraces(report);
@@ -66,7 +79,7 @@ describe("rum app installation", () => {
       await vi.waitFor(() => expect(collector).toHaveBeenCalledOnce());
       expect(sentTo(collector).url).toBe(`${COLLECTOR_ENDPOINT}/v1/traces`);
       expect(sentTo(collector).headers.get("authorization")).toBe("Bearer rum");
-      expect(deprecationWarnings(lines)).toEqual([]);
+      expect(deprecations()).toEqual([]);
     });
   });
 
@@ -74,12 +87,10 @@ describe("rum app installation", () => {
     /** @scenario "The deprecated OTLP variables still work and warn once at boot" */
     it("forwards to it with its headers and warns once, naming old and new variables", async () => {
       const collector = stubCollector();
-      const { logger, lines } = createTestLogger();
       const runtime = await rumInstallation({
         collectorEndpoint: undefined,
         telemetryEndpoint: TELEMETRY_ENDPOINT,
-        telemetryHeaders: { Authorization: "Bearer otel" },
-        logger,
+        telemetryHeaders: "Authorization=Bearer otel",
       }).boot();
 
       await runtime.service(RumApi).ingestBrowserTraces(report);
@@ -88,7 +99,7 @@ describe("rum app installation", () => {
       await vi.waitFor(() => expect(collector).toHaveBeenCalledTimes(2));
       expect(sentTo(collector).url).toBe(`${TELEMETRY_ENDPOINT}/v1/traces`);
       expect(sentTo(collector).headers.get("authorization")).toBe("Bearer otel");
-      const warnings = deprecationWarnings(lines);
+      const warnings = deprecations().map(([fields]) => fields as Record<string, unknown>);
       expect(warnings).toHaveLength(1);
       expect(warnings[0]?.deprecated).toEqual([
         "OTEL_EXPORTER_OTLP_ENDPOINT",

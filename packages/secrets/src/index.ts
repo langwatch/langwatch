@@ -11,6 +11,7 @@ export {
   openAiApiKey,
   sessionSecret,
   signInProviderSecrets,
+  telemetryExporterHeaders,
   virtualKeyPepper,
 } from "./shared-secrets.ts";
 export {

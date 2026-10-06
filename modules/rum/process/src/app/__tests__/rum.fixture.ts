@@ -1,30 +1,29 @@
-import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/process";
+import { createApp, type ModuleSecretsScope } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
-import { createTestLogger } from "@langwatch/test-harness";
 
 import { rumProcessModule } from "../../rum.module.ts";
 
 export const COLLECTOR_ENDPOINT = "http://collector.test:4318";
 export const TELEMETRY_ENDPOINT = "http://telemetry-collector.test:4318";
 
-/** rum's collector headers, from a chain over a fake environment, scoped as boot scopes them. */
-function collectorSecrets(headers: string | undefined): ModuleSecretsScope {
+/** rum's headers, from a chain over a fake environment, scoped as boot scopes them. */
+function headerSecrets({
+  collectorHeaders,
+  telemetryHeaders,
+}: Readonly<{
+  collectorHeaders: string | undefined;
+  telemetryHeaders: string | undefined;
+}>): ModuleSecretsScope {
   const resolver = SecretsResolver.over(
-    SecretsChain.start({ environment: { RUM_COLLECTOR_HEADERS: headers } }).withEnv(),
+    SecretsChain.start({
+      environment: {
+        RUM_COLLECTOR_HEADERS: collectorHeaders,
+        OTEL_EXPORTER_OTLP_HEADERS: telemetryHeaders,
+      },
+    }).withEnv(),
   );
   return (owner, declared) => resolver.scopeTo(owner, declared);
-}
-
-/** Observability's exporter as the process hands it down, headers applied inside a build. */
-function telemetryExporter(
-  endpoint: string | undefined,
-  headers: Readonly<Record<string, string>>,
-) {
-  return {
-    endpoint,
-    withHeaders: <Out>(build: (applied: Readonly<Record<string, string>>) => Out): Out =>
-      build(headers),
-  };
 }
 
 /** The same chain production boots, over memory buckets. */
@@ -32,22 +31,19 @@ export function rumInstallation({
   collectorEndpoint,
   collectorHeaders,
   telemetryEndpoint,
-  telemetryHeaders = {},
-  logger = createTestLogger().logger,
+  telemetryHeaders,
 }: Readonly<{
   collectorEndpoint: string | undefined;
   collectorHeaders?: string;
   telemetryEndpoint?: string;
-  telemetryHeaders?: Readonly<Record<string, string>>;
-  logger?: ReturnType<typeof createTestLogger>["logger"];
+  telemetryHeaders?: string;
 }>) {
-  return createApp({ role: "api", secrets: collectorSecrets(collectorHeaders) })
-    .withModules([withMemoryRepositories(rumProcessModule)])
+  return createApp({ role: "api", secrets: headerSecrets({ collectorHeaders, telemetryHeaders }) })
+    .withModules([rumProcessModule])
+    .withStores(memoryStores())
     .withConfig({
       rum: { enabled: false, sampleRatio: 1, collectorEndpoint, telemetryEndpoint },
-    })
-    .withObservability((observability) => observability.withLogging(logger))
-    .withMembers({ telemetryExporter: telemetryExporter(telemetryEndpoint, telemetryHeaders) });
+    });
 }
 
 export const exportWith = (spanCount: number) =>

@@ -1,6 +1,7 @@
 import { Config, type ConfigOf, telemetryExporterEndpoint } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { Secret } from "@langwatch/secrets/secret";
+import { telemetryExporterHeaders } from "@langwatch/secrets/shared-secrets";
 import { z } from "zod";
 
 const blankIsUnset = (value: unknown) => (value === "" ? undefined : value);
@@ -33,6 +34,8 @@ export type RumConfig = ConfigOf<typeof rumConfig>;
 /** The collector's auth headers, `key=value,key2=value2`: a credential, never a config field. */
 export const rumSecrets = {
   collectorHeaders: Secret.load("RUM_COLLECTOR_HEADERS", { optional: true }),
+  /** The shared exporter headers, read only as the deprecated fallback. */
+  telemetryHeaders: telemetryExporterHeaders,
 } as const;
 
 /** All a browser learns: whether to trace, and what share of sessions to record. */

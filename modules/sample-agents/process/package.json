@@ -23,6 +23,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/sample-agents-contract": "workspace:*",

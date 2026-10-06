@@ -19,6 +19,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@langwatch/config": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
     "zod": "catalog:"

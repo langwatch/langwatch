@@ -3,7 +3,12 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
-import { UsageApi, type UsageApi as UsageApiContract } from "@langwatch/usage-contract";
+import {
+  UsageApi,
+  type UsageApi as UsageApiContract,
+  type UsageServerConfig,
+  usageConfig,
+} from "@langwatch/usage-contract";
 
 import { CountMonthCommand } from "../eventing/usage.commands.ts";
 import {
@@ -15,8 +20,6 @@ import type { UsageRepositories } from "../repositories/usage.repositories.ts";
 import { BillableEventsMeterAppendService } from "../services/billable-events-meter-append.service.ts";
 import { TraceMeterAppendService } from "../services/trace-meter-append.service.ts";
 import { UsageCountingService } from "../services/usage-counting.service.ts";
-
-export type UsageInfrastructure = Readonly<{ isSaas: boolean }>;
 
 type UsageDependencies = Readonly<{
   entitlement: typeof EntitlementApi;
@@ -32,7 +35,7 @@ export class UsageModule implements UsageApiContract {
     billing: BillingApi,
     projects: ProjectApi,
   };
-  static readonly reads = ["isSaas"] as const;
+  static readonly config = usageConfig;
 
   #senders: UsageSenders | undefined;
 
@@ -42,14 +45,9 @@ export class UsageModule implements UsageApiContract {
 
   static create({
     dependencies,
-    members,
+    config,
     repositories,
-  }: FeatureSetup<
-    UsageDependencies,
-    UsageInfrastructure,
-    unknown,
-    UsageRepositories
-  >): UsageModule {
+  }: FeatureSetup<UsageDependencies, never, UsageServerConfig, UsageRepositories>): UsageModule {
     const meter = repositories.billableEvents;
     const counting = UsageCountingService.create({
       meter,
@@ -59,7 +57,7 @@ export class UsageModule implements UsageApiContract {
     return new UsageModule((send) =>
       buildUsagePipeline({
         countMonth: CountMonthCommand.create({ counting }),
-        meterStores: members.isSaas
+        meterStores: config.isSaas
           ? {
               billableEvents: BillableEventsMeterAppendService.create({
                 meter,

@@ -20,6 +20,14 @@ export const virtualKeyPepper = Secret.load("LW_VIRTUAL_KEY_PEPPER", { optional:
 export const nlpInternalSecret = Secret.load("LANGWATCH_NLP_INTERNAL_SECRET", { optional: true });
 
 /**
+ * The telemetry exporter's collector headers: the process's exporter sends with
+ * them, rum falls back to them while `OTEL_EXPORTER_OTLP_*` is deprecated for it.
+ */
+export const telemetryExporterHeaders = Secret.load("OTEL_EXPORTER_OTLP_HEADERS", {
+  optional: true,
+});
+
+/**
  * The platform's own OpenAI key: model-provider dispatches on it, evaluation
  * reads it, sample-agents' demo bot spends it.
  */

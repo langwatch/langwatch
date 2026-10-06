@@ -1,7 +1,7 @@
 /**
  * Telemetry is an everyone-sends-to-one-place concern, so it declares its
  * config slice and secret handles at its framework owner exactly as a module
- * does (§6). The handles come from `@langwatch/observability`, which reads them.
+ * does (§6). The exporter headers are the shared handle rum also reads.
  */
 import {
   Config,
@@ -9,7 +9,8 @@ import {
   serviceVersion,
   telemetryExporterEndpoint,
 } from "@langwatch/config";
-import { metricsScrapeTokenSecret, otlpHeadersSecret } from "@langwatch/observability/node";
+import { metricsScrapeTokenSecret } from "@langwatch/observability/node";
+import { telemetryExporterHeaders } from "@langwatch/secrets/shared-secrets";
 import { z } from "zod";
 
 const optionalString = z.preprocess(
@@ -53,7 +54,7 @@ export const observabilityOwner = {
     },
   })),
   secrets: {
-    otlpHeaders: otlpHeadersSecret,
+    otlpHeaders: telemetryExporterHeaders,
     metricsScrapeToken: metricsScrapeTokenSecret,
   },
 } as const;

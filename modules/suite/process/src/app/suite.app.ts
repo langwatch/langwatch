@@ -43,7 +43,9 @@ import {
   type SuiteRunResult,
   type SuiteRunStateData,
   SuiteScopeNotAllowedError,
+  type SuiteServerConfig,
   type SuiteTarget,
+  suiteConfig,
   type CreateSuiteCommand,
   type CompleteSuiteRunItemCommandData,
   type ConnectedTargetAgent,
@@ -103,17 +105,10 @@ export interface SuiteAppDependencies {
   featureFlags: FeatureFlagApiType;
 }
 
-/**
- * Shapes restated rather than imported from `@langwatch/process-stores`: a
- * module depends on contracts. `publicBaseUrl` is the process's own fact,
- * absent where the deployment named no `BASE_HOST`.
- */
-type SuiteProcessMembers = Readonly<{ publicBaseUrl: string | undefined }>;
-
 type SuiteSetup = FeatureSetup<
   typeof SuiteModule.dependencies,
-  SuiteProcessMembers,
-  undefined,
+  never,
+  SuiteServerConfig,
   SuiteRepositories
 >;
 
@@ -139,11 +134,10 @@ export class SuiteModule implements SuiteApi {
     /** The project's default model per role, stamped on each queued run as main did. */
     modelProviders: ModelProviderApi,
   };
-  /** Every name is from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["publicBaseUrl"] as const;
+  static readonly config = suiteConfig;
 
   static create(setup: SuiteSetup): SuiteModule {
-    const { members, dependencies, repositories } = setup;
+    const { config, dependencies, repositories } = setup;
     const runItems = SuiteRunItemCommandsService.create();
     const infrastructure = SuiteModule.infrastructureOver({
       agents: dependencies.agents,
@@ -153,7 +147,7 @@ export class SuiteModule implements SuiteApi {
         scenarios: dependencies.scenarios,
         modelProviders: dependencies.modelProviders,
       }).resolve,
-      publicBaseUrl: members.publicBaseUrl,
+      publicBaseUrl: config.publicBaseUrl,
     });
     const defaultRetentionDays = () => dependencies.retention.getPlatformDefaultRetentionDays();
 

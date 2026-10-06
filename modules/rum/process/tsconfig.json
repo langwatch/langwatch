@@ -30,6 +30,9 @@
       "path": "../../../packages/process/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/process-stores/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/react-rum/tsconfig.build.json"
     },
     {
