@@ -296,6 +296,12 @@ wscat -c "wss://gateway.langwatch.ai/v1/live/sessions" \
 > {"type":"session.start","session":{"model":"openai/gpt-live-1","audio":{"format":{"type":"audio/pcm","rate":24000}}}}
 ```
 
+A browser passes the virtual key as a subprotocol, as on the Realtime socket. The gateway answers `realtime` to the browser and opens OpenAI's socket with no subprotocol:
+
+```js
+const ws = new WebSocket("wss://gateway.langwatch.ai/v1/live/sessions", ["realtime", `openai-insecure-api-key.${virtualKey}`]);
+```
+
 The gateway reads that one frame, resolves `session.model`, checks `session.delegation.responses.model` against the allowlist, writes the resolved model back and sends the frame to OpenAI. A first frame that is not `session.start`, names no model, or names a model the key does not allow gets an error frame and close `1008`. The client has 15 seconds to send it.
 
 Duration is reported from OpenAI's cumulative seconds and delegated responses under their own model, as on the WebRTC route. When the client leaves without `session.close`, the gateway sends it, so the final duration is the one OpenAI states.

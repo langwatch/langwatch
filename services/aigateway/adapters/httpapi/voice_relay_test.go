@@ -283,6 +283,27 @@ func TestLiveSocketResolvesTheModelOfTheFirstFrame(t *testing.T) {
 	assert.Equal(t, "live", booked.RequestedModel)
 }
 
+// @scenario "A browser opens a Live socket with its key as a subprotocol"
+func TestLiveSocketAnswersABrowserThatOffersTheKeySubprotocol(t *testing.T) {
+	t.Parallel()
+	g := newSocketGateway(t, &brokerWorld{}, nil)
+
+	client, _, err := g.dial("/v1/live/sessions", nil, "realtime", "openai-insecure-api-key."+socketVirtualKey)
+	require.NoError(t, err)
+	assert.Equal(t, "realtime", client.Subprotocol(), "a browser fails a handshake that answers none of its subprotocols")
+	g.mu.Lock()
+	assert.Equal(t, []string{socketVirtualKey}, g.tokens, "the key subprotocol authenticates the socket")
+	g.mu.Unlock()
+
+	start := `{"type":"session.start","session":{"model":"gpt-live-1"}}`
+	require.NoError(t, client.Write(context.Background(), websocket.MessageText, []byte(start)))
+	g.vendor.frame()
+	g.vendor.mu.Lock()
+	defer g.vendor.mu.Unlock()
+	assert.Empty(t, g.vendor.headers[0].Values("Sec-WebSocket-Protocol"), "the Live vendor socket takes no subprotocol")
+	assert.NotContains(t, g.vendor.requests[0], socketVirtualKey)
+}
+
 // @scenario "A Live socket cannot delegate to a model the key does not allow"
 func TestLiveSocketRefusesADelegatedModelOutsideTheAllowlist(t *testing.T) {
 	t.Parallel()

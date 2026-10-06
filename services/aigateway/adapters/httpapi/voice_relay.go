@@ -90,6 +90,15 @@ func offeredSubprotocols(r *http.Request) []string {
 	return offered
 }
 
+// answeredSubprotocols is the subprotocol a client is answered: realtime
+// when offered, never the key one.
+func answeredSubprotocols(r *http.Request) []string {
+	if slices.Contains(offeredSubprotocols(r), realtimeSubprotocol) {
+		return []string{realtimeSubprotocol}
+	}
+	return nil
+}
+
 // voiceSocket is one upgrade request being answered.
 type voiceSocket struct {
 	deps RouterDeps
@@ -191,8 +200,12 @@ func openAILiveSocketHandler(deps RouterDeps) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		// The key authenticates the socket, so any origin may open one.
-		client, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
+		// The key authenticates the socket, so any origin may open one. A
+		// browser offering a key subprotocol needs one answered, and the
+		// vendor takes none, so realtime is answered to the client only.
+		client, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+			InsecureSkipVerify: true, Subprotocols: answeredSubprotocols(r),
+		})
 		if err != nil {
 			return
 		}
@@ -270,10 +283,7 @@ func openAIRealtimeSocketHandler(deps RouterDeps) http.HandlerFunc {
 			socket.refuse(err)
 			return
 		}
-		var subprotocols []string
-		if slices.Contains(offeredSubprotocols(r), realtimeSubprotocol) {
-			subprotocols = []string{realtimeSubprotocol}
-		}
+		subprotocols := answeredSubprotocols(r)
 		socket.relay(voicesession.RelayCall{
 			Ticket:             ticket,
 			Path:               "/v1/realtime",

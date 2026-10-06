@@ -199,6 +199,9 @@ type relay struct {
 	units    atomic.Int64
 	counter  relayCounter
 	vendorUp bool
+	// sessionOver is set once the vendor said the session ended, after
+	// which its socket dropping is the normal end of the call.
+	sessionOver bool
 }
 
 // newRelay takes the two sockets as client, then vendor.
@@ -251,7 +254,7 @@ func (r *relay) supervise() (string, pumpEnd) {
 	for {
 		select {
 		case event := <-r.events:
-			s.record(event)
+			r.record(event)
 			if reason := s.flush(); reason != "" {
 				return reason, pumpEnd{}
 			}
@@ -281,12 +284,19 @@ func (r *relay) pumpStopped(end pumpEnd) string {
 	return ReasonClientClosed
 }
 
+// record records one vendor event and notes a session the vendor closed.
+func (r *relay) record(event Event) {
+	if r.s.record(event) {
+		r.sessionOver = true
+	}
+}
+
 // drain records the events the vendor pump passed on and nobody read yet.
 func (r *relay) drain() {
 	for {
 		select {
 		case event := <-r.events:
-			r.s.record(event)
+			r.record(event)
 		default:
 			return
 		}
@@ -298,7 +308,11 @@ func (r *relay) drain() {
 func (r *relay) close(reason string, end pumpEnd) {
 	switch reason {
 	case ReasonVendorClosed:
-		code, text := closeOf(end.err, websocket.StatusInternalError, "provider_connection_lost")
+		fallback, fallbackText := websocket.StatusInternalError, "provider_connection_lost"
+		if r.sessionOver {
+			fallback, fallbackText = websocket.StatusNormalClosure, ""
+		}
+		code, text := closeOf(end.err, fallback, fallbackText)
 		_ = r.conns[sideClient].Close(code, text)
 	case ReasonClientClosed:
 		r.clientGone.Store(true)
@@ -357,7 +371,7 @@ func (r *relay) awaitVendor(wait time.Duration) bool {
 	for {
 		select {
 		case event := <-r.events:
-			r.s.record(event)
+			r.record(event)
 		case end := <-r.ended:
 			if end.pump == sideVendor {
 				r.drain()

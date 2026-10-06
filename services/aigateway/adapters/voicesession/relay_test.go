@@ -433,6 +433,28 @@ func TestRelayPassesCloseCodesOn(t *testing.T) {
 	})
 }
 
+// @scenario "A Live vendor that drops its socket after session.closed ends the call normally"
+func TestRelayLiveVendorDropAfterSessionClosedIsANormalClose(t *testing.T) {
+	t.Parallel()
+	r := newRelayRig(t, domain.RealtimeKindLive, nil)
+	r.shape = func(call *RelayCall) {
+		call.Path, call.RawQuery = "/v1/live/sessions", ""
+		call.Opening = []byte(`{"type":"session.start","session":{"model":"gpt-live-1"}}`)
+	}
+	client, vendor := r.dial()
+	r.vendor.frame()
+
+	send(t, vendor, websocket.MessageText,
+		[]byte(`{"type":"session.closed","reason":"close_requested","usage":{"seconds":8}}`))
+	readFrame(t, client)
+	require.NoError(t, vendor.CloseNow(), "no close frame, as OpenAI Live does")
+	closed := readClose(t, client)
+
+	assert.Equal(t, websocket.StatusNormalClosure, closed.Code, "OpenAI Live drops its socket without a close frame after session.closed")
+	assert.Empty(t, closed.Reason)
+	assert.Equal(t, ReasonVendorClosed, r.metrics.awaitEnded(t))
+}
+
 // @scenario "A vendor that refuses the socket releases the booking"
 func TestRelayReleasesTheBookingWhenTheDialFails(t *testing.T) {
 	t.Parallel()

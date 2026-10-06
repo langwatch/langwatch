@@ -890,6 +890,20 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       And every later frame is relayed untouched
 
     @unit
+    Scenario: A browser opens a Live socket with its key as a subprotocol
+      Given a browser offers the subprotocols realtime and openai-insecure-api-key.<key>
+      When it upgrades on GET /v1/live/sessions
+      Then the key subprotocol authenticates the socket
+      And the client is answered the realtime subprotocol, never the key one
+      And the vendor socket is opened with no subprotocol
+
+    @unit
+    Scenario: A Live vendor that drops its socket after session.closed ends the call normally
+      Given a relayed Live socket whose vendor sent session.closed
+      When the vendor drops its socket without a close frame
+      Then the client is closed with 1000, not 1011 provider_connection_lost
+
+    @unit
     Scenario: A Live socket cannot delegate to a model the key does not allow
       When session.start names a session or delegated model outside the allowlist
       Then the client gets an error frame and close 1008
