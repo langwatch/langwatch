@@ -8,7 +8,6 @@
 # Prerequisites — create secrets first:
 #   kubectl create secret generic langwatch-secrets -n langwatch \
 #     --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
-#     --from-literal=cronApiKey=$(openssl rand -hex 16) \
 #     --from-literal=nextAuthSecret=$(openssl rand -hex 16)
 #
 # Usage:

@@ -97,26 +97,16 @@ Feature: The API process authenticates through the installed auth module
     # lets the process build one. A boot statement that is contradicted by the
     # line under it is worse than no boot statement.
 
-    @integration
-    Scenario: A process that composes its own browser sessions announces no absence
-      Given a deployment that supplies no Better Auth transport but names its own browser-session identity
-      When the API process starts
-      Then it does not announce that transport as one nobody supplied
-      And what it says about Better Auth describes the one it composed
-
     @unit
     Scenario: A process that can compose no browser sessions says so, with the reason
       Given a deployment that supplies no Better Auth transport and names no browser-session identity
       When the API process starts
       Then the composition that could not build one says so, naming the reason
 
-    @unit
-    Scenario: An avatar upload refuses by name on a process with no stored objects
-      Given the process composed its user service with no stored-object application
-      When somebody uploads an avatar through it
-      Then the write refuses and names the process
-      # Accepting the bytes and dropping them would answer a customer's upload
-      # with success and no picture.
+    # An avatar upload on a process with no stored objects is not a runtime
+    # refusal any more: the user module declares the stored-object module as a
+    # peer, so a process without it refuses to boot naming both
+    # (declarative-process-composition.feature, "A missing peer refuses by name").
 
   # The API process reads its user directory through the user application it
   # installs. It used to wrap that application in an adapter that refused the

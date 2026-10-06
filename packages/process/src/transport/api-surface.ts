@@ -138,7 +138,6 @@ class ApiSurface {
         scim_token: unboundDirectoryDoor(),
         instance_admin: this.composition.instanceAdmin,
       },
-      bearers: (namespace) => bearerDoor({ name: namespace, token: void 0 }),
       audit: this.door.audit.rest,
       idempotency,
       rateLimiter,

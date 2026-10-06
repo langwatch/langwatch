@@ -11,15 +11,14 @@ Feature: The API process serves credentials through the installed tenancy module
 
   Rule: A credential this process cannot verify is not a weaker service
 
-    @unit @unimplemented
+    @unit
     Scenario: A process configured with no API-key pepper refuses to boot, naming the setting
       Given the process installs the API-key module
-      And the deployment configured no API-key pepper
+      And the deployment set none of API_KEY_PEPPER, CREDENTIALS_SECRET and NEXTAUTH_SECRET
       When the process boots
-      Then the boot refuses, naming the pepper setting
-      # Gap: the pepper is an optional secret today. An unset one still mounts
-      # the product transports and every presented key is refused per request
-      # (open question Q154(3), handoffs/process-bearer-gating.md).
+      Then the boot refuses, naming the pepper settings it looked for
+      # Main's chain: the first of the three that is set is the pepper; an
+      # empty value counts as unset, and a key is never hashed under "".
 
   Rule: A persisted format is read the way the other tier writes it
 

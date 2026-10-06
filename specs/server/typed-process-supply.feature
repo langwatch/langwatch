@@ -82,6 +82,15 @@ Feature: A process cannot boot without what its modules declared
       And a deployment that configured no database
       Then the boot refuses, naming the setting that would configure one
 
+    @unit
+    Scenario: A queue a module needs and the deployment did not configure
+      Given an installed module that keeps its state in Redis
+      And a deployment that configured no Redis
+      Then the boot refuses, naming REDIS_URL
+      # The eventing queue runs over the process's one Redis, so a process
+      # with no Redis cannot compose dispatch either: it refuses to boot
+      # rather than naming "no dispatch" and serving without it.
+
   Rule: choosing memory is an override, and an override against a real endpoint is said out loud
 
     @unit
@@ -140,6 +149,13 @@ Feature: A process cannot boot without what its modules declared
     # The deployment's shared-secret map (CRON_API_KEY) is retired: no family
     # used it. A module that needs a bearer owns it and binds it on its own
     # family (record section 4), so there is no host-side name to misspell.
+
+    @integration
+    Scenario: A host given no deployment bearers leaves an unbound internal family closed
+      Given a REST host created with no bearers option
+      And a family naming the internal secret credential that binds no door of its own
+      When a caller presents a bearer to it
+      Then the call is refused and the handler is never reached
 
     @unit
     Scenario: A door whose credential was never supplied refuses callers

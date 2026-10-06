@@ -121,7 +121,6 @@ With `autogen.enabled: false` the chart creates no Secrets; it reads them from S
 | Key | Needed when |
 |-----|-------------|
 | `credentialsEncryptionKey` | Always |
-| `cronApiKey` | Always |
 | `nextAuthSecret` | Always |
 | `virtualKeyPepper` | Always |
 | `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET` | `gateway.chartManaged: true` (default) |
@@ -504,7 +503,7 @@ The defaults are a HorizontalPodAutoscaler running 2 to 10 replicas, a ClusterIP
 
 Three things to know when running it:
 
-1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
+1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
    The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key (under plain `helm`, a missing `LANGY_INTERNAL_SECRET` in an existing Secret stops the render instead); under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **A public route needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate route. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
