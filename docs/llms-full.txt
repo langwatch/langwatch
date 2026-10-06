@@ -41602,6 +41602,55 @@ The verifier throws (Python raises) rather than returning a boolean, so a receiv
 
 Working receivers built on both snippets live in the [agent-billing-demo](https://github.com/langwatch/agent-billing-demo) reference repo.
 
+### Middleware for Hono and Express
+
+`@langwatch/webhook-verify` wraps the same check as route middleware, with no runtime dependencies. It answers `401` with `{ "error": "<code>" }` when a delivery does not verify and hands the request on when it does.
+
+```bash
+npm install @langwatch/webhook-verify
+```
+
+<CodeGroup>
+
+```typescript hono.ts
+import { Hono } from "hono";
+import { langwatchWebhook } from "@langwatch/webhook-verify/hono";
+
+const app = new Hono();
+
+app.post(
+  "/langwatch/webhooks",
+  langwatchWebhook({ secret: [process.env.LANGWATCH_WEBHOOK_SECRET!] }),
+  async (c) => {
+    const { batch } = await c.req.json();
+    // ... deduplicate on each envelope's id, then process
+    return c.body(null, 200);
+  },
+);
+```
+
+```typescript express.ts
+import express from "express";
+import { langwatchWebhook } from "@langwatch/webhook-verify/express";
+
+const app = express();
+
+app.post(
+  "/langwatch/webhooks",
+  express.raw({ type: "application/json" }),
+  langwatchWebhook({ secret: [process.env.LANGWATCH_WEBHOOK_SECRET!] }),
+  (req, res) => {
+    const { batch } = JSON.parse(req.body.toString("utf8"));
+    // ... deduplicate on each envelope's id, then process
+    res.sendStatus(200);
+  },
+);
+```
+
+</CodeGroup>
+
+Express must hand the middleware the raw bytes, so mount `express.raw()` before it rather than `express.json()`. The middleware runs on Node 20+, Bun, Deno and edge runtimes (it uses Web Crypto). Pass every valid secret during a rotation. A receiver of the legacy `X-LangWatch-Signature: sha256=<hex>` header (the body alone, no timestamp) passes `scheme: "sha256"`; every webhook endpoint signs `t=,v1=`, the default.
+
 ### Rotating the signing secret
 
 `roll-secret` returns a new secret and keeps the old one valid for **24 hours**. For that window every delivery is signed with both, so there is no coordinated deploy and no gap:
