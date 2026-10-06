@@ -1,4 +1,4 @@
-import { UiSlot } from "@langwatch/browser-host/slots";
+import { Lent } from "@langwatch/browser-host/lent";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -14,6 +14,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
 import {
   History,
   MoreVertical,
@@ -185,7 +186,7 @@ function WebhooksUpsell() {
             </Alert.Content>
           </Alert.Root>
           <Box width="full">
-            <UiSlot name="contactSales" props={{}} />
+            <Lent of={ContactSalesToken} props={{}} />
           </Box>
         </VStack>
       </PageLayout.Container>

@@ -46,6 +46,9 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../enterprise/modules/enterprise-gateway/contract/tsconfig.build.json"
     },
     {

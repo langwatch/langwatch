@@ -109,14 +109,14 @@ describe("the Roles screen", () => {
 
   describe("given the organization is not on Enterprise", () => {
     /** @scenario Custom roles are an Enterprise feature */
-    it("explains the feature is Enterprise and offers sales", () => {
+    it("explains the feature is Enterprise and offers sales", async () => {
       renderWithAuthzHost(
         <RolesScreen />,
         new FakeAuthzHost({ plan: { isEnterprise: false, isLoading: false } }),
       );
 
       expect(screen.getByText("Enterprise Feature")).toBeInTheDocument();
-      expect(screen.getByTestId("contact-sales-block")).toBeInTheDocument();
+      expect(await screen.findByTestId("contact-sales-block")).toBeInTheDocument();
       expect(screen.queryByText("Custom roles")).not.toBeInTheDocument();
     });
   });

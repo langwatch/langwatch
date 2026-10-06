@@ -340,14 +340,14 @@ export type UiCapabilities = {
   /**
    * Where every module's named events go. Absent and "installed no
    * destination" are the same reading — `useUiAnalytics` degrades to the
-   * inert destination either way, exactly as `useUiSlots` does.
+   * inert destination either way.
    */
   analytics?: UiAnalytics;
   /** Where the reader could replicate a thing to. Absent reads as no answer. */
   copyTargets?: UiCopyTargets;
   /**
    * What installed modules declared through `withCapabilities`. Optional:
-   * absent reads as nothing declared, exactly as `slots` does.
+   * absent reads as nothing declared.
    */
   declarations?: UiDeclarations;
   /**

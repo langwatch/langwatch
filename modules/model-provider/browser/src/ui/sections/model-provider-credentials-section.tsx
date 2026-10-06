@@ -1,6 +1,7 @@
-import { UiSlot } from "@langwatch/browser-host/slots";
+import { Lent } from "@langwatch/browser-host/lent";
 import { Box, Field, Input, VStack } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
+import { ManagedModelProviderAlertToken } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import type React from "react";
 import { useEffect } from "react";
@@ -133,9 +134,9 @@ export const CredentialsSection = ({
 
   if (isManaged) {
     return (
-      <UiSlot
-        name="managedModelProviderAlert"
-        props={{ provider: provider.provider, error: state.errors.customKeysRoot }}
+      <Lent
+        of={ManagedModelProviderAlertToken}
+        props={{ provider, error: state.errors.customKeysRoot }}
       />
     );
   }

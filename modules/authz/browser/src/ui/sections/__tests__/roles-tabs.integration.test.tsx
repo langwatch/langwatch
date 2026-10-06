@@ -154,7 +154,7 @@ describe("the Roles & access page", () => {
 
   describe("given an organization that is not on Enterprise", () => {
     /** @scenario Access is an Enterprise feature */
-    it("offers sales and reads no grant, even on the Access address", () => {
+    it("offers sales and reads no grant, even on the Access address", async () => {
       renderWithAuthzHost(
         <RolesScreen />,
         new FakeAuthzHost({
@@ -163,7 +163,7 @@ describe("the Roles & access page", () => {
         }),
       );
 
-      expect(screen.getByTestId("contact-sales-block")).toBeInTheDocument();
+      expect(await screen.findByTestId("contact-sales-block")).toBeInTheDocument();
       expect(state.bindingReads).toBe(0);
       expect(state.grantReads).toBe(0);
     });

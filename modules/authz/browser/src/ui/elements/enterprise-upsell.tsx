@@ -1,17 +1,17 @@
 /**
  * What both RBAC pages show an organization that is not on Enterprise. The
- * words belong to billing, which this package may not name, so they arrive
- * through the composition's `contactSales` slot; unfilled, no card shows.
+ * words belong to billing, which lends the card by token; unlent, none shows.
  */
 
-import { UiSlot } from "@langwatch/browser-host/slots";
+import { Lent } from "@langwatch/browser-host/lent";
 import { Box } from "@langwatch/design-system/primitives";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
 
 /** The sales block, framed the way both pages framed it. */
 export function EnterpriseUpsell() {
   return (
     <Box width="full">
-      <UiSlot name="contactSales" props={{}} />
+      <Lent of={ContactSalesToken} props={{}} />
     </Box>
   );
 }
