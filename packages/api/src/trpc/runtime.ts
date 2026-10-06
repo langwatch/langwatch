@@ -471,11 +471,11 @@ export interface TrpcRouterAccess<
   /**
    * What the tenant must hold beside the permission, asked after access at the scope it
    * resolved (refused access never reaches the plan). `feature` is named on the refusal;
-   * `when` asks only for an input it holds for.
+   * `when` asks only for an input it holds for. The plan-first order is REST's alone (Q31).
    */
   withEntitlement(
     entitlement: ApiEntitlement,
-    options?: EntitlementOptions,
+    options?: Omit<EntitlementOptions, "before">,
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
   /**
    * The procedure mints a credential (a key, token or secret). The runtime refuses it with
@@ -702,6 +702,8 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
       },
       withEntitlement: (named: ApiEntitlement, options: EntitlementOptions = {}) => {
         assertSingleEntitlement({ contract, name, entitlement });
+
+        assertNoPlanFirst({ address: `tRPC ${contract.namespace}.${name}`, options });
 
         return selected(name, facts, { ...marks, entitlement: { entitlement: named, ...options } });
       },
@@ -2092,4 +2094,15 @@ export function createTrpcErrorFormatter(
       },
     };
   };
+}
+
+/** The plan-first order (Q31) is a REST door's; a procedure asks its plan after access. */
+function assertNoPlanFirst({
+  address,
+  options,
+}: {
+  address: string;
+  options: EntitlementOptions;
+}): void {
+  if (options.before) throw new Error(`${address} asks its plan first, which REST alone does`);
 }

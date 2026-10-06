@@ -902,6 +902,11 @@ export type EntitlementGate = Readonly<{
   feature?: string;
   /** Asked only for an input this holds for; absent, every call asks. */
   when?: (input: unknown) => boolean;
+  /**
+   * `"permission"`: the door identifies, the plan is asked at the credential's scope, then the
+   * permission (Q31: main's CLI answers 402 before 403). Absent, refused access never reaches it.
+   */
+  before?: "permission";
 }>;
 
 export type EntitlementOptions = Omit<EntitlementGate, "entitlement">;

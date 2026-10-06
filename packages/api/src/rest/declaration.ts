@@ -537,6 +537,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly rawResponse?: RestRawResponse;
   /** Present exactly when the route declared the kind of answer it gives. */
   readonly response?: RestResponseDeclaration;
+  /** Present exactly when a `responds()` route writes its refusals in its own wire. */
+  readonly refusal?: RestProtocolRefusal;
   /** Every method this one declaration answers; the declared method alone by default. */
   readonly methods?: readonly HttpMethod[];
   /** True for the one route of a path that answers whatever method arrives. */
@@ -597,6 +599,7 @@ type RouteState = Readonly<{
   rawResponse?: RestRawResponse;
   /** Present exactly when the route declared the kind of answer it gives. */
   response?: RestResponseDeclaration;
+  refusal?: RestProtocolRefusal;
   methods?: readonly HttpMethod[];
   anyMethod?: boolean;
   permission?: AuthzPermission;
@@ -912,8 +915,8 @@ class RouteBuilder<Api, S extends RouteShape> {
 
   /**
    * What the tenant must hold beside the permission, asked after access at the scope it
-   * resolved (refused access never reaches the plan). `feature` is named on the refusal;
-   * `when` asks only for an input it holds for.
+   * resolved (refused access never reaches the plan), or, with `before: "permission"`, after
+   * the door identifies. `feature` is named on the refusal; `when` narrows by input.
    */
   withEntitlement(
     entitlement: ApiEntitlement,
@@ -1152,11 +1155,12 @@ class RouteBuilder<Api, S extends RouteShape> {
 
   /**
    * The several answers this route may give, each with the body it carries:
-   * `responds({ 200: report, 503: report })`. An unhealthy report is an answer,
-   * not a failure — the handler returns `{ status, body }` typed by this declaration.
+   * `responds({ 200: report, 503: report })`; the handler returns `{ status, body }`.
+   * `refusal` writes the route's refusals in a wire it keeps (Q31), as a protocol route's does.
    */
   responds<const Answers extends RestRouteAnswers>(
     answers: Answers,
+    options: Readonly<{ refusal?: RestProtocolRefusal }> = {},
   ): RouteBuilder<Api, With<S, { answer: Answers }>> {
     assertSourceUnset("output", this.state.output ?? this.state.answers);
     assertSchemaAnswerFree({ operation: this.operation, state: this.state });
@@ -1170,6 +1174,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       state: {
         ...this.state,
         answers,
+        ...(options.refusal ? { refusal: options.refusal } : {}),
       },
     });
   }
@@ -1539,6 +1544,7 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
     ...(state.idempotency ? { idempotency: state.idempotency } : {}),
     ...(state.rawResponse ? { rawResponse: state.rawResponse } : {}),
     ...(state.response ? { response: state.response } : {}),
+    ...(state.refusal ? { refusal: state.refusal } : {}),
     ...(state.credential ? { credential: state.credential } : {}),
     ...(state.key ? { key: state.key } : {}),
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),
@@ -2017,9 +2023,34 @@ function assertRouteReady({
 
   assertMethodsCarryTheirBody({ operation, state });
   assertCacheableAnswer({ operation, state });
+  assertEntitlementOrder({ operation, state });
 
   if (/:([A-Za-z0-9_]+)/.test(path) && !state.params) {
     throw new Error(`REST ${method.toUpperCase()} ${path} must declare withParams()`);
+  }
+}
+
+/**
+ * A plan asked before the permission is asked at the credential's own scope, so the route names
+ * a permission asked there: not an access kind, an input choice, a path target or the platform.
+ */
+function assertEntitlementOrder({
+  operation,
+  state,
+}: {
+  operation: string;
+  state: RouteState;
+}): void {
+  if (state.entitlement?.before !== "permission") return;
+
+  const asked = state.permission ?? state.permissions;
+  const elsewhere = state.permissionBy ?? state.permissionTarget ?? state.permissionPlatform;
+
+  if (!asked || state.access || elsewhere) {
+    throw new Error(
+      `REST ${operation} asks its plan before the permission, so it must name a permission ` +
+        "asked at the credential's own scope",
+    );
   }
 }
 
