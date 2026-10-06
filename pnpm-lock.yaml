@@ -11442,9 +11442,6 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
-      '@langwatch/clickhouse-migrations':
-        specifier: workspace:*
-        version: link:../../../packages/clickhouse-migrations
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../../coding-agent/contract
@@ -11565,6 +11562,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract

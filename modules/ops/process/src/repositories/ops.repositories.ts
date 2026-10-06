@@ -25,6 +25,7 @@ import type { StorageFootprintRepository } from "./storage-footprint.repository.
 import type { StorageStatsReadingsRepository } from "./storage-stats-readings.repository.ts";
 import type { SystemMigrationEnrollmentRepository } from "./system-migration-enrollment.repository.ts";
 import type { SystemMigrationStateRepository } from "./system-migration-state.repository.ts";
+import type { UpgradeLedgerRepository } from "./upgrade-ledger.repository.ts";
 import type {
   OrganizationMemberTenantSourceRepository,
   UserTenantSourceRepository,
@@ -65,4 +66,5 @@ export interface OpsRepositories {
   readonly redisHealth: RedisHealthRepository;
   readonly events: EventExplorerRepository;
   readonly storageFootprint: StorageFootprintRepository;
+  readonly upgradeLedger: UpgradeLedgerRepository;
 }

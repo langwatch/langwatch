@@ -20,6 +20,7 @@ import {
   MemoryRedisHealthRepository,
 } from "../../repositories/memory/memory.datastore-health.repository.ts";
 import { OpsCheckupService } from "../ops-checkup.service.ts";
+import { ledgerOf, stepOf } from "./support/upgrade-ledger.ts";
 import { UsageReportWorld } from "./support/usage-report-peers.ts";
 
 const CONFIG: OpsServerConfig = {
@@ -81,6 +82,7 @@ let provisionable: boolean[];
 let probes: MemoryCheckupProbeChannel;
 let mintedKeys: MintRunKeyInput[];
 let gatewayAddresses: GatewayDeploymentAddresses;
+let upgrade: ReturnType<typeof ledgerOf>;
 
 function checkup() {
   return service().checkupFor({ organizationId: "org-1", requestedBy: "user-1" });
@@ -147,7 +149,10 @@ function service() {
         },
       },
     },
-    repositories: datastores,
+    repositories: {
+      ...datastores,
+      upgradeLedger: { findStatus: upgrade.status, findSteps: upgrade.listSteps },
+    },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),
       probes,
@@ -176,39 +181,49 @@ beforeEach(() => {
     publicUrl: void 0,
     expectedControlPlaneUrl: "https://langwatch.acme.test",
   };
+  upgrade = ledgerOf([]);
 });
 
 describe("OpsCheckupService", () => {
-  describe("given a release migration the ledger never finished", () => {
-    it("names it as pending, and a started one as failed", async () => {
-      datastores.postgres.releaseMigrations.push("0_init", "20260101_add", "20260102_more");
-      datastores.postgres.ledger.push(
-        { name: "0_init", finished: true, rolledBack: false },
-        { name: "20260102_more", finished: false, rolledBack: false },
-      );
+  describe("given the upgrade ledger holds a blocking step that is not done", () => {
+    /** @scenario "The migration rows read the upgrade ledger" */
+    it("refuses the migrations row of that engine, names the step and the upgrade", async () => {
+      upgrade = ledgerOf([
+        stepOf({ id: "prisma:20260101000000_add", status: "pending" }),
+        stepOf({ id: "clickhouse:00002", kind: "clickhouse-schema", status: "failed" }),
+      ]);
 
-      const verdict = await verdictOf("postgres_migrations");
+      const [postgres, clickhouse] = await Promise.all([
+        verdictOf("postgres_migrations"),
+        verdictOf("clickhouse_migrations"),
+      ]);
 
-      expect(verdict).toMatchObject({
+      expect(postgres).toMatchObject({
         outcome: "refused",
-        code: "checkup_postgres_migration_failed",
+        code: "checkup_postgres_migrations_pending",
+        detail: expect.stringContaining("prisma:20260101000000_add"),
+        fix: expect.stringMatching(/pnpm task upgrade.*\/ops\/upgrades/),
       });
-    });
-
-    it("reads as not checked where the release's folder is not on the install", async () => {
-      await expect(verdictOf("postgres_migrations")).resolves.toMatchObject({
-        outcome: "unchecked",
+      expect(clickhouse).toMatchObject({
+        outcome: "refused",
+        code: "checkup_clickhouse_migrations_pending",
       });
+      expect(clickhouse?.detail).toContain("clickhouse:00002");
     });
   });
 
-  describe("given goose reports a pending ClickHouse migration", () => {
-    it("refuses with the pending count", async () => {
-      datastores.clickhouse.migrationStatus = "Applied  00001_init.sql\nPending -- 00002_more.sql";
+  describe("given every blocking step in the upgrade ledger is done", () => {
+    it("verifies both migration rows", async () => {
+      upgrade = ledgerOf([
+        stepOf({ id: "prisma:20260101000000_add" }),
+        stepOf({ id: "clickhouse:00002", kind: "clickhouse-schema" }),
+      ]);
 
+      await expect(verdictOf("postgres_migrations")).resolves.toMatchObject({
+        outcome: "verified",
+      });
       await expect(verdictOf("clickhouse_migrations")).resolves.toMatchObject({
-        outcome: "refused",
-        code: "checkup_clickhouse_migrations_pending",
+        outcome: "verified",
       });
     });
   });

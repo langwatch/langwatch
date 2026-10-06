@@ -27,16 +27,17 @@ import { MemoryStorageFootprintRepository } from "./memory.storage-footprint.rep
 import { MemoryStorageStatsReadingsRepository } from "./memory.storage-stats-readings.repository.ts";
 import { MemorySystemMigrationEnrollmentRepository } from "./memory.system-migration-enrollment.repository.ts";
 import { MemorySystemMigrationStateRepository } from "./memory.system-migration-state.repository.ts";
-import {
-  MemoryOrganizationMemberTenantSourceRepository,
-  MemoryUserTenantSourceRepository,
-} from "./memory.user-tenant-source.repository.ts";
-
 /**
  * One store per composed process, shared by every twin, so a row one
  * repository writes is a row the next one reads. A memory process keeps no
  * GroupQueue in Redis, so the queue and blob readings answer empty.
  */
+import { MemoryUpgradeLedgerRepository } from "./memory.upgrade-ledger.repository.ts";
+import {
+  MemoryOrganizationMemberTenantSourceRepository,
+  MemoryUserTenantSourceRepository,
+} from "./memory.user-tenant-source.repository.ts";
+
 export class MemoryOpsRepositories {
   static readonly requires = [] as const;
 
@@ -70,6 +71,7 @@ export class MemoryOpsRepositories {
       redisHealth: MemoryRedisHealthRepository.create(),
       events: MemoryEventExplorerRepository.create({ store }),
       storageFootprint: MemoryStorageFootprintRepository.create(),
+      upgradeLedger: MemoryUpgradeLedgerRepository.create(),
     };
   }
 }

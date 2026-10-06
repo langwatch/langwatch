@@ -14,6 +14,7 @@ import { ProcessOpsPrismaRepository } from "./prisma.process-ops.repository.ts";
 import { PrismaProjectTenantSourceRepository } from "./prisma.project-tenant-source.repository.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "./prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "./prisma.system-migration-state.repository.ts";
+import { PrismaUpgradeLedgerRepository } from "./prisma.upgrade-ledger.repository.ts";
 import {
   PrismaOrganizationMemberTenantSourceRepository,
   PrismaUserTenantSourceRepository,
@@ -63,6 +64,7 @@ export const PostgresOpsRepositories = {
       impersonation: PrismaImpersonationRepository.create(prisma),
       processFleet: ProcessOpsPrismaRepository.create({ prisma }),
       postgresHealth: PrismaPostgresHealthRepository.create(prisma),
+      upgradeLedger: PrismaUpgradeLedgerRepository.create({ prisma }),
     };
   },
 };

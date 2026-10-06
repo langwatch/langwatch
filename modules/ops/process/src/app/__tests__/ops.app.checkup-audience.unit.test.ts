@@ -20,6 +20,7 @@ import {
   MemoryPostgresHealthRepository,
   MemoryRedisHealthRepository,
 } from "../../repositories/memory/memory.datastore-health.repository.ts";
+import { MemoryUpgradeLedgerRepository } from "../../repositories/memory/memory.upgrade-ledger.repository.ts";
 import { UsageReportWorld } from "../../services/__tests__/support/usage-report-peers.ts";
 import { OpsCheckupService } from "../../services/ops-checkup.service.ts";
 import {
@@ -117,6 +118,7 @@ function checkupService(): OpsCheckupService {
       postgres: MemoryPostgresHealthRepository.create(),
       clickhouse: MemoryClickHouseHealthRepository.create(),
       redis: MemoryRedisHealthRepository.create(),
+      upgradeLedger: MemoryUpgradeLedgerRepository.create(),
     },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),

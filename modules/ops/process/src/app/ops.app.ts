@@ -228,7 +228,6 @@ import {
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup, ServerRole } from "@langwatch/process";
-import { storesOwner } from "@langwatch/process-stores/config";
 import {
   ProjectApi,
   type ProjectApi as ProjectApiContract,
@@ -734,8 +733,6 @@ export class OpsModule implements OpsApi {
   static readonly config = opsConfig;
   static readonly secrets = {
     licensePrivateKey: licensingSecrets.licensePrivateKey,
-    /** The stores' own handle: goose reads migration status from the same ClickHouse. */
-    clickhouseUrl: storesOwner.secrets.clickhouse,
     /** Posts the new-bug-report alert; absent, intake stays silent. */
     slackBugReportsBotToken: Secret.load("SLACK_BUG_REPORTS_BOT_TOKEN", { optional: true }),
     /** The stores' own keys: credentials-reseal moves values from the previous to the current. */
@@ -813,13 +810,9 @@ export class OpsModule implements OpsApi {
       },
       repositories: {
         postgres: repositories.postgresHealth,
-        clickhouse: await setup.secrets.into(OpsModule.secrets.clickhouseUrl, (connectionUrl) =>
-          ClickHouseClickHouseHealthRepository.create({
-            clickhouse: members.clickhouse,
-            connectionUrl,
-          }),
-        ),
+        clickhouse: ClickHouseClickHouseHealthRepository.create({ clickhouse: members.clickhouse }),
         redis: repositories.redisHealth,
+        upgradeLedger: repositories.upgradeLedger,
       },
       channels: {
         usageReport: HttpUsageReportChannel.create(),
