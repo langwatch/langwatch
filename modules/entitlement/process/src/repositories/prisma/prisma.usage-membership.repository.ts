@@ -6,7 +6,7 @@ import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { UsageMembershipRepository } from "../usage-membership.repository.ts";
 
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
-export type PrismaUsageMembershipDatabase = PrismaClient | Prisma.TransactionClient;
+type PrismaUsageMembershipDatabase = PrismaClient | Prisma.TransactionClient;
 
 /** The first instant of the current calendar month, in the process's zone. */
 function getCurrentMonthStart(): Date {

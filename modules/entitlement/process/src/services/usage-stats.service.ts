@@ -45,10 +45,10 @@ function formatPercent(value: number): string {
 }
 
 /** Threshold at which to show a warning (80% of limit) */
-export const MESSAGE_LIMIT_WARNING_THRESHOLD = 0.8;
+const MESSAGE_LIMIT_WARNING_THRESHOLD = 0.8;
 
 /** The operator a plan is resolved for. */
-export type UsageStatsCaller = PlanProviderUser;
+type UsageStatsCaller = PlanProviderUser;
 
 type UsageStatsSources = {
   membership: UsageMembershipRepository;

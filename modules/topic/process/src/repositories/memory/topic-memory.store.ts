@@ -15,7 +15,7 @@ export type MemoryTopicProject = Readonly<{
 }>;
 
 /** One recorded clustering cost row, as the ledger keeps it. */
-export type MemoryClusteringCost = Readonly<{
+type MemoryClusteringCost = Readonly<{
   projectId: string;
   amount: number;
   currency: "USD" | "EUR";
@@ -37,7 +37,7 @@ export type MemoryClusteringProject = {
 };
 
 /** The clustering defaults for a project nothing has been seeded for. */
-export function emptyClusteringProject(): MemoryClusteringProject {
+function emptyClusteringProject(): MemoryClusteringProject {
   return {
     exists: true,
     eligible: false,

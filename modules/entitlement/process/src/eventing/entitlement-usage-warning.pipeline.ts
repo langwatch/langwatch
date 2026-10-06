@@ -23,7 +23,7 @@ import {
   usageWarningSweepStateSchema,
 } from "./entitlement-usage-warning.process.ts";
 
-export const USAGE_WARNING_PIPELINE_NAME = "entitlement_usage_warning";
+const USAGE_WARNING_PIPELINE_NAME = "entitlement_usage_warning";
 
 export function buildUsageWarningPipeline(
   deps: Omit<UsageWarningSweepRunDeps, "now">,

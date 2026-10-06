@@ -59,7 +59,7 @@ export interface UsageOrganization {
 }
 
 /** Which unit an organization is metered in, once resolved. */
-export interface UsageMeterReading {
+interface UsageMeterReading {
   usageUnit: UsageUnit;
   reason: string;
 }
@@ -91,12 +91,12 @@ export interface UsageVolumeCounter {
  * so the composition binds whatever it has — a Redis cache shared across pods, or a per-pod map
  * — and the absence of one only costs repeated reads.
  */
-export interface UsageCache {
+interface UsageCache {
   findValue<T>(key: string): Promise<T | undefined>;
   set<T>(key: string, value: T): Promise<void>;
 }
 
-export class NoUsageCache implements UsageCache {
+class NoUsageCache implements UsageCache {
   async findValue<T>(): Promise<T | undefined> {
     return undefined;
   }
@@ -142,7 +142,7 @@ export type EntitlementUsagePeers = Readonly<{
 const USAGE_CACHE_TTL_MS = 30_000;
 
 /** A plan resolved for one organization. */
-export type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
+type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
 
 export type UsageLimitResult =
   | { exceeded: false }
@@ -156,7 +156,7 @@ export type UsageLimitResult =
     };
 
 /** What enforcement is composed from: the counters, the plan, and the install. */
-export interface UsageServiceDependencies {
+interface UsageServiceDependencies {
   organizations: UsageOrganization;
   traceCounter: UsageVolumeCounter;
   eventCounter: UsageVolumeCounter;

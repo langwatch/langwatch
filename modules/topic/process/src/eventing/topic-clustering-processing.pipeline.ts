@@ -53,7 +53,7 @@ import {
 import { topicClusteringProcessManager } from "./topic-clustering.process.ts";
 import { type TopicModelData, TopicModelFoldProjection } from "./topic-model.projection.ts";
 
-export const TOPIC_CLUSTERING_PIPELINE_NAME = "topic_clustering_processing";
+const TOPIC_CLUSTERING_PIPELINE_NAME = "topic_clustering_processing";
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (state, intents, handlers, outbox tuning) is declared
