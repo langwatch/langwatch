@@ -212,7 +212,7 @@ issued it, and does not pretend to be max-min fairness. It keeps the
 lone-producer property this section insists on — either kind may borrow every
 slot except the other kind's small reserve — so a flood of one kind can no
 longer starve the other, while an insert-only or read-only process still uses
-the whole budget. Decision 2 remains the answer for bounding a single
+the whole budget less the other kind's reserve. Decision 2 remains the answer for bounding a single
 *producer*; this does not close that gap.
 
 ## Rationale / Trade-offs

@@ -68,12 +68,19 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
     And the statement already running is left alone
     And the wait bound is shorter than the time one statement may spend on the wire
 
+  @unit
+  Scenario: a same-tick statement blocked only on the total is still bounded
+    Given the whole budget is taken within one tick
+    When a statement with lane room but no total slot arrives in the same tick
+    Then it is refused as overload rather than queueing indefinitely
+    And the wait bound is armed at the total, where it is full
+
   # An insert holds its connection until the async insert flushes, so with one
   # shared bound a burst of ingest could occupy every slot and starve UI reads.
   # Each kind reserves a minimum of the shared budget for the other
   # (configurable via CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE) but may borrow the
   # rest when the other is idle, so neither can delay the other, a lone kind
-  # still uses the whole budget, and together they never exceed it.
+  # still uses the whole budget less the other kind's reserve, and together they never exceed it.
   @unit
   Scenario: a saturated insert lane does not delay reads
     Given the insert lane has used every slot it may hold
