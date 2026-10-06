@@ -52,15 +52,15 @@ export const hooksOver = ({
   arrivalConnection = null,
   arrivalOrganization = null,
   governingConnectionId = null,
-  governingMethodId = governingConnectionId,
+  governingMethodId,
 }: {
   user?: DatabaseHookUser | null;
   organization?: LegacyOrganization | null;
   /** The connection the ROUTER says governs the address, or null for none. */
   governingConnectionId?: string | null;
-  /** The method the router dials for it. Defaults to the connection's own
+  /** The method the router dials for it. Omitted, it is the connection's own
    *  id, the self-serve shape; `auth0` is the grandfathered one. */
-  governingMethodId?: string | null;
+  governingMethodId?: string;
   accountCount?: number;
   federationAllowed?: boolean;
   memberships?: number;
