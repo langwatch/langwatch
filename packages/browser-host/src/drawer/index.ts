@@ -36,6 +36,11 @@ export {
   updateDrawerParams,
 } from "./behavior/use-drawer.ts";
 export {
+  BrowserDrawerUndeclaredError,
+  declareDrawers,
+  refuseUndeclaredDrawer,
+} from "./model/drawer-declarations.ts";
+export {
   readDrawerAncestors,
   readDrawerStack,
   type DrawerStackEntry,

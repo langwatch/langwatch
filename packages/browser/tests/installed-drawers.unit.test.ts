@@ -1,6 +1,8 @@
+import { declareDrawers, navigateToDrawer } from "@langwatch/browser-host/drawer";
 import { describe, expect, it } from "vitest";
 
 import { defineBrowserModule, installedDrawerLoaders } from "../src/index.ts";
+import { installedModuleDrawers } from "../src/ui-module-drawers.ts";
 
 const traceDrawer = { default: () => null };
 const spanDrawer = { default: () => null };
@@ -44,5 +46,23 @@ describe("installed drawers", () => {
     expect(() => installedDrawerLoaders([trace, rival])).toThrow(
       'Drawer "traceDetails" is declared by both "trace" and "scenario".',
     );
+  });
+
+  /** @scenario "A module declaring no drawers contributes none" */
+  it("composes nothing from a module declaring screens only, and refuses its undeclared name", () => {
+    const screensOnly = defineBrowserModule("annotation").withScreens({
+      "pages/annotations": { path: "/annotations" },
+    });
+    const registry = installedModuleDrawers([trace, screensOnly]);
+    const undeclare = declareDrawers(registry);
+
+    try {
+      expect(Object.keys(registry).toSorted()).toEqual(["spanDetails", "traceDetails"]);
+      expect(() => navigateToDrawer("annotationEditor")).toThrow(
+        expect.objectContaining({ code: "browser_drawer_undeclared", drawer: "annotationEditor" }),
+      );
+    } finally {
+      undeclare();
+    }
   });
 });
