@@ -5,7 +5,8 @@ import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-co
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ShareApi } from "@langwatch/share-contract";
 /**
  * @vitest-environment node
@@ -47,7 +48,8 @@ function recordingAuditLog(recorded: RecordAuditLogCommand[]): AuditLogApi {
 
 function installed(peers: Peers) {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(projectProcessModule)])
+    .withModules([projectProcessModule])
+    .withStores(memoryStores())
     .withConfig({ project: undefined })
     .withMembers({
       encryption: { encrypt: (plaintext: string) => `cipher(${plaintext})` },

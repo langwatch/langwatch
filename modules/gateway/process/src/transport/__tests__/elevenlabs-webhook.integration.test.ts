@@ -130,6 +130,11 @@ async function mountWebhook(): Promise<MountableRestApp> {
     spendConfirmation: new RecordingSpendConfirmation(),
   };
   // The gateway resolves its secrets through the process chain; an empty one leaves each unset.
+  const stores: Readonly<Record<string, unknown>> = {
+    prisma: database(),
+    clickhouse: peer("analytical store"),
+    redis: memoryRedisDouble(),
+  };
   const secretsChain = SecretsResolver.over(SecretsChain.start({ environment: {} }));
   const runtime = await createApp({
     role: "api",
@@ -148,11 +153,12 @@ async function mountWebhook(): Promise<MountableRestApp> {
         allowLoopbackVoiceProviders: false,
       },
     })
-    // The live tier, over only the stores supplied below: real Postgres, no ClickHouse.
-    .withStores({ tier: "live", order: [], read: (name) => refuseUnsuppliedStore(name) })
-    .withRelational(database())
-    .withAnalytical(peer("analytical store"))
-    .withKeyvalue(memoryRedisDouble())
+    // The live tier, over only the stores supplied here: real Postgres, no ClickHouse.
+    .withStores({
+      tier: "live",
+      order: Object.keys(stores),
+      read: (name) => (Object.hasOwn(stores, name) ? stores[name] : refuseUnsuppliedStore(name)),
+    })
     .withSecrets(resolvedSecrets({}))
     .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
     .provide({

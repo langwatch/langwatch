@@ -6,19 +6,12 @@ import {
   type BlobCleanupDeps,
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
-import {
-  bootInstalledProcess,
-  type InstallableServerFeature,
-  processConfig,
-  storesBackedMembers,
-  withMemoryRepositories,
-} from "@langwatch/process";
+import { type BootedRuntime, createApp, processConfig } from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,
   resolvedSecrets,
   systemClock,
-  type ProcessMembers,
 } from "@langwatch/process-stores";
 import {
   refuseDoubleClaims,
@@ -51,8 +44,17 @@ function unreachable<Client extends object>(name: string): Client {
   return createApiFixture<Client>({}, `${name} (no raw client over memory stores)`);
 }
 
-function overMemory(module: InstallableServerFeature<never>): InstallableServerFeature<never> {
-  return module.repositoryRegistry === void 0 ? module : withMemoryRepositories(module);
+/**
+ * The supply chain over the whole installed list: its per-module type check does not close over
+ * thirty modules, so this names only the calls the harness makes.
+ */
+interface WholeListSupply {
+  withModules(modules: readonly unknown[]): WholeListSupply;
+  withConfig(config: unknown): WholeListSupply;
+  withStores(stores: ReturnType<typeof memoryStores>): WholeListSupply;
+  withMembers(members: Readonly<Record<string, unknown>>): WholeListSupply;
+  withEventing(eventing: EventSourcing): WholeListSupply;
+  boot(): Promise<BootedRuntime<Record<string, unknown>, unknown, unknown>>;
 }
 
 async function bootTasks() {
@@ -67,7 +69,6 @@ async function bootTasks() {
   );
   await resolver.preflight(declared);
 
-  const prisma = unreachable<ProcessMembers["prisma"]>("prisma");
   const eventing = new EventSourcing({
     enabled: false,
     participation: "produce",
@@ -79,60 +80,57 @@ async function bootTasks() {
       }),
     ],
   });
-  const stores: Partial<ProcessMembers> = {
-    logger: createTestLogger().logger,
-    clock: systemClock(),
-    secrets: resolvedSecrets({}),
-    encryption: aesEncryption(new Uint8Array(32)),
-    telemetry: unreachable<ProcessMembers["telemetry"]>("telemetry"),
-    prisma,
-    clickhouse: unreachable<ProcessMembers["clickhouse"]>("clickhouse"),
-    objectStorage: unreachable<ProcessMembers["objectStorage"]>("objectStorage"),
-    cache: unreachable<ProcessMembers["cache"]>("cache"),
-    idempotency: { claim: async () => true },
-    rateLimiter: { check: async () => ({ allowed: true }) },
-    eventing,
-  };
-  const runtime = await bootInstalledProcess({
+  const supply: WholeListSupply = createApp({
     role: ROLE,
-    modules: processModules.map(overMemory),
-    config,
-    secrets: (owner, declared) => resolver.scopeTo(owner, declared),
-    members: {
-      ...storesBackedMembers(memoryStores(), {
-        ...stores,
-        // The memory answer for Redis is none: every Redis-backed member has a twin.
-        redis: null,
-        publicBaseUrl: config.process.baseHost,
-        serviceVersion: "test",
-        // No collector: rum answers not configured unless the test names one.
-        telemetryExporter: {
-          endpoint: void 0,
-          withHeaders: <Out>(build: (headers: Readonly<Record<string, string>>) => Out): Out =>
-            build({}),
-        },
-        nodeEnvironment: config.process.nodeEnvironment,
-        isSaas: config.process.isSaas ?? false,
-        nlpServiceUrl: config.process.nlpServiceUrl,
-        nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
-        nlpInternalSecret: void 0,
-        outboundProxy: config.process.outboundProxy,
-        processName: "langwatch-tasks",
-        storageResolver: void 0,
-        storage: void 0,
-        queue: void 0,
-        content: void 0,
-        connectJudge: null,
-        monitor: void 0,
-        langwatchQl: {
-          admin: { configured: false },
-          postgres: { configured: false },
-          database: () => prisma,
-        },
-      }),
-      close: async () => void 0,
-    },
+    secrets: (owner, handles) => resolver.scopeTo(owner, handles),
   });
+  const runtime = await supply
+    .withModules(processModules)
+    .withConfig(config)
+    .withStores(memoryStores())
+    .withMembers({
+      logger: createTestLogger().logger,
+      clock: systemClock(),
+      secrets: resolvedSecrets({}),
+      encryption: aesEncryption(new Uint8Array(32)),
+      telemetry: unreachable<object>("telemetry"),
+      prisma: unreachable<object>("prisma"),
+      clickhouse: unreachable<object>("clickhouse"),
+      objectStorage: unreachable<object>("objectStorage"),
+      cache: unreachable<object>("cache"),
+      idempotency: { claim: async () => true },
+      rateLimiter: { check: async () => ({ allowed: true }) },
+      // The memory answer for Redis is none: every Redis-backed member has a twin.
+      redis: null,
+      publicBaseUrl: config.process.baseHost,
+      serviceVersion: "test",
+      // No collector: rum answers not configured unless the test names one.
+      telemetryExporter: {
+        endpoint: void 0,
+        withHeaders: <Out>(build: (headers: Readonly<Record<string, string>>) => Out): Out =>
+          build({}),
+      },
+      nodeEnvironment: config.process.nodeEnvironment,
+      isSaas: config.process.isSaas ?? false,
+      nlpServiceUrl: config.process.nlpServiceUrl,
+      nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
+      nlpInternalSecret: void 0,
+      outboundProxy: config.process.outboundProxy,
+      processName: "langwatch-tasks",
+      storageResolver: void 0,
+      storage: void 0,
+      queue: void 0,
+      content: void 0,
+      connectJudge: null,
+      monitor: void 0,
+      langwatchQl: {
+        admin: { configured: false },
+        postgres: { configured: false },
+        database: () => unreachable<object>("langwatchQl database"),
+      },
+    })
+    .withEventing(eventing)
+    .boot();
   return { runtime, eventing };
 }
 
