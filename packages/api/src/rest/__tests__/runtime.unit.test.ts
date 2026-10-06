@@ -219,6 +219,7 @@ describe("defineRestRouter", () => {
       ).toThrow(/GET \/api\/projects\/ .*supplied no identity\.identify/s);
     });
 
+    /** @scenario "A service endpoint opting out of its permission check carries a written reason" */
     it("refuses an access kind with no written reason", () => {
       expect(() => anyAuthenticated({ reason: "  " })).toThrow(/needs a written reason/);
     });

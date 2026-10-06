@@ -145,6 +145,7 @@ describe("EventingAuthzAuditAdapter", () => {
     expect(store.rows.size).toBe(1);
   });
 
+  /** @scenario "A grant write is recorded on the grants path" */
   it("uses tenantId for grant and role audit organizations", async () => {
     const store = new RecordingAuditTrailStore();
     const adapter = EventingAuthzAuditAdapter.create({ store });
