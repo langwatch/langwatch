@@ -285,7 +285,10 @@ describe("the product sidebar", () => {
   });
 
   describe("when on a Governance page", () => {
-    /** @scenario The Governance sidebar promotes the governance pages */
+    /**
+     * @scenario The Governance sidebar promotes the governance pages
+     * @scenario Anomaly Rules and Billed are no longer rail entries
+     */
     it("lists the governance pages from the shared registry", () => {
       renderSidebar({ surface: "governance", pathname: "/governance" });
 
