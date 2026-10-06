@@ -3003,6 +3003,15 @@
 					"documentation": "How the domain was matched; `verified-identifier-domain` today."
 				},
 				{
+					"name": "origin",
+					"columnName": "origin",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Where the request was made: `web` or `cli` (ADR-143 v6). A request from\nthe terminal lands a Developer seat whatever the joiner seat says."
+				},
+				{
 					"name": "expiresAt",
 					"columnName": "expiresAt",
 					"type": "DateTime",

@@ -175,3 +175,77 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
     expect(heavyQuery!).not.toContain("ScheduledAt <=");
   });
 });
+
+describe("EvaluationRunClickHouseRepository.findByTraceId (integration)", () => {
+  const traceId = `trace-find-${nanoid()}`;
+
+  beforeAll(async () => {
+    await repo.upsert(
+      makeEval("eval-find-1", {
+        traceId,
+        evaluatorId: "monitor-a",
+        passed: true,
+      }),
+      tenantId,
+    );
+    await repo.upsert(
+      makeEval("eval-find-1", {
+        traceId,
+        evaluatorId: "monitor-a",
+        passed: false,
+        updatedAt: base + 1000,
+      }),
+      tenantId,
+    );
+    await repo.upsert(
+      makeEval("eval-find-2", {
+        traceId,
+        evaluatorId: "monitor-b",
+        score: 0.4,
+      }),
+      tenantId,
+    );
+    await repo.upsert(makeEval("eval-find-other-trace"), tenantId);
+  }, 60_000);
+
+  describe("when the trace has evaluation runs", () => {
+    it("returns the latest version of each run on that trace", async () => {
+      const runs = await repo.findByTraceId(tenantId, traceId);
+
+      expect(
+        runs
+          .map((run) => ({
+            evaluationId: run.evaluationId,
+            evaluatorId: run.evaluatorId,
+            passed: run.passed,
+            updatedAt: run.updatedAt,
+            scheduledAt: run.scheduledAt,
+          }))
+          .sort((a, b) => a.evaluationId.localeCompare(b.evaluationId)),
+      ).toEqual([
+        {
+          evaluationId: "eval-find-1",
+          evaluatorId: "monitor-a",
+          passed: false,
+          updatedAt: base + 1000,
+          scheduledAt: base,
+        },
+        {
+          evaluationId: "eval-find-2",
+          evaluatorId: "monitor-b",
+          passed: true,
+          updatedAt: base,
+          scheduledAt: base,
+        },
+      ]);
+    });
+  });
+
+  describe("when the trace has no evaluation runs", () => {
+    it("returns nothing", async () => {
+      expect(
+        await repo.findByTraceId(tenantId, `trace-none-${nanoid()}`),
+      ).toEqual([]);
+    });
+  });
+});

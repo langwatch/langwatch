@@ -167,6 +167,8 @@ describe("given a colleague who walked in on the domain setting", () => {
         joinRequestId: "jreq_1",
         commandId: "join-approve:jreq_1:policy:domain-auto",
         approvedByUserId: null,
+        role: "MEMBER",
+        origin: "web",
       });
 
       expect(writer.attachBindings).toHaveBeenCalledWith(
@@ -198,6 +200,8 @@ describe("given a colleague who walked in on the domain setting", () => {
           joinRequestId: "jreq_retry",
           commandId: "join-approve:jreq_retry:admin:ana",
           approvedByUserId: "user_ana",
+          role: "MEMBER",
+          origin: "web",
         }),
       ).rejects.toThrow("projection unavailable");
 
@@ -248,6 +252,8 @@ describe("given a colleague who walked in on the domain setting", () => {
         joinRequestId: "jreq_existing",
         commandId: "join-approve:jreq_existing:admin:ana",
         approvedByUserId: "user_ana",
+        role: "MEMBER",
+        origin: "web",
       });
 
       expect(prisma.processManagerOutbox.createMany).not.toHaveBeenCalled();
@@ -302,7 +308,10 @@ describe("given a colleague who walked in on the domain setting", () => {
   });
 });
 
-describe("given an organization whose joiner seat is Developer (ADR-143)", () => {
+// The seat arrives decided (ADR-143 v6): the service reads the joiner seat
+// and the origin and hands the adapter the role to attach. The adapter only
+// has to grant, or not grant, accordingly.
+describe("given a request whose seat was decided as Developer (ADR-143)", () => {
   describe("when a colleague walks in on the domain setting", () => {
     /** @scenario The joiner seat setting lands email joiners as Developers */
     it("admits them as a Developer with no organization-wide grant and no intent", async () => {
@@ -319,6 +328,8 @@ describe("given an organization whose joiner seat is Developer (ADR-143)", () =>
         joinRequestId: "jreq_dev",
         commandId: "join-approve:jreq_dev:policy:domain-auto",
         approvedByUserId: null,
+        role: "DEVELOPER",
+        origin: "web",
       });
 
       expect(prisma.organizationUser.createMany).toHaveBeenCalledWith(
@@ -349,6 +360,8 @@ describe("given an organization whose joiner seat is Developer (ADR-143)", () =>
         joinRequestId: "jreq_dev",
         commandId: "join-approve:jreq_dev:policy:domain-auto",
         approvedByUserId: null,
+        role: "DEVELOPER",
+        origin: "web",
       });
 
       expect(prisma.auditLog.create).toHaveBeenCalledWith({
@@ -359,6 +372,7 @@ describe("given an organization whose joiner seat is Developer (ADR-143)", () =>
           organizationId: ORGANIZATION_ID,
           metadata: {
             seat: "DEVELOPER",
+            origin: "web",
             joinRequestId: "jreq_dev",
             via: "domain-join",
           },
@@ -445,6 +459,8 @@ describe("given an organization whose joiner seat is Developer (ADR-143)", () =>
         joinRequestId: "jreq_full",
         commandId: "join-approve:jreq_full:policy:domain-auto",
         approvedByUserId: null,
+        role: "MEMBER",
+        origin: "web",
       });
 
       expect(prisma.organizationUser.createMany).toHaveBeenCalledWith(

@@ -4,6 +4,7 @@ import {
   type DomainJoinSetting,
   type JoinerRole,
   JoinRequestNotFoundError,
+  type JoinRequestOrigin,
   readJoinerRole,
 } from "@langwatch/identity";
 import { newJoinRequestCommandId } from "@langwatch/identity-server";
@@ -66,10 +67,12 @@ import { joinRequests } from "./runtime";
  * approval retried after a partial failure finishes the job rather than
  * attaching a second membership.
  *
- * The role is the literal default and there is no parameter for it. An
- * approval — by an admin or by the policy — grants MEMBER and nothing else;
- * least privilege by construction, and an admin who wants to hand over more
- * sends a formal invitation, which is the flow that owns roles and teams.
+ * The seat arrives decided (ADR-143 v6): the service reads the organisation's
+ * joiner seat and the request's origin and hands the answer in, so this
+ * writes what it is given and never chooses. An approval, by an admin or by
+ * the policy, grants that seat and nothing else; an admin who wants to hand
+ * over more sends a formal invitation, which is the flow that owns roles and
+ * teams.
  */
 export class PrismaJoinMembership implements JoinMembershipPort {
   constructor(
@@ -97,26 +100,19 @@ export class PrismaJoinMembership implements JoinMembershipPort {
     joinRequestId,
     commandId,
     approvedByUserId,
+    role: joinerRole,
+    origin,
   }: {
     userId: string;
     organizationId: string;
     joinRequestId: string;
     commandId: string;
     approvedByUserId: string | null;
+    role: JoinerRole;
+    origin: JoinRequestOrigin;
   }): Promise<void> {
     const bindingId = generate(KSUID_RESOURCES.ROLE_BINDING).toString();
     const now = Date.now();
-    // The seat the organisation hands to people who join without an
-    // invitation (ADR-143). Read before the transaction: it is configuration,
-    // not part of the admission's own consistency.
-    const joinerRole = readJoinerRole(
-      (
-        await this.prisma.organization.findUnique({
-          where: { id: organizationId },
-          select: { joinerRole: true },
-        })
-      )?.joinerRole,
-    );
     const intentPayload = await this.prisma.$transaction(async (tx) => {
       const membership = await tx.organizationUser.createMany({
         data: [{ userId, organizationId, role: joinerRole }],
@@ -141,6 +137,10 @@ export class PrismaJoinMembership implements JoinMembershipPort {
               via: (approvedByUserId
                 ? "join-request-approved"
                 : "domain-join") satisfies DeveloperAdmissionVia,
+              // Where the request was made, so the audit page can say that a
+              // Developer seat on a Full-seat organisation was the terminal's
+              // doing and not a setting somebody changed.
+              origin,
             },
           },
         });

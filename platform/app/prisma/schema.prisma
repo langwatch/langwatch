@@ -941,6 +941,9 @@ model JoinRequest {
   state             String
   /// How the domain was matched; `verified-identifier-domain` today.
   matchedVia        String
+  /// Where the request was made: `web` or `cli` (ADR-143 v6). A request from
+  /// the terminal lands a Developer seat whatever the joiner seat says.
+  origin            String    @default("web")
   /// While PENDING: when the day-14 wake lapses it. Null once resolved.
   expiresAt         DateTime?
   resolvedAt        DateTime?
