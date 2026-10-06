@@ -167,8 +167,11 @@ interface Lanes {
 }
 
 /**
- * Builds the total ceiling and the per-kind lane caps, or a single shared bound
- * when the budget is too small to reserve against.
+ * The total stays the pool size so the split never adds load the server's
+ * max_concurrent_queries budget was not sized for. The per-kind caps sit one
+ * reserve below it so a flood of either kind cannot take the slots the other
+ * needs. Under two slots, any reserve would starve one kind outright, so a
+ * single shared bound is the honest fallback.
  */
 function buildLanes({
   maxConcurrent,
