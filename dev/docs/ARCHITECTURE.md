@@ -1357,8 +1357,11 @@ bucket, account or root. Its settings belong to the stores owner:
 `AZURE_BLOB_*`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`,
 `AZURE_FEDERATED_TOKEN_FILE` and `LANGWATCH_LOCAL_STORAGE_PATH`, with
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_SESSION_TOKEN` and
-`AZURE_BLOB_ACCOUNT_KEY` as secrets. The memory tier answers it with a memory
-twin.
+`AZURE_BLOB_ACCOUNT_KEY` as secrets. Main's per-organisation
+`DATAPLANE_S3__<label>__<orgId>=<json>` family is one `Secret.family("DATAPLANE_S3__")`
+handle on the stores, parsed once at boot into private accounts as the ClickHouse routes
+are; an organisation listed there is placed on its own S3 account whatever the shared
+backend is. The memory tier answers it with a memory twin.
 
 Bodies travel as streams, and every digest is computed over a stream, once.
 Nothing holds a whole object in memory to hash it. Modules build repositories

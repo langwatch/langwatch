@@ -3,12 +3,15 @@ import { Config, type ProcessConfigOf } from "@langwatch/config";
 import { credentialsSecret, Secret, sessionSecret } from "@langwatch/secrets";
 import { z } from "zod";
 
+/** Main's per-organisation S3 family prefix, parsed in object-storage-private-accounts.ts. */
+export const DATAPLANE_S3_ENV_PREFIX = "DATAPLANE_S3__";
+
 function readDrainTimeoutMs(value: unknown): number | undefined {
   if (value === undefined || value === "") return undefined;
   const parsed = Number(value);
   if (Number.isInteger(parsed) && parsed > 0) return parsed;
   console.error(
-    `[shutdown] SHUTDOWN_DRAIN_TIMEOUT_MS must be a positive whole number of milliseconds, got "${String(value)}"; using the queue's default drain. The pod's terminationGracePeriodSeconds may not match this budget.`,
+    `[shutdown] SHUTDOWN_DRAIN_TIMEOUT_MS must be a positive whole number of milliseconds, got "${typeof value === "string" ? value : JSON.stringify(value)}"; using the queue's default drain. The pod's terminationGracePeriodSeconds may not match this budget.`,
   );
   return undefined;
 }
@@ -86,6 +89,8 @@ export const storesOwner = {
     s3SecretAccessKey: Secret.load("S3_SECRET_ACCESS_KEY", { optional: true }),
     s3SessionToken: Secret.load("S3_SESSION_TOKEN", { optional: true }),
     azureAccountKey: Secret.load("AZURE_BLOB_ACCOUNT_KEY", { optional: true }),
+    /** Main's `DATAPLANE_S3__<label>__<orgId>` family: each organisation's own S3 account. */
+    dataplaneS3: Secret.family(DATAPLANE_S3_ENV_PREFIX),
   },
 } as const;
 export type StoresConfig = ProcessConfigOf<readonly [typeof storesOwner]>["stores"];
