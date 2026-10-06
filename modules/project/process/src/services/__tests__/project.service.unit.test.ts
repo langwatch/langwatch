@@ -15,6 +15,7 @@ import {
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
   PROJECT_KIND,
+  ProjectNotFoundError,
   projectSchema,
   type InternalProject,
   type Project,
@@ -544,6 +545,7 @@ describe("ProjectService", () => {
     expect(repository.isPresenceEnabled).toHaveBeenCalledWith("project-1");
   });
 
+  /** @scenario The organization is resolved through the project's team */
   it("returns the project organization through the throwing Project service", async () => {
     const repository = new StubRepository();
     repository.findWithTeam.mockResolvedValue({
@@ -563,6 +565,16 @@ describe("ProjectService", () => {
     });
 
     await expect(createService(repository).getOrganizationId("project_1")).resolves.toBe("org");
+  });
+
+  /** @scenario An unknown or archived project has no organization */
+  it("fails with ProjectNotFoundError when the tenant names no active project", async () => {
+    const repository = new StubRepository();
+    repository.findWithTeam.mockResolvedValue(null);
+
+    await expect(
+      createService(repository).getOrganizationId("project_missing"),
+    ).rejects.toBeInstanceOf(ProjectNotFoundError);
   });
 
   /** @scenario "A compatibility caller resolves a project tenant target" */
@@ -1080,6 +1092,8 @@ describe("ProjectService", () => {
     );
   });
 
+  /** @scenario An active project is stamped when its activity is stale */
+  /** @scenario A mapped pull request stamps its own column */
   it("keeps coding-agent activity columns on independent clocks", async () => {
     const repository = new StubRepository();
     const at = fromDate(new Date("2026-08-25T12:00:00.000Z"));

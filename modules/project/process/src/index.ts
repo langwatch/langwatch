@@ -1,4 +1,3 @@
-export type { PrismaCodingAgentActivityDatabase } from "./repositories/prisma/prisma.coding-agent-activity.repository.ts";
 export { projectProcessModule } from "./project.module.ts";
 export {
   type ProjectManagementApi,

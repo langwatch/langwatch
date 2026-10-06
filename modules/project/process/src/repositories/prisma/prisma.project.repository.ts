@@ -1,10 +1,6 @@
 import { parseOnboardingVariant } from "@langwatch/onboarding-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
-import {
-  Prisma,
-  type PrismaClient,
-  type Project as PrismaProject,
-} from "@langwatch/prisma-client/generated";
+import { Prisma, type Project as PrismaProject } from "@langwatch/prisma-client/generated";
 import {
   PROJECT_KIND,
   ProjectNotFoundError,
@@ -35,12 +31,6 @@ import type {
   TouchCodingAgentActivityInput,
 } from "../project.repository.ts";
 import { mapProjectIdentityRow, PROJECT_IDENTITY_SELECT } from "./prisma.project.mapper.ts";
-
-/**
- * Models used by this repository; lets composition roots hand a typed client
- * subset without describing full PrismaClient at the seam.
- */
-export type PrismaProjectDatabase = Pick<PrismaClient, "project" | "team">;
 
 export class PrismaProjectRepository
   extends PrismaRepository.for("Project")
