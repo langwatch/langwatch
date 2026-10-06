@@ -345,10 +345,19 @@ function joinMemberships(organizations: OrganizationApi): JoinMembership {
     isMember: (args) => organizations.isMember(args),
     memberOrganizationIds: (args) => organizations.memberOrganizationIds(args),
     // The approving admin, or the policy that approved: the grant is audited to them.
-    attachDefaultMembership: async ({ userId, organizationId, commandId, approvedByUserId }) => {
+    attachDefaultMembership: async ({
+      userId,
+      organizationId,
+      commandId,
+      approvedByUserId,
+      role,
+      origin,
+    }) => {
       await organizations.createMembership({
         userId,
         organizationId,
+        seat: role,
+        origin,
         admittedBy: {
           actor: approvedByUserId
             ? { type: "user", id: approvedByUserId }

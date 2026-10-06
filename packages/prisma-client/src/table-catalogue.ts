@@ -502,6 +502,7 @@ export const prismaModelFieldCatalogue = {
     "domain",
     "state",
     "matchedVia",
+    "origin",
     "expiresAt",
     "resolvedAt",
     "resolvedByType",

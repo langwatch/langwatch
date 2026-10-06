@@ -9,6 +9,7 @@ import type { OrganizationJoinRequests } from "../organization-join-requests.ser
 
 const directory: OrganizationDirectory = {
   findVerifiedEmail: vi.fn(async () => "sam@acme.com"),
+  findProvenAddresses: vi.fn(async () => ["sam@acme.com"]),
   listUserNames: vi.fn(async () => [{ id: "user_sam", name: "Sam" }]),
 };
 
@@ -44,6 +45,7 @@ describe("given the members area asking who walked in", () => {
               userId: "user_sam",
               organizationId: "org_acme",
               domain: "acme.com",
+              origin: "web" as const,
               createdAtMs: 1_700_000_000_000,
               expiresAtMs: null,
               resolvedAtMs: 1_700_000_000_000,
@@ -100,5 +102,92 @@ describe("given an administrator saving the joining setting", () => {
       previousJoinerRole: "MEMBER",
       nextJoinerRole: "MEMBER",
     });
+  });
+});
+
+describe("given a request made from the terminal (ADR-171 v6)", () => {
+  /** @scenario A request made from the terminal lands as a Developer when approved */
+  it("hands the origin to the ledger", async () => {
+    const request = vi.fn(async () => ({ joinRequestId: "jreq_1", state: "PENDING" as const }));
+    const door = OrganizationJoinDoorService.create({
+      joinRequests: createApiFixture<OrganizationJoinRequests>({ request }),
+      directory,
+    });
+
+    await door.file({ userId: "user_sam", organizationId: "org_acme", origin: "cli" });
+
+    expect(request).toHaveBeenCalledWith({
+      userId: "user_sam",
+      verifiedEmail: "sam@acme.com",
+      organizationId: "org_acme",
+      origin: "cli",
+    });
+  });
+
+  /** @scenario A request made on the web keeps the organisation's joiner seat */
+  it("names no origin for an older client, which the ledger reads as web", async () => {
+    const request = vi.fn(async () => ({ joinRequestId: "jreq_1", state: "PENDING" as const }));
+    const door = OrganizationJoinDoorService.create({
+      joinRequests: createApiFixture<OrganizationJoinRequests>({ request }),
+      directory,
+    });
+
+    await door.file({ userId: "user_sam", organizationId: "org_acme" });
+
+    expect(request).toHaveBeenCalledWith({
+      userId: "user_sam",
+      verifiedEmail: "sam@acme.com",
+      organizationId: "org_acme",
+    });
+  });
+
+  /** @scenario The welcome screen honours an automatic door */
+  it("hands the origin to the automatic door too", async () => {
+    const joinAutomaticallyIfAdmitted = vi.fn(async () => ({ organization: null }));
+    const door = OrganizationJoinDoorService.create({
+      joinRequests: createApiFixture<OrganizationJoinRequests>({ joinAutomaticallyIfAdmitted }),
+      directory,
+    });
+
+    await door.admitAutomatically({ userId: "user_sam", origin: "cli" });
+
+    expect(joinAutomaticallyIfAdmitted).toHaveBeenCalledWith({
+      userId: "user_sam",
+      verifiedEmail: "sam@acme.com",
+      origin: "cli",
+    });
+  });
+});
+
+describe("given an administrator opening the pending list", () => {
+  /** @scenario The pending list shows the seat each request will land as */
+  it("shows a Developer seat for the terminal's request and the joiner seat for the web's", async () => {
+    const waiting = (joinRequestId: string, origin: "web" | "cli") => ({
+      joinRequestId,
+      userId: "user_sam",
+      organizationId: "org_acme",
+      domain: "acme.com",
+      origin,
+      createdAtMs: 1_700_000_000_000,
+      expiresAtMs: null,
+      resolvedAtMs: null,
+    });
+    const door = OrganizationJoinDoorService.create({
+      joinRequests: createApiFixture<OrganizationJoinRequests>({
+        pendingForOrganization: async () => [
+          waiting("jreq_cli", "cli"),
+          waiting("jreq_web", "web"),
+        ],
+        readJoining: async () => ({ domainJoin: "request", joinDomains: [], joinerRole: "MEMBER" }),
+      }),
+      directory,
+    });
+
+    const pending = await door.listPending({ organizationId: "org_acme" });
+
+    expect(pending.map(({ joinRequestId, seat }) => ({ joinRequestId, seat }))).toEqual([
+      { joinRequestId: "jreq_cli", seat: "DEVELOPER" },
+      { joinRequestId: "jreq_web", seat: "MEMBER" },
+    ]);
   });
 });

@@ -123,6 +123,7 @@ function usePendingJoinRequests({
         domain: request.domain,
         requestedAt: request.requestedAt,
         expiresAt: request.expiresAt,
+        seat: request.seat,
       })),
     [pending.data],
   );
@@ -133,7 +134,7 @@ function usePendingJoinRequests({
         joinRequestId,
         run: approveMutation,
         title: "Request approved",
-        description: "They are a member now, with your organization's default role.",
+        description: "They are a member now, in the seat their request showed.",
       }),
     [answer, approveMutation],
   );

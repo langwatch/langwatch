@@ -283,6 +283,7 @@ export interface LwqlPrismaRows {
     readonly domain: "String";
     readonly state: "String";
     readonly matchedVia: "String";
+    readonly origin: "String";
     readonly expiresAt: "DateTime?";
     readonly resolvedAt: "DateTime?";
     readonly resolvedByType: "String?";
@@ -1183,6 +1184,13 @@ export interface LwqlPrismaRows {
     readonly createdById: "String?";
     readonly updatedById: "String?";
     readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly TraceIngestSourceBilling: {
+    readonly organizationId: "String";
+    readonly sourceType: "String";
+    readonly billed: "Boolean";
+    readonly recordedAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
   readonly RetentionPolicy: {

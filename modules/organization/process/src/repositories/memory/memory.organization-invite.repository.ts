@@ -242,6 +242,28 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
     return inviteOfRow(invite);
   }
 
+  async findOldestPendingInviteForAddress(input: { address: string }): Promise<{
+    inviteCode: string;
+    organizationName: string;
+    role: OrganizationUserRole;
+  } | null> {
+    const now = nowInstant();
+    const invite = [...this.memory.invites.values()]
+      .filter(
+        (candidate) =>
+          sameAddress(candidate.email, input.address) &&
+          candidate.status === "PENDING" &&
+          isUnexpired(candidate, now),
+      )
+      .toSorted((a, b) => a.createdAt.epochMilliseconds - b.createdAt.epochMilliseconds)[0];
+    if (!invite) return null;
+    return {
+      inviteCode: invite.inviteCode,
+      organizationName: this.memory.organizations.get(invite.organizationId)?.name ?? "",
+      role: invite.role,
+    };
+  }
+
   async claimInviteForAcceptance(input: {
     inviteId: string;
     organizationId: string;

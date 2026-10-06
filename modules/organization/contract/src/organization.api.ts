@@ -36,9 +36,11 @@ import type {
   JoinRequestMine,
   JoinRequestPending,
 } from "./join-request.responses.ts";
+import type { JoinRequestApiOrigin } from "./join-request.trpc-schemas.ts";
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
   PendingInvitationForCaller,
+  PendingInvitationsForCaller,
   OrganizationDirectoryCounts,
   OrganizationInviteAccepted,
   OrganizationInviteCreated,
@@ -247,6 +249,11 @@ export interface OrganizationApi {
    * has proven count.
    */
   getPendingInvitation(by: OrganizationCaller): Promise<PendingInvitationForCaller>;
+  /**
+   * The oldest pending invitation on each address the caller has PROVEN, in any
+   * organization (ADR-171 v6). Carries the invitation code, so verified addresses only.
+   */
+  listPendingInvitationsForCaller(by: OrganizationCaller): Promise<PendingInvitationsForCaller>;
   deleteMember(
     input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller | null,
@@ -389,6 +396,10 @@ export interface OrganizationApi {
       organizationId: string;
       userId: string;
       admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
+      /** The seat the admitting caller decided (ADR-171 v6); absent is the joiner seat. */
+      seat?: "MEMBER" | "DEVELOPER";
+      /** Where a join request was made, written on the Developer admission audit row. */
+      origin?: JoinRequestApiOrigin;
     }>,
   ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
@@ -775,7 +786,7 @@ export interface OrganizationApi {
   lookupJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown>;
   listOwnJoinRequests(input: Readonly<{ userId: string }>): Promise<JoinRequestMine>;
   fileJoinRequest(
-    input: Readonly<{ userId: string; organizationId: string }>,
+    input: Readonly<{ userId: string; organizationId: string; origin?: JoinRequestApiOrigin }>,
   ): Promise<JoinRequestFiled>;
   withdrawJoinRequest(input: Readonly<{ joinRequestId: string; userId: string }>): Promise<void>;
   listPendingJoinRequests(input: Readonly<{ organizationId: string }>): Promise<JoinRequestPending>;
@@ -799,7 +810,9 @@ export interface OrganizationApi {
   /** The post-login offer: the lookup minus the domains this person dismissed. */
   offerJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown>;
   dismissJoinOffer(input: Readonly<{ userId: string }>): Promise<void>;
-  admitAutomatically(input: Readonly<{ userId: string }>): Promise<JoinRequestAdmitted>;
+  admitAutomatically(
+    input: Readonly<{ userId: string; origin?: JoinRequestApiOrigin }>,
+  ): Promise<JoinRequestAdmitted>;
   listAutomaticJoins(
     input: Readonly<{ organizationId: string }>,
   ): Promise<JoinRequestAutomaticJoins>;

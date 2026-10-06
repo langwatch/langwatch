@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { isSameOrigin, signIn, useSession } from "../../behavior/auth-client.tsx";
 import { hardNavigate } from "../../behavior/browser-navigation.ts";
@@ -84,6 +84,41 @@ export default function Error() {
   );
 }
 
+/**
+ * Dials the connection the refusal named, answering it while the dial is live and null once the
+ * server refused or the dial threw: a refused dial falls through to the stable refusal copy
+ * instead of a card waiting on a provider that never answers (native-social-at-a-claimed-domain).
+ */
+function useConnectionBounce({
+  error,
+  target,
+}: {
+  error: ReturnType<typeof normalizeSignInErrorCode>;
+  target: string | null | undefined;
+}): string | null {
+  const connectionId = bounceConnectionFrom({ error, target });
+  const [dialRefused, setDialRefused] = useState(false);
+
+  // Ahead of the five-second timer: this is somebody being taken to the door their
+  // organization chose.
+  useEffect(() => {
+    if (!connectionId) return;
+    let cancelled = false;
+    void signIn(connectionId, { callbackUrl: "/" })
+      .then((result) => {
+        if (!cancelled && result?.error) setDialRefused(true);
+      })
+      .catch(() => {
+        if (!cancelled) setDialRefused(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connectionId]);
+
+  return dialRefused ? null : connectionId;
+}
+
 export function SignInErrorScreen() {
   const { data: session } = useSession();
   const query = useSearchParams();
@@ -91,14 +126,10 @@ export function SignInErrorScreen() {
   const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
-  const bounceTo = bounceConnectionFrom({ error, target: query?.get("error_description") });
-
-  // The bounce goes ahead of the five-second timer: this is somebody being taken to the door
-  // their organization chose (specs/identity/native-social-at-a-claimed-domain.feature).
-  useEffect(() => {
-    if (!bounceTo) return;
-    void signIn(bounceTo, { callbackUrl: "/" });
-  }, [bounceTo]);
+  const bounceTo = useConnectionBounce({
+    error,
+    target: query?.get("error_description"),
+  });
 
   useEffect(() => {
     if (!publicEnv.data) {

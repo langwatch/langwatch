@@ -3099,6 +3099,15 @@
           "documentation": "How the domain was matched: `verified-identifier-domain` or `sso-connection-domain`."
         },
         {
+          "name": "origin",
+          "columnName": "origin",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Where the request was made: `web` or `cli` (ADR-171 v6). A request from\nthe terminal lands a Developer seat whatever the joiner seat says."
+        },
+        {
           "name": "expiresAt",
           "columnName": "expiresAt",
           "type": "DateTime",
@@ -13195,6 +13204,62 @@
         {
           "name": "createdAt",
           "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "TraceIngestSourceBilling",
+      "tableName": "TraceIngestSourceBilling",
+      "documentation": "",
+      "primaryKey": [
+        "organizationId",
+        "sourceType"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "sourceType",
+          "columnName": "sourceType",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "billed",
+          "columnName": "billed",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "recordedAt",
+          "columnName": "recordedAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,

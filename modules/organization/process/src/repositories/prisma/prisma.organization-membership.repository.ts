@@ -1680,13 +1680,22 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     userId: string;
     pendingAdmissionId: string;
     via: DeveloperAdmissionVia;
+    /** The seat a caller decided (ADR-171 v6); absent reads the joiner seat. */
+    seat?: "MEMBER" | "DEVELOPER";
+    /** Where a join request was made, for the Developer admission audit row. */
+    origin?: "web" | "cli";
   }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
     const { organizationId, userId } = input;
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { joinerRole: true },
-    });
-    const seat = readJoinerRole(organization?.joinerRole);
+    const seat =
+      input.seat ??
+      readJoinerRole(
+        (
+          await this.prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { joinerRole: true },
+          })
+        )?.joinerRole,
+      );
     try {
       await this.prisma.$transaction(async (tx) => {
         await tx.organizationUser.create({
@@ -1704,7 +1713,13 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
               action: DEVELOPER_ADMISSION_AUDIT_ACTION,
               userId,
               organizationId,
-              metadata: { seat, via: input.via },
+              // The origin says a Developer seat on a Full-seat organisation was
+              // the terminal's doing, not a setting somebody changed.
+              metadata: {
+                seat,
+                via: input.via,
+                ...(input.origin === undefined ? {} : { origin: input.origin }),
+              },
             },
           });
         }

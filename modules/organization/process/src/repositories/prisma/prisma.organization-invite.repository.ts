@@ -366,6 +366,29 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     return inviteFromRecord(invite);
   }
 
+  async findOldestPendingInviteForAddress({ address }: { address: string }): Promise<{
+    inviteCode: string;
+    organizationName: string;
+    role: OrganizationUserRole;
+  } | null> {
+    // Stored as the administrator typed it, so matched case-insensitively.
+    const invite = await this.prisma.organizationInvite.findFirst({
+      where: {
+        email: { equals: address, mode: "insensitive" },
+        status: "PENDING",
+        OR: [{ expiration: null }, { expiration: { gt: new Date() } }],
+      },
+      select: { inviteCode: true, role: true, organization: { select: { name: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+    if (invite === null) return null;
+    return {
+      inviteCode: invite.inviteCode,
+      organizationName: invite.organization.name,
+      role: invite.role,
+    };
+  }
+
   async claimInviteForAcceptance({
     inviteId,
     organizationId,

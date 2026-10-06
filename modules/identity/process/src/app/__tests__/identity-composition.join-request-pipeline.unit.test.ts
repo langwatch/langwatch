@@ -77,6 +77,7 @@ function foldedState(): JoinRequestFoldState {
     domain: "acme.example",
     state: "PENDING",
     matchedVia: "verified-identifier-domain",
+    origin: "web",
     createdAtMs: 1_600_000_000_000,
     updatedAtMs: 1_700_000_000_000,
     expiresAtMs: 1_700_600_000_000,
