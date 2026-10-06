@@ -27,16 +27,20 @@ export function dashboardTemplatesPath({ projectSlug }: { projectSlug: string })
 }
 
 /**
- * The board `/[project]/dashboards` opens: the member's first own board, else
- * the first they can see; undefined when they can see none.
+ * The board `/[project]/dashboards` opens: the member's default while it exists, else
+ * their first own board, else the first they can see; undefined when they can see none.
  */
 export function landingBoardId({
   boards,
   userId,
+  defaultBoardId,
 }: {
   boards: readonly { id: string; createdById: string | null }[];
   userId: string | undefined;
+  /** The board the member set as their default; ignored once it is gone. */
+  defaultBoardId?: string;
 }): string | undefined {
+  if (boards.some(({ id }) => id === defaultBoardId)) return defaultBoardId;
   const own = boards.find(({ createdById }) => userId !== void 0 && createdById === userId);
   return (own ?? boards[0])?.id;
 }
@@ -44,6 +48,11 @@ export function landingBoardId({
 /** The name a board gets when created from the sidebar, before the member renames it. */
 export function untitledBoardName({ existingCount }: { existingCount: number }): string {
   return `Untitled dashboard ${existingCount + 1}`;
+}
+
+/** The name a duplicate is offered before numbering: the board's, marked as a copy. */
+export function boardCopyName(name: string): string {
+  return `${name} copy`;
 }
 
 /** A board made from a template takes its name, numbered from 2 when a board already has it. */

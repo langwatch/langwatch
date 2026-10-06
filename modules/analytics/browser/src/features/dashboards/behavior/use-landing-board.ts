@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { dashboardsPath, FIRST_BOARD_NAME, landingBoardId } from "../model/boards.ts";
+import { useDefaultBoard } from "./use-default-board.ts";
 import { useSavedDashboards } from "./use-saved-dashboards.ts";
 
 export function useLandingBoard() {
@@ -19,7 +20,12 @@ export function useLandingBoard() {
   const createRequested = useRef(false);
   const projectId = host.project()?.id ?? "";
   const { projectSlug, isLoading, loadError } = saved;
-  const landingId = landingBoardId({ boards: saved.boards, userId: host.userId() });
+  const { defaultBoardId } = useDefaultBoard();
+  const landingId = landingBoardId({
+    boards: saved.boards,
+    userId: host.userId(),
+    defaultBoardId,
+  });
   const { mutate: createBoard } = create;
 
   useEffect(() => {

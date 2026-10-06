@@ -30,6 +30,42 @@ const OWN_BOARDS = [
   board({ id: "board-2", name: "Latency" }),
 ];
 
+const graph = { version: 1, code: "export default () => null;", queries: [] };
+
+/** Two widgets on "Latency" and one on another board, as `dashboardWidgets.list` answers. */
+const STORED_WIDGETS = [
+  {
+    id: "w-1",
+    name: "Traffic",
+    dashboardId: "board-2",
+    gridColumn: 0,
+    gridRow: 0,
+    colSpan: 6,
+    rowSpan: 3,
+    graph,
+  },
+  {
+    id: "w-2",
+    name: "Cost",
+    dashboardId: "board-2",
+    gridColumn: 6,
+    gridRow: 0,
+    colSpan: 6,
+    rowSpan: 3,
+    graph,
+  },
+  {
+    id: "w-3",
+    name: "Other",
+    dashboardId: "board-1",
+    gridColumn: 0,
+    gridRow: 0,
+    colSpan: 12,
+    rowSpan: 3,
+    graph,
+  },
+];
+
 /** Answers the list and a create, and keeps every call so a test can read what was sent. */
 function projectWithBoards(boards = OWN_BOARDS) {
   const calls: UiProcedureCall[] = [];
@@ -37,6 +73,17 @@ function projectWithBoards(boards = OWN_BOARDS) {
     calls.push(call);
     if (call.path === "dashboards.getAll") return Promise.resolve(boards);
     if (call.path === "dashboards.create") return Promise.resolve({ id: "board-3" });
+    if (call.path === "dashboardWidgets.list") return Promise.resolve(STORED_WIDGETS);
+    if (call.path === "dashboardWidgets.create") {
+      return Promise.resolve({ id: `copy-${calls.length}` });
+    }
+    if (
+      call.path === "dashboards.updateDetails" ||
+      call.path === "dashboards.setVisibility" ||
+      call.path === "dashboardWidgets.batchUpdateLayouts"
+    ) {
+      return Promise.resolve({ success: true });
+    }
     return NO_PROCEDURES(call);
   };
   return { calls, answer };
@@ -136,6 +183,110 @@ describe("the saved-dashboards list in the sidebar", () => {
         await user.click(screen.getByRole("button", { name: "Actions for Latency" }));
         expect(await screen.findByRole("menuitem", { name: "Rename" })).toBeInTheDocument();
         expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
+      });
+    });
+
+    describe("when the member opens a board's menu", () => {
+      const menuItemNames = () =>
+        screen.getAllByRole("menuitem").map((item) => item.textContent?.trim());
+
+      /** @scenario "AC107 Sidebar menu: each board offers its actions in the prototype's order" */
+      it("offers Set as default, Rename, Share, Duplicate and Delete, in that order", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        renderSection();
+
+        await user.click(await screen.findByRole("button", { name: "Actions for Latency" }));
+        await screen.findByRole("menuitem", { name: "Delete" });
+
+        expect(menuItemNames()).toEqual([
+          "Set as default",
+          "Rename",
+          "Share",
+          "Duplicate",
+          "Delete",
+        ]);
+        expect(screen.getByRole("separator")).toBeInTheDocument();
+      });
+
+      /** @scenario "AC107b Sidebar menu: a board the member cannot manage offers only what they may use" */
+      it("leaves Share and Delete off a teammate's board", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        renderSection({
+          boards: [
+            board({ id: "board-2", name: "Latency", visibility: "team", createdById: "user-2" }),
+          ],
+        });
+
+        await user.click(await screen.findByRole("button", { name: "Actions for Latency" }));
+        await screen.findByRole("menuitem", { name: "Duplicate" });
+
+        expect(menuItemNames()).toEqual(["Set as default", "Rename", "Duplicate"]);
+      });
+
+      /** @scenario "AC108 Sidebar menu: Share changes who sees the board" */
+      it("checks who sees the board now, and changes it to the one picked", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const { calls } = renderSection();
+
+        await user.click(await screen.findByRole("button", { name: "Actions for Latency" }));
+        await user.click(await screen.findByRole("menuitem", { name: "Share" }));
+        expect(await screen.findByRole("menuitemradio", { name: /Only me/ })).toHaveAttribute(
+          "aria-checked",
+          "true",
+        );
+        await user.click(screen.getByRole("menuitemradio", { name: /Team/ }));
+
+        await waitFor(() =>
+          expect(calls.find(({ path }) => path === "dashboards.setVisibility")?.input).toEqual({
+            projectId: "proj-1",
+            dashboardId: "board-2",
+            visibility: "team",
+          }),
+        );
+      });
+
+      /** @scenario "AC109 Sidebar menu: Duplicate copies the board and its widgets" */
+      it("copies the board and its widgets as an only-me copy, then opens it", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const { host, calls } = renderSection();
+
+        await user.click(await screen.findByRole("button", { name: "Actions for Latency" }));
+        await user.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
+
+        await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-3"]));
+        const inputsTo = (path: string) =>
+          calls.filter((call) => call.path === path).map(({ input }) => input);
+        expect(inputsTo("dashboards.create")).toEqual([
+          { projectId: "proj-1", name: "Latency copy", visibility: "only_me" },
+        ]);
+        expect(
+          inputsTo("dashboardWidgets.create").map((input) => (input as { name: string }).name),
+        ).toEqual(["Traffic", "Cost"]);
+        const [{ layouts }] = inputsTo("dashboardWidgets.batchUpdateLayouts") as [
+          { layouts: { gridColumn: number; gridRow: number }[] },
+        ];
+        expect(layouts.map(({ gridColumn, gridRow }) => [gridColumn, gridRow])).toEqual([
+          [0, 0],
+          [6, 0],
+        ]);
+      });
+
+      /** @scenario "AC109b Sidebar menu: Set as default picks the board the area opens on" */
+      it("marks the board as the member's default and checks the item", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        renderSection();
+
+        await user.click(await screen.findByRole("button", { name: "Actions for Latency" }));
+        await user.click(await screen.findByRole("menuitem", { name: "Set as default" }));
+
+        expect(
+          await within(await mine()).findByRole("link", { name: /Latency.*default/ }),
+        ).toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: "Actions for Latency" }));
+        expect(await screen.findByRole("menuitem", { name: /Set as default/ })).toHaveAttribute(
+          "aria-disabled",
+          "true",
+        );
       });
     });
 

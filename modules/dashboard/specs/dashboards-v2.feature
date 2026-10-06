@@ -646,6 +646,40 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And "Create board" on a ready template makes the same board as picking it on a blank board, and opens it
     And a coming-soon card says how many of its widgets are built and cannot create a board
 
+  @integration
+  Scenario: AC107 Sidebar menu: each board offers its actions in the prototype's order
+    Given a member opens the "⋮" menu of a board they may manage
+    Then they see Set as default, Rename, Share, Duplicate, a separator and Delete, each with its icon
+    And Delete is in red
+
+  @integration
+  Scenario: AC107b Sidebar menu: a board the member cannot manage offers only what they may use
+    Given a teammate's board the member may not manage
+    When the member opens its "⋮" menu
+    Then they see Set as default, Rename and Duplicate
+    And they do not see Share or Delete
+
+  @integration
+  Scenario: AC108 Sidebar menu: Share changes who sees the board
+    Given a member opens Share on a board they may manage
+    Then Only me, Team and Organisation are offered with the current one checked
+    And picking another one changes who sees the board
+
+  @integration
+  Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets
+    When the member picks Duplicate on a board
+    Then a new board named "<name> copy", visible only to them, is made
+    And every widget on the board is copied to it at the same place
+    And the new board opens
+    # Decision: no server procedure copies a board; the browser repeats the create and widget writes
+
+  @unit @integration
+  Scenario: AC109b Sidebar menu: Set as default picks the board the area opens on
+    When the member picks Set as default on a board
+    Then the row shows a quiet default marker and the menu item is checked
+    And /[project]/dashboards opens that board while it exists, else the member's first own board
+    # Decision: the choice is a per-reader preference in the browser, kept per project
+
   # ---------------------------------------------------------------------------
   # Widget description and fit
   # ---------------------------------------------------------------------------
@@ -736,3 +770,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 100-106: "Templates library" → Scenario: AC100 Templates library: the sidebar opens the library; Scenario: AC100b Templates library: the library is behind the dashboards gate; Scenario: AC101 Templates library: every template is listed by trunk, ready ones first; Scenario: AC102 Templates library: search matches name, job, widget questions and agent kinds; Scenario: AC103 Templates library: filter chips narrow by trunk, agent kind and readiness; Scenario: AC104 Templates library: the search and filters are kept in the address; Scenario: AC105 Templates library: no match says so and offers to clear the filters; Scenario: AC106 Templates library: a ready template creates a board, a coming-soon one cannot
   # AC 110-113: "Widget description: the description moves from the stored code to an info tip on the card" → Scenario: AC110 Widget description: a built widget carries its description, not in its code; Scenario: AC111 Widget description: the card shows the description behind an info icon; Scenario: AC112 Widget description: a widget without a description has no info icon; Scenario: AC113 Widget description: the description is stored and kept when the code is edited
   # AC 114-116: "Widget fit: a short card keeps its empty face usable" → Scenario: AC114 Widget fit: the empty face fits a short card; Scenario: AC115 Widget fit: a widget is never shorter than its title and one-row empty face; Scenario: AC116 Widget fit: every built widget is at least the minimum height
+  # AC 107-109b: "Sidebar menu" → Scenario: AC107 Sidebar menu: each board offers its actions in the prototype's order; Scenario: AC107b Sidebar menu: a board the member cannot manage offers only what they may use; Scenario: AC108 Sidebar menu: Share changes who sees the board; Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets; Scenario: AC109b Sidebar menu: Set as default picks the board the area opens on

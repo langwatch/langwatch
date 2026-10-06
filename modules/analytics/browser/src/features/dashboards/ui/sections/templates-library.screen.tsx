@@ -107,7 +107,8 @@ function TemplatesLibrary() {
         </Text>
       </VStack>
       <VStack align="stretch" gap={2}>
-        <Box maxWidth="420px">
+        {/* A grid stretches the inline search group, so the whole placeholder shows. */}
+        <Box display="grid" width="full" maxWidth="420px">
           <SearchInput
             size="sm"
             aria-label="Search templates"

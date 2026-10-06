@@ -12,14 +12,16 @@ import { Building2, LayoutTemplate, type LucideIcon, Plus, Star, Users } from "l
 import { useId, useState, type ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
+import { useBoardVisibility } from "../../behavior/use-board-visibility.ts";
+import { useDefaultBoard } from "../../behavior/use-default-board.ts";
 import { useSavedDashboards, type SavedBoard } from "../../behavior/use-saved-dashboards.ts";
-import {
-  BOARD_ADMIN_PERMISSION,
-  boardVisibilityGroups,
-  canManageBoard,
-} from "../../model/board-visibility.ts";
+import { boardVisibilityGroups } from "../../model/board-visibility.ts";
 import { dashboardsPath, dashboardTemplatesPath, TEMPLATES_SEGMENT } from "../../model/boards.ts";
-import { SavedDashboardRow } from "../blocks/saved-dashboard-row.tsx";
+import {
+  SavedDashboardRow,
+  type SavedDashboardRowActions,
+} from "../blocks/saved-dashboard-row.tsx";
 
 const GROUP_LABEL_STYLE = {
   fontSize: "10px",
@@ -50,8 +52,9 @@ export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsP
   const [renamingId, setRenamingId] = useState<string | undefined>();
   const [pendingDelete, setPendingDelete] = useState<SavedBoard | undefined>();
   const { projectSlug } = saved;
-  const userId = host.userId();
-  const isAdmin = host.hasPermission(BOARD_ADMIN_PERMISSION);
+  const { defaultBoardId, setDefaultBoard } = useDefaultBoard();
+  const fromTemplate = useBoardFromTemplate();
+  const boardNames = saved.boards.map(({ name }) => name);
 
   const confirmDelete = () => {
     if (!pendingDelete) return;
@@ -88,11 +91,10 @@ export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsP
       {boardVisibilityGroups(saved.boards).map((group) => (
         <BoardGroup key={group.key} label={group.label}>
           {group.boards.map((board) => (
-            <SavedDashboardRow
+            <BoardRow
               key={board.id}
-              name={board.name}
+              board={board}
               href={dashboardsPath({ projectSlug, dashboardId: board.id })}
-              icon={<RowIcon {...ROW_ICONS[board.visibility]} />}
               isActive={activeDashboardId === board.id}
               actions={{
                 isRenaming: renamingId === board.id,
@@ -102,9 +104,14 @@ export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsP
                   saved.renameBoard({ dashboardId: board.id, name });
                 },
                 onRenameCancel: () => setRenamingId(void 0),
-                onDelete: canManageBoard({ createdById: board.createdById, userId, isAdmin })
-                  ? () => setPendingDelete(board)
-                  : void 0,
+                isDefault: defaultBoardId === board.id,
+                onSetDefault: () => {
+                  setDefaultBoard(board.id);
+                  host.succeeded({ title: `"${board.name}" is now your default dashboard` });
+                },
+                onDuplicate: () =>
+                  void fromTemplate.duplicateBoard({ board, existingNames: boardNames }),
+                onDelete: () => setPendingDelete(board),
               }}
             />
           ))}
@@ -131,6 +138,36 @@ export function SavedDashboardsSection({ activeDashboardId }: UiSavedDashboardsP
         onConfirm={confirmDelete}
       />
     </VStack>
+  );
+}
+
+/** A board's row, with Share and Delete offered only to a member who may use them (AC26). */
+function BoardRow({
+  board,
+  href,
+  isActive,
+  actions,
+}: {
+  board: SavedBoard;
+  href: string;
+  isActive: boolean;
+  actions: SavedDashboardRowActions;
+}) {
+  const visibility = useBoardVisibility({ board, reportsRefusal: true });
+  return (
+    <SavedDashboardRow
+      name={board.name}
+      href={href}
+      icon={<RowIcon {...ROW_ICONS[board.visibility]} />}
+      isActive={isActive}
+      actions={{
+        ...actions,
+        share: visibility.canChange
+          ? { visibility: visibility.visibility, onChange: visibility.setVisibility }
+          : void 0,
+        onDelete: visibility.canChange ? actions.onDelete : void 0,
+      }}
+    />
   );
 }
 

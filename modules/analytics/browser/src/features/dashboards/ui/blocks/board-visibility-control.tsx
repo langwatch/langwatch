@@ -15,7 +15,8 @@ import {
   boardVisibilityLabel,
 } from "../../model/board-visibility.ts";
 
-const VISIBILITY_ICONS: Readonly<Record<DashboardVisibility, LucideIcon>> = {
+/** The icon each audience wears, here and in the sidebar row's Share menu. */
+export const VISIBILITY_ICONS: Readonly<Record<DashboardVisibility, LucideIcon>> = {
   only_me: Lock,
   team: Users,
   organisation: Building2,

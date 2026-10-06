@@ -1,10 +1,11 @@
 /**
  * The stored widgets on one board, in grid order, and where a copy of one
- * lands. Every widget is an ordinary `dashboardWidgets` row. Pure.
+ * lands, alone or with its whole board. Every widget is an ordinary `dashboardWidgets` row. Pure.
  */
 
 import { chartGridBottomRow, type ChartGridPlacement } from "../../../model/chart-grid.ts";
 import type { DashboardWidgetDefinition } from "../../../model/dashboard-widget-definition.ts";
+import type { BoardTemplateWidget } from "../templates/index.ts";
 import { atLeastBoardMinRows } from "./board-grid.ts";
 
 /** A stored widget, as much of it as a board reads. */
@@ -88,5 +89,20 @@ export function addedWidgetSlots({
     gridRow: layout.gridRow - topRow + bottom,
     colSpan: layout.colSpan,
     rowSpan: layout.rowSpan,
+  }));
+}
+
+/** A board's widgets as a duplicate is made from them: each at the same place. */
+export function boardCopyWidgets(widgets: readonly BoardWidget[]): BoardTemplateWidget[] {
+  return widgets.map(({ id, name, definition, placement }) => ({
+    key: id,
+    name,
+    definition,
+    layout: {
+      gridColumn: placement.gridColumn,
+      gridRow: placement.gridRow,
+      colSpan: placement.colSpan,
+      rowSpan: placement.rowSpan,
+    },
   }));
 }
