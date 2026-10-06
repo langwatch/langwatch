@@ -186,7 +186,7 @@ func fixture(t *testing.T, passing bool) (string, Lists) {
 
 func run(repo string, lists Lists, args ...string) (string, string, int) {
 	var out, errOut bytes.Buffer
-	code := RunAt(repo, lists, args, &out, &errOut)
+	code := RunAt(Invocation{Repo: repo, Lists: lists, Args: args, Stdout: &out, Stderr: &errOut})
 	return out.String(), errOut.String(), code
 }
 

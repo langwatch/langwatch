@@ -20,11 +20,22 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "Error:", err)
 		return 1
 	}
-	return RunAt(cwd, DefaultLists(), args, stdout, stderr)
+	return RunAt(Invocation{Repo: cwd, Lists: DefaultLists(), Args: args, Stdout: stdout, Stderr: stderr})
 }
 
-// RunAt is Run against the tree at repo, judged by lists.
-func RunAt(repo string, lists Lists, args []string, stdout, stderr io.Writer) int {
+// Invocation is one run of the check: the tree at Repo, judged by Lists, with
+// the command line's Args and where its output goes.
+type Invocation struct {
+	Repo   string
+	Lists  Lists
+	Args   []string
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// RunAt is Run against the tree at inv.Repo, judged by inv.Lists.
+func RunAt(inv Invocation) int {
+	repo, lists, args, stdout, stderr := inv.Repo, inv.Lists, inv.Args, inv.Stdout, inv.Stderr
 	asJSON := slices.Contains(args, "--json")
 	a, err := Analyze(repo, lists)
 	if err != nil {

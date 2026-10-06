@@ -101,14 +101,7 @@ func isUnimplemented(t string) bool { return t == unimplemented }
 func buildReport(feature string, all []Scenario, byTitle map[string][]BindingRef) Report {
 	r := Report{Feature: feature, Scenarios: []AnnotatedScenario{}, Unbound: []Scenario{}, TotalScenarios: len(all)}
 	for _, s := range all {
-		bound, parked := has(s.Tags, isBoundTag), has(s.Tags, isUnimplemented)
-		if parked {
-			r.UnimplementedScenarios++
-		}
-		if !bound && !parked {
-			r.UntaggedScenarios++
-		}
-		if !bound || parked {
+		if !r.countTags(s) {
 			continue
 		}
 		binds := byTitle[s.Title]
@@ -118,6 +111,19 @@ func buildReport(feature string, all []Scenario, byTitle map[string][]BindingRef
 		r.Scenarios = append(r.Scenarios, AnnotatedScenario{Scenario: s, Bindings: binds})
 	}
 	return r
+}
+
+// countTags counts s as parked or untagged, and reports whether it is enforced:
+// bound by a level tag and not parked.
+func (r *Report) countTags(s Scenario) bool {
+	bound, parked := has(s.Tags, isBoundTag), has(s.Tags, isUnimplemented)
+	if parked {
+		r.UnimplementedScenarios++
+	}
+	if !bound && !parked {
+		r.UntaggedScenarios++
+	}
+	return bound && !parked
 }
 
 func isInert(r Report) bool { return r.TotalScenarios > 0 && len(r.Scenarios) == 0 }
@@ -140,7 +146,14 @@ func toLegacy(r Report) LegacyReport {
 	return LegacyReport{r.Feature, len(r.Scenarios) - len(r.Unbound), len(r.Unbound), len(r.Scenarios), titles}
 }
 
-func validateExemptionList(repo, name string, entries, all []string) []string {
+// exemptionList is one ratcheted list by its name in the Node tool.
+type exemptionList struct {
+	name    string
+	entries []string
+}
+
+func validateExemptionList(repo string, list exemptionList, all []string) []string {
+	name, entries := list.name, list.entries
 	var errs []string
 	seen := map[string]bool{}
 	for _, e := range entries {
@@ -173,9 +186,9 @@ func validateLists(repo string, l Lists, all []string) []string {
 			}
 		}
 	}
-	errs = append(errs, validateExemptionList(repo, "LEGACY_UNBOUND", l.LegacyUnbound, all)...)
-	errs = append(errs, validateExemptionList(repo, "LEGACY_INERT", l.LegacyInert, all)...)
-	return append(errs, validateExemptionList(repo, "LEGACY_PARTIAL", l.LegacyPartial, all)...)
+	errs = append(errs, validateExemptionList(repo, exemptionList{"LEGACY_UNBOUND", l.LegacyUnbound}, all)...)
+	errs = append(errs, validateExemptionList(repo, exemptionList{"LEGACY_INERT", l.LegacyInert}, all)...)
+	return append(errs, validateExemptionList(repo, exemptionList{"LEGACY_PARTIAL", l.LegacyPartial}, all)...)
 }
 
 // readSource reads a file as a string without copying it: the bytes are
@@ -232,7 +245,7 @@ func Analyze(repo string, l Lists) (Analysis, error) {
 	if err != nil {
 		return Analysis{}, err
 	}
-	a := Analysis{ListErrors: validateLists(repo, l, features)}
+	run := &analysis{lists: l, features: features, a: Analysis{ListErrors: validateLists(repo, l, features)}}
 
 	var bindings []Binding
 	done := make(chan struct{})
@@ -240,74 +253,120 @@ func Analyze(repo string, l Lists) (Analysis, error) {
 	scenarios := parallel.Map(features, func(f string) []Scenario { return ParseFeature(readSource(filepath.Join(repo, f))) })
 	<-done
 
+	run.a.Unknown = unknownBindings(bindings, scenarios)
+	all := run.addReports(scenarios, bindingsByTitle(bindings))
+	inertSeen := run.addInert()
+	partialSeen := run.addPartial(all)
+	run.addStale(inertSeen, partialSeen)
+	return run.a, nil
+}
+
+// analysis is one Analyze over its feature files, judged by its lists.
+type analysis struct {
+	lists    Lists
+	features []string
+	a        Analysis
+}
+
+// bindingsByTitle groups the bindings' refs by the scenario title they name.
+func bindingsByTitle(bindings []Binding) map[string][]BindingRef {
 	byTitle := map[string][]BindingRef{}
 	for _, b := range bindings {
 		byTitle[b.Title] = append(byTitle[b.Title], b.Ref)
 	}
+	return byTitle
+}
+
+// unknownBindings is every binding naming a title no feature file holds.
+func unknownBindings(bindings []Binding, scenarios [][]Scenario) []Binding {
 	known := map[string]bool{}
 	for _, ss := range scenarios {
 		for _, s := range ss {
 			known[s.Title] = true
 		}
 	}
-	a.Unknown = []Binding{}
+	unknown := []Binding{}
 	for _, b := range bindings {
 		if !known[b.Title] {
-			a.Unknown = append(a.Unknown, b)
+			unknown = append(unknown, b)
 		}
 	}
+	return unknown
+}
 
+// addReports builds each feature's report and files it as legacy or enforced.
+func (run *analysis) addReports(scenarios [][]Scenario, byTitle map[string][]BindingRef) []Report {
 	var all []Report
-	for i, f := range features {
+	for i, f := range run.features {
 		r := buildReport(f, scenarios[i], byTitle)
 		all = append(all, r)
-		if slices.Contains(l.LegacyUnbound, f) {
-			a.Legacy = append(a.Legacy, toLegacy(r))
+		if slices.Contains(run.lists.LegacyUnbound, f) {
+			run.a.Legacy = append(run.a.Legacy, toLegacy(r))
 		} else {
-			a.Enforced = append(a.Enforced, r)
+			run.a.Enforced = append(run.a.Enforced, r)
 		}
 	}
+	return all
+}
 
+// addInert files each enforced report that enforces nothing, exempt or new,
+// and answers the features it filed.
+func (run *analysis) addInert() map[string]bool {
 	inertSeen := map[string]bool{}
-	for _, r := range a.Enforced {
-		if isInert(r) {
-			ir := toInert(r)
-			a.Inert = append(a.Inert, ir)
-			inertSeen[r.Feature] = true
-			if slices.Contains(l.LegacyInert, r.Feature) {
-				a.ExemptInert = append(a.ExemptInert, ir)
-			} else {
-				a.NewInert = append(a.NewInert, ir)
-			}
+	for _, r := range run.a.Enforced {
+		if !isInert(r) {
+			continue
+		}
+		ir := toInert(r)
+		run.a.Inert = append(run.a.Inert, ir)
+		inertSeen[r.Feature] = true
+		if slices.Contains(run.lists.LegacyInert, r.Feature) {
+			run.a.ExemptInert = append(run.a.ExemptInert, ir)
+		} else {
+			run.a.NewInert = append(run.a.NewInert, ir)
 		}
 	}
+	return inertSeen
+}
+
+// addPartial files each partially tagged report, exempt or new, and answers
+// the features it filed.
+func (run *analysis) addPartial(all []Report) map[string]bool {
 	partialSeen := map[string]bool{}
 	for _, r := range all {
-		if isPartiallyTagged(r) {
-			pr := toPartial(r)
-			a.Partial = append(a.Partial, pr)
-			partialSeen[r.Feature] = true
-			if slices.Contains(l.LegacyPartial, r.Feature) {
-				a.ExemptPartial = append(a.ExemptPartial, pr)
-			} else {
-				a.NewPartial = append(a.NewPartial, pr)
-			}
+		if !isPartiallyTagged(r) {
+			continue
+		}
+		pr := toPartial(r)
+		run.a.Partial = append(run.a.Partial, pr)
+		partialSeen[r.Feature] = true
+		if slices.Contains(run.lists.LegacyPartial, r.Feature) {
+			run.a.ExemptPartial = append(run.a.ExemptPartial, pr)
+		} else {
+			run.a.NewPartial = append(run.a.NewPartial, pr)
 		}
 	}
-	for _, r := range a.Legacy {
+	return partialSeen
+}
+
+// addStale files the list entries that no longer describe their file.
+func (run *analysis) addStale(inertSeen, partialSeen map[string]bool) {
+	for _, r := range run.a.Legacy {
 		if r.Unbound == 0 {
-			a.StaleLegacy = append(a.StaleLegacy, r)
+			run.a.StaleLegacy = append(run.a.StaleLegacy, r)
 		}
 	}
-	for _, f := range l.LegacyInert {
-		if slices.Contains(features, f) && !inertSeen[f] {
-			a.StaleInert = append(a.StaleInert, f)
+	run.a.StaleInert = staleEntries(run.lists.LegacyInert, run.features, inertSeen)
+	run.a.StalePartial = staleEntries(run.lists.LegacyPartial, run.features, partialSeen)
+}
+
+// staleEntries is each listed feature that exists but was not seen.
+func staleEntries(listed, features []string, seen map[string]bool) []string {
+	var stale []string
+	for _, f := range listed {
+		if slices.Contains(features, f) && !seen[f] {
+			stale = append(stale, f)
 		}
 	}
-	for _, f := range l.LegacyPartial {
-		if slices.Contains(features, f) && !partialSeen[f] {
-			a.StalePartial = append(a.StalePartial, f)
-		}
-	}
-	return a, nil
+	return stale
 }

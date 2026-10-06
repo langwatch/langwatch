@@ -53,42 +53,63 @@ var (
 // ParseFeature reads the scenarios of one .feature source, with feature-level
 // tags applied to every scenario.
 func ParseFeature(raw string) []Scenario {
-	var scenarios []Scenario
-	var featureTags, pendingTags []string
-	featureSeen := false
-
+	parser := &featureParser{}
 	for i, line := range strings.Split(raw, "\n") {
-		trimmed := jsTrim(line)
-		if strings.HasPrefix(trimmed, "#") || trimmed == "" {
-			continue
-		}
-		if strings.HasPrefix(trimmed, "@") {
-			for _, t := range strings.FieldsFunc(trimmed, isJSSpace) {
-				if strings.HasPrefix(t, "@") {
-					pendingTags = append(pendingTags, t)
-				}
-			}
-			continue
-		}
-		if !featureSeen && strings.HasPrefix(trimmed, "Feature:") {
-			featureTags, pendingTags, featureSeen = pendingTags, nil, true
-			continue
-		}
-		if m := scenarioLine.FindStringSubmatch(trimmed); m != nil {
-			tags := append(append([]string{}, featureTags...), pendingTags...)
-			scenarios = append(scenarios, Scenario{Title: jsTrim(m[1]), Tags: tags, Line: i + 1})
-			pendingTags = nil
-			continue
-		}
-		body := false
-		for _, p := range gherkinBodyHead {
-			body = body || strings.HasPrefix(trimmed, p)
-		}
-		if !body {
-			pendingTags = nil
+		parser.line(i+1, jsTrim(line))
+	}
+	return parser.scenarios
+}
+
+// featureParser carries the tags seen so far through a feature file's lines.
+type featureParser struct {
+	scenarios                []Scenario
+	featureTags, pendingTags []string
+	featureSeen              bool
+}
+
+// line reads one trimmed line, numbered from 1.
+func (p *featureParser) line(number int, trimmed string) {
+	if strings.HasPrefix(trimmed, "#") || trimmed == "" {
+		return
+	}
+	if strings.HasPrefix(trimmed, "@") {
+		p.pendingTags = append(p.pendingTags, tagsOf(trimmed)...)
+		return
+	}
+	if !p.featureSeen && strings.HasPrefix(trimmed, "Feature:") {
+		p.featureTags, p.pendingTags, p.featureSeen = p.pendingTags, nil, true
+		return
+	}
+	if m := scenarioLine.FindStringSubmatch(trimmed); m != nil {
+		tags := append(append([]string{}, p.featureTags...), p.pendingTags...)
+		p.scenarios = append(p.scenarios, Scenario{Title: jsTrim(m[1]), Tags: tags, Line: number})
+		p.pendingTags = nil
+		return
+	}
+	if !isGherkinBody(trimmed) {
+		p.pendingTags = nil
+	}
+}
+
+// tagsOf is the @tags on a tag line.
+func tagsOf(trimmed string) []string {
+	var tags []string
+	for _, t := range strings.FieldsFunc(trimmed, isJSSpace) {
+		if strings.HasPrefix(t, "@") {
+			tags = append(tags, t)
 		}
 	}
-	return scenarios
+	return tags
+}
+
+// isGherkinBody reports a line that opens a step, a table or a doc string.
+func isGherkinBody(trimmed string) bool {
+	for _, p := range gherkinBodyHead {
+		if strings.HasPrefix(trimmed, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // annotationRE is the Node tool's ANNOTATION_RE run at one JavaScript line start;
@@ -122,15 +143,13 @@ func lineStartBefore(src string, at int) int {
 
 // FindScenarioAnnotations is the Node tool's findScenarioAnnotations.
 func FindScenarioAnnotations(src string) []Annotation {
+	scan := &annotationScan{src: src}
 	var found []Annotation
-	var spans [][2]int
-	spansDone := false
 	lastIndex, lastTried := 0, -1
-
 	for from := 0; ; {
 		k := strings.Index(src[from:], "@scenario")
 		if k < 0 {
-			break
+			return found
 		}
 		occ := from + k
 		from = occ + 1
@@ -139,43 +158,73 @@ func FindScenarioAnnotations(src string) []Annotation {
 			continue
 		}
 		lastTried = s
-		m := annotationRE.FindStringSubmatchIndex(src[s:])
-		if m == nil {
+		annotation, matched := scan.at(s)
+		if !matched {
 			continue
 		}
-		end := m[1]
-		if term := src[s+m[8] : s+m[9]]; term != "*/" {
-			end -= len(term)
+		lastIndex = annotation.End
+		if scan.counts(annotation) {
+			found = append(found, annotation)
 		}
-		whole := src[s : s+end]
-		lastIndex = s + end
-
-		title := ""
-		for g := 1; g <= 3; g++ {
-			if m[2*g] >= 0 {
-				title = jsTrim(src[s+m[2*g] : s+m[2*g+1]])
-				break
-			}
-		}
-		if title == "" {
-			continue
-		}
-		if !markedAnnotation.MatchString(whole) {
-			if !spansDone {
-				spans, spansDone = markerlessBindingSpans(src), true
-			}
-			at := s + strings.Index(whole, "@scenario")
-			inside := false
-			for _, sp := range spans {
-				inside = inside || (at >= sp[0] && at < sp[1])
-			}
-			if !inside {
-				continue
-			}
-		}
-		found = append(found, Annotation{Title: title, Index: s, End: s + end})
 	}
-	return found
+}
+
+// annotationScan is one source's annotation search, with its markerless
+// binding spans computed once, on first need.
+type annotationScan struct {
+	src       string
+	spans     [][2]int
+	spansDone bool
+}
+
+// at matches an annotation starting at line start s, title and all.
+func (scan *annotationScan) at(s int) (Annotation, bool) {
+	src := scan.src
+	m := annotationRE.FindStringSubmatchIndex(src[s:])
+	if m == nil {
+		return Annotation{}, false
+	}
+	end := m[1]
+	if term := src[s+m[8] : s+m[9]]; term != "*/" {
+		end -= len(term)
+	}
+	return Annotation{Title: annotationTitle(src[s:], m), Index: s, End: s + end}, true
+}
+
+// annotationTitle is the first title group the match filled, trimmed.
+func annotationTitle(rest string, m []int) string {
+	for g := 1; g <= 3; g++ {
+		if m[2*g] >= 0 {
+			return jsTrim(rest[m[2*g]:m[2*g+1]])
+		}
+	}
+	return ""
+}
+
+// counts reports an annotation with a title that is marked, or that sits
+// inside a markerless binding.
+func (scan *annotationScan) counts(annotation Annotation) bool {
+	if annotation.Title == "" {
+		return false
+	}
+	whole := scan.src[annotation.Index:annotation.End]
+	if markedAnnotation.MatchString(whole) {
+		return true
+	}
+	return scan.inMarkerlessSpan(annotation.Index + strings.Index(whole, "@scenario"))
+}
+
+// inMarkerlessSpan reports an offset inside a markerless binding span.
+func (scan *annotationScan) inMarkerlessSpan(at int) bool {
+	if !scan.spansDone {
+		scan.spans, scan.spansDone = markerlessBindingSpans(scan.src), true
+	}
+	for _, sp := range scan.spans {
+		if at >= sp[0] && at < sp[1] {
+			return true
+		}
+	}
+	return false
 }
 
 func spanEnd(src string, from int, closer string) int {
@@ -234,18 +283,20 @@ func pastTSComment(src string, i int) int {
 		return i + 2
 	}
 	if ch == '*' || (ch == '/' && next == '/') {
-		if nl := indexFrom(src, i, "\n"); nl >= 0 {
-			return nl + 1
-		}
-		return -1
+		return pastToken(src, i, "\n")
 	}
 	if ch == '/' && next == '*' {
-		if c := indexFrom(src, i+2, "*/"); c >= 0 {
-			return c + 2
-		}
-		return -1
+		return pastToken(src, i+2, "*/")
 	}
 	return i
+}
+
+// pastToken is the index just past the first token at or after from, or -1.
+func pastToken(src string, from int, token string) int {
+	if at := indexFrom(src, from, token); at >= 0 {
+		return at + len(token)
+	}
+	return -1
 }
 
 var testCallRE = jsRegexp(`^(?:(?:void|await)\s+)?(?:it|test|tester\.run)(?:\.[a-zA-Z]+)?(?:<[^>\n]+>)?\s*\(`)
@@ -361,22 +412,32 @@ func topLevelCommaAt(rest string, start, limit int) int {
 			i = next
 			continue
 		}
-		switch rest[i] {
-		case '(', '[', '{':
-			depth++
-		case ')', ']', '}':
-			if depth == 0 {
-				return -1
-			}
-			depth--
-		case ',':
-			if depth == 0 {
+		if stop, comma := bracketStep(rest[i], &depth); stop {
+			if comma {
 				return i
 			}
+			return -1
 		}
 		i++
 	}
 	return -1
+}
+
+// bracketStep tracks depth over one byte. It stops at a top-level comma
+// (comma true) or at a closer with nothing open (comma false).
+func bracketStep(ch byte, depth *int) (stop, comma bool) {
+	switch ch {
+	case '(', '[', '{':
+		*depth++
+	case ')', ']', '}':
+		if *depth == 0 {
+			return true, false
+		}
+		*depth--
+	case ',':
+		return *depth == 0, true
+	}
+	return false, false
 }
 
 // byteOffsetAfterUnits advances n UTF-16 code units from byte offset from.
