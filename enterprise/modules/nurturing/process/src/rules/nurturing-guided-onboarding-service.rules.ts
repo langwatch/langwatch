@@ -17,7 +17,7 @@ import { nowInstant } from "@langwatch/time";
  * these, so the names are part of the contract with Customer.io and never
  * change with the path enum.
  */
-export const GUIDED_PATH_CAMPAIGN_EVENT: Record<GuidedPath, CioEventName> = {
+const GUIDED_PATH_CAMPAIGN_EVENT: Record<GuidedPath, CioEventName> = {
   llmops: "onboarding_path_llmops",
   coding: "onboarding_path_coding_agents",
   gateway: "onboarding_path_gateway",

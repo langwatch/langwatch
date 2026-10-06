@@ -3,7 +3,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { RecentTouch } from "../repositories/recent-touch.repository.ts";
 
-export const RECENT_ACTION_TYPES: readonly (readonly [prefix: string, type: RecentItemType])[] = [
+const RECENT_ACTION_TYPES: readonly (readonly [prefix: string, type: RecentItemType])[] = [
   ["prompts.", "prompt"],
   ["workflow.", "workflow"],
   ["dataset.", "dataset"],

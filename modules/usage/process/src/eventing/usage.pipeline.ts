@@ -47,7 +47,7 @@ export type UsageSenders = Readonly<{
 }>;
 
 /** The two meters' append sides; both are written on SaaS only. */
-export type UsageMeterStores = Readonly<{
+type UsageMeterStores = Readonly<{
   billableEvents: AppendStore<BillableEventRecord>;
   traces: AppendStore<TraceMeterRecord>;
 }>;

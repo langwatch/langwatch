@@ -31,7 +31,7 @@ const RESERVED_QUEUE_SLUGS = new Set(["all", "me", "my-queue"]);
 /** How far ahead the walk looks for a readable item before calling the queue finished. */
 const QUEUE_WALK_LOOKAHEAD = 50;
 
-export type AnnotationQueueWalkPosition = Readonly<{
+type AnnotationQueueWalkPosition = Readonly<{
   item?: AnnotationQueuePageItem;
   position: number;
   total: number;

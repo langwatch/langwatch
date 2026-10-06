@@ -26,7 +26,7 @@ import {
 
 import type { SecretRepository } from "../repositories/secret.repository.ts";
 
-export interface SecretServiceOptions {
+interface SecretServiceOptions {
   repository: SecretRepository;
   reservedNames: readonly string[];
   maximumPerProject?: number;

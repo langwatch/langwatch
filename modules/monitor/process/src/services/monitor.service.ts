@@ -33,7 +33,7 @@ import {
 
 import type { MonitorRepository } from "../repositories/monitor.repository.ts";
 
-export type MonitorServiceOptions = {
+type MonitorServiceOptions = {
   repository: MonitorRepository;
   evaluators: Pick<EvaluatorApi, "getById" | "findById">;
   evaluation: Pick<EvaluationApi, "getEvaluatorEffectiveSettings">;

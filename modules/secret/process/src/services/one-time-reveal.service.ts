@@ -20,7 +20,7 @@ import type { OneTimeRevealRepository } from "../repositories/one-time-reveal.re
 
 const logger = createLogger("langwatch:secret:one-time-reveal");
 
-export interface OneTimeRevealDeps {
+interface OneTimeRevealDeps {
   store: OneTimeRevealRepository;
   ttlMs?: number;
 }

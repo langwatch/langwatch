@@ -24,7 +24,7 @@ import type { PresenceModule } from "../app/presence.app.ts";
 import type { PresenceRepositories } from "../repositories/presence.repositories.ts";
 import type { PresenceSettingsService } from "../services/presence-settings.service.ts";
 
-export const PRESENCE_SETTINGS_PIPELINE_NAME = "presence_settings" as const;
+const PRESENCE_SETTINGS_PIPELINE_NAME = "presence_settings" as const;
 
 export type PresenceSettingsPipeline = StaticPipelineDefinition<never>;
 

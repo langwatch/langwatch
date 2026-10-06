@@ -7,7 +7,7 @@ import {
   type AnnotationQueueWithItems,
 } from "@langwatch/annotation-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
 
 import type {
@@ -25,11 +25,6 @@ import type {
   ListAnnotationQueuesWithItemsInput,
   MarkAnnotationQueueItemDoneInput,
 } from "../annotation-queue-item.repository.ts";
-
-export type AnnotationQueueItemDatabase = Pick<
-  PrismaClient,
-  "annotationQueue" | "annotationQueueItem" | "$transaction"
->;
 
 const reviewerSelect = { select: { id: true, name: true, image: true } };
 

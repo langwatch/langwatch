@@ -30,7 +30,7 @@ export function initialGuestPrompt(query: string): string {
 }
 
 /** A roll of 0-9 from a `[0, 1)` draw, as main's `Math.floor(Math.random() * 10)`. */
-export function rollOfTen(draw: number): number {
+function rollOfTen(draw: number): number {
   return Math.floor(draw * 10);
 }
 

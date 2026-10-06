@@ -62,7 +62,7 @@ type CollectorSource = Readonly<{
   headers: Readonly<Record<string, string>>;
 }>;
 
-export type CollectorTarget =
+type CollectorTarget =
   | Readonly<{
       configured: true;
       tracesUrl: string;

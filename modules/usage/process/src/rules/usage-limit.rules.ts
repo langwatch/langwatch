@@ -27,7 +27,7 @@ export function usageLimitOf({ plan, unit }: { plan: Plan; unit: UsageUnit }): U
 /** What the decider remembers per organization: the month it holds and whether it refuses. */
 export type LimitState = Readonly<{ month: string | null; reached: boolean }>;
 
-export type LimitDecision = "reached" | "cleared" | "none";
+type LimitDecision = "reached" | "cleared" | "none";
 
 /** Decides a counted month against the remembered state; last month's count changes nothing. */
 export function decideLimit({

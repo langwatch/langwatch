@@ -1,4 +1,4 @@
-export type ExperimentSubjectType = "USER" | "ORGANIZATION" | "PROJECT";
+type ExperimentSubjectType = "USER" | "ORGANIZATION" | "PROJECT";
 
 export interface ExperimentSubject {
   subjectType: ExperimentSubjectType;
