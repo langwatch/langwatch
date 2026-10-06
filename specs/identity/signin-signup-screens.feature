@@ -575,7 +575,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # callback returns the browser to wherever the sign-in was heading, and that
   # screen is never mounted again. The session fetch is the one thing every
   # landing passes through, so it is where the promotion belongs.
-  @unit
+  @integration
   Scenario: A social provider that got me in is badged, wherever the callback lands
     Given I dialled a social provider and it signed me in
     When the browser lands anywhere in the app holding a session

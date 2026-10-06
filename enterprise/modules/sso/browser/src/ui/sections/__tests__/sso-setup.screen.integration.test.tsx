@@ -231,7 +231,10 @@ describe("the single sign-on setup page", () => {
   });
 
   describe("given the page inside the Authentication section", () => {
-    /** @scenario "The Authentication pages share main's rail" */
+    /**
+     * @scenario "The Authentication pages share main's rail"
+     * @scenario "Managing a live connection stays on the same page"
+     */
     it("frames it in main's rail with Identity provider as the current entry", () => {
       renderWithSsoHost(<SsoSetupScreen />);
 
