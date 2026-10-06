@@ -69,7 +69,7 @@ function request(cookie: string | null, method: string, path: string, body: stri
 
 describe("the admin REST declaration", () => {
   describe("given a caller the platform door refuses", () => {
-    /** @scenario "The back office answers a refused caller the hidden 404 at its door" */
+    /** @scenario "Instance admin answers a refused caller the hidden 404 at its door" */
     it.each([
       ["no session", null, "POST", "/api/admin/impersonate"],
       ["a customer", "customer", "POST", "/api/admin/impersonate"],

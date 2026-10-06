@@ -63,7 +63,7 @@ describe("given the platform-operator grant answers through authz", () => {
   });
 
   /** @scenario "Operator gates ask the platform-operator grant" */
-  it("demands manage for a back-office write, hidden as not found", async () => {
+  it("demands manage for an instance-admin write, hidden as not found", async () => {
     const run = (actor: OpsOperator, method: "getList" | "update") =>
       app.runAdminOperation({
         actor,
