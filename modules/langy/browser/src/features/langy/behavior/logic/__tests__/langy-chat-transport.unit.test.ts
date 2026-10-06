@@ -190,10 +190,12 @@ describe("createLangyChatTransport", () => {
   });
 
   describe("when an active conversation id", () => {
+    /** @scenario A message typed into a reopened conversation continues it */
     it("continues via langy.continueConversation carrying that conversation id", async () => {
       const { transport } = makeTransport({ conversationId: "conv-active" });
       await transport.sendMessages(options());
 
+      expect(mutation).toHaveBeenCalledTimes(1);
       const [path, input] = mutation.mock.calls[0]!;
       expect(path).toBe("langy.continueConversation");
       expect(input).toMatchObject({ conversationId: "conv-active" });
