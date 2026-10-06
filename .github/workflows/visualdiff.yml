@@ -247,11 +247,13 @@ jobs:
           echo "publish: skipped, a fork's pull request gets a read-only token; the report is in the workflow's artifact"
 
       # Edits the PR's one <!-- visualdiff:screens --> comment in place; a dispatch
-      # publishes to its branch's open PR, when there is one.
+      # publishes to its branch's open PR, when there is one. A skipped run's
+      # unset exit_code compares equal to '0', so the run's outcome is asked first.
       - name: Publish the screens to the pull request
         id: publish
         if: >-
-          !cancelled() && (steps.run.outputs.exit_code == '0' || steps.run.outputs.exit_code == '1')
+          !cancelled() && steps.run.outcome == 'success'
+          && (steps.run.outputs.exit_code == '0' || steps.run.outputs.exit_code == '1')
           && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         env:
           GH_TOKEN: ${{ github.token }}
