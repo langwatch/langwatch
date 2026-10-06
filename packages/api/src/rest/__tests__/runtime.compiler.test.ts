@@ -99,6 +99,36 @@ defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-0
   }
 });
 
+/** @scenario "Registering a route without an access policy is a type error" */
+it("refuses a route registered with no access decision, because it has no handler to call", () => {
+  const directory = mkdtempSync(join(process.cwd(), ".tmp-rest-access-"));
+  const fixture = join(directory, "fixture.ts");
+
+  writeFileSync(
+    fixture,
+    `import { z } from "zod";
+import { moduleApi } from "@langwatch/module";
+import { defineRestRouter } from "../src/rest/declaration.ts";
+const api = moduleApi<object>()("annotation");
+const route = () => defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08");
+route().get("/", "list").withOutput(z.object({ id: z.string() })).handle(() => ({ id: "" }));
+route().get("/", "list").withPermission("annotations:view").withOutput(z.object({ id: z.string() })).handle(() => ({ id: "" }));
+`,
+  );
+
+  try {
+    const errors = compile(fixture)
+      .split("\n")
+      .filter((line) => line.includes("fixture.ts(") && line.includes("error TS"));
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/fixture\.ts\(6,/);
+    expect(errors[0]).toContain("'this' context of type");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 /** @scenario "A route answers one of several shapes, told apart by a field" */
 it("infers trailing middleware arguments and rejects wrong facts and responses", () => {
   const directory = mkdtempSync(join(process.cwd(), ".tmp-transport-middleware-"));
