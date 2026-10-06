@@ -960,13 +960,7 @@ export class WorkflowModule implements WorkflowApi {
   }
 
   /** Starts one evaluation run of a committed version. */
-  async triggerEvaluation({
-    callerMayReadRuns,
-    ...input
-  }: WorkflowEvaluationRequest & {
-    callerMayReadRuns: boolean;
-  }): Promise<WorkflowEvaluationStarted> {
-    if (!callerMayReadRuns) throw new ApiKeyPermissionDeniedError("evaluations:view");
+  async triggerEvaluation(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted> {
     return this.#infrastructure.evaluations.trigger(input);
   }
 
@@ -1010,18 +1004,8 @@ export class WorkflowModule implements WorkflowApi {
 
   async completeCode(input: {
     projectId: string;
-    userId: string | undefined;
     body: WorkflowRestEnvelope;
   }): Promise<WorkflowCodeCompletionResponse> {
-    if (input.userId === undefined) throw new WorkflowCallerUnauthenticatedError();
-    const permitted = await this.#infrastructure.permissions.has({
-      userId: input.userId,
-      projectId: input.projectId,
-      permission: "workflows:manage",
-    });
-
-    if (!permitted) throw new ProjectPermissionDeniedError("workflows:manage");
-
     try {
       return await this.#infrastructure.codeCompletions.complete({
         projectId: input.projectId,

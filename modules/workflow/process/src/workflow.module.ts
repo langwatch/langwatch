@@ -10,13 +10,12 @@ import { workflowLifecycleEventing } from "#eventing/workflow-lifecycle.pipeline
 import { workflowNlpLambdaCleanupEventing } from "#eventing/workflow-nlp-lambda-cleanup.pipeline";
 import { workflowRepositories } from "#repositories/workflow-repositories.registry";
 import { WorkflowHttpSecretsService } from "#services/workflow-http-secrets.service";
-import { WorkflowPermissionService } from "#services/workflow-permission.service";
 import { WorkflowHttpCredentialsBackfillTask } from "#tasks/workflow-http-credentials-backfill.task";
 import { workflowExecuteSyncRest } from "#transport/workflow-execute-sync.rest";
 import { workflowOptimizationTrpcTransport } from "#transport/workflow-optimization.trpc";
 import { workflowRunCallerKey, workflowRunRest } from "#transport/workflow-run.rest";
 import { workflowStudioRest } from "#transport/workflow-studio.rest";
-import { createWorkflowRest, workflowEvaluationRunCeiling } from "#transport/workflow.rest";
+import { createWorkflowRest } from "#transport/workflow.rest";
 import { workflowTrpcTransport } from "#transport/workflow.trpc";
 
 export const workflowProcessModule = defineProcessModule("workflow")
@@ -38,22 +37,9 @@ export const workflowProcessModule = defineProcessModule("workflow")
       httpSecrets: WorkflowHttpSecretsService.create(dependencies.secrets),
     }),
   ])
-  .withTransportFacts(({ dependencies }) => [
+  .withTransportFacts(() => [
     bindRestMiddleware(workflowRunCallerKey, (context) => {
       const principal = principalOfCredential(projectCredentialOfRequest(context.req.raw));
       return principal?.type === "apiKey" ? principal.id : null;
-    }),
-    // A legacy API key predates RBAC and carries full project access by its class alone. Any
-    // other credential is asked as its principal: a key its own row, a person's token the person.
-    bindRestMiddleware(workflowEvaluationRunCeiling, async (context) => {
-      const credential = projectCredentialOfRequest(context.req.raw);
-      const principal = principalOfCredential(credential);
-      if (principal === null) return true;
-
-      return WorkflowPermissionService.create({ authz: dependencies.authz }).holds({
-        principal,
-        project: credential.project,
-        permission: "evaluations:view",
-      });
     }),
   ]);

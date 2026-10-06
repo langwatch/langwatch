@@ -226,10 +226,8 @@ export interface WorkflowApi {
   run(input: RunWorkflowCommand): Promise<WorkflowRunAnswer>;
   /** Runs one public synchronous REST door with its named refusals. */
   runSynchronous(input: RunWorkflowCommand): Promise<WorkflowRunAnswer>;
-  /** Starts one evaluation run of a committed version, unless the caller may not read runs. */
-  triggerEvaluation(
-    input: WorkflowEvaluationRequest & { callerMayReadRuns: boolean },
-  ): Promise<WorkflowEvaluationStarted>;
+  /** Starts one evaluation run of a committed version. */
+  triggerEvaluation(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted>;
 
   // -- the Studio's own graph ------------------------------------------------
 
@@ -265,8 +263,6 @@ export interface WorkflowApi {
   /** One Monaco completion for the editor, over whichever model answers it. */
   completeCode(input: {
     projectId: string;
-    /** Absent when no one is signed in, which is refused. */
-    userId: string | undefined;
     body: WorkflowRestEnvelope;
   }): Promise<WorkflowCodeCompletionResponse>;
   /**

@@ -4,7 +4,6 @@
  * this one, so their literal paths win over `/:id`.
  */
 import {
-  defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
@@ -25,16 +24,6 @@ import {
 import { z } from "zod";
 
 const logger = createLogger("langwatch:api:workflows");
-
-/**
- * Whether the key may also READ the run it is about to start. A fact rather
- * than a second declared permission, because a route declares one permission
- * and the caller polls the run behind `evaluations:view`.
- */
-export const workflowEvaluationRunCeiling = defineRestMiddleware(
-  "workflowEvaluationRunCeiling",
-  z.boolean(),
-);
 
 function toWorkflowResponse(workflow: Workflow): Omit<WorkflowRestDetail, "platformUrl"> {
   return {
@@ -149,13 +138,13 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
 
       // Running a workflow is not administering it: the committed version, its
       // nodes and its dataset are untouched - the call produces a RUN. So it
-      // asks for `workflows:create`, the same grain as the suite run. The
-      // second gate is the ceiling fact above: the caller must also be able to
-      // READ the run it starts.
+      // asks for `workflows:create`, the same grain as the suite run, and
+      // `evaluations:view` after it: the caller must also be able to READ the
+      // run it starts.
       .post("/:id/evaluate", "postApiWorkflowsByIdEvaluate")
       .withParams(workflowRestParamsSchema)
       .withInput(workflowRestEvaluateSchema)
-      .withPermission("workflows:create")
+      .withPermission(["workflows:create", "evaluations:view"])
       .withOutput(workflowRestEvaluationStartedSchema)
       .withDocs({
         description:
@@ -174,15 +163,14 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
           { status: 422, description: "The body failed validation" },
         ],
       })
-      .withMiddleware(projectRestFacts, workflowEvaluationRunCeiling)
-      .handle(async ({ app, input, scope }, project, mayReadRuns) => {
+      .withMiddleware(projectRestFacts)
+      .handle(async ({ app, input, scope }, project) => {
         logger.info(
           { projectId: scope.id, workflowId: input.id },
           "Triggering workflow evaluation via API",
         );
 
         const started = await app.triggerEvaluation({
-          callerMayReadRuns: mayReadRuns,
           projectId: scope.id,
           projectSlug: project.projectSlug,
           workflowId: input.id,

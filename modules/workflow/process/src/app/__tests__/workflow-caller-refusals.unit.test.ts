@@ -10,7 +10,7 @@ import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import { WorkflowModule } from "../workflow.app.ts";
@@ -18,8 +18,7 @@ import { WorkflowModule } from "../workflow.app.ts";
 /** The app over the memory registry; a test passes the peer whose calls it watches. */
 async function appWith({
   authz = createApiFixture<AuthzApi>({}, "AuthzApi"),
-  experiments = createApiFixture<ExperimentApi>({}, "ExperimentApi"),
-}: { authz?: AuthzApi; experiments?: ExperimentApi } = {}): Promise<WorkflowModule> {
+}: { authz?: AuthzApi } = {}): Promise<WorkflowModule> {
   return WorkflowModule.create({
     dependencies: {
       evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
@@ -27,7 +26,7 @@ async function appWith({
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz,
       apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
-      experiments,
+      experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
       secrets: createApiFixture<SecretApi>({}, "SecretApi"),
@@ -47,48 +46,6 @@ async function appWith({
 }
 
 describe("WorkflowModule caller refusals", () => {
-  describe("given a key that cannot read the run it would start", () => {
-    /** @scenario A workflows-only key cannot start a run it could not read */
-    it("refuses before the trigger is reached", async () => {
-      const trigger = vi.fn<ExperimentApi["triggerWorkflowEvaluation"]>();
-      const app = await appWith({
-        experiments: createApiFixture<ExperimentApi>(
-          { triggerWorkflowEvaluation: trigger },
-          "ExperimentApi",
-        ),
-      });
-
-      await expect(
-        app.triggerEvaluation({
-          projectId: "project_1",
-          projectSlug: "project-one",
-          workflowId: "workflow_1",
-          callerMayReadRuns: false,
-        }),
-      ).rejects.toMatchObject({
-        code: "api_key_permission_denied",
-        meta: { permission: "evaluations:view" },
-      });
-      expect(trigger).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("given a code completion with no signed-in caller", () => {
-    it("refuses it as unauthorized before checking any permission", async () => {
-      const hasPermission = vi.fn<AuthzApi["hasPermission"]>();
-      const can = vi.fn<AuthzApi["can"]>();
-      const app = await appWith({
-        authz: createApiFixture<AuthzApi>({ hasPermission, can }, "AuthzApi"),
-      });
-
-      await expect(
-        app.completeCode({ projectId: "project_1", userId: undefined, body: {} }),
-      ).rejects.toMatchObject({ code: "unauthorized", httpStatus: 401 });
-      expect(hasPermission).not.toHaveBeenCalled();
-      expect(can).not.toHaveBeenCalled();
-    });
-  });
-
   describe("given a Studio event posted to the editor's door", () => {
     const isAlive = JSON.stringify({
       projectId: "project_1",

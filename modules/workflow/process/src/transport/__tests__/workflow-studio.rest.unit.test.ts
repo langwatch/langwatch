@@ -124,7 +124,7 @@ describe("the Studio editor's doors", () => {
       expect(completeCode).not.toHaveBeenCalled();
     });
 
-    it("hands a permitted caller's completion request to the app with the door's user", async () => {
+    it("hands a permitted caller's completion request to the app", async () => {
       const completeCode = vi.fn(async () => ({ completion: "x" }));
       const { hono } = mount({ app: { completeCode }, caller: signedIn });
 
@@ -137,7 +137,6 @@ describe("the Studio editor's doors", () => {
       expect(completeCode).toHaveBeenCalledWith({
         projectId: "project_1",
         body: { completionMetadata: { language: "python" } },
-        userId: "user_1",
       });
     });
   });

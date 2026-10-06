@@ -34,13 +34,9 @@ export const workflowStudioRest = defineRestRouter(WorkflowApi)
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withPermission("workflows:manage", { at: "route", param: "projectId" })
   .withOutput(workflowCodeCompletionResponseSchema)
-  .handle(({ app, input, actor }) => {
+  .handle(({ app, input }) => {
     const { projectId, ...body } = input;
-    return app.completeCode({
-      projectId,
-      body,
-      userId: actor?.type === "user" ? actor.id : undefined,
-    });
+    return app.completeCode({ projectId, body });
   })
 
   .post("/api/workflows/post_event", "postWorkflowStudioEvent")
