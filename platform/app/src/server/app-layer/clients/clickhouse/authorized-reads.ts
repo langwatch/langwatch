@@ -14,7 +14,12 @@
  *
  * Home on `main`; ports to `packages/clickhouse-client` with PR 7536.
  */
-import type { ClickHouseClient, QueryParams } from "@clickhouse/client";
+import type {
+  ClickHouseClient,
+  DataFormat,
+  QueryParams,
+  QueryResult,
+} from "@clickhouse/client";
 import {
   AccessNotGrantedError,
   type Authorization,
@@ -229,8 +234,34 @@ export function fenceFor({
   return { own, shared };
 }
 
-/** What a repository hands the reader: the client's own query shape. */
-export type ScopedQueryParams = QueryParams;
+/**
+ * The own project behind a proof: the one a route minted it for, which is
+ * where its Postgres rows (topic names, broadcast channels) live. One own
+ * grant by construction; a proof with none is refused before anything reads.
+ */
+export function ownProjectIdOf({
+  authorization,
+  reads,
+}: {
+  authorization: Authorization;
+  reads: ReadResource;
+}): string {
+  const own = fenceFor({ authorization, reads }).own[0];
+  if (own === undefined) {
+    throw new Error("a proof reached a read with no own project to act for");
+  }
+  return own;
+}
+
+/**
+ * What a repository hands the reader: the client's own query shape, with the
+ * format kept as a literal so the result set types its rows the way the
+ * client's own `query` does.
+ */
+export type ScopedQueryParams<Format extends DataFormat = "JSON"> = Omit<
+  QueryParams,
+  "format"
+> & { format?: Format };
 
 /**
  * A reader bound to one fence. `query` expands the markers and sends the
@@ -250,9 +281,9 @@ export class TenantScopedReader {
     return this.deps.fence;
   }
 
-  async query(
-    params: ScopedQueryParams,
-  ): ReturnType<ClickHouseClient["query"]> {
+  async query<Format extends DataFormat = "JSON">(
+    params: ScopedQueryParams<Format>,
+  ): Promise<QueryResult<Format>> {
     const expanded = expandStatement({
       query: params.query,
       queryParams: params.query_params ?? {},

@@ -162,6 +162,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     app: opts.app,
     mfaGate: opts.mfaGate,
     permissionChecked: opts.permissionChecked ?? false,
+    authorization: opts.authorization,
     publiclyShared: opts.publiclyShared ?? false,
     organizationRole: opts.organizationRole ?? undefined,
     opsScope: opts.opsScope,

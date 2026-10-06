@@ -19,6 +19,8 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it, vi } from "vitest";
+import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import { TraceListClickHouseRepository } from "../trace-list.clickhouse.repository";
 import type { TraceListQuery } from "../trace-list.repository";
 
@@ -47,14 +49,16 @@ function makeRepo() {
     }),
   } as unknown as ClickHouseClient;
   return {
-    repo: new TraceListClickHouseRepository(async () => client),
+    repo: new TraceListClickHouseRepository(
+      new AuthorizedClickHouse({ resolveClient: async () => client }),
+    ),
     queries,
   };
 }
 
 function baseQuery(overrides: Partial<TraceListQuery> = {}): TraceListQuery {
   return {
-    tenantId: "tenant-1",
+    authorization: ownProof({ projectId: "tenant-1" }),
     timeRange: { from: 1_000, to: 2_000 },
     sort: { column: "OccurredAt", direction: "desc" },
     limit: 25,

@@ -12,10 +12,12 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import {
   type LogRedactionService,
   prepareCanonicalLogRecords,
 } from "~/server/event-sourcing/pipelines/log-processing/canonicalLog";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import {
   startTestContainers,
   stopTestContainers,
@@ -208,7 +210,7 @@ function query(
   overrides: Partial<SessionGroupsQuery> = {},
 ): SessionGroupsQuery {
   return {
-    tenantId,
+    authorization: ownProof({ projectId: tenantId }),
     timeRange,
     sort: { column: "lastActivity", direction: "desc" },
     limit: 50,
@@ -219,7 +221,9 @@ function query(
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repository = new SessionGroupsClickHouseRepository(async () => ch);
+  repository = new SessionGroupsClickHouseRepository(
+    new AuthorizedClickHouse({ resolveClient: async () => ch }),
+  );
 
   await insertTraceSummaries([
     // Session alpha: three traces whose rollup the small-page read must

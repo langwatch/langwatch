@@ -43,6 +43,7 @@ import {
 } from "@ee/sso/sso-self-serve-adapters";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import { internalActor } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
@@ -206,6 +207,7 @@ import { TriggerService } from "./automations/trigger.service";
 import { testFireTrigger } from "./automations/trigger-template.service";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
+import { AuthorizedClickHouse } from "./clients/clickhouse/authorized-reads";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
 import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
@@ -484,6 +486,12 @@ export function initializeDefaultApp(options?: {
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
   };
+  // ADR-144 block C: the one client that fences a read by its proof. Every
+  // repository that reads the trace list goes through it, never the resolver.
+  const authorizedClickHouse = new AuthorizedClickHouse({
+    resolveClient: resolveClickHouseClient,
+  });
+  const authorizationService = authorizationServiceFor(prisma);
 
   // ADR-137: one runs store and one judgements store, handed to the
   // pipeline's run port and to the App, so the run surface never resolves a
@@ -595,7 +603,7 @@ export function initializeDefaultApp(options?: {
   const traceList = traced(
     new TraceListService(
       clickhouseEnabled
-        ? new TraceListClickHouseRepository(resolveClickHouseClient)
+        ? new TraceListClickHouseRepository(authorizedClickHouse)
         : new NullTraceListRepository(),
       evaluationRuns,
       topics,
@@ -1384,8 +1392,20 @@ export function initializeDefaultApp(options?: {
               to,
               limit,
             }) => {
+              // A scheduled report acts on its own behalf: no request minted
+              // a proof, so the read is fenced to the report's project alone.
+              const authorization =
+                await authorizationService.authorizeInternal({
+                  actor: internalActor("app-layer/reports/report-dispatch"),
+                  projectId,
+                  permission: "traces:view",
+                  purpose: {
+                    kind: "operator",
+                    entry: "ReportDispatch.listReportTraces",
+                  },
+                });
               const page = await traceList.getList({
-                tenantId: projectId,
+                authorization,
                 timeRange: { from, to },
                 sort: { columnId: "time", direction: "desc" },
                 page: 1,
@@ -1899,7 +1919,7 @@ export function initializeDefaultApp(options?: {
   const sessionGroups = traced(
     new SessionGroupsService({
       repository: clickhouseEnabled
-        ? new SessionGroupsClickHouseRepository(resolveClickHouseClient)
+        ? new SessionGroupsClickHouseRepository(authorizedClickHouse)
         : new NullSessionGroupsRepository(),
       codingAgentSessions,
       pullRequests: {
@@ -2186,7 +2206,7 @@ export function initializeDefaultApp(options?: {
     organizations,
     projects,
     permissions: permissionsServiceFor(prisma),
-    authorization: authorizationServiceFor(prisma),
+    authorization: authorizationService,
     tokenizer,
     usage,
     planProvider,

@@ -47,7 +47,7 @@ export type Actor =
 export function internalActor(
   codePath: string,
   options?: { revision?: string },
-): Actor {
+): Extract<Actor, { type: "internal" }> {
   return { type: "internal", codePath, revision: options?.revision };
 }
 

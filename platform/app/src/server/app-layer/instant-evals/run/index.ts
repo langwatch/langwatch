@@ -18,6 +18,7 @@
  * @see ./instant-eval-run.service.ts
  */
 
+import { internalActor } from "@langwatch/actor";
 import { getLangWatchQLService } from "~/server/analytics/lwql";
 import { lwqlConnectionFromEnv } from "~/server/analytics/lwql/executor";
 import { getProtectionsForProject } from "~/server/api/utils";
@@ -166,8 +167,17 @@ async function selectExplorerTraceIds({
   window: { from: number; to: number };
   limit: number;
 }): Promise<readonly string[]> {
-  return await getApp().traces.list.getTraceIds({
-    tenantId: projectId,
+  const app = getApp();
+  // The run acts on its own behalf: no request minted a proof, so the read
+  // is fenced to the run's project alone.
+  const authorization = await app.authorization.authorizeInternal({
+    actor: internalActor("app-layer/instant-evals/run"),
+    projectId,
+    permission: "traces:view",
+    purpose: { kind: "operator", entry: "InstantEvalRunService.accept" },
+  });
+  return await app.traces.list.getTraceIds({
+    authorization,
     timeRange: window,
     filterWhere: translateFilterToClickHouse(filter, window) ?? undefined,
     hiddenOrigins: explorerHiddenOrigins(filter),

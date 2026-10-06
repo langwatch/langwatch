@@ -1,3 +1,5 @@
+import type { Authorization } from "@langwatch/actor";
+import type { TenantScopeTimeColumn } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { TraceSummaryData } from "../types";
 
 export type TraceListSortColumn =
@@ -29,7 +31,8 @@ export interface TraceListCursor {
 }
 
 export interface TraceListQuery {
-  tenantId: string;
+  /** The proof the read is fenced by; the reader applies its tenant set. */
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
   sort: TraceListSort;
   limit: number;
@@ -117,7 +120,7 @@ export interface TraceListRepository {
   findAll(query: TraceListQuery): Promise<TraceListPage>;
 
   findCount(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     since: number;
     filterWhere?: { sql: string; params: Record<string, unknown> };
@@ -129,14 +132,14 @@ export interface TraceListRepository {
    * names a field only this repository's compiler can answer.
    */
   findTraceIds(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     filterWhere?: { sql: string; params: Record<string, unknown> };
     limit: number;
   }): Promise<string[]>;
 
   findDistinctValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     column: string;
     prefix: string;
     limit: number;
@@ -148,10 +151,10 @@ export interface TraceListRepository {
    * applies after the version dedup. Absent for the unfiltered discover read.
    */
   findCategoricalFacet(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: TenantScopeTimeColumn;
     facetExpression: string;
     limit: number;
     offset: number;
@@ -160,15 +163,15 @@ export interface TraceListRepository {
   }): Promise<CategoricalFacetResult>;
 
   findCategoricalFacetRaw(params: {
-    tenantId: string;
+    authorization: Authorization;
     query: { sql: string; params: Record<string, unknown> };
   }): Promise<CategoricalFacetResult>;
 
   findRangeStatsForTable(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: TenantScopeTimeColumn;
     column: string;
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<{ min: number; max: number }>;
@@ -180,10 +183,10 @@ export interface TraceListRepository {
    * to the slider once the distinct values exceed its threshold.
    */
   findDiscreteValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: TenantScopeTimeColumn;
     column: string;
     limit: number;
     filterWhere?: { sql: string; params: Record<string, unknown> };
@@ -195,10 +198,10 @@ export interface TraceListRepository {
    * Used by `discover` to collapse ~25 parallel queries into ~2 per table.
    */
   findBatchedFacets(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: TenantScopeTimeColumn;
     categoricalSpecs: { key: string; expression: string }[];
     rangeSpecs: { key: string; expression: string }[];
     topN: number;
@@ -211,7 +214,7 @@ export interface TraceListRepository {
    * the repo trusts it.
    */
   findAttributeValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     attributeKey: string;
     prefix?: string;
@@ -226,7 +229,7 @@ export interface TraceListRepository {
    * contract as {@link findAttributeValues}.
    */
   findEventAttributeValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     attributeKey: string;
     prefix?: string;
@@ -240,7 +243,7 @@ export interface TraceListRepository {
    * injection-safety contract as {@link findAttributeValues}.
    */
   findSpanAttributeValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     attributeKey: string;
     prefix?: string;

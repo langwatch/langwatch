@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/actor";
 /**
  * Read side of the Sessions lens (specs/traces-v2/sessions-lens.feature):
  * one row per `gen_ai.conversation.id`, rolled up in ClickHouse over EVERY
@@ -29,7 +30,8 @@ export interface SessionGroupCursor {
 }
 
 export interface SessionGroupsQuery {
-  tenantId: string;
+  /** The proof the read is fenced by; the reader applies its tenant set. */
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
   sort: SessionGroupSort;
   limit: number;

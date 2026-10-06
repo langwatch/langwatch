@@ -9,6 +9,7 @@
  * updates").
  */
 import { describe, expect, it, vi } from "vitest";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import { LANGY_TRACE_ORIGIN } from "../derive-trace-origin";
 import { FACET_REGISTRY } from "../facet-registry";
 import { translateFilterToClickHouse } from "../filter-to-clickhouse";
@@ -16,6 +17,7 @@ import { HIDDEN_ORIGINS_PARAM } from "../hidden-origins";
 import { TraceListService } from "../trace-list.service";
 
 const TENANT = "tenant-1";
+const PROOF = ownProof({ projectId: TENANT });
 const timeRange = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
 
 function fakeRepository() {
@@ -82,7 +84,7 @@ describe("TraceListService.getFacets", () => {
     it("counts each named facet under the query without its own field", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -101,7 +103,7 @@ describe("TraceListService.getFacets", () => {
     it("counts a facet the query never names under the whole query", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -119,7 +121,7 @@ describe("TraceListService.getFacets", () => {
     it("shares one scan between every facet under the same predicate", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -139,7 +141,7 @@ describe("TraceListService.getFacets", () => {
     it("reaches facets on other tables through the filtered traces", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -163,7 +165,7 @@ describe("TraceListService.getFacets", () => {
     it("leaves attribute key discovery to discover", async () => {
       const repository = fakeRepository();
       const { facets } = await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query,
       });
@@ -180,7 +182,7 @@ describe("TraceListService.getFacets", () => {
     it("applies the exclusion to every facet but origin", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query: "status:error",
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -210,7 +212,7 @@ describe("TraceListService.getFacets", () => {
     it("counts facets on other tables as discover does when only the origin rule applies", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query: "",
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -232,7 +234,7 @@ describe("TraceListService.getFacets", () => {
     it("scopes that facet to the window's visible traces, its own field left out", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query: "evaluatorStatus:error",
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -250,7 +252,7 @@ describe("TraceListService.getFacets", () => {
     it("reads every trace facet but origin in one batched scan", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange,
         query: null,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -288,7 +290,7 @@ describe("TraceListService.getFacets", () => {
         live: true,
       };
       await serviceWith(repository).getFacets({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: live,
         query: "status:error",
       });

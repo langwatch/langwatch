@@ -1,5 +1,10 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
+import {
+  ownProjectIdOf,
+  tenantScopeKey,
+} from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
@@ -113,7 +118,7 @@ export interface TraceListPage {
 }
 
 interface ListParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   sort: { columnId: string; direction: "asc" | "desc" };
   /** 1-based offset compatibility for non-cursor callers. */
@@ -131,7 +136,7 @@ interface ListParams {
 }
 
 interface FacetParams {
-  tenantId: string;
+  authorization: Authorization;
   /** The exact window the list reads, never snapped. */
   timeRange: { from: number; to: number; live?: boolean };
   /**
@@ -154,7 +159,7 @@ export interface FacetsResult {
 }
 
 interface TraceIdsParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   filterWhere?: { sql: string; params: Record<string, unknown> };
   hiddenOrigins?: readonly string[];
@@ -162,7 +167,7 @@ interface TraceIdsParams {
 }
 
 interface NewCountParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   since: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
@@ -170,14 +175,14 @@ interface NewCountParams {
 }
 
 interface SuggestParams {
-  tenantId: string;
+  authorization: Authorization;
   field: string;
   prefix: string;
   limit?: number;
 }
 
 interface DiscoverParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
 }
 
@@ -195,7 +200,7 @@ export interface DiscoverResult {
 }
 
 interface FacetValuesParams {
-  tenantId: string;
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   facetKey: string;
   prefix?: string;
@@ -222,7 +227,7 @@ const ATTRIBUTE_KEY_REGEX = /^[a-zA-Z0-9_.\-]+$/;
  * Attribute key sets and top values turn over slowly, so a 30-min ceiling
  * with a 2-min background refresh is the right trade: the user almost
  * always gets a cached answer, and active sessions still see fresh data
- * within ~2 minutes of ingest. Cache keys include `tenantId`, so this is
+ * within ~2 minutes of ingest. Cache keys include the proof's scope, so this is
  * tenant-isolated by construction.
  */
 const FACET_VALUES_TTL_MS = 30 * 60 * 1000; // cache lives up to 30 minutes
@@ -248,7 +253,7 @@ const FACET_VALUES_CACHE = new TtlCache<CachedFacetValues>(
  * underlying ClickHouse scans are ~125MB+ on busy tenants, the result
  * turns over slowly (top values + key sets), and the SWR pattern means
  * users still get a background refresh every ~2 min of actual reads.
- * Cache keys are tenant-scoped — see `discoverCacheKey`.
+ * Cache keys are scoped to the proof's tenant set — see `discoverCacheKey`.
  */
 const DISCOVER_TTL_MS = 30 * 60 * 1000;
 /**
@@ -293,7 +298,7 @@ const DISCOVER_REFRESH_LOCK_CACHE = new TtlCache<number>(
  * (which is shared with the null repo / test factories that don't
  * want the dependency); production callers register the live one.
  */
-type DiscoverBroadcaster = (tenantId: string) => void;
+type DiscoverBroadcaster = (projectId: string) => void;
 let discoverBroadcaster: DiscoverBroadcaster | null = null;
 
 export function setDiscoverBroadcaster(fn: DiscoverBroadcaster | null): void {
@@ -366,11 +371,27 @@ function snapToWindowPreset(timeRange: { from: number; to: number }): {
   return { from, to, label: preset.label };
 }
 
+/** The tenant set and windows a proof fences reads to, as one cache key part. */
+function scopeKeyOf(authorization: Authorization): string {
+  return tenantScopeKey({ authorization, reads: "traces" });
+}
+
+/**
+ * The project the proof was minted for. Postgres rows (topic names) and the
+ * discover broadcast channel live under it; on an aggregate that is the
+ * aggregate itself, not a member.
+ */
+function ownProjectOf(authorization: Authorization): string {
+  return ownProjectIdOf({ authorization, reads: "traces" });
+}
+
 function facetValuesCacheKey(params: FacetValuesParams): string {
   // "Live" time ranges roll forward by milliseconds each request — bucket to the
-  // minute so identical user intent hits the same cache slot.
+  // minute so identical user intent hits the same cache slot. The scope key
+  // names every project in the proof and its window, so an aggregate and one
+  // of its members never share a slot.
   return [
-    params.tenantId,
+    scopeKeyOf(params.authorization),
     params.facetKey,
     bucketTime(params.timeRange.from),
     bucketTime(params.timeRange.to),
@@ -380,17 +401,25 @@ function facetValuesCacheKey(params: FacetValuesParams): string {
   ].join("|");
 }
 
-function discoverCacheKey(
-  tenantId: string,
-  snapped: ReturnType<typeof snapToWindowPreset>,
-): string {
+function discoverCacheKey({
+  authorization,
+  snapped,
+}: {
+  authorization: Authorization;
+  snapped: ReturnType<typeof snapToWindowPreset>;
+}): string {
   // Include the snapped `from` alongside `to` so two requests with
   // different actual spans that happen to land in the same preset
   // label (e.g. a 15-minute window and a 1-hour window both classify
   // as "1h") don't collide on a single cache slot. Without `from` we'd
   // serve the first-computed payload to both viewers; the second
   // viewer's facets would be for a window they aren't looking at.
-  return [tenantId, snapped.label, snapped.from, snapped.to].join("|");
+  return [
+    scopeKeyOf(authorization),
+    snapped.label,
+    snapped.from,
+    snapped.to,
+  ].join("|");
 }
 
 /**
@@ -539,7 +568,7 @@ export class TraceListService {
     }
 
     const result = await this.repository.findAll({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       sort: { column: sortColumn, direction: params.sort.direction },
       // Read one sentinel row so `nextCursor` is exact without guessing from
@@ -558,7 +587,7 @@ export class TraceListService {
     const traceIds = items.map((item) => item.traceId);
 
     const evaluations = await this.evaluationRunService.findSummariesByTraceIds(
-      params.tenantId,
+      ownProjectOf(params.authorization),
       traceIds,
       params.timeRange.from,
     );
@@ -647,7 +676,7 @@ export class TraceListService {
     };
 
     const facets = await this.computeFacets({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       filterFor,
       includeDynamicKeys: false,
@@ -662,7 +691,7 @@ export class TraceListService {
    */
   async getTraceIds(params: TraceIdsParams): Promise<string[]> {
     return this.repository.findTraceIds({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       filterWhere: withHiddenOrigins(params.filterWhere, params.hiddenOrigins),
       limit: params.limit,
@@ -671,7 +700,7 @@ export class TraceListService {
 
   async getNewCount(params: NewCountParams): Promise<number> {
     return this.repository.findCount({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       since: params.since,
       filterWhere: withHiddenOrigins(params.filterWhere, params.hiddenOrigins),
@@ -683,7 +712,7 @@ export class TraceListService {
     if (!column) return [];
 
     return this.repository.findDistinctValues({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       column,
       prefix: params.prefix,
       limit: params.limit ?? 20,
@@ -701,10 +730,13 @@ export class TraceListService {
     // content always matches its key.
     const snapped = snapToWindowPreset(params.timeRange);
     const snappedParams: DiscoverParams = {
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: { from: snapped.from, to: snapped.to },
     };
-    const cacheKey = discoverCacheKey(params.tenantId, snapped);
+    const cacheKey = discoverCacheKey({
+      authorization: params.authorization,
+      snapped,
+    });
     const cached = await DISCOVER_CACHE.get(cacheKey);
 
     if (cached) {
@@ -770,11 +802,11 @@ export class TraceListService {
         // never bubble up into the user-facing path (the cache write
         // already succeeded).
         try {
-          discoverBroadcaster?.(params.tenantId);
+          discoverBroadcaster?.(ownProjectOf(params.authorization));
         } catch (broadcastErr) {
           discoverLogger.warn(
             {
-              tenantId: params.tenantId,
+              scope: scopeKeyOf(params.authorization),
               cacheKey,
               error:
                 broadcastErr instanceof Error
@@ -815,17 +847,17 @@ export class TraceListService {
    * dynamic-key facets run on their own.
    */
   private async computeFacets({
-    tenantId,
+    authorization,
     timeRange,
     filterFor,
     includeDynamicKeys,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     filterFor: (def: FacetDefinition) => FilterWhere | undefined;
     includeDynamicKeys: boolean;
   }): Promise<FacetDescriptor[]> {
-    const params: DiscoverParams = { tenantId, timeRange };
+    const params: DiscoverParams = { authorization, timeRange };
     const TOP_N = 50;
     // Distinct integer values fetched per `isDiscrete`-flagged facet. The exact
     // distinct count comes back regardless of this cap, so the sidebar can
@@ -909,7 +941,7 @@ export class TraceListService {
           `batch:${slotKey}`,
           this.repository
             .findBatchedFacets({
-              tenantId: params.tenantId,
+              authorization: params.authorization,
               timeRange: params.timeRange,
               table,
               timeColumn: TABLE_TIME_COLUMNS[table],
@@ -970,7 +1002,7 @@ export class TraceListService {
           `discrete:${def.key}`,
           this.repository
             .findDiscreteValues({
-              tenantId: params.tenantId,
+              authorization: params.authorization,
               timeRange: params.timeRange,
               table: def.table,
               timeColumn: TABLE_TIME_COLUMNS[def.table],
@@ -995,7 +1027,7 @@ export class TraceListService {
       taskTimings.sort((a, b) => b.durationMs - a.durationMs);
       discoverLogger.info(
         {
-          tenantId: params.tenantId,
+          scope: scopeKeyOf(params.authorization),
           totalMs,
           breakdown: taskTimings.slice(0, 20),
           taskCount: tasks.length,
@@ -1061,7 +1093,7 @@ export class TraceListService {
       if (!raw) return null;
       const enriched =
         def.key === "topic" || def.key === "subtopic"
-          ? await this.enrichTopicNames(params.tenantId, raw)
+          ? await this.enrichTopicNames(ownProjectOf(params.authorization), raw)
           : raw;
       return {
         key: def.key,
@@ -1180,7 +1212,7 @@ export class TraceListService {
     let result: CategoricalFacetResult;
     if (isExpressionCategorical(def)) {
       result = await this.repository.findCategoricalFacet({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         timeRange: params.timeRange,
         table: def.table,
         timeColumn: TABLE_TIME_COLUMNS[def.table],
@@ -1197,13 +1229,16 @@ export class TraceListService {
         prefix: params.prefix,
       });
       result = await this.repository.findCategoricalFacetRaw({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         query,
       });
     }
 
     if (def.key === "topic" || def.key === "subtopic") {
-      result = await this.enrichTopicNames(params.tenantId, result);
+      result = await this.enrichTopicNames(
+        ownProjectOf(params.authorization),
+        result,
+      );
     }
 
     return result;
@@ -1213,7 +1248,7 @@ export class TraceListService {
     params: FacetValuesParams,
     facetPrefix: string,
     find: (p: {
-      tenantId: string;
+      authorization: Authorization;
       timeRange: { from: number; to: number };
       attributeKey: string;
       prefix?: string;
@@ -1227,7 +1262,7 @@ export class TraceListService {
     }
 
     return find({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       attributeKey,
       limit: params.limit,
@@ -1251,7 +1286,7 @@ export class TraceListService {
 
     if (isExpressionCategorical(def)) {
       result = await this.repository.findCategoricalFacet({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         timeRange: params.timeRange,
         table: def.table,
         timeColumn: TABLE_TIME_COLUMNS[def.table],
@@ -1274,13 +1309,16 @@ export class TraceListService {
           : undefined,
       });
       result = await this.repository.findCategoricalFacetRaw({
-        tenantId: params.tenantId,
+        authorization: params.authorization,
         query,
       });
     }
 
     if (def.key === "topic" || def.key === "subtopic") {
-      result = await this.enrichTopicNames(params.tenantId, result);
+      result = await this.enrichTopicNames(
+        ownProjectOf(params.authorization),
+        result,
+      );
     }
 
     return {
@@ -1303,7 +1341,7 @@ export class TraceListService {
     filterWhere: FilterWhere | undefined;
   }): Promise<RangeFacetDescriptor> {
     const result = await this.repository.findRangeStatsForTable({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       table: def.table,
       timeColumn: TABLE_TIME_COLUMNS[def.table],
@@ -1332,7 +1370,7 @@ export class TraceListService {
       offset: 0,
     });
     const result = await this.repository.findCategoricalFacetRaw({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       query,
     });
 

@@ -1,3 +1,4 @@
+import { type Authorization, internalActor } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
@@ -377,6 +378,10 @@ export function registerTracesRoutes(
       const filterWhere = withHiddenOrigins(
         compileTraceFilter({
           filter,
+          authorization: await authorizeTraceRead({
+            projectId: project.id,
+            route: "api/v1/traces/search",
+          }),
           timeRange: { from: startDate, to: endDate },
           dateField,
         }),
@@ -925,6 +930,26 @@ function visibleWindow({
 }
 
 /**
+ * The proof an API-key route reads the trace list through. The key's access
+ * check already admitted the request; this fences the read to the key's own
+ * project, the way the tRPC mint does for the browser (ADR-144 block C).
+ */
+function authorizeTraceRead({
+  projectId,
+  route,
+}: {
+  projectId: string;
+  route: string;
+}): Promise<Authorization> {
+  return getApp().authorization.authorizeInternal({
+    actor: internalActor("app/api/traces/[[...route]]/app.v1.ts"),
+    projectId,
+    permission: "traces:view",
+    purpose: { kind: "route", route },
+  });
+}
+
+/**
  * `GET /facets`: what the filter fields actually hold.
  *
  * Registered BEFORE `/:traceId`: hono matches in registration order, so the
@@ -958,10 +983,14 @@ function registerFacetsRoute(
         };
 
         const list = getApp().traces.list;
+        const authorization = await authorizeTraceRead({
+          projectId: project.id,
+          route: "api/v1/traces/facets",
+        });
 
         if (field === undefined) {
           const discover = await list.getDiscover({
-            tenantId: project.id,
+            authorization,
             timeRange,
           });
           return c.json(discover);
@@ -972,7 +1001,7 @@ function registerFacetsRoute(
         });
         const facetKey = resolveFacetKey({ field, protections });
         const result = await list.getFacetValues({
-          tenantId: project.id,
+          authorization,
           timeRange: visibleWindow({ timeRange, facetKey, protections }),
           facetKey,
           limit,

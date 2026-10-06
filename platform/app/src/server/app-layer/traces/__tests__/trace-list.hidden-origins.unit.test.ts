@@ -7,11 +7,14 @@
  * specs/traces-v2/origin-badge-filter.feature.
  */
 import { describe, expect, it, vi } from "vitest";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import { LANGY_TRACE_ORIGIN } from "../derive-trace-origin";
 import { translateFilterToClickHouse } from "../filter-to-clickhouse";
 import { HIDDEN_ORIGINS_PARAM } from "../hidden-origins";
 import { SessionGroupsService } from "../session-groups.service";
 import { TraceListService } from "../trace-list.service";
+
+const PROOF = ownProof({ projectId: "tenant-1" });
 
 const timeRange = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
 const filterWhere = { sql: "ContainsErrorStatus = 1", params: {} };
@@ -79,7 +82,7 @@ describe("TraceListService with hidden origins", () => {
     it("reads the list with the exclusion after the filter", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getList({
-        tenantId: "tenant-1",
+        authorization: PROOF,
         timeRange,
         sort: { columnId: "timestamp", direction: "desc" },
         pageSize: 50,
@@ -98,7 +101,7 @@ describe("TraceListService with hidden origins", () => {
     it("counts the new traces with the exclusion", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getNewCount({
-        tenantId: "tenant-1",
+        authorization: PROOF,
         timeRange,
         since: timeRange.from,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -111,7 +114,7 @@ describe("TraceListService with hidden origins", () => {
     it("counts every facet and range but origin with the exclusion", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: "tenant-1",
+        authorization: PROOF,
         timeRange,
         query: FACET_QUERY,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -137,7 +140,7 @@ describe("TraceListService with hidden origins", () => {
     it("counts the origin facet with the filter alone", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
-        tenantId: "tenant-1",
+        authorization: PROOF,
         timeRange,
         query: FACET_QUERY,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
@@ -157,7 +160,7 @@ describe("TraceListService with hidden origins", () => {
       const repository = fakeRepository();
       const service = serviceWith(repository);
       await service.getList({
-        tenantId: "tenant-1",
+        authorization: PROOF,
         timeRange,
         sort: { columnId: "timestamp", direction: "desc" },
         pageSize: 50,
@@ -165,14 +168,14 @@ describe("TraceListService with hidden origins", () => {
         hiddenOrigins: [],
       });
       await service.getNewCount({
-        tenantId: "tenant-1",
+        authorization: PROOF,
         timeRange,
         since: timeRange.from,
         filterWhere,
         hiddenOrigins: [],
       });
       await service.getFacets({
-        tenantId: "tenant-1",
+        authorization: PROOF,
         timeRange,
         query: FACET_QUERY,
         hiddenOrigins: [],
@@ -214,7 +217,7 @@ describe("SessionGroupsService with hidden origins", () => {
         .fn()
         .mockResolvedValue({ rows: [], totalHits: 0 });
       await sessionService(findSessionGroups).getSessionGroups({
-        tenantId: "tenant-1",
+        authorization: PROOF,
         timeRange,
         pageSize: 50,
         filterWhere,
@@ -232,7 +235,7 @@ describe("SessionGroupsService with hidden origins", () => {
         .fn()
         .mockResolvedValue({ rows: [], totalHits: 0 });
       await sessionService(findSessionGroups).getSessionGroups({
-        tenantId: "tenant-1",
+        authorization: PROOF,
         timeRange,
         pageSize: 50,
         filterWhere,

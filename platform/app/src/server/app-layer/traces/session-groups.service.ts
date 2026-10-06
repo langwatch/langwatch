@@ -1,3 +1,5 @@
+import type { Authorization } from "@langwatch/actor";
+import { ownProjectIdOf } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { withHiddenOrigins } from "./hidden-origins";
 import type {
   SessionGroupRow,
@@ -135,7 +137,8 @@ export interface SessionGroupsResult {
 }
 
 interface SessionGroupsParams {
-  tenantId: string;
+  /** The route's proof; the rollup reads through it. */
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
   sort?: { columnId: string; direction: "asc" | "desc" };
   pageSize: number;
@@ -232,7 +235,7 @@ export class SessionGroupsService {
       SORT_COLUMN_MAP[params.sort?.columnId ?? ""] ?? DEFAULT_SORT.column;
     const sortDirection = params.sort?.direction ?? DEFAULT_SORT.direction;
     const page = await this.repository.findSessionGroups({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       sort: { column: sortColumn, direction: sortDirection },
       // One sentinel row past the page so `nextCursor` is exact.
@@ -251,12 +254,19 @@ export class SessionGroupsService {
       ? page.rows.slice(0, params.pageSize)
       : page.rows;
 
+    // Coding-agent sessions and pull request links live in Postgres under
+    // the project the proof was minted for; on an aggregate that is the
+    // aggregate itself, not a member.
+    const projectId = ownProjectIdOf({
+      authorization: params.authorization,
+      reads: "traces",
+    });
     const enrichments = await this.enrich({
-      tenantId: params.tenantId,
+      tenantId: projectId,
       rows: visibleRows,
     });
     await this.linkPullRequests({
-      tenantId: params.tenantId,
+      tenantId: projectId,
       rows: visibleRows,
       enrichments,
     });

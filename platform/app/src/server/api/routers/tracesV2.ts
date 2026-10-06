@@ -102,6 +102,7 @@ import {
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
 } from "~/shared/traces/media-refs";
+import { requireRouteAuthorization } from "../authorization";
 import { getUserProtectionsForProject } from "../utils";
 import {
   gateHeaderCost,
@@ -1207,7 +1208,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
       });
       const page = await app.traces.list.getList({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange: input.timeRange,
         sort: input.sort,
         page: input.page,
@@ -1253,7 +1254,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
       });
       const result = await app.traces.sessionGroups.getSessionGroups({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange: input.timeRange,
         sort: input.sort,
         pageSize: input.pageSize,
@@ -1329,11 +1330,11 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
       const evalRuns = await resolveEvalRuns(input);
       return app.traces.list.getFacets({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange: input.timeRange,
         query: input.query,
         hiddenOrigins: explorerHiddenOrigins(input.query),
@@ -1352,10 +1353,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
       const count = await app.traces.list.getNewCount({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange: input.timeRange,
         since: input.since,
         filterWhere: await buildFilterWhere(input),
@@ -1378,10 +1379,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
       const values = await app.traces.list.getSuggestions({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         field: input.field,
         prefix: input.prefix,
         limit: input.limit,
@@ -1416,7 +1417,7 @@ export const tracesV2Router = createTRPCRouter({
         params: { threadConversationId: input.conversationId },
       };
       const page = await app.traces.list.getList({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange,
         sort: { columnId: "time", direction: "asc" },
         page: 1,
@@ -1446,10 +1447,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
       return app.traces.list.getDiscover({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange: input.timeRange,
       });
     }),
@@ -1493,10 +1494,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
       return app.traces.list.getFacetValues({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange: input.timeRange,
         facetKey: input.facetKey,
         prefix: input.prefix,
@@ -1514,9 +1515,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return generateTraceQueryFromPrompt({
         projectId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         prompt: input.prompt,
         timeRange: { from: input.timeRange.from, to: input.timeRange.to },
       });
@@ -1535,9 +1537,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return generateTraceAction({
         projectId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         prompt: input.prompt,
         timeRange: { from: input.timeRange.from, to: input.timeRange.to },
       });
@@ -1558,9 +1561,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return routeSearch({
         projectId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         text: input.text,
         timeRange: { from: input.timeRange.from, to: input.timeRange.to },
         activeQuery: input.activeQuery,

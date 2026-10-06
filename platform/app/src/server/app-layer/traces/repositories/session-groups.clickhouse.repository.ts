@@ -1,5 +1,9 @@
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import type { Authorization } from "@langwatch/actor";
+import {
+  type AuthorizedClickHouse,
+  tenantScope,
+  tenantSet,
+} from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type {
   SessionGroupRow,
   SessionGroupSortColumn,
@@ -73,16 +77,16 @@ function isLiveUpperBound(timeRange: { to: number; live?: boolean }): boolean {
   return timeRange.live === true;
 }
 
-function buildBaseWhere(
-  tenantId: string,
-  timeRange: { from: number; to: number; live?: boolean },
-): { sql: string; params: Record<string, unknown> } {
+function buildBaseWhere(timeRange: {
+  from: number;
+  to: number;
+  live?: boolean;
+}): { sql: string; params: Record<string, unknown> } {
   const parts = [
-    "TenantId = {tenantId:String}",
+    tenantScope("OccurredAt"),
     "OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})",
   ];
   const params: Record<string, unknown> = {
-    tenantId,
     timeFrom: timeRange.from,
   };
   if (!isLiveUpperBound(timeRange)) {
@@ -95,20 +99,12 @@ function buildBaseWhere(
 export class SessionGroupsClickHouseRepository
   implements SessionGroupsRepository
 {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  constructor(private readonly clickhouse: AuthorizedClickHouse) {}
 
   async findSessionGroups(
     query: SessionGroupsQuery,
   ): Promise<SessionGroupsPage> {
-    EventUtils.validateTenantId(
-      { tenantId: query.tenantId },
-      "SessionGroupsClickHouseRepository.findSessionGroups",
-    );
-
-    const { sql: baseWhere, params } = buildBaseWhere(
-      query.tenantId,
-      query.timeRange,
-    );
+    const { sql: baseWhere, params } = buildBaseWhere(query.timeRange);
 
     // Latest-version dedup, the rollup must sum each logical trace exactly
     // once even while ReplacingMergeTree merges lag. Same IN-tuple shape as
@@ -145,7 +141,7 @@ export class SessionGroupsClickHouseRepository
       params.cursorConversationId = query.cursor.conversationId;
     }
 
-    const client = await this.resolveClient(query.tenantId);
+    const client = this.clickhouse.as(query.authorization, { reads: "traces" });
 
     // Phase 1: the rollup itself, light columns only. Heavy previews
     // (ComputedInput/ComputedOutput) are read in phase 2 for the page's
@@ -204,7 +200,7 @@ export class SessionGroupsClickHouseRepository
       countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
 
     const previews = await this.findPreviewsByTraceIds({
-      tenantId: query.tenantId,
+      authorization: query.authorization,
       timeRange: query.timeRange,
       traceIds: rows.map((row) => row.LastTraceId).filter(Boolean),
     });
@@ -274,7 +270,7 @@ export class SessionGroupsClickHouseRepository
       branches.push(`
             SELECT DISTINCT ProviderSessionId AS SessionId
             FROM log_records
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantSet()}
               AND TimeUnixMs >= fromUnixTimestamp64Milli({logTimeFrom:Int64})
               ${upperBound}
               AND ProviderSessionId != ''
@@ -296,7 +292,7 @@ export class SessionGroupsClickHouseRepository
    * ride through the rollup scan.
    */
   private async findPreviewsByTraceIds(args: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     traceIds: string[];
   }): Promise<Map<string, { input: string | null; output: string | null }>> {
@@ -306,12 +302,9 @@ export class SessionGroupsClickHouseRepository
     >();
     if (args.traceIds.length === 0) return previews;
 
-    const { sql: baseWhere, params } = buildBaseWhere(
-      args.tenantId,
-      args.timeRange,
-    );
+    const { sql: baseWhere, params } = buildBaseWhere(args.timeRange);
 
-    const client = await this.resolveClient(args.tenantId);
+    const client = this.clickhouse.as(args.authorization, { reads: "traces" });
     const result = await client.query({
       query: `
         SELECT TraceId, ComputedInput, ComputedOutput

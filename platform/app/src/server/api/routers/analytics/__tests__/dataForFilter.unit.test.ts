@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getApp } from "~/server/app-layer/app";
 import { appPermissionsService } from "~/test-utils/appPermissionsMock";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import { createInnerTRPCContext, createTRPCRouter } from "../../../trpc";
 import { dataForFilter } from "../dataForFilter";
 
@@ -70,6 +71,11 @@ describe("dataForFilter", () => {
     mockedGetApp.mockReturnValue({
       permissions: appPermissionsService(),
       filters: { options: { getFilterOptions } },
+      // The analytics permission is proof-bearing, so the route mints.
+      authorization: {
+        authorize: async ({ scope }: { scope: { projectId: string } }) =>
+          ownProof({ projectId: scope.projectId }),
+      },
     } as any);
   });
 
