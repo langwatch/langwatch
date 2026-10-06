@@ -841,6 +841,9 @@ function handledErrorEnvelope(
       message: error.message ?? "",
       retryable: error.retryable,
       meta: { ...error.meta, ...(reasons.length > 0 ? { reasons } : {}) },
+      tips: error.tips,
+      docsUrl: error.docsUrl,
+      fault: error.fault,
       ...traceIds,
     }),
   };
