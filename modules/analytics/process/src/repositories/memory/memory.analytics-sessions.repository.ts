@@ -1,8 +1,15 @@
 import { AnalyticsSessionsRepository } from "../analytics-sessions.repository.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../clickhouse/clickhouse.analytics-persistence.repository.ts";
-import { AnalyticsClientUnavailableError } from "../clickhouse/clickhouse.analytics.repository.ts";
 
-/** The memory tier opens no ClickHouse: a tenant session is refused by name, never faked. */
+/**
+ * The memory tier holds no analytics rows (as its recency twin says): a tenant's session takes
+ * a write and keeps none, and answers every read with no rows rather than refusing it.
+ */
+const emptySession: EvaluationAnalyticsClickHouseClient = {
+  insert: () => Promise.resolve(),
+  query: () => Promise.resolve({ json: () => Promise.resolve([]) }),
+};
+
 export class MemoryAnalyticsSessionsRepository extends AnalyticsSessionsRepository {
   static create(): MemoryAnalyticsSessionsRepository {
     return new MemoryAnalyticsSessionsRepository();
@@ -12,7 +19,7 @@ export class MemoryAnalyticsSessionsRepository extends AnalyticsSessionsReposito
     super();
   }
 
-  resolve(tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> {
-    return Promise.reject(new AnalyticsClientUnavailableError(tenantId));
+  resolve(_tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> {
+    return Promise.resolve(emptySession);
   }
 }
