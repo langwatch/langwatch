@@ -19,6 +19,7 @@ import {
 } from "./ui-supply.fixtures.ts";
 
 describe("UI supply", () => {
+  /** @scenario "A browser installing one module is asked only for that module's needs" */
   it("resolves a complete composition without reading undeclared config", async () => {
     const reader = vi.fn(() => publicAppConfig);
     const rendered = await createUi({ document: documentRoot, mount: "root" })
@@ -33,6 +34,7 @@ describe("UI supply", () => {
     expect(rendered.modules.map((module) => module.name)).toEqual(["screen"]);
   });
 
+  /** @scenario "A configuration that parses draws no screen before it is checked" */
   it("reads and parses every declared config slice before resolving", async () => {
     const secondConfig = defineBrowserModule("second-config").withConfig({
       notification: z.strictObject({ email: z.boolean() }),
@@ -65,6 +67,7 @@ describe("UI supply", () => {
     await expect(render).rejects.toBeInstanceOf(BrowserConfigMissingError);
   });
 
+  /** @scenario "A module refuses the value it was given" */
   it("names the module refusing a slice and never repeats the value", async () => {
     const refusing = defineBrowserModule("refusing").withConfig({
       process: z.strictObject({ mode: z.string().refine((mode) => mode === "production") }),
@@ -100,6 +103,7 @@ describe("UI supply", () => {
     await expect(render).rejects.toMatchObject({ code: "browser_mount_missing", mount: "absent" });
   });
 
+  /** @scenario "Rendering with a supply outstanding fails the build" */
   it("names every outstanding supply when render is laundered through instanceof Function", async () => {
     const incomplete = createUi({ document: documentRoot, mount: "root" }).withModules([
       transportModule,

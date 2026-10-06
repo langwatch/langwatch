@@ -60,6 +60,29 @@ describe("given the browser transport a feature package's hooks run on", () => {
     });
   });
 
+  describe("when one of two calls in the same tick fails", () => {
+    /** @scenario "One failing call does not fail another" */
+    it("resolves the other with its own data", async () => {
+      const fetch = (async (input: RequestInfo | URL) => {
+        const failing = requestUrl(input).includes("prompts.getById");
+        const body = failing
+          ? { error: { message: "internal", code: -32603, data: { httpStatus: 500 } } }
+          : resultOf("ok");
+        return new Response(JSON.stringify(body), {
+          status: failing ? 500 : 200,
+          headers: { "content-type": "application/json" },
+        });
+      }) as typeof globalThis.fetch;
+      const client = createUiFeatureApiClient({ fetch });
+      const outcomes = await Promise.allSettled([
+        client.query("prompts.getById", { id: "a" }),
+        client.query("prompts.getAll", { projectId: "p" }),
+      ]);
+      expect(outcomes[0]?.status).toBe("rejected");
+      expect(outcomes[1]).toEqual({ status: "fulfilled", value: "ok" });
+    });
+  });
+
   describe("when a feature mutates", () => {
     it("posts to the same endpoint", async () => {
       const { client, calls } = transportOver([resultOf({ id: "prompt_2" })]);
@@ -83,6 +106,7 @@ describe("given the browser transport a feature package's hooks run on", () => {
 });
 
 describe("when a feature sends an answer on its way out of the document", () => {
+  /** @scenario "A write sent as the document goes away still lands" */
   it("keeps the request alive past navigation and sends the other call on its own", async () => {
     const inits: RequestInit[] = [];
     const urls: string[] = [];
