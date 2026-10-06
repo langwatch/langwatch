@@ -254,6 +254,41 @@ describe("given a shared project read in the ledger", () => {
     expect(after?.condition).toEqual(CONDITION);
   });
 
+  it("lists the reader's live shared reads by member, whatever their condition says", async () => {
+    const malformedGrantId = `grant_${ns}_malformed`;
+    await prisma.grant.create({
+      data: {
+        id: malformedGrantId,
+        organizationId: organization.id,
+        principalType: GrantPrincipalType.PROJECT,
+        principalId: reader.id,
+        roleKey: "project-reader",
+        source: "aggregate-reconciler",
+        scopeType: GrantScopeType.PROJECT,
+        scopeId: foreign.id,
+        condition: { type: "not-a-store" },
+        occurredAt: new Date(),
+      },
+    });
+
+    try {
+      const live = await writer().findLiveSharedProjectGrants({
+        organizationId: organization.id,
+        readerProjectId: reader.id,
+      });
+      expect(new Set(live.map((row) => row.grantId))).toEqual(
+        new Set([sharedGrantId, projectedGrantId, malformedGrantId]),
+      );
+      expect(
+        live.find((row) => row.grantId === malformedGrantId)?.memberProjectId,
+      ).toBe(foreign.id);
+    } finally {
+      await prisma.grant.deleteMany({
+        where: { id: malformedGrantId, organizationId: organization.id },
+      });
+    }
+  });
+
   /** @scenario "Revoking a shared grant keeps its row" */
   it("marks the row with the reason, keeps its condition, and moves the epoch forward", async () => {
     const before =

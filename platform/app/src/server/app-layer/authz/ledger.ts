@@ -770,6 +770,30 @@ export class GrantsLedgerWriter {
   }
 
   /**
+   * The live shared reads one reader project holds, one per member project.
+   * The condition is not read: what the reconciler compares is which members
+   * hold a row, and a row whose condition no longer parses is still a row it
+   * must be able to revoke.
+   */
+  async findLiveSharedProjectGrants({
+    organizationId,
+    readerProjectId,
+  }: {
+    organizationId: string;
+    readerProjectId: string;
+  }): Promise<Array<{ grantId: string; memberProjectId: string }>> {
+    const rows = await liveGrants(this.prisma).findMany({
+      where: sharedProjectReadsOf({ organizationId, readerProjectId }),
+      select: { id: true, scopeId: true },
+      orderBy: { scopeId: "asc" },
+    });
+    return rows.map((row) => ({
+      grantId: row.id,
+      memberProjectId: row.scopeId,
+    }));
+  }
+
+  /**
    * Revoke the live shared reads one reader project holds - all of them, or
    * only those on the member projects named. Marks the rows and bumps the
    * epoch exactly as `revokeBindings` does; returns the grant ids revoked.
@@ -789,11 +813,7 @@ export class GrantsLedgerWriter {
   }): Promise<string[]> {
     const rows = await liveGrants(this.prisma).findMany({
       where: {
-        organizationId,
-        principalType: STORED_PRINCIPAL_KIND.project,
-        principalId: readerProjectId,
-        scopeType: "PROJECT",
-        roleKey: PROJECT_READER_ROLE_KEY,
+        ...sharedProjectReadsOf({ organizationId, readerProjectId }),
         ...(memberProjectIds !== undefined
           ? { scopeId: { in: memberProjectIds } }
           : {}),
@@ -1230,6 +1250,23 @@ export class GrantsLedgerWriter {
 }
 
 /** The writer over the app's Prisma singleton, composed per call. */
+/** The rows that are one reader project's shared reads (ADR-144). */
+function sharedProjectReadsOf({
+  organizationId,
+  readerProjectId,
+}: {
+  organizationId: string;
+  readerProjectId: string;
+}) {
+  return {
+    organizationId,
+    principalType: STORED_PRINCIPAL_KIND.project,
+    principalId: readerProjectId,
+    scopeType: "PROJECT" as const,
+    roleKey: PROJECT_READER_ROLE_KEY,
+  };
+}
+
 export function grantsLedgerWriter(): GrantsLedgerWriter {
   return new GrantsLedgerWriter(appPrisma);
 }
