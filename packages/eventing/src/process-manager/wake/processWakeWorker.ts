@@ -22,8 +22,8 @@ export interface ProcessWakeWorkerOptions {
    */
   managers: Record<string, ProcessWakeHandler>;
   logger: Logger;
-  /** Best-effort drain nudge after a committed wake inserted intents. */
-  notifyOutbox?: () => void;
+  /** Best-effort drain nudge for the woken process's own outbox after it inserted intents. */
+  notifyOutbox?: (processName: string) => void;
   intervalMs?: number;
   batchSize?: number;
   now?: () => number;
@@ -34,7 +34,7 @@ export class ProcessWakeWorker {
   private readonly store: Pick<ProcessStore, "findDueWakes">;
   private readonly managers: Record<string, ProcessWakeHandler>;
   private readonly logger: Logger;
-  private readonly notifyOutbox: (() => void) | undefined;
+  private readonly notifyOutbox: ((processName: string) => void) | undefined;
   private readonly intervalMs: number;
   private readonly batchSize: number;
   private readonly now: () => number;
@@ -133,7 +133,7 @@ export class ProcessWakeWorker {
       });
       const result = await manager.handleWake({ wake, now });
       if (result.outcome === "committed" && result.insertedMessageKeys.length > 0) {
-        this.notifyOutbox?.();
+        this.notifyOutbox?.(wake.ref.processName);
       }
       // staleWake / revisionConflict: another commit advanced the process
       // since this wake was scheduled — it stands down silently.

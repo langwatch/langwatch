@@ -324,7 +324,8 @@ export class ProcessRuntime {
               `Process manager "${definition.config.name}" revision conflict on event ${event.id}`,
             );
           }
-          if (result.outcome === "committed") {
+          // A commit that inserted no intent left nothing new to lease.
+          if (result.outcome === "committed" && result.insertedMessageKeys.length > 0) {
             registered.outboxWorker.notify();
           }
         },
@@ -384,7 +385,8 @@ export class ProcessRuntime {
       now: params.now ?? nowInstant().epochMilliseconds,
       createIfMissing: params.createIfMissing,
     });
-    if (result.outcome === "committed" || result.outcome === "duplicateSignal") {
+    const insertedIntents = result.outcome === "committed" && result.insertedMessageKeys.length > 0;
+    if (insertedIntents || result.outcome === "duplicateSignal") {
       // The duplicate path may be recovery after the first response was lost;
       // nudging again is cheap and closes the analogous notification-loss
       // window. Periodic polling remains the crash-recovery guarantee.
@@ -464,11 +466,7 @@ export class ProcessRuntime {
           store: this.store,
           managers: this.wakeManagers,
           logger: this.logger,
-          notifyOutbox: () => {
-            for (const item of this.managers.values()) {
-              item.outboxWorker.notify();
-            }
-          },
+          notifyOutbox: (processName) => this.managers.get(processName)?.outboxWorker.notify(),
         });
         if (this.running) this.wakeWorker.start();
       }
