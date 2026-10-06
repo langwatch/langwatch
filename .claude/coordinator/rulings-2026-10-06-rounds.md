@@ -149,3 +149,6 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Tenant pass (S3-PREPARE-PASS): AFTER upgrade in the preparation script
 - Judge cycle (lwql-sync-eval): ALLOW analytics -> InstantEvalApi for one hold-judge-record operation, one named cycle finding (210 -> 211). Alex: "this one cycle pass is needed because we can't make assumptions about which cycles to cut and how without a global look at cycles".
 - No-ClickHouse installs (S3-NO-CLICKHOUSE, confirmed): YES, always refuse; ClickHouse is mandatory and an install without it refuses to serve by name.
+- Adopt gap (Auth 32, finalized users): the identifier backfill NEVER finalizes an account that is unconfirmed and never signed into, and a sweep un-finalizes any already finalized; adoption then covers everyone and the held auth wiring lands.
+- Trace filters (P8484-R3 seam): ANALYTICS lends a traceFilters browser-host capability that the shell installs (copyTargets precedent); no annotation -> analytics edge.
+- Walk size (annotations filtered list): KEEP 1000.
