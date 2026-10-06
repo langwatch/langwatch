@@ -454,9 +454,11 @@ describe("explainHandledError", () => {
       "UNAUTHENTICATED",
       "PERMISSION_DENIED",
     ])("explains the provider's own %s code as a refused credential", (code) => {
-      const { description } = explainHandledError(
+      const { title, description } = explainHandledError(
         shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
       );
+
+      expect(title).toBe("This provider rejected the API key");
 
       expect(description).toBe(
         "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",

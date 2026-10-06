@@ -5452,6 +5452,11 @@ const presentations = {
     // cannot name is exactly the ADR-045 "unknown" scenario, and a trace id serves
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
+    // A refused key has one fix, so the headline names it like the body does.
+    titleFor: (error) =>
+      hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
+        ? "This provider rejected the API key"
+        : undefined,
     describe: (error) => {
       if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
         return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
