@@ -170,7 +170,9 @@ func FetchSpec(ctx context.Context, client *http.Client, baseURL string) (map[st
 
 // SpecDiff diffs both served documents with openapidiff after alias
 // normalization (CanonicalAliasPath; the bare form wins when one document has
-// both), then keeps only the breaking field-level changes (ClassifyChanges).
+// both) and after pairing operations a parameter rename split in two
+// (pairRenamedOperations), then keeps only the breaking field-level changes
+// (ClassifyChanges).
 func SpecDiff(baseBytes, candidateBytes []byte, dir string) ([]openapidiff.Change, error) {
 	baseBytes, err := normalizeAliasSpec(baseBytes)
 	if err != nil {
@@ -179,6 +181,10 @@ func SpecDiff(baseBytes, candidateBytes []byte, dir string) ([]openapidiff.Chang
 	candidateBytes, err = normalizeAliasSpec(candidateBytes)
 	if err != nil {
 		return nil, fmt.Errorf("candidate spec: %w", err)
+	}
+	baseBytes, err = pairRenamedOperations(baseBytes, candidateBytes)
+	if err != nil {
+		return nil, fmt.Errorf("pair renamed operations: %w", err)
 	}
 	basePath := filepath.Join(dir, "base.openapi.json")
 	candidatePath := filepath.Join(dir, "candidate.openapi.json")
@@ -365,7 +371,12 @@ func parseBodySchema(document, operationObject map[string]any) (map[string]any, 
 	if !ok {
 		return nil, required
 	}
-	schema, _ := media["schema"].(map[string]any)
+	schema, declared := media["schema"].(map[string]any)
+	if !declared {
+		// A JSON body published with no schema accepts any JSON: an empty
+		// schema, so a probe still sends one with its media type.
+		return map[string]any{}, required
+	}
 	return schema, required
 }
 

@@ -222,6 +222,37 @@ Feature: apidiff boots its instances through haven
     Then the two are paired as one operation
     And each side is probed at the spelling its own document declares
 
+  # The spec diff ran on the raw templates, so a renamed parameter was still a
+  # removal plus an addition there. Measured on run 37415340518: 32 of 39
+  # removed operations were renames with identical security.
+  @unit
+  Scenario: A parameter rename is one operation in the spec diff
+    Given the base and the candidate spell one route's path parameter differently with the same security
+    When the spec diff runs
+    Then the pair is compared and reports no removal or addition
+    And a real change on the pair is still reported under the candidate's spelling
+
+  @unit
+  Scenario: A pair whose security differs is not paired
+    Given the base and the candidate spell one route's path parameter differently with different security
+    When the spec diff runs
+    Then the route is reported as removed and added
+
+  # A ruling was given for the kinds of change triage saw, not for the operation.
+  @unit
+  Scenario: A ruling covers only the spec changes it was given for
+    Given an operation ruled as a phantom field
+    When the spec diff reports a security change on it
+    Then that change is counted as a difference
+
+  # E9 rows on the raw-body auth routes came from the probe sending no
+  # Content-Type: the document publishes application/json with no schema.
+  @unit
+  Scenario: A documented JSON body without a schema is sent as JSON
+    Given an operation whose request body is application/json with no schema
+    When the probe builds its cases
+    Then it sends {} with Content-Type application/json
+
   # The harness reported its own nondeterminism as drift. Measured on run 25 of
   # 2026-09-21: 12 body_value_diff findings, of which 3 were a handle the server
   # minted for a create that named none, and 2 more carried SCIM's own spelling

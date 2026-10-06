@@ -21,6 +21,9 @@ type SpecChange struct {
 	Path   string            `json:"path"`
 	Method string            `json:"method"`
 	Fields map[string][2]any `json:"fields,omitempty"`
+	// Ruling names the triage ruling that covers this change; a ruled change
+	// still renders but is not counted as a difference (ruledSpecChange).
+	Ruling string `json:"ruling,omitempty"`
 
 	raw openapidiff.Change
 }
@@ -45,11 +48,13 @@ type Report struct {
 func MapSpecChanges(changes []openapidiff.Change) []SpecChange {
 	mapped := make([]SpecChange, 0, len(changes))
 	for _, change := range changes {
+		kind := SpecChangeKind(change)
 		mapped = append(mapped, SpecChange{
-			Kind:   SpecChangeKind(change),
+			Kind:   kind,
 			Path:   change.Path,
 			Method: change.Method,
 			Fields: change.Fields,
+			Ruling: ruledSpecChange(change.Method, change.Path, kind),
 			raw:    change,
 		})
 	}
@@ -69,7 +74,11 @@ func BuildReport(changes []openapidiff.Change, result ProbeResult) Report {
 		CredentialChecks: result.CredentialChecks,
 		Effects:          result.Effects,
 	}
-	report.Differences = len(changes)
+	for index := range report.SpecChanges {
+		if report.SpecChanges[index].Ruling == "" {
+			report.Differences++
+		}
+	}
 	for _, finding := range result.Findings {
 		// Skips are harness notes, unverified_shape is a coverage gap, and an
 		// improved-error finding is drift the tool grants on sight — see

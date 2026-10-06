@@ -294,6 +294,9 @@ func (build *ledgerBuild) classify(row *LedgerRow, finding Finding) {
 func (build *ledgerBuild) applySpecChanges(changes []SpecChange) {
 	for index := range changes {
 		change := changes[index]
+		if change.Ruling != "" {
+			continue
+		}
 		cause := "spec-" + strings.ReplaceAll(change.Kind, "_", "-")
 		key := strings.ToUpper(change.Method) + " " + CanonicalAliasPath(change.Path)
 		if !build.inScope(key) {

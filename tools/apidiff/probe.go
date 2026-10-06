@@ -838,6 +838,11 @@ func operationCases(operation Operation) []probeCase {
 		if operation.BodySchema == nil {
 			return []probeCase{{name: "mutation"}}
 		}
+		if len(operation.BodySchema) == 0 {
+			// An empty schema accepts any JSON, so a validation case asks nothing
+			// the mutation does not; the body carries its media type all the same.
+			return []probeCase{{name: "mutation", body: map[string]any{}}}
+		}
 		return []probeCase{
 			{name: "validation", body: ValidationBody(operation.BodySchema)},
 			{name: "mutation", body: SynthesizePayload(operation.BodySchema, 0)},

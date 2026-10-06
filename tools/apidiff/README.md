@@ -157,6 +157,21 @@ deterministic summary, or the machine report with `-json` (optionally to
   names are erased (`PairingPath`, `spec.go`) — arity and every literal
   segment still decide identity — and each side is still probed at the
   spelling its own document declares, with the candidate's spelling reported.
+  The spec diff pairs the same way (`pairRenamedOperations`, `spec-pairing.go`):
+  it respells the base's path and path parameters to the candidate's before
+  diffing, so a rename is no longer a removal plus an addition. A pair needs the
+  same method, a path that differs only in parameter names with exactly one
+  partner on each side, and identical effective security (the operation's own,
+  else its path item's, else the document's). Anything else stays split.
+- **Ruled spec changes are shown, not counted.** `ruledBreakingRest` rulings
+  also cover the spec causes of the probe pass, but only for the change kinds
+  each ruling was given for (`rulingSpecKinds`): a security change under a
+  phantom-field ruling is still a new difference. A ruled change carries its
+  `ruling` in the report, is not in `differences`, and is not a ledger cause.
+- **A documented JSON body with no schema is sent as `{}`** with
+  `Content-Type: application/json`, so a route that insists on the header
+  answers its handler rather than 415. `GET /api/query/reference` is a
+  catalogue read (`catalogReads`): its fixed filter ids are not an owner's.
 - **URL version mounts are skipped, never reported.** Versioning is negotiated
   through the `X-API-Version` header; `/api/<family>/latest/...` and
   `/api/<family>/<YYYY-MM-DD>/...` are a supported convenience fallback the
