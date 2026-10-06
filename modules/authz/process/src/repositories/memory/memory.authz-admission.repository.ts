@@ -37,14 +37,17 @@ export class MemoryAuthzAdmissionRepository extends AuthzAdmissionRepository {
     userId,
     grantId,
   }: AuthzResolveAdmissionInput): Promise<AuthzAdmissionGrantRow> {
-    const grant = this.memory.admissionGrants.find(
+    const grant = this.memory.grants.find(
       (candidate) =>
+        candidate.id === grantId &&
         candidate.organizationId === organizationId &&
-        candidate.userId === userId &&
-        candidate.grantId === grantId,
+        candidate.principalType === "USER" &&
+        candidate.principalId === userId &&
+        candidate.scopeType === "ORGANIZATION" &&
+        candidate.scopeId === organizationId,
     );
     if (!grant) return { found: false };
-    return { found: true, revoked: grant.revoked };
+    return { found: true, revoked: grant.revokedAt !== null };
   }
 
   async completeAdmission(input: AuthzResolveAdmissionInput): Promise<boolean> {

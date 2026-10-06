@@ -89,6 +89,7 @@ function unreachable<Client extends object>(name: string): Client {
 }
 
 function tierOf(module: InstallableServerFeature<never>): InstallableServerFeature<never> {
+  if (module.name === "authz") return { ...module, tier: "live" };
   if (LIVE_MODULES.has(module.name) || module.repositoryRegistry === void 0) return module;
   return withMemoryRepositories(module);
 }

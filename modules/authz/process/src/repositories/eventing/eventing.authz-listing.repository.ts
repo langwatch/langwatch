@@ -8,16 +8,34 @@ import type {
   AuthzCustomRole,
   AuthzTeamMemberBinding,
   GrantScopeTier,
-  TeamUserRole,
 } from "@langwatch/authz-contract";
-import { type Instant, fromDate, toDate } from "@langwatch/time";
+import { type Instant, fromDate } from "@langwatch/time";
 import { z } from "zod";
 
 import { AuthzListingRepository } from "../authz-listing.repository.ts";
 import type { AuthzDatabase } from "../authz-read.repository.ts";
+import {
+  BINDING_PRINCIPAL_TYPES,
+  BINDING_SCOPE_TYPES,
+  bindingsForSynthesisFrom,
+  collectDecorationIds,
+  type Decoration,
+  type DecorationIds,
+  decoratedBindings,
+  type GrantListRow,
+  LISTABLE_BUILT_IN_ROLE_KEYS,
+  type ListableGrant,
+  listableGrants,
+  roleIdsByOrganization,
+  type RoleHeadListRow,
+  synthesisGrants,
+  teamMemberBindingsFrom,
+  teamMemberDecorationIds,
+  toCustomRoleShape,
+  USER_CREATED_ROLE_KIND,
+} from "./eventing.authz-listing.mapper.ts";
 import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
 
-const USER_CREATED_ROLE_KIND = "custom" as const;
 const ACCESS_LISTING_USER_SELECT = {
   id: true,
   name: true,
@@ -31,20 +49,13 @@ const ACCESS_LISTING_GROUP_SELECT = {
 } as const;
 const ACCESS_LISTING_API_KEY_SELECT = { id: true, name: true } as const;
 
-/** The three scope tiers a listed binding can carry - RESOURCE rows are the
- *  share tier and PLATFORM rows are dormant facts; neither is a binding the
- *  Access surface lists. */
-const BINDING_SCOPE_TYPES = ["ORGANIZATION", "TEAM", "PROJECT"] as const;
-
-/** The three principal kinds the legacy tables could express. Collective
- *  principals (team / organization / project / anyone) are future-head-only
- *  and never listed. */
-const BINDING_PRINCIPAL_TYPES = ["USER", "GROUP", "API_KEY"] as const;
-
 /** The roleKey shapes the legacy vocabulary can carry: the three built-ins
  *  and `custom:<id>`. Everything else (`lite-member`, null) is dormant. */
 const LISTABLE_ROLE_KEY_WHERE = {
-  OR: [{ roleKey: { in: ["admin", "member", "viewer"] } }, { roleKey: { startsWith: "custom:" } }],
+  OR: [
+    { roleKey: { in: [...LISTABLE_BUILT_IN_ROLE_KEYS] } },
+    { roleKey: { startsWith: "custom:" } },
+  ],
 };
 
 const GRANT_ROW_SELECT = {
@@ -60,28 +71,6 @@ const GRANT_ROW_SELECT = {
   occurredAt: true,
   updatedAt: true,
 } as const;
-
-type GrantListRow = {
-  id: string;
-  organizationId: string;
-  principalType: string;
-  principalId: string | null;
-  roleKey: string | null;
-  legacyRole: string | null;
-  scopeType: string;
-  scopeId: string;
-  /** The stored end moment as the store hands it back; listed past its own date too. */
-  expiresAt: unknown;
-  occurredAt: Instant;
-  updatedAt: Instant;
-};
-
-type ListableGrant = {
-  row: GrantListRow;
-  role: TeamUserRole;
-  customRoleId: string | null;
-  scopeType: GrantScopeTier;
-};
 
 export class EventingAuthzListingRepository extends AuthzListingRepository {
   static create(database: AuthzDatabase): EventingAuthzListingRepository {
@@ -110,7 +99,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     // caller already scoped the ask to a member - so neither does this one.
     return this.decorate({
       organizationId,
-      grants: this.listableGrants(rows),
+      grants: listableGrants(rows),
     });
   };
 
@@ -122,7 +111,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     const rows = await this.findGrantRows({ organizationId, where: {} });
     return this.decorate({
       organizationId,
-      grants: this.listableGrants(rows),
+      grants: listableGrants(rows),
       shouldDropUndecoratedPrincipals: true,
     });
   };
@@ -144,7 +133,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     });
     return this.decorate({
       organizationId,
-      grants: this.listableGrants(rows),
+      grants: listableGrants(rows),
     });
   };
 
@@ -164,7 +153,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     });
     return this.decorate({
       organizationId,
-      grants: this.listableGrants(rows),
+      grants: listableGrants(rows),
       shouldDropUndecoratedPrincipals: true,
     });
   };
@@ -182,7 +171,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     });
     return this.decorate({
       organizationId,
-      grants: this.listableGrants(rows),
+      grants: listableGrants(rows),
     });
   };
 
@@ -200,7 +189,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       organizationId,
       where: { principalType: "API_KEY", principalId: { in: [...apiKeyIds] } },
     });
-    return this.decorate({ organizationId, grants: this.listableGrants(rows) });
+    return this.decorate({ organizationId, grants: listableGrants(rows) });
   };
 
   findTeamMemberBindings = async ({
@@ -210,8 +199,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     organizationId: string;
     teamIds: readonly string[];
   }): Promise<Map<string, AuthzTeamMemberBinding[]>> => {
-    const byTeam = new Map<string, AuthzTeamMemberBinding[]>(teamIds.map((teamId) => [teamId, []]));
-    if (teamIds.length === 0) return byTeam;
+    if (teamIds.length === 0) return new Map();
 
     const rows = await this.findGrantRows({
       organizationId,
@@ -221,18 +209,13 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
         scopeId: { in: [...teamIds] },
       },
     });
-    const grants = this.listableGrants(rows);
+    const grants = listableGrants(rows);
 
     // Full rows here, not the display selects: the member list's shape mirrors
     // a legacy `TeamUser` join and carries the whole user and role. The user
     // read keeps the legacy membership fence (a departed member is not
     // listed); the role read is bounded to the organization.
-    const userIds = [
-      ...new Set(grants.flatMap(({ row }) => (row.principalId ? [row.principalId] : []))),
-    ];
-    const roleIds = [
-      ...new Set(grants.flatMap(({ customRoleId }) => (customRoleId ? [customRoleId] : []))),
-    ];
+    const { userIds, roleIds } = teamMemberDecorationIds(grants);
     const [users, roles] = await Promise.all([
       userIds.length > 0
         ? this.database.user.findMany({
@@ -244,24 +227,12 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
         : Promise.resolve([]),
       this.findRolesAsCustomRoles({ organizationId, roleIds }),
     ]);
-    const typedUsers = users as AuthzAccessUser[];
-    const userById = new Map(typedUsers.map((user) => [user.id, user]));
-    const roleById = new Map(roles.map((role) => [role.id, role]));
-
-    for (const grant of grants) {
-      const user = grant.row.principalId ? userById.get(grant.row.principalId) : undefined;
-      if (!user) continue;
-      byTeam.get(grant.row.scopeId)?.push({
-        userId: user.id,
-        role: grant.role,
-        customRoleId: grant.customRoleId,
-        createdAt: toDate(grant.row.occurredAt),
-        updatedAt: toDate(grant.row.updatedAt),
-        user,
-        customRole: grant.customRoleId ? (roleById.get(grant.customRoleId) ?? null) : null,
-      });
-    }
-    return byTeam;
+    return teamMemberBindingsFrom({
+      teamIds,
+      grants,
+      users: users as AuthzAccessUser[],
+      roles,
+    });
   };
 
   findBindingsForSynthesis = async ({
@@ -293,46 +264,9 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
         orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
       })) as StoredHeadRow<GrantListRow>[]
     ).map(headRow<GrantListRow>);
-    const grants = this.listableGrants(rows)
-      .filter(
-        ({ row }) =>
-          row.principalType !== "GROUP" ||
-          (row.principalId != null &&
-            groupIdsByOrg.get(row.organizationId)?.has(row.principalId) === true),
-      )
-      // The engine grants a Developer (ADR-171) nothing through an organization-scoped or group
-      // binding, so the workspace listing synthesizes neither a shared team nor an admin role.
-      .filter(
-        ({ row, scopeType }) =>
-          !developerOrgIds.has(row.organizationId) ||
-          (row.principalType !== "GROUP" && scopeType !== "ORGANIZATION"),
-      );
-
+    const grants = synthesisGrants({ rows, groupIdsByOrg, developerOrgIds });
     const rolesByOrg = await this.rolesByOrganizationFor(grants);
-
-    return grants.map(({ row, role, customRoleId, scopeType }) => {
-      const customRole = customRoleId
-        ? (rolesByOrg.get(row.organizationId)?.get(customRoleId) ?? null)
-        : null;
-      return {
-        organizationId: row.organizationId,
-        scopeType,
-        scopeId: row.scopeId,
-        role,
-        customRoleId,
-        customRole: customRole
-          ? {
-              id: customRole.id,
-              name: customRole.name,
-              description: customRole.description,
-              permissions: customRole.permissions,
-              organizationId: customRole.organizationId,
-              createdAt: customRole.createdAt,
-              updatedAt: customRole.updatedAt,
-            }
-          : null,
-      };
-    });
+    return bindingsForSynthesisFrom({ grants, rolesByOrg });
   };
 
   /** The organizations among `orgIds` where this user holds a Developer seat. */
@@ -386,14 +320,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
   private async rolesByOrganizationFor(
     grants: readonly ListableGrant[],
   ): Promise<Map<string, Map<string, AuthzCustomRole>>> {
-    const roleIdsByOrg = new Map<string, Set<string>>();
-    for (const { row, customRoleId } of grants) {
-      if (!customRoleId) continue;
-      if (!roleIdsByOrg.has(row.organizationId)) {
-        roleIdsByOrg.set(row.organizationId, new Set());
-      }
-      roleIdsByOrg.get(row.organizationId)?.add(customRoleId);
-    }
+    const roleIdsByOrg = roleIdsByOrganization(grants);
     const rolesByOrg = new Map<string, Map<string, AuthzCustomRole>>();
     await Promise.all(
       [...roleIdsByOrg.entries()].map(async ([orgId, roleIds]) => {
@@ -419,9 +346,9 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       (await liveRoles(this.database).findMany({
         where: { organizationId, kind: USER_CREATED_ROLE_KIND },
         orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
-      })) as StoredHeadRow<RoleHeadRow>[]
-    ).map(headRow<RoleHeadRow>);
-    return roles.map((role) => this.toCustomRoleShape(role));
+      })) as StoredHeadRow<RoleHeadListRow>[]
+    ).map(headRow<RoleHeadListRow>);
+    return roles.map(toCustomRoleShape);
   };
 
   findRolePermissionRows = async ({
@@ -480,9 +407,9 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     const roles = (
       (await liveRoles(this.database).findMany({
         where: { id: { in: [...roleIds] }, organizationId },
-      })) as StoredHeadRow<RoleHeadRow>[]
-    ).map(headRow<RoleHeadRow>);
-    return roles.map((role) => this.toCustomRoleShape(role));
+      })) as StoredHeadRow<RoleHeadListRow>[]
+    ).map(headRow<RoleHeadListRow>);
+    return roles.map(toCustomRoleShape);
   }
 
   /** The principal and role decoration for `AccessListingBindingRow`s.
@@ -500,19 +427,10 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
   }): Promise<AuthzAccessBinding[]> {
     const decoration = await this.fetchDecoration({
       organizationId,
-      ids: this.collectDecorationIds(grants),
+      ids: collectDecorationIds(grants),
       shouldDropUndecoratedPrincipals,
     });
-    const listed: AuthzAccessBinding[] = [];
-    for (const grant of grants) {
-      const row = this.tryToListedRow({
-        grant,
-        decoration,
-        shouldDropUndecoratedPrincipals,
-      });
-      if (row) listed.push(row);
-    }
-    return listed;
+    return decoratedBindings({ grants, decoration, shouldDropUndecoratedPrincipals });
   }
 
   private async fetchDecoration({
@@ -591,178 +509,10 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     }
     return where;
   }
-
-  /** roleKey → the compat pair the fold writes onto the legacy head. */
-  private tryCompatRole(row: {
-    roleKey: string | null;
-    legacyRole: string | null;
-  }): { role: TeamUserRole; customRoleId: string | null } | null {
-    if (row.roleKey === "admin") return { role: "ADMIN", customRoleId: null };
-    if (row.roleKey === "member") {
-      return { role: "MEMBER", customRoleId: null };
-    }
-    if (row.roleKey === "viewer") {
-      return { role: "VIEWER", customRoleId: null };
-    }
-    if (row.roleKey?.startsWith("custom:") && row.roleKey.length > "custom:".length) {
-      return {
-        role: this.tryTeamUserRoleFrom(row.legacyRole) ?? "CUSTOM",
-        customRoleId: row.roleKey.slice("custom:".length),
-      };
-    }
-    return null;
-  }
-
-  private tryTeamUserRoleFrom(value: string | null): TeamUserRole | null {
-    return value === "ADMIN" || value === "MEMBER" || value === "VIEWER" || value === "CUSTOM"
-      ? value
-      : null;
-  }
-
-  private isBindingScope(scopeType: string): scopeType is GrantScopeTier {
-    return (BINDING_SCOPE_TYPES as readonly string[]).includes(scopeType);
-  }
-
-  private isBindingPrincipal(principalType: string): boolean {
-    return (BINDING_PRINCIPAL_TYPES as readonly string[]).includes(principalType);
-  }
-
-  private listableGrants(rows: readonly GrantListRow[]): ListableGrant[] {
-    const listable: ListableGrant[] = [];
-    for (const row of rows) {
-      if (!this.isBindingScope(row.scopeType)) continue;
-      if (!this.isBindingPrincipal(row.principalType)) continue;
-      const translated = this.tryCompatRole(row);
-      if (!translated) continue;
-      listable.push({
-        row,
-        role: translated.role,
-        customRoleId: translated.customRoleId,
-        scopeType: row.scopeType,
-      });
-    }
-    return listable;
-  }
-
-  private collectDecorationIds(grants: readonly ListableGrant[]): DecorationIds {
-    const ids: DecorationIds = {
-      user: new Set(),
-      group: new Set(),
-      apiKey: new Set(),
-      role: new Set(),
-    };
-    const byPrincipalType: Partial<Record<string, Set<string>>> = {
-      USER: ids.user,
-      GROUP: ids.group,
-      API_KEY: ids.apiKey,
-    };
-    for (const grant of grants) {
-      if (grant.customRoleId) ids.role.add(grant.customRoleId);
-      if (grant.row.principalId) {
-        byPrincipalType[grant.row.principalType]?.add(grant.row.principalId);
-      }
-    }
-    return ids;
-  }
-
-  private principalOf({
-    row,
-    decoration,
-  }: {
-    row: ListableGrant["row"];
-    decoration: Decoration;
-  }): Pick<AuthzAccessBinding, "user" | "group" | "apiKey"> {
-    const { principalId } = row;
-    if (!principalId) return { user: null, group: null, apiKey: null };
-    return {
-      user: row.principalType === "USER" ? (decoration.userById.get(principalId) ?? null) : null,
-      group: row.principalType === "GROUP" ? (decoration.groupById.get(principalId) ?? null) : null,
-      apiKey:
-        row.principalType === "API_KEY" ? (decoration.apiKeyById.get(principalId) ?? null) : null,
-    };
-  }
-
-  private tryToListedRow({
-    grant,
-    decoration,
-    shouldDropUndecoratedPrincipals,
-  }: {
-    grant: ListableGrant;
-    decoration: Decoration;
-    shouldDropUndecoratedPrincipals: boolean;
-  }): AuthzAccessBinding | null {
-    const { row } = grant;
-    const { user, group, apiKey } = this.principalOf({ row, decoration });
-    if (shouldDropUndecoratedPrincipals && !user && !group && !apiKey) {
-      return null;
-    }
-    const customRole = grant.customRoleId
-      ? (decoration.roleById.get(grant.customRoleId) ?? null)
-      : null;
-    return {
-      id: row.id,
-      organizationId: row.organizationId,
-      userId: row.principalType === "USER" ? row.principalId : null,
-      groupId: row.principalType === "GROUP" ? row.principalId : null,
-      apiKeyId: row.principalType === "API_KEY" ? row.principalId : null,
-      role: grant.role,
-      customRoleId: grant.customRoleId,
-      scopeType: grant.scopeType,
-      scopeId: row.scopeId,
-      createdAt: toDate(row.occurredAt),
-      expiresAt: row.expiresAt instanceof Date ? row.expiresAt : null,
-      user,
-      group,
-      apiKey,
-      customRole,
-    };
-  }
-
-  private toCustomRoleShape(role: RoleHeadRow): AuthzCustomRole {
-    return {
-      id: role.id,
-      organizationId: role.organizationId,
-      name: role.name,
-      description: role.description,
-      permissions: role.permissions,
-      kind: role.kind,
-      createdAt: toDate(role.occurredAt),
-      updatedAt: toDate(role.updatedAt),
-    };
-  }
 }
-
-type DecorationIds = {
-  user: Set<string>;
-  group: Set<string>;
-  apiKey: Set<string>;
-  role: Set<string>;
-};
-
-type Decoration = {
-  userById: Map<string, AuthzAccessUser>;
-  groupById: Map<string, AuthzAccessGroup>;
-  apiKeyById: Map<string, AuthzAccessApiKey>;
-  roleById: Map<string, AuthzCustomRole>;
-};
-
-/** A `Role` head row in the `CustomRole` column shape. The two heads share
- *  every column; `createdAt` carries the fact's business time
- *  (`occurredAt`), consistent with what the binding rows report. */
 const rolePermissionRowsSchema = z.array(
   z.object({ id: z.string(), name: z.string(), permissions: z.unknown() }),
 );
-
-type RoleHeadRow = {
-  id: string;
-  organizationId: string;
-  name: string;
-  description: string | null;
-  permissions: unknown;
-  kind: string;
-  occurredAt: Instant;
-  updatedAt: Instant;
-};
 
 /** A head row as the store hands it back: its two timestamps are stored moments. */
 type StoredHeadRow<TRow> = Omit<TRow, "occurredAt" | "updatedAt"> & {

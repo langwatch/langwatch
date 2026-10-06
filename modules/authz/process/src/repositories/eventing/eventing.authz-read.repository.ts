@@ -1,11 +1,6 @@
 // Read repository for cut-over organizations; deliberately independent for parity verification.
 import type { ShareableResourceKind } from "@langwatch/authorization";
-import type {
-  AuthzPrincipalRef,
-  BindingRoleKey,
-  CollectedBinding,
-  GrantScopeTier,
-} from "@langwatch/authz-contract";
+import type { AuthzPrincipalRef, CollectedBinding } from "@langwatch/authz-contract";
 import { type Instant, fromDate } from "@langwatch/time";
 
 import {
@@ -16,25 +11,21 @@ import {
   type OrganizationRole,
   type ShareLinkRow,
 } from "../authz-read.repository.ts";
-import {
-  RESOURCE_KIND_TO_DB,
-  SHARE_VISIBILITY_BY_PRINCIPAL_DB,
-} from "../prisma/prisma.authz-grant.mapper.ts";
+import { RESOURCE_KIND_TO_DB } from "../prisma/prisma.authz-grant.mapper.ts";
 import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
+import {
+  BINDING_SCOPE_TYPES,
+  type BindingGrantRow,
+  collectBindings,
+  type RoleHolderRow,
+  rolesExclusiveTo,
+  type ShareLinkGrantCandidateRow,
+  shareLinkRowFrom,
+  SYSTEM_API_KEY_ROLE_KIND,
+} from "./eventing.authz-read.mapper.ts";
 
-const SYSTEM_API_KEY_ROLE_KIND = "system_api_key" as const;
-
-/** The three scope tiers a `CollectedBinding` can carry. RESOURCE rows are
- *  the share tier (findShareLinks) and PLATFORM rows are dormant facts that
- *  no PR-3 decision reads, so neither belongs in a binding list. */
-const BINDING_SCOPE_TYPES: readonly GrantScopeTier[] = ["ORGANIZATION", "TEAM", "PROJECT"];
-
-type BindingGrantRow = {
-  roleKey: string | null;
-  scopeType: string;
-  scopeId: string;
-  expiresAt: unknown;
-};
+/** A binding row as the store hands it back: the end moment is a stored Date. */
+type StoredBindingGrantRow = Omit<BindingGrantRow, "expiresAt"> & { expiresAt: unknown };
 
 export class EventingAuthzReadRepository extends AuthzReadRepository {
   static create(database: AuthzDatabase): EventingAuthzReadRepository {
@@ -88,8 +79,8 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
       select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true },
-    })) as BindingGrantRow[];
-    return this.collectBindings({ rows, viaGroupId: () => null });
+    })) as StoredBindingGrantRow[];
+    return collectBindings({ rows: rows.map(withStoredEnd), viaGroupId: () => null });
   };
 
   findGroupBindings = async ({
@@ -125,9 +116,9 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         principalId: true,
         expiresAt: true,
       },
-    })) as (BindingGrantRow & { principalId: string })[];
-    return this.collectBindings({
-      rows,
+    })) as (StoredBindingGrantRow & { principalId: string })[];
+    return collectBindings({
+      rows: rows.map(withStoredEnd),
       viaGroupId: (row) => row.principalId,
     });
   };
@@ -150,8 +141,8 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
       select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true },
-    })) as BindingGrantRow[];
-    return this.collectBindings({ rows, viaGroupId: () => null });
+    })) as StoredBindingGrantRow[];
+    return collectBindings({ rows: rows.map(withStoredEnd), viaGroupId: () => null });
   };
 
   // Role head fenced on organization (poisoned grants) and API key (private roles).
@@ -229,7 +220,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       organizationId: resolvedOrganizationId,
       grantIds: rows.map((row) => row.id),
     });
-    return rows.flatMap((row) => this.shareLinkRowFrom({ row, viewCounts }));
+    return rows.flatMap((row) => shareLinkRowFrom({ row, viewCounts }));
   };
 
   /** The RESOURCE grants a share-link check may match: possession (the
@@ -336,11 +327,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return membership !== null;
   }
 
-  /**
-   * Role ids among `roleIds` this API key alone holds a grant for. `some`
-   * matters as much as `every`: `every` is vacuously true over an empty
-   * relation, so a system role with NO grants would be readable by any key.
-   */
+  /** Role ids among `roleIds` this API key alone holds a grant for. */
   private async rolesExclusiveToApiKey({
     organizationId,
     apiKeyId,
@@ -356,32 +343,8 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         roleKey: { in: roleIds.map((roleId) => `custom:${roleId}`) },
       },
       select: { roleKey: true, principalType: true, principalId: true },
-    })) as {
-      roleKey: string | null;
-      principalType: string;
-      principalId: string | null;
-    }[];
-    const held = new Map<string, { isMine: boolean; isForeign: boolean }>();
-    for (const holder of holders) {
-      const roleKey = this.bindingRoleKeyFrom(holder.roleKey);
-      if (roleKey === null || !roleKey.startsWith("custom:")) continue;
-      const customRoleId = roleKey.slice("custom:".length);
-      const entry = held.get(customRoleId) ?? {
-        isMine: false,
-        isForeign: false,
-      };
-      if (holder.principalType === "API_KEY" && holder.principalId === apiKeyId) {
-        entry.isMine = true;
-      } else {
-        entry.isForeign = true;
-      }
-      held.set(customRoleId, entry);
-    }
-    return new Set(
-      [...held.entries()]
-        .filter(([, entry]) => entry.isMine && !entry.isForeign)
-        .map(([roleId]) => roleId),
-    );
+    })) as RoleHolderRow[];
+    return rolesExclusiveTo({ holders, apiKeyId });
   }
 
   private roleKindFence(apiKeyId: string | null): Record<string, unknown> {
@@ -390,83 +353,13 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     }
     return {};
   }
-
-  /** Only the role keys a decision can represent. Dormant facts such as
-   * lite-member stay migration data instead of becoming permissions. */
-  private collectBindings<TRow extends BindingGrantRow>({
-    rows,
-    viaGroupId,
-  }: {
-    rows: readonly TRow[];
-    viaGroupId: (row: TRow) => string | null;
-  }): CollectedBinding[] {
-    const bindings: CollectedBinding[] = [];
-    for (const row of rows) {
-      if (!this.isBindingScope(row.scopeType)) continue;
-      const roleKey = this.bindingRoleKeyFrom(row.roleKey);
-      if (roleKey === null) continue;
-      // Reported, never filtered: whether an elapsed end still grants is the collector's call.
-      const expiresAtMs = findStoredInstant(row.expiresAt)?.epochMilliseconds;
-      bindings.push({
-        roleKey,
-        scopeType: row.scopeType,
-        scopeId: row.scopeId,
-        viaGroupId: viaGroupId(row),
-        ...(expiresAtMs !== undefined ? { expiresAtMs } : {}),
-      });
-    }
-    return bindings;
-  }
-
-  private bindingRoleKeyFrom(roleKey: string | null): BindingRoleKey | null {
-    if (roleKey === "admin" || roleKey === "member" || roleKey === "viewer") return roleKey;
-    if (roleKey?.startsWith("custom:") && roleKey.length > "custom:".length) {
-      return `custom:${roleKey.slice("custom:".length)}`;
-    }
-    return null;
-  }
-
-  private isBindingScope(scopeType: string): scopeType is GrantScopeTier {
-    return (BINDING_SCOPE_TYPES as readonly string[]).includes(scopeType);
-  }
-
-  private shareLinkRowFrom({
-    row,
-    viewCounts,
-  }: {
-    row: ShareLinkGrantCandidateRow;
-    viewCounts: Map<string, number>;
-  }): ShareLinkRow[] {
-    const visibility = SHARE_VISIBILITY_BY_PRINCIPAL_DB[row.principalType];
-    if (!visibility) return [];
-    if (row.resourceKind !== "TRACE" && row.resourceKind !== "THREAD") {
-      return [];
-    }
-    if (row.projectId == null) return [];
-    return [
-      {
-        resourceType: row.resourceKind,
-        resourceId: row.scopeId,
-        projectId: row.projectId,
-        visibility,
-        expiresAt: row.expiresAt,
-        maxViews: row.maxViews,
-        viewCount: viewCounts.get(row.id) ?? 0,
-      },
-    ];
-  }
 }
 
-/** The columns `findResourceGrantCandidates` selects off `Grant`. */
-type ShareLinkGrantCandidateRow = {
-  id: string;
-  principalType: string;
-  resourceKind: string | null;
-  scopeId: string;
-  projectId: string | null;
-  expiresAt: Instant | null;
-  maxViews: number | null;
-};
+function withStoredEnd<TRow extends StoredBindingGrantRow>(
+  row: TRow,
+): Omit<TRow, "expiresAt"> & { expiresAt: Instant | null } {
+  return { ...row, expiresAt: findStoredInstant(row.expiresAt) };
+}
 
 /** A nullable stored timestamp column, as the store hands it back. */
 function findStoredInstant(value: unknown): Instant | null {

@@ -58,7 +58,7 @@ const authz = processModules.filter((module) => module.name === "authz");
 const bootAuthz = () =>
   bootInstalledProcess({
     role: "api",
-    modules: authz,
+    modules: authz.map((module) => ({ ...module, tier: "live" as const })),
     config: parseProcessConfig({
       owners: processConfig(authz, "api"),
       environment: { NODE_ENV: "test" },

@@ -8,6 +8,7 @@ import {
   type AuthzGrantEventPayload,
 } from "@langwatch/authz-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
@@ -56,11 +57,17 @@ describe("AuthzSessionVersionService", () => {
       bindings: MemoryAuthzManagedGrantRepository.create({ memory }),
     });
     for (const userId of ["user_ada", "user_bo", "user_cy"]) {
-      memory.organizationRoles.set(`${ORG}:${userId}`, "MEMBER");
+      memory.memberships.set(`${ORG}:${userId}`, {
+        role: "MEMBER",
+        disabled: false,
+        membershipStamp: `stamp_${userId}`,
+        createdAt: Temporal.Instant.fromEpochMilliseconds(0),
+      });
     }
+    memory.groups.push({ ...GROUP, organizationId: ORG });
     memory.groupMemberships.push(
-      { organizationId: ORG, userId: "user_bo", groupId: GROUP.id, group: GROUP },
-      { organizationId: ORG, userId: "user_cy", groupId: GROUP.id, group: GROUP },
+      { userId: "user_bo", groupId: GROUP.id },
+      { userId: "user_cy", groupId: GROUP.id },
     );
   });
 
@@ -93,7 +100,14 @@ describe("AuthzSessionVersionService", () => {
 
     /** @scenario A binding or unbinding refreshes exactly the users it reaches */
     it("bumps the members of a team the grant attaches to", async () => {
-      memory.teamMemberships.push({ organizationId: ORG, teamId: "team_core", userId: "user_cy" });
+      memory.teams.push({ id: "team_core", organizationId: ORG });
+      memory.teamMemberships.push({
+        teamId: "team_core",
+        userId: "user_cy",
+        role: "MEMBER",
+        assignedRoleId: null,
+        createdAt: Temporal.Instant.fromEpochMilliseconds(0),
+      });
 
       await service.bumpFor({
         organizationId: ORG,
@@ -126,6 +140,7 @@ describe("AuthzSessionVersionService", () => {
         customRoleId: null,
         scopeType: "ORGANIZATION",
         scopeId: ORG,
+        createdAt: Temporal.Instant.fromEpochMilliseconds(0),
       });
 
       await service.bumpFor({
@@ -149,6 +164,7 @@ describe("AuthzSessionVersionService", () => {
         customRoleId: null,
         scopeType: "ORGANIZATION",
         scopeId: ORG,
+        createdAt: Temporal.Instant.fromEpochMilliseconds(0),
       });
 
       await service.bumpFor({
@@ -171,6 +187,7 @@ describe("AuthzSessionVersionService", () => {
         customRoleId: null,
         scopeType: "ORGANIZATION",
         scopeId: ORG,
+        createdAt: Temporal.Instant.fromEpochMilliseconds(0),
       });
 
       await service.bumpFor({

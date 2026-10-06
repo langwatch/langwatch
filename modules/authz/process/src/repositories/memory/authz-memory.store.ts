@@ -1,5 +1,9 @@
 import type { OrganizationRole } from "@langwatch/authorization";
-import type { MigrationTenantStatus } from "@langwatch/authz-contract";
+import type {
+  AuthzAccessUser,
+  MigrationTenantStatus,
+  TeamUserRole,
+} from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { AuthzAuditRow } from "../authz-audit-trail.repository.ts";
@@ -31,22 +35,18 @@ export type AuthzMemoryUserStandingRow = {
   changedAtMs: number;
 };
 
-/** What the ledger says about the grant an admission marker named. */
-export type AuthzMemoryAdmissionGrantRow = {
-  organizationId: string;
-  userId: string;
-  grantId: string;
-  revoked: boolean;
-};
-
-/** A Grant head row: the projected fact, and the revocation mark that ends it. */
+/** A Grant head row: the projected fact, the revocation mark that ends it, the last write. */
 export type AuthzMemoryGrantRow = GrantRowShape & {
   revokedAt: Instant | null;
   revokedReason: string | null;
+  updatedAt: Instant;
 };
 
 /** A Role head row; a deleted role keeps its row, marked. */
-export type AuthzMemoryRoleRow = RoleRowShape & { deletedAt: Instant | null };
+export type AuthzMemoryRoleRow = RoleRowShape & { deletedAt: Instant | null; updatedAt: Instant };
+
+/** The RoleBinding compat head, with the moment its row was inserted. */
+export type AuthzMemoryBindingRow = AuthzManagedBindingRow & { createdAt: Instant };
 
 /** The CustomRole compat head the legacy resolver and the binding reads still read. */
 export type AuthzMemoryCustomRoleRow = AuthzAssignableRoleRow & {
@@ -54,10 +54,50 @@ export type AuthzMemoryCustomRoleRow = AuthzAssignableRoleRow & {
   name: string;
   description: string | null;
   kind: string;
+  createdAt: Instant;
 };
 
-/** A membership's generation, the column the grant fence compares. */
-export type AuthzMemoryMembershipStampRow = { membershipStamp: string; disabled: boolean };
+/** An OrganizationUser row: the role, the seat, and the generation the grant fence compares. */
+export type AuthzMemoryMembershipRow = {
+  role: OrganizationRole;
+  disabled: boolean;
+  membershipStamp: string;
+  createdAt: Instant;
+};
+
+/** A Group row; its members are `groupMemberships`. */
+export type AuthzMemoryGroupRow = AuthzUserGroupRow["group"] & { organizationId: string };
+
+export type AuthzMemoryApiKeyRow = {
+  id: string;
+  organizationId: string;
+  name: string;
+  userId: string | null;
+};
+
+/** A TeamUser row; its organization is its team's. */
+export type AuthzMemoryTeamMembershipRow = {
+  teamId: string;
+  userId: string;
+  role: TeamUserRole;
+  assignedRoleId: string | null;
+  createdAt: Instant;
+};
+
+export type AuthzMemoryProjectRow = {
+  id: string;
+  teamId: string;
+  apiKey: string;
+  createdAt: Instant;
+};
+
+/** A share grant's counted views (GrantUsage). */
+export type AuthzMemoryGrantUsageRow = {
+  grantId: string;
+  organizationId: string;
+  projectId: string;
+  viewCount: number;
+};
 
 export type AuthzMemoryCutoverRow = {
   organizationId: string;
@@ -76,25 +116,27 @@ export class AuthzMemoryStore {
   readonly cutovers = new Map<string, AuthzMemoryCutoverRow>();
   readonly userStandings = new Map<string, AuthzMemoryUserStandingRow>();
   readonly admissions: AuthzMemoryAdmissionRow[] = [];
-  readonly admissionGrants: AuthzMemoryAdmissionGrantRow[] = [];
-  readonly bindings: AuthzManagedBindingRow[] = [];
+  readonly bindings: AuthzMemoryBindingRow[] = [];
   readonly scopes: (AuthzBindingScopeRow & { organizationId: string })[] = [];
-  readonly groupMemberships: ({ organizationId: string; userId: string } & AuthzUserGroupRow)[] =
-    [];
-  readonly organizationRoles = new Map<string, OrganizationRole>();
+  readonly users: Pick<AuthzAccessUser, "id" | "name" | "email" | "image">[] = [];
+  /** Keyed `organizationId:userId`: the OrganizationUser row. */
+  readonly memberships = new Map<string, AuthzMemoryMembershipRow>();
+  readonly groups: AuthzMemoryGroupRow[] = [];
+  readonly groupMemberships: { userId: string; groupId: string }[] = [];
   readonly legacySharedTeamMemberships: { organizationId: string; userId: string }[] = [];
-  readonly teamMemberships: { organizationId: string; teamId: string; userId: string }[] = [];
+  readonly teams: { id: string; organizationId: string }[] = [];
+  readonly teamMemberships: AuthzMemoryTeamMembershipRow[] = [];
+  readonly projects: AuthzMemoryProjectRow[] = [];
   /** The grant ledger's Grant head, as the projection writes it. */
   readonly grants: AuthzMemoryGrantRow[] = [];
+  readonly grantUsages: AuthzMemoryGrantUsageRow[] = [];
   readonly roleHeads: AuthzMemoryRoleRow[] = [];
   /** The CustomRole compat head. */
   readonly roles: AuthzMemoryCustomRoleRow[] = [];
-  readonly shareLinks: (CompatShareLinkRowShape & { viewCount: number })[] = [];
-  readonly apiKeys: { organizationId: string; apiKeyId: string }[] = [];
-  /** Keyed `organizationId:userId`, as `organizationRoles` is: the same membership row. */
-  readonly membershipStamps = new Map<string, AuthzMemoryMembershipStampRow>();
-  /** Organizations that exist, as far as the bootstrap fence asks. */
-  readonly organizations = new Set<string>();
+  readonly shareLinks: (CompatShareLinkRowShape & { viewCount: number; createdAt: Instant })[] = [];
+  readonly apiKeys: AuthzMemoryApiKeyRow[] = [];
+  /** Organizations that exist, as the bootstrap fence and the import ask. */
+  readonly organizations = new Map<string, { createdAt: Instant }>();
   readonly auditLogs: AuthzAuditRow[] = [];
 
   static create(): AuthzMemoryStore {
@@ -109,23 +151,45 @@ export class AuthzMemoryStore {
     return row !== undefined && (row.deactivated || row.erased);
   }
 
+  /** The key `memberships` holds an OrganizationUser row under. */
+  membershipKey(organizationId: string, userId: string): string {
+    return `${organizationId}:${userId}`;
+  }
+
+  isMember(organizationId: string, userId: string): boolean {
+    return this.memberships.has(this.membershipKey(organizationId, userId));
+  }
+
+  isTeamIn(teamId: string, organizationId: string): boolean {
+    return this.teams.some((team) => team.id === teamId && team.organizationId === organizationId);
+  }
+
+  isGroupIn(groupId: string, organizationId: string): boolean {
+    return this.groups.some(
+      (group) => group.id === groupId && group.organizationId === organizationId,
+    );
+  }
+
   reset(): void {
     this.epochs.clear();
     this.sessionVersions.clear();
     this.cutovers.clear();
     this.userStandings.clear();
-    this.organizationRoles.clear();
-    this.membershipStamps.clear();
+    this.memberships.clear();
     this.organizations.clear();
     for (const rows of [
       this.admissions,
-      this.admissionGrants,
       this.bindings,
       this.scopes,
+      this.users,
+      this.groups,
       this.groupMemberships,
       this.legacySharedTeamMemberships,
+      this.teams,
       this.teamMemberships,
+      this.projects,
       this.grants,
+      this.grantUsages,
       this.roleHeads,
       this.roles,
       this.shareLinks,

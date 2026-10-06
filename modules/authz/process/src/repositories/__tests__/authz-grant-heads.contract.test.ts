@@ -63,7 +63,7 @@ const CONTEXT = { aggregateId: "grant", tenantId: createTenantId("org_contract")
 function memoryHeadsFixture(): HeadsFixture {
   const memory = AuthzMemoryStore.create();
   const organizationId = id("org");
-  memory.organizations.add(organizationId);
+  memory.organizations.set(organizationId, { createdAt: at(T0) });
   const projectId = id("project");
 
   return {
@@ -79,15 +79,16 @@ function memoryHeadsFixture(): HeadsFixture {
     member: async () => {
       const userId = id("user");
       const membershipStamp = randomUUID();
-      memory.organizationRoles.set(`${organizationId}:${userId}`, "MEMBER");
-      memory.membershipStamps.set(`${organizationId}:${userId}`, {
-        membershipStamp,
+      memory.memberships.set(`${organizationId}:${userId}`, {
+        role: "MEMBER",
         disabled: false,
+        membershipStamp,
+        createdAt: at(T0),
       });
       return { userId, membershipStamp };
     },
     disableMembership: async (userId) => {
-      const row = memory.membershipStamps.get(`${organizationId}:${userId}`);
+      const row = memory.memberships.get(memory.membershipKey(organizationId, userId));
       if (row) row.disabled = true;
     },
     grant: async (grantId) => {

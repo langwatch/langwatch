@@ -15,15 +15,18 @@ import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import type { AuthzManagedGrantRepository } from "../authz-managed-grant.repository.ts";
 import type { AuthzRepositories } from "../authz.repositories.ts";
-import { AuthzMemoryStore } from "../memory/authz-memory.store.ts";
+import { type AuthzMemoryGrantRow, AuthzMemoryStore } from "../memory/authz-memory.store.ts";
 import { MemoryAuthzAdmissionRepository } from "../memory/memory.authz-admission.repository.ts";
 import { MemoryAuthzAuditTrailRepository } from "../memory/memory.authz-audit-trail.repository.ts";
 import { MemoryAuthzCutoverRepository } from "../memory/memory.authz-cutover.repository.ts";
 import { MemoryAuthzEpochRepository } from "../memory/memory.authz-epoch.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../memory/memory.authz-grant-projection.repository.ts";
+import { MemoryAuthzListingRepository } from "../memory/memory.authz-listing.repository.ts";
 import { MemoryAuthzManagedGrantRepository } from "../memory/memory.authz-managed-grant.repository.ts";
 import { MemoryAuthzMembershipStampRepository } from "../memory/memory.authz-membership-stamp.repository.ts";
+import { MemoryAuthzMigrationRepository } from "../memory/memory.authz-migration.repository.ts";
 import { MemoryAuthzPlatformGrantRepository } from "../memory/memory.authz-platform-grant.repository.ts";
+import { MemoryAuthzReadRepository } from "../memory/memory.authz-read.repository.ts";
 import { MemoryAuthzRevocationRepository } from "../memory/memory.authz-revocation.repository.ts";
 import { MemoryAuthzSessionVersionRepository } from "../memory/memory.authz-session-version.repository.ts";
 import { MemoryAuthzUserStandingRepository } from "../memory/memory.authz-user-standing.repository.ts";
@@ -56,6 +59,9 @@ const backends: readonly Backend[] = [
         membershipStamps: MemoryAuthzMembershipStampRepository.create({ memory }),
         grantProjection: MemoryAuthzGrantProjectionRepository.create({ memory }),
         revocation: MemoryAuthzRevocationRepository.create({ memory }),
+        read: MemoryAuthzReadRepository.create({ memory }),
+        listing: MemoryAuthzListingRepository.create({ memory }),
+        migration: MemoryAuthzMigrationRepository.create({ memory }),
       };
     },
   },
@@ -137,7 +143,7 @@ describe.each(backends)("given the $name authz backend", (backend) => {
         scopeType: "ORGANIZATION" as const,
         scopeId: ORGANIZATION_ID,
       };
-      repositories.store.bindings.push(binding);
+      repositories.store.bindings.push({ ...binding, createdAt: nowInstant() });
 
       await expect(
         repositories.bindings.findBinding({
@@ -191,11 +197,9 @@ describe.each(backends)("given the $name authz backend", (backend) => {
         occurredAtMs: 1,
         disabled: false,
       });
-      repositories.store.admissionGrants.push({
-        ...scope,
-        grantId: "rb_admission",
-        revoked: true,
-      });
+      repositories.store.grants.push(
+        admissionGrant({ ...scope, grantId: "rb_admission", revoked: true }),
+      );
 
       await expect(
         repositories.admissions.completeAdmission({ ...scope, grantId: "rb_admission" }),
@@ -217,11 +221,9 @@ describe.each(backends)("given the $name authz backend", (backend) => {
         disabled: false,
       };
       repositories.store.admissions.push(marker);
-      repositories.store.admissionGrants.push({
-        ...scope,
-        grantId: "rb_admission",
-        revoked: false,
-      });
+      repositories.store.grants.push(
+        admissionGrant({ ...scope, grantId: "rb_admission", revoked: false }),
+      );
 
       await expect(
         repositories.admissions.completeAdmission({ ...scope, grantId: "rb_admission" }),
@@ -372,14 +374,27 @@ function memoryHolderFixture(): HolderFixture {
     organizationId,
     member: async () => {
       const userId = id("user");
-      memory.organizationRoles.set(`${organizationId}:${userId}`, "MEMBER");
+      memory.memberships.set(`${organizationId}:${userId}`, {
+        role: "MEMBER",
+        disabled: false,
+        membershipStamp: randomUUID(),
+        createdAt: nowInstant(),
+      });
       return userId;
     },
     outsider: async () => id("user"),
     team: async (memberIds) => {
       const teamId = id("team");
-      for (const userId of memberIds)
-        memory.teamMemberships.push({ organizationId, teamId, userId });
+      memory.teams.push({ id: teamId, organizationId });
+      for (const userId of memberIds) {
+        memory.teamMemberships.push({
+          teamId,
+          userId,
+          role: "MEMBER",
+          assignedRoleId: null,
+          createdAt: nowInstant(),
+        });
+      }
       return teamId;
     },
     grant: async ({ principal, roleKey, revoked = false }) => {
@@ -403,6 +418,7 @@ function memoryHolderFixture(): HolderFixture {
         occurredAt: nowInstant(),
         revokedAt: revoked ? nowInstant() : null,
         revokedReason: null,
+        updatedAt: nowInstant(),
       });
     },
     close: async () => {},
@@ -580,3 +596,40 @@ describe.each(holderBackends)("given a role's holders on the $name backend", (ba
     },
   );
 });
+
+/** The organization-scope Grant row an SSO admission names, as the projection writes it. */
+function admissionGrant({
+  organizationId,
+  userId,
+  grantId,
+  revoked,
+}: {
+  organizationId: string;
+  userId: string;
+  grantId: string;
+  revoked: boolean;
+}): AuthzMemoryGrantRow {
+  const occurredAt = Temporal.Instant.fromEpochMilliseconds(1_700_000_000_000);
+  return {
+    id: grantId,
+    organizationId,
+    principalType: "USER",
+    principalId: userId,
+    roleKey: "member",
+    legacyRole: null,
+    source: "sso",
+    scopeType: "ORGANIZATION",
+    scopeId: organizationId,
+    token: null,
+    permission: null,
+    resourceKind: null,
+    projectId: null,
+    createdByUserId: null,
+    expiresAt: null,
+    maxViews: null,
+    occurredAt,
+    revokedAt: revoked ? occurredAt : null,
+    revokedReason: revoked ? "revocation" : null,
+    updatedAt: occurredAt,
+  };
+}

@@ -3,9 +3,13 @@
  * What an unfinished automatic admission means, over the memory backend: the
  * marker says one is open, the ledger says whether the grant landed.
  */
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.ts";
+import {
+  type AuthzMemoryGrantRow,
+  AuthzMemoryStore,
+} from "../../repositories/memory/authz-memory.store.ts";
 import { MemoryAuthzAdmissionRepository } from "../../repositories/memory/memory.authz-admission.repository.ts";
 import { AuthzAdmissionService } from "../authz-admission.service.ts";
 
@@ -56,7 +60,7 @@ describe("an automatic single-sign-on admission", () => {
     it("reads as applied, and completing clears the marker", async () => {
       const { memory, service } = harness();
       openAdmission(memory);
-      memory.admissionGrants.push({ ...SCOPE, grantId: GRANT_ID, revoked: false });
+      memory.grants.push(admissionGrant({ ...SCOPE, grantId: GRANT_ID, revoked: false }));
 
       await expect(service.readPendingAdmission(SCOPE)).resolves.toEqual({
         pending: true,
@@ -71,7 +75,7 @@ describe("an automatic single-sign-on admission", () => {
     it("reads as revoked, and clearing leaves no marker for a retry to revive", async () => {
       const { memory, service } = harness();
       openAdmission(memory);
-      memory.admissionGrants.push({ ...SCOPE, grantId: GRANT_ID, revoked: true });
+      memory.grants.push(admissionGrant({ ...SCOPE, grantId: GRANT_ID, revoked: true }));
 
       await expect(service.readPendingAdmission(SCOPE)).resolves.toEqual({
         pending: true,
@@ -85,3 +89,40 @@ describe("an automatic single-sign-on admission", () => {
     });
   });
 });
+
+/** The organization-scope Grant row an SSO admission names, as the projection writes it. */
+function admissionGrant({
+  organizationId,
+  userId,
+  grantId,
+  revoked,
+}: {
+  organizationId: string;
+  userId: string;
+  grantId: string;
+  revoked: boolean;
+}): AuthzMemoryGrantRow {
+  const occurredAt = Temporal.Instant.fromEpochMilliseconds(1_700_000_000_000);
+  return {
+    id: grantId,
+    organizationId,
+    principalType: "USER",
+    principalId: userId,
+    roleKey: "member",
+    legacyRole: null,
+    source: "sso",
+    scopeType: "ORGANIZATION",
+    scopeId: organizationId,
+    token: null,
+    permission: null,
+    resourceKind: null,
+    projectId: null,
+    createdByUserId: null,
+    expiresAt: null,
+    maxViews: null,
+    occurredAt,
+    revokedAt: revoked ? occurredAt : null,
+    revokedReason: revoked ? "revocation" : null,
+    updatedAt: occurredAt,
+  };
+}

@@ -23,7 +23,6 @@ import type { AuthzDatabase, AuthzReadRepository } from "../repositories/authz-r
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import type { AuthzGrantWriteDatabase } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.authz-grant.repository.ts";
-import { EventingAuthzListingRepository } from "../repositories/eventing/eventing.authz-listing.repository.ts";
 import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
 import type { AuthzAuditDatabase } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import { PrismaAuthzAuditRepository } from "../repositories/prisma/prisma.authz-audit.repository.ts";
@@ -31,8 +30,6 @@ import type { AuthzCutoverDatabase } from "../repositories/prisma/prisma.authz-c
 import type { PrismaAuthzGrantDatabase } from "../repositories/prisma/prisma.authz-grant.repository.ts";
 import type { AuthzManagedGrantDatabase } from "../repositories/prisma/prisma.authz-managed-grant.repository.ts";
 import type { AuthzMembershipStampDatabase } from "../repositories/prisma/prisma.authz-membership-stamp.repository.ts";
-import type { AuthzMigrationDatabase } from "../repositories/prisma/prisma.authz-migration.repository.ts";
-import { PrismaAuthzMigrationRepository } from "../repositories/prisma/prisma.authz-migration.repository.ts";
 import {
   type AuthzProjectionDatabase,
   PrismaAuthzProjectionRepository,
@@ -58,7 +55,6 @@ export type PostgresAuthzDatabase = PrismaAuthzUserStandingDatabase &
   AuthzLedgerDatabase &
   AuthzGrantWriteDatabase &
   PrismaAuthzGrantDatabase &
-  AuthzMigrationDatabase &
   AuthzCutoverDatabase &
   AuthzAuditDatabase &
   AuthzManagedGrantDatabase &
@@ -213,8 +209,8 @@ export class PostgresAuthzAdapter {
     const userStandings = AuthzUserStandingService.create({ standings, platformOperators });
 
     const authzOptions: AuthzServiceOptions = {
-      repository: EventingAuthzReadRepository.create(database),
-      listing: EventingAuthzListingRepository.create(database),
+      repository: repositories.read,
+      listing: repositories.listing,
       bindings: bindingRepository,
       epoch,
       isOnEngine,
@@ -252,7 +248,7 @@ export class PostgresAuthzAdapter {
       userStandings,
     });
     const migration = LegacyImportAuthzGrantMigration.create({
-      store: PrismaAuthzMigrationRepository.create(database),
+      store: repositories.migration,
       ledger: new DispatcherAuthzEngineLedger(this.options.dispatcher),
       now: this.options.now ?? Date.now,
     });

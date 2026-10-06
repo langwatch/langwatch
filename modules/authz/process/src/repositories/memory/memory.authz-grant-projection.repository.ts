@@ -1,4 +1,4 @@
-import { type Instant, Temporal } from "@langwatch/time";
+import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
 import { isMigrationOwnedSource } from "../../rules/authz-migration-ownership.rules.ts";
 import {
@@ -24,6 +24,9 @@ const atMillis = (instant: Instant): Instant =>
   Temporal.Instant.fromEpochMilliseconds(instant.epochMilliseconds);
 
 const msOf = (instant: Instant): number => instant.epochMilliseconds;
+
+/** `NOW()` and `@updatedAt`, at the precision Postgres keeps. */
+const now = (): Instant => atMillis(nowInstant());
 
 /** `Grant_resource_terms_check`: a RESOURCE row holds all four resource terms, any other none. */
 function holdsResourceTerms(row: GrantRowShape): boolean {
@@ -139,11 +142,16 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
     const stored = { ...row, occurredAt: atMillis(row.occurredAt) };
     const existing = this.memory.grants.find((candidate) => candidate.id === row.id);
     if (!existing) {
-      this.memory.grants.push({ ...stored, revokedAt: null, revokedReason: null });
+      this.memory.grants.push({
+        ...stored,
+        revokedAt: null,
+        revokedReason: null,
+        updatedAt: now(),
+      });
       return 1;
     }
     if (msOf(existing.occurredAt) >= msOf(row.occurredAt)) return 0;
-    Object.assign(existing, stored);
+    Object.assign(existing, stored, { updatedAt: now() });
     return 1;
   }
 
@@ -154,7 +162,9 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
     membershipBootstrap,
   }: Extract<GrantProjectionWrite, { kind: "grant.upsert" }>): boolean {
     if (membershipStamp === undefined || row.principalType !== "USER") return true;
-    const live = this.memory.membershipStamps.get(`${row.organizationId}:${row.principalId}`);
+    const live = this.memory.memberships.get(
+      this.memory.membershipKey(row.organizationId, row.principalId ?? ""),
+    );
     if (live?.membershipStamp === membershipStamp) return true;
     const bootstrapScopeIsAllowed =
       row.scopeType === "TEAM" ||
@@ -183,11 +193,11 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
     };
     const existing = this.memory.roleHeads.find((candidate) => candidate.id === row.id);
     if (!existing) {
-      this.memory.roleHeads.push({ ...stored, deletedAt: null });
+      this.memory.roleHeads.push({ ...stored, deletedAt: null, updatedAt: now() });
       return 1;
     }
     if (msOf(existing.occurredAt) >= msOf(row.occurredAt)) return 0;
-    Object.assign(existing, stored);
+    Object.assign(existing, stored, { updatedAt: now() });
     return 1;
   }
 
@@ -196,7 +206,10 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
     update: (row: AuthzMemoryStore["grants"][number]) => void,
   ): number {
     const rows = this.memory.grants.filter(matches);
-    rows.forEach(update);
+    for (const row of rows) {
+      update(row);
+      row.updatedAt = now();
+    }
     return rows.length;
   }
 
@@ -205,7 +218,10 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
     update: (row: AuthzMemoryStore["roleHeads"][number]) => void,
   ): number {
     const rows = this.memory.roleHeads.filter(matches);
-    rows.forEach(update);
+    for (const row of rows) {
+      update(row);
+      row.updatedAt = now();
+    }
     return rows.length;
   }
 
@@ -285,7 +301,7 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
     }
     if (!createMissing) return;
     if (this.memory.bindings.some((row) => row.id === binding.id)) throw new CompatConflict();
-    this.memory.bindings.push({ ...binding });
+    this.memory.bindings.push({ ...binding, createdAt: now() });
   }
 
   private writeCompatShareLink({
@@ -310,7 +326,7 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
     if (tokenHeld || this.memory.shareLinks.some((row) => row.id === link.id)) {
       throw new CompatConflict();
     }
-    this.memory.shareLinks.push({ ...link, viewCount: 0 });
+    this.memory.shareLinks.push({ ...link, viewCount: 0, createdAt: now() });
   }
 
   /** The compat row carries `(role, customRoleId)`, so a roleKey change re-reads the mapper. */
@@ -369,7 +385,7 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
       if (!head || head.deletedAt !== null) return;
       if (msOf(head.occurredAt) !== msOf(row.occurredAt)) return;
     }
-    const compat: AuthzMemoryCustomRoleRow = {
+    const compat: Omit<AuthzMemoryCustomRoleRow, "createdAt"> = {
       id: row.id,
       organizationId: row.organizationId,
       name: row.name,
@@ -392,7 +408,7 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
       return;
     }
     if (this.memory.roles.some((custom) => custom.id === row.id)) throw new CompatConflict();
-    this.memory.roles.push(compat);
+    this.memory.roles.push({ ...compat, createdAt: now() });
   }
 
   private deleteCompatBinding({ organizationId, id }: { organizationId: string; id: string }) {

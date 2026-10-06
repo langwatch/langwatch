@@ -1,4 +1,4 @@
-import { Temporal } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 
 import {
   type AuthzRevocationMark,
@@ -23,11 +23,13 @@ export class MemoryAuthzRevocationRepository extends AuthzRevocationRepository {
     revokedReason,
   }: AuthzRevocationMark): Promise<void> {
     const at = Temporal.Instant.fromEpochMilliseconds(revokedAt.epochMilliseconds);
+    const updatedAt = Temporal.Instant.fromEpochMilliseconds(nowInstant().epochMilliseconds);
     for (const row of this.memory.grants) {
       if (row.organizationId !== organizationId || row.revokedAt !== null) continue;
       if (!grantIds.includes(row.id)) continue;
       row.revokedAt = at;
       row.revokedReason = revokedReason;
+      row.updatedAt = updatedAt;
     }
   }
 }

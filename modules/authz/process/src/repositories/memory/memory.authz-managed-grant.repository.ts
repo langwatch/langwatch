@@ -9,7 +9,7 @@ import {
   type AuthzManagedBindingRow,
   type AuthzUserGroupRow,
 } from "../authz-managed-grant.repository.ts";
-import type { AuthzMemoryStore } from "./authz-memory.store.ts";
+import type { AuthzMemoryBindingRow, AuthzMemoryStore } from "./authz-memory.store.ts";
 
 /** The binding facts a process without a database keeps in one shared store. */
 export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantRepository {
@@ -56,7 +56,9 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     return this.memory.groupMemberships
       .filter(
         (row) =>
-          row.organizationId === input.organizationId && input.groupIds.includes(row.groupId),
+          input.groupIds.includes(row.groupId) &&
+          this.memory.isGroupIn(row.groupId, input.organizationId) &&
+          this.memory.isMember(input.organizationId, row.userId),
       )
       .map((row) => ({ groupId: row.groupId, userId: row.userId }));
   }
@@ -68,9 +70,9 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     return this.memory.teamMemberships
       .filter(
         (row) =>
-          row.organizationId === input.organizationId &&
           input.teamIds.includes(row.teamId) &&
-          this.memory.organizationRoles.has(`${input.organizationId}:${row.userId}`),
+          this.memory.isTeamIn(row.teamId, input.organizationId) &&
+          this.memory.isMember(input.organizationId, row.userId),
       )
       .map((row) => ({ teamId: row.teamId, userId: row.userId }));
   }
@@ -98,7 +100,7 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
 
   async findOrganizationUserIds(input: { organizationId: string }): Promise<string[]> {
     const prefix = `${input.organizationId}:`;
-    return [...this.memory.organizationRoles.keys()]
+    return [...this.memory.memberships.keys()]
       .filter((key) => key.startsWith(prefix))
       .map((key) => key.slice(prefix.length));
   }
@@ -126,24 +128,28 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     organizationId: string;
     userId: string;
   }): Promise<AuthzUserGroupRow[]> {
-    return this.memory.groupMemberships
-      .filter((row) => row.organizationId === input.organizationId && row.userId === input.userId)
-      .map((row) => ({ groupId: row.groupId, group: row.group }));
+    return this.memory.groupMemberships.flatMap((row) => {
+      const group = this.memory.groups.find((candidate) => candidate.id === row.groupId);
+      if (row.userId !== input.userId || group?.organizationId !== input.organizationId) return [];
+      const { id, name, slug, scimSource } = group;
+      return [{ groupId: row.groupId, group: { id, name, slug, scimSource } }];
+    });
   }
 
   async findOrganizationRole(input: {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationRole | null> {
-    return this.memory.organizationRoles.get(`${input.organizationId}:${input.userId}`) ?? null;
+    const key = this.memory.membershipKey(input.organizationId, input.userId);
+    return this.memory.memberships.get(key)?.role ?? null;
   }
 
   async isGroupInOrganization(input: {
     organizationId: string;
     groupId: string;
   }): Promise<boolean> {
-    return this.memory.groupMemberships.some(
-      (row) => row.organizationId === input.organizationId && row.groupId === input.groupId,
+    return this.memory.groups.some(
+      (row) => row.organizationId === input.organizationId && row.id === input.groupId,
     );
   }
 
@@ -152,7 +158,7 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     apiKeyId: string;
   }): Promise<boolean> {
     return this.memory.apiKeys.some(
-      (row) => row.organizationId === input.organizationId && row.apiKeyId === input.apiKeyId,
+      (row) => row.organizationId === input.organizationId && row.id === input.apiKeyId,
     );
   }
 
@@ -160,11 +166,11 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     organizationId: string;
     bindingId: string;
   }): Promise<AuthzManagedBindingRow | null> {
-    return (
-      this.memory.bindings.find(
-        (row) => row.organizationId === input.organizationId && row.id === input.bindingId,
-      ) ?? null
+    const row = this.memory.bindings.find(
+      (candidate) =>
+        candidate.organizationId === input.organizationId && candidate.id === input.bindingId,
     );
+    return row ? bindingFrom(row) : null;
   }
 
   async findDirectUserBindings(input: {
@@ -172,12 +178,14 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
     userId: string;
     bindingIds: readonly string[];
   }): Promise<AuthzManagedBindingRow[]> {
-    return this.memory.bindings.filter(
-      (row) =>
-        row.organizationId === input.organizationId &&
-        row.userId === input.userId &&
-        input.bindingIds.includes(row.id),
-    );
+    return this.memory.bindings
+      .filter(
+        (row) =>
+          row.organizationId === input.organizationId &&
+          row.userId === input.userId &&
+          input.bindingIds.includes(row.id),
+      )
+      .map(bindingFrom);
   }
 
   async findAssignableRoles(input: {
@@ -190,4 +198,11 @@ export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantReposito
       )
       .map((row) => ({ id: row.id, permissions: row.permissions }));
   }
+}
+
+function bindingFrom({
+  createdAt: _createdAt,
+  ...row
+}: AuthzMemoryBindingRow): AuthzManagedBindingRow {
+  return row;
 }

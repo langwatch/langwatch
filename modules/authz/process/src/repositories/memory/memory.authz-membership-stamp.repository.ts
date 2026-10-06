@@ -22,7 +22,7 @@ export class MemoryAuthzMembershipStampRepository extends AuthzMembershipStampRe
     userIds: string[];
   }): Promise<MembershipStampRow[]> {
     return [...new Set(userIds)].flatMap((userId) => {
-      const row = this.memory.membershipStamps.get(`${organizationId}:${userId}`);
+      const row = this.memory.memberships.get(this.memory.membershipKey(organizationId, userId));
       if (!row || row.disabled) return [];
       return [{ userId, membershipStamp: row.membershipStamp }];
     });
