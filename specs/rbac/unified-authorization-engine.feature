@@ -113,6 +113,14 @@ Feature: Unified authorization engine
     # effective(key) = grants(key) ∩ grants(owner), evaluated live.
 
   @unit
+  Scenario: An API key and its owner are read from one storage head when grants are not cached
+    Given the grants cache is off, or its epoch store is unreachable
+    And storage is being cut over between two heads that disagree about the key and its owner
+    When the API key's permission is checked, by scope or by ids
+    Then the key's grants and its owner's grants are read from the same head
+    And the check is decided as either head alone would decide it
+
+  @unit
   Scenario: A share token grants exactly one permission on exactly one resource
     Given trace "t1" in project "chatbot" has a public share token
     When an anonymous visitor presents the token

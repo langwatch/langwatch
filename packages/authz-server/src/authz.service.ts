@@ -38,6 +38,7 @@ import {
 } from "@langwatch/authz";
 import { createLogger } from "@langwatch/observability";
 import type { AuthzCollectorService } from "./authz-collector.service";
+import type { AuthzReadRepository } from "./authz-read.repository";
 
 const decisions = createLogger("langwatch:authz:decisions");
 
@@ -105,10 +106,9 @@ export class AuthzService {
     grants: CollectedGrants;
   }> {
     const organizationId = scopeOrganizationId(scope);
-    const [grants, resourceGrants, ownerGrants] = await Promise.all([
-      this.collectCached({ principal, organizationId }),
+    const [{ grants, ownerGrants }, resourceGrants] = await Promise.all([
+      this.collectWithCeiling({ principal, organizationId }),
       this.resourceGrantsFor(scope),
-      this.ownerGrantsFor({ principal, organizationId }),
     ]);
     const decision = this.engine.decideWithCeiling({
       keyGrants: grants,
@@ -142,10 +142,9 @@ export class AuthzService {
     scope: AuthzScopeRef;
   }): Promise<AuthzPermission[]> {
     const organizationId = scopeOrganizationId(scope);
-    const [grants, resourceGrants, ownerGrants] = await Promise.all([
-      this.collectCached({ principal, organizationId }),
+    const [{ grants, ownerGrants }, resourceGrants] = await Promise.all([
+      this.collectWithCeiling({ principal, organizationId }),
       this.resourceGrantsFor(scope),
-      this.ownerGrantsFor({ principal, organizationId }),
     ]);
     const demo = this.demoProjectId();
     return ALL_PERMISSIONS.filter(
@@ -192,12 +191,11 @@ export class AuthzService {
     if (!scope) return { allowed: false, organizationRole: null };
 
     const scopeOrg = scopeOrganizationId(scope);
-    const [grants, ownerGrants] = await Promise.all([
-      this.collectCached({ principal, organizationId: scopeOrg }),
-      ceiling
-        ? this.ownerGrantsFor({ principal, organizationId: scopeOrg })
-        : Promise.resolve(null),
-    ]);
+    const { grants, ownerGrants } = await this.collectWithCeiling({
+      principal,
+      organizationId: scopeOrg,
+      ceiling,
+    });
     const decision = this.engine.decideWithCeiling({
       keyGrants: grants,
       ownerGrants,
@@ -242,10 +240,10 @@ export class AuthzService {
     // decide — so this is a no-op for the user callers this has today and
     // closes the hole before an api-key caller reaches it.
     const scopeOrg = scopeOrganizationId(scope);
-    const [grants, ownerGrants] = await Promise.all([
-      this.collectCached({ principal, organizationId: scopeOrg }),
-      this.ownerGrantsFor({ principal, organizationId: scopeOrg }),
-    ]);
+    const { grants, ownerGrants } = await this.collectWithCeiling({
+      principal,
+      organizationId: scopeOrg,
+    });
     const demoProjectId = this.demoProjectId();
     const matched = permissions.find(
       (permission) =>
@@ -337,13 +335,13 @@ export class AuthzService {
     >;
     organizationRole: OrganizationRoleOrNull;
   }> {
-    // The api-key owner ceiling, read through the epoch cache as check()
-    // reads it — see `canAnyByIds`. Null for a user or service-key principal, and
-    // `decideWithCeiling` with a null ceiling is a plain decide.
-    const [grants, ownerGrants] = await Promise.all([
-      this.collectCached({ principal, organizationId }),
-      this.ownerGrantsFor({ principal, organizationId }),
-    ]);
+    // The api-key owner ceiling, collected with the key's grants as check()
+    // collects it — see `canAnyByIds`. Null for a user or service-key
+    // principal, and `decideWithCeiling` with a null ceiling is a plain decide.
+    const { grants, ownerGrants } = await this.collectWithCeiling({
+      principal,
+      organizationId,
+    });
     const demoProjectId = this.demoProjectId();
     const allowedAt = (
       permission: AuthzPermission,
@@ -441,9 +439,13 @@ export class AuthzService {
   private async ownerGrantsFor({
     principal,
     organizationId,
+    epoch,
+    reader,
   }: {
     principal: AuthzPrincipalRef;
     organizationId: string;
+    epoch: number | null;
+    reader?: AuthzReadRepository;
   }): Promise<CollectedGrants | null> {
     if (principal.type !== "apiKey") return null;
     const owner = await this.collector.findApiKeyOwner({
@@ -454,7 +456,44 @@ export class AuthzService {
       type: "user",
       id: owner.userId,
     };
-    return this.collectCached({ principal: ownerPrincipal, organizationId });
+    return this.collectAtEpoch({
+      principal: ownerPrincipal,
+      organizationId,
+      epoch,
+      reader,
+    });
+  }
+
+  /**
+   * A principal's grants and its §9 owner ceiling, as one pair. With an epoch
+   * both come off the cache under that one epoch; without one both come off
+   * ONE pass, so a cutover between the two collects cannot cap a key with an
+   * owner snapshot read from the other head (`beginPass` on the port).
+   */
+  private async collectWithCeiling({
+    principal,
+    organizationId,
+    ceiling = true,
+  }: {
+    principal: AuthzPrincipalRef;
+    organizationId: string;
+    ceiling?: boolean;
+  }): Promise<{
+    grants: CollectedGrants;
+    ownerGrants: CollectedGrants | null;
+  }> {
+    const epoch = await this.epochFor({ principal, organizationId });
+    const reader =
+      epoch === null && principal.type !== "anonymous"
+        ? this.collector.beginPass()
+        : undefined;
+    const [grants, ownerGrants] = await Promise.all([
+      this.collectAtEpoch({ principal, organizationId, epoch, reader }),
+      ceiling
+        ? this.ownerGrantsFor({ principal, organizationId, epoch, reader })
+        : Promise.resolve(null),
+    ]);
+    return { grants, ownerGrants };
   }
 
   private async resourceGrantsFor(
@@ -484,18 +523,49 @@ export class AuthzService {
     principal: AuthzPrincipalRef;
     organizationId: string;
   }): Promise<CollectedGrants> {
+    const epoch = await this.epochFor({ principal, organizationId });
+    return this.collectAtEpoch({ principal, organizationId, epoch });
+  }
+
+  /** The organization's grant epoch, or null when nothing may be cached: the
+   *  flag is off, the store is unreachable, or the caller is anonymous. */
+  private async epochFor({
+    principal,
+    organizationId,
+  }: {
+    principal: AuthzPrincipalRef;
+    organizationId: string;
+  }): Promise<number | null> {
     const { epochReader } = this.options;
     if (
       !this.cacheEnabled() ||
       !epochReader ||
       principal.type === "anonymous"
     ) {
-      return this.collector.collectGrants({ principal, organizationId });
+      return null;
     }
+    return epochReader({ organizationId });
+  }
 
-    const epoch = await epochReader({ organizationId });
-    if (epoch === null) {
-      return this.collector.collectGrants({ principal, organizationId });
+  /** A cached snapshot at `epoch`, or a fresh collect (on `reader`, when the
+   *  caller holds a pass) when there is no epoch to cache under. */
+  private async collectAtEpoch({
+    principal,
+    organizationId,
+    epoch,
+    reader,
+  }: {
+    principal: AuthzPrincipalRef;
+    organizationId: string;
+    epoch: number | null;
+    reader?: AuthzReadRepository;
+  }): Promise<CollectedGrants> {
+    if (epoch === null || principal.type === "anonymous") {
+      return this.collector.collectGrants({
+        principal,
+        organizationId,
+        reader,
+      });
     }
 
     const maxAgeMs = this.options.cacheMaxAgeMs ?? DEFAULT_CACHE_MAX_AGE_MS;
