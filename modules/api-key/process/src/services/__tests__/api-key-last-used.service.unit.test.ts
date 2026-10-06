@@ -2,6 +2,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  API_KEY_LAST_USED_MAX_HOLDS,
   API_KEY_LAST_USED_WINDOW_MS,
   ApiKeyLastUsedService,
 } from "../api-key-last-used.service.ts";
@@ -63,6 +64,48 @@ describe("ApiKeyLastUsedService.markUsed", () => {
       usage.markUsed({ id: "key-1" });
 
       expect(updateLastUsedAt.mock.calls).toEqual([[{ id: "key-1" }], [{ id: "key-2" }]]);
+    });
+  });
+
+  describe("given as many keys held as the ceiling allows", () => {
+    function full() {
+      const world = usageWith();
+      for (let key = 0; key < API_KEY_LAST_USED_MAX_HOLDS; key++) {
+        world.usage.markUsed({ id: `key-${key}` });
+      }
+      world.updateLastUsedAt.mockClear();
+      return world;
+    }
+
+    it("lets a new key in by dropping the oldest hold, and only that one", () => {
+      const { usage, updateLastUsedAt } = full();
+
+      usage.markUsed({ id: "key-new" });
+      usage.markUsed({ id: "key-1" });
+      usage.markUsed({ id: "key-0" });
+
+      expect(updateLastUsedAt.mock.calls).toEqual([[{ id: "key-new" }], [{ id: "key-0" }]]);
+    });
+
+    it("never walks the held keys, however hot one key runs", () => {
+      const { usage, advance } = full();
+      const walks = [
+        vi.spyOn(Map.prototype, Symbol.iterator),
+        vi.spyOn(Map.prototype, "forEach"),
+        vi.spyOn(Map.prototype, "values"),
+      ];
+      const peeks = [vi.spyOn(Map.prototype, "entries"), vi.spyOn(Map.prototype, "keys")];
+
+      for (let use = 0; use < 100; use++) {
+        usage.markUsed({ id: "key-hot" });
+        advance(100);
+      }
+      const walked = walks.map((spy) => spy.mock.calls.length);
+      const peeked = peeks.reduce((sum, spy) => sum + spy.mock.calls.length, 0);
+      for (const spy of [...walks, ...peeks]) spy.mockRestore();
+
+      expect(walked).toEqual([0, 0, 0]);
+      expect(peeked).toBeLessThanOrEqual(100 * 3);
     });
   });
 

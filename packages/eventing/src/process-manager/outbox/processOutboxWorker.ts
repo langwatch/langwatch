@@ -15,9 +15,8 @@ const DEFAULT_STUCK_DRAIN_TIMEOUT_MS = 300_000;
  */
 const MAX_ABANDONED_DRAINS = 5;
 
-/** A drain that leased nothing; a failed or unreported drain is never idle. */
-function leasedNothing(report: DispatchReport | undefined): boolean {
-  if (!report) return false;
+/** A drain that leased nothing. */
+function leasedNothing(report: DispatchReport): boolean {
   const { dispatched, retried, dead, released, fenced } = report;
   return [dispatched, retried, dead, released, fenced].every((keys) => keys.length === 0);
 }
@@ -33,7 +32,7 @@ export interface ProcessOutboxWorkerOptions {
   /** Process-manager name, used to label stuck-drain metrics and logs. */
   name?: string;
   intervalMs?: number;
-  /** Each poll that leases nothing doubles the interval up to this ceiling. */
+  /** Each poll that leases nothing or fails doubles the interval up to this ceiling. */
   maxIdleIntervalMs?: number;
   batchSize?: number;
   /** Stuck drain timeout; generous to avoid false positives that wedge processing. */
@@ -132,16 +131,22 @@ export class ProcessOutboxWorker {
     this.logger.info({}, "ProcessOutboxWorker stopped");
   }
 
-  /** One recovery poll: drain, then re-arm with the interval as it stands now. */
+  /** One recovery poll. The next is armed once its drain settles, so it carries that verdict. */
   private armPoll(delayMs: number): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => {
       this.timer = null;
       if (!this.started) return;
       this.triggerDrain();
-      this.armPoll(this.pollIntervalMs);
+      this.armPollAfterDrain();
     }, delayMs);
     this.timer.unref();
+  }
+
+  /** Re-arms a fired poll once nothing is draining, with the interval the last drain settled. */
+  private armPollAfterDrain(): void {
+    if (!this.started || this.timer !== null || this.inFlight !== null) return;
+    this.armPoll(this.pollIntervalMs);
   }
 
   /** Back to `intervalMs`, re-arming a poll that was armed with a longer idle delay. */
@@ -151,8 +156,9 @@ export class ProcessOutboxWorker {
     if (this.started) this.armPoll(this.intervalMs);
   }
 
+  /** A failed drain backs off like an idle one: resetting would hammer a database that is down. */
   private settleBackoff(report: DispatchReport | undefined): void {
-    if (leasedNothing(report)) {
+    if (!report || leasedNothing(report)) {
       this.pollIntervalMs = Math.min(this.pollIntervalMs * 2, this.maxIdleIntervalMs);
       return;
     }
@@ -218,6 +224,7 @@ export class ProcessOutboxWorker {
       this.drainRequested = false;
       this.triggerDrain();
     }
+    this.armPollAfterDrain();
   }
 
   private settleDrain({
@@ -245,6 +252,7 @@ export class ProcessOutboxWorker {
       this.drainRequested = false;
       this.triggerDrain();
     }
+    this.armPollAfterDrain();
   }
 
   private async runDrain(): Promise<DispatchReport | undefined> {

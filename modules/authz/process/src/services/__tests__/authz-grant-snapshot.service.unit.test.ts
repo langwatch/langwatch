@@ -15,18 +15,26 @@ type Options = {
 };
 
 function snapshotWith(options: Options = {}) {
-  const collected: { principalId: string; organizationId: string }[] = [];
+  const collected: { principalId: string; organizationId: string; pass?: number }[] = [];
   let nextEpoch = options.epoch === undefined ? 1 : options.epoch;
+  let passes = 0;
 
   const collector = {
+    beginPass: () => ({ pass: ++passes }),
     collectGrants: async ({
       principal,
       organizationId,
+      reader,
     }: {
       principal: { id: string };
       organizationId: string;
+      reader?: { pass: number };
     }) => {
-      collected.push({ principalId: principal.id, organizationId });
+      collected.push({
+        principalId: principal.id,
+        organizationId,
+        ...(reader ? { pass: reader.pass } : {}),
+      });
       return { marker: `${principal.id}@${organizationId}`, bindings: options.bindings ?? [] };
     },
     findApiKeyOwner: async () =>
@@ -196,42 +204,90 @@ describe("AuthzGrantSnapshotService.collectCached", () => {
   });
 });
 
-describe("AuthzGrantSnapshotService.findOwnerGrantsFor", () => {
+describe("AuthzGrantSnapshotService.collectWithOwnerCeiling", () => {
   describe("given a principal that is not an API key", () => {
-    it("has no owner to fall back to", async () => {
+    it("has no owner to cap it", async () => {
       const { service } = snapshotWith({});
 
-      await expect(
-        service.findOwnerGrantsFor({ principal: user, organizationId: "org-a" }),
-      ).resolves.toBeNull();
+      const { ownerGrants } = await service.collectWithOwnerCeiling({
+        principal: user,
+        organizationId: "org-a",
+      });
+
+      expect(ownerGrants).toBeNull();
     });
   });
 
   describe("given an API key with an owner", () => {
-    it("answers with the owner's grants, not the key's", async () => {
+    it("answers with the key's grants capped by the owner's", async () => {
       const { service, collected } = snapshotWith({});
 
-      const grants = await service.findOwnerGrantsFor({
+      const answer = await service.collectWithOwnerCeiling({
         principal: { type: "apiKey", id: "key-1" },
         organizationId: "org-a",
       });
 
-      expect(grants).toEqual({ marker: "user-1@org-a", bindings: [] });
-      expect(collected).toEqual([{ principalId: "user-1", organizationId: "org-a" }]);
+      expect(answer).toEqual({
+        grants: { marker: "key-1@org-a", bindings: [] },
+        ownerGrants: { marker: "user-1@org-a", bindings: [] },
+      });
+      expect(collected.map(({ principalId }) => principalId)).toEqual(["key-1", "user-1"]);
+    });
+
+    it("skips the owner when the caller asks for no ceiling", async () => {
+      const { service, collected } = snapshotWith({});
+
+      const { ownerGrants } = await service.collectWithOwnerCeiling({
+        principal: { type: "apiKey", id: "key-1" },
+        organizationId: "org-a",
+        ceiling: false,
+      });
+
+      expect(ownerGrants).toBeNull();
+      expect(collected.map(({ principalId }) => principalId)).toEqual(["key-1"]);
     });
   });
 
   describe("given an API key nobody owns", () => {
-    it("has nothing to fall back to, rather than collecting for a null user", async () => {
+    it("has nothing to cap it, rather than collecting for a null user", async () => {
       const { service, collected } = snapshotWith({ owner: { userId: null } });
 
-      await expect(
-        service.findOwnerGrantsFor({
-          principal: { type: "apiKey", id: "key-1" },
-          organizationId: "org-a",
-        }),
-      ).resolves.toBeNull();
-      expect(collected).toHaveLength(0);
+      const { ownerGrants } = await service.collectWithOwnerCeiling({
+        principal: { type: "apiKey", id: "key-1" },
+        organizationId: "org-a",
+      });
+
+      expect(ownerGrants).toBeNull();
+      expect(collected.map(({ principalId }) => principalId)).toEqual(["key-1"]);
+    });
+  });
+
+  describe.each([
+    ["the grants cache is off", { cacheEnabled: false }],
+    ["the change signal cannot be read", { epoch: null }],
+  ])("when %s", (_when, options: Options) => {
+    it("reads the key and its owner on one pass", async () => {
+      const { service, collected } = snapshotWith(options);
+
+      await service.collectWithOwnerCeiling({
+        principal: { type: "apiKey", id: "key-1" },
+        organizationId: "org-a",
+      });
+
+      expect(collected.map(({ pass }) => pass)).toEqual([1, 1]);
+    });
+  });
+
+  describe("when the cache serves", () => {
+    it("collects without opening a pass", async () => {
+      const { service, collected } = snapshotWith({});
+
+      await service.collectWithOwnerCeiling({
+        principal: { type: "apiKey", id: "key-1" },
+        organizationId: "org-a",
+      });
+
+      expect(collected.map(({ pass }) => pass)).toEqual([undefined, undefined]);
     });
   });
 });

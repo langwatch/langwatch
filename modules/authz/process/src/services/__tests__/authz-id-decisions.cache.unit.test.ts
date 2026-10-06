@@ -206,6 +206,98 @@ describe("AuthzService id-asked decisions under the epoch cache", () => {
   });
 });
 
+/**
+ * A routed reader mid-cutover: the first pass reads the head being cut over to (alice demoted),
+ * every later pass the stale head (alice still admin). The key is admin on both.
+ */
+function makeCutoverWorld() {
+  const headReader = (aliceRole: BindingRoleKey) =>
+    makeReader({
+      findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
+      findUserBindings: vi.fn().mockResolvedValue([projectBinding(aliceRole)]),
+      findApiKeyBindings: vi.fn().mockResolvedValue([projectBinding("admin")]),
+      findApiKeyOwner: vi.fn().mockResolvedValue({ userId: alice.id }),
+    });
+  const current = headReader("viewer");
+  const stale = headReader("admin");
+  let passes = 0;
+  const reader = makeReader({
+    findApiKeyOwner: vi.fn().mockResolvedValue({ userId: alice.id }),
+    findProjectLineage: vi.fn().mockResolvedValue({ teamId: TEAM, organizationId: ORG }),
+    findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
+    beginPass: vi.fn(() => (passes++ === 0 ? current : stale)),
+  });
+  const authz = AuthzService.create({
+    isOnEngine: async () => true,
+    repository: reader,
+    listing: new StubAuthzListingRepository(),
+    bindings: new StubAuthzManagedGrantRepository(),
+    epoch: new StubAuthzEpoch(),
+    lineageEpochs: new StubAuthzLineageEpoch(),
+    cacheEnabled: () => false,
+  });
+
+  return { authz };
+}
+
+describe("AuthzService api-key ceiling with the grants cache off", () => {
+  describe("when the key and its owner are read during a storage cutover", () => {
+    /** @scenario "A key and its owner are read from one storage head when nothing is held" */
+    it("caps checkByIds at the owner's role on the key's own head", async () => {
+      const { authz } = makeCutoverWorld();
+
+      const answer = await authz.checkByIds({
+        principal: aliceKey,
+        permission: "project:delete",
+        projectId: PROJECT,
+      });
+
+      expect(answer.allowed).toBe(false);
+    });
+
+    /** @scenario "A key and its owner are read from one storage head when nothing is held" */
+    it("caps canAnyByIds at the owner's role on the key's own head", async () => {
+      const { authz } = makeCutoverWorld();
+
+      const answer = await authz.canAnyByIds({
+        principal: aliceKey,
+        permissions: ["project:delete"],
+        projectId: PROJECT,
+      });
+
+      expect(answer.allowed).toBe(false);
+    });
+
+    /** @scenario "A key and its owner are read from one storage head when nothing is held" */
+    it("caps canBatchByIds at the owner's role on the key's own head", async () => {
+      const { authz } = makeCutoverWorld();
+
+      const answer = await authz.canBatchByIds({
+        principal: aliceKey,
+        permission: "project:delete",
+        organizationId: ORG,
+        teams: [],
+        projects: [{ projectId: PROJECT }],
+      });
+
+      expect(answer.projects.get(PROJECT)).toBe(false);
+    });
+
+    /** @scenario "A key and its owner are read from one storage head when nothing is held" */
+    it("caps check at the owner's role on the key's own head", async () => {
+      const { authz } = makeCutoverWorld();
+
+      const decision = await authz.check({
+        principal: aliceKey,
+        permission: "project:delete",
+        scope: { type: "project", id: PROJECT, teamId: TEAM, organizationId: ORG },
+      });
+
+      expect(decision.allowed).toBe(false);
+    });
+  });
+});
+
 describe("AuthzService scope lineage cache", () => {
   beforeEach(() => {
     vi.useFakeTimers();

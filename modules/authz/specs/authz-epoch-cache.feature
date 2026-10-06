@@ -66,6 +66,14 @@ Feature: The grants cache and its epoch
     And neither check answers from an older reading
 
   @unit
+  Scenario: A key and its owner are read from one storage head when nothing is held
+    Given the grants cache is off for "acme"
+    And alice owns an API key and has just been demoted on the storage head being cut over to
+    When the key is checked during the cutover
+    Then the key's grants and alice's are read from the same storage head
+    And the key is capped at her new role
+
+  @unit
   Scenario: A held answer is never served indefinitely
     Given alice's grants were read once and nothing in "acme" has changed
     When enough time passes
