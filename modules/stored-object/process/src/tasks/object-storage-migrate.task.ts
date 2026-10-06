@@ -306,20 +306,33 @@ export class ObjectStorageMigrateTask extends Task {
   readonly description =
     "Runs one phase (plan, copy, finalize, verify) of an S3 <-> Azure Blob migration.";
 
-  private constructor(private readonly migration: () => ObjectStorageMigrationService) {
+  private constructor(
+    private readonly migration: () => ObjectStorageMigrationService,
+    private readonly config: MigrationTaskConfig,
+    private readonly activeEnvironment: NodeJS.ProcessEnv,
+  ) {
     super();
   }
 
   static create({
     migration,
+    config,
+    activeEnvironment,
   }: {
     migration: () => ObjectStorageMigrationService;
+    config: MigrationTaskConfig;
+    activeEnvironment: NodeJS.ProcessEnv;
   }): ObjectStorageMigrateTask {
-    return new ObjectStorageMigrateTask(migration);
+    return new ObjectStorageMigrateTask(migration, config, activeEnvironment);
   }
 
   async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     const phase = parseMigrationTaskPhase(args[0]);
+    assertMigrationPhaseMatchesActiveProvider({
+      phase,
+      config: this.config,
+      activeEnvironment: this.activeEnvironment,
+    });
     await runMigrationPhase(this.migration(), phase);
   }
 }
