@@ -44,6 +44,8 @@ export async function runModuleTask({
   const server = await Server.create("langwatch-tasks")
     .withEnvironment(processEnvironment)
     .withConfig(processConfig(processModules))
+    // Ephemeral health door: API_PORT is the api's. specs/tasks/task-launcher.feature
+    .withHealthPort(0)
     .withSecrets((config, secrets) =>
       secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
     )
