@@ -6,8 +6,9 @@ test("experiment creation keeps the SDK workflow discoverable", async ({ page },
 
   await page.goto(`/${projectSlug}/evaluations`);
   const newExperiment = page.getByRole("button", { name: "New Experiment" }).first();
-  // The solid primary button: design-system token orange.solid, #ED8926.
-  await expect(newExperiment).toHaveCSS("background-color", "rgb(237, 137, 38)");
+  // The solid primary button renders orange.600 (#DD6B20), as every solid orange does on main:
+  // Langy's `_langyDark` orange.solid replaces the base #ED8926 when the themes merge.
+  await expect(newExperiment).toHaveCSS("background-color", "rgb(221, 107, 32)");
   await newExperiment.click();
   const sdkExperiment = page.getByRole("menuitem", {
     name: /New Experiment via SDK/,
