@@ -40,20 +40,44 @@ const CONVERTED_REPOSITORIES = [
 
 /**
  * Methods of a converted repository that still resolve the tenant's own
- * client by id and write their own predicate. Each entry is a read the
- * block has not reached yet; it is converted together with its callers and
- * leaves this list in the same change. A stale entry fails the gate, so the
- * list can only shrink.
+ * client by id and write their own predicate. Each entry names the block
+ * that converts it together with its callers; the entry leaves this list in
+ * the same change. A stale entry fails the gate, so the list can only shrink.
  */
-const NOT_YET_CONVERTED: Record<string, { methods: string[]; reason: string }> =
+const NOT_YET_CONVERTED: Array<{
+  file: string;
+  method: string;
+  reason: string;
+  owner: string;
+}> = [
   {
-    "server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository.ts":
-      {
-        methods: ["queryScheduledAtMs", "getByEvaluationId", "findByTraceId"],
-        reason:
-          "the per-evaluation and per-trace reads are converted with their callers (the trace page's evaluations tab and the evaluation worker); only the trace list's summary read is through the proof",
-      },
-  };
+    file: "server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository.ts",
+    method: "queryScheduledAtMs",
+    reason:
+      "the partition-window resolver behind getByEvaluationId reads by tenant id with it",
+    owner: "block F",
+  },
+  {
+    file: "server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository.ts",
+    method: "getByEvaluationId",
+    reason:
+      "the per-evaluation read serves the evaluation worker, which holds no route proof yet",
+    owner: "block F",
+  },
+  {
+    file: "server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository.ts",
+    method: "findByTraceId",
+    reason:
+      "the per-trace read serves the trace page's evaluations tab, converted with that route",
+    owner: "block F",
+  },
+];
+
+function notYetConvertedMethodsOf(file: string): string[] {
+  return NOT_YET_CONVERTED.filter((entry) => entry.file === file).map(
+    (entry) => entry.method,
+  );
+}
 
 /** A method that writes rows resolves the tenant's own client; that is its job. */
 const WRITE_METHOD = /^(?:insert|upsert|delete|backfill)/;
@@ -76,20 +100,35 @@ const TRACE_ROUTERS = [
   "server/api/routers/traceEditOverlay.ts",
 ];
 
-/** A call into, or a hand-over of, a service whose repository reads through the proof. */
+/**
+ * A call into, or a hand-over of, a service whose repository reads through
+ * the proof: the trace list, summary, spans and session groups services, and
+ * the evaluation runs service that owns the evaluation summaries.
+ */
 const CONVERTED_SERVICE_READ =
-  /\btraces\.(?:list|summary|spans|sessionGroups)\b/;
+  /\b(?:traces\.(?:list|summary|spans|sessionGroups)|evaluations\.runs)\b/;
 
 /**
- * Router chunks that reach a converted read and legitimately carry no proof.
- * Empty: every such chunk today either mints a proof with
- * `requireRouteAuthorization(ctx)` or receives one as a parameter.
+ * Router chunks that reach one of those services and carry no proof. Every
+ * other such chunk mints one with `requireRouteAuthorization(ctx)` or
+ * receives one as a parameter. An entry here names the block that converts
+ * it and leaves with it; the gate fails if the chunk gains a proof, so the
+ * list can only shrink.
  */
 const ROUTE_CHUNKS_WITHOUT_PROOF: Array<{
   file: string;
   chunk: string;
   reason: string;
-}> = [];
+  owner: string;
+}> = [
+  {
+    file: "server/api/routers/tracesV2.ts",
+    chunk: "procedure evals",
+    reason:
+      "calls evaluations.runs.findByTraceId by tenant id, the per-trace read NOT_YET_CONVERTED lists",
+    owner: "block F",
+  },
+];
 
 function read(relativeToSrc: string): string {
   return readFileSync(path.join(SRC, relativeToSrc), "utf8");
@@ -327,7 +366,7 @@ describe("store calls carry authorization", () => {
         return handWrittenTenantPredicatesIn({
           file,
           source,
-          skipMethods: NOT_YET_CONVERTED[file]?.methods,
+          skipMethods: notYetConvertedMethodsOf(file),
         });
       });
 
@@ -366,7 +405,7 @@ describe("store calls carry authorization", () => {
           methods.length,
           `${file} has no methods to scan`,
         ).toBeGreaterThan(0);
-        const allowed = NOT_YET_CONVERTED[file]?.methods ?? [];
+        const allowed = notYetConvertedMethodsOf(file);
         return [...source.matchAll(/\bresolveClient\(/g)].flatMap((match) => {
           const offset = match.index as number;
           const method = methodAt(methods, offset);
@@ -382,26 +421,23 @@ describe("store calls carry authorization", () => {
     });
 
     it("keeps the not-yet-converted list to methods that still read by tenant id", () => {
-      const stale = Object.entries(NOT_YET_CONVERTED).flatMap(
-        ([file, entry]) => {
-          const source = read(file);
-          const methods = methodsOf(source);
-          return entry.methods.flatMap((name) => {
-            const method = methods.find((candidate) => candidate.name === name);
-            if (!method)
-              return [`${file} has no method ${name}; remove it from the list`];
-            const body = source.slice(method.start, method.end);
-            const stillByTenantId =
-              /\bresolveClient\(/.test(body) &&
-              handWrittenTenantPredicatesIn({ file, source: body }).length > 0;
-            return stillByTenantId
-              ? []
-              : [
-                  `${file}#${name} reads through the proof now; remove it from the list`,
-                ];
-          });
-        },
-      );
+      const stale = NOT_YET_CONVERTED.flatMap(({ file, method: name }) => {
+        const source = read(file);
+        const method = methodsOf(source).find(
+          (candidate) => candidate.name === name,
+        );
+        if (!method)
+          return [`${file} has no method ${name}; remove it from the list`];
+        const body = source.slice(method.start, method.end);
+        const stillByTenantId =
+          /\bresolveClient\(/.test(body) &&
+          handWrittenTenantPredicatesIn({ file, source: body }).length > 0;
+        return stillByTenantId
+          ? []
+          : [
+              `${file}#${name} reads through the proof now; remove it from the list`,
+            ];
+      });
 
       expect(stale).toEqual([]);
     });
@@ -458,6 +494,26 @@ describe("store calls carry authorization", () => {
       });
 
       expect(missing).toEqual([]);
+    });
+
+    it("keeps the no-proof list to chunks that still read without one", () => {
+      const stale = ROUTE_CHUNKS_WITHOUT_PROOF.flatMap(
+        ({ file, chunk: name }) => {
+          const chunk = routeChunksOf(read(file)).find(
+            (candidate) => candidate.name === name,
+          );
+          if (!chunk)
+            return [`${file} has no ${name}; remove it from the list`];
+          const stillWithoutProof =
+            CONVERTED_SERVICE_READ.test(chunk.text) &&
+            !/\bauthorization\b/.test(chunk.text);
+          return stillWithoutProof
+            ? []
+            : [`${file} ${name} carries a proof now; remove it from the list`];
+        },
+      );
+
+      expect(stale).toEqual([]);
     });
   });
 });
