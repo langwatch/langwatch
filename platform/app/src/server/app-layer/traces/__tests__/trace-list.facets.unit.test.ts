@@ -72,7 +72,7 @@ function batchCarrying(
 }
 
 const compiled = (query: string) =>
-  translateFilterToClickHouse(query, TENANT, timeRange)!.sql;
+  translateFilterToClickHouse(query, timeRange)!.sql;
 
 describe("TraceListService.getFacets", () => {
   describe("given a query naming two facet fields", () => {

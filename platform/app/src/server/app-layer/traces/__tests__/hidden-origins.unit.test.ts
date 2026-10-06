@@ -97,7 +97,6 @@ describe("withHiddenOrigins", () => {
     it("keeps the filter whole and ANDs the exclusion after it", () => {
       const compiled = translateFilterToClickHouse(
         "status:error OR model:gpt-4o",
-        "project_test",
         timeRange,
       );
       expect(compiled).not.toBeNull();

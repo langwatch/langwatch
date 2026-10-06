@@ -38,7 +38,6 @@ describe("tracesHrefForKey", () => {
     const parsed = parseFragment(href.slice(href.indexOf("#")));
     const translated = translateFilterToClickHouse(
       parsed?.overrides.query ?? "",
-      "project_test",
       { from: 1714435200000, to: 1715040000000 },
     );
 
@@ -100,7 +99,6 @@ describe("tracesHrefForKey narrowed to one model", () => {
     describe("when the query language reads the two clauses back", () => {
       const translated = translateFilterToClickHouse(
         parsed?.overrides.query ?? "",
-        "project_test",
         { from: 1714435200000, to: 1715040000000 },
       );
 

@@ -11,11 +11,12 @@
  * Spec: specs/traces-v2/search.feature ("Facet counts").
  */
 import { describe, expect, it } from "vitest";
+import { tenantScope } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { scopeTraceFilterToTable } from "../trace-filter-scope";
 
 const FILTER = {
   sql: "Status = {p0:String}",
-  params: { tenantId: "project-1", timeFrom: 1, timeTo: 2, p0: "error" },
+  params: { timeFrom: 1, timeTo: 2, p0: "error" },
 };
 
 describe("scopeTraceFilterToTable", () => {
@@ -51,7 +52,7 @@ describe("scopeTraceFilterToTable", () => {
       });
       expect(sql).toContain("OccurredAt >= fromUnixTimestamp64Milli");
       expect(sql).not.toContain("OccurredAt <= fromUnixTimestamp64Milli");
-      expect(sql).toContain("TenantId = {tenantId:String}");
+      expect(sql).toContain(tenantScope("OccurredAt"));
     });
   });
 });

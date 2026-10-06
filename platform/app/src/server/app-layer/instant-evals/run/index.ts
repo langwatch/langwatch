@@ -169,8 +169,7 @@ async function selectExplorerTraceIds({
   return await getApp().traces.list.getTraceIds({
     tenantId: projectId,
     timeRange: window,
-    filterWhere:
-      translateFilterToClickHouse(filter, projectId, window) ?? undefined,
+    filterWhere: translateFilterToClickHouse(filter, window) ?? undefined,
     hiddenOrigins: explorerHiddenOrigins(filter),
     limit,
   });

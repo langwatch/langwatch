@@ -1,12 +1,13 @@
+import { tenantScope } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { FacetTable } from "./facet-registry";
 import type { FilterWhere } from "./hidden-origins";
 
 /**
- * The tenant and window predicate of `trace_summaries`, bound to the same
- * parameter names the filter compiler seeds (`tenantId`, `timeFrom`, `timeTo`).
+ * The tenant marker and window predicate of `trace_summaries`. The window is
+ * bound to the parameter names the filter compiler seeds (`timeFrom`,
+ * `timeTo`); the tenant is the authorized reader's to add (ADR-144 block C).
  */
-const TRACE_WINDOW_FROM =
-  "TenantId = {tenantId:String} AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})";
+const TRACE_WINDOW_FROM = `${tenantScope("OccurredAt")} AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})`;
 
 const TRACE_WINDOW_TO =
   " AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})";

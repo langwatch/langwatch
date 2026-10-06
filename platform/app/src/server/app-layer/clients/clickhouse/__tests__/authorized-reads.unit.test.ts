@@ -13,6 +13,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import {
   AuthorizedClickHouse,
+  expandFragment,
   expandStatement,
   fenceExpression,
   fenceFor,
@@ -252,6 +253,17 @@ describe("AuthorizedClickHouse", () => {
       });
     });
 
+    describe("when the marker names the evaluation table's own occurrence time", () => {
+      it("applies the window to ScheduledAt", () => {
+        const { query } = expand(
+          `SELECT 1 FROM evaluation_runs WHERE ${tenantScope("ScheduledAt")}`,
+        );
+        expect(query).toContain(
+          "ScheduledAt >= fromUnixTimestamp64Milli({tenantScope_s0_from:Int64})",
+        );
+      });
+    });
+
     describe("when the marker names a column the window cannot be applied to", () => {
       it("refuses it", () => {
         expect(() =>
@@ -271,6 +283,70 @@ describe("AuthorizedClickHouse", () => {
             tenantScope_own: ["x"],
           }),
         ).toThrow(StatementScopeError);
+      });
+    });
+  });
+
+  describe("given a compiled filter fragment a legacy statement has to embed", () => {
+    describe("when the fragment is expanded on its own", () => {
+      it("expands each marker into the fence and leaves the statement checks to the caller", () => {
+        const fence = fenceFor({ authorization: proof(), reads: "traces" });
+        const { sql, params } = expandFragment({
+          fragment: `Status = {p0:String} AND TraceId IN (SELECT TraceId FROM stored_spans WHERE ${tenantScope("StartTime")} AND x IN (SELECT x FROM evals WHERE ${tenantSet()}))`,
+          queryParams: { p0: "error" },
+          fence,
+        });
+        expect(sql).toContain("StartTime >= fromUnixTimestamp64Milli");
+        expect(sql).toContain(
+          "(TenantId IN ({tenantScope_all:Array(String)}))",
+        );
+        expect(sql).not.toContain("{{tenantScope");
+        expect(params).toMatchObject({
+          p0: "error",
+          tenantScope_own: [AGG],
+          tenantScope_all: [AGG, A, B],
+        });
+      });
+
+      it("refuses a fragment that names the tenant in a predicate of its own", () => {
+        const fence = fenceFor({ authorization: proof(), reads: "traces" });
+        expect(() =>
+          expandFragment({
+            fragment: "Status = {p0:String} AND TenantId = {t:String}",
+            queryParams: { p0: "error", t: A },
+            fence,
+          }),
+        ).toThrow(
+          expect.objectContaining({
+            violation: { kind: "hand-written-tenant-predicate" },
+          }),
+        );
+      });
+
+      it("refuses a fragment whose parameters use the reserved prefix", () => {
+        const fence = fenceFor({ authorization: proof(), reads: "traces" });
+        expect(() =>
+          expandFragment({
+            fragment: "Status = {p0:String}",
+            queryParams: { p0: "error", tenantScope_own: ["x"] },
+            fence,
+          }),
+        ).toThrow(
+          expect.objectContaining({
+            violation: { kind: "reserved-param", param: "tenantScope_own" },
+          }),
+        );
+      });
+
+      it("passes a fragment with no marker through unchanged", () => {
+        const fence = fenceFor({ authorization: proof(), reads: "traces" });
+        const { sql, params } = expandFragment({
+          fragment: "Status = {p0:String}",
+          queryParams: { p0: "error" },
+          fence,
+        });
+        expect(sql).toBe("Status = {p0:String}");
+        expect(params).toEqual({ p0: "error" });
       });
     });
   });

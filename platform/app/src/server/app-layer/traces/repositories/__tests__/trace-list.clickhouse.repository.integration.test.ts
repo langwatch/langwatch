@@ -664,11 +664,7 @@ describe("TraceListClickHouseRepository filtering across row versions", () => {
 
   /** The filter the sidebar compiles, so the test reads the production SQL. */
   const filterFor = (queryText: string) => {
-    const compiled = translateFilterToClickHouse(
-      queryText,
-      versionTenant,
-      timeRange,
-    );
+    const compiled = translateFilterToClickHouse(queryText, timeRange);
     if (!compiled) throw new Error(`"${queryText}" compiled to no filter`);
     return compiled;
   };
@@ -791,7 +787,7 @@ describe("TraceListClickHouseRepository with the explorer's hidden origins", () 
   })();
 
   const filterFor = (queryText: string) =>
-    translateFilterToClickHouse(queryText, langyTenant, timeRange) ?? undefined;
+    translateFilterToClickHouse(queryText, timeRange) ?? undefined;
 
   const listWith = (filterWhere: FilterWhere | undefined) =>
     repo.findAll({

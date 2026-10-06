@@ -73,19 +73,17 @@ const SPAN_SCOPED_TABLE = "stored_spans";
  */
 export function compileTraceFilter({
   filter,
-  tenantId,
   timeRange,
   dateField,
 }: {
   filter: string | undefined;
-  tenantId: string;
   timeRange: { from: number; to: number };
   dateField: "occurred" | "updated";
 }): { sql: string; params: Record<string, unknown> } | undefined {
   if (!filter || filter.trim().length === 0) return undefined;
   try {
     const compiled =
-      translateFilterToClickHouse(filter, tenantId, timeRange) ?? undefined;
+      translateFilterToClickHouse(filter, timeRange) ?? undefined;
     if (compiled) assertFilterFitsAxis({ compiled, dateField, filter });
     return compiled;
   } catch (error) {

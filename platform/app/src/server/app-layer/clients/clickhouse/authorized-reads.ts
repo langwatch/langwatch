@@ -43,11 +43,15 @@ export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set(
 
 /**
  * The time columns a marker may name. The window on a shared grant is
- * applied to this column, so it must be the table's own occurrence time.
+ * applied to this column, so it must be the table's own occurrence time:
+ * `OccurredAt` on `trace_summaries`, `StartTime` on `stored_spans`,
+ * `ScheduledAt` on `evaluation_runs` (each is that table's partition key in
+ * migration 00002), `Timestamp` on the log tables.
  */
 export const TENANT_SCOPE_TIME_COLUMNS = [
   "OccurredAt",
   "StartTime",
+  "ScheduledAt",
   "Timestamp",
 ] as const;
 export type TenantScopeTimeColumn = (typeof TENANT_SCOPE_TIME_COLUMNS)[number];
@@ -285,9 +289,61 @@ export function expandStatement({
   if (HAND_WRITTEN_TENANT_PREDICATE.test(bare)) {
     throw new StatementScopeError({ kind: "hand-written-tenant-predicate" });
   }
+  const expanded = replaceMarkers({ text: query, queryParams, fence });
+  if (expanded.windowed === 0) {
+    throw new StatementScopeError({ kind: "missing-marker" });
+  }
+  return { query: expanded.text, queryParams: expanded.queryParams };
+}
+
+/**
+ * Expand the markers of a WHERE fragment on its own.
+ *
+ * The bridge for a statement a legacy raw client still assembles by hand: the
+ * compiled trace filter carries markers, and the one caller allowed to embed
+ * it in such a statement, `app/api/traces/[[...route]]/trace-filter.ts`, has
+ * to expand them into the proof's fence first. A repository reads through
+ * `as()` and never needs this; a new caller is a gap in the fence, not a use.
+ *
+ * The fragment-level checks still apply: a hand-written tenant predicate and
+ * a reserved parameter are refused. Only the whole-statement check, that a
+ * windowed marker is present, is relaxed, since the statement around the
+ * fragment supplies the window and names its own tenant.
+ */
+export function expandFragment({
+  fragment,
+  queryParams,
+  fence,
+}: {
+  fragment: string;
+  queryParams: Record<string, unknown>;
+  fence: TenantFence;
+}): { sql: string; params: Record<string, unknown> } {
+  for (const param of Object.keys(queryParams)) {
+    if (param.startsWith(TENANT_SCOPE_PARAM_PREFIX)) {
+      throw new StatementScopeError({ kind: "reserved-param", param });
+    }
+  }
+  const bare = fragment.replace(MARKER, " ").replace(SET_MARKER, " ");
+  if (HAND_WRITTEN_TENANT_PREDICATE.test(bare)) {
+    throw new StatementScopeError({ kind: "hand-written-tenant-predicate" });
+  }
+  const expanded = replaceMarkers({ text: fragment, queryParams, fence });
+  return { sql: expanded.text, params: expanded.queryParams };
+}
+
+function replaceMarkers({
+  text,
+  queryParams,
+  fence,
+}: {
+  text: string;
+  queryParams: Record<string, unknown>;
+  fence: TenantFence;
+}): { text: string; queryParams: Record<string, unknown>; windowed: number } {
   let merged: Record<string, unknown> = { ...queryParams };
   let windowed = 0;
-  const expanded = query
+  const replaced = text
     .replace(MARKER, (_match, column: string) => {
       if (!isTimeColumn(column)) {
         throw new StatementScopeError({ kind: "unknown-time-column", column });
@@ -302,8 +358,7 @@ export function expandStatement({
       merged = { ...merged, ...expression.params };
       return expression.sql;
     });
-  if (windowed === 0) throw new StatementScopeError({ kind: "missing-marker" });
-  return { query: expanded, queryParams: merged };
+  return { text: replaced, queryParams: merged, windowed };
 }
 
 function isTimeColumn(column: string): column is TenantScopeTimeColumn {

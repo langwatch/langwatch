@@ -624,7 +624,6 @@ export class TraceListService {
   async getFacets(params: FacetParams): Promise<FacetsResult> {
     const compiler = createFacetFilterCompiler({
       queryText: params.query ?? "",
-      tenantId: params.tenantId,
       timeRange: params.timeRange,
       ...(params.evalRuns ? { evalRuns: params.evalRuns } : {}),
     });
@@ -1192,7 +1191,6 @@ export class TraceListService {
       });
     } else {
       const query = def.queryBuilder({
-        tenantId: params.tenantId,
         timeRange: params.timeRange,
         limit: params.limit,
         offset: params.offset,
@@ -1264,7 +1262,6 @@ export class TraceListService {
       });
     } else {
       const query = def.queryBuilder({
-        tenantId: params.tenantId,
         timeRange: params.timeRange,
         limit,
         offset: 0,
@@ -1330,7 +1327,6 @@ export class TraceListService {
     limit: number,
   ): Promise<DynamicKeysFacetDescriptor> {
     const query = def.queryBuilder({
-      tenantId: params.tenantId,
       timeRange: params.timeRange,
       limit,
       offset: 0,

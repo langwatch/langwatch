@@ -1392,8 +1392,7 @@ export function initializeDefaultApp(options?: {
                 pageSize: limit,
                 visibilityCutoffMs: null,
                 filterWhere:
-                  translateFilterToClickHouse(query, projectId, { from, to }) ??
-                  undefined,
+                  translateFilterToClickHouse(query, { from, to }) ?? undefined,
               });
               const projectUrl = `${config.baseHost ?? env.BASE_HOST}/${projectSlug}`;
               return page.items.map((item) =>

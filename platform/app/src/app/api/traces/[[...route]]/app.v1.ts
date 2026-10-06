@@ -377,7 +377,6 @@ export function registerTracesRoutes(
       const filterWhere = withHiddenOrigins(
         compileTraceFilter({
           filter,
-          tenantId: project.id,
           timeRange: { from: startDate, to: endDate },
           dateField,
         }),

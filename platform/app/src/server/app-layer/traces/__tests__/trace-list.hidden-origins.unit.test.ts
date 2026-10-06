@@ -16,11 +16,7 @@ import { TraceListService } from "../trace-list.service";
 const timeRange = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
 const filterWhere = { sql: "ContainsErrorStatus = 1", params: {} };
 const FACET_QUERY = "status:error";
-const facetFilterSql = translateFilterToClickHouse(
-  FACET_QUERY,
-  "tenant-1",
-  timeRange,
-)!.sql;
+const facetFilterSql = translateFilterToClickHouse(FACET_QUERY, timeRange)!.sql;
 
 function fakeRepository() {
   return {

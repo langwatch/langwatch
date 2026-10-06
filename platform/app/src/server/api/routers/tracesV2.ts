@@ -201,7 +201,6 @@ async function buildFilterWhere(input: {
   return (
     translateFilterWithEvalRuns({
       queryText: input.query ?? "",
-      tenantId: input.projectId,
       timeRange: input.timeRange,
       ...(evalRuns ? { evalRuns } : {}),
     }) ?? undefined
