@@ -4,23 +4,45 @@ import { LISTING_FAILED_REASON } from "@langwatch/enterprise-governance-contract
 import { createLogger, type Logger } from "@langwatch/observability";
 import { type Instant, nowInstant } from "@langwatch/time";
 
-import type {
-  IngestionPullListingOutcome,
-  IngestionPullListingOutcomeChannel,
-} from "../app/governance.members.ts";
 import type { IngestionSourceRepository } from "../repositories/ingestion-source.repository.ts";
 import type { AgentDiscoveryService } from "./agent-discovery.service.ts";
 import { INGESTION_PULL_MAX_ATTEMPTS } from "./ingestion-pull.service.ts";
 import type { PersonListingService } from "./person-listing.service.ts";
 
-/** One on-demand listing, as the process manager's `listAgents`/`listPeople` intent carries it. */
-export type IngestionPullListingRequest = {
+/** Where one listing's outcome lands: the ingestion-pull pipeline's own record commands. */
+export type IngestionPullListingOutcome = {
+  tenantId: string;
+  occurredAt: number;
   sourceId: string;
   requestId: string;
   requestedAt: number;
 };
 
-export type IngestionPullListingExecution = {
+export type IngestionPullListingRefusal = IngestionPullListingOutcome & {
+  reason: string;
+  status: number | null;
+};
+
+export interface IngestionPullListingOutcomeChannel {
+  agentsListed(input: IngestionPullListingOutcome & { agentCount: number }): Promise<void>;
+  agentsListingRefused(input: IngestionPullListingRefusal): Promise<void>;
+  peopleListed(
+    input: IngestionPullListingOutcome & {
+      directoryPersonCount: number;
+      withheldPersonCount: number;
+    },
+  ): Promise<void>;
+  peopleListingRefused(input: IngestionPullListingRefusal): Promise<void>;
+}
+
+/** One on-demand listing, as the process manager's `listAgents`/`listPeople` intent carries it. */
+type IngestionPullListingRequest = {
+  sourceId: string;
+  requestId: string;
+  requestedAt: number;
+};
+
+type IngestionPullListingExecution = {
   tenantId: string;
   attempt: number;
   listing: IngestionPullListingRequest;

@@ -28,6 +28,7 @@ import type {
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
+import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { appendDefaultRowLimit } from "../rules/langwatch-ql-row-limit.rules.ts";
 import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
 import type { LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
@@ -38,7 +39,6 @@ import {
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
-import { DEFAULT_LWQL_RESULT_LIMITS } from "./langwatch-ql-executor.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import {
   type LangWatchQLGranularityResolution,
@@ -57,13 +57,11 @@ const lwqlValidationErrors = LangWatchQLValidationErrorService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
 
-export type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
-
 /**
  * A statement that passed the gate, plus what the surface's time window means
  * for it.
  */
-export interface ValidatedLangWatchQL extends AcceptedLangWatchQL {
+interface ValidatedLangWatchQL extends AcceptedLangWatchQL {
   /** Whether the statement declares the reserved time-window parameters. */
   readonly followsTimeWindow: boolean;
   /**

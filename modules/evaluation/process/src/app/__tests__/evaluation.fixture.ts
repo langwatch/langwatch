@@ -13,7 +13,6 @@ import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import { withMemoryRepositories } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -254,13 +253,11 @@ export function createEvaluationTestApp(
   });
 }
 
-const memoryEvaluation = withMemoryRepositories(evaluationProcessModule);
-
 /** `createApp` composes no secrets chain: the install gets a scope answering every handle unset. */
-export const installableEvaluation: typeof memoryEvaluation = {
-  ...memoryEvaluation,
+export const installableEvaluation: typeof evaluationProcessModule = {
+  ...evaluationProcessModule,
   install: (args) =>
-    memoryEvaluation.install({
+    evaluationProcessModule.install({
       ...args,
       secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     }),

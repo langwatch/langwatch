@@ -16,28 +16,50 @@ import (
 // with gzip's magic bytes, as posthog-js's batches do) and posthog-js's
 // form-encoded base64 `data=` field (by content type, ?compression=base64 or the
 // body's own prefix). Anything else is taken as JSON.
-func decodeBody(body []byte, contentEncoding, compression, contentType string) ([]byte, error) {
-	if strings.EqualFold(strings.TrimSpace(contentEncoding), "gzip") || compression == "gzip-js" || bytes.HasPrefix(body, []byte{0x1f, 0x8b}) {
-		reader, err := gzip.NewReader(bytes.NewReader(body))
-		if err != nil {
-			return nil, fmt.Errorf("the body is not gzip: %w", err)
-		}
-		if body, err = io.ReadAll(reader); err != nil {
-			return nil, fmt.Errorf("the body is not gzip: %w", err)
-		}
+func decodeBody(body []byte, enc bodyEncoding) ([]byte, error) {
+	body, err := gunzipBody(body, enc)
+	if err != nil {
+		return nil, err
 	}
-	if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") || compression == "base64" || bytes.HasPrefix(body, []byte("data=")) {
-		form, err := url.ParseQuery(string(body))
-		if err != nil {
-			return nil, fmt.Errorf("the form body does not parse: %w", err)
-		}
-		data := form.Get("data")
-		if decoded, err := base64.StdEncoding.DecodeString(data); err == nil {
-			return decoded, nil
-		}
-		return []byte(data), nil
+	if !isFormBody(body, enc) {
+		return body, nil
+	}
+	form, err := url.ParseQuery(string(body))
+	if err != nil {
+		return nil, fmt.Errorf("the form body does not parse: %w", err)
+	}
+	data := form.Get("data")
+	if decoded, err := base64.StdEncoding.DecodeString(data); err == nil {
+		return decoded, nil
+	}
+	return []byte(data), nil
+}
+
+// bodyEncoding is how a capture request says its body is encoded: the
+// Content-Encoding and Content-Type headers and the ?compression parameter.
+type bodyEncoding struct {
+	contentEncoding, compression, contentType string
+}
+
+// gunzipBody inflates a gzip body, by header, parameter or magic bytes.
+func gunzipBody(body []byte, enc bodyEncoding) ([]byte, error) {
+	isGzip := strings.EqualFold(strings.TrimSpace(enc.contentEncoding), "gzip") || enc.compression == "gzip-js" || bytes.HasPrefix(body, []byte{0x1f, 0x8b})
+	if !isGzip {
+		return body, nil
+	}
+	reader, err := gzip.NewReader(bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("the body is not gzip: %w", err)
+	}
+	if body, err = io.ReadAll(reader); err != nil {
+		return nil, fmt.Errorf("the body is not gzip: %w", err)
 	}
 	return body, nil
+}
+
+// isFormBody reports whether the body is posthog-js's form-encoded `data=` field.
+func isFormBody(body []byte, enc bodyEncoding) bool {
+	return strings.HasPrefix(enc.contentType, "application/x-www-form-urlencoded") || enc.compression == "base64" || bytes.HasPrefix(body, []byte("data="))
 }
 
 // postHogMessage is one captured message as either client sends it: posthog-node
@@ -95,31 +117,46 @@ func postHogRecord(m postHogMessage, raw json.RawMessage) Record {
 	r := Record{Provider: ProviderPostHog, DistinctID: id, Raw: raw}
 	switch m.Event {
 	case "$identify", "$set":
-		r.Kind = KindIdentify
-		r.Properties = map[string]any{}
-		for _, set := range []any{props["$set"], m.Set} {
-			if traits, ok := set.(map[string]any); ok {
-				for k, v := range traits {
-					r.Properties[k] = v
-				}
-			}
-		}
+		r.Kind, r.Properties = KindIdentify, postHogTraits(props["$set"], m.Set)
 	case "$create_alias":
 		r.Kind, r.Properties = KindAlias, map[string]any{"alias": props["alias"]}
 	case "$groupidentify":
 		r.Kind = KindGroup
 		r.Name, _ = props["$group_type"].(string)
-		r.Properties, _ = props["$group_set"].(map[string]any)
-		if key, ok := props["$group_key"]; ok {
-			if r.Properties == nil {
-				r.Properties = map[string]any{}
-			}
-			r.Properties["$group_key"] = key
-		}
+		r.Properties = postHogGroupProperties(props)
 	default:
 		r.Kind, r.Name, r.Properties = KindEvent, m.Event, props
 	}
 	return r
+}
+
+// postHogTraits merges an identify's traits, from properties.$set and the
+// top-level $set, in that order.
+func postHogTraits(sets ...any) map[string]any {
+	traits := map[string]any{}
+	for _, set := range sets {
+		if values, ok := set.(map[string]any); ok {
+			for k, v := range values {
+				traits[k] = v
+			}
+		}
+	}
+	return traits
+}
+
+// postHogGroupProperties is a group identify's $group_set, with $group_key
+// added when the message carries one.
+func postHogGroupProperties(props map[string]any) map[string]any {
+	properties, _ := props["$group_set"].(map[string]any)
+	key, ok := props["$group_key"]
+	if !ok {
+		return properties
+	}
+	if properties == nil {
+		properties = map[string]any{}
+	}
+	properties["$group_key"] = key
+	return properties
 }
 
 // cdpCall is one Customer.io CDP (Segment-shaped) call: identify, track, group,

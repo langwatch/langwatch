@@ -10,6 +10,7 @@ import {
   declaredScopeIdSchema,
   type AuthzDeclaredScopeId,
   type AuthzPermission,
+  type PlatformTierPermission,
   type ScopeTierField,
 } from "@langwatch/authorization";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
@@ -51,8 +52,10 @@ import {
   decideEntitlement,
   declareAccessMiddleware,
   SCOPE_INPUT_FIELDS,
+  assertNotPlatformPermission,
+  permissionsTogether,
+  platformPermissionOf,
   refuseImpersonatedMint,
-  sharedGrantTiers,
   type AccessDeclaration,
   type AccessDenial,
   type ApiEntitlement,
@@ -61,12 +64,19 @@ import {
   type EntitlementGate,
   type EntitlementOptions,
   type Entitlements,
+  type PlatformPermissionTarget,
   type PublicRouteAccess,
 } from "../access/access.ts";
 import type { AuthzDeclaration, EnforcedScopeFields } from "../access/declared-middleware.ts";
+import {
+  assertInputPermission,
+  type ExactInputPermission,
+  type InputPermission,
+} from "../access/input-permission.ts";
 import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
 import {
+  auditScopeId,
   auditScopeIds,
   callerTraceContext,
   deriveAuditTarget,
@@ -353,11 +363,23 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   entitlement?: EntitlementGate;
   /** Present exactly when the procedure mints a credential: the permission its refusal names. */
   mintsCredential?: AuthzPermission;
+  /** Present exactly when the procedure's audit row names a target its input does not. */
+  audit?: TrpcAuditTarget;
   /** What the procedure asks the process for; the mount binds each one. */
   facts: readonly TrpcFact[];
   handle(args: never, ...facts: never[]): unknown;
   app(ctx: TContext): unknown;
 }>;
+
+/**
+ * The scope a mutation's audit row is recorded against when its input names a narrower one:
+ * `{ target: "organization", via: "projectId" }` records the organization holding the project
+ * (Alex, 2026-10-05, E10). The host resolves it; the handler writes nothing.
+ */
+export type TrpcAuditTarget = Readonly<{ target: "organization"; via: "projectId" | "teamId" }>;
+
+/** The tier each audited input field names, as the host is asked about it. */
+const AUDITED_TIER = { projectId: "project", teamId: "team" } as const;
 
 /**
  * What a procedure declares instead of a permission. `publicRoute` is REST's
@@ -451,8 +473,35 @@ export interface TrpcRouterAccess<
   mintsCredential(
     permission: AuthzPermission,
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  /**
+   * The mutation's audit row names the organization holding the scope its `via` input field
+   * names, as its organization and its target. Refused on a query, twice, for a field the input
+   * does not carry, and on a procedure that runs with no caller.
+   */
+  withAudit(target: TrpcAuditTarget): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
+  /**
+   * The permission the parsed input chooses (`permissionBy`): its map names every value the
+   * field holds. A bare entry is asked at `via`'s scope, an entry with a tier at its own field.
+   */
+  withPermission<const Choice extends InputPermission>(
+    choice: Choice & ExactInputPermission<z.output<Contract["members"][Name]["input"]>, Choice>,
+    options?: { via: ScopeTierField },
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
   withPermission(
     access: AuthzPermission | AuthzDeclaration,
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  /** One permission, asked at the scope the named input field holds. */
+  withPermission(
+    permission: AuthzPermission,
+    options: { via: ScopeTierField },
+  ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
+  /**
+   * A platform-tier permission, asked of the operator's PLATFORM grant before the handler (E4);
+   * `hidden` answers NOT_FOUND to every caller it refuses, an anonymous one included.
+   */
+  withPermission<P extends PlatformTierPermission>(
+    permission: P,
+    options: PlatformPermissionTarget,
   ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
   /**
    * Every one of them, asked before the handler at the one scope the input
@@ -505,6 +554,7 @@ type Implementation = Readonly<{
   access: TrpcAccess;
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
+  audit?: TrpcAuditTarget;
   facts: readonly TrpcFact[];
   handle(args: never, ...facts: never[]): unknown;
 }>;
@@ -536,6 +586,7 @@ function mountRouter<Api, Contract extends TrpcContract>(
         ...(implementation.mintsCredential
           ? { mintsCredential: implementation.mintsCredential }
           : {}),
+        ...(implementation.audit ? { audit: implementation.audit } : {}),
         facts: implementation.facts,
         handle: implementation.handle,
         app,
@@ -549,12 +600,17 @@ function mountRouter<Api, Contract extends TrpcContract>(
   };
 }
 
-type PermissionArgument = AuthzPermission | AuthzDeclaration | readonly AuthzPermission[];
+type PermissionArgument =
+  | AuthzPermission
+  | AuthzDeclaration
+  | InputPermission
+  | readonly AuthzPermission[];
 
 /** What a selected procedure has declared beside its facts, before its access. */
 type ProcedureMarks = Readonly<{
   entitlement?: EntitlementGate;
   mintsCredential?: AuthzPermission;
+  audit?: TrpcAuditTarget;
 }>;
 
 type EntitlementQuestion = {
@@ -623,14 +679,36 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
       },
       mintsCredential: (permission: AuthzPermission) =>
         selected(name, facts, { ...marks, mintsCredential: permission }),
-      withPermission: (access: PermissionArgument, options?: { via: ScopeTierField }) =>
-        implement(permissionDeclarationOf({ contract, name, access, via: options?.via })),
+      withAudit: (target: TrpcAuditTarget) => {
+        assertAuditTarget({ contract, name, target, declared: marks.audit });
+
+        return selected(name, facts, {
+          ...marks,
+          audit: { target: target.target, via: target.via },
+        });
+      },
+      withPermission: (
+        access: PermissionArgument,
+        options?: { via: ScopeTierField } | PlatformPermissionTarget,
+      ) =>
+        implement(
+          options && "at" in options
+            ? platformDeclarationOf({ contract, name, access, target: options })
+            : permissionDeclarationOf({ contract, name, access, via: options?.via }),
+        ),
       withAccess: (access: PublicRouteAccess) => {
         assertNoTenantQuestion({ contract, name, entitlement });
 
         if (marks.mintsCredential) {
           throw new Error(
             `tRPC ${contract.namespace}.${name} mints a credential, so it cannot run with no caller`,
+          );
+        }
+
+        if (marks.audit) {
+          throw new Error(
+            `tRPC ${contract.namespace}.${name} declares an audit target, and a procedure with ` +
+              "no caller writes no audit row",
           );
         }
 
@@ -695,10 +773,36 @@ function permissionDeclarationOf({
   access: PermissionArgument;
   via?: ScopeTierField;
 }): AccessDeclaration {
-  if (typeof access === "string") return { kind: "permission", permission: access };
+  if (typeof access === "string") {
+    assertNotPlatformPermission({
+      address: `tRPC ${contract.namespace}.${name}`,
+      permissions: [access],
+    });
+
+    return via === undefined
+      ? { kind: "permission", permission: access }
+      : { kind: "permission", permission: access, via };
+  }
 
   if (isPermissionList(access)) {
     return permissionAllOf({ contract, name, permissions: access, via });
+  }
+
+  if (access.kind === "permission-by-input") {
+    const input = contract.members[name]?.input;
+
+    assertInputPermission({
+      address: `tRPC ${contract.namespace}.${name}`,
+      declared: access,
+      schemas: input ? [input] : [],
+    });
+
+    return {
+      kind: "permission-by-input",
+      field: access.field,
+      map: access.map,
+      ...(via ? { via } : {}),
+    };
   }
 
   if (access.kind === "custom") {
@@ -725,6 +829,27 @@ function permissionDeclarationOf({
   return access;
 }
 
+/** One platform-tier permission at the platform (E4); anything else is refused where written. */
+function platformDeclarationOf({
+  contract,
+  name,
+  access,
+  target,
+}: {
+  contract: TrpcContract;
+  name: string;
+  access: PermissionArgument;
+  target: PlatformPermissionTarget;
+}): AccessDeclaration {
+  const address = `tRPC ${contract.namespace}.${name}`;
+
+  if (typeof access !== "string") {
+    throw new Error(`${address} asks one permission at the platform, and only one`);
+  }
+
+  return platformPermissionOf({ address, permission: access, target });
+}
+
 /**
  * Every one of them, at one scope. A set that names fewer than two, repeats
  * one, or shares no tier it could all be asked at is refused where it is
@@ -741,29 +866,44 @@ function permissionAllOf({
   permissions: readonly AuthzPermission[];
   via?: ScopeTierField;
 }): AccessDeclaration {
+  const together = permissionsTogether({
+    address: `tRPC ${contract.namespace}.${name}`,
+    permissions,
+  });
+
+  return { kind: "permission-all", permissions: together, ...(via ? { via } : {}) };
+}
+
+/**
+ * One audit target per mutation, over a field its input carries: a query writes no row, and a
+ * field the parser drops would name no scope to resolve.
+ */
+function assertAuditTarget({
+  contract,
+  name,
+  target,
+  declared,
+}: {
+  contract: TrpcContract;
+  name: string;
+  target: TrpcAuditTarget;
+  declared: TrpcAuditTarget | undefined;
+}): void {
   const address = `tRPC ${contract.namespace}.${name}`;
+  const member = contract.members[name];
 
-  if (permissions.length < 2) {
-    throw new Error(`${address} names ${permissions.length} permissions to check together`);
+  if (declared) throw new Error(`${address} already declares the target its audit row names`);
+
+  if (member?.kind !== "mutation") {
+    throw new Error(`${address} is not a mutation, so it writes no audit row to name a target on`);
   }
 
-  if (new Set(permissions).size !== permissions.length) {
-    throw new Error(`${address} names one permission twice among the ones it checks together`);
+  const input = member.input;
+  const shape = input instanceof z.ZodObject ? Object.keys(input.shape) : [];
+
+  if (!(target.via in AUDITED_TIER) || !shape.includes(target.via)) {
+    throw new Error(`${address} audits via "${target.via}", a field its input does not carry`);
   }
-
-  if (sharedGrantTiers(permissions).length === 0) {
-    throw new Error(
-      `${address} checks ${permissions.join(" and ")} together, and no one scope grants them all`,
-    );
-  }
-
-  const [first, second, ...rest] = permissions as [
-    AuthzPermission,
-    AuthzPermission,
-    ...AuthzPermission[],
-  ];
-
-  return { kind: "permission-all", permissions: [first, second, ...rest], ...(via ? { via } : {}) };
 }
 
 /**
@@ -852,6 +992,9 @@ export interface TrpcRuntimeContext {
   readonly res?: { statusCode?: number } | undefined;
 }
 
+/** The scope a declared audit target is resolved from. */
+export type TrpcAuditedScope = Readonly<{ tier: "project" | "team"; id: string }>;
+
 /** One audit row, as the path describes it. */
 export type TrpcRuntimeAuditEntry = Readonly<{
   userId: string;
@@ -888,6 +1031,8 @@ export type TrpcRuntimeMembers<TContext> = Readonly<{
     redact(input: { procedure: string; args: unknown }): unknown;
     /** The process decides which procedures it does not record. */
     exempt(procedure: string): boolean;
+    /** The organization holding a scope, for a declared target; absent, one is refused at mount. */
+    organizationOf?(scope: TrpcAuditedScope): Promise<string | null>;
   }>;
   errors: Readonly<{
     report(failure: unknown): void;
@@ -981,7 +1126,10 @@ export function createTrpcRuntime<
     // the door resolved, and BEFORE the trail, so a refused call writes no
     // audit row.
     const built = (throttle ? checked.use(throttle) : checked).use(
-      auditTrail(members, { anonymous }),
+      auditTrail(members, {
+        anonymous,
+        ...(request.audit ? { target: auditTargetPort({ members, request }) } : {}),
+      }),
     );
 
     const handle = guardOutput({
@@ -1647,10 +1795,67 @@ function trpcCodeOf(error: HandledError): TRPCError["code"] {
   return TRPC_CODE_BY_STATUS[error.httpStatus] ?? "INTERNAL_SERVER_ERROR";
 }
 
+/** A declared audit target, with the port that resolves it; a runtime with none refuses it. */
+type ResolvableAuditTarget = Readonly<{
+  declared: TrpcAuditTarget;
+  organizationOf(scope: TrpcAuditedScope): Promise<string | null>;
+}>;
+
+function auditTargetPort<TContext extends object>({
+  members,
+  request,
+}: {
+  members: TrpcRuntimeMembers<TContext>;
+  request: TrpcProcedureRequest<TContext>;
+}): ResolvableAuditTarget {
+  const declared = request.audit;
+  const organizationOf = members.audit.organizationOf;
+
+  if (!declared || !organizationOf) {
+    throw new Error(
+      `tRPC ${request.procedure} records its audit row against the organization holding its ` +
+        `${declared?.via ?? "input"}, and this runtime supplied no port to ask which one`,
+    );
+  }
+
+  return { declared, organizationOf: (scope) => organizationOf(scope) };
+}
+
+/** The organization a declared target names for this input; none when the field is empty. */
+async function declaredOrganization({
+  target,
+  input,
+}: {
+  target: ResolvableAuditTarget;
+  input: unknown;
+}): Promise<string | undefined> {
+  const { via } = target.declared;
+  const id = auditScopeId(input, via);
+
+  if (id === undefined) return undefined;
+
+  return (await target.organizationOf({ tier: AUDITED_TIER[via], id })) ?? undefined;
+}
+
+/** The resource a row is about: the declared organization, else what the answer named. */
+function rowTarget({
+  organization,
+  path,
+  result,
+}: {
+  organization: string | undefined;
+  path: string;
+  result: MiddlewareResult<object>;
+}): { targetKind?: string; targetId?: string } {
+  if (organization) return { targetKind: "organization", targetId: organization };
+
+  return result.ok ? deriveAuditTarget(path, result.data) : {};
+}
+
 /** Writes the audit row for a mutation, with the arguments the owner redacted. */
 function auditTrail<TContext extends TrpcRuntimeContext & object>(
   members: TrpcRuntimeMembers<TContext>,
-  { anonymous }: { anonymous: boolean },
+  { anonymous, target: declared }: { anonymous: boolean; target?: ResolvableAuditTarget },
 ) {
   return async ({
     ctx,
@@ -1675,15 +1880,19 @@ function auditTrail<TContext extends TrpcRuntimeContext & object>(
 
     if (type !== "mutation" || !actor || members.audit.exempt(path)) return next();
 
+    // Asked before the handler runs, so a handler that removes the scope cannot hide its owner.
+    const organization = declared
+      ? await declaredOrganization({ target: declared, input: input ?? (await getRawInput()) })
+      : undefined;
     const result = await next();
     const audited = input ?? (await getRawInput());
-    const target = result.ok ? deriveAuditTarget(path, result.data) : {};
+    const target = rowTarget({ organization, path, result });
     const scopeIds = auditScopeIds(audited);
     const impersonatorId = impersonatorOf(actor);
 
     await members.audit.record({
       userId: actor.id,
-      organizationId: scopeIds.organizationId,
+      organizationId: organization ?? scopeIds.organizationId,
       projectId: scopeIds.projectId,
       action: path,
       args: members.audit.redact({ procedure: path, args: audited }),

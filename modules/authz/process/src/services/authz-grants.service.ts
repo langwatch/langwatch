@@ -99,7 +99,7 @@ type AuthzOffboardRequest = Omit<AuthzOffboardInput, "actor"> & {
   actor: { userId: string } | Actor;
 };
 
-export type GrantableScope = GrantableAuthzScopeRef;
+type GrantableScope = GrantableAuthzScopeRef;
 
 const SCOPE_TYPE_FOR_REF = {
   project: "PROJECT",

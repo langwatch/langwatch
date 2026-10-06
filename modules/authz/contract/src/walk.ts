@@ -1,3 +1,5 @@
+import type { AuthzDenialReason } from "@langwatch/authorization";
+
 import type {
   AuthzDecision,
   AuthzPrincipalRef,
@@ -147,14 +149,20 @@ export function findResourceGrantStep({
   };
 }
 
+/** The seat is the reason when it is one: a Lite Member or a Developer (ADR-171) asks
+ *  for a different seat, not for a binding. */
 function unreachedDenialReason({
-  liteMember,
+  organizationRole,
   hadAnyPath,
 }: {
-  liteMember: boolean;
+  organizationRole: CollectedGrants["organizationRole"];
   hadAnyPath: boolean;
-}): "lite-member-restricted" | "no-binding" | "no-membership" {
-  if (liteMember) return "lite-member-restricted";
+}): Extract<
+  AuthzDenialReason,
+  "lite-member-restricted" | "developer-restricted" | "no-binding" | "no-membership"
+> {
+  if (organizationRole === "EXTERNAL") return "lite-member-restricted";
+  if (organizationRole === "DEVELOPER") return "developer-restricted";
   return hadAnyPath ? "no-binding" : "no-membership";
 }
 
@@ -174,7 +182,7 @@ export function denyStep({ grants, chainBindings, base }: DecideContext): AuthzD
     ...base,
     allowed: false,
     denialReason: unreachedDenialReason({
-      liteMember: grants.organizationRole === "EXTERNAL",
+      organizationRole: grants.organizationRole,
       hadAnyPath,
     }),
   };

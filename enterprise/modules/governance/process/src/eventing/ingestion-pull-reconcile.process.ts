@@ -12,13 +12,13 @@ export const ingestionPullReconcileStateSchema = z.object({
   /** Epoch ms of the last reconciliation this process asked for. */
   lastReconciledAt: z.number().nullable(),
 });
-export type IngestionPullReconcileState = z.infer<typeof ingestionPullReconcileStateSchema>;
+type IngestionPullReconcileState = z.infer<typeof ingestionPullReconcileStateSchema>;
 
 export const INGESTION_PULL_RECONCILE_INITIAL_STATE: IngestionPullReconcileState = {
   lastReconciledAt: null,
 };
 
-export type IngestionPullReconcileIntents = {
+type IngestionPullReconcileIntents = {
   reconcile: IntentSpec<typeof ingestionPullReconcileSchema>;
 };
 

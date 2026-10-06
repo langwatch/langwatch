@@ -9,9 +9,11 @@ import {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import type { GatewayScopePermissions } from "../app/gateway.members.ts";
 import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository.ts";
-import { isMemberNotFound } from "../rules/gateway-organization-peer.rules.ts";
+import {
+  isMemberNotFound,
+  seatSharesOrganizationKeys,
+} from "../rules/gateway-organization-peer.rules.ts";
 import type { VirtualKeyService } from "./virtual-key.service.ts";
 
 /**
@@ -54,7 +56,7 @@ export type ActorContext = {
 };
 
 /** A key's scopes as given (or read from the stored key when absent) and its trace destination. */
-export type GuardrailProjectKey = {
+type GuardrailProjectKey = {
   organizationId: string;
   vkId: string | null;
   inputScopes: { scopeType: string; scopeId: string }[] | undefined;
@@ -368,7 +370,7 @@ export class VirtualKeyAuthorizationService {
         : [];
 
     return {
-      isOrgMember: organizationRole !== null,
+      isOrgMember: organizationRole !== null && seatSharesOrganizationKeys(organizationRole.role),
       isOrgAdmin: organizationRole?.role === "ADMIN",
       teamIds,
       projectIds: new Set(projectIds),
@@ -606,4 +608,31 @@ export class VirtualKeyAuthorizationService {
 
     return vk;
   }
+}
+
+/** The scope a virtual key is reachable from, as the key's own rows spell it. */
+export type GatewayPermissionScope =
+  | { type: "org"; id: string }
+  | { type: "team"; id: string }
+  | { type: "project"; id: string; teamId: string };
+
+/**
+ * The one authorization seam the virtual-key write paths decide on. Two
+ * questions, not one, because a scoped API key resolves through its own
+ * ceiling (`effective = key ∩ user`) rather than the session's full cascade.
+ */
+export interface GatewayScopePermissions {
+  sessionHolds(input: {
+    userId: string;
+    permission: AuthzPermission;
+    scope: GatewayPermissionScope;
+  }): Promise<boolean>;
+
+  apiKeyHolds(input: {
+    apiKeyId: string;
+    userId: string | null;
+    organizationId: string;
+    permission: AuthzPermission;
+    scope: GatewayPermissionScope;
+  }): Promise<boolean>;
 }

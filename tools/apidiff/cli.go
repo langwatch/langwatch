@@ -213,11 +213,7 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	defer parity.cleanup()
 	phaseDone(out.stderr, "prepare (worktrees and install)", prepared)
 	if probe.parityOnly {
-		if err := parity.finish(); err != nil {
-			fmt.Fprintln(out.stderr, "parity:", err)
-			return exitError
-		}
-		return parity.verdict(probe, out)
+		return parity.finishParityOnly(probe, out)
 	}
 	probe.parity = parity
 
@@ -249,6 +245,23 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	}
 	defer closeFindings()
 
+	probe.adoptBooted(booted, boot, out.stderr)
+	probe.onOperationDone = findingsHook(findings, boot.BranchDir, out.stderr)
+	return probePipeline(ctx, probe, out)
+}
+
+// finishParityOnly ends a -parity-only run: the inventories, then the verdict.
+func (phase *parityPhase) finishParityOnly(probe *probeFlags, out streams) int {
+	if err := phase.finish(); err != nil {
+		fmt.Fprintln(out.stderr, "parity:", err)
+		return exitError
+	}
+	return phase.verdict(probe, out)
+}
+
+// adoptBooted points the probe at the stacks run mode booted, with the
+// credentials and directories that boot provisioned.
+func (probe *probeFlags) adoptBooted(booted *Booted, boot BootConfig, stderr io.Writer) {
 	probe.a = booted.A.URL
 	probe.b = booted.B.URL
 	probe.runDir = booted.WorkRoot
@@ -259,13 +272,11 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 		// SQL, and the haven path runs none of it (only the entitled pass's
 		// licence copy). Both sides are missing the same fixtures, so those operations
 		// still compare like against like - unauthorized against unauthorized.
-		fmt.Fprintln(out.stderr, "haven path: SCIM and permission-probe fixtures are not provisioned; those operations compare unauthorized on both sides")
+		fmt.Fprintln(stderr, "haven path: SCIM and permission-probe fixtures are not provisioned; those operations compare unauthorized on both sides")
 	}
 	probe.applyRunDefaults()
-	probe.onOperationDone = findingsHook(findings, boot.BranchDir, out.stderr)
 	probe.repoRoot = boot.BranchDir
 	probe.packetDir = filepath.Join(booted.WorkRoot, "probe")
-	return probePipeline(ctx, probe, out)
 }
 
 // applyRunDefaults fills the probe credentials `run` mode itself provisioned:
@@ -414,7 +425,19 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 
 	selected := SelectOperations(operations, probe.filter())
 	fmt.Fprintf(out.stderr, "probing %d operations (lockstep, %d modules at once)\n", len(selected), max(probe.concurrency, 1))
-	result := ProbeAll(ctx, ProbeOptions{
+	result := ProbeAll(ctx, probe.probeOptions(client, specs, out.stderr), operations)
+
+	verdict := runVerdict{report: BuildReport(changes, result), probe: probe}
+	verdict.ledger = BuildScopedLedger(operations, verdict.report, probe.ledgerOptions(baseline))
+	if code := emitReport(verdict, out); code != exitEqual {
+		return code
+	}
+	return max(verdict.exitCode(out), probe.runScenarioAfterMainPass(ctx, out))
+}
+
+// probeOptions are the probe flags as ProbeAll takes them.
+func (probe *probeFlags) probeOptions(client *http.Client, specs *fetchedSpecs, progress io.Writer) ProbeOptions {
+	return ProbeOptions{
 		A:                   probe.a,
 		B:                   probe.b,
 		Keys:                probe.keys,
@@ -424,20 +447,13 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 		ExcludePrefixes:     probe.excludePrefixes,
 		ExactStatus:         probe.exactStatus,
 		Client:              client,
-		Progress:            out.stderr,
+		Progress:            progress,
 		SettleTimeout:       probe.settleTimeout,
 		OnOperationDone:     probe.onOperationDone,
 		ActivateEntitlement: probe.activateEntitlement,
 		ModuleOf:            probe.moduleOf(),
 		Concurrency:         probe.concurrency,
-	}, operations)
-
-	verdict := runVerdict{report: BuildReport(changes, result), probe: probe}
-	verdict.ledger = BuildScopedLedger(operations, verdict.report, probe.ledgerOptions(baseline))
-	if code := emitReport(verdict, out); code != exitEqual {
-		return code
 	}
-	return max(verdict.exitCode(out), probe.runScenarioAfterMainPass(ctx, out))
 }
 
 // runVerdict is one completed comparison: what was found, how it groups, and

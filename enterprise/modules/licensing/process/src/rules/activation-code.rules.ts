@@ -38,11 +38,6 @@ export function normaliseActivationCode(code: string): string | null {
   return input.form === "activation_code" ? input.code : null;
 }
 
-/** Whether a presented value could be a code at all. */
-export function isActivationCodeShape(code: string): boolean {
-  return normaliseActivationCode(code) !== null;
-}
-
 /** What the registry stores and looks a code up by, over the normalised code. */
 export function activationCodeHash(normalisedCode: string): string {
   return createHash("sha256").update(normalisedCode).digest("hex");

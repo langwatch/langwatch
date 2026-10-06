@@ -11,7 +11,7 @@ import {
   type ResolvePlanInput,
 } from "@langwatch/entitlement-contract";
 
-export type EntitlementServiceOptions = {
+type EntitlementServiceOptions = {
   baseline: Plan | BaselinePlanSource;
   license?: EntitlementSource;
   subscription?: EntitlementSource;

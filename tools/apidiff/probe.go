@@ -12,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // bodyCaptureCap bounds each side's captured response body in a transcript.
@@ -165,7 +167,7 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 	defer engine.fixtureTraceSettled()
 
 	mainStart := time.Now()
-	stopTicker := startTicker(options.Progress, "probe", len(selected), engine.probeSnapshot)
+	stopTicker := diffkit.Ticker{Out: options.Progress, Label: "probe", Total: len(selected), Snapshot: engine.probeSnapshot}.Start()
 	findings, probed, collectionsVerified := engine.mainPass(selected)
 	stopTicker()
 	engine.phaseDone("probe main pass", mainStart)
@@ -835,6 +837,11 @@ func operationCases(operation Operation) []probeCase {
 	case http.MethodPost, http.MethodPut, http.MethodPatch:
 		if operation.BodySchema == nil {
 			return []probeCase{{name: "mutation"}}
+		}
+		if len(operation.BodySchema) == 0 {
+			// An empty schema accepts any JSON, so a validation case asks nothing
+			// the mutation does not; the body carries its media type all the same.
+			return []probeCase{{name: "mutation", body: map[string]any{}}}
 		}
 		return []probeCase{
 			{name: "validation", body: ValidationBody(operation.BodySchema)},

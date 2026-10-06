@@ -2,7 +2,7 @@ import type { TransportPeers } from "@langwatch/api";
 import { ModuleApiToken, type ResolvedTokens, SupplyToken } from "@langwatch/module";
 import { type StoresMemberSource } from "@langwatch/process-stores";
 
-import { ApplicationBuilder, type BootedRuntime, type RuntimeService } from "./application.ts";
+import { ApplicationBuilder, type BootedRuntime } from "./application.ts";
 import type {
   InstallableServerFeature,
   ModuleSecretsScope,
@@ -22,6 +22,7 @@ import type {
   SupplyModule,
   ValidateSupply,
 } from "./process-supply.types.ts";
+import type { RuntimeService } from "./runtime-lifecycle.ts";
 import type { FeatureTransportHosts } from "./transport-mounting.ts";
 
 type SupplyRecord = Readonly<Record<string, unknown>>;
@@ -87,7 +88,9 @@ type StoreSuppliedNames =
   | "eventing"
   | "rateLimiter"
   | "cache"
-  | "idempotency";
+  | "idempotency"
+  | "clickhouseAdmin"
+  | "databaseTarget";
 
 declare const supplyState: unique symbol;
 declare const missingSupply: unique symbol;
@@ -328,10 +331,6 @@ export class ProcessSupply<
     return this.#withMembers({ keyvalue });
   }
 
-  withBlobs<Value extends MemberValueFrom<RequiredMemberSet, "blobs">>(blobs: Value) {
-    return this.#withMembers({ blobs });
-  }
-
   withEventing<Value extends MemberValueFrom<RequiredMemberSet, "eventing">>(eventing: Value) {
     return this.#withMembers({ eventing });
   }
@@ -372,38 +371,6 @@ export class ProcessSupply<
     >({
       ...this.#state,
       stores,
-    });
-  }
-
-  withMember<
-    const Name extends keyof RequiredMemberSet & string,
-    Value extends MemberValueFrom<RequiredMemberSet, Name>,
-  >(name: Name, value: Value) {
-    return new ProcessSupply<
-      Modules,
-      Merge<Members, Readonly<Record<Name, Value>>>,
-      Config,
-      Peers,
-      MissingFrom<
-        RequiredMemberSet,
-        RequiredConfigSet,
-        RequiredPeerSet,
-        InstalledPeerSet,
-        InstalledPeerSetInAnyBranch,
-        Merge<Members, Readonly<Record<Name, Value>>>,
-        Config,
-        Peers
-      >,
-      Rest,
-      Trpc,
-      RequiredMemberSet,
-      RequiredConfigSet,
-      RequiredPeerSet,
-      InstalledPeerSet,
-      InstalledPeerSetInAnyBranch
-    >({
-      ...this.#state,
-      members: { ...this.#state.members, [name]: value },
     });
   }
 

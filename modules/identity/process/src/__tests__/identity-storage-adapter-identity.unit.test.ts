@@ -9,6 +9,8 @@ import {
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
+import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
 import {
   type IdentityStack,
   identityStack,
@@ -167,6 +169,47 @@ describe("better-auth over the identity storage adapter", () => {
 
         // ADR-101's payload rule: nothing a command carried is a secret.
         expect(JSON.stringify(stack.commands)).not.toContain(credential?.secrets.password);
+      });
+    });
+
+    describe("when the sign-up's own credential is later backfilled", () => {
+      /** @scenario "A sign-up states its identifier against the credential it just opened" */
+      it("states one identifier against that credential, which the backfill plan derives again", async () => {
+        await signUp(stack.auth, EMAIL);
+        const [identifier] = statedIdentifiers(stack);
+        const [attach] = stack.commands;
+        const attachedAtMs = (attach!.data as { occurredAtMs: number }).occurredAtMs;
+        const accountId = identifier?.accountId as string;
+
+        expect(stack.commands).toHaveLength(1);
+        expect(statedIdentifiers(stack)).toHaveLength(1);
+        expect(stack.storage.credentials.size).toBe(1);
+        expect([...stack.storage.credentials.keys()]).toEqual([accountId]);
+
+        const planned = IdentityBackfillPlanService.create(
+          CryptoIdentifierIdentityService.create(),
+        ).planIdentifiers({
+          user: {
+            id: userIdOf(stack),
+            email: EMAIL,
+            emailVerified: true,
+            createdAtMs: attachedAtMs,
+            userHashKey: null,
+          },
+          accounts: [
+            {
+              id: accountId,
+              provider: "credential",
+              issuer: CREDENTIAL_ISSUER,
+              providerAccountId: userIdOf(stack),
+              createdAtMs: attachedAtMs,
+            },
+          ],
+        });
+
+        expect(planned.find((plan) => plan.accountId === accountId)?.identifierId).toBe(
+          identifier?.identifierId,
+        );
       });
     });
 
@@ -1237,12 +1280,14 @@ describe("the atomic passkey-delete adapter boundary", () => {
     expect(remove).toHaveBeenCalledWith({ passkeyId: "passkey-1" });
   });
 
+  /** @scenario "The passkey removal route refuses the last way in the same way" */
   it("surfaces the serialization loser in better-auth's last-way-in vocabulary", async () => {
     const stack = identityStack({
       passkeyRemoval: {
         deleteIfAnotherWayInRemains: async () => "would_strand_user",
       },
     });
+    stack.db.passkey?.push({ id: "passkey-last", userId: "user-1" });
     const context = await stack.auth.$context;
 
     await expect(
@@ -1251,6 +1296,7 @@ describe("the atomic passkey-delete adapter boundary", () => {
         where: [{ field: "id", value: "passkey-last" }],
       }),
     ).rejects.toMatchObject({ body: { code: "LAST_WAY_IN" } });
+    expect(stack.db.passkey?.map((row) => row.id)).toEqual(["passkey-last"]);
   });
 
   it("fails closed when a single passkey delete is not one exact id equality", async () => {

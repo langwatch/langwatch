@@ -19,19 +19,18 @@ explicitly.
 
 ## Remaining migration seams
 
-- The execution port (`server/src/ports/suite-execution.port.ts`) is now
-  implemented package-side by `SuiteExecutionService`
-  (`server/src/services/suite-execution.service.ts`), which resolves run-only
-  parameters and dispatches the existing simulation and Suite-run commands.
-  `apps/api/src/features/scenario/scenario.composition.ts` only
-  injects its collaborators (the command queue, the run-id generator, and run-
-  model resolution). The Suite service and its run repository remain
-  package-owned.
+- Suite execution is `SuiteExecutionService`
+  (`process/src/services/suite-execution.service.ts`), which resolves run-only
+  parameters and dispatches the existing simulation and Suite-run commands. Its
+  collaborators arrive as repositories, channels and peer tokens the container
+  builds (ARCHITECTURE.md §5); no file under `apps/` composes it. The Suite
+  service and its run repository remain module-owned.
 - `@langwatch/suite-browser` routes nothing: its declaration (`suite.web.ts`)
   only declares the `suite:run-history` slice, and `apps/ui` installs it via
   `browser-modules.generated.ts`. Scenario's browser module renders the
   Suite-run pickers, dialogs and run history, reading that slice.
-- The REST `/api/suites` family (`createSuiteRestApp`, mounted from
-  `apps/api/src/app-rest/app-rest.packaged-families.ts`) and the tRPC suite
-  router both consume the process-owned `app.suites`; neither transport
-  constructs a service per request.
+- The REST families (`process/src/transport/test-suites.rest.ts`,
+  `suites-alias.rest.ts`, `run-plans.rest.ts`) and the tRPC routers
+  (`suite.trpc.ts`, `test-suite.trpc.ts`) are declarations the process mounts
+  (ARCHITECTURE.md §8); each handler calls one `*Api` operation, and no
+  transport constructs a service per request.

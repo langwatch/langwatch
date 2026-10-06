@@ -4,7 +4,11 @@
  * Drawer -> Dialog on this branch; the wire name did not change.
  */
 
-import { analyticsLwqlTrpc, analyticsTrpc } from "@langwatch/analytics-contract";
+import {
+  FilterSidebarToken,
+  analyticsLwqlTrpc,
+  analyticsTrpc,
+} from "@langwatch/analytics-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 import { savedViewTrpc } from "@langwatch/dashboard-contract";
 import { createElement } from "react";
@@ -87,17 +91,11 @@ export const analyticsWeb = defineBrowserModule("analytics")
       }),
     },
   })
-  /** The trace filter sidebar, lent to the evaluator's sample picker (§3.4 rule 7). */
   .withCapabilities({
     /** A custom graph over the project's traces, lent to modules that chart it (§3.4 rule 7). */
     customGraph: {
       load: async () => ({
         default: (await import("./ui/sections/custom-graph.tsx")).CustomGraph,
-      }),
-    },
-    filterSidebar: {
-      load: async () => ({
-        default: (await import("./ui/sections/filter-sidebar.tsx")).FilterSidebar,
       }),
     },
     /** The saved-dashboards list, lent to navigation's sidebar on dashboards pages. */
@@ -107,4 +105,10 @@ export const analyticsWeb = defineBrowserModule("analytics")
           .SavedDashboardsSection,
       }),
     },
+  })
+  /** The trace filter sidebar, lent to the evaluator's sample picker (§3.4 rule 7). */
+  .lends(FilterSidebarToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/filter-sidebar.tsx")).FilterSidebar,
+    }),
   });

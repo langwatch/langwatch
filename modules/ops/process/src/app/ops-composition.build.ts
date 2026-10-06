@@ -77,7 +77,10 @@ import { ReplayRetentionService } from "../services/replay-retention.service.ts"
 import { ReplayService } from "../services/replay.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import type { StorageStatsInstance } from "../services/storage-stats-collection.service.ts";
-import { buildSystemMigrations } from "./ops-system-migrations-composition.build.ts";
+import {
+  SystemMigrationPassService,
+  type SystemMigrationPassRepositories,
+} from "../services/system-migration-pass.service.ts";
 import type {
   OpsExplorers,
   QueuePayloadDecoder,
@@ -95,15 +98,8 @@ export type OpsProcessMembers = Readonly<{
   prisma: ProcessMembers["prisma"];
   redis: RedisConnection;
   clickhouse: ClickHouseQueryClient;
-  eventing: EventSourcing;
-  logger: Logger;
-  /** The process's own fact (§6), for the EXPLAIN fail-closed rule. */
-  nodeEnvironment: string | undefined;
-  /** The process's own facts the checkup and the usage report name. */
-  isSaas: boolean;
-  serviceVersion: string;
-  publicBaseUrl: string | undefined;
-  processName: string;
+  /** Cross-pipeline inspection and replay read the registered definitions, nothing more. */
+  eventing: Pick<EventSourcing, "definitions">;
 }>;
 
 /**
@@ -190,13 +186,15 @@ export function sharedStorageStatsInstance(
 /** Builds the {@link OpsAppInfrastructure} `OpsModule.create` composes over. */
 export function buildOpsInfrastructure(input: {
   members: OpsProcessMembers;
+  logger: Logger;
   config: OpsServerConfig;
   resources: ResourceOwnership;
   processStore: ProcessStore;
+  repositories: SystemMigrationPassRepositories;
   rateTracker: AnomalyRateTrackerRepository;
   cloudOps: boolean;
 }): OpsAppInfrastructure {
-  const { members, config, resources } = input;
+  const { members, logger, config, resources } = input;
   const introspection = EventingIntrospectionService.create(() => members.eventing.definitions);
 
   const snapshots = DefaultOpsSnapshotService.create(
@@ -205,7 +203,7 @@ export function buildOpsInfrastructure(input: {
   // Polling starts here rather than on first read: the dashboard, the badge and
   // the live stream all read the last artifact this process pulled.
   snapshots.start().catch((error: unknown) => {
-    members.logger.error({ error }, "failed to start the ops snapshot reader");
+    logger.error({ error }, "failed to start the ops snapshot reader");
   });
   resources.own("api ops snapshot reader", () => snapshots.stop());
 
@@ -223,7 +221,7 @@ export function buildOpsInfrastructure(input: {
     name: "ops queue-metrics writer",
     start: () => {
       queueMetricsWriter.start().catch((error: unknown) => {
-        members.logger.error({ error }, "failed to start the ops queue-metrics writer");
+        logger.error({ error }, "failed to start the ops queue-metrics writer");
       });
     },
     stop: () => queueMetricsWriter.stop(),
@@ -293,10 +291,9 @@ export function buildOpsInfrastructure(input: {
     },
     grafana: { findLinkConfig: () => null },
     createSystemMigrations: ({ dependencies, passRequests }) =>
-      buildSystemMigrations({
-        database: members.prisma,
-        redis: members.redis,
-        isSaaS: () => members.isSaas,
+      SystemMigrationPassService.runner({
+        repositories: input.repositories,
+        isSaaS: () => config.isSaas,
         routes: () => members.clickhouse.privateRoutes(),
         dependencies,
         passRequests,
@@ -313,10 +310,10 @@ export function buildOpsInfrastructure(input: {
       const { key, host } = config.productAnalytics;
       return key ? [{ key, ...(host ? { host } : {}) }] : [];
     },
-    isProduction: members.nodeEnvironment === "production",
+    isProduction: config.nodeEnvironment === "production",
     cloudOps: input.cloudOps,
     // Cloud never bootstraps: staff are seeded at cutover with the recovery task.
-    operatorSeed: { adminEmails: config.adminEmails, cloud: members.isSaas || input.cloudOps },
+    operatorSeed: { adminEmails: config.adminEmails, cloud: config.isSaas || input.cloudOps },
   };
 }
 

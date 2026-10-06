@@ -21,7 +21,7 @@ type TargetKind = "issuedLicense" | "activationCode";
 type Staff = Readonly<{ operatorId: string }>;
 
 /** The registry operations an operator reaches, as licensing serves them. */
-export type LicenseRegistry = Pick<
+type LicenseRegistry = Pick<
   LicensingApi,
   | "listIssuedLicenses"
   | "getIssuedLicense"

@@ -11,6 +11,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ProjectStorageSettingsRepository } from "../../repositories/project-storage-settings.repository.ts";
+import type { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import {
   ProjectOperationsService,
   type ProjectOperationsDirectory,
@@ -125,18 +127,32 @@ function characterizationProject(traceSharingEnabled: boolean): ProjectWithTeam 
   };
 }
 
+const MEMBER = { id: "user_1" };
+
+type PresenceSettingChange = Parameters<ProjectCreatedNoticeService["presenceSettingChanged"]>[0];
+
 function characterizationOperations(options: {
   projects: Partial<ProjectOperationsDirectory>;
+  storageSettings?: ProjectStorageSettingsRepository["update"];
   revokeAllTraceShares: ShareApi["revokeAllTraceShares"];
+  presenceChanges?: PresenceSettingChange[];
 }): ProjectOperationsService {
   return ProjectOperationsService.create({
     projects: new CharacterizationProjectDirectory(options.projects),
+    storageSettings: {
+      update: options.storageSettings ?? (async ({ settings }) => settings),
+    },
     share: new CharacterizationShareApi(options.revokeAllTraceShares),
     topics: refusingTopics(),
     auditLog: createApiFixture<AuditLogApi>({
       record: async () => ({ id: "audit", occurredAt: 0 }),
     }),
-    lifecycle: { legacyKeyRevoked: async () => undefined },
+    lifecycle: {
+      legacyKeyRevoked: async () => undefined,
+      presenceSettingChanged: async (change) => {
+        options.presenceChanges?.push(change);
+      },
+    },
     logger: { error: () => undefined },
     now: () => 0,
   });
@@ -153,7 +169,10 @@ describe("ProjectOperationsService", () => {
         revokeAllTraceShares,
       });
 
-      await operations.updateSettings({ projectId: "project_123", traceSharingEnabled: false });
+      await operations.updateSettings(
+        { projectId: "project_123", traceSharingEnabled: false },
+        MEMBER,
+      );
 
       expect(update).toHaveBeenCalledWith(
         expect.objectContaining({ id: "project_123", organizationId: "org-1" }),
@@ -173,7 +192,10 @@ describe("ProjectOperationsService", () => {
         revokeAllTraceShares,
       });
 
-      await operations.updateSettings({ projectId: "project_123", traceSharingEnabled: false });
+      await operations.updateSettings(
+        { projectId: "project_123", traceSharingEnabled: false },
+        MEMBER,
+      );
 
       expect(revokeAllTraceShares).not.toHaveBeenCalled();
     });
@@ -182,8 +204,8 @@ describe("ProjectOperationsService", () => {
   describe("when the settings form saves an endpoint with a blank secret", () => {
     const storage = {
       projectId: "project_123",
-      s3Endpoint: "cipher(https://s3.example)",
-      s3AccessKeyId: "cipher(AKIA)",
+      s3Endpoint: "https://s3.example",
+      s3AccessKeyId: "AKIA",
     };
 
     /** @scenario A first-time storage setup with a blank secret is refused */
@@ -194,7 +216,7 @@ describe("ProjectOperationsService", () => {
         revokeAllTraceShares: async () => {},
       });
 
-      await expect(operations.updateSettings(storage)).rejects.toMatchObject({
+      await expect(operations.updateSettings(storage, MEMBER)).rejects.toMatchObject({
         code: "validation_error",
         httpStatus: 400,
       });
@@ -210,9 +232,117 @@ describe("ProjectOperationsService", () => {
         revokeAllTraceShares: async () => {},
       });
 
-      await operations.updateSettings(storage);
+      await operations.updateSettings(storage, MEMBER);
 
       expect(update).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("when the settings form saves stored-object credentials", () => {
+    it("writes them through the storage repository and answers what it stored", async () => {
+      const update = vi.fn(async (_input: unknown) => characterizationProject(false));
+      const storageSettings = vi.fn<ProjectStorageSettingsRepository["update"]>(
+        async ({ settings }) => ({ ...settings, s3Endpoint: "stored(endpoint)" }),
+      );
+      const operations = characterizationOperations({
+        projects: { findWithTeam: async () => characterizationProject(false), update },
+        storageSettings,
+        revokeAllTraceShares: async () => {},
+      });
+
+      const answer = await operations.updateSettings(
+        {
+          projectId: "project_123",
+          s3Endpoint: "https://s3.example",
+          s3AccessKeyId: "AKIA",
+          s3SecretAccessKey: "shh",
+          s3Bucket: "bucket",
+        },
+        MEMBER,
+      );
+
+      expect(storageSettings).toHaveBeenCalledWith({
+        projectId: "project_123",
+        organizationId: "org-1",
+        settings: {
+          s3Endpoint: "https://s3.example",
+          s3AccessKeyId: "AKIA",
+          s3SecretAccessKey: "shh",
+          s3Bucket: "bucket",
+        },
+      });
+      expect(update.mock.calls[0]?.[0]).not.toHaveProperty("data.s3Endpoint");
+      expect(answer.s3Endpoint).toBe("stored(endpoint)");
+    });
+
+    it("leaves the stored secret out of the write when none was sent", async () => {
+      const storageSettings = vi.fn<ProjectStorageSettingsRepository["update"]>(
+        async ({ settings }) => settings,
+      );
+      const held = { ...characterizationProject(false), s3SecretAccessKey: "held" };
+      const operations = characterizationOperations({
+        projects: { findWithTeam: async () => held, update: async () => held },
+        storageSettings,
+        revokeAllTraceShares: async () => {},
+      });
+
+      await operations.updateSettings(
+        { projectId: "project_123", s3Endpoint: "https://s3.example", s3AccessKeyId: "AKIA" },
+        MEMBER,
+      );
+
+      expect(storageSettings.mock.calls[0]?.[0].settings).not.toHaveProperty("s3SecretAccessKey");
+    });
+  });
+
+  describe("given a project whose presence setting is on", () => {
+    function presenceOperations() {
+      const presenceChanges: PresenceSettingChange[] = [];
+      const operations = characterizationOperations({
+        projects: {
+          findWithTeam: async () => characterizationProject(false),
+          update: async () => characterizationProject(false),
+        },
+        revokeAllTraceShares: async () => {},
+        presenceChanges,
+      });
+      return { operations, presenceChanges };
+    }
+
+    describe("when a member saves the settings with presence off", () => {
+      /** @scenario "A changed project presence setting is recorded as project's fact" */
+      it("records the change with the organization and the member who made it", async () => {
+        const { operations, presenceChanges } = presenceOperations();
+
+        await operations.updateSettings(
+          { projectId: "project_123", presenceEnabled: false },
+          MEMBER,
+        );
+
+        expect(presenceChanges).toEqual([
+          {
+            projectId: "project_123",
+            organizationId: "org-1",
+            presenceEnabled: false,
+            changedByUserId: "user_1",
+          },
+        ]);
+      });
+    });
+
+    describe("when a member saves the settings with presence unchanged or absent", () => {
+      /** @scenario "Saving project settings without changing presence records no presence fact" */
+      it("records no presence fact", async () => {
+        const { operations, presenceChanges } = presenceOperations();
+
+        await operations.updateSettings(
+          { projectId: "project_123", presenceEnabled: true },
+          MEMBER,
+        );
+        await operations.updateSettings({ projectId: "project_123", name: "Renamed" }, MEMBER);
+
+        expect(presenceChanges).toEqual([]);
+      });
     });
   });
 });

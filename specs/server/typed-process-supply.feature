@@ -69,14 +69,14 @@ Feature: A process cannot boot without what its modules declared
 
   Rule: stores are built from the deployment's own configuration
 
-    @unit @unimplemented
+    @unit
     Scenario: A configured deployment names no store
       Given a deployment whose configuration carries its connection strings
       When the process boots
       Then every store its modules need is opened from that configuration
       And the composition names none of them
 
-    @unit @unimplemented
+    @unit
     Scenario: A store a module needs and the deployment did not configure
       Given an installed module that keeps relational state
       And a deployment that configured no database
@@ -84,7 +84,7 @@ Feature: A process cannot boot without what its modules declared
 
   Rule: choosing memory is an override, and an override against a real endpoint is said out loud
 
-    @unit @unimplemented
+    @unit
     Scenario: A test runs a module over memory
       Given an installed module that keeps relational state
       When the process chooses memory for its relational store
@@ -110,7 +110,7 @@ Feature: A process cannot boot without what its modules declared
       Then the module reads the field as unset
       And a warning names the module and the setting that was dropped
 
-    @unit @unimplemented
+    @unit
     Scenario: A misspelled required setting refuses the boot
       Given a module whose settings carry a required field
       When the process sends that field under a misspelled name
@@ -143,7 +143,7 @@ Feature: A process cannot boot without what its modules declared
       When one is given under a name no door guards
       Then it is refused where it was written, rather than guarding nothing
 
-    @unit @unimplemented
+    @unit
     Scenario: A door whose credential was never supplied refuses callers
       Given a process that supplies no instance administrator bearer
       When a caller presents one

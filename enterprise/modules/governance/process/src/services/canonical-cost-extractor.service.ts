@@ -6,11 +6,8 @@ import type {
   OtlpLogsRequest,
 } from "@langwatch/enterprise-governance-contract";
 export type {
-  CanonicalCostEvent,
-  OtlpAnyValue,
   OtlpFixed64,
   OtlpKeyValue,
-  OtlpLogRecord,
   OtlpLogsRequest,
 } from "@langwatch/enterprise-governance-contract";
 import { type Instant, Temporal, nowInstant } from "@langwatch/time";

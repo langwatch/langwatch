@@ -652,7 +652,8 @@ export const fallibleResultNamingRule = defineRule({
     },
     repositoryServiceVocabulary: {
       what: "Repository method `{{name}}` uses service vocabulary; repositories answer `find*`, services answer `get*`.",
-      fix: "Rename it `find{{rest}}` here and in the repository interface this class implements.",
+      why: "A repository answers what it found; deciding that absence is an error is the service's job (ADR-146).",
+      fix: "Rename it `find{{rest}}` here and in the repository interface this class implements. Read the `contract` skill.",
     },
     findAnswersPage: {
       what: "`{{name}}` answers a page, and `find` answers an array.",

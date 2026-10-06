@@ -99,6 +99,36 @@ defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-0
   }
 });
 
+/** @scenario "Registering a route without an access policy is a type error" */
+it("refuses a route registered with no access decision, because it has no handler to call", () => {
+  const directory = mkdtempSync(join(process.cwd(), ".tmp-rest-access-"));
+  const fixture = join(directory, "fixture.ts");
+
+  writeFileSync(
+    fixture,
+    `import { z } from "zod";
+import { moduleApi } from "@langwatch/module";
+import { defineRestRouter } from "../src/rest/declaration.ts";
+const api = moduleApi<object>()("annotation");
+const route = () => defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08");
+route().get("/", "list").withOutput(z.object({ id: z.string() })).handle(() => ({ id: "" }));
+route().get("/", "list").withPermission("annotations:view").withOutput(z.object({ id: z.string() })).handle(() => ({ id: "" }));
+`,
+  );
+
+  try {
+    const errors = compile(fixture)
+      .split("\n")
+      .filter((line) => line.includes("fixture.ts(") && line.includes("error TS"));
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatch(/fixture\.ts\(6,/);
+    expect(errors[0]).toContain("'this' context of type");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 /** @scenario "A route answers one of several shapes, told apart by a field" */
 it("infers trailing middleware arguments and rejects wrong facts and responses", () => {
   const directory = mkdtempSync(join(process.cwd(), ".tmp-transport-middleware-"));
@@ -242,6 +272,39 @@ route().handle(() => ({ status: "healthy" }));
     expect(errors[0]).toContain("418");
     expect(errors[1]).toContain("number");
     expect(errors[2]).toContain("503");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+/** @scenario "Handler arguments expose the application the composition root supplied" */
+it("types the handler's app as the supplied API and refuses an operation it does not expose", () => {
+  const directory = mkdtempSync(join(process.cwd(), ".tmp-transport-app-"));
+  const fixture = join(directory, "fixture.ts");
+
+  writeFileSync(
+    fixture,
+    `import { z } from "zod";
+import { moduleApi } from "@langwatch/module";
+import { defineRestRouter } from "../src/rest/declaration.ts";
+interface Supplied { getAnnotation(input: { id: string }): Promise<{ id: string }> }
+const api = moduleApi<Supplied>()("annotation");
+const route = () => defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
+  .get("/:id", "getAnnotation").withParams(z.object({ id: z.string() }))
+  .withPermission("annotations:view").withOutput(z.object({ id: z.string() }));
+route().handle(({ app, input }) => app.getAnnotation({ id: input.id }));
+route().handle(({ app }) => app.deleteAnnotation({ id: "one" }));
+`,
+  );
+
+  try {
+    const errors = compile(fixture)
+      .split("\n")
+      .filter((line) => line.includes("fixture.ts(") && line.includes("error TS"));
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("fixture.ts(10,");
+    expect(errors[0]).toContain("Property 'deleteAnnotation' does not exist");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

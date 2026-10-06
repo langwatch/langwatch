@@ -2,6 +2,7 @@ Feature: Enterprise governance package boundary
 
   Rule: Governance is the Enterprise AI control plane
 
+    @unit
     Scenario: Governance orchestrates rather than absorbs infrastructure
       Given gateway, billing, webhook, automation and audit capabilities exist
       When governance enforces an organizational AI policy
@@ -39,6 +40,7 @@ Feature: Enterprise governance package boundary
     Then the result is an exact integer nano-USD value
     And values outside the safe JSON integer range are rejected
 
+  @unit
   Scenario: Governance owns its persona-home decision
     Given the application has loaded organization intent and governance setup state
     When the portable persona-home policy resolves the user's destination
@@ -52,6 +54,7 @@ Feature: Enterprise governance package boundary
     Then governance computes the per-source rate and warning threshold
     And ClickHouse access remains behind the injected trace-activity capability
 
+  @unit
   Scenario: Anomaly rules are validated before persistence
     Given an administrator supplies an anomaly rule configuration
     When Governance creates or updates the rule
@@ -79,12 +82,14 @@ Feature: Enterprise governance package boundary
     And every destination produces an auditable outcome
     And the application supplies the SSRF-safe HTTP adapter
 
+  @unit
   Scenario: Spend spike evaluation does not expose storage syntax
     Given an active spend spike rule targets a source or source type
     When Governance reads the current and baseline spend windows
     Then the feature passes a structured source filter to the spend capability
     And ClickHouse query syntax remains inside the application adapter
 
+  @unit
   Scenario: Department assignments are organization scoped
     Given a department belongs to one organization
     When an administrator assigns a user, team or project to it
@@ -108,12 +113,14 @@ Feature: Enterprise governance package boundary
     And each mutation and its audit fact commit in one Postgres transaction
     And a platform template is immutable while a cross-organization template is not found
 
+  @unit
   Scenario: The platform ingestion template catalog reconciles idempotently
     Given retired platform template rows may remain from an earlier release
     When Governance synchronizes the current platform catalog
     Then every retired platform copy is archived and disabled
     And repeating the synchronization does not create duplicate templates
 
+  @unit
   Scenario: Request transports reuse the process-owned Governance application
     Given the process composition root has constructed the Governance capabilities
     When a tRPC or Hono request resolves Governance setup state
@@ -121,6 +128,7 @@ Feature: Enterprise governance package boundary
     And it does not construct a service, adapter or database client for the request
     And it does not fall back to a global application lookup
 
+  @unit
   Scenario: Contracts are transport independent
     Given a browser imports the governance contract root
     Then no server, Eventing, application, environment, or generated database module loads

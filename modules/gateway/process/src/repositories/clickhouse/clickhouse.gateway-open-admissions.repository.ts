@@ -1,10 +1,10 @@
-import type { GatewayClickHouseClient } from "../../app/gateway.members.ts";
 import {
   GatewayOpenAdmissionsRepository,
   type OpenAdmission,
   type OpenAdmissionQuery,
 } from "../../repositories/gateway-open-admissions.repository.ts";
 import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../rules/gateway-spend-settlement.rules.ts";
+import type { GatewayClickHouseClient } from "./clickhouse.gateway-session.store.ts";
 
 const TABLE_NAME = "gateway_spend" as const;
 

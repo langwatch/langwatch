@@ -1,6 +1,6 @@
+import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 
-import type { AutomationTriggerMatchRecorder } from "../app/automation.members.ts";
 import type { AutomationsPipeline } from "../eventing/automation.pipeline.ts";
 
 /**
@@ -31,4 +31,13 @@ export class AutomationTriggerMatchDispatcherService implements AutomationTrigge
 
     await this.#commands.recordTriggerMatch.send(input);
   }
+}
+
+export interface AutomationTriggerMatchRecorder {
+  send(
+    input: TriggerMatchRecordedEventData & {
+      tenantId: string;
+      occurredAt: number;
+    },
+  ): Promise<void>;
 }

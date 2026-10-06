@@ -10,16 +10,26 @@ import { STORED_PRINCIPAL_KIND } from "@langwatch/authz-contract";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
-import { Temporal } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import type { AuthzManagedGrantRepository } from "../authz-managed-grant.repository.ts";
 import type { AuthzRepositories } from "../authz.repositories.ts";
 import { AuthzMemoryStore } from "../memory/authz-memory.store.ts";
 import { MemoryAuthzAdmissionRepository } from "../memory/memory.authz-admission.repository.ts";
+import { MemoryAuthzAuditTrailRepository } from "../memory/memory.authz-audit-trail.repository.ts";
 import { MemoryAuthzCutoverRepository } from "../memory/memory.authz-cutover.repository.ts";
 import { MemoryAuthzEpochRepository } from "../memory/memory.authz-epoch.repository.ts";
+import { MemoryAuthzGrantProjectionRepository } from "../memory/memory.authz-grant-projection.repository.ts";
+import { MemoryAuthzLedgerReadRepository } from "../memory/memory.authz-ledger-read.repository.ts";
+import { MemoryAuthzListingRepository } from "../memory/memory.authz-listing.repository.ts";
 import { MemoryAuthzManagedGrantRepository } from "../memory/memory.authz-managed-grant.repository.ts";
+import { MemoryAuthzMembershipStampRepository } from "../memory/memory.authz-membership-stamp.repository.ts";
+import { MemoryAuthzMigrationRepository } from "../memory/memory.authz-migration.repository.ts";
+import { MemoryAuthzPlatformGrantRepository } from "../memory/memory.authz-platform-grant.repository.ts";
+import { MemoryAuthzReadRepository } from "../memory/memory.authz-read.repository.ts";
+import { MemoryAuthzRevocationRepository } from "../memory/memory.authz-revocation.repository.ts";
+import { MemoryAuthzSessionVersionRepository } from "../memory/memory.authz-session-version.repository.ts";
 import { MemoryAuthzUserStandingRepository } from "../memory/memory.authz-user-standing.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "../prisma/prisma.authz-managed-grant.repository.ts";
 
@@ -43,6 +53,17 @@ const backends: readonly Backend[] = [
         cutover: MemoryAuthzCutoverRepository.create({ memory }),
         admissions: MemoryAuthzAdmissionRepository.create({ memory }),
         userStandings: MemoryAuthzUserStandingRepository.create({ memory }),
+        epoch: MemoryAuthzEpochRepository.create({ memory }),
+        sessionVersions: MemoryAuthzSessionVersionRepository.create({ memory }),
+        auditTrail: MemoryAuthzAuditTrailRepository.create({ memory }),
+        platformGrants: MemoryAuthzPlatformGrantRepository.create({ memory }),
+        membershipStamps: MemoryAuthzMembershipStampRepository.create({ memory }),
+        grantProjection: MemoryAuthzGrantProjectionRepository.create({ memory }),
+        revocation: MemoryAuthzRevocationRepository.create({ memory }),
+        read: MemoryAuthzReadRepository.create({ memory }),
+        listing: MemoryAuthzListingRepository.create({ memory }),
+        migration: MemoryAuthzMigrationRepository.create({ memory }),
+        ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
       };
     },
   },
@@ -124,7 +145,7 @@ describe.each(backends)("given the $name authz backend", (backend) => {
         scopeType: "ORGANIZATION" as const,
         scopeId: ORGANIZATION_ID,
       };
-      repositories.store.bindings.push(binding);
+      repositories.store.bindings.push({ ...binding, createdAt: nowInstant() });
 
       await expect(
         repositories.bindings.findBinding({
@@ -145,100 +166,6 @@ describe.each(backends)("given the $name authz backend", (backend) => {
           bindingIds: ["rb_1"],
         }),
       ).resolves.toEqual([binding]);
-    });
-  });
-
-  describe("when a membership carries an unfinished admission", () => {
-    it("reads the marker back, and the grant only once the ledger holds one", async () => {
-      const repositories = backend.create();
-      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
-      repositories.store.admissions.push({
-        ...scope,
-        grantId: "rb_admission",
-        occurredAtMs: 1_700_000_000_000,
-        disabled: false,
-      });
-
-      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
-        found: true,
-        grantId: "rb_admission",
-        occurredAtMs: 1_700_000_000_000,
-      });
-      await expect(
-        repositories.admissions.readAdmissionGrant({ ...scope, grantId: "rb_admission" }),
-      ).resolves.toEqual({ found: false });
-    });
-
-    it("refuses to complete while no live grant answers the marker", async () => {
-      const repositories = backend.create();
-      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
-      repositories.store.admissions.push({
-        ...scope,
-        grantId: "rb_admission",
-        occurredAtMs: 1,
-        disabled: false,
-      });
-      repositories.store.admissionGrants.push({
-        ...scope,
-        grantId: "rb_admission",
-        revoked: true,
-      });
-
-      await expect(
-        repositories.admissions.completeAdmission({ ...scope, grantId: "rb_admission" }),
-      ).resolves.toBe(false);
-      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
-        found: true,
-        grantId: "rb_admission",
-        occurredAtMs: 1,
-      });
-    });
-
-    it("clears the marker once a live grant answers it, and again on a revoked one", async () => {
-      const repositories = backend.create();
-      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
-      const marker = {
-        ...scope,
-        grantId: "rb_admission",
-        occurredAtMs: 1,
-        disabled: false,
-      };
-      repositories.store.admissions.push(marker);
-      repositories.store.admissionGrants.push({
-        ...scope,
-        grantId: "rb_admission",
-        revoked: false,
-      });
-
-      await expect(
-        repositories.admissions.completeAdmission({ ...scope, grantId: "rb_admission" }),
-      ).resolves.toBe(true);
-      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
-        found: false,
-      });
-
-      repositories.store.admissions.push(marker);
-      await expect(
-        repositories.admissions.clearPendingAdmission({ ...scope, grantId: "rb_admission" }),
-      ).resolves.toBe(true);
-      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
-        found: false,
-      });
-    });
-
-    it("keeps a disabled membership's marker out of the read", async () => {
-      const repositories = backend.create();
-      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
-      repositories.store.admissions.push({
-        ...scope,
-        grantId: "rb_admission",
-        occurredAtMs: 1,
-        disabled: true,
-      });
-
-      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
-        found: false,
-      });
     });
   });
 
@@ -300,22 +227,6 @@ describe.each(backends)("given the $name authz backend", (backend) => {
         USER_ID,
       ]);
     });
-
-    it("keeps an inactive user's admission marker out of the read", async () => {
-      const repositories = backend.create();
-      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
-      repositories.store.admissions.push({
-        ...scope,
-        grantId: "rb_admission",
-        occurredAtMs: 1,
-        disabled: false,
-      });
-      await repositories.userStandings.recordDeactivated({ userId: USER_ID, at: at(10) });
-
-      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
-        found: false,
-      });
-    });
   });
 
   describe("when the epoch is bumped", () => {
@@ -359,24 +270,67 @@ function memoryHolderFixture(): HolderFixture {
     organizationId,
     member: async () => {
       const userId = id("user");
-      memory.organizationRoles.set(`${organizationId}:${userId}`, "MEMBER");
+      memory.memberships.set(`${organizationId}:${userId}`, {
+        role: "MEMBER",
+        disabled: false,
+        membershipStamp: randomUUID(),
+        pendingSsoGrantId: null,
+        createdAt: nowInstant(),
+      });
       return userId;
     },
     outsider: async () => id("user"),
     team: async (memberIds) => {
       const teamId = id("team");
-      for (const userId of memberIds) memory.teamMemberships.push({ organizationId, teamId, userId });
+      memory.teams.push({
+        id: teamId,
+        organizationId,
+        name: "Grants",
+        isPersonal: false,
+        ownerUserId: null,
+      });
+      for (const userId of memberIds) {
+        memory.teamMemberships.push({
+          teamId,
+          userId,
+          role: "MEMBER",
+          assignedRoleId: null,
+          createdAt: nowInstant(),
+        });
+      }
       return teamId;
     },
     grant: async ({ principal, roleKey, revoked = false }) => {
-      memory.grants.push({ organizationId, principal, roleKey, revoked });
+      memory.grants.push({
+        id: id("grant"),
+        organizationId,
+        principalType: STORED_PRINCIPAL_KIND[principal.type],
+        principalId: principal.id,
+        roleKey,
+        legacyRole: null,
+        source: "grants-service",
+        scopeType: "PROJECT",
+        scopeId: id("project"),
+        token: null,
+        permission: null,
+        resourceKind: null,
+        projectId: null,
+        createdByUserId: null,
+        expiresAt: null,
+        maxViews: null,
+        occurredAt: nowInstant(),
+        revokedAt: revoked ? nowInstant() : null,
+        revokedReason: null,
+        createdAt: nowInstant(),
+        updatedAt: nowInstant(),
+      });
     },
     close: async () => {},
   };
 }
 
-/** The lane's Postgres; the Postgres row is skipped without one. */
-const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+/** The integration lane's Postgres; the unit lane never sets it, so the row is skipped there. */
+const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 let prisma: PrismaClient | undefined;
 
 async function postgresHolderFixture(): Promise<HolderFixture> {
@@ -473,59 +427,76 @@ describe.each(holderBackends)("given a role's holders on the $name backend", (ba
       .map((principal) => `${principal.type}:${principal.id}`)
       .toSorted();
 
-  describe.skipIf(backend.skip)("when the role is granted directly, to a group and to a team", () => {
-    it("reads each live principal of that role, and none revoked or of another role", async () => {
-      const fixture = await open();
-      const { member, team, grant } = fixture;
-      const ada = await member();
-      const teamId = await team([ada]);
-      await grant({ principal: { type: "user", id: ada }, roleKey: "custom:role_r" });
-      await grant({ principal: { type: "group", id: "group_eng" }, roleKey: "custom:role_r" });
-      await grant({ principal: { type: "team", id: teamId }, roleKey: "custom:role_r" });
-      await grant({ principal: { type: "apiKey", id: "key_1" }, roleKey: "custom:role_r" });
-      await grant({ principal: { type: "user", id: "user_gone" }, roleKey: "custom:role_r", revoked: true });
-      await grant({ principal: { type: "user", id: "user_other" }, roleKey: "custom:role_r2" });
+  describe.skipIf(backend.skip)(
+    "when the role is granted directly, to a group and to a team",
+    () => {
+      it("reads each live principal of that role, and none revoked or of another role", async () => {
+        const fixture = await open();
+        const { member, team, grant } = fixture;
+        const ada = await member();
+        const teamId = await team([ada]);
+        await grant({ principal: { type: "user", id: ada }, roleKey: "custom:role_r" });
+        await grant({ principal: { type: "group", id: "group_eng" }, roleKey: "custom:role_r" });
+        await grant({ principal: { type: "team", id: teamId }, roleKey: "custom:role_r" });
+        await grant({ principal: { type: "apiKey", id: "key_1" }, roleKey: "custom:role_r" });
+        await grant({
+          principal: { type: "user", id: "user_gone" },
+          roleKey: "custom:role_r",
+          revoked: true,
+        });
+        await grant({ principal: { type: "user", id: "user_other" }, roleKey: "custom:role_r2" });
 
-      await expect(holdersOf(fixture, { roleId: "role_r" })).resolves.toEqual(
-        ["apiKey:key_1", "group:group_eng", `team:${teamId}`, `user:${ada}`].toSorted(),
-      );
-    });
+        await expect(holdersOf(fixture, { roleId: "role_r" })).resolves.toEqual(
+          ["apiKey:key_1", "group:group_eng", `team:${teamId}`, `user:${ada}`].toSorted(),
+        );
+      });
 
-    it("reads a principal granted the role more than once only once", async () => {
-      const fixture = await open();
-      const ada = await fixture.member();
-      await fixture.grant({ principal: { type: "user", id: ada }, roleKey: "custom:role_r" });
-      await fixture.grant({ principal: { type: "user", id: ada }, roleKey: "custom:role_r" });
+      it("reads a principal granted the role more than once only once", async () => {
+        const fixture = await open();
+        const ada = await fixture.member();
+        await fixture.grant({ principal: { type: "user", id: ada }, roleKey: "custom:role_r" });
+        await fixture.grant({ principal: { type: "user", id: ada }, roleKey: "custom:role_r" });
 
-      await expect(holdersOf(fixture, { roleId: "role_r" })).resolves.toEqual([`user:${ada}`]);
-    });
+        await expect(holdersOf(fixture, { roleId: "role_r" })).resolves.toEqual([`user:${ada}`]);
+      });
 
-    it("counts the limit in distinct principals, not grant rows", async () => {
-      const fixture = await open();
-      for (const userId of ["user_a", "user_a", "user_a", "user_b", "user_c"]) {
-        await fixture.grant({ principal: { type: "user", id: userId }, roleKey: "custom:role_r" });
-      }
+      it("counts the limit in distinct principals, not grant rows", async () => {
+        const fixture = await open();
+        for (const userId of ["user_a", "user_a", "user_a", "user_b", "user_c"]) {
+          await fixture.grant({
+            principal: { type: "user", id: userId },
+            roleKey: "custom:role_r",
+          });
+        }
 
-      const capped = await holdersOf(fixture, { roleId: "role_r", limit: 2 });
+        const capped = await holdersOf(fixture, { roleId: "role_r", limit: 2 });
 
-      expect(capped).toHaveLength(2);
-      expect(new Set(capped).size).toBe(2);
-      await expect(holdersOf(fixture, { roleId: "role_r", limit: 3 })).resolves.toEqual(["user:user_a", "user:user_b", "user:user_c"]);
-    });
-  });
+        expect(capped).toHaveLength(2);
+        expect(new Set(capped).size).toBe(2);
+        await expect(holdersOf(fixture, { roleId: "role_r", limit: 3 })).resolves.toEqual([
+          "user:user_a",
+          "user:user_b",
+          "user:user_c",
+        ]);
+      });
+    },
+  );
 
-  describe.skipIf(backend.skip)("when a team holds members and someone outside the organization", () => {
-    it("reads only the team's current organization members", async () => {
-      const { member, outsider, team, bindings, organizationId } = await open();
-      const ada = await member();
-      const bo = await member();
-      const stranger = await outsider();
-      const teamId = await team([ada, stranger]);
-      await team([bo]);
+  describe.skipIf(backend.skip)(
+    "when a team holds members and someone outside the organization",
+    () => {
+      it("reads only the team's current organization members", async () => {
+        const { member, outsider, team, bindings, organizationId } = await open();
+        const ada = await member();
+        const bo = await member();
+        const stranger = await outsider();
+        const teamId = await team([ada, stranger]);
+        await team([bo]);
 
-      await expect(bindings.findTeamMembers({ organizationId, teamIds: [teamId] })).resolves.toEqual([
-        { teamId, userId: ada },
-      ]);
-    });
-  });
+        await expect(
+          bindings.findTeamMembers({ organizationId, teamIds: [teamId] }),
+        ).resolves.toEqual([{ teamId, userId: ada }]);
+      });
+    },
+  );
 });

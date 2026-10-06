@@ -28,5 +28,5 @@ install the module's process half through the generated process-module list,
 and the role decides what runs: the api serves the routes, the worker consumes
 the pipeline (graph, settlement and settlement reads). Eventing calls the
 module's own services; delivery, Redis claims, ClickHouse counting, recipient
-auth and limit mail arrive as members and channels the process supplies, never
-as a second `AutomationService`.
+auth and limit mail arrive as repositories, channels and peer `*Api` tokens the
+container builds (ARCHITECTURE.md §3.3, §5), never as a second `AutomationService`.

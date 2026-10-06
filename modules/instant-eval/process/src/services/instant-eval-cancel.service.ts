@@ -1,7 +1,7 @@
 /**
  * Asking a run to stop: the durable command first, then the hint. A hint that
  * landed while the command was refused would stop the page with no record that
- * anyone asked. @see specs/instant-evals/instant-eval-api.feature
+ * anyone asked. @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import {
@@ -10,7 +10,7 @@ import {
 } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 
-import type { InstantEvalCancellationChannel } from "../channels/instant-eval-cancellation.channel.ts";
+import type { InstantEvalCancellationRepository } from "../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalRunRow } from "../repositories/instant-eval-run.repository.ts";
 import {
   isInstantEvalStoredStatus,
@@ -44,13 +44,13 @@ export interface InstantEvalCancelCommands {
 export class InstantEvalCancelService {
   private readonly reads: InstantEvalReadsService;
   private readonly commands: InstantEvalCancelCommands;
-  private readonly cancellations: InstantEvalCancellationChannel;
+  private readonly cancellations: InstantEvalCancellationRepository;
   private readonly now: () => number;
 
   private constructor(options: {
     reads: InstantEvalReadsService;
     commands: InstantEvalCancelCommands;
-    cancellations: InstantEvalCancellationChannel;
+    cancellations: InstantEvalCancellationRepository;
     now: () => number;
   }) {
     this.reads = options.reads;
@@ -67,7 +67,7 @@ export class InstantEvalCancelService {
   }: {
     reads: InstantEvalReadsService;
     commands: InstantEvalCancelCommands;
-    cancellations: InstantEvalCancellationChannel;
+    cancellations: InstantEvalCancellationRepository;
     now: () => number;
   }): InstantEvalCancelService {
     return new InstantEvalCancelService({ reads, commands, cancellations, now });

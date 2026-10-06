@@ -1,11 +1,9 @@
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  OrganizationDirectory,
-  OrganizationJoinRequests,
-} from "../../app/organization.members.ts";
+import type { OrganizationDirectory } from "../organization-directory.service.ts";
 import { OrganizationJoinDoorService } from "../organization-join-door.service.ts";
+import type { OrganizationJoinRequests } from "../organization-join-requests.service.ts";
 
 /** Spec: specs/identity/join-requests.feature, specs/identity/domain-auto-join.feature */
 
@@ -78,6 +76,8 @@ describe("given an administrator saving the joining setting", () => {
       next: "off" as const,
       previousDomains: [],
       nextDomains: [],
+      previousJoinerRole: "MEMBER" as const,
+      nextJoinerRole: "MEMBER" as const,
     }));
     const door = OrganizationJoinDoorService.create({
       joinRequests: createApiFixture<OrganizationJoinRequests>({ setJoining }),
@@ -97,6 +97,8 @@ describe("given an administrator saving the joining setting", () => {
       next: "off",
       previousDomains: [],
       nextDomains: [],
+      previousJoinerRole: "MEMBER",
+      nextJoinerRole: "MEMBER",
     });
   });
 });

@@ -264,17 +264,17 @@ func TestRunOnceReadsTheToolsResultsAndItsStop(t *testing.T) {
 	s.env = os.Environ()
 	dir := t.TempDir()
 	up := func() bool { return true }
-	got := s.runOnce(context.Background(), s.tools[0], dir, up)
+	got := s.runOnce(context.Background(), iterationOf(s.tools[0], dir), up)
 	if got.Exit != 1 || got.Pass != 4 || got.Fail != 1 || got.Stopped != "" || !slices.Equal(got.Failing, []string{"FAIL x-1"}) {
 		t.Fatalf("a: %+v", got)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "a.log")); err != nil {
 		t.Errorf("the log belongs in the iteration directory: %v", err)
 	}
-	if got := s.runOnce(context.Background(), s.tools[1], t.TempDir(), up); got.Exit != 3 || got.Stopped != "sign-in refused" {
+	if got := s.runOnce(context.Background(), iterationOf(s.tools[1], t.TempDir()), up); got.Exit != 3 || got.Stopped != "sign-in refused" {
 		t.Fatalf("b: %+v", got)
 	}
-	if got := s.runOnce(context.Background(), s.tools[0], t.TempDir(), func() bool { return false }); got.Stopped != "stack unhealthy" {
+	if got := s.runOnce(context.Background(), iterationOf(s.tools[0], t.TempDir()), func() bool { return false }); got.Stopped != "stack unhealthy" {
 		t.Fatalf("a with the stack gone: %+v", got)
 	}
 }

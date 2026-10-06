@@ -36,7 +36,7 @@ import { EvaluatorExecutionService } from "./evaluator-execution.service.ts";
 import type { EvaluatorHistoryService } from "./evaluator-history.service.ts";
 import { EvaluatorNativeService } from "./evaluator-native.service.ts";
 
-export type EvaluatorServiceOptions = {
+type EvaluatorServiceOptions = {
   repository: EvaluatorRepository;
   workflows: WorkflowApi;
   /** The trail one evaluator's change history is read off. */

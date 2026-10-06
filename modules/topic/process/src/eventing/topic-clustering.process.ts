@@ -61,18 +61,18 @@ export type TopicClusteringProcessState = z.infer<typeof topicClusteringProcessS
  * Clustering events carry no customer content, but the boundary keeps the
  * same shape discipline as other process managers.
  */
-export const topicClusteringProcessEventViewSchema = z.object({
+const topicClusteringProcessEventViewSchema = z.object({
   trigger: z.string().nullable(),
   runId: z.string().nullable(),
   page: z.number().nullable(),
   hasNextPage: z.boolean(),
   nextSearchAfter: topicClusteringSearchAfterSchema.nullable(),
 });
-export type TopicClusteringProcessEventView = z.infer<typeof topicClusteringProcessEventViewSchema>;
+type TopicClusteringProcessEventView = z.infer<typeof topicClusteringProcessEventViewSchema>;
 
 type Ctx = ProcessHandlerContext<TopicClusteringIntents>;
 
-export const INITIAL_TOPIC_CLUSTERING_STATE: TopicClusteringProcessState = {
+const INITIAL_TOPIC_CLUSTERING_STATE: TopicClusteringProcessState = {
   projectId: "",
   enabled: false,
   currentRun: null,

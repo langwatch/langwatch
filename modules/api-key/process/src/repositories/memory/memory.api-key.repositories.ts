@@ -1,4 +1,5 @@
 import type { ApiKeyRepositories } from "../api-key.repositories.ts";
+import { MemoryApiKeyAnswerCacheRepository } from "./memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "./memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "./memory.api-key.repository.ts";
 
@@ -7,6 +8,9 @@ export class MemoryApiKeyRepositories {
   static readonly requires = [] as const;
 
   static create(): ApiKeyRepositories {
-    return { apiKeys: MemoryApiKeyRepository.create({ memory: MemoryApiKeyDatabase.create() }) };
+    return {
+      apiKeys: MemoryApiKeyRepository.create({ memory: MemoryApiKeyDatabase.create() }),
+      answers: MemoryApiKeyAnswerCacheRepository.create(),
+    };
   }
 }

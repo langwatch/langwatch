@@ -26,7 +26,7 @@ const SERVICE_RESTART_CLOSE_CODE = 1012;
 /** Close code for a refused connection: the SDK prints and backs off. */
 const POLICY_VIOLATION_CLOSE_CODE = 1008;
 
-export interface ConnectedAgentConnectionOptions {
+interface ConnectedAgentConnectionOptions {
   session: AgentSessionService;
   pingIntervalMs?: number;
   pongWaitMs?: number;

@@ -67,3 +67,10 @@ Feature: File reads answer through the installed stored-object module
     Given a signed read URL whose signature was altered, names another object, is an upload seal, or has lapsed
     When it is fetched
     Then the answer is 401 and no bytes are served
+
+  @regression
+  Scenario: the installed module on memory stores refuses a signature written by hand
+    Given the stored-object module is installed over memory stores
+    When a read URL carries claims written by hand in place of a seal
+    Then the route answers 401 and serves nothing
+    And a seal made under the process's own random key shows no claim in the clear and opens

@@ -106,22 +106,12 @@ func seedEntities(ctx context.Context, request entityRequest) (map[string]string
 	var mutex sync.Mutex
 	settled := map[string]bool{}
 	for pending := request.seeds; len(pending) > 0; {
-		var wave, later []entitySeed
-		for _, seed := range pending {
-			if waitsOn(seed, settled) {
-				later = append(later, seed)
-				continue
-			}
-			wave = append(wave, seed)
-		}
-		if len(wave) == 0 {
-			wave, later = later, nil // a prerequisite no seed makes: each reports it missing
-		}
+		wave, later := nextWave(pending, settled)
 		var group sync.WaitGroup
 		earlier := maps.Clone(fixtures)
 		for _, seed := range wave {
 			group.Go(func() {
-				id, warning := seedEntity(ctx, request, seed, earlier)
+				id, warning := request.seedEntity(ctx, seed, earlier)
 				mutex.Lock()
 				defer mutex.Unlock()
 				if warning != "" {
@@ -141,6 +131,23 @@ func seedEntities(ctx context.Context, request entityRequest) (map[string]string
 	return fixtures, warnings
 }
 
+// nextWave splits pending into the entities whose prerequisites are settled and
+// those still waiting. When none is ready, every one goes: a prerequisite no
+// seed makes, so each reports it missing.
+func nextWave(pending []entitySeed, settled map[string]bool) (wave, later []entitySeed) {
+	for _, seed := range pending {
+		if waitsOn(seed, settled) {
+			later = append(later, seed)
+			continue
+		}
+		wave = append(wave, seed)
+	}
+	if len(wave) == 0 {
+		return later, nil
+	}
+	return wave, later
+}
+
 // waitsOn reports an entity with a prerequisite not yet settled either way.
 func waitsOn(seed entitySeed, settled map[string]bool) bool {
 	for _, need := range seed.needs {
@@ -152,7 +159,7 @@ func waitsOn(seed entitySeed, settled map[string]bool) bool {
 }
 
 // seedEntity posts one entity once its wave starts, when its prerequisites were seeded.
-func seedEntity(ctx context.Context, request entityRequest, seed entitySeed, fixtures map[string]string) (string, string) {
+func (request entityRequest) seedEntity(ctx context.Context, seed entitySeed, fixtures map[string]string) (string, string) {
 	if missing := firstMissing(fixtures, seed.needs); missing != "" {
 		return "", fmt.Sprintf("%s not seeded: needs %s, which was not", seed.fixture, missing)
 	}

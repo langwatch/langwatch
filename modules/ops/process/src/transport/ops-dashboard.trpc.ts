@@ -1,12 +1,12 @@
 /**
  * The server half of the operator dashboard and scheduler procedures.
- * Platform-tier: the platform-operator grant decides, not an
- * RBAC permission. `getScope` answers rather than refuses, so the menu can poll it.
+ * Platform-tier: the door asks the platform-operator grant. `getScope` answers rather than
+ * refuses, so the menu can poll it.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { OpsApi, opsDashboardTrpc } from "@langwatch/ops-contract";
 
-import { OPS_MANAGE, OPS_PROBE, OPS_VIEW, opsOperatorFact } from "#transport/ops-operator.trpc";
+import { OPS_PROBE, opsOperatorFact } from "#transport/ops-operator.trpc";
 
 export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsDashboardTrpc> =
   defineTrpcRouter(OpsApi, opsDashboardTrpc)
@@ -16,120 +16,66 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .handle(async ({ app }, operator) => ({ scope: await app.operatorScope(operator) }))
 
     .procedure("getDashboardSnapshot")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.findDashboardData();
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app }) => app.findDashboardData())
 
     .procedure("getSignUpHealth")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.getSignUpHealth(input);
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.getSignUpHealth(input))
 
     .procedure("getBadgeCounts")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.badgeCounts();
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app }) => app.badgeCounts())
 
     .procedure("dashboardStream")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, signal }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.streamDashboard({ signal });
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, signal }) => app.streamDashboard({ signal }))
 
     .procedure("listParkedGroups")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.listParkedQueueGroups(input);
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.listParkedQueueGroups(input))
 
     .procedure("listQueues")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.listQueues();
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app }) => app.listQueues())
 
     .procedure("listScheduledJobs")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.listScheduledJobs({ limit: input.limit });
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.listScheduledJobs({ limit: input.limit }))
 
     .procedure("listPausedSchedules")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.listPausedSchedules({ limit: input.limit });
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.listPausedSchedules({ limit: input.limit }))
 
     .procedure("listSchedulerActions")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_VIEW)
-    .handle(async ({ app, input }, operator) => {
-      await app.admitOperator(operator, "ops:view");
-
-      return app.listSchedulerActions({ limit: input.limit });
-    })
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.listSchedulerActions({ limit: input.limit }))
 
     .procedure("setScheduleActive")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input, actor }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
-      return app.setScheduleActive({
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input, actor }) =>
+      app.setScheduleActive({
         scheduleId: input.scheduleId,
         active: input.active,
         actorUserId: actor.id,
-      });
-    })
+      }),
+    )
 
     .procedure("clearScheduleSlot")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input, actor }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
-      return app.clearStuckScheduleSlot({
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input, actor }) =>
+      app.clearStuckScheduleSlot({
         scheduleId: input.scheduleId,
         actorUserId: actor.id,
-      });
-    })
+      }),
+    )
 
     .procedure("runScheduleNow")
-    .withFacts(opsOperatorFact)
-    .serviceAuthorized(OPS_MANAGE)
-    .handle(async ({ app, input, actor }, operator) => {
-      await app.admitOperator(operator, "ops:manage");
-
-      return app.runScheduleNow({
+    .withPermission("ops:manage", { at: "platform" })
+    .handle(({ app, input, actor }) =>
+      app.runScheduleNow({
         scheduleId: input.scheduleId,
         actorUserId: actor.id,
-      });
-    })
+      }),
+    )
     .build();

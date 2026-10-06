@@ -6,6 +6,7 @@
 import { createHmac } from "crypto";
 
 import { bindRestMiddleware, createRestRuntime, type MountableRestApp } from "@langwatch/api/rest";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import {
   ModelProviderNotFoundError,
   type ModelProviderApi,
@@ -27,13 +28,13 @@ import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis"
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { GatewayModule } from "../../app/gateway.app.ts";
-import type { GatewaySpendConfirmation } from "../../app/gateway.members.ts";
+import type { GatewayModule } from "../../app/gateway.app.ts";
 import type { ConfirmSpendCommandData } from "../../eventing/gateway-spend-commands.process.ts";
 import { gatewayProcessModule } from "../../gateway.module.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../services/gateway-elevenlabs-credential.service.ts";
 import {
+  type GatewaySpendConfirmation,
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
 } from "../../services/gateway-realtime-session.service.ts";
@@ -60,6 +61,10 @@ function database(): PrismaClient {
   if (!client) throw new Error("This integration test needs DATABASE_URL");
 
   return client;
+}
+
+function refuseUnsuppliedStore(name: string): never {
+  throw new Error(`This integration test supplies no "${name}" store`);
 }
 
 /** Recorded so a confirmation can be asserted without the whole spend spine. */
@@ -125,6 +130,11 @@ async function mountWebhook(): Promise<MountableRestApp> {
     spendConfirmation: new RecordingSpendConfirmation(),
   };
   // The gateway resolves its secrets through the process chain; an empty one leaves each unset.
+  const stores: Readonly<Record<string, unknown>> = {
+    prisma: database(),
+    clickhouse: peer("analytical store"),
+    redis: memoryRedisDouble(),
+  };
   const secretsChain = SecretsResolver.over(SecretsChain.start({ environment: {} }));
   const runtime = await createApp({
     role: "api",
@@ -136,18 +146,21 @@ async function mountWebhook(): Promise<MountableRestApp> {
         spendSettlementGraceMs: undefined,
         internalUrl: undefined,
         controlPlaneUrl: undefined,
+        publicBaseUrl: "http://langwatch.test",
         baseUrl: undefined,
         publicUrl: undefined,
         isSaas: false,
         allowLoopbackVoiceProviders: false,
       },
     })
-    .withRelational(database())
-    .withAnalytical(peer("analytical store"))
-    .withKeyvalue(memoryRedisDouble())
+    // The live tier, over only the stores supplied here: real Postgres, no ClickHouse.
+    .withStores({
+      tier: "live",
+      order: Object.keys(stores),
+      read: (name) => (Object.hasOwn(stores, name) ? stores[name] : refuseUnsuppliedStore(name)),
+    })
     .withSecrets(resolvedSecrets({}))
     .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
-    .withMember("publicBaseUrl", "http://langwatch.test")
     .provide({
       webhook: peer("webhook"),
       entitlement: peer("entitlement"),
@@ -164,8 +177,10 @@ async function mountWebhook(): Promise<MountableRestApp> {
       "api-key": peer("api key"),
     })
     .boot();
-  const gateway = runtime.module(gatewayProcessModule).provided;
-  if (!(gateway instanceof GatewayModule)) throw new Error("gateway installs as its own app");
+  // The runtime hands out the API reference; it forwards every method of the installed
+  // GatewayModule, so the spend pipeline's producer hook is reachable the way eventing reaches it.
+  const gateway = runtime.module(gatewayProcessModule).provided as GatewayApi &
+    Pick<GatewayModule, "connectSpend">;
   gateway.connectSpend({
     confirmSpend: {
       send: async (payload: unknown) => {

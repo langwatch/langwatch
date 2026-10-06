@@ -13,6 +13,11 @@ export {
   type ProcessConfigOf,
 } from "./config.ts";
 export {
+  alignDevAuthUrlsToPort,
+  type DevAddressAlignment,
+  type DevAddressRealignment,
+} from "./dev-port-alignment.ts";
+export {
   adminEmails,
   allowedProxyHosts,
   allowLoopbackVoiceProviders,
@@ -26,9 +31,18 @@ export {
   langevalsStagingTtlSeconds,
   langwatchDefaultModel,
   LOCAL_GATEWAY_URL,
+  nlpCodeBlockTimeoutSeconds,
+  nlpServiceUrl,
+  nodeEnvironment,
+  otelResourceAttributes,
+  outboundProxy,
   posthogHost,
   posthogKey,
+  publicBaseUrl,
+  rawSocketPort,
+  releaseVersionOf,
   SAAS_GATEWAY_URL,
+  serviceVersion,
   signInProviders,
   signUpAllowedDomains,
   signUpMode,

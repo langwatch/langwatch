@@ -9,8 +9,8 @@ import { PersonalProjectOwnerMismatchError } from "@langwatch/organization-contr
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type { PersonalWorkspaceIdentity } from "../../app/organization.members.ts";
 import type { OrganizationRepository } from "../../repositories/organization.repository.ts";
+import type { PersonalWorkspaceIdentity } from "../personal-workspace-identity.service.ts";
 import {
   PersonalWorkspaceService,
   type PersonalWorkspaceNotices,

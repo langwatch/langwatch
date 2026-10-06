@@ -79,10 +79,12 @@ describe("GET /api/image-proxy", () => {
   });
 
   /** @scenario "the image proxy refuses an address that is not a picture" */
+  /** @scenario "A proxied response that is not an image is refused" */
   it("answers 400 for something other than a picture", async () => {
     const response = await proxy()(at("https://pics.test/page"));
 
     expect(response.status).toBe(400);
+    expect(response.headers.get("content-type")).toBe("application/json");
     expect(await response.json()).toEqual({ error: "URL does not point to an image" });
   });
 

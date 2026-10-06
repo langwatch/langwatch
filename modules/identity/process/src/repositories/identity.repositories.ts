@@ -8,9 +8,9 @@ import type { IdentitySecretCarryRepository } from "../services/identity-secret-
 import type { IdentityAccountRekeyRepository } from "./identity-account-rekey.repository.ts";
 import type { IdentityBackfillRepository } from "./identity-backfill.repository.ts";
 import type { IdentityHeadsRepository } from "./identity-heads.repository.ts";
-import type { IdentityHistoryRepository } from "./identity-history.repository.ts";
 import type { IdentityLatchRepository } from "./identity-latch.repository.ts";
 import type { IdentityLookupRepository } from "./identity-lookup.repository.ts";
+import type { IdentityRateLimitRepository } from "./identity-rate-limit.repository.ts";
 import type { IdentityReservationRepository } from "./identity-reservations.repository.ts";
 import type { IdentitySignInAccountsRepository } from "./identity-signin-accounts.repository.ts";
 import type { IdentityUsersRepository } from "./identity-users.repository.ts";
@@ -95,31 +95,6 @@ export interface IdentityRepositories {
   readonly ssoDomainOwnership: SsoDomainOwnershipRepository;
   /** The cross-organization reads the operator identity lookup takes (D05). */
   readonly identityLookup: IdentityLookupRepository;
-  /** A person's identity log, read: the lookup's history panel and its waiting proposals. */
-  readonly identityHistory: IdentityHistoryRepository;
+  /** Identity's throttles: join requests, confirmation mails and the lookup's attempt budget. */
+  readonly rateLimits: IdentityRateLimitRepository;
 }
-
-/** The rows a one-shot migration pass reads, none of which needs the deployment's encryption. */
-/** The rows the identity pipeline's guards and projections read, with no encryption needed. */
-export type IdentityPipelineRepositories = Pick<
-  IdentityRepositories,
-  | "heads"
-  | "users"
-  | "reservations"
-  | "mfaEnrollment"
-  | "identityProjection"
-  | "mfaProjection"
-  | "identityHistory"
->;
-
-export type IdentityMigrationRepositories = Pick<
-  IdentityRepositories,
-  | "heads"
-  | "users"
-  | "reservations"
-  | "mfaEnrollment"
-  | "identityProjection"
-  | "backfill"
-  | "secretCarry"
-  | "ssoDomainOwnership"
->;

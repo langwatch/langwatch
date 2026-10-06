@@ -73,7 +73,7 @@ export const issuerForProviderId = (providerId: string): string =>
     : `${OAUTH_ISSUER_PREFIX}${encodeURIComponent(providerId)}`;
 
 /** An issuer this branch minted names its `providerId`; any other is the provider's own. */
-export type IssuerProvider = { minted: true; providerId: string } | { minted: false };
+type IssuerProvider = { minted: true; providerId: string } | { minted: false };
 
 /** better-auth's `issuer`, inverted back to the `providerId` this branch keys on. */
 export const providerIdFromIssuer = (issuer: string): IssuerProvider => {

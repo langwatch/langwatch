@@ -120,6 +120,16 @@ export class PrismaAgentRepository
     return mapAgentRow(row);
   }
 
+  async findProjectIdsWithHttpAgents(): Promise<string[]> {
+    const rows = await this.prisma.agent.findMany({
+      where: { type: "http", archivedAt: null },
+      select: { projectId: true },
+      distinct: ["projectId"],
+    });
+
+    return rows.map((row) => row.projectId);
+  }
+
   async findAll(input: AgentProjectInput): Promise<Agent[]> {
     const rows = await this.prisma.agent.findMany({
       where: { projectId: input.projectId, archivedAt: null, AND: [connectedAgentVisibleWhere()] },

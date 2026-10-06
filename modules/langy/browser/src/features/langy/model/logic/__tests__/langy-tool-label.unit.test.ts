@@ -60,6 +60,7 @@ describe("given a tool frame from the live stream", () => {
   describe("when the agent shells out to the LangWatch CLI", () => {
     const command = "langwatch trace search --format json";
 
+    /** @scenario "A plain CLI search is recognised as a trace search" */
     it("is treated as the capability it is, not as a shell call", () => {
       expect(effectiveToolName("bash", { command })).toBe("langwatch.trace.search");
     });

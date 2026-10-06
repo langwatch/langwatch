@@ -526,8 +526,8 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 		return err
 	}
 	o.EnsureGateHookForUp(p.WorktreeDir)
-	langyDockerHost := o.langyContainerHost(ctx, st, &opts)
-	o.sup.Supervise(ctx, o.planChildren(st, opts, p.WorktreeDir, langyDockerHost))
+	opts.langyDockerHost = o.langyContainerHost(ctx, st, &opts)
+	o.sup.Supervise(ctx, o.planChildren(st, opts, p.WorktreeDir))
 	return nil
 }
 

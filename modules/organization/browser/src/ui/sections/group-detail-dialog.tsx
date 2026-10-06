@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import type { RouterOutputs } from "../../behavior/organization-api.ts";
 import { api } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
+import { directoryOwnershipCopy } from "../../model/group-source.ts";
 import {
   GrantInputRow,
   type GrantInputRowHandle,
@@ -404,7 +405,7 @@ export function GroupDetailDialog({
                     fontSize="sm"
                     color="fg.muted"
                   >
-                    Membership managed by {d.scimSource.toUpperCase()} via SCIM.
+                    {directoryOwnershipCopy({ source: d.scimSource })}
                   </Box>
                 )}
 

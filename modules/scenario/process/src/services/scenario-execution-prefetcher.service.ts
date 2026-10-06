@@ -15,27 +15,21 @@ import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import type { ScenarioRunSecretSeal } from "../repositories/scenario.repository.ts";
 import { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
 import { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
 import {
   ScenarioPrefetchCompletionService,
   type ScenarioPrefetchLookups,
 } from "./scenario-prefetch-completion.service.ts";
+import { ScenarioRunKeyService } from "./scenario-run-key.service.ts";
+import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 import {
   ScenarioTargetPrefetchService,
   type VoiceTargetReader,
 } from "./scenario-target-prefetch.service.ts";
-import type { ScenarioService } from "./scenario.service.ts";
-export type { VoiceTargetReader } from "./scenario-target-prefetch.service.ts";
-import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
-import { ScenarioRunKeyService } from "./scenario-run-key.service.ts";
-import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
-
-export type {
-  ModelParamsFailureReason,
-  ModelParamsResult,
-} from "./scenario-model-parameters.service.ts";
+import type { ScenarioService } from "./scenario.service.ts";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 
@@ -44,10 +38,13 @@ export interface ScenarioExecutionPrefetchConfig {
   langwatchEndpoint: string;
   nlpServiceUrl: string;
   legacyDefaultModel: string;
+  /** The deployment's public origin: the relay address when no endpoint is configured. */
+  publicBaseUrl?: string;
 }
 
 type ScenarioExecutionPrefetcherServiceOptions = {
-  secretCipher: ScenarioSecretCipher;
+  /** Opens a run's secret parameters: the scenario repository's own operation. */
+  runSecretSeal: ScenarioRunSecretSeal;
   config: ScenarioExecutionPrefetchConfig;
   scenarios: ScenarioService;
   suites: SuiteApi;
@@ -96,8 +93,9 @@ export class ScenarioExecutionPrefetcherService {
       modelParameters,
       traces: options.traces,
       runKeys,
+      workflows: options.workflows,
     });
-    const runSecrets = ScenarioRunSecretsService.create(options.secretCipher);
+    const runSecrets = ScenarioRunSecretsService.create(options.runSecretSeal);
 
     return new ScenarioExecutionPrefetcherService({
       options,
@@ -173,6 +171,10 @@ export class ScenarioExecutionPrefetcherService {
       childEnvironment: Promise.all([lookups.scenario, lookups.project, runKey])
         .then(([scenario, project, apiKey]) => {
           if (!project.success || apiKey === undefined) {
+            return null;
+          }
+          // A voice child needs the caller's keys, which arrive with the prefetched data.
+          if (target.type === "voice") {
             return null;
           }
 

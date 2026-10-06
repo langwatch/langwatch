@@ -39,7 +39,7 @@ export const SESSION_PERSON_TTL_MS = 30_000;
 const MAX_CACHED_PEOPLE = 10_000;
 
 /** What the browser-session half of the module is built from. */
-export interface BrowserSessionDeps {
+interface BrowserSessionDeps {
   sessions: AuthSessionRepository;
   /** Absent where the deployment composed no cache: the database still answers. */
   cache: AuthSessionCacheRepository | null;

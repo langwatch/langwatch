@@ -146,6 +146,7 @@ describe("budget detail page", () => {
     });
   });
   describe("when the scope target cannot be named", () => {
+    /** @scenario A budget whose scope target cannot be named still opens */
     it("shows the raw scope id in its place", () => {
       state.budget = budget({ scopeId: "org-gone", scopeTarget: null });
       renderPage(MANAGE);
@@ -155,6 +156,7 @@ describe("budget detail page", () => {
   });
 
   describe("when a ledger line carries an unrecognised status", () => {
+    /** @scenario A ledger line with an unrecognised status is still listed */
     it("still lists the debit with its status as written", () => {
       state.budget = budget({
         recentLedger: [
@@ -173,7 +175,8 @@ describe("budget detail page", () => {
       renderPage(MANAGE);
 
       expect(screen.getByText("ci key")).toBeInTheDocument();
-      expect(screen.getByText("queued")).toBeInTheDocument();
+      expect(screen.getByText("QUEUED")).toBeInTheDocument();
+      expect(screen.queryByText("queued")).not.toBeInTheDocument();
     });
   });
 });

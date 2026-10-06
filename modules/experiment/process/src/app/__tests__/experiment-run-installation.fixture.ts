@@ -39,7 +39,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import { createApp } from "@langwatch/process";
-import { memoryStores } from "@langwatch/process-stores";
+import type { StoresMemberSource } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
@@ -312,6 +312,7 @@ function peersOf(overrides: PeerOverrides) {
     }),
     "data-retention": createApiFixture<DataRetentionApi>({
       getPlatformDefaultRetentionDays: () => 49,
+      getResolvedForProject: async () => ({ traces: 49, scenarios: 49, experiments: 49 }),
     }),
     ...overrides,
   };
@@ -336,24 +337,33 @@ function boot({
   peers: PeerOverrides;
   workflow: WorkflowApi;
 }) {
+  // The live tier: two processes share a run only through the stores both hold.
+  const clients: Record<string, unknown> = {
+    prisma: database.client,
+    clickhouse: new ClickHouseQueryClient({ driver: new EmptyDriver() }),
+    redis: memoryRedisDouble({ store: redis }),
+  };
+  const stores: StoresMemberSource = {
+    tier: "live",
+    order: Object.keys(clients),
+    read: (name) => clients[name],
+  };
   const app = createApp({ role })
     .withModules([experimentProcessModule])
-    .withStores(memoryStores())
+    .withStores(stores)
     .withEventing(eventing)
-    .withRelational(database.client)
-    .withAnalytical(new ClickHouseQueryClient({ driver: new EmptyDriver() }))
     .withConfig({
-      experiment: { blockLocalHttpCalls: false, allowedProxyHosts: [], runConcurrency },
+      experiment: {
+        blockLocalHttpCalls: false,
+        allowedProxyHosts: [],
+        runConcurrency,
+        publicBaseUrl,
+        isSaas: false,
+      },
     })
-    .withMember("publicBaseUrl", publicBaseUrl)
-    .withMember("processName", `langwatch-test-${role}`)
-    .withMember("isSaas", false)
     .withObservability((observability) => observability.withLogging(createTestLogger().logger));
 
-  return app
-    .withKeyvalue(memoryRedisDouble({ store: redis }))
-    .provide({ ...peersOf(peers), workflow })
-    .boot();
+  return app.provide({ ...peersOf(peers), workflow }).boot();
 }
 
 export type RunPairOptions = Readonly<{
@@ -459,6 +469,9 @@ export async function bootRunPair(options: RunPairOptions) {
     peers: options.api ?? {},
     workflow: createApiFixture<WorkflowApi>({ ...options.workflow }),
   });
+  // Boot holds each runtime's consumers; the worker's process managers drain only once started.
+  await worker.start();
+  await api.start();
 
   return {
     api: installedExperimentOf(api.module(experimentProcessModule).provided),

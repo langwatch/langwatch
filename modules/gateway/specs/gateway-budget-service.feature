@@ -49,6 +49,12 @@ Feature: Gateway budget decision service
     Then each row carries scope_reach from the same per-row reach read the detail route uses
 
   @integration
+  Scenario: A budget read on its own carries its scope reach
+    Given a budget no active key can reach
+    When the budget is read by id
+    Then the answer carries scope_reach "unreachable", as its row in the budget list does
+
+  @integration
   Scenario: A budget reset answers with the row it moved, carrying no reach read
     Given a budget whose period is reset
     When the reset answers with the row it moved

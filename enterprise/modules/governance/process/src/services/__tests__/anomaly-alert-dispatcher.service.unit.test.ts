@@ -2,10 +2,10 @@ import { createHmac } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  type AnomalyAlertHttpClient,
-  type AnomalyAlertHttpResponse,
-} from "../../app/governance.members.ts";
+import type {
+  AnomalyAlertHttpClient,
+  AnomalyAlertHttpResponse,
+} from "../../channels/anomaly-alert.channel.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
 
 type Call = {
@@ -86,6 +86,7 @@ describe("AnomalyAlertDispatcherService", () => {
     expect(result.dispatchTag).toBe("dispatched_webhook_1");
   });
 
+  /** @scenario "Anomaly delivery delegates network safety" */
   it("signs the exact request body when a shared secret is configured", async () => {
     const http = new RecordingHttp(() => ({
       status: 200,
@@ -109,6 +110,7 @@ describe("AnomalyAlertDispatcherService", () => {
     expect(call.headers["X-LangWatch-Signature"]).toBe(`sha256=${expected}`);
   });
 
+  /** @scenario "Anomaly delivery delegates network safety" */
   it("retries 5xx responses but not 4xx responses", async () => {
     const transient = new RecordingHttp((_call, index) => ({
       status: index === 0 ? 503 : 200,
@@ -137,6 +139,7 @@ describe("AnomalyAlertDispatcherService", () => {
     });
   });
 
+  /** @scenario "Anomaly delivery delegates network safety" */
   it("continues fan-out when one destination exhausts retries", async () => {
     const http = new RecordingHttp((call) => ({
       status: call.url.includes("primary") ? 500 : 200,

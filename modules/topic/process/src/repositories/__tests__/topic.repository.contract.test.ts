@@ -52,14 +52,11 @@ describe.each(backends)("given the $name topic backend", ({ create }) => {
       ).resolves.toBeNull();
     });
 
-    it("leaves an unknown project out of the owned and scheduled subsets", async () => {
+    it("leaves an unknown project out of the owned subset", async () => {
       const repositories = create();
 
       await expect(
         repositories.clustering.findOwnedTopicModelProjectIds(["project-absent"]),
-      ).resolves.toEqual([]);
-      await expect(
-        repositories.clustering.findAlreadyScheduledProjectIds(["project-absent"]),
       ).resolves.toEqual([]);
     });
 

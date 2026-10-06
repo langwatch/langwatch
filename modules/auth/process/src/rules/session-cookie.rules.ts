@@ -1,7 +1,7 @@
 import { getSessionCookie } from "better-auth/cookies";
 
 /** Whether the caller presented a session cookie, and the token it names. */
-export type PresentedSessionCookie = { kind: "absent" } | { kind: "present"; token: string };
+type PresentedSessionCookie = { kind: "absent" } | { kind: "present"; token: string };
 
 /**
  * better-auth owns the cookie's name and its `__Secure-` variant, and signs it

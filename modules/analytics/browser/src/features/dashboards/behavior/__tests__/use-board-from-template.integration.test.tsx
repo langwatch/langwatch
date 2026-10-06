@@ -5,10 +5,7 @@
  * @see modules/dashboard/specs/dashboards-v1.feature
  */
 
-import {
-  type UiProcedureCall,
-  UiProcedureRefusal,
-} from "@langwatch/browser-host/testing-transport";
+import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";

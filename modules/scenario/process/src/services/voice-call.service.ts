@@ -59,7 +59,7 @@ export type VoiceCallPlaybackInput = {
 };
 
 /** A run already written for a conversation, as a finish or a replay reads it back. */
-export type VoiceSessionExistingRun = {
+type VoiceSessionExistingRun = {
   agentId: string | null;
   status: ScenarioRunStatus;
   source: CallRecord["source"] | null;

@@ -32,7 +32,12 @@ function FlagProbe({
   transport: UiFeatureApiTransport;
   session: UiSessionReading;
 }) {
-  const ui = useBrowserUiSession({ transport, session, scope: UNSCOPED });
+  const ui = useBrowserUiSession({
+    transport,
+    session,
+    scope: UNSCOPED,
+    isPublicRoute: false,
+  });
   return <span data-testid="flag">{String(ui.featureFlag("release_ui_sign_in"))}</span>;
 }
 

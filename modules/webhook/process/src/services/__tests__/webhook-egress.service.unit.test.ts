@@ -204,6 +204,7 @@ describe("WebhookEgressService", () => {
 
   describe("given a scope that has reached its hourly dispatch cap", () => {
     /** @scenario "The hourly dispatch cap backs a flood off rather than dropping it" */
+    /** @scenario "The dispatch cap is counted where the whole fleet can see it" */
     /** @scenario "A project cannot flood an endpoint" */
     it("backs off retryably with the time the window resets in, contacting nobody", async () => {
       transportResolves();
@@ -248,6 +249,7 @@ describe("WebhookEgressService", () => {
 
   describe("given a destination the address policy refuses", () => {
     /** @scenario "A send refuses a fenced address before it opens a connection" */
+    /** @scenario "A process builds the webhook transport from its own configuration" */
     /** @scenario "Requests to private or internal addresses are blocked" */
     it.each([
       "https://127.0.0.1/hook",

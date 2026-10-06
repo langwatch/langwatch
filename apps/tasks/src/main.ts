@@ -6,6 +6,7 @@ import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-c
 import { secretLogRedactPaths, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 
 import {
+  processEnvironment,
   resolveTasksConfig,
   resolveTasksEnvironment,
   tasksSecrets,
@@ -32,9 +33,6 @@ const tasks = new Map<string, () => Promise<TaskRun>>([
   ],
   ["storage-seed", async () => (await import("./storage-seed/storage-seed.ts")).storageSeed],
 ]);
-
-/** Tasks that read the per-organization ClickHouse routing. */
-const DATAPLANE_TASKS = new Set(["system-migrations-pass"]);
 
 /** Tasks that never touch the migration database, so never wait on its advisory lock. */
 const LOCK_FREE_TASKS = new Set(["system-migrations-pass", "lwql-render-access-config"]);
@@ -73,11 +71,9 @@ export async function runTasks(argv: readonly string[], input: TaskInput): Promi
 async function openConnections({
   config,
   chain,
-  argv,
 }: {
   config: TasksConfig;
   chain: SecretsChain;
-  argv: readonly string[];
 }): Promise<TaskConnections> {
   const resolver = SecretsResolver.over(chain);
   const declared = Object.values(tasksSecrets);
@@ -91,15 +87,10 @@ async function openConnections({
   const redis = await secrets.into(tasksSecrets.redisUrl, (url) =>
     url === undefined ? null : new RedisConnectionService().connect({ url }),
   );
-  const dataplane = argv.some((name) => DATAPLANE_TASKS.has(name))
-    ? await (
-        await import("./system-migrations-dataplane.ts")
-      ).openSystemMigrationsDataplane(secrets)
-    : null;
 
   resolver.seal();
 
-  return { database, redis, dataplane };
+  return { database, redis };
 }
 
 async function main(): Promise<void> {
@@ -114,21 +105,29 @@ async function main(): Promise<void> {
     try {
       // Only module tasks load every module; the migrations stay a small graph.
       const { runModuleTask } = await import("./module-task.ts");
-      await runModuleTask({ name: first, args: rest, signal: controller.signal });
+      await runModuleTask({
+        name: first,
+        args: rest,
+        signal: controller.signal,
+        plugins: {
+          taskModules: resolveTasksConfig({ ...processEnvironment }).taskModules,
+          importModule: (specifier) => import(specifier),
+        },
+      });
     } finally {
       process.off("SIGINT", abort);
       process.off("SIGTERM", abort);
     }
     return;
   }
-  const source = { ...process.env };
+  const source = { ...processEnvironment };
   const environment = resolveTasksEnvironment(source);
   const config = resolveTasksConfig(source);
-  const chain = SecretsChain.start({ environment: process.env })
+  const chain = SecretsChain.start({ environment: processEnvironment })
     .withEnv()
     .withFile()
     .withOnePassword(config.onePasswordAccount);
-  const connections = await openConnections({ config, chain, argv });
+  const connections = await openConnections({ config, chain });
   try {
     await runTasks(argv, {
       config,

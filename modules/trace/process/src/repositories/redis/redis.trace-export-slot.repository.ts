@@ -1,16 +1,16 @@
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import { TraceExportSlotRepository } from "../trace-export-slot.repository.ts";
 
 /** Export slots over the process's Redis: a claim is one `SET key value EX seconds NX`. */
 export class RedisTraceExportSlotRepository extends TraceExportSlotRepository {
-  static create(input: { connection: ProcessMembers["redis"] }): RedisTraceExportSlotRepository {
+  static create(input: { connection: RedisConnection }): RedisTraceExportSlotRepository {
     return new RedisTraceExportSlotRepository(input.connection);
   }
 
-  #connection: ProcessMembers["redis"];
+  #connection: RedisConnection;
 
-  private constructor(connection: ProcessMembers["redis"]) {
+  private constructor(connection: RedisConnection) {
     super();
     this.#connection = connection;
   }

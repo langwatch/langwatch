@@ -35,3 +35,23 @@ export const projectLegacyKeyRevokedEventDataSchema = z.object({
 export type ProjectLegacyKeyRevokedEventData = z.infer<
   typeof projectLegacyKeyRevokedEventDataSchema
 >;
+
+export const PROJECT_PRESENCE_SETTING_CHANGED_EVENT_TYPE =
+  "lw.project.presence_setting_changed" as const;
+export const PROJECT_PRESENCE_SETTING_CHANGED_EVENT_VERSION = "2026-10-05" as const;
+
+/** The project's own presence switch; presence ANDs it with its organization's. */
+export const projectPresenceSettingChangedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  presenceEnabled: z.boolean(),
+  /** Who saved the change; absent for a backfill. */
+  changedByUserId: z.string().min(1).nullish(),
+  /** Set by project's backfill: the stored value, recorded before any change was. */
+  backfilled: z.boolean().optional(),
+});
+export type ProjectPresenceSettingChangedEventData = z.infer<
+  typeof projectPresenceSettingChangedEventDataSchema
+>;

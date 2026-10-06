@@ -2,7 +2,7 @@
  * The rest of the loop: page after page, a cancellation, the stall wake, and
  * the outcome that clears the wake for good. Pure state logic, so every case
  * here is one input against one state.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import { describe, expect, it } from "vitest";

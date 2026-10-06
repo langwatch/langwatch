@@ -116,6 +116,7 @@ export function ApiKeyIntegrationInfoCard({ projectId, minting }: ApiKeyIntegrat
         isCreating={minting.isMinting}
         onCreate={handleGenerate}
         scopeNote={minting.scopeNote}
+        createLabel="Create a key"
       />
       <CodePreview
         code={code}

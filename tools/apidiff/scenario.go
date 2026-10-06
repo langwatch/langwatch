@@ -319,6 +319,12 @@ func validateScenario(item *scenario) []string {
 	}
 	problems = append(problems, validateMainRequest(item)...)
 	problems = append(problems, validateCaptures("capture", item.Capture)...)
+	return append(problems, validateSteps(item)...)
+}
+
+// validateSteps checks the setup, verify and teardown steps, in that order.
+func validateSteps(item *scenario) []string {
+	var problems []string
 	for index := range item.Setup {
 		problems = append(problems, validateStep(fmt.Sprintf("setup[%d]", index), &item.Setup[index], false)...)
 	}
@@ -399,7 +405,9 @@ func validateStep(where string, step *scenarioStep, verify bool) []string {
 	return validateRequestStep(where, step, verify)
 }
 
-func validateRequestStep(where string, step *scenarioStep, verify bool) []string {
+// foldStepRequest fills what a scalar request leaves unset from the step's
+// sibling body, bodyRaw, contentType, query, headers and auth.
+func foldStepRequest(step *scenarioStep) {
 	request := step.Request
 	if request.Body == nil {
 		request.Body = step.Body
@@ -419,6 +427,11 @@ func validateRequestStep(where string, step *scenarioStep, verify bool) []string
 	if request.Auth == "" {
 		request.Auth = step.Auth
 	}
+}
+
+func validateRequestStep(where string, step *scenarioStep, verify bool) []string {
+	foldStepRequest(step)
+	request := step.Request
 	problems := validateCaptures(where+" capture", step.Capture)
 	if request.BodyRaw != nil && request.Body != nil {
 		problems = append(problems, where+": a request takes body or bodyRaw, not both")

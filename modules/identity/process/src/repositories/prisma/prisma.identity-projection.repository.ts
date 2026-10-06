@@ -17,19 +17,6 @@ import {
   identifierRowToFact as rowToFact,
 } from "./prisma.identifier.mapper.ts";
 
-/**
- * Secrets are absent deliberately, and the list is narrow on purpose: a replay that rewrote
- * `access_token` would undo a token refresh that legitimately happened after the event.
- * The columns the fold owns on `Account` (ADR-116's bridge phase).
- */
-export const FOLD_OWNED_ACCOUNT_COLUMNS = [
-  "id",
-  "userId",
-  "provider",
-  "issuer",
-  "providerAccountId",
-] as const;
-
 const logger = createLogger("langwatch:identity:projection");
 
 /** An identifier that projects to an `Account` row at all. One with no

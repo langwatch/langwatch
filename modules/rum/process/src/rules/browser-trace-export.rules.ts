@@ -17,10 +17,10 @@ const traceExportSchema = z.looseObject({
   resourceSpans: z.array(resourceSpansSchema).min(1),
 });
 
-export type OtlpResourceSpans = z.infer<typeof resourceSpansSchema>;
+type OtlpResourceSpans = z.infer<typeof resourceSpansSchema>;
 export type BrowserTraceExport = z.infer<typeof traceExportSchema>;
 
-export type ParsedTraceExport =
+type ParsedTraceExport =
   | Readonly<{ walkable: true; traceExport: BrowserTraceExport }>
   | Readonly<{ walkable: false }>;
 

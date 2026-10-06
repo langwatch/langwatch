@@ -10,7 +10,11 @@ import {
   type TokenCredential,
 } from "@azure/identity";
 
-import type { ObjectStorageAzureConfig, ObjectStorageAzureIdentity } from "./config.ts";
+import type {
+  ObjectStorageAzureConfig,
+  ObjectStorageAzureIdentity,
+  ObjectStorageConfig,
+} from "./config.ts";
 import type { Clock } from "./members.ts";
 
 const TOKEN_MODES = ["workloadIdentity", "managedIdentity", "azureCli"] as const;
@@ -114,18 +118,49 @@ function assertWorkloadIdentity(identity: ObjectStorageAzureIdentity): void {
   ].flatMap(([name, value]) => (value?.trim() ? [] : [name ?? ""]));
   if (missing.length === 0) return;
   throw new AzureBackendMisconfiguredError(
-    `AZURE_BLOB_AUTH_MODE=workloadIdentity but ${missing.join(", ")} are absent: the AKS ` +
-      "workload-identity webhook never mutated this pod. Check the pod label " +
-      '`azure.workload.identity/use: "true"` and the ServiceAccount client-id annotation.',
+    "AZURE_BLOB_AUTH_MODE=workloadIdentity but the platform-injected federated identity values " +
+      `(${missing.join(", ")}) are absent. This means the AKS workload-identity admission webhook ` +
+      'never mutated this pod. Check: the pod carries the label `azure.workload.identity/use: "true"`, ' +
+      "the ServiceAccount carries the `azure.workload.identity/client-id` annotation, and the " +
+      "azure-workload-identity webhook is installed on the cluster. These variables are injected " +
+      "by the webhook, never set by the operator.",
     missing,
   );
 }
 
-export function resolveAzureCredentials(config: ObjectStorageAzureConfig): AzureCredentials {
-  const mode = config.authMode?.trim() || "sharedKey";
+function selectedMode(options: {
+  authMode: string | undefined;
+  purpose: "read" | "write";
+  backend: ObjectStorageConfig["backend"];
+}): "sharedKey" | AzureTokenMode {
+  const { purpose, backend } = options;
+  const mode = options.authMode?.trim() || "sharedKey";
   if (mode !== "sharedKey" && !isTokenMode(mode)) {
     throw new AzureBackendMisconfiguredError(`Unsupported AZURE_BLOB_AUTH_MODE "${mode}".`);
   }
+  if (purpose === "write" && mode !== "sharedKey" && backend !== "azure") {
+    throw new AzureBackendMisconfiguredError(
+      `AZURE_BLOB_AUTH_MODE=${mode} has no effect without STORED_OBJECTS_BACKEND=azure. ` +
+        "Set STORED_OBJECTS_BACKEND=azure to use it, or unset AZURE_BLOB_AUTH_MODE.",
+    );
+  }
+  return mode;
+}
+
+/**
+ * Writes name the container and refuse a token mode the deployment did not select. Reads need
+ * neither: a recorded location carries its container, and an operator moving off Azure keeps
+ * the block so what was written there stays readable.
+ */
+export function resolveAzureCredentials(
+  config: ObjectStorageAzureConfig,
+  options: {
+    purpose?: "read" | "write";
+    backend?: ObjectStorageConfig["backend"];
+  } = {},
+): AzureCredentials {
+  const { purpose = "write", backend = "azure" } = options;
+  const mode = selectedMode({ authMode: config.authMode, purpose, backend });
   const accountName = config.accountName?.trim() ?? "";
   const accountKey = config.accountKey?.trim() ?? "";
   const container = config.container?.trim() ?? "";
@@ -141,7 +176,7 @@ export function resolveAzureCredentials(config: ObjectStorageAzureConfig): Azure
   }
   const missing = [
     ...(accountName ? [] : ["AZURE_BLOB_ACCOUNT_NAME"]),
-    ...(container ? [] : ["AZURE_BLOB_CONTAINER"]),
+    ...(purpose === "read" || container ? [] : ["AZURE_BLOB_CONTAINER"]),
     ...(mode === "sharedKey" && !accountKey ? ["AZURE_BLOB_ACCOUNT_KEY"] : []),
   ];
   if (missing.length > 0) {

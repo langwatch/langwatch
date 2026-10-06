@@ -12,13 +12,7 @@ const ERROR_OPTIONS = [
 ];
 
 /** The switches every call without its own X-Llmsim-* header follows. */
-export const SettingsPanel = ({
-  info,
-  onSaved,
-}: {
-  info: Info;
-  onSaved: () => void;
-}) => {
+export const SettingsPanel = ({ info, onSaved }: { info: Info; onSaved: () => void }) => {
   const { settings } = info;
   const [forcedError, setForcedError] = useState(String(settings.forcedError));
   const [seed, setSeed] = useState(settings.seed);

@@ -5,6 +5,7 @@
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiKeyHostProvider } from "../../../model/api-key-host.ts";
@@ -29,7 +30,11 @@ vi.mock("shiki", () => {
 const TOKEN = "sk-lw-test-token-value";
 
 function renderDialog(
-  overrides: { projectId?: string; orgProjects?: { id: string; name: string }[] } = {},
+  overrides: {
+    projectId?: string;
+    orgProjects?: { id: string; name: string }[];
+    onClose?: () => void;
+  } = {},
 ) {
   const host = new FakeApiKeyHost();
   renderWithDesignSystem(
@@ -39,7 +44,7 @@ function renderDialog(
         projectId={"projectId" in overrides ? overrides.projectId : "project-abc"}
         endpoint="https://app.langwatch.ai"
         orgProjects={overrides.orgProjects ?? [{ id: "project-abc", name: "ACME" }]}
-        onClose={() => void 0}
+        onClose={overrides.onClose ?? (() => void 0)}
       />
     </ApiKeyHostProvider>,
   );
@@ -70,6 +75,7 @@ afterEach(cleanup);
 describe("given a token has just been minted", () => {
   describe("when the .env tab renders", () => {
     /** @scenario .env tab renders in the shared labelled code preview */
+    /** @scenario The secret panel shows the token once with ready-to-copy snippets */
     it("shows a snippet box whose header carries the .env label", async () => {
       renderDialog();
       // ".env" appears once as the tab label and once as the code block's
@@ -128,6 +134,7 @@ describe("given a token has just been minted", () => {
     });
 
     /** @scenario One list of coding assistants drives both the tabs and the config paths */
+    /** @scenario The secret panel shows the token once with ready-to-copy snippets */
     it("draws the tab strip and the config-path chips from the same list", () => {
       renderDialog();
       const configOnly = CODE_ASSISTANTS.filter((assistant) => assistant.configPath);
@@ -145,6 +152,7 @@ describe("given a token has just been minted", () => {
 
   describe("when the Bearer tab is selected", () => {
     /** @scenario Bearer tab renders in the shared labelled code preview */
+    /** @scenario The secret panel shows the token once with ready-to-copy snippets */
     it("shows a snippet box whose header names the snippet", async () => {
       renderDialog();
       fireEvent.click(within(useInCodeSection()).getByRole("button", { name: "Bearer" }));
@@ -154,6 +162,7 @@ describe("given a token has just been minted", () => {
 
   describe("when the Basic Auth tab is selected", () => {
     /** @scenario Basic Auth tab renders in the shared labelled code preview */
+    /** @scenario The secret panel shows the token once with ready-to-copy snippets */
     it("shows a snippet box whose header names the snippet", async () => {
       renderDialog();
       fireEvent.click(within(useInCodeSection()).getByRole("button", { name: "Basic Auth" }));
@@ -190,8 +199,24 @@ describe("given a token has just been minted", () => {
     });
   });
 
+  describe("when the member closes it", () => {
+    /** @scenario Closing the secret panel needs no confirmation */
+    it("closes at once, with no checkbox or confirmation in the way", async () => {
+      const user = userEvent.setup();
+      const onClose = vi.fn();
+      renderDialog({ onClose });
+
+      expect(screen.queryByRole("checkbox")).toBeNull();
+      await user.click(screen.getByRole("button", { name: /close/i }));
+
+      expect(onClose).toHaveBeenCalledOnce();
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+  });
+
   describe("when the dialog renders", () => {
     /** @scenario Amber warning between .env block and Code Assistants section stays */
+    /** @scenario Closing the secret panel needs no confirmation */
     it("keeps the amber copy-this-token-now warning", async () => {
       renderDialog();
       expect(await screen.findByText(/Copy this token now\./)).toBeInTheDocument();
@@ -211,6 +236,7 @@ describe("given a token has just been minted", () => {
     });
 
     /** @scenario Copy delivers the real value even while the snippet is masked */
+    /** @scenario The secret panel shows the token once with ready-to-copy snippets */
     it("copies the real command while the snippet is masked", async () => {
       const host = renderDialog();
       const box = await boxLabelled("Terminal");

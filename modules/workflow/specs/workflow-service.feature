@@ -12,6 +12,7 @@ Feature: Workflow service boundary
     When a caller saves it as an evaluator
     Then workflow_not_found is reported and no publication changes
 
+  @unit
   Scenario: Linked features discover workflow fields without reading workflow tables
     Given a project has valid, invalid and archived workflow graphs
     When a peer lists fields for those workflow identifiers
@@ -19,6 +20,7 @@ Feature: Workflow service boundary
     And invalid graphs report unresolved fields
     And valid graphs preserve all declared input and output identifiers
 
+  @unit
   Scenario: A failed peer copy removes only the newly copied workflow
     Given a copied workflow has current and latest version pointers and version parentage
     When the peer deletes its uncommitted workflow in the target project
@@ -66,12 +68,14 @@ Feature: Workflow service boundary
     Then it migrates the graph through the application port
     And updates the current pointer and display metadata together
 
+  @unit
   Scenario: Studio and execution share graph migration
     Given a persisted workflow version uses an older graph shape
     When Studio or execution materialises that version
     Then it uses the Workflow contract migration
     And both paths produce the same current DSL shape
 
+  @unit
   Scenario: Studio execution events use one portable wire contract
     Given Studio dispatches a component, flow, evaluation, or optimization event
     When a browser or server consumes the event
@@ -84,47 +88,20 @@ Feature: Workflow service boundary
     Then declared entry defaults fill only missing values
     And the browser template does not pin a resolved project model
 
-  Scenario: Workflow creation import is portable browser behaviour
-    Given a user opens the workflow creation dialog
-    When they select a template or import a valid workflow file
-    Then Workflow Web owns the selection and file validation
-    And application composition supplies the create mutation and routing
-
-  Scenario: Workflow management cards keep transport in application composition
-    Given the workflow list displays a saved workflow
-    When the user opens its sync, push, copy or delete actions
-    Then Workflow Web renders the card and action menu
-    And application composition performs project queries, mutations and dialogs
-
-  Scenario: Studio result presentation keeps transport in application composition
-    Given Studio displays workflow evaluation results
-    When the panel is loading, waiting, failed, or showing a selected run
-    Then Workflow Web owns the panel state and layout
-    And application composition supplies project queries and Experiment renderers
-
-  Scenario: Studio dataset transforms are portable browser behaviour
-    Given Studio, Prompts, or execution needs to reshape a dataset
-    When it converts records, fields, or train/test partitions
-    Then it uses the Workflow browser surface
-    And application modules retain only compatibility imports
-
+  @unit
   Scenario: Local configuration dispatch stays portable
     Given a browser or API dispatches unsaved local Studio configuration
     When it materializes execution DSL or a default LLM node
     Then it uses the Workflow contract
     And no backend imports the Workflow browser surface
 
-  Scenario: Code-node Python language support is portable browser behaviour
-    Given the Studio code or Liquid-condition editor opens
-    When it completes, validates, formats, hovers, or offers quick fixes
-    Then it uses the Workflow browser surface for its editor and Python providers
-    And the application supplies only project-scoped secret transport and controls
-
+  @integration
   Scenario: Canvas node renderers use explicit application host ports
     Given Studio renders workflow nodes or palette entries
     When a node needs application-only execution or dataset data
     Then Workflow uses its injected browser host port
 
+  @integration
   Scenario: The canvas resolves its renderers from the Workflow browser surface
     Given the Workflow browser surface mounts the React Flow canvas
     When it resolves node or default-edge renderers
@@ -145,6 +122,7 @@ Feature: Workflow service boundary
     When Workflow materializes the event with an injected DatasetService
     Then execution receives inline records without accessing application globals
 
+  @unit
   Scenario: Workflow prepares a Studio event through typed runtime ports
     Given a Studio event needs project credentials, model parameters, and datasets
     When a caller invokes prepareStudioEvent for its project
@@ -158,12 +136,14 @@ Feature: Workflow service boundary
     Then it calls the canonical Dataset service
     And it does not access the Dataset repository
 
+  @unit
   Scenario: Evaluation remains application composition
     Given a caller requests `/workflows/:id/evaluate`
     When the API handles the request
     Then it composes Workflow version selection with Evaluation execution
     And Workflow does not own the evaluation run lifecycle
 
+  @unit
   Scenario: Execution dispatch is a Workflow server concern
     Given Workflow resolves a version to run
     When the server executor dispatches it through injected nlpgo infrastructure
@@ -233,10 +213,10 @@ Feature: Workflow service boundary
     Then the monitor is deleted, the evaluator and the agent are archived, then the workflow
 
   @unit
-  Scenario: The workflows list reads copy lineage on a process that supplies only declared members
-    Given the workflow module is installed from its declared members alone
+  Scenario: The workflows list reads copy lineage on a process that supplies only stores and declared peers
+    Given the workflow module is installed on the process's stores and its declared peers alone
     When the project's workflows are listed with their copy lineage
-    Then the list answers instead of failing on a member the process never supplied
+    Then the list answers instead of failing on anything the process never supplied
 
   @unit
   Scenario: An evaluation run is judged against an API key's own bindings

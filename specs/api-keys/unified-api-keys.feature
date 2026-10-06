@@ -419,7 +419,7 @@ Feature: Unified API Keys
   Scenario: Every key the family claims is served by it
     Given the API Key frontend feature
     When its page loaders are read
-    Then it registers the settings key and the CLI authorize key, and nothing else
+    Then it registers the API keys settings, authorize, MCP authorize and CLI auth screens, and nothing else
   # ── The grants have to land before the key is handed out ───────
 
   # A key row is a plain insert and its grants are ledger commands, so the two

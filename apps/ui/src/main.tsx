@@ -122,15 +122,14 @@ function browserUiCapabilitiesHook({
     feedback: UiFeedback;
   }): UiSessionCapabilities {
     const { pathname } = useLocation();
-    const sessionReading = auth.useUiSessionReading({
-      feedback,
-      isPublicRoute: organization.isUiPublicRoute(pathname),
-    });
+    const isPublicRoute = organization.isUiPublicRoute(pathname);
+    const sessionReading = auth.useUiSessionReading({ feedback, isPublicRoute });
     const scopeReading = organization.useUiScopeReading({ transport, session: sessionReading });
     const session = auth.useBrowserUiSession({
       transport,
       session: sessionReading,
       scope: scopeReading.scope,
+      isPublicRoute,
     });
 
     const copyTargets = lending.useUiCopyTargetsReading({

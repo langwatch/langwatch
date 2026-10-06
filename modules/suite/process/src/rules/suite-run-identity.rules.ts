@@ -36,7 +36,7 @@ function digest(fields: readonly string[]): string {
  * What the run covers, as the run service resolved it. Its targets arrive
  * canonically sorted, so the same request twice resolves to the same list.
  */
-export type SuiteRunIdentity = {
+type SuiteRunIdentity = {
   projectId: string;
   suiteId: string;
   idempotencyKey: string;

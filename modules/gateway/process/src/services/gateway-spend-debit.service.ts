@@ -7,8 +7,9 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
-import type { GatewayBudgetSpend, GatewayChangeEvents } from "../app/gateway.members.ts";
 import type { WriteGatewayDebitsPayload } from "../eventing/gateway-debit.intent.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
+import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
 import type { BudgetChangeEventDedupeService } from "./gateway-budget-change-dedupe.service.ts";
 import type { GatewayBudgetCrossingService } from "./gateway-budget-crossing.service.ts";
@@ -23,9 +24,9 @@ const logger = createLogger("langwatch:gateway:spend-debits");
  */
 type GatewaySpendDebitCollaborators = Readonly<{
   budgets: Pick<GatewayService, "resolveApplicableBudgets">;
-  spend: Pick<GatewayBudgetSpend, "insertDebitsForBudgets">;
+  spend: Pick<GatewayBudgetSpendRepository, "insertDebitsForBudgets">;
   dedupe: BudgetChangeEventDedupeService;
-  changes: Pick<GatewayChangeEvents, "append">;
+  changes: Pick<GatewayChangeEventsRepository, "append">;
   crossings: Pick<GatewayBudgetCrossingService, "detect">;
 }>;
 

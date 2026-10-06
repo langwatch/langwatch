@@ -30,3 +30,4 @@ export * from "./workflow-lifecycle.events.ts";
 export * from "./workflow-host-slice.ts";
 export * from "./http-agent-node-secrets.ts";
 export * from "./workflow-run-permissions.ts";
+export * from "./workflow-lent-components.ts";

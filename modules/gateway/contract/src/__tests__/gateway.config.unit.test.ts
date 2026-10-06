@@ -12,8 +12,16 @@ const read = (source: Record<string, string | undefined>) =>
 describe("gateway server configuration", () => {
   describe("given a deployment sets nothing", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
-    it("reads its one deployment fact absent, and declares no credential", () => {
-      expect(read({})).toEqual({ spendSettlementGraceMs: undefined, isSaas: false });
+    it("reads every address and the grace absent, isSaas and loopback voice providers off", () => {
+      expect(read({})).toEqual({
+        spendSettlementGraceMs: undefined,
+        internalUrl: undefined,
+        controlPlaneUrl: undefined,
+        baseUrl: undefined,
+        publicUrl: undefined,
+        isSaas: false,
+        allowLoopbackVoiceProviders: false,
+      });
     });
   });
 

@@ -4,7 +4,6 @@
  * payload schema, which lives in `@langwatch/langy-contract` (ADR-059). They
  */
 import {
-  type Projection,
   type StateProjectionStore,
   AbstractFoldProjection,
   EventSchema,
@@ -263,10 +262,6 @@ export type LangyConversationProcessingEvent =
   | LangyLocalPolicyChangedEvent
   | LangyUserWaitStartedEvent
   | LangyUserWaitEndedEvent;
-
-export interface LangyConversationState extends Projection<LangyConversationStateData> {
-  data: LangyConversationStateData;
-}
 
 const langyConversationEvents = [
   LangyConversationStartedEventSchema,

@@ -45,6 +45,8 @@ export const usageStatsSchema = z
     maxMonthlyUsageLimit: z.number(),
     membersCount: z.number(),
     membersLiteCount: z.number(),
+    /** Developer seats (ADR-171): shown beside the metered seats, never capped. */
+    membersDeveloperCount: z.number(),
     messageLimitInfo: messageLimitInfoSchema,
     usageUnit: usageUnitSchema,
   })

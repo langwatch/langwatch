@@ -16,9 +16,9 @@ import { z } from "zod";
  */
 export const GATEWAY_GOVERNANCE_EVENTS_PIPELINE_NAME = "governance_events_processing" as const;
 export const GATEWAY_GOVERNANCE_EVENTS_AGGREGATE_TYPE = "governance_subject" as const;
-export const GATEWAY_GOVERNANCE_EVENTS_VERSION = "2026-07-31" as const;
-export const RECORD_VK_LIFECYCLE_COMMAND_TYPE = "lw.governance.record_vk_lifecycle" as const;
-export const RECORD_BUDGET_CROSSING_COMMAND_TYPE = "lw.governance.record_budget_crossing" as const;
+const GATEWAY_GOVERNANCE_EVENTS_VERSION = "2026-07-31" as const;
+const RECORD_VK_LIFECYCLE_COMMAND_TYPE = "lw.governance.record_vk_lifecycle" as const;
+const RECORD_BUDGET_CROSSING_COMMAND_TYPE = "lw.governance.record_budget_crossing" as const;
 
 const eventEnvelope = z.object({
   ...EventSchema.shape,
@@ -30,14 +30,14 @@ export const gatewayVkLifecycleEventSchema = z.object({
   type: z.literal(GATEWAY_VK_LIFECYCLE_EVENT_TYPE),
   data: recordVkLifecycleCommandDataSchema,
 });
-export type GatewayVkLifecycleEvent = z.infer<typeof gatewayVkLifecycleEventSchema>;
+type GatewayVkLifecycleEvent = z.infer<typeof gatewayVkLifecycleEventSchema>;
 
 export const gatewayBudgetCrossingEventSchema = z.object({
   ...eventEnvelope.shape,
   type: z.literal(GATEWAY_BUDGET_CROSSING_EVENT_TYPE),
   data: recordBudgetCrossingCommandDataSchema,
 });
-export type GatewayBudgetCrossingEvent = z.infer<typeof gatewayBudgetCrossingEventSchema>;
+type GatewayBudgetCrossingEvent = z.infer<typeof gatewayBudgetCrossingEventSchema>;
 
 export type GatewayGovernanceProcessingEvent = GatewayVkLifecycleEvent | GatewayBudgetCrossingEvent;
 

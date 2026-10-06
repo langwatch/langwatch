@@ -72,7 +72,7 @@ function pendingInvites(inviteId: string) {
 }
 
 class RecordingAnnouncements implements BetterAuthAnnouncements {
-  readonly trackServerEvent = vi.fn();
+  readonly signUpNurturing = vi.fn();
   readonly reportError = vi.fn();
   readonly announceSignup = vi.fn();
   readonly ssoAutoAddNurturing = vi.fn();

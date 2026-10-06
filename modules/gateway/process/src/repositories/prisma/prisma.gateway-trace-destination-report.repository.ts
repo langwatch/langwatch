@@ -32,7 +32,7 @@ type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClie
   Methods
 >;
 
-export type TraceDestinationReportDatabase = {
+type TraceDestinationReportDatabase = {
   project: Delegate<"project", "findMany">;
   organization: Delegate<"organization", "findMany">;
   virtualKey: Delegate<"virtualKey", "findMany">;

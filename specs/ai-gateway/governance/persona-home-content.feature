@@ -1,3 +1,6 @@
+# Untagged scenarios below are @unimplemented: home-page content, the pin picker and the org pin have no test
+# at this level (the resolver itself is bound in persona-home-resolver.feature). Org pin rows are follow-ups.
+
 Feature: Persona-aware home CONTENT — what each persona sees on landing
   As LangWatch becomes both an LLMOps observability platform AND an AI Governance
   platform, the home page each persona lands on must SHOW the right content for
@@ -74,7 +77,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   # Persona 1 — personal_only — /me with AiToolsPortal + personal usage
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @persona-content @persona-1
+  @bdd @ui @persona-content @persona-1 @unimplemented
   Scenario: Personal-only home renders the AI tools portal + personal usage
     Given a user resolves to persona "personal_only"
     When the user navigates to "/"
@@ -89,7 +92,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
     And NO "Your projects" section is rendered (no project memberships)
     And NO project-scoped CTAs surface
 
-  @bdd @ui @persona-content @persona-1 @empty-state
+  @bdd @ui @persona-content @persona-1 @empty-state @unimplemented
   Scenario: Personal-only home renders an honest empty state when no usage yet
     Given a user resolves to persona "personal_only"
     And the user has zero wrapper invocations on record
@@ -103,7 +106,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   # Persona 2 — mixed — /me with personal + projects + cross-project activity
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @persona-content @persona-2 @gap
+  @bdd @ui @persona-content @persona-2 @gap @unimplemented
   Scenario: Mixed-persona home additionally renders the user's projects card
     Given a user resolves to persona "mixed"
     And the user is a member of at least one project (ProjectMember row)
@@ -123,7 +126,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
       proxy; rendering it would mislead since updatedAt fires on any project
       edit, not just trace activity)
 
-  @bdd @ui @persona-content @persona-2
+  @bdd @ui @persona-content @persona-2 @unimplemented
   Scenario: Mixed-persona "Your projects" card lists only the user's own projects
     Given a user is a member of projects "alex-prod" and "alex-stg"
     And the user is NOT a member of project "isolated-team-prod"
@@ -131,7 +134,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
     Then "Your projects" lists rows ONLY for "alex-prod" and "alex-stg"
     And NO row references "isolated-team-prod"
 
-  @bdd @ui @persona-content @persona-2 @hidden-projects
+  @bdd @ui @persona-content @persona-2 @hidden-projects @unimplemented
   Scenario: Mixed persona "Your projects" excludes hidden internal_governance projects
     Given a user is a member of an org with both application projects
       and at least one hidden internal_governance project
@@ -142,7 +145,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
       (regression-invariant — same hidden-project filter as every other
       user-facing project picker)
 
-  @bdd @ui @persona-content @persona-2 @follow-up
+  @bdd @ui @persona-content @persona-2 @follow-up @unimplemented
   Scenario: Mixed persona cross-project Recent activity panel — DEFERRED
     Given the user has multiple projects with recent traces
     When the user lands on "/me"
@@ -156,7 +159,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   # Persona 3 — project_only — REGRESSION INVARIANT — DO NOT TOUCH
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @persona-content @persona-3 @regression-invariant
+  @bdd @ui @persona-content @persona-3 @regression-invariant @unimplemented
   Scenario: LLMOps majority sees the existing project home content unchanged
     Given a user resolves to persona "project_only"
     When the user navigates to "/"
@@ -172,7 +175,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   #  redirects there per specs/navigation/gateway-url-move.feature)
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @persona-content @persona-4
+  @bdd @ui @persona-content @persona-4 @unimplemented
   Scenario: Governance-admin home renders the populated bird's-eye dashboard
     Given a user resolves to persona "governance_admin"
     And the org has at least one IngestionSource with recent activity
@@ -188,7 +191,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
     And clicking a team row routes to a per-team drilldown
     And clicking an anomaly routes to the anomaly detail page
 
-  @bdd @ui @persona-content @persona-4 @empty-state
+  @bdd @ui @persona-content @persona-4 @empty-state @unimplemented
   Scenario: Governance-admin home renders the setup checklist when not configured
     Given a user resolves to persona "governance_admin"
     And the org has zero IngestionSources
@@ -203,7 +206,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   # Customization — User pin (in this PR)
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @persona-content @customization @user-pin
+  @bdd @ui @persona-content @customization @user-pin @unit
   Scenario: User pin overrides auto-detected persona destination
     Given a user resolves to persona "mixed" (default destination /me)
     And the user has set `User.lastHomePath = "/<projectSlug>/messages"` via /me/settings
@@ -212,7 +215,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
     And NOT "/me"
     And the resolution carries `isOverride: true`
 
-  @bdd @ui @persona-content @customization @user-pin
+  @bdd @ui @persona-content @customization @user-pin @unimplemented
   Scenario: User can clear their pin and revert to auto-detection
     Given a user has `User.lastHomePath` set to "/<projectSlug>/messages"
     When the user opens /me/settings
@@ -220,7 +223,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
     Then `User.lastHomePath` is cleared (NULL)
     And the next visit to "/" resolves via auto-detection
 
-  @bdd @ui @persona-content @customization @user-pin
+  @bdd @ui @persona-content @customization @user-pin @unimplemented
   Scenario Outline: User pin picker offers only valid destinations for the user's persona
     Given a user resolves to persona "<persona>"
     When the user opens /me/settings → "Default landing page"
@@ -245,7 +248,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
   # Customization — Org pin (follow-up PR; contract locked here)
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @persona-content @customization @org-pin @follow-up
+  @bdd @ui @persona-content @customization @org-pin @follow-up @unimplemented
   Scenario: Org admin sets a default landing path that all members inherit
     Given a user is an organization admin
     And `Organization.defaultLandingPath` is unset (NULL)
@@ -256,7 +259,7 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
     And NOT to their auto-detected persona destination
     And member-level user pins (if set) STILL take precedence over the org pin
 
-  @bdd @ui @persona-content @customization @priority @follow-up
+  @bdd @ui @persona-content @customization @priority @follow-up @unimplemented
   Scenario: Resolver priority — user pin > org pin > auto-detection
     Given a user has `User.lastHomePath = "/me"`
     And `Organization.defaultLandingPath = "/<projectSlug>/messages"`

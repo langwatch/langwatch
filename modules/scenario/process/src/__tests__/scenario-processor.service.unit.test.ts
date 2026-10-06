@@ -326,6 +326,58 @@ describe("ScenarioProcessorService", () => {
     expect(fixture.finishUnsuccessfulRun).not.toHaveBeenCalled();
   });
 
+  it("starts a voice child after preparation with the caller env the prefetch resolved", async () => {
+    const fixture = processorFixture();
+    const session = new TestChildSession();
+    const start = vi.fn().mockReturnValue(session);
+    fixture.childProcesses.start = start;
+    fixture.execution.prepare = vi.fn().mockReturnValue({
+      childEnvironment: Promise.resolve(null),
+      result: Promise.resolve({
+        success: true,
+        resolvedModels: null,
+        telemetry: { endpoint: "https://app.langwatch.ai", apiKey: "project-key" },
+        data: {
+          context: {
+            projectId: "project-1",
+            scenarioId: "scenario-voice",
+            setId: "set-1",
+            batchRunId: "batch-1",
+          },
+          scenario: {
+            id: "scenario-voice",
+            name: "Voice",
+            situation: "Calls the agent",
+            criteria: [],
+            labels: ["voice"],
+          },
+          parameters: {},
+          adapterData: {
+            type: "voice",
+            agentId: "agent-1",
+            voiceTarget: { transport: "elevenlabs_convai", agentId: "el-1", credential: null },
+            callerEnv: { OPENAI_API_KEY: "sk-caller-openai" },
+            maxCallSeconds: 300,
+          },
+          simulatorModelParams: { model: "openai/simulator", api_key: "key" },
+          judgeModelParams: { model: "openai/judge", api_key: "key" },
+          nlpServiceUrl: "http://nlp",
+          target: { type: "voice", referenceId: "agent-1" },
+        },
+      } satisfies ScenarioExecutionPrefetchResult),
+    });
+
+    await fixture.processor.execute({
+      ...job("voice-run"),
+      target: { type: "voice", referenceId: "agent-1" },
+    });
+
+    expect(start).toHaveBeenCalledOnce();
+    expect(start.mock.calls[0]?.[0].environment.callerEnv).toEqual({
+      OPENAI_API_KEY: "sk-caller-openai",
+    });
+  });
+
   /** @scenario "Child startup overlaps slow preparation" */
   it("aborts an early child when preparation fails", async () => {
     const fixture = processorFixture();

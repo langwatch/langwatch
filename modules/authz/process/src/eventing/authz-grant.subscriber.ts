@@ -17,8 +17,8 @@ import {
 } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzGrantsEvent } from "./authz-grant.events.ts";
 
-export const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
-export const AUTHZ_AUDIT_VERBS = [
+const AUTHZ_AUDIT_ACTION_PREFIX = "authz.grants." as const;
+const AUTHZ_AUDIT_VERBS = [
   "attach",
   "role_change",
   "revoke",
@@ -26,9 +26,9 @@ export const AUTHZ_AUDIT_VERBS = [
   "role_permissions_changed",
   "role_deleted",
 ] as const;
-export type AuthzAuditVerb = (typeof AUTHZ_AUDIT_VERBS)[number];
+type AuthzAuditVerb = (typeof AUTHZ_AUDIT_VERBS)[number];
 
-export const AUTHZ_AUDIT_EVENT_TYPES = [
+const AUTHZ_AUDIT_EVENT_TYPES = [
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
@@ -36,8 +36,6 @@ export const AUTHZ_AUDIT_EVENT_TYPES = [
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
 ] as const;
-
-export const AUTHZ_NON_AUDIT_EVENT_TYPES = [] as const;
 
 type AuditableEventType = (typeof AUTHZ_AUDIT_EVENT_TYPES)[number];
 
@@ -128,7 +126,7 @@ function metadata(event: AuthzGrantsEvent): Record<string, unknown> {
   return metadata;
 }
 
-export interface EventingAuthzAuditAdapterOptions {
+interface EventingAuthzAuditAdapterOptions {
   store: AuthzAuditTrailRepository;
 }
 

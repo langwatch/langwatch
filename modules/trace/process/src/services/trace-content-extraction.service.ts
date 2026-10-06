@@ -9,7 +9,6 @@ import { visitContentPartAsync } from "@langwatch/trace-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
-import type { TraceMediaStore } from "../app/trace.members.ts";
 import {
   extractBareImagePart,
   extractBinaryPart,
@@ -21,6 +20,7 @@ import {
   type ExtractionContext,
 } from "../rules/content-part-extraction.rules.ts";
 import { coerceContentToArray } from "../rules/trace-content-array.rules.ts";
+import type { TraceMediaStore } from "./trace-stored-media-store.service.ts";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.content-extractor");
 

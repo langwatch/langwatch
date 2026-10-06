@@ -2,7 +2,7 @@
  * The organization's Instant Eval spend for a billing month, in meter units.
  * Read across every project it owns, because the ledger's tenant is the
  * project the judgement ran in.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
@@ -17,7 +17,7 @@ import type { BillableEventsTotalResult } from "./billable-events-query.service.
 const logger = createLogger("langwatch:billing:instantEvalSpendQuery");
 
 /** The peers the read goes through, each one operation wide. */
-export interface InstantEvalSpendQueryPeers {
+interface InstantEvalSpendQueryPeers {
   /** Whether this deployment has the ledger a judgement's cost is read from. */
   isSpendSourceAvailable(): boolean;
   /** Every project of the organization, archived ones included. */

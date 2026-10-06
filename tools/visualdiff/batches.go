@@ -326,15 +326,7 @@ func (batches *batcher) seal(phase string, identities []itemKey) {
 // expects, everything else by the classifier. Flagged is anything but a clean pass.
 func (batches *batcher) item(identity itemKey, entry *batchEntry, files itemFiles) BatchItem {
 	item := BatchItem{Kind: identity.kind, Key: identity.key}
-	for _, capture := range entry.captures {
-		switch {
-		case capture.Side != "candidate":
-		case capture.Error != "" && item.Failing == nil:
-			item.Failing = &BatchFailure{Index: capture.Index, Label: capture.Label, Error: capture.Error}
-		case capture.Error == "" && capture.Expect != "":
-			item.Expects++
-		}
-	}
+	tallyCandidate(&item, entry.captures)
 	rows := BuildRows(entry.captures, entry.diffs)
 	slices.SortStableFunc(rows, func(a, b Row) int { return a.Index - b.Index })
 	finding := false
@@ -343,16 +335,36 @@ func (batches *batcher) item(identity itemKey, entry *batchEntry, files itemFile
 		item.Screens = append(item.Screens, files.screen(rows[index]))
 	}
 	checkFlow := batches.check && identity.kind == "flow"
-	switch {
-	case checkFlow && item.Failing != nil, !checkFlow && finding:
-		item.Verdict = "fail"
-	case checkFlow && item.Expects == 0:
-		item.Verdict = "unproven"
-	default:
-		item.Verdict = "pass"
-	}
+	item.Verdict = itemVerdict(item, checkFlow, finding)
 	item.Flagged = item.Verdict != "pass" || finding
 	return item
+}
+
+// tallyCandidate records the candidate side's first failure and its held
+// expects on item.
+func tallyCandidate(item *BatchItem, captures []Capture) {
+	for _, capture := range captures {
+		switch {
+		case capture.Side != "candidate":
+		case capture.Error != "" && item.Failing == nil:
+			item.Failing = &BatchFailure{Index: capture.Index, Label: capture.Label, Error: capture.Error}
+		case capture.Error == "" && capture.Expect != "":
+			item.Expects++
+		}
+	}
+}
+
+// itemVerdict is fail, unproven or pass: a checked flow by its own failure
+// and expects, anything else by whether it differs from main.
+func itemVerdict(item BatchItem, checkFlow, finding bool) string {
+	switch {
+	case checkFlow && item.Failing != nil, !checkFlow && finding:
+		return "fail"
+	case checkFlow && item.Expects == 0:
+		return "unproven"
+	default:
+		return "pass"
+	}
 }
 
 // finding is Row.Finding, less what check calls unmatched: nothing of main's to compare.

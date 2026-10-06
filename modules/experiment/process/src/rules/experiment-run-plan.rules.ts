@@ -61,7 +61,7 @@ export function getPlanCell({
 }
 
 /** The target as the run pinned it at start, so every cell runs the same prompt or workflow. */
-export function pinnedTargetOf({
+function pinnedTargetOf({
   target,
   plan,
 }: {

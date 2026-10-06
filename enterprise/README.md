@@ -22,8 +22,8 @@ peer, which verifies each organization's stored license. See [dev/docs/ARCHITECT
 for the shape ruling.
 
 Billing's Stripe subscription lifecycle, usage-limit notifications, and
-license-purchase workflow live in `modules/billing/process`; the application
-keeps only injected provider/mail/notification adapters and route mounting.
+license-purchase workflow live in `enterprise/modules/billing/process`; the
+application only installs it from the generated module list (ARCHITECTURE.md §4).
 
 These modules ship in every LangWatch distribution and you may run them in
 production without a license: the enterprise capabilities verify a license at

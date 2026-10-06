@@ -6,7 +6,7 @@ import { mergeNameParts, namePartsIn, namesAName } from "../rules/scim-name.rule
 import type { ScimCostCenterService } from "./scim-cost-center.service.ts";
 
 /** What one PATCH asks of a directory resource, once every operation is read. */
-export interface ScimPatchedUser {
+interface ScimPatchedUser {
   active: boolean;
   /** Whether any operation turned `active` off, which is what removes access. */
   deactivating: boolean;

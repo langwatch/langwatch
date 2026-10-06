@@ -73,16 +73,14 @@ import { CodingAgentProjectionPersistenceService } from "../services/coding-agen
 import { CodingAgentReceivedFactsService } from "../services/coding-agent-received-facts.service.ts";
 import { CodingAgentScopeDirectoryService } from "../services/coding-agent-scope-directory.service.ts";
 import { CodingAgentScopePermissionsService } from "../services/coding-agent-scope-permissions.service.ts";
+import type { CodingAgentScopeCaller } from "../services/coding-agent-scope-permissions.service.ts";
 import { CodingAgentViewerVisibilityService } from "../services/coding-agent-viewer-visibility.service.ts";
+import type { CodingAgentViewerVisibilityReader } from "../services/coding-agent-viewer-visibility.service.ts";
 import {
   type CodingAgentSessionService,
   CodingAgentFeatureService,
 } from "../services/coding-agent.service.ts";
 import { ModelCatalogCostEstimatorService } from "../services/model-catalog-cost-estimator.service.ts";
-import type {
-  CodingAgentScopeCaller,
-  CodingAgentViewerVisibilityReader,
-} from "./coding-agent.members.ts";
 
 /**
  * The caller's permission cut over an organization: which projects they may
@@ -107,8 +105,8 @@ export interface CodingAgentPullRequestRef {
   prNumber: number;
 }
 
-/** The process capabilities this feature needs that are not coding-agent's own. */
-export interface CodingAgentScopeMembers {
+/** The scope reads the module answers through its project and authorization peers. */
+export interface CodingAgentScopeReads {
   /**
    * The organization a project belongs to, or undefined for an orphan project.
    * Derived here rather than taken from the client, so a caller cannot ask
@@ -126,9 +124,6 @@ export interface CodingAgentScopeMembers {
   }): Promise<CodingAgentCallerScope>;
 }
 
-/** What the process composes this feature's application from: nothing, every need is a peer. */
-export type CodingAgentInfrastructure = Readonly<Record<never, never>>;
-
 type CodingAgentDependencies = {
   projects: typeof ProjectApi;
   github: typeof GithubApi;
@@ -142,7 +137,7 @@ type CodingAgentDependencies = {
 };
 type CodingAgentSetup = FeatureSetup<
   CodingAgentDependencies,
-  CodingAgentInfrastructure,
+  never,
   undefined,
   CodingAgentRepositories
 >;
@@ -186,7 +181,7 @@ export class CodingAgentModule implements CodingAgentApi {
       }),
       permissions: CodingAgentScopePermissionsService.create({ authz: dependencies.authz }),
     });
-    const scope: CodingAgentScopeMembers = {
+    const scope: CodingAgentScopeReads = {
       findOrganizationForProject: async (projectId: string) => {
         try {
           return await dependencies.projects.getOrganizationId(projectId);
@@ -232,7 +227,7 @@ export class CodingAgentModule implements CodingAgentApi {
   readonly #codingAgents: CodingAgentSessionService;
   readonly #github: GithubApi;
   readonly #traces: TraceApi;
-  readonly #scope: CodingAgentScopeMembers;
+  readonly #scope: CodingAgentScopeReads;
   readonly #visibility: CodingAgentViewerVisibilityReader;
   readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #processing: CodingAgentProcessingPipeline;
@@ -251,7 +246,7 @@ export class CodingAgentModule implements CodingAgentApi {
     codingAgents: CodingAgentSessionService;
     github: GithubApi;
     traces: TraceApi;
-    scope: CodingAgentScopeMembers;
+    scope: CodingAgentScopeReads;
     visibility: CodingAgentViewerVisibilityReader;
     auditLog: Pick<AuditLogApi, "record">;
     processing: CodingAgentProcessingPipeline;

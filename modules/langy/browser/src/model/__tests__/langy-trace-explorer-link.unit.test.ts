@@ -518,6 +518,7 @@ describe("buildAutomationHref", () => {
         expect(params.get("drawer.initialFilterQuery")).toBe('"checkout failed"');
       });
 
+      /** @scenario "Carried text is never mistranslated into a filter" */
       it("keeps free text free text — the subject parses as an implicit term, never a field filter", () => {
         // The same load-bearing claim as `q` on the Explorer link, asked of
         // the REAL parser: what was free text to the CLI must stay free text

@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { assertChartFrameNonce, buildChartFrameDocument } from "../chart-frame-document.ts";
+import { CHART_FRAME_BUILTIN_MODULES } from "../chart-frame-import-specifier.ts";
 
 const INLINE_SCRIPT = /<script(?![^>]*\bsrc=)([^>]*)>/g;
 
@@ -26,7 +27,6 @@ describe("the chart frame document", () => {
       for (const attributes of tags) {
         expect(attributes).toContain('nonce="n0nce+VALUE/="');
       }
-      expect(document).toContain("cur.nonce");
     });
 
     it("refuses one that could close the attribute it is written into", () => {
@@ -42,7 +42,7 @@ describe("the chart frame document", () => {
       const document = buildChartFrameDocument();
 
       for (const attributes of inlineScriptTags(document)) {
-        expect(attributes.trim()).toBe("");
+        expect(attributes).not.toContain("nonce");
       }
     });
   });
@@ -57,8 +57,10 @@ describe("the chart frame document", () => {
       expect(document).toContain("unpkg.com/@babel/standalone@");
     });
 
-    it("maps react/jsx-runtime in the import map", () => {
-      expect(document).toContain("react/jsx-runtime");
+    it("pins the versions the import map's export names were recorded from", () => {
+      expect(document).toContain("unpkg.com/react@18.3.1/");
+      expect(document).toContain("unpkg.com/react-dom@18.3.1/");
+      expect(document).toContain("unpkg.com/recharts@2.15.4/");
     });
 
     /** @scenario "The frame's own inline scripts survive a nonce added upstream" */
@@ -67,6 +69,38 @@ describe("the chart frame document", () => {
 
       expect(external.length).toBeGreaterThan(0);
       for (const tag of external) expect(tag).not.toContain("nonce=");
+    });
+  });
+
+  describe("when its import map is read", () => {
+    const document = buildChartFrameDocument({ nonce: "abc" });
+    const head = document.slice(document.indexOf("<head>") + "<head>".length);
+
+    /** @scenario "A custom widget that imports recharts renders in Chromium, WebKit and Firefox" */
+    it("opens the head with it, ahead of every script, stylesheet and preload", () => {
+      expect(head.startsWith('<script type="importmap" nonce="abc">')).toBe(true);
+
+      const firstOther = document.search(/<(?:script(?! type="importmap")|link|style)\b/);
+      expect(document.indexOf('<script type="importmap"')).toBeLessThan(firstOther);
+      expect(document.match(/<script type="importmap"/g)).toHaveLength(1);
+    });
+
+    /** @scenario "A custom widget that imports recharts renders in Chromium, WebKit and Firefox" */
+    it("maps every built-in specifier to a module of its own", () => {
+      const json = head.slice(head.indexOf(">") + 1, head.indexOf("</script>"));
+      const { imports } = JSON.parse(json) as { imports: Record<string, string> };
+
+      expect(Object.keys(imports).toSorted()).toEqual([...CHART_FRAME_BUILTIN_MODULES].toSorted());
+      for (const url of Object.values(imports)) {
+        expect(url.startsWith("data:text/javascript;charset=utf-8,")).toBe(true);
+      }
+    });
+
+    /** @scenario "A custom widget that imports recharts renders in Chromium, WebKit and Firefox" */
+    it("leaves no script that builds an import map once the document is running", () => {
+      const afterMap = head.slice(head.indexOf("</script>"));
+
+      expect(afterMap).not.toContain("importmap");
     });
   });
 

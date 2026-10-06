@@ -16,11 +16,11 @@ const ADMIN = { userId: "user_admin" };
 const BINDING_ID = "rb_provenance";
 
 function service() {
-  const { writer, db, sent } = harness({});
+  const { writer, db, sent, reads, lineage } = harness({});
   // The attach's read-your-writes hold reads the canonical Grant head; these
   // cases are about the fact the writer emits, not about the fold's lag.
   db.grant.count.mockResolvedValue(1);
-  const repository = EventingAuthzGrantRepository.create({ database: db as never, writer });
+  const repository = EventingAuthzGrantRepository.create({ reads, lineage, writer });
   const grants = AuthzGrantsService.create({
     permissions: permissiveGrantGuards,
     repository,

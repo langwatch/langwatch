@@ -5,5 +5,10 @@
  */
 
 import { defineBrowserVitestConfig } from "@langwatch/vitest-config/browser";
+import { mergeConfig } from "vitest/config";
 
-export default defineBrowserVitestConfig();
+// Monaco is only reached through a mocked import, so the optimiser finds it
+// after the first run starts, reloads, and fails the file on a cold cache.
+export default mergeConfig(defineBrowserVitestConfig(), {
+  optimizeDeps: { include: ["@monaco-editor/react"] },
+});

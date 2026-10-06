@@ -6,14 +6,32 @@
 
 import { Temporal, nowInstant, toDate, toEpochMs, type Instant } from "@langwatch/time";
 
+/** The preset before the creator has chosen: neither a duration nor "never". */
+export const EXPIRATION_UNCHOSEN = "";
+
+/** The preset that mints a key with no expiry. */
+export const EXPIRATION_NEVER = "never";
+
 export const EXPIRATION_OPTIONS = [
-  { label: "No expiration", value: "" },
+  { label: "No expiration", value: EXPIRATION_NEVER },
   { label: "7 days", value: "7" },
   { label: "30 days", value: "30" },
   { label: "60 days", value: "60" },
   { label: "90 days", value: "90" },
   { label: "Custom...", value: "custom" },
 ];
+
+/** Whether the creator has made an expiry choice a key can be minted with. */
+export function isExpirationChosen({
+  preset,
+  customDate,
+}: {
+  preset: string;
+  customDate: string;
+}): boolean {
+  if (preset === "custom") return customDate !== "";
+  return EXPIRATION_OPTIONS.some((option) => option.value === preset);
+}
 
 /**
  * The date an expiration choice means, resolved against now. Extracted
@@ -32,7 +50,7 @@ export function resolveExpiresAt({
   if (preset === "custom") {
     return customDate ? Temporal.Instant.fromEpochMilliseconds(toEpochMs(customDate)) : undefined;
   }
-  if (!preset) return undefined;
+  if (preset === EXPIRATION_NEVER || !preset) return undefined;
   const days = parseInt(preset, 10);
   if (Number.isNaN(days)) return undefined;
 

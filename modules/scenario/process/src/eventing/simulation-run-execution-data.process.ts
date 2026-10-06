@@ -40,7 +40,7 @@ export const EVALUATION_DEADLINE_MS = 15 * 60_000;
 export const EVALUATION_LOST_DETAILS =
   "The evaluation did not complete: its grading job was lost before it recorded a result";
 
-export const simulationRunExecutionPhaseSchema = z.enum([
+const simulationRunExecutionPhaseSchema = z.enum([
   "queued",
   "running",
   "cancelling",

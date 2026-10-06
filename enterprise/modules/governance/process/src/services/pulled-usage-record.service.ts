@@ -29,7 +29,11 @@ import {
 import { fromDate, type Instant, Temporal, toEpochMs } from "@langwatch/time";
 
 import { actorForPulledDay } from "../rules/pulled-actor-naming.rules.ts";
-import type { PulledUsagePricingService } from "./pulled-usage-pricing.service.ts";
+import type {
+  PulledUsagePrice,
+  PulledUsagePricingService,
+  PulledUsageQuantities,
+} from "./pulled-usage-pricing.service.ts";
 
 /**
  * The dimension-only identity two versions of one bucket share.
@@ -162,35 +166,9 @@ export class PulledUsageRecordService {
     };
     const model = hint.model ?? event.target;
 
-    // Both halves of the provider's figure, from one decision. Read once into
-    // one binding so there is no line at which a later edit could take the
-    // amount from here and the currency from somewhere else.
-    const reported = deriveReportedMoney({ hint, event });
-    if (hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED && reported === null) {
+    const priced = this.priceFor({ hint, event, model, quantities });
+    if (priced === null) {
       return null;
-    }
-
-    let priced;
-    if (hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED) {
-      if (reported === null) {
-        return null;
-      }
-      if (hint.costStatus === undefined) {
-        throw new Error("provider-reported pulled usage requires costStatus");
-      }
-      priced = this.pricing.price({
-        basis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
-        costUsd: reported.amount,
-        currencyCode: reported.currencyCode,
-        costUsdBiller: hint.costUsdBiller,
-        costStatus: hint.costStatus,
-      });
-    } else {
-      priced = this.pricing.price({
-        basis: PULLED_USAGE_COST_BASIS.COMPUTED,
-        model,
-        quantities,
-      });
     }
 
     const sourceCreatedAt = fromDate(source.createdAt);
@@ -234,5 +212,48 @@ export class PulledUsageRecordService {
       occurredAtMs,
       observedAtMs: observedAt.epochMilliseconds,
     };
+  }
+
+  /** Null when the provider reported money this branch cannot read: the event stays audit-only. */
+  private priceFor({
+    hint,
+    event,
+    model,
+    quantities,
+  }: {
+    hint: PulledUsageHint;
+    event: NormalizedPullEvent;
+    model: string;
+    quantities: PulledUsageQuantities;
+  }): PulledUsagePrice | null {
+    // Both halves of the provider's figure, from one decision. Read once into
+    // one binding so there is no line at which a later edit could take the
+    // amount from here and the currency from somewhere else.
+    const reported = deriveReportedMoney({ hint, event });
+    if (hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED && reported === null) {
+      return null;
+    }
+
+    if (hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED) {
+      if (reported === null) {
+        return null;
+      }
+      if (hint.costStatus === undefined) {
+        throw new Error("provider-reported pulled usage requires costStatus");
+      }
+      return this.pricing.price({
+        basis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
+        costUsd: reported.amount,
+        currencyCode: reported.currencyCode,
+        costUsdBiller: hint.costUsdBiller,
+        costStatus: hint.costStatus,
+      });
+    } else {
+      return this.pricing.price({
+        basis: PULLED_USAGE_COST_BASIS.COMPUTED,
+        model,
+        quantities,
+      });
+    }
   }
 }

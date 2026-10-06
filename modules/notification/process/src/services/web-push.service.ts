@@ -52,7 +52,7 @@ export const webPushSendSchema = z
 export type WebPushSend = z.infer<typeof webPushSendSchema>;
 
 /** One queued send, keyed so a second request for the same fact and browser is a duplicate. */
-export interface WebPushQueuedSend {
+interface WebPushQueuedSend {
   messageKey: string;
   send: WebPushSend;
 }
@@ -66,7 +66,7 @@ export interface WebPushQueue {
   }): Promise<{ queued: number }>;
 }
 
-export interface WebPushServiceDeps {
+interface WebPushServiceDeps {
   subscriptions: WebPushSubscriptionRepository;
   vapidKeys: WebPushVapidKeyRepository;
   gateway: WebPushGateway;

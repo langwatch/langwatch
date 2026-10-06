@@ -99,5 +99,34 @@ describe("GovernanceCostSummaryService.summary", () => {
 
       expect((await read()).azureBilling).toBeNull();
     });
+
+    /** @scenario "A declared-prepaid tenant whose bill has amounts sees the amounts" */
+    it("shows the billed amounts and does not explain them away once the bill has spend", async () => {
+      const { sources, costRollup, read } = setup({
+        noticeSources: (memory) => ({
+          findAll: async (organizationId) =>
+            (await memory.findAll(organizationId)).map((source) => ({
+              ...source,
+              pollerCursor: JSON.stringify({ costPricedThroughDay: "2026-09-24" }),
+            })),
+          findUnpricedUsageWindows: (organizationId) =>
+            memory.findUnpricedUsageWindows(organizationId),
+        }),
+      });
+      const claiming = await sources.create({
+        ...SOURCE,
+        name: "Copilot",
+        parserConfig: { azureSubscriptionId: "sub-1", azureBillingIsPrepaid: true },
+      });
+
+      // The declaration is live: with an empty bill it is the explanation given.
+      expect((await read()).azureBilling).toBe("prepaid_declared");
+
+      costRollup.seed(cell({ ingestionSourceId: claiming.id, amountNanoUsd: 2_000_000_000 }));
+      const summary = await read();
+
+      expect(summary.billed.amountUsd).toBe(2);
+      expect(summary.azureBilling).toBeNull();
+    });
   });
 });

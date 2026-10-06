@@ -8,7 +8,7 @@ export const SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME = "scimRequestLogRetention"
 /** Outbox rows are bookkeeping, one per tick, pruned like every recurring process's. */
 const RETENTION_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
-export interface ScimRequestLogRetentionDeps {
+interface ScimRequestLogRetentionDeps {
   /** Drops what has aged out of the retention window; answers how many rows went. */
   sweep: () => Promise<number>;
   deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;

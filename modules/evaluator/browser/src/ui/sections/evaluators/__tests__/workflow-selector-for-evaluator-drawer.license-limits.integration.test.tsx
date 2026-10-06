@@ -118,16 +118,27 @@ afterEach(() => {
 
 describe("creating a workflow evaluator", () => {
   describe("given the organization is already at its workflow limit", () => {
-    /** @scenario "Creating workflow evaluator checks workflows limit first" */
-    it("stops at the workflow and never reaches the evaluator", async () => {
+    beforeEach(async () => {
       calls.createWorkflow.mockImplementation(answeredLimitRefusal("workflows"));
-
       renderDrawer();
       submit();
+    });
 
+    /** @scenario "Creating workflow evaluator checks workflows limit first" */
+    it("stops at the workflow and never reaches the evaluator", async () => {
       await waitFor(() => expect(calls.createWorkflow).toHaveBeenCalled());
       expect(calls.createEvaluator).not.toHaveBeenCalled();
       expect(toasts).toEqual([]);
+    });
+
+    /** @scenario "Workflow evaluator creation error toast suppressed when license modal shown" */
+    it("adds no toast of its own to the refusal the licence handler answered", async () => {
+      await waitFor(() =>
+        expect(
+          screen.getAllByRole("button", { name: "Create & Open Editor" }).at(-1),
+        ).toBeEnabled(),
+      );
+      expect(toasts).not.toContain("Couldn't create workflow evaluator");
     });
   });
 

@@ -11,8 +11,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
+import type { GatewayModelProviderCredentials } from "../rules/gateway-config-wire.rules.ts";
 import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
 
 const noPlatformProviders = createApiFixture<ModelProviderApi>({

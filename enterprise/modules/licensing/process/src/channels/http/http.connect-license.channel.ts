@@ -11,7 +11,7 @@ import { ConnectLicenseChannel } from "../connect-license.channel.ts";
 import { type ConnectHostOptions, ConnectHost } from "./http.connect-host.channel.ts";
 
 /** Origin of the connect host; the paths are this channel's own. */
-export type HttpConnectLicenseChannelOptions = ConnectHostOptions;
+type HttpConnectLicenseChannelOptions = ConnectHostOptions;
 
 /** The two routes the connect host answers, over the shared transport. */
 export class HttpConnectLicenseChannel extends ConnectLicenseChannel {

@@ -37,7 +37,7 @@ export const SORT_COLUMN_MAP: Record<string, TraceListSort["column"]> = {
  * strings (e.g. `'["prod","beta"]'`) parked on the trace summary. A
  * missing or malformed value reads as no labels rather than throwing.
  */
-export function parseLabels(raw: string | undefined): string[] {
+function parseLabels(raw: string | undefined): string[] {
   if (raw == null || raw === "") {
     return [];
   }

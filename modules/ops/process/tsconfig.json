@@ -52,6 +52,9 @@
       "path": "../../coding-agent/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
       "path": "../../dashboard/contract/tsconfig.build.json"
     },
     {

@@ -319,10 +319,10 @@ export const collectorRest = defineRestRouter(CollectorApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/collector", "collectTrace")
-  // The body is the evidence: it is read once, checked against the content type
-  // this family has always demanded, and parsed by the family's own rules so a
-  // malformed payload earns the sentence a deployed SDK already parses.
-  .withRawBody("text", { mediaType: PRODUCES_JSON })
+  // The body is read once and parsed by the family's own rules. It names no media type:
+  // the 401 above is the handler's, so the handler checks the content type after it
+  // and a malformed payload earns the sentence a deployed SDK already parses.
+  .withRawBody("text")
   .withAccess(
     publicRoute({
       reason:

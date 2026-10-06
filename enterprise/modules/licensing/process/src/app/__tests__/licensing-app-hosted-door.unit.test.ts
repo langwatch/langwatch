@@ -1,6 +1,7 @@
 import type { RestIdentity } from "@langwatch/api/hosting";
 import { BearerIdentity, RestHost } from "@langwatch/api/rest";
 import { GatewayApi, GatewayInternalAuthenticationError } from "@langwatch/gateway-contract";
+import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
@@ -9,11 +10,13 @@ import { ScopedSecrets } from "@langwatch/secrets";
  * @see enterprise/modules/licensing/specs/licensing.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
 import { licensingProcessModule } from "../../licensing.module.ts";
-import { LicensingInfrastructureService } from "../../services/licensing-infrastructure.service.ts";
+import type { IssuedLicenseRecord } from "../../repositories/issued-license.repository.ts";
+import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import { connectHostedRest } from "../../transport/connect-hosted.rest.ts";
 
 const SIGNED = "signed-with-the-gateway-secret";
@@ -35,36 +38,71 @@ const gatewayDoor: RestIdentity = {
   },
 };
 
-async function hostedFamily() {
-  const partial = LicensingInfrastructureService.create({ processName: "the api" });
-  const unregistered = partial.unavailableRegistry();
-  const findByVirtualKeyId = vi.fn().mockResolvedValue(null);
+const AT = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
+
+/** A licence of the organization that carries the instant-eval service on a managed key. */
+function licenceOnManagedKey(): IssuedLicenseRecord {
+  return {
+    id: "license-1",
+    licenseId: "lic-1",
+    tokenHash: "hash-1",
+    organizationId: "org-acme",
+    organizationName: "ACME",
+    email: "ops@example.com",
+    planType: "ENTERPRISE",
+    maxMembers: 50,
+    maxMembersLite: 0,
+    issuedAt: AT,
+    expiresAt: Temporal.Instant.from("2099-01-01T00:00:00.000Z"),
+    source: "BACKOFFICE",
+    issuedById: "operator-1",
+    revokedAt: null,
+    revokedById: null,
+    revokedReason: null,
+    supersededAt: null,
+    replacesId: null,
+    pendingDeliveryLicense: null,
+    services: ["instant_evals"],
+    seatRateCents: null,
+    seatCurrency: null,
+    commitUsdCents: 100_000,
+    overageEnabled: false,
+    overageMaxUsdCents: null,
+    instanceId: "instance-1",
+    instanceBoundAt: AT,
+    lastSyncAt: null,
+    lastSyncVersion: null,
+    reportedMembers: null,
+    reportedMembersLite: null,
+    virtualKeyId: "vk-unlicensed",
+    seatsRaisedFrom: null,
+    createdAt: AT,
+    updatedAt: AT,
+  };
+}
+
+async function hostedFamily(
+  options: { licence?: IssuedLicenseRecord; instantEval?: InstantEvalApi } = {},
+) {
+  // The memory tier's own licence rows: none carries the calling key, unless the test names one.
+  const findByVirtualKeyId = vi
+    .spyOn(MemoryIssuedLicenseRepository.prototype, "findByVirtualKeyId")
+    .mockResolvedValue(options.licence ?? null);
   const resources = new ResourceScope();
   const state = await licensingProcessModule.install({
     resources,
-    config: TEST_LICENSING_CONFIG,
-    members: {
-      infrastructure: {
-        ...partial.withoutMutation({
-          licenses: {
-            getOrganizationLicense: () => Promise.resolve({ licenseKey: null }),
-            findOrganizationsWithLicense: () => Promise.resolve([]),
-          },
-        }),
-        registry: {
-          ...unregistered,
-          repository: { ...unregistered.repository, findByVirtualKeyId },
-        },
-      },
-      isSaas: true,
-      serviceVersion: "test",
-    },
+    config: { ...TEST_LICENSING_CONFIG, isSaas: true },
+    members: {},
+    repositorySelection: { tier: "memory", members: {} },
     role: "api",
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
-    resolve: (token) =>
-      token === GatewayApi
-        ? createApiFixture<GatewayApi>({ internalDoor: () => gatewayDoor })
-        : createApiFixture<never>(),
+    resolve: (token) => {
+      if (token === GatewayApi) {
+        return createApiFixture<GatewayApi>({ internalDoor: () => gatewayDoor });
+      }
+      if (token === InstantEvalApi && options.instantEval) return options.instantEval;
+      return createApiFixture<never>();
+    },
   });
   const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
   const runtime = RestHost.create({
@@ -93,11 +131,21 @@ async function hostedFamily() {
           virtual_key_id: "vk-unlicensed",
           organization_id: "org-acme",
           project_id: "",
-          payload: { text: "the customer wrote in", questions: [] },
+          payload: {
+            text: "the customer wrote in",
+            questions: [{ id: "q1", kind: "boolean", instructions: "Is it polite?" }],
+          },
         }),
       }),
     );
-  return { call, findByVirtualKeyId, close: () => resources.close() };
+  return {
+    call,
+    findByVirtualKeyId,
+    close: async () => {
+      findByVirtualKeyId.mockRestore();
+      await resources.close();
+    },
+  };
 }
 
 describe("the hosted Connect family behind the gateway's own door", () => {
@@ -134,6 +182,45 @@ describe("the hosted Connect family behind the gateway's own door", () => {
       } finally {
         await family.close();
       }
+    });
+  });
+
+  describe("given LangWatch Cloud judges hosted calls with a judge at its own rate and markup", () => {
+    /** @scenario A hosted judgement is priced at the rate of the judge that made it */
+    it("tells the customer the judge's price and records the judge's cost under the calling key", async () => {
+      const recorded: Parameters<InstantEvalApi["recordSpendForHostedCalls"]>[0][] = [];
+      const priced: number[] = [];
+      const instantEval = createApiFixture<InstantEvalApi>({
+        classify: async () => ({ verdicts: [], inputTokens: 2_000_000, isTextTruncated: false }),
+        priceOf: ({ inputTokens }) => {
+          priced.push(inputTokens);
+          const costUsd = (inputTokens / 1_000_000) * 0.5;
+          return { costUsd, priceUsd: costUsd * 1.4 };
+        },
+        recordSpendForHostedCalls: async (entry) => {
+          recorded.push(entry);
+        },
+      });
+      const family = await hostedFamily({ licence: licenceOnManagedKey(), instantEval });
+
+      let response: Response;
+      try {
+        response = await family.call(SIGNED);
+      } finally {
+        // Closing the install writes the spend the buffer still holds.
+        await family.close();
+      }
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ charged_usd: 1.4 });
+      expect(priced).toEqual([2_000_000]);
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0]).toMatchObject({
+        virtualKeyId: "vk-unlicensed",
+        inputTokens: 2_000_000,
+        costUsd: 1,
+        priceUsd: 1.4,
+      });
     });
   });
 });

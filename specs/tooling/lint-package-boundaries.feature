@@ -120,6 +120,7 @@ Feature: The package-boundaries lint rule
     Given the browser application's shell importing a browser package
     When the import names a subpath other than ./declaration
     Then it reports browserSideDoor
+    And the fix names the owner's lent token read with useLent, never a withCapabilities slot
     But an import of ./declaration is left alone
 
   @unit

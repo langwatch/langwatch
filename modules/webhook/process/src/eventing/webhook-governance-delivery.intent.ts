@@ -12,11 +12,11 @@ import { z } from "zod";
 
 import type { WebhookSpendDeliveryRequestedEvent } from "./webhook-spend-delivery.intent.ts";
 
-export const requestGovernanceDeliveryCommandDataSchema = z.object({
+const requestGovernanceDeliveryCommandDataSchema = z.object({
   ...webhookGovernanceDeliveryRequestSchema.shape,
   tenantId: z.string().min(1),
 });
-export type RequestGovernanceDeliveryCommandData = z.infer<
+type RequestGovernanceDeliveryCommandData = z.infer<
   typeof requestGovernanceDeliveryCommandDataSchema
 >;
 
@@ -26,7 +26,7 @@ export const webhookGovernanceDeliveryRequestedEventSchema = z.object({
   version: z.literal(WEBHOOK_GOVERNANCE_DELIVERY_REQUESTED_EVENT_VERSION),
   data: requestGovernanceDeliveryCommandDataSchema,
 });
-export type WebhookGovernanceDeliveryRequestedEvent = z.infer<
+type WebhookGovernanceDeliveryRequestedEvent = z.infer<
   typeof webhookGovernanceDeliveryRequestedEventSchema
 >;
 

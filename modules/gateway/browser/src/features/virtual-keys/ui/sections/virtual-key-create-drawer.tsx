@@ -22,6 +22,10 @@ import {
 } from "../../../../behavior/gateway-session.ts";
 import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
 import {
+  useRecordMintedKey,
+  useVirtualKeyTourActions,
+} from "../../behavior/use-virtual-key-tour.ts";
+import {
   buildScopeHierarchy,
   firstEligibleDefaultModel,
   type OrgModelProvider,
@@ -141,6 +145,7 @@ function createVirtualKeyInput(form: {
   expiresAt: ReturnType<typeof resolveExpiresAt>;
   budget: VirtualKeyBudgetValue;
   access: ReturnType<typeof providerAccessToConfig>;
+  revealOnce: boolean;
 }): CreateVirtualKeyInput {
   const tags = parseTagsCsv(form.tagsCsv);
   return {
@@ -164,6 +169,7 @@ function createVirtualKeyInput(form: {
       modelsAllowed: form.access.modelsAllowed,
       ...(tags.length > 0 ? { metadata: { tags } } : {}),
     },
+    ...(form.revealOnce ? { revealOnce: true } : {}),
   };
 }
 
@@ -222,8 +228,9 @@ export function VirtualKeyCreateDrawer({
 
   const utils = api.useUtils();
   const createMutation = api.virtualKeys.create.useMutation({
-    onSuccess: async () => {
-      await utils.virtualKeys.list.invalidate({ organizationId });
+    // The secret is handed over as soon as the create answers; the list refreshes behind it.
+    onSuccess: () => {
+      void utils.virtualKeys.list.invalidate({ organizationId });
     },
   });
   const orgProvidersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
@@ -316,7 +323,9 @@ export function VirtualKeyCreateDrawer({
     expiresAt,
   });
 
-  const handleSubmit = async () => {
+  const recordMintedKey = useRecordMintedKey();
+
+  const handleSubmit = async ({ revealOnce = false }: { revealOnce?: boolean } = {}) => {
     if (cannotIssueReason) {
       toaster.create({ title: cannotIssueReason, type: "error" });
       return;
@@ -336,8 +345,17 @@ export function VirtualKeyCreateDrawer({
           expiresAt,
           budget,
           access: providerAccessToConfig(providerAccess, eligible),
+          revealOnce,
         }),
       );
+      if (revealOnce) {
+        await recordMintedKey({
+          organizationId,
+          name: result.virtualKey.name,
+          revealId: result.revealId,
+          preview: result.preview,
+        });
+      }
       onCreated({
         id: result.virtualKey.id,
         name: result.virtualKey.name,
@@ -366,6 +384,8 @@ export function VirtualKeyCreateDrawer({
     }
   };
 
+  useVirtualKeyTourActions({ organizationId, setName, submit: handleSubmit });
+
   return (
     <Drawer.Root open={open} onOpenChange={() => handleClose()} placement="end" size="md">
       <Drawer.Content bg="bg">
@@ -385,6 +405,7 @@ export function VirtualKeyCreateDrawer({
               </Field.Label>
               <Input
                 data-testid="gateway-virtual-key-name"
+                data-tour="vk-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. codex-prod"
@@ -479,7 +500,8 @@ export function VirtualKeyCreateDrawer({
               <Button
                 colorPalette="orange"
                 data-testid="gateway-virtual-key-create-submit"
-                onClick={handleSubmit}
+                data-tour="vk-create"
+                onClick={() => handleSubmit()}
                 loading={createMutation.isPending}
               >
                 Create

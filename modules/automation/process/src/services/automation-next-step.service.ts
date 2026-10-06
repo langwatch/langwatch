@@ -12,7 +12,7 @@ import type { AutomationNextStepResolution } from "./automation-runaway.service.
 const ACCOUNT_TEAM_CONTACT_URL = "https://langwatch.ai/contact";
 
 /** `unpriced` is an organization with no billing record to price an upgrade from. */
-export type AutomationOrganizationPricingAnswer =
+type AutomationOrganizationPricingAnswer =
   | { kind: "priced"; pricingModel: PricingModel | null; currency: "USD" | "EUR" }
   | { kind: "unpriced" };
 

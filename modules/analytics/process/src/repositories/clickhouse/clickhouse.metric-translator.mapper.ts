@@ -21,14 +21,14 @@ import {
 /**
  * The metric keys each category translator below has an expression for.
  */
-export const METADATA_METRIC_KEYS = [
+const METADATA_METRIC_KEYS = [
   "metadata.trace_id",
   "metadata.user_id",
   "metadata.thread_id",
   "metadata.span_type",
 ] as const;
 
-export const PERFORMANCE_METRIC_KEYS = [
+const PERFORMANCE_METRIC_KEYS = [
   "performance.completion_time",
   "performance.first_token",
   "performance.total_cost",
@@ -46,21 +46,21 @@ export const PERFORMANCE_METRIC_KEYS = [
   "spans.metrics.completion_tokens",
 ] as const;
 
-export const EVALUATION_METRIC_KEYS = [
+const EVALUATION_METRIC_KEYS = [
   "evaluations.evaluation_score",
   "evaluations.evaluation_pass_rate",
   "evaluations.evaluation_runs",
 ] as const;
 
-export const EVENT_METRIC_KEYS = [
+const EVENT_METRIC_KEYS = [
   "events.event_type",
   "events.event_score",
   "events.event_details",
 ] as const;
 
-export const SENTIMENT_METRIC_KEYS = ["sentiment.thumbs_up_down"] as const;
+const SENTIMENT_METRIC_KEYS = ["sentiment.thumbs_up_down"] as const;
 
-export const THREADS_METRIC_KEYS = ["threads.average_duration_per_thread"] as const;
+const THREADS_METRIC_KEYS = ["threads.average_duration_per_thread"] as const;
 
 type MetadataMetricKey = (typeof METADATA_METRIC_KEYS)[number];
 type PerformanceMetricKey = (typeof PERFORMANCE_METRIC_KEYS)[number];
@@ -96,7 +96,7 @@ export const KNOWN_METRIC_KEYS: ReadonlySet<string> = new Set<string>([
   ...Object.keys(fieldMappings),
 ]);
 
-export function isKnownMetricKey(metric: string): boolean {
+function isKnownMetricKey(metric: string): boolean {
   return KNOWN_METRIC_KEYS.has(metric);
 }
 
@@ -104,7 +104,7 @@ export function isKnownMetricKey(metric: string): boolean {
  * Refuse a metric the translator has no expression for, naming the series the
  * caller sent it in. The rejected text is never echoed back or compiled.
  */
-export function unknownMetricError(index: number): ValidationError {
+function unknownMetricError(index: number): ValidationError {
   return new ValidationError("Unknown analytics metric", {
     meta: {
       fieldErrors: {
@@ -179,7 +179,7 @@ export const percentileToPercent: Record<PercentileAggregationTypes, number> = {
 /**
  * Per-metric opt-in for which percentile aggregate to compile to.
  */
-export type PercentileMode = "exact" | "tdigest";
+type PercentileMode = "exact" | "tdigest";
 
 function percentileFunctionName(
   mode: PercentileMode,

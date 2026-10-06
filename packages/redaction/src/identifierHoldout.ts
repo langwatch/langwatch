@@ -198,7 +198,42 @@ export function reservesModelOrToolName({ key, value }: { key: string; value: st
 }
 
 /**
- * Held back from PII analysis: reserved by name, or a value that's
+ * The span kind attribute (`ATTR_KEYS.SPAN_TYPE` in trace) and its known kinds (trace's
+ * `spanTypesSchema`). Inlined: this leaf package has no workspace deps, so the lists are
+ * kept equal by a parity test on the trace side.
+ */
+const SPAN_TYPE_ATTRIBUTE_KEY = "langwatch.span.type";
+const KNOWN_SPAN_TYPES: ReadonlySet<string> = new Set([
+  "span",
+  "llm",
+  "chain",
+  "tool",
+  "agent",
+  "rag",
+  "guardrail",
+  "evaluation",
+  "workflow",
+  "component",
+  "module",
+  "server",
+  "client",
+  "producer",
+  "consumer",
+  "task",
+  "unknown",
+]);
+
+/**
+ * Whether this attribute is the span kind carrying one of the known kinds. The name pass reads
+ * some of them as first names, so strict mode stored `[PERSON]` as a top-level span's kind.
+ * Gated on the exact list, not a shape: anything else written under this key is still analysed.
+ */
+export function reservesSpanType({ key, value }: { key: string; value: string }): boolean {
+  return key.toLowerCase() === SPAN_TYPE_ATTRIBUTE_KEY && KNOWN_SPAN_TYPES.has(value);
+}
+
+/**
+ * Held back from PII analysis: reserved by name, a known span kind, or a value that's
  * exclusively one opaque identifier token. Attribute values only — free
  * text (a log body, a status message, chat content) is always analysed.
  */
@@ -209,5 +244,9 @@ export function isHeldOutIdentifierAttribute({
   key: string;
   value: string;
 }): boolean {
-  return reservesTraceAddress({ key, value }) || isOpaqueIdentifierValue(value);
+  return (
+    reservesTraceAddress({ key, value }) ||
+    reservesSpanType({ key, value }) ||
+    isOpaqueIdentifierValue(value)
+  );
 }

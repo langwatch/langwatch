@@ -348,4 +348,81 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       });
     });
   });
+  describe("given one batch of a suite and an export-capable history", () => {
+    const runOf = (scenarioRunId: string, status: string) => ({
+      batchRunId: "batch_1",
+      scenarioRunId,
+      scenarioId: "scen_1",
+      status,
+      timestamp: 1700000000000,
+      results: null,
+      messages: [],
+      name: "Login Flow",
+      description: null,
+      durationInMs: 100,
+    });
+
+    function renderHistory({
+      runs,
+      scenarioSetId = "__internal__suite_1__suite",
+      suiteNameMap,
+    }: {
+      runs: ReturnType<typeof runOf>[];
+      scenarioSetId?: string;
+      suiteNameMap?: Map<string, string>;
+    }) {
+      mockRunDataQuery.mockReturnValue({
+        data: { runs, scenarioSetIds: { batch_1: scenarioSetId }, hasMore: false, changed: true },
+        isLoading: false,
+        error: null,
+      });
+      mockScenariosQuery.mockReturnValue({ data: [] });
+      return renderWithDesignSystem(
+        <RunHistoryPanel period={defaultPeriod} suiteNameMap={suiteNameMap} />,
+      );
+    }
+
+    describe("when the batch belongs to suite Regression Tests", () => {
+      /** @scenario "Suite batch entry displays the suite name" */
+      it("shows the suite name in the collapsed row header", () => {
+        renderHistory({
+          runs: [runOf("run_1", "SUCCESS")],
+          suiteNameMap: new Map([["suite_1", "Regression Tests"]]),
+        });
+
+        const header = screen.getByTestId("run-row-header");
+        expect(within(header).getByText("Regression Tests")).toBeInTheDocument();
+      });
+    });
+
+    describe("when the user clicks Export CSV in the run history header", () => {
+      /** @scenario "Export CSV button opens the config dialog" */
+      it("opens the config dialog with the run count and Full chosen", async () => {
+        renderHistory({ runs: [runOf("run_1", "SUCCESS"), runOf("run_2", "FAILED")] });
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole("button", { name: "Export CSV" }));
+
+        const dialog = await screen.findByRole("dialog");
+        expect(within(dialog).getByText("Export Scenario Runs")).toBeInTheDocument();
+        expect(within(dialog).getByText(/2 runs/)).toBeInTheDocument();
+        expect(within(dialog).getByRole("radio", { name: "Full" })).toBeChecked();
+      });
+    });
+
+    describe("when no runs match the current filters", () => {
+      /** @scenario "Export is unavailable when no runs match" */
+      it("disables the Export CSV button", () => {
+        renderHistory({ runs: [] });
+
+        expect(screen.getByRole("button", { name: "Export CSV" })).toBeDisabled();
+      });
+
+      it("keeps the button enabled while runs are listed", () => {
+        renderHistory({ runs: [runOf("run_1", "SUCCESS")] });
+
+        expect(screen.getByRole("button", { name: "Export CSV" })).toBeEnabled();
+      });
+    });
+  });
 });

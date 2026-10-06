@@ -36,7 +36,7 @@ export class ExampleService {
       ]);
       expect(found[0].message).toBe(
         "ExampleService forwards 5 of its 5 public methods to a method of the same name on" +
-          ` \`this.inner\`. ${LAYER_CLASS_ALLOWED}`,
+          ` \`this.inner\`. A pass-through class costs every reader a hop and hides nothing. Read the \`process-module\` skill. ${LAYER_CLASS_ALLOWED}`,
       );
     });
 

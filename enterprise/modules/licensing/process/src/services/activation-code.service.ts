@@ -65,7 +65,7 @@ export interface ActivationCredentials {
   tokenOf(licenseKey: string): string;
 }
 
-export interface ActivationCodeCollaborators {
+interface ActivationCodeCollaborators {
   repository: ActivationCodeRepository;
   licenses: LicenseMinter;
   /** So the first hosted call after activation is not refused for want of a sync. */

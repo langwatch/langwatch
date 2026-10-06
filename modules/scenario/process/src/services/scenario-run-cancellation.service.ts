@@ -10,7 +10,7 @@ import type { ScenarioClock } from "../app/scenario.app.ts";
 
 const logger = createLogger("langwatch:scenarios");
 
-export type ScenarioRunCancellationServiceOptions = {
+type ScenarioRunCancellationServiceOptions = {
   simulations: SimulationService;
   clock: ScenarioClock;
 };

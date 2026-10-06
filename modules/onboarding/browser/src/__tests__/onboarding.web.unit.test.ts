@@ -1,10 +1,12 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
+import { GuidedTourToken } from "@langwatch/onboarding-contract";
 import { describe, expect, it } from "vitest";
 
 import { onboardingFirstTouchAttribution } from "../behavior/first-touch-attribution.capability.ts";
 import { onboardingGuidedPath } from "../features/guided-onboarding/behavior/guided-path-active.capability.ts";
+import { onboardingGuidedTourHooks } from "../features/guided-onboarding/behavior/guided-tour.lend.ts";
 import { onboardingWeb } from "../onboarding.web.ts";
 
 function browserDocument() {
@@ -24,6 +26,17 @@ describe("given a browser that installs onboarding", () => {
         .render();
 
       expect(installed.modules).toContain(onboardingWeb);
+    });
+  });
+
+  describe("when a page the guided tour visits reads what onboarding lends it", () => {
+    /** @scenario a page outside onboarding registers its tour actions through the guided tour lend */
+    it("lends the tour's hooks under the guided tour token", () => {
+      const lend = onboardingWeb.installation.lends.find(
+        ({ token }) => token.key === GuidedTourToken.key,
+      );
+
+      expect(lend).toMatchObject({ value: onboardingGuidedTourHooks });
     });
   });
 

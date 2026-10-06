@@ -14,6 +14,7 @@ import {
   experimentRunTargetSchema,
   experimentRunWithItemsSchema,
 } from "@langwatch/experiment-contract";
+import { createLogger } from "@langwatch/observability";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { z } from "zod";
 
@@ -141,6 +142,17 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
   /** The `(experiment, run)` pair a keyset query binds as one ClickHouse tuple parameter. */
   static tupleParam(values: string[]): unknown {
     return new TupleParam(values);
+  }
+
+  /** Run-history telemetry through this module's logger; the request's own span is the trace. */
+  static loggedTelemetry(): ClickHouseExperimentRunRepositoryOptions["telemetry"] {
+    const logger = createLogger("langwatch:experiment");
+    return {
+      trace: (_input, operation) => operation(),
+      warnOldRuns: (input) => logger.warn(input, "experiment run history reached far back in time"),
+      error: (input, message) => logger.error(input, message),
+      warn: (input, message) => logger.warn(input, message),
+    };
   }
 
   static create(

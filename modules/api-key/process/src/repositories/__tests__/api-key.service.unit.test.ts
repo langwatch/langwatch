@@ -392,6 +392,7 @@ function createService(
 }
 
 describe("API-key service", () => {
+  /** @scenario "A minted key can authenticate once" */
   it("mints a split token and verifies it without exposing the hash", async () => {
     const service = createService();
     const created = await service.create({
@@ -406,6 +407,7 @@ describe("API-key service", () => {
     expect(verified).not.toHaveProperty("hashedSecret");
   });
 
+  /** @scenario "A revoked or expired key cannot authenticate" */
   it("rejects a revoked token", async () => {
     const service = createService();
     const created = await service.create({
@@ -556,6 +558,7 @@ describe("API-key service", () => {
     );
   });
 
+  /** @scenario "A service key without bindings defaults to organization administration" */
   it("defaults an unowned service key to organization ADMIN", async () => {
     const service = createService();
     const created = await service.create({
@@ -575,6 +578,7 @@ describe("API-key service", () => {
     ]);
   });
 
+  /** @scenario "A system-managed key is not customer-addressable" */
   it("refuses the hidden system name to customer callers", async () => {
     const service = createService();
     await expect(
@@ -600,6 +604,7 @@ describe("API-key service", () => {
     ).resolves.toMatchObject({ apiKey: { name: "Langy session" } });
   });
 
+  /** @scenario "A system-managed key is not customer-addressable" */
   it("keeps system-managed keys hidden from customer mutation paths", async () => {
     const service = createService();
     const created = await service.create({
@@ -609,6 +614,14 @@ describe("API-key service", () => {
       permissionMode: "all",
       bindings: [],
     });
+    await expect(
+      service.getByIdForCaller({
+        id: created.apiKey.id,
+        organizationId: "org-1",
+        callerUserId: null,
+        callerCanReadAnyKey: true,
+      }),
+    ).rejects.toMatchObject({ code: "api_key_not_found" });
     await expect(
       service.update({
         id: created.apiKey.id,
@@ -628,6 +641,7 @@ describe("API-key service", () => {
     ).rejects.toMatchObject({ code: "api_key_not_found" });
   });
 
+  /** @scenario "A personal key cannot exceed its owner's live grants" */
   it("validates the owner ceiling at the resolved project scope", async () => {
     const findPermissionsBeyondCaller = vi.fn().mockResolvedValue([]);
     const authz = createApiFixture<AuthzApi>({

@@ -2,7 +2,7 @@ import { useRouter } from "@langwatch/browser-host/use-router";
 /**
  * In-chat "Install the LangWatch GitHub App" card. Rendered by LangySidebar when the
  * assistant needs GitHub access it doesn't have yet, or proactively in onboarding.
- * Spec: specs/integrations/github-connection.feature.
+ * Spec: modules/integration/specs/github-connection.feature.
  */
 import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";

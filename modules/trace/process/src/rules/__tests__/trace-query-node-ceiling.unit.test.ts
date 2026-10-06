@@ -42,6 +42,27 @@ describe("given a filter with more than twenty nodes", () => {
   });
 });
 
+describe("given an evaluator bound to excluded verdicts", () => {
+  // `head` and n excluded verdicts span 3n + 1 nodes either way: bound under
+  // `evaluator:X`, walked tag by tag under `evaluatorStatus`. Same ceiling.
+  const chain = (head: string, n: number): string =>
+    [head, ...Array.from({ length: n }, () => "NOT evaluatorVerdict:fail")].join(" AND ");
+  const lastAllowed = Math.floor((MAX_FILTER_NODE_COUNT - 1) / 3);
+
+  describe.each([
+    ["bound", "evaluator:X"],
+    ["walked tag by tag", "evaluatorStatus:processed"],
+  ])("when the chain is %s", (_, head) => {
+    it("compiles at the ceiling", () => {
+      expect(compile(chain(head, lastAllowed))).not.toBeNull();
+    });
+
+    it("refuses one verdict past it", () => {
+      expect(() => compile(chain(head, lastAllowed + 1))).toThrow(FilterTooComplexError);
+    });
+  });
+});
+
 describe("given the same sentence in quotes", () => {
   describe("when it is compiled for ClickHouse", () => {
     it("compiles as one phrase node", () => {

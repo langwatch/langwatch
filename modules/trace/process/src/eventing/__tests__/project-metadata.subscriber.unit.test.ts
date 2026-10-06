@@ -219,6 +219,7 @@ describe("createProjectMetadataHandler()", () => {
      * @scenario First trace tracks the PostHog integration milestone against the org admin
      * @scenario The milestone is attributed to the person the browser knows
      * @scenario The first-trace milestone is recorded through a sink, not a function
+     * @scenario "A project's first trace claims its topic clustering"
      */
     it("tracks first_trace_integrated against the org admin", async () => {
       const subscriber = createProjectMetadataHandler(deps);
@@ -537,6 +538,7 @@ describe("createProjectMetadataHandler()", () => {
     });
 
     describe("when a topic clustering bootstrap is wired", () => {
+      /** @scenario "A project's first trace claims its topic clustering" */
       it("bootstraps the project's clustering schedule exactly once", async () => {
         const subscriber = createProjectMetadataHandler(deps);
 

@@ -164,4 +164,81 @@ describe("AnnotationService review workflow", () => {
       [],
     );
   });
+
+  describe("when an annotation is written over the REST path", () => {
+    it("records an unattributed annotation on its trace, so has:annotation finds it", async () => {
+      const harnessed = harness();
+
+      const created = await harnessed.app.createUnattributed({
+        projectId: "project-1",
+        traceId: "trace-1",
+        comment: "looks wrong",
+        isThumbsUp: false,
+      });
+
+      expect(harnessed.recordAnnotation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: "project-1",
+          traceId: "trace-1",
+          annotationId: created.id,
+        }),
+      );
+    });
+
+    it("removes a deleted annotation from its trace exactly once", async () => {
+      const harnessed = harness();
+      const created = await harnessed.app.createUnattributed({
+        projectId: "project-1",
+        traceId: "trace-1",
+        comment: "looks wrong",
+        isThumbsUp: false,
+      });
+
+      await harnessed.app.delete({ id: created.id, projectId: "project-1" });
+
+      expect(harnessed.removeAnnotation).toHaveBeenCalledTimes(1);
+      expect(harnessed.removeAnnotation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: "project-1",
+          traceId: "trace-1",
+          annotationId: created.id,
+        }),
+      );
+    });
+
+    it("removes from the trace once when a review delete goes through the same path", async () => {
+      const harnessed = harness();
+      const created = await harnessed.app.createReview({ ...createInput, expectedOutput: null });
+
+      await harnessed.app.deleteReview({ projectId: "project-1", annotationId: created.id });
+
+      expect(harnessed.removeAnnotation).toHaveBeenCalledTimes(1);
+    });
+
+    it("answers not-found for an unknown id and syncs nothing to a trace", async () => {
+      const harnessed = harness();
+
+      await expect(
+        harnessed.app.delete({ id: "missing", projectId: "project-1" }),
+      ).rejects.toBeInstanceOf(AnnotationNotFoundError);
+
+      expect(harnessed.removeAnnotation).not.toHaveBeenCalled();
+    });
+
+    it("keeps create and delete successful when the trace sync fails", async () => {
+      const harnessed = harness();
+      harnessed.recordAnnotation.mockRejectedValue(new Error("queue down"));
+      harnessed.removeAnnotation.mockRejectedValue(new Error("queue down"));
+
+      const created = await harnessed.app.createUnattributed({
+        projectId: "project-1",
+        traceId: "trace-1",
+        comment: "looks wrong",
+        isThumbsUp: false,
+      });
+      const deleted = await harnessed.app.delete({ id: created.id, projectId: "project-1" });
+
+      expect(deleted.id).toBe(created.id);
+    });
+  });
 });

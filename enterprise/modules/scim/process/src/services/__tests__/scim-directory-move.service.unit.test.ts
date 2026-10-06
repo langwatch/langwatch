@@ -51,18 +51,24 @@ async function seed(directory: MemoryScimRepository) {
     description: null,
   });
   await directory.rememberDirectoryIdentity({
+    organizationId: ORGANIZATION_ID,
     connectionId: LEGACY,
     externalId: "ext-ana",
+    releasedConnectionIds: [],
     userId: "user_ana",
   });
   await directory.rememberDirectoryIdentity({
+    organizationId: ORGANIZATION_ID,
     connectionId: LEGACY,
     externalId: "ext-bo",
+    releasedConnectionIds: [],
     userId: "user_bo_old",
   });
   await directory.rememberDirectoryIdentity({
+    organizationId: ORGANIZATION_ID,
     connectionId: REPLACEMENT,
     externalId: "ext-bo",
+    releasedConnectionIds: [],
     userId: "user_bo",
   });
   return id;

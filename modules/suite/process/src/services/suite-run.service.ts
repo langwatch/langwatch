@@ -1,3 +1,4 @@
+import { VOICE_AGENTS_FLAG_KEY } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   parseScenarioParameterDefinitions,
@@ -35,6 +36,7 @@ import {
   type SuiteRunPlanResult,
   type SuiteScope,
   type SuiteTarget,
+  VoiceAgentsDisabledError,
 } from "@langwatch/suite-contract";
 
 import type { SuiteExecution } from "../app/suite.app.ts";
@@ -94,6 +96,11 @@ export class SuiteRunService {
     if (suite.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
     }
+    await this.assertVoiceTargetsAllowed({
+      targets: suite.targets,
+      projectId: parsed.projectId,
+      organizationId: parsed.organizationId,
+    });
 
     const scope = parseSuiteScope(suite.scope);
     const scenarioIds = await this.scope.resolveRunMembership({
@@ -153,6 +160,11 @@ export class SuiteRunService {
     if (parsed.config.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
     }
+    await this.assertVoiceTargetsAllowed({
+      targets: parsed.config.targets,
+      projectId: parsed.projectId,
+      organizationId: parsed.organizationId,
+    });
 
     const { scope, scenarioIds } = await this.planScope(parsed);
 
@@ -374,6 +386,28 @@ export class SuiteRunService {
   }
 
   /**
+   * A voice target reaches the call panel and the ElevenLabs adapter, both behind
+   * `release_voice_agents_enabled` (AC29); a run naming one is refused while it is off.
+   */
+  private async assertVoiceTargetsAllowed({
+    targets,
+    projectId,
+    organizationId,
+  }: {
+    targets: readonly SuiteTarget[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<void> {
+    if (!targets.some((target) => target.type === "voice")) return;
+    const enabled = await this.options.featureFlags.isEnabled(VOICE_AGENTS_FLAG_KEY, {
+      kind: "project",
+      projectId,
+      organizationId,
+    });
+    if (!enabled) throw new VoiceAgentsDisabledError();
+  }
+
+  /**
    * The scenarios and targets a run actually covers, with every refusal raised before anything
    * is stored: a missing or fully archived reference, and a connected agent nobody may run.
    */
@@ -445,6 +479,12 @@ export class SuiteRunService {
 
   async runAll(input: SuiteRunAllInput): Promise<SuiteRunAllResult> {
     const parsed = suiteRunAllInputSchema.parse(input);
+    // Refused before the managed Run-all row is written; `run` asks again for the stored targets.
+    await this.assertVoiceTargetsAllowed({
+      targets: parsed.targets ?? [],
+      projectId: parsed.projectId,
+      organizationId: parsed.organizationId,
+    });
     const scenarioIds = (await this.options.scenarios.list({ projectId: parsed.projectId })).map(
       (scenario) => scenario.id,
     );

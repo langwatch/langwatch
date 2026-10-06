@@ -27,3 +27,6 @@ export * from "./onboarding-experiment.ts";
 export * from "./onboarding-guided-paths.ts";
 export * from "./onboarding-schemas.ts";
 export * from "./onboarding-guided-events.ts";
+export * from "./onboarding-guided-kickoff.ts";
+export * from "./onboarding-guided-tour.ts";
+export * from "./onboarding-guided-offer.ts";

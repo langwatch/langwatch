@@ -2,12 +2,18 @@
 export type McpSessionTransport = "streamable" | "sse";
 
 /**
- * A session record read: the key it was opened with, still encrypted, and the project it was
+ * A session record read: the key it was opened with, opened again, and the project it was
  * opened for (absent on records older replicas wrote), or nothing.
  */
 export type McpSessionRecordLookup =
-  | Readonly<{ kind: "found"; encryptedApiKey: string; projectId: string | undefined }>
+  | Readonly<{ kind: "found"; apiKey: string; projectId: string | undefined }>
   | Readonly<{ kind: "missing" }>;
+
+/** Reversible encryption for the credential a session record holds at rest. */
+export interface McpSessionCipher {
+  encrypt(plaintext: string): string;
+  decrypt(ciphertext: string): string;
+}
 
 /**
  * Session records every replica can read, so a session opened on one replica can be found,
@@ -21,7 +27,6 @@ export abstract class McpSessionRepository {
     transport: McpSessionTransport;
     sessionId: string;
     apiKey: string;
-    encryptedApiKey: string;
     projectId?: string;
   }): Promise<void>;
 
@@ -31,6 +36,7 @@ export abstract class McpSessionRepository {
     apiKey: string;
   }): Promise<void>;
 
+  /** A record whose key cannot be opened throws; the caller reads that as missing. */
   abstract getRecord(input: {
     transport: McpSessionTransport;
     sessionId: string;

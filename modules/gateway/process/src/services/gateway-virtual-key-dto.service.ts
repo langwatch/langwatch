@@ -18,11 +18,9 @@ import { toDate } from "@langwatch/time";
  * behind it is deleted — spans keep landing there and reappear if restored.
  * Unreadable from the row alone, so it's read once per listing and published.
  */
-export type TraceDestinationFacts = {
+type TraceDestinationFacts = {
   archivedProjectIds: ReadonlySet<string>;
 };
-
-export type VirtualKeyScopeEntry = VirtualKeyCamelDtoResponse["scopes"][number];
 
 export type VirtualKeyCamelDto = VirtualKeyCamelDtoResponse;
 

@@ -22,6 +22,7 @@
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
@@ -50,6 +51,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@clickhouse/client": "catalog:",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",

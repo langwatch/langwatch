@@ -11,6 +11,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
+import { MemorySuiteRunProcessingRepository } from "../../repositories/memory/memory.suite-run-processing.repository.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
 import type { SuiteRepositories } from "../../repositories/suite.repositories.ts";
@@ -37,6 +38,7 @@ export class RecordingSuiteExecution implements SuiteExecution {
 export function createSuiteTestRepositories(database?: MemorySuiteDatabase): SuiteRepositories {
   return {
     suites: MemorySuiteRepository.create({ database: database ?? MemorySuiteDatabase.create() }),
+    runProcessing: MemorySuiteRunProcessingRepository.create(),
   };
 }
 

@@ -5,14 +5,36 @@ import {
   type SsrfUrlValidator,
 } from "@langwatch/egress";
 
-import {
-  ModelProviderEgress,
-  type ModelProviderEgressRequest,
-  type ModelProviderEgressResponse,
-} from "../app/model-provider.members.ts";
+/** One outbound probe's answer, as the credential prober reads it. */
+export type ModelProviderEgressResponse = {
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+};
+
+/** What one credential probe asks of the network. */
+export type ModelProviderEgressRequest = {
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+  signal: AbortSignal;
+};
+
+/**
+ * The guarded way out of the process, for the credential probe: bare `fetch` is refused since a
+ * customer's credential goes to a customer-chosen URL. `isRedirectRefusal` matches by error type
+ * because only the implementation knows which class a refused hop raises, not the message.
+ */
+export abstract class ModelProviderEgress {
+  abstract fetch(
+    url: string,
+    request: ModelProviderEgressRequest,
+  ): Promise<ModelProviderEgressResponse>;
+  abstract isRedirectRefusal(error: unknown): boolean;
+}
 
 /** The address policy a deployment fences its outbound probes with. */
-export type ModelProviderEgressPolicy = Readonly<{
+type ModelProviderEgressPolicy = Readonly<{
   /** Refuse private, loopback and link-local destinations, and names resolving to them. */
   blockLocal: boolean;
   /** The literal hostname allowlist that relaxes the local block, and only it. */

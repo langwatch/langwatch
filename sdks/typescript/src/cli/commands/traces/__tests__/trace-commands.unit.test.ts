@@ -309,6 +309,51 @@ describe("searchTracesCommand()", () => {
     });
   });
 
+  describe("when a filter and a text query are given together", () => {
+    /** @scenario The CLI sends a filter and keeps free text separate */
+    it("sends the filter and the text as separate request fields", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+
+      await searchTracesCommand({ filter: "status:error", query: "refund" });
+
+      const body = mockSearch.mock.calls[0]?.[0] as { filter?: string; query?: string };
+      expect(body.filter).toBe("status:error");
+      expect(body.query).toBe("refund");
+    });
+  });
+
+  describe("when a filtered search returns no rows", () => {
+    let log: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+    });
+
+    afterEach(() => {
+      log.mockRestore();
+    });
+
+    /** @scenario An empty filtered result points at the facets command */
+    it("points at the facets command", async () => {
+      await searchTracesCommand({ filter: "status:error" });
+
+      expect(log.mock.calls.flat().join("\n")).toContain("langwatch trace facets <field>");
+    });
+
+    it("stays quiet about facets when no filter was given", async () => {
+      await searchTracesCommand({ query: "refund" });
+
+      expect(log.mock.calls.flat().join("\n")).not.toContain("langwatch trace facets");
+    });
+  });
+
   // An error is recorded on the span, not in the trace's searchable text, so
   // before this flag existed the only way to answer "show me my failed
   // traces" was to pull every trace and filter locally. An agent that instead

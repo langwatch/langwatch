@@ -4,7 +4,7 @@
  */
 import type { FoldStateRead } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { Cluster, Redis } from "ioredis";
 import type { z } from "zod";
 
 import {
@@ -27,11 +27,11 @@ const planKey = (runKey: string): string => `${RUN_KEY_PREFIX}${runKey}:plan`;
 const startKey = (runId: string): string => `${RUN_KEY_PREFIX}${runId}:start`;
 
 export class RedisExperimentRunFoldRepository extends ExperimentRunFoldRepository {
-  static create(options: { redis: ProcessMembers["redis"] }): RedisExperimentRunFoldRepository {
+  static create(options: { redis: Redis | Cluster }): RedisExperimentRunFoldRepository {
     return new RedisExperimentRunFoldRepository(options.redis);
   }
 
-  private constructor(private readonly redis: ProcessMembers["redis"]) {
+  private constructor(private readonly redis: Redis | Cluster) {
     super();
   }
 

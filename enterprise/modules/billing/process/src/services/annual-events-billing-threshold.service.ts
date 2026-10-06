@@ -11,7 +11,7 @@ import type Stripe from "stripe";
  */
 export const ANNUAL_EVENTS_BILLING_THRESHOLD = 75_000;
 
-export type ThresholdResult = "applied" | "already_set" | "anchor_pinned" | "not_annual_events";
+type ThresholdResult = "applied" | "already_set" | "anchor_pinned" | "not_annual_events";
 
 /**
  * Sets the billing threshold on a Stripe subscription that carries an annually-billed

@@ -32,7 +32,7 @@ import type { PinnedTraceRepository } from "../repositories/pinned-trace.reposit
 import type { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository.ts";
 import type { StorageMeterService } from "./storage-meter.service.ts";
 
-export type DataRetentionServiceOptions = Readonly<{
+type DataRetentionServiceOptions = Readonly<{
   policies: DataRetentionRepository;
   pins: PinnedTraceRepository;
   projects: ProjectApi;

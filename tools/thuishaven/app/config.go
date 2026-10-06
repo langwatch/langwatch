@@ -131,6 +131,9 @@ type PlanOptions struct {
 	// langyImageTag is the content-addressed image tag Up resolves before
 	// provisioning (internal — derived, never set by the composition root).
 	langyImageTag string
+	// langyDockerHost is the container host Up resolved for the langy worker
+	// (internal, derived like langyImageTag; empty outside a container tier).
+	langyDockerHost string
 	// LangyTierRequest is what the langy isolation posture is resolved FROM: the
 	// developer's two env flags plus whether this is a development stack. Up
 	// resolves it into LangyTier once, before the stack is built, because the

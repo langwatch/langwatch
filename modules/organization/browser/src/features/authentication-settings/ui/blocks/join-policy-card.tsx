@@ -8,7 +8,7 @@ import { Box, Button, HStack, Input, Text, VStack } from "@langwatch/design-syst
 import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
 import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { DomainJoinSetting } from "@langwatch/identity-contract";
+import type { DomainJoinSetting, JoinerRole } from "@langwatch/identity-contract";
 import { Lock } from "lucide-react";
 import { useState } from "react";
 
@@ -28,6 +28,24 @@ const OPTIONS: { value: DomainJoinSetting; label: string; help: string }[] = [
   },
 ];
 
+/**
+ * The seat a newcomer lands on (ADR-171): a Member sees the shared projects, a
+ * Developer gets a project of their own and nothing shared. It applies to
+ * everybody admitted without an invitation, whichever door they came through.
+ */
+const JOINER_SEAT_OPTIONS: { value: JoinerRole; label: string; help: string }[] = [
+  {
+    value: "MEMBER",
+    label: "Member",
+    help: "Sees the shared projects and can work in them. Uses a member seat.",
+  },
+  {
+    value: "DEVELOPER",
+    label: "Developer",
+    help: "Gets a project of their own and nothing shared. Never counted against your seats.",
+  },
+];
+
 const OFF_EXPLANATION =
   "Choosing who can join without an invitation is part of the Enterprise plan. You can still invite people by email on any plan.";
 const HELD_EXPLANATION =
@@ -39,9 +57,67 @@ const splitDomains = (value: string) =>
     .map((domain) => domain.trim())
     .filter(Boolean);
 
+/** Which seat they land on. Shown whenever anybody can get in without an invitation. */
+function JoinerSeatOptions({
+  seat,
+  saving,
+  onSelect,
+}: {
+  seat: JoinerRole;
+  saving: boolean;
+  onSelect: (seat: JoinerRole) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={2}>
+      <Text fontSize="13px" fontWeight="500">
+        Seat for people who join
+      </Text>
+      <RadioGroup.Root
+        value={seat}
+        colorPalette="orange"
+        onValueChange={(event) => onSelect((event.value ?? "MEMBER") as JoinerRole)}
+      >
+        <VStack align="stretch" gap={2}>
+          {JOINER_SEAT_OPTIONS.map((option) => (
+            <RadioGroup.Item
+              key={option.value}
+              value={option.value}
+              disabled={saving}
+              paddingX={2.5}
+              paddingY={2}
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="md"
+              background="bg.panel"
+              _checked={{
+                borderColor: "colorPalette.solid",
+                background: "colorPalette.subtle",
+              }}
+            >
+              <RadioGroup.ItemHiddenInput data-testid={`joiner-seat-${option.value}`} />
+              <RadioGroup.ItemIndicator />
+              <RadioGroup.ItemText>
+                <VStack align="start" gap={0}>
+                  <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
+                    {option.label}
+                  </Text>
+                  <Text color="fg.muted" fontSize="xs" lineHeight="1.5">
+                    {option.help}
+                  </Text>
+                </VStack>
+              </RadioGroup.ItemText>
+            </RadioGroup.Item>
+          ))}
+        </VStack>
+      </RadioGroup.Root>
+    </VStack>
+  );
+}
+
 export function JoinPolicyCard({
   domainJoin,
   joinDomains,
+  joinerRole = "MEMBER",
   saving,
   planLocked,
   planLink,
@@ -50,22 +126,38 @@ export function JoinPolicyCard({
 }: {
   domainJoin: DomainJoinSetting;
   joinDomains: string[];
+  /** The seat people who join without an invitation receive (ADR-171). */
+  joinerRole?: JoinerRole;
   saving: boolean;
   planLocked: boolean;
   planLink: { href: string; label: string };
-  onSave: (next: { domainJoin: DomainJoinSetting; domains: string[] }) => void;
+  onSave: (next: {
+    domainJoin: DomainJoinSetting;
+    domains: string[];
+    /** Left out when the seat control is hidden: the seat in force stays. */
+    joinerRole?: JoinerRole;
+  }) => void;
   /** A connection routes sign-ins, so the card points at its own setting. */
   ssoLive?: boolean;
 }) {
   const [selected, setSelected] = useState<DomainJoinSetting>(domainJoin);
   const [domains, setDomains] = useState(joinDomains.join(", "));
+  const [seat, setSeat] = useState<JoinerRole>(joinerRole);
   const explanation = domainJoin === "off" ? OFF_EXPLANATION : HELD_EXPLANATION;
 
   const isLocked = (value: DomainJoinSetting) =>
     planLocked && value !== "off" && value !== domainJoin;
 
   const parsedDomains = splitDomains(domains);
-  const unchanged = selected === domainJoin && parsedDomains.join(",") === joinDomains.join(",");
+  // A live connection admits people too and they land on this seat, so it
+  // stays offered while that door is open. When neither door is open the seat
+  // is hidden and never sent: the save would overwrite another admin's change.
+  const seatShown = selected !== "off" || ssoLive;
+  const seatToSave = seatShown ? seat : undefined;
+  const unchanged =
+    selected === domainJoin &&
+    parsedDomains.join(",") === joinDomains.join(",") &&
+    (seatToSave === undefined || seatToSave === joinerRole);
 
   return (
     <SettingsCard
@@ -78,7 +170,13 @@ export function JoinPolicyCard({
           colorPalette="orange"
           loading={saving}
           disabled={unchanged || isLocked(selected)}
-          onClick={() => onSave({ domainJoin: selected, domains: parsedDomains })}
+          onClick={() =>
+            onSave({
+              domainJoin: selected,
+              domains: parsedDomains,
+              ...(seatToSave === undefined ? {} : { joinerRole: seatToSave }),
+            })
+          }
         >
           Save
         </Button>
@@ -164,10 +262,12 @@ export function JoinPolicyCard({
         </VStack>
       )}
 
+      {seatShown && <JoinerSeatOptions seat={seat} saving={saving} onSelect={setSeat} />}
+
       {ssoLive && (
         <Text color="fg.subtle" fontSize="xs">
-          People signing in through your identity provider are answered by the connection's own
-          setting, on{" "}
+          Whether people signing in through your identity provider are admitted is the connection's
+          own setting, on{" "}
           <Link
             href="/settings/authentication/provider"
             colorPalette="orange"
@@ -175,7 +275,7 @@ export function JoinPolicyCard({
           >
             Identity provider
           </Link>
-          .
+          . Those admitted land on the seat chosen above.
         </Text>
       )}
     </SettingsCard>

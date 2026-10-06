@@ -38,7 +38,9 @@ Envoy and Traefik stream responses without buffering and pass WebSocket upgrades
 
 ## Chart Ingress
 
-The chart renders an Ingress for the app when `ingress.enabled` is `true`. Set `ingress.gateway.host` and it renders a second Ingress, `<release>-gateway-ingress`, for the gateway host. The second Ingress uses the same `className`, `labels` and `annotations` as the app Ingress. It is a separate object because ingress-nginx and similar controllers apply annotations to a whole Ingress, and the gateway needs streaming settings that the app routes do not.
+The chart renders an Ingress for the app when `ingress.enabled` is `true`. Set `ingress.gateway.host` and it renders a second Ingress, `<release>-gateway-ingress`, for the gateway host. The second Ingress uses the same `className`, `labels` and `annotations` as the app Ingress, minus the nginx `rewrite-target`, `use-regex` and `app-root` annotations, which would break the gateway paths.
+
+It is a separate object because ingress-nginx and similar controllers apply annotations to a whole Ingress, and the gateway needs streaming settings that the app routes do not.
 
 On ingress-nginx:
 

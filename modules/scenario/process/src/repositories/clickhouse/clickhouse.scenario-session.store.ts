@@ -1,7 +1,7 @@
 import type { SimulationClickHouseClient } from "./simulation-clickhouse.repository.ts";
 
 /** The process's one routing `clickhouse` member, as the simulation reads query it. */
-export type ScenarioReadOnlyClickHouse = Readonly<{
+type ScenarioReadOnlyClickHouse = Readonly<{
   query<Row>(input: {
     tenantId: string;
     tenantIds?: readonly string[];

@@ -31,7 +31,7 @@ export type MemoryWebhookEndpointRow = {
   updatedAt: Instant;
 };
 
-export type MemoryWebhookDeliveryRow = {
+type MemoryWebhookDeliveryRow = {
   id: string;
   organizationId: string;
   endpointId: string;

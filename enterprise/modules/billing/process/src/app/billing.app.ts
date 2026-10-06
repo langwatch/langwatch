@@ -51,7 +51,6 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { fromDate, Temporal, type Instant } from "@langwatch/time";
 import Stripe from "stripe";
 
-import { billingProductAnalyticsChannels } from "../channels/billing-product-analytics-channels.registry.ts";
 import { billingSubscriptionNotifierChannels } from "../channels/billing-subscription-notifier-channels.registry.ts";
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
 import { billingWebhookHostChannels } from "../channels/billing-webhook-host-channels.registry.ts";
@@ -78,7 +77,6 @@ import {
   type LicensePurchaseHandler,
 } from "../services/billing-stripe-webhook.service.ts";
 import type { SeatRetentionRules } from "../services/billing-subscription-lifecycle.service.ts";
-import { BillingSubscriptionStartedAnalyticsService } from "../services/billing-subscription-started-analytics.service.ts";
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { ConnectedBillingOverviewService } from "../services/connected-billing-overview.service.ts";
 import { ConnectedBillingTickService } from "../services/connected-billing-tick.service.ts";
@@ -115,15 +113,12 @@ import type { BillingStripeWebhookApi } from "../transport/billing-stripe-webhoo
 import type { BillingCurrencyApi } from "../transport/currency.trpc.ts";
 import type { BillingSubscriber, BillingSubscriptionApi } from "../transport/subscription.trpc.ts";
 
-/** Both are the process's own facts: where it runs, and which price mode it bills in. */
-type BillingMembers = Readonly<{ isSaas: boolean; nodeEnvironment: string | undefined }>;
-
 /** Main's `env.BASE_HOST ?? "https://app.langwatch.ai"` for the usage link. */
 const DEFAULT_PUBLIC_BASE_URL = "https://app.langwatch.ai";
 
 type BillingSetup = FeatureSetup<
   typeof BillingModule.dependencies,
-  BillingMembers & Readonly<{ publicBaseUrl: string | undefined }>,
+  never,
   BillingServerConfig,
   BillingRepositories
 >;
@@ -161,8 +156,6 @@ type StripeWebhookComposition = Readonly<{
   licensePurchase?: LicensePurchaseHandler;
   /** Opens the invitations a seat checkout paid for; organization owns them. */
   invites?: Pick<OrganizationApi, "approvePaymentPendingInvites">;
-  /** Tracks subscription_started in product analytics for a subscription that became active. */
-  startedAnalytics?: Pick<BillingSubscriptionStartedAnalyticsService, "fire">;
 }>;
 
 type SubscriptionComposition = Readonly<{
@@ -220,7 +213,6 @@ export class BillingModule
     internalSlackSelfHostedWebhook: billingSecrets.internalSlackSelfHostedWebhook,
     internalSlackSignupsWebhook: billingSecrets.internalSlackSignupsWebhook,
   } as const;
-  static readonly reads = ["isSaas", "nodeEnvironment", "publicBaseUrl"] as const;
 
   static async create(setup: BillingSetup): Promise<BillingModule> {
     const mailer: MailSender = {
@@ -244,7 +236,6 @@ export class BillingModule
     const resourceLimitAlerts = BillingModule.#composeResourceLimitAlerts(setup, notices);
     return setup.secrets.into(BillingModule.secrets.stripeSecretKey, (stripeSecretKey) =>
       BillingModule.assemble({
-        members: setup.members,
         repositories: setup.repositories,
         config: setup.config,
         peers: setup.dependencies,
@@ -263,7 +254,6 @@ export class BillingModule
           retention: setup.dependencies.dataRetention,
           invites: setup.dependencies.organizations,
           licensePurchase,
-          startedAnalytics: BillingModule.#composeStartedAnalytics(setup),
         },
         subscription: {
           notifier: billingSubscriptionNotifierChannels.slack.create({ notices }),
@@ -271,23 +261,6 @@ export class BillingModule
         },
       }),
     );
-  }
-
-  /** subscription_started for every member, sent where the deployment names a PostHog key. */
-  static #composeStartedAnalytics(setup: BillingSetup): BillingSubscriptionStartedAnalyticsService {
-    const { posthogKey: key, posthogHost: host } = setup.config;
-    const analytics = key
-      ? billingProductAnalyticsChannels.live.create({
-          targets: () => [{ key, ...(host ? { host } : {}) }],
-        })
-      : void 0;
-    if (analytics) setup.resources.own("Billing PostHog client", () => analytics.close());
-
-    return BillingSubscriptionStartedAnalyticsService.create({
-      analytics,
-      organizations: setup.dependencies.organizations,
-      errors: BillingErrorReporterService.create(),
-    });
   }
 
   /** Main's Slack, HubSpot and usage-limit mail notices; each Slack webhook is a secret. */
@@ -301,7 +274,7 @@ export class BillingModule
             secrets.into(handles.internalSlackSelfHostedWebhook, (slackSelfHostedChannel) =>
               BillingUsageNoticeService.create({
                 config: {
-                  baseHost: setup.members.publicBaseUrl,
+                  baseHost: setup.config.publicBaseUrl,
                   slackPlanLimitChannel,
                   slackSignupsChannel,
                   slackSelfHostedChannel,
@@ -332,7 +305,7 @@ export class BillingModule
       records: notifications,
       organizations: UsageLimitOrganizationService.create({ organizations, projects }),
       emails: notices,
-      baseHost: setup.members.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
+      baseHost: setup.config.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
     });
   }
 
@@ -342,7 +315,7 @@ export class BillingModule
     notices: BillingUsageNoticeService,
   ): ResourceLimitAlertService {
     const { organizations, projects } = setup.dependencies;
-    const { isSaas } = setup.members;
+    const { isSaas } = setup.config;
     return ResourceLimitAlertService.create({
       isSaas,
       cooldown: resourceLimitCooldown,
@@ -358,7 +331,6 @@ export class BillingModule
 
   /** The construction once the payment provider's key has resolved, or not. */
   static assemble({
-    members,
     repositories,
     config,
     peers,
@@ -370,7 +342,6 @@ export class BillingModule
     subscription,
     lifecycle,
   }: {
-    members: BillingMembers;
     repositories: Pick<
       BillingRepositories,
       | "connectedBilling"
@@ -384,10 +355,11 @@ export class BillingModule
       | "webhookOrganizations"
       | "seatEventSubscriptions"
       | "organizations"
-      | "tenantOrganizations"
-      | "tenantOrganizationCache"
     >;
-    config: Pick<BillingServerConfig, "bankDetails" | "licensePaymentLinkId">;
+    config: Pick<
+      BillingServerConfig,
+      "bankDetails" | "licensePaymentLinkId" | "isSaas" | "nodeEnvironment"
+    >;
     peers: ConnectedBillingPeers;
     stripeSecretKey: string | undefined;
     /** The monthly statement mail; absent, statements wait and nothing is recorded. */
@@ -401,7 +373,7 @@ export class BillingModule
     /** Records the checkout and subscription changes for peers; absent where a suite composes none. */
     lifecycle?: BillingLifecycleAnnouncerService;
   }): BillingModule {
-    const { isSaas, nodeEnvironment } = members;
+    const { isSaas, nodeEnvironment } = config;
     const repository = repositories.connectedBilling;
     const facts = ConnectedCustomerFactsService.create(peers);
     const overview = ConnectedBillingOverviewService.create({
@@ -426,6 +398,7 @@ export class BillingModule
         repositories,
         peers,
         facts,
+        nodeEnvironment,
         usageReporting: isSaas
           ? () =>
               StripeUsageReportingBuilder.create({
@@ -691,7 +664,6 @@ export class BillingModule
       retention: webhook.retention,
       connectedBilling,
       ...(announcer ? { announcer } : {}),
-      ...(webhook.startedAnalytics ? { startedAnalytics: webhook.startedAnalytics } : {}),
     });
     return StripeWebhookReceiptService.create({
       dispatchesEvents: () => isSaas,
@@ -850,6 +822,7 @@ export class BillingModule
     peers,
     facts,
     usageReporting,
+    nodeEnvironment,
   }: {
     repositories: Pick<
       BillingRepositories,
@@ -858,6 +831,7 @@ export class BillingModule
     peers: Pick<ConnectedBillingPeers, "licensing" | "gateway">;
     facts: ConnectedCustomerFactsService;
     usageReporting: (() => UsageReportingService) | undefined;
+    nodeEnvironment: string | undefined;
   }): BillingReportingPipeline {
     const projects = {
       findProjectIds: (organizationId: string) => facts.findProjectIds(organizationId),
@@ -879,6 +853,9 @@ export class BillingModule
       billingCheckpoints: repositories.checkpoints,
       getUsageReportingService: () => (reporter ??= usageReporting?.()),
       queryInstantEvalSpendTotal: (input) => instantEvalSpend.queryInstantEvalSpendTotal(input),
+      isInstantEvalMeterProvisioned: () =>
+        BillingPriceCatalogue.create(getStripeEnvironmentFromNodeEnv(nodeEnvironment)).meters
+          .INSTANT_EVAL_USD !== undefined,
       organizationCache: repositories.organizationCache,
       errorReporter: BillingErrorReporterService.create(),
       connectedUsageCeiling: async (input) => {

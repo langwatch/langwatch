@@ -12,6 +12,7 @@ import type { UiCachePlan } from "../cache-tiers.ts";
 import {
   clearPersistedUiQueries,
   indexedDbQueryStore,
+  isStoredQuery,
   persistUiQueries,
   sealedUiQueryStore,
   storedQueryKey,
@@ -130,6 +131,26 @@ describe("persistUiQueries", () => {
     });
   });
 
+  describe("given a read whose contract declares no cache option", () => {
+    /** @scenario "A read is mirrored to disk without any declaration" */
+    it("seals the answer into the store under the user and the read's key", async () => {
+      const store = memoryStore();
+      await session({
+        store,
+        userId: "alice",
+        write: (qc) => qc.setQueryData(orgGraph, ["content-marker"]),
+      });
+
+      const key = storedQueryKey({ userId: "alice", queryHash: hashKey(orgGraph) });
+      const row = store.entries.get(key);
+      const reloaded = await session({ store, userId: "alice" });
+      expect([...store.entries.keys()]).toEqual([key]);
+      expect(isStoredQuery(row)).toBe(false);
+      expect(JSON.stringify(row)).not.toContain("content-marker");
+      expect(reloaded.getQueryData(orgGraph)).toEqual(["content-marker"]);
+    });
+  });
+
   describe("given a read on the exclusion list", () => {
     /** @scenario "An excluded read never reaches the disk" */
     it("never reaches the store, while the others do", async () => {
@@ -144,6 +165,36 @@ describe("persistUiQueries", () => {
       expect([...store.entries.keys()]).toEqual([
         storedQueryKey({ userId: "alice", queryHash: hashKey(orgGraph) }),
       ]);
+    });
+  });
+
+  describe("given reads cached under one project", () => {
+    const readFor = (projectId: string) =>
+      trpcQueryKey("organization.getMemberById", { input: { id: projectId }, type: "query" });
+
+    /** @scenario "Switching project reads a different key and keeps the other project's rows" */
+    it("asks for the other project's key empty and leaves the first project's row on disk", async () => {
+      const store = memoryStore();
+      const first = readFor("p1");
+      const second = readFor("p2");
+
+      await session({
+        store,
+        userId: "alice",
+        write: (qc) => {
+          qc.setQueryData(first, { id: "p1" });
+          expect(qc.getQueryData(second)).toBeUndefined();
+          qc.setQueryData(second, { id: "p2" });
+        },
+      });
+
+      expect(hashKey(first)).not.toBe(hashKey(second));
+      expect([...store.entries.keys()].toSorted()).toEqual(
+        [
+          storedQueryKey({ userId: "alice", queryHash: hashKey(first) }),
+          storedQueryKey({ userId: "alice", queryHash: hashKey(second) }),
+        ].toSorted(),
+      );
     });
   });
 
@@ -203,6 +254,7 @@ describe("persistUiQueries", () => {
   });
 
   describe("given a row for a read the plan no longer mirrors", () => {
+    /** @scenario "A read added to the exclusion list loses the row it left on disk" */
     it("restores nothing and removes the row", async () => {
       const store = memoryStore();
       await session({ store, userId: "alice", write: (qc) => qc.setQueryData(orgGraph, ["acme"]) });

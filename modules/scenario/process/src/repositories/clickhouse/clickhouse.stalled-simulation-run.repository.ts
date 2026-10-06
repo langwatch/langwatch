@@ -22,7 +22,7 @@ const NON_TERMINAL_STATUSES = ["QUEUED", "PENDING", "IN_PROGRESS"] as const;
  * older than `now - thresholdMs`, across all tenants on the given client.
  * Cross-tenant sweep BY DESIGN — a backfill has no single tenant to scope to.
  */
-export type StalledSimulationRunClickHouseClient = Pick<ClickHouseQueryClient, "query">;
+type StalledSimulationRunClickHouseClient = Pick<ClickHouseQueryClient, "query">;
 
 export class ClickHouseStalledSimulationRunRepository implements StalledSimulationRunRepository {
   static create(

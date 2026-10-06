@@ -1,4 +1,4 @@
-/** One organization's Slack connection pass. @see specs/automations/slack-connections.feature */
+/** One organization's Slack connection pass. @see modules/slack/specs/slack-connections.feature */
 import { SystemMigrationRunnerService, type TenantSource } from "@langwatch/system-migrations";
 import { describe, expect, it } from "vitest";
 

@@ -7,8 +7,11 @@ import { isNamedProviderMounted } from "@langwatch/enterprise-sso-contract/sign-
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { SsoGateLogger } from "../app/sso.members.ts";
-import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
+import {
+  SsoGateService,
+  SsoProviderMountInspector,
+  type SsoGateLogger,
+} from "../services/sso-gate.service.ts";
 
 class FakeLogger implements SsoGateLogger {
   readonly info = vi.fn<SsoGateLogger["info"]>();
@@ -120,6 +123,15 @@ describe("SsoGateService", () => {
       {},
       expect.stringContaining("SSO is configured but no genuine license was found"),
     );
+  });
+
+  /** @scenario "Self-hosted that never had a license hides SSO and offers email sign-in" */
+  it("reports email, not the configured identity provider, when no license exists anywhere", async () => {
+    const service = create();
+
+    expect(await service.platformAllowed()).toBe(false);
+    expect(await service.resolveProvider()).toBe("email");
+    expect(inspectPlatformAccess).toHaveBeenCalled();
   });
 
   /** @scenario "A tampered license does not enable SSO" */

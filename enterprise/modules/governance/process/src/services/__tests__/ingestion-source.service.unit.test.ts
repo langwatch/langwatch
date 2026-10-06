@@ -1,5 +1,3 @@
-import { Buffer } from "node:buffer";
-
 import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
 import type {
   InternalProject,
@@ -10,12 +8,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  GovernanceDiagnosticsSink,
-  IngestionSourceEntitlements,
-  IngestionSourceLifecycleChannel,
-  GovernanceEncryptor,
-} from "../../app/governance.members.ts";
 import { MemoryProviderAccountChannel } from "../../channels/memory/memory.provider-account.channel.ts";
 import {
   IngestionSourceRepository,
@@ -23,11 +15,15 @@ import {
   type CursorPinnedUpdate,
   type UpdateIngestionSourceRecord,
 } from "../../repositories/ingestion-source.repository.ts";
-import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
+import type { GovernanceDiagnosticsSink } from "../governance-policy.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
 } from "../ingestion-source-secret.service.ts";
+import type {
+  IngestionSourceEntitlements,
+  IngestionSourceLifecycleChannel,
+} from "../ingestion-source.service.ts";
 import { IngestionSourceService } from "../ingestion-source.service.ts";
 import { PullDestinationService } from "../pull-destination.service.ts";
 
@@ -131,14 +127,6 @@ class FakeEntitlements implements IngestionSourceEntitlements {
 class FakeLifecycle implements IngestionSourceLifecycleChannel {
   sync = vi.fn(async () => undefined);
 }
-class FakeEncryption implements GovernanceEncryptor {
-  encrypt(value: string): string {
-    return Buffer.from(value).toString("base64url");
-  }
-  decrypt(value: string): string {
-    return Buffer.from(value, "base64url").toString();
-  }
-}
 class FakeDiagnostics implements GovernanceDiagnosticsSink {
   warn = vi.fn();
 }
@@ -153,7 +141,6 @@ function harness() {
     projects,
     entitlements,
     lifecycle,
-    credentials: IngestionCredentialsService.create(new FakeEncryption()),
     secrets: IngestionSecretService.create(
       IngestionSecretConfiguration.create({ pepper: "pepper" }),
       { random: () => new Uint8Array(32).fill(7) },
@@ -167,7 +154,7 @@ function harness() {
 }
 
 describe("IngestionSourceService", () => {
-  it("encrypts credentials before persistence and returns a one-time secret", async () => {
+  it("hands typed credentials to the store, which seals them, and returns a one-time secret", async () => {
     const { service, repository } = harness();
     const result = await service.createSource({
       organizationId: "org-1",
@@ -178,12 +165,7 @@ describe("IngestionSourceService", () => {
     });
 
     expect(result.ingestSecret).toMatch(/^lw_is_/);
-    expect(repository.createInput?.parserConfig.credentials).toEqual(
-      expect.stringMatching(/^enc:v1:/),
-    );
-    expect(repository.createInput?.parserConfig).not.toEqual(
-      expect.objectContaining({ credentials: { token: "secret" } }),
-    );
+    expect(repository.createInput?.parserConfig.credentials).toEqual({ token: "secret" });
   });
 
   /** @scenario "Saving without touching the secret keeps the existing credential" */
@@ -191,7 +173,7 @@ describe("IngestionSourceService", () => {
     const { service, repository } = harness();
     repository.row = source({
       parserConfig: {
-        credentials: "enc:v1:c2VjcmV0",
+        credentials: { token: "secret" },
         _rotation: { priorHash: "old", expiresAt: NOW + 1_000 },
         visible: "old",
       },
@@ -204,16 +186,16 @@ describe("IngestionSourceService", () => {
     });
 
     expect(repository.updateInput?.parserConfig).toMatchObject({
-      credentials: "enc:v1:c2VjcmV0",
+      credentials: { token: "secret" },
       _rotation: { priorHash: "old", expiresAt: NOW + 1_000 },
       visible: "new",
     });
   });
 
   /** @scenario "Entering a new secret replaces the stored one" */
-  it("encrypts a freshly typed credential on the edit path, not only on create", async () => {
+  it("writes a freshly typed credential in place of the stored one on the edit path", async () => {
     const { service, repository } = harness();
-    repository.row = source({ parserConfig: { credentials: "enc:v1:c2VjcmV0" } });
+    repository.row = source({ parserConfig: { credentials: { token: "sk-ant-admin-old" } } });
 
     await service.updateSource({
       id: "source-1",
@@ -221,12 +203,9 @@ describe("IngestionSourceService", () => {
       parserConfig: { credentials: { token: "sk-ant-admin-new" } },
     });
 
-    expect(repository.updateInput?.parserConfig?.credentials).toEqual(
-      expect.stringMatching(/^enc:v1:/),
-    );
-    expect(repository.updateInput?.parserConfig).not.toEqual(
-      expect.objectContaining({ credentials: { token: "sk-ant-admin-new" } }),
-    );
+    expect(repository.updateInput?.parserConfig?.credentials).toEqual({
+      token: "sk-ant-admin-new",
+    });
   });
 
   /** @scenario "A stored envelope is never sent back to the server" */
@@ -282,7 +261,7 @@ describe("IngestionSourceService", () => {
       parserConfig: {
         adapter: "databricks_genie",
         workspaceUrl: "https://adb-1.7.azuredatabricks.net",
-        credentials: "enc:v1:aaaa:bbbb:cccc",
+        credentials: { token: "dapi-stored" },
         _rotation: rotation,
       },
     });
@@ -298,7 +277,7 @@ describe("IngestionSourceService", () => {
     });
 
     expect(repository.updateInput?.parserConfig).toMatchObject({
-      credentials: "enc:v1:aaaa:bbbb:cccc",
+      credentials: { token: "dapi-stored" },
       _rotation: rotation,
     });
   });
@@ -344,6 +323,93 @@ describe("IngestionSourceService", () => {
       }),
     ).rejects.toThrow(/already pulled its usage report/);
     expect(repository.updateInput).toBeNull();
+  });
+
+  describe("given a source that has read its bill", () => {
+    const BILL_A = "aaaaaaaa-0000-4000-8000-000000000001";
+    const BILL_B = "bbbbbbbb-0000-4000-8000-000000000002";
+    const billing = { billingClientId: "bid", billingClientSecret: "bsecret" };
+    const read = JSON.stringify({ costPricedThroughDay: "2026-08-20" });
+
+    function billed({ claim, pollerCursor }: { claim?: string; pollerCursor: string | null }) {
+      const { service, repository } = harness();
+      repository.row = source({
+        sourceType: "copilot_studio",
+        parserConfig: {
+          adapter: "copilot_studio_dataverse",
+          credentials: "enc:v1:aaaa:bbbb:cccc",
+          ...(claim ? { azureSubscriptionId: claim } : {}),
+          ...(claim ? { _azureBillSubscriptionId: claim } : {}),
+        },
+        pollerCursor,
+      });
+      return { service, repository };
+    }
+
+    /** @scenario "A source that has read one bill cannot be pointed at another" */
+    it("refuses a different subscription, telling the admin to archive and create anew", async () => {
+      const { service, repository } = billed({ claim: BILL_A, pollerCursor: read });
+
+      await expect(
+        service.updateSource({
+          id: "source-1",
+          organizationId: "org-1",
+          parserConfig: {
+            azureSubscriptionId: BILL_B,
+            credentials: { clientId: "c", clientSecret: "s", ...billing },
+          },
+        }),
+      ).rejects.toThrow(/Archive this source and create a new one/);
+      expect(repository.updateInput).toBeNull();
+    });
+
+    /** @scenario "A source that has read one bill cannot be pointed at another" */
+    it("refuses the dropped claim coming back once cost memory exists", async () => {
+      const { service, repository } = billed({ pollerCursor: read });
+
+      await expect(
+        service.updateSource({
+          id: "source-1",
+          organizationId: "org-1",
+          parserConfig: {
+            azureSubscriptionId: BILL_A,
+            credentials: { clientId: "c", clientSecret: "s", ...billing },
+          },
+        }),
+      ).rejects.toThrow(/already read the bill/);
+      expect(repository.updateInput).toBeNull();
+    });
+
+    /** @scenario "A source that has read one bill cannot be pointed at another" */
+    it("lets the same subscription be saved again and lets the claim be dropped", async () => {
+      const { service, repository } = billed({ claim: BILL_A, pollerCursor: read });
+
+      await service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        parserConfig: { azureSubscriptionId: BILL_A.toUpperCase() },
+      });
+      expect(repository.updateInput).not.toBeNull();
+      repository.updateInput = null;
+
+      await service.updateSource({ id: "source-1", organizationId: "org-1", parserConfig: {} });
+      expect(repository.updateInput).not.toBeNull();
+    });
+
+    /** @scenario "A source that has read one bill cannot be pointed at another" */
+    it("lets the claim move before any cost read has been made", async () => {
+      const { service, repository } = billed({ claim: BILL_A, pollerCursor: null });
+
+      await service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        parserConfig: {
+          azureSubscriptionId: BILL_B,
+          credentials: { clientId: "c", clientSecret: "s", ...billing },
+        },
+      });
+      expect(repository.updateInput).not.toBeNull();
+    });
   });
 
   /** @scenario "A source that starts pulling mid-save does not lose the rule" */

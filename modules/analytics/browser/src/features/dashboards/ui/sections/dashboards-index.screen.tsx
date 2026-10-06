@@ -1,9 +1,9 @@
 /** `/[project]/dashboards` has no page of its own: it forwards to the member's landing board. */
 
 import { Box } from "@chakra-ui/react";
-import { UiPageLoading, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
+import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
+import { HandledErrorAlert } from "@langwatch/error-views";
 
-import { HandledErrorAlert } from "../../../../ui/elements/handled-error-alert.tsx";
 import { useLandingBoard } from "../../behavior/use-landing-board.ts";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 

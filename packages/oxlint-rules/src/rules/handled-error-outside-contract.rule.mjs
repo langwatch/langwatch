@@ -36,7 +36,7 @@ export const handledErrorOutsideContractRule = defineRule({
     handledError: {
       what: "`{{name}}` is a `HandledError` subclass (it extends `{{parent}}`) declared in `{{path}}`.",
       why: "A service throws it and a client reads its code, so both sides need the class and neither may import a process package.",
-      fix: "Move it to `{{errorsFile}}`.",
+      fix: "Move it to `{{errorsFile}}`. Read the `contract` skill.",
     },
   },
   create(context, file) {

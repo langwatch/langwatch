@@ -1,5 +1,6 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { EvaluatorApi, EvaluatorWithFields } from "@langwatch/evaluator-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -57,6 +58,8 @@ export type SuiteServiceOptions = {
   prompts: PromptApi;
   evaluators: EvaluatorApi;
   execution: SuiteExecution;
+  /** A run naming a voice target asks `release_voice_agents_enabled` (AC29). */
+  featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   /**
    * Which connected agents have a process attached, so a target naming an
    * agent without environment can be settled. Absent on a process with no

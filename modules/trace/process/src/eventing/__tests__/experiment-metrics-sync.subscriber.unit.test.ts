@@ -101,6 +101,7 @@ describe("experimentMetricsSync subscriber (trace-side ECST publisher)", () => {
   describe("when trace has evaluation.run_id attribute", () => {
     /** @scenario Trace metrics are published to experiment pipeline after stabilisation */
     /** @scenario evaluation.run_id is hoisted to trace-level attributes */
+    /** @scenario "Scenario and Experiment metrics are published from the worker" */
     it("dispatches computeExperimentRunMetrics with cost payload", async () => {
       const deps = createDeps();
       const subscriber = createExperimentMetricsSyncHandler(deps);

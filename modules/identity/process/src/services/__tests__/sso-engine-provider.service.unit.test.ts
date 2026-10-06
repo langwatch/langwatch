@@ -3,7 +3,7 @@
  * sign-in can reach, what it cannot, and what the stored document is kept
  * under.
  */
-import { sealedProviderConfigCipher, type SsoConnectionState } from "@langwatch/identity-contract";
+import type { SsoConnectionState } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
@@ -12,12 +12,6 @@ import { MemorySsoEngineProviderRepository } from "../../repositories/memory/mem
 import { SsoEngineProviderService } from "../sso-engine-provider.service.ts";
 
 const BASE_URL = "https://app.langwatch.test";
-
-/** A reversible stand-in for the deployment's cipher. */
-const cipher = sealedProviderConfigCipher({
-  encrypt: (plaintext) => Buffer.from(plaintext).toString("base64"),
-  decrypt: (ciphertext) => Buffer.from(ciphertext, "base64").toString("utf8"),
-});
 
 function connectionOf(overrides: Partial<SsoConnectionState> = {}): SsoConnectionState {
   return {
@@ -62,7 +56,6 @@ async function serviceOver(store: MemoryIdentityStore) {
     credentials: MemorySsoCredentialRepository.create(store),
     rows: MemorySsoEngineProviderRepository.create(store),
     baseUrl: BASE_URL,
-    providerConfig: cipher,
   });
 }
 
@@ -105,7 +98,7 @@ describe("given an OIDC connection whose credentials the vault holds", () => {
       domain: "acme.test",
       samlConfig: null,
     });
-    expect(JSON.parse(cipher.open(row?.oidcConfig ?? ""))).toEqual({
+    expect(JSON.parse(row?.oidcConfig ?? "")).toEqual({
       clientId: "client-1",
       clientSecret: "shhh",
       discoveryEndpoint: "https://idp.acme.test/.well-known/openid-configuration",
@@ -113,6 +106,58 @@ describe("given an OIDC connection whose credentials the vault holds", () => {
       scopes: ["openid", "email", "profile"],
       mapping: { id: "sub", email: "email", emailVerified: "email_verified" },
     });
+  });
+
+  /** @scenario "Two organizations may both call their provider okta" */
+  it("keeps each organization's own row when both name their provider okta", async () => {
+    const store = MemoryIdentityStore.create();
+    const credentials = MemorySsoCredentialRepository.create(store);
+    const service = await serviceOver(store);
+    const organizations = [
+      { organizationId: "org_acme", connectionId: "ssoc_acme", issuer: "https://idp.acme.test" },
+      {
+        organizationId: "org_globex",
+        connectionId: "ssoc_globex",
+        issuer: "https://idp.globex.test",
+      },
+    ];
+
+    for (const { organizationId, connectionId, issuer } of organizations) {
+      const clientIdRef = await credentials.put({
+        organizationId,
+        connectionId,
+        kind: "oidc-client-id",
+        value: `client-${organizationId}`,
+      });
+      const secretRef = await credentials.put({
+        organizationId,
+        connectionId,
+        kind: "oidc-client-secret",
+        value: `secret-${organizationId}`,
+      });
+      await service.project({
+        connection: connectionOf({
+          connectionId,
+          organizationId,
+          claimedDomains: [`${organizationId}.test`],
+          approvedDomains: [`${organizationId}.test`],
+          verifiedDomains: [`${organizationId}.test`],
+          idpMetadata: { issuer, providerId: "okta", clientIdRef, secretRef, certRefs: [] },
+        }),
+      });
+    }
+
+    expect([...store.ssoEngineProviders.keys()].toSorted()).toEqual(["ssoc_acme", "ssoc_globex"]);
+    for (const { organizationId, connectionId, issuer } of organizations) {
+      const row = store.ssoEngineProviders.get(connectionId);
+      expect(row).toMatchObject({
+        id: connectionId,
+        providerId: connectionId,
+        organizationId,
+        issuer,
+      });
+      expect(JSON.parse(row?.oidcConfig ?? "").clientId).toBe(`client-${organizationId}`);
+    }
   });
 
   /** @scenario "A Microsoft Entra ID connection stored with a trailing slash signs in after the upgrade" */
@@ -150,41 +195,9 @@ describe("given an OIDC connection whose credentials the vault holds", () => {
 
     const row = store.ssoEngineProviders.get("connection_1");
     expect(row?.issuer).toBe(entra);
-    expect(JSON.parse(cipher.open(row?.oidcConfig ?? "")).discoveryEndpoint).toBe(
+    expect(JSON.parse(row?.oidcConfig ?? "").discoveryEndpoint).toBe(
       `${entra}/.well-known/openid-configuration`,
     );
-  });
-
-  it("keeps the client secret out of the row it writes", async () => {
-    const store = MemoryIdentityStore.create();
-    const credentials = MemorySsoCredentialRepository.create(store);
-    const clientIdRef = await credentials.put({
-      organizationId: "org_1",
-      connectionId: "connection_1",
-      kind: "oidc-client-id",
-      value: "client-1",
-    });
-    const secretRef = await credentials.put({
-      organizationId: "org_1",
-      connectionId: "connection_1",
-      kind: "oidc-client-secret",
-      value: "shhh",
-    });
-    const service = await serviceOver(store);
-
-    await service.project({
-      connection: connectionOf({
-        idpMetadata: {
-          issuer: "https://idp.acme.test",
-          providerId: "okta",
-          clientIdRef,
-          secretRef,
-          certRefs: [],
-        },
-      }),
-    });
-
-    expect(store.ssoEngineProviders.get("connection_1")?.oidcConfig).not.toContain("shhh");
   });
 
   it("projects nothing while the vault holds no credentials for it", async () => {
@@ -270,7 +283,7 @@ describe("given a SAML connection whose document the vault holds", () => {
 
     const row = store.ssoEngineProviders.get("connection_1");
     expect(row?.issuer).toBe("https://idp.acme.test/entity");
-    expect(JSON.parse(cipher.open(row?.samlConfig ?? ""))).toMatchObject({
+    expect(JSON.parse(row?.samlConfig ?? "")).toMatchObject({
       entryPoint: "https://idp.acme.test/sso",
       cert: "CERT",
       spMetadata: { entityID: `${BASE_URL}/api/auth/sso/saml2/sp` },

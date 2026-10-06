@@ -8,16 +8,30 @@ import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
-import type { LangyGeneratedTitle, LangyTitleGenerator } from "../app/langy.members.ts";
 import { normalizeLangyConversationTitle } from "../rules/langy-conversation-title.rules.ts";
 import type { LangyTrustedMessageReader } from "./langy-message.service.ts";
+
+/**
+ * Generates a conversation title from the transcript so far, or null when
+ * the transcript is empty or the model call failed. Declared here since
+ * the effect ports are its only consumer.
+ */
+export type LangyTitleGenerator = (input: {
+  projectId: string;
+  conversationId: string;
+}) => Promise<LangyGeneratedTitle>;
+
+/** A title and the model that wrote it, or `unchanged` when the conversation keeps its title. */
+type LangyGeneratedTitle =
+  | { outcome: "generated"; title: string; model: string }
+  | { outcome: "unchanged" };
 
 const logger = createLogger("langwatch:langy:title-generator");
 
 const UNCHANGED: LangyGeneratedTitle = { outcome: "unchanged" };
 
 /** The cascade key a project may point at a model of its own. */
-export const LANGY_TITLE_FEATURE_KEY = "langy.conversation_title";
+const LANGY_TITLE_FEATURE_KEY = "langy.conversation_title";
 
 const TITLE_SYSTEM_PROMPT = [
   "You write a very short, specific title for a chat between the user and the",
@@ -29,7 +43,7 @@ const TITLE_SYSTEM_PROMPT = [
   '"Title:". Output ONLY the title, nothing else.',
 ].join(" ");
 
-export type LangyTitleGeneratorDeps = Readonly<{
+type LangyTitleGeneratorDeps = Readonly<{
   /** The transcript, off the conversation's own message projection. */
   messages: LangyTrustedMessageReader;
   /** The project's model for the title key, and the completion run on it. */

@@ -31,6 +31,7 @@ import type {
   DerivedTraceEvent,
   DiscoverResult,
   ExplorerInstantEvalEstimate,
+  ExplorerInstantEvalOptInAccess,
   ExplorerInstantEvalProgress,
   ExplorerInstantEvalRuns,
   ExplorerInstantEvalRunInput,
@@ -204,6 +205,8 @@ export type TraceApiMap = {
           output: ExplorerInstantEvalProgress;
         };
       };
+      access: { query: { input: ProjectScope; output: ExplorerInstantEvalOptInAccess } };
+      enable: { mutation: { input: ProjectScope; output: ExplorerInstantEvalOptInAccess } };
     };
 
     /** One facet's values, paged. */

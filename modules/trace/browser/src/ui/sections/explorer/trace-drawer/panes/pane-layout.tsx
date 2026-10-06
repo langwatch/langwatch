@@ -8,7 +8,11 @@ import {
   PanelResizeHandle,
 } from "react-resizable-panels";
 
-import { useTraceDrawer, getTraceDrawer, type TraceDrawerState } from "../../../../../behavior/trace-drawer.ts";
+import {
+  useTraceDrawer,
+  getTraceDrawer,
+  type TraceDrawerState,
+} from "../../../../../behavior/trace-drawer.ts";
 import { IsolatedErrorBoundary } from "../../../isolated-error-boundary.tsx";
 import { useConversationContext } from "../../hooks/use-conversation-context.ts";
 import { ConversationContext } from "../conversation-context.tsx";

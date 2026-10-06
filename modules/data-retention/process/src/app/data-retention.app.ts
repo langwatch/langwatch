@@ -1,5 +1,4 @@
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   dataRetentionConfig,
   DataRetentionApi,
@@ -29,17 +28,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
 
-import { ClickHouseRetroactiveRetentionRepository } from "../repositories/clickhouse/clickhouse.retroactive-retention.repository.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
-import {
-  RedisDataRetentionCacheRepository,
-  type DataRetentionRedis,
-} from "../repositories/redis/redis.data-retention-cache.repository.ts";
-import {
-  RedisStorageMeterCacheRepository,
-  type StorageMeterRedis,
-} from "../repositories/redis/redis.storage-meter-cache.repository.ts";
-import { STORAGE_METER_CACHE_TTL_MS } from "../repositories/storage-meter-cache.repository.ts";
 import {
   DataRetentionPolicyService,
   type RetentionActor,
@@ -50,8 +39,6 @@ import { RetentionPermissionsService } from "../services/retention-permissions.s
 import { RetentionPlanService } from "../services/retention-plan.service.ts";
 import { StorageMeterScopeService } from "../services/storage-meter-scope.service.ts";
 import { StorageMeterService } from "../services/storage-meter.service.ts";
-
-const DEFAULT_CACHE_TTL_MS = 60_000;
 
 /** A project's place in the organization chain, plus the name it renders under. */
 export type RetentionProjectLineage = Readonly<{
@@ -104,24 +91,9 @@ export interface DataRetentionDirectoryReader {
   }): Promise<readonly { id: string; teamId: string }[]>;
 }
 
-/**
- * Shapes restated rather than imported from `@langwatch/process-stores` (§6).
- * The directory is a repository and the plan a peer, so neither is a member.
- */
-type DataRetentionMembers = Readonly<{
-  clickhouse: ClickHouseQueryClient;
-  nodeEnvironment: string | undefined;
-  redis: (DataRetentionRedis & StorageMeterRedis) | null;
-}>;
-
-/**
- * Both ClickHouse paths this feature has — the retention rewrite and the
- * storage meter — run on the process's one `clickhouse` member. A deployment
- * with no ClickHouse refuses at boot rather than silently metering at zero.
- */
 type DataRetentionSetup = FeatureSetup<
   typeof DataRetentionModule.dependencies,
-  DataRetentionMembers,
+  never,
   DataRetentionServerConfig,
   DataRetentionRepositories
 >;
@@ -136,8 +108,6 @@ export class DataRetentionModule implements DataRetentionApiContract {
     entitlement: EntitlementApi,
   };
   static readonly config = dataRetentionConfig;
-  /** Every name is from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["clickhouse", "nodeEnvironment", "redis"] as const;
 
   readonly #retention: DataRetentionService;
   readonly #policy: DataRetentionPolicyService;
@@ -159,18 +129,10 @@ export class DataRetentionModule implements DataRetentionApiContract {
     this.#users = services.users;
   }
 
-  static create({
-    repositories,
-    members,
-    dependencies,
-    config,
-  }: DataRetentionSetup): DataRetentionModule {
+  static create({ repositories, dependencies, config }: DataRetentionSetup): DataRetentionModule {
     const storageMeter = StorageMeterService.create({
-      clickhouse: members.clickhouse,
-      cache: RedisStorageMeterCacheRepository.create({
-        redis: members.redis,
-        ttlMs: STORAGE_METER_CACHE_TTL_MS,
-      }),
+      meter: repositories.storageMeter,
+      cache: repositories.storageMeterCache,
     });
     const retention = DataRetentionService.create({
       policies: repositories.policies,
@@ -179,15 +141,10 @@ export class DataRetentionModule implements DataRetentionApiContract {
       organizations: dependencies.organizations,
       defaultRetentionDays: resolvePlatformDefaultRetentionDays({
         LANGWATCH_DEFAULT_RETENTION_DAYS: config.platformDefaultDays,
-        NODE_ENV: members.nodeEnvironment,
+        NODE_ENV: config.nodeEnvironment,
       }),
-      retroactive: ClickHouseRetroactiveRetentionRepository.create({
-        clickhouse: members.clickhouse,
-      }),
-      cache: RedisDataRetentionCacheRepository.create({
-        redis: members.redis,
-        ttlMs: DEFAULT_CACHE_TTL_MS,
-      }),
+      retroactive: repositories.retroactive,
+      cache: repositories.cache,
       storageMeter,
     });
     const permissions = RetentionPermissionsService.create({ authz: dependencies.permissions });

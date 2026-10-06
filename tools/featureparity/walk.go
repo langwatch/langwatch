@@ -22,21 +22,16 @@ func walkFiles(root string, keep func(name string) bool) []string {
 	var out []string
 	for _, e := range entries {
 		name := e.Name()
-		if skipDir[name] || strings.HasPrefix(name, ".") {
+		if skippedName(name) {
 			continue
 		}
 		full := filepath.Join(root, name)
-		isDir := e.IsDir()
-		if e.Type()&os.ModeSymlink != 0 {
-			info, err := os.Stat(full)
-			if err != nil {
-				continue
-			}
-			isDir = info.IsDir()
-		}
-		if isDir {
+		isDir, ok := entryIsDir(full, e)
+		switch {
+		case !ok:
+		case isDir:
 			out = append(out, walkFiles(full, keep)...)
-		} else if keep(name) {
+		case keep(name):
 			out = append(out, full)
 		}
 	}
@@ -65,26 +60,7 @@ func discoverPackageSpecRoots(root string) ([]string, error) {
 		return nil, nil
 	}
 	var roots []string
-	var visit func(string) error
-	visit = func(dir string) error {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			return err
-		}
-		for _, e := range entries {
-			if !e.IsDir() || e.Name() == "node_modules" {
-				continue
-			}
-			p := filepath.Join(dir, e.Name())
-			if e.Name() == "specs" {
-				roots = append(roots, p)
-			} else if err := visit(p); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	if err := visit(root); err != nil {
+	if err := collectSpecDirs(root, &roots); err != nil {
 		return nil, err
 	}
 	sort.Strings(roots)
@@ -143,4 +119,43 @@ func FindRepoRoot(dir string) (string, error) {
 		}
 		d = parent
 	}
+}
+
+// entryIsDir reports whether e is a directory, following a symlink; ok is
+// false for a link that does not resolve.
+func entryIsDir(full string, e os.DirEntry) (isDir, ok bool) {
+	if e.Type()&os.ModeSymlink == 0 {
+		return e.IsDir(), true
+	}
+	info, err := os.Stat(full)
+	if err != nil {
+		return false, false
+	}
+	return info.IsDir(), true
+}
+
+// collectSpecDirs appends every specs directory under dir to roots, without
+// descending into a specs directory or node_modules.
+func collectSpecDirs(dir string, roots *[]string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if !e.IsDir() || e.Name() == "node_modules" {
+			continue
+		}
+		p := filepath.Join(dir, e.Name())
+		if e.Name() == "specs" {
+			*roots = append(*roots, p)
+		} else if err := collectSpecDirs(p, roots); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// skippedName reports a vendored, generated or hidden entry the walk skips.
+func skippedName(name string) bool {
+	return skipDir[name] || strings.HasPrefix(name, ".")
 }

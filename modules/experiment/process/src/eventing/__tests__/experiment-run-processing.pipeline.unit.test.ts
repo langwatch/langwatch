@@ -12,9 +12,9 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
 import { ClickHouseExperimentRunProcessingRepository } from "../../repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { ClickHouseExperimentSession } from "../../repositories/clickhouse/clickhouse.experiment-session.store.ts";
+import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
 import type { ExperimentRunBoardWriteBackService } from "../../services/experiment-run-board-write-back.service.ts";
 import type { ExperimentRunCellService } from "../../services/experiment-run-cell.service.ts";
@@ -75,7 +75,7 @@ function build() {
       }),
     },
     runFrames: createExperimentRunFramesSubscriber({
-      stream: experimentRunEventStreamChannels.memory.create(),
+      stream: MemoryExperimentRunEventStreamRepository.create(),
     }),
     retention: { resolve: async () => null },
     experimentRunStateFoldStore: ExperimentRunStateStore.create({

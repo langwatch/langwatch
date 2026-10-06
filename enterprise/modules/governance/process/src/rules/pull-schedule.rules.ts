@@ -5,7 +5,7 @@ import { fromDate } from "@langwatch/time";
 
 import type { IngestionPullLifecycleSource } from "../repositories/ingestion-pull-lifecycle.repository.ts";
 
-export interface SchedulableSourceRecord {
+interface SchedulableSourceRecord {
   status: string;
   pullSchedule: string | null;
   archivedAt: object | null;

@@ -33,6 +33,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { NamedSlackConnection } from "@langwatch/slack-contract";
 import { nowInstant } from "@langwatch/time";
 import { Mail, Send } from "lucide-react";
@@ -51,7 +52,6 @@ import {
 } from "../../../../behavior/automation-session.ts";
 import { useAutomation } from "../../../../behavior/use-automation-reads.ts";
 import { useAutomationHost } from "../../../../model/automation-host.ts";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { type ConfigFormCtx } from "../../../../model/provider-types.ts";
 import {
   ALERT_TEMPLATE_VARIABLES,

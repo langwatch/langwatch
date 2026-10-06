@@ -7,8 +7,8 @@ import {
   parseSummedNanoUsd,
 } from "@langwatch/gateway-contract";
 
-import type { GatewayClickHouseResolver } from "../../app/gateway.members.ts";
 import { GatewayPrincipalSpendRepository } from "../gateway-principal-spend.repository.ts";
+import type { GatewayClickHouseResolver } from "./clickhouse.gateway-session.store.ts";
 
 const SETTINGS = { max_bytes_before_external_group_by: 500_000_000 };
 

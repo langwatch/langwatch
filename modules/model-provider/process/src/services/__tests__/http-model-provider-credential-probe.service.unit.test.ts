@@ -8,8 +8,8 @@ import {
 } from "@langwatch/model-provider-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ModelProviderEgress } from "../../app/model-provider.members.ts";
 import { HttpModelProviderCredentialProbeService } from "../http-model-provider-credential-probe.service.ts";
+import type { ModelProviderEgress } from "../ssrf-model-provider-egress.service.ts";
 
 // Mocks the guarded egress port, not `global.fetch` — the real SSRF fence would make every
 // assertion about DNS. The redirect refusal still uses the egress's real error type.
@@ -1187,7 +1187,6 @@ describe("given a deployment that points a provider's probe at its own API root"
   });
 });
 
-/** @scenario A stored key is checked only against the endpoint it was saved with */
 describe("validateKeyWithCustomUrl", () => {
   const probeStored = ({
     stored,
@@ -1245,6 +1244,7 @@ describe("validateKeyWithCustomUrl", () => {
     });
   });
 
+  /** @scenario "A stored key is checked only against the endpoint it was saved with" */
   it("refuses to send the stored key to another address", async () => {
     const result = await probeStored({
       stored: { OPENAI_API_KEY: "sk-stored", OPENAI_BASE_URL: "https://home.example/v1" },
@@ -1254,6 +1254,7 @@ describe("validateKeyWithCustomUrl", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A stored key is checked only against the endpoint it was saved with" */
   it("refuses to send the deployment's key to another address", async () => {
     const result = await probeStored({
       stored: null,
@@ -1264,6 +1265,7 @@ describe("validateKeyWithCustomUrl", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A stored key is checked only against the endpoint it was saved with" */
   it("refuses to send the deployment's key to a stored custom address", async () => {
     const result = await probeStored({
       stored: { OPENAI_BASE_URL: "https://home.example/v1" },
@@ -1273,6 +1275,7 @@ describe("validateKeyWithCustomUrl", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A stored key is checked only against the endpoint it was saved with" */
   it("checks the stored key against its own address, however the slash is spelled", async () => {
     await probeStored({
       stored: { OPENAI_API_KEY: "sk-stored", OPENAI_BASE_URL: "https://home.example/v1" },
@@ -1283,6 +1286,7 @@ describe("validateKeyWithCustomUrl", () => {
     expect(JSON.stringify(sentTo()[0]?.init)).toContain("sk-stored");
   });
 
+  /** @scenario "A stored key is checked only against the endpoint it was saved with" */
   it("checks the deployment's key against the default address when nothing is named", async () => {
     await probeStored({ stored: null, environment: { OPENAI_API_KEY: "sk-deployment" } });
     expect(sentTo().length).toBeGreaterThan(0);

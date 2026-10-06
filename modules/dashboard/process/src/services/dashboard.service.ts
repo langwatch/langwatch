@@ -32,7 +32,6 @@ import {
 } from "@langwatch/dashboard-contract";
 import { generate } from "@langwatch/ksuid";
 
-import type { DashboardAudience, WorkbenchAccess } from "../app/dashboard.members.ts";
 import type {
   DashboardGraphKind,
   DashboardRepository,
@@ -49,6 +48,26 @@ const defaultLayout: GraphLayout = {
   colSpan: CHART_GRID_DEFAULT_COL_SPAN,
   rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
 };
+
+/**
+ * Whether a project may place workbench cards at all: LangWatchQL's own gate,
+ * a feature flag resolved against the project's organization, reached through Analytics.
+ */
+export interface WorkbenchAccess {
+  isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
+}
+
+/**
+ * The two audience facts visibility needs about a member, asked of the peers
+ * that own them: team membership (project, which owns the team) and admin
+ * rights (authz).
+ */
+export interface DashboardAudience {
+  /** Whether the member belongs to the team that owns the project. */
+  isTeamMember(input: { projectId: string; userId: string }): Promise<boolean>;
+  /** Whether the member administers the project (`project:manage`). */
+  isAdmin(input: { projectId: string; userId: string }): Promise<boolean>;
+}
 
 /** The project's dashboards and the chart-builder graphs placed on them. */
 export class DashboardService {

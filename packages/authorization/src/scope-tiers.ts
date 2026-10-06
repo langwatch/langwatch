@@ -90,7 +90,7 @@ export const isStoredScopeTier = (value: unknown): value is StoredScopeTier =>
   typeof value === "string" && hasOwn(SCOPE_TIER_FROM_STORED, value);
 
 export const isDeclaredScopeTier = (value: unknown): value is DeclaredScopeTier =>
-  declaredScopeTierSchema.safeParse(value).success;
+  declaredScopeTierSchema.validate(value);
 
 export const declaredScopeIdSchema = z.discriminatedUnion("tier", [
   z.object({ tier: z.literal("project"), id: z.string() }).strict(),

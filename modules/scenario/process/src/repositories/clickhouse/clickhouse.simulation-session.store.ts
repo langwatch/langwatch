@@ -1,7 +1,7 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
-export type SimulationEventingClickHouseClient = {
+type SimulationEventingClickHouseClient = {
   query(input: {
     query: string;
     query_params: Record<string, unknown>;

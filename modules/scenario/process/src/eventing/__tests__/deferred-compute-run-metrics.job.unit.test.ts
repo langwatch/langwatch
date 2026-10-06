@@ -26,12 +26,10 @@ function payload(
 describe("the scenario deferred metrics retry description", () => {
   describe("given the legacy registry holds a frozen copy of it", () => {
     describe("when a graph stages the job", () => {
-      /** @scenario "The delayed metrics retry keeps one routing key across both graphs" */
       it("names the routing key the twin names", () => {
         expect(scenarioDeferredComputeRunMetricsJob.name).toBe("deferredComputeRunMetrics");
       });
 
-      /** @scenario "The delayed metrics retry keeps one routing key across both graphs" */
       it("delays by the constant both copies read", () => {
         expect(scenarioDeferredComputeRunMetricsJob.delayMs).toBe(COMPUTE_METRICS_RETRY_DELAY_MS);
       });
@@ -59,7 +57,6 @@ describe("the scenario deferred metrics retry description", () => {
         ).not.toBe(scenarioDeferredComputeRunMetricsJob.makeJobId(payload()));
       });
 
-      /** @scenario "The delayed metrics retry keeps one routing key across both graphs" */
       it("reports the retry under the attribute names the twin reports", () => {
         expect(scenarioDeferredComputeRunMetricsJob.spanAttributes(payload())).toEqual({
           "deferred.tenant_id": "tenant-1",

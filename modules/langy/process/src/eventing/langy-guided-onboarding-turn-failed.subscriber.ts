@@ -28,7 +28,7 @@ export interface GuidedOnboardingReader {
 }
 
 /** The owner of a conversation, for the distinct id the failure is tracked against. */
-export interface LangyConversationOwnerReader {
+interface LangyConversationOwnerReader {
   /** Throws `langy_conversation_not_found` until the conversation is folded. */
   getById(params: {
     projectId: string;
@@ -48,7 +48,7 @@ export interface GuidedOnboardingAnalytics {
   }): void;
 }
 
-export interface GuidedOnboardingTurnFailedSubscriberDeps {
+interface GuidedOnboardingTurnFailedSubscriberDeps {
   guidedOnboarding: GuidedOnboardingReader;
   conversations: LangyConversationOwnerReader;
   analytics: GuidedOnboardingAnalytics;

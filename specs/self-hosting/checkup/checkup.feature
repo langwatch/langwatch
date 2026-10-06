@@ -113,6 +113,13 @@ Feature: The checkup page of a self-hosted install
     And the row names LANGWATCH_CONNECT_DISABLED
 
   @unit
+  Scenario: Connect switched off by the deployment probes no LangWatch host
+    Given the deployment sets LANGWATCH_CONNECT_DISABLED
+    When someone asks for the connect host and gateway host reach checks
+    Then no connection is opened to either host
+    And both rows read not checked, naming LANGWATCH_CONNECT_DISABLED
+
+  @unit
   Scenario: A connected install shows its last sync
     Given the organization holds a connected license that synced an hour ago
     When the checkup runs

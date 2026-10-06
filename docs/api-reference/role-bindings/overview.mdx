@@ -94,7 +94,7 @@ curl -X POST https://app.langwatch.ai/api/v1/role-bindings \
 
 ## `hasLegacyAccessNotice`
 
-A create response can carry `hasLegacyAccessNotice: true`. It means this is the person's first explicit binding, and until now their access came from plain team membership, which this write switches off. Nothing failed, and nothing is blocked: it is there so a tool can tell an operator that this user's access is now described entirely by bindings.
+A create response can carry `hasLegacyAccessNotice: true`. It means this is the person's first explicit binding, and until now their access came from plain team membership, which this write switches off. No call failed and no call is blocked: it is there so a tool can tell an operator that this user's access is now described entirely by bindings.
 
 ## Errors
 
@@ -116,7 +116,7 @@ A create response can carry `hasLegacyAccessNotice: true`. It means this is the 
 
 ## Migrating to grants
 
-Grants and role bindings are the same records, so existing bindings appear in `GET /api/v1/grants` straight away and nothing needs copying. Change the calls:
+Grants and role bindings are the same records, so existing bindings appear in `GET /api/v1/grants` straight away and no copying is needed. Change the calls:
 
 | Role bindings                                              | Grants                                                         |
 | ---------------------------------------------------------- | -------------------------------------------------------------- |

@@ -2,7 +2,7 @@
  * Everything a step of a run needs about the run it is a step of: the row that
  * says what to run, the identity it runs as, and what that identity may read.
  * A job has neither a session nor a credential, so both come from the project.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { LangWatchQLCaller, LangWatchQLProtections } from "@langwatch/analytics-contract";
@@ -19,7 +19,7 @@ import {
 } from "../rules/instant-eval-run-questions.rules.ts";
 
 /** The peers a job resolves a project's own query identity through. */
-export interface InstantEvalJobPeers {
+interface InstantEvalJobPeers {
   /** The project's restricted query identity, project-scoped and nothing more. */
   findProjectCaller(input: { projectId: string }): Promise<LangWatchQLCaller>;
   /** What the project itself may read, with nobody asking. */

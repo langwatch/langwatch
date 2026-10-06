@@ -3,8 +3,7 @@
  * @vitest-environment node
  */
 import { SurfaceUnverifiedError } from "@langwatch/api";
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import {
   VoiceRecordingKeyMissingError,
@@ -12,7 +11,6 @@ import {
   VoiceSessionInvalidError,
 } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { scenarioVoiceRest } from "../scenario-voice.rest.ts";
@@ -111,11 +109,6 @@ describe("the voice-session procedures", () => {
   });
 });
 
-const boundaryErrorHandler: RestErrorHandler = (error, context) =>
-  HandledError.isHandled(error)
-    ? context.json({ code: error.code }, (error.httpStatus ?? 500) as ContentfulStatusCode)
-    : context.json({ error: "internal_server_error" }, 500);
-
 function audioDoor(stream: ScenarioApi["streamVoiceSessionAudio"]) {
   const streamVoiceSessionAudio = vi.fn(stream);
   const runtime = createRestRuntime({
@@ -127,7 +120,7 @@ function audioDoor(stream: ScenarioApi["streamVoiceSessionAudio"]) {
   });
   const hono = runtime.mount(scenarioVoiceRest.router(), {
     app: () => createApiFixture<ScenarioApi>({ streamVoiceSessionAudio }),
-    onError: boundaryErrorHandler,
+    onError: canonicalErrorResponse,
   });
   const request = () =>
     hono.request("http://api.test/api/voice/session/conv_1/audio?projectId=project_1");
@@ -168,7 +161,7 @@ describe("GET /api/voice/session/:conversationId/audio", () => {
       const response = await request();
 
       expect(response.status).toBe(404);
-      expect(await response.json()).toEqual({ code: "voice_recording_unavailable" });
+      expect(await response.json()).toMatchObject({ code: "voice_recording_unavailable" });
     });
   });
 });
@@ -184,7 +177,7 @@ function runAudioDoor(stream: ScenarioApi["streamVoiceRunAudio"]) {
   });
   const hono = runtime.mount(scenarioVoiceRest.router(), {
     app: () => createApiFixture<ScenarioApi>({ streamVoiceRunAudio }),
-    onError: boundaryErrorHandler,
+    onError: canonicalErrorResponse,
   });
   const request = () =>
     hono.request("http://api.test/api/voice/run/scenariorun_1/audio?projectId=project_1");
@@ -227,7 +220,7 @@ describe("GET /api/voice/run/:scenarioRunId/audio", () => {
       const response = await request();
 
       expect(response.status).toBe(404);
-      expect(await response.json()).toEqual({ code: "voice_recording_key_missing" });
+      expect(await response.json()).toMatchObject({ code: "voice_recording_key_missing" });
     });
   });
 });
@@ -252,7 +245,7 @@ function sessionDoor({
   });
   const hono = runtime.mount(scenarioVoiceRest.router(), {
     app: () => createApiFixture<ScenarioApi>(app),
-    onError: boundaryErrorHandler,
+    onError: canonicalErrorResponse,
   });
 
   return (path: string, body: object) =>
@@ -352,7 +345,7 @@ describe("POST /api/voice/session/:sessionId/finish", () => {
       });
 
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({ code: "voice_session_invalid" });
+      expect(await response.json()).toMatchObject({ code: "voice_session_invalid" });
     });
   });
 });

@@ -11,8 +11,8 @@ Feature: A health probe that fails says what broke
   500 with nothing attached, or as a hand-written JSON body with no code in it.
 
   # Bindings:
-  #   [gone] src/server/routes/health-checks.ts
-  #   [gone] src/server/routes/__tests__/health-checks.unit.test.ts
+  #   modules/platform-health/process/src/services/subsystem-probe.service.ts
+  #   modules/platform-health/process/src/services/__tests__/subsystem-probe-canary.unit.test.ts
 
   @unit
   Scenario: A canary the collector never answers is reported as our failure

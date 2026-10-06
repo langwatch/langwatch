@@ -2,3 +2,29 @@
 title: "Search traces"
 openapi: "POST /api/v1/traces/search"
 ---
+
+The `filter` field takes the LangWatch filter language. See
+[Filtering traces](/features/querying-your-data#filtering-traces) for the syntax.
+
+```text
+status:error
+-status:error
+evaluatorVerdict:fail
+has:feedback
+has:annotation
+event:thumbs_up_down
+```
+
+`has:feedback` matches traces with `thumbs_up_down` feedback, recorded through
+`POST /api/events/track` or the SDK. `has:annotation` matches traces with an
+annotation, including ones created through `POST /api/annotations/trace/{id}`.
+The annotation reaches trace search a moment after it is saved.
+`event:<name>` matches traces carrying an event with that name.
+
+<Note>
+Prefer `filter` over the older `filters` map. In that map, evaluation fields are
+keyed by monitor ID: `{"evaluations.passed": {"<monitorId>": ["false"]}}`.
+A flat list such as `{"evaluations.passed": ["false"]}` is rejected with 422.
+To find failed evaluations across every evaluator, send
+`"filter": "evaluatorVerdict:fail"`.
+</Note>

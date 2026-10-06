@@ -1,6 +1,6 @@
 /**
  * The shipped judge: one POST per text, with LangWatch's own key — a customer
- * key is never sent here. @see specs/instant-evals/classifier.feature
+ * key is never sent here. @see modules/instant-eval/specs/classifier.feature
  */
 
 import {
@@ -55,7 +55,7 @@ const REQUEST_TIMEOUT_MS = 120_000;
 /** At least the classifications one page keeps in flight. */
 const POOL_CONNECTIONS = 128;
 
-export interface HttpInstantEvalJudgeOptions {
+interface HttpInstantEvalJudgeOptions {
   readonly apiKey: string;
   /** Origin only; the path is this channel's own. */
   readonly baseUrl?: string;

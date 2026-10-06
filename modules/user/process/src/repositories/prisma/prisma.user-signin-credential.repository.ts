@@ -12,7 +12,7 @@ import type {
 } from "../user-signin-credential.repository.ts";
 
 /** The one model and the one transaction runner these five statements need. */
-export type UserCredentialDatabase = Pick<PrismaClient, "account" | "$transaction">;
+type UserCredentialDatabase = Pick<PrismaClient, "account" | "$transaction">;
 
 /** better-auth's own provider name for an email-and-password sign-in method. */
 const CREDENTIAL_PROVIDER = "credential";

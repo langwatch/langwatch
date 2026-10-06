@@ -7,7 +7,7 @@ import type { IdentityEmailService } from "./identity-email.service.ts";
 
 const logger = createLogger("langwatch:identity:organization-mfa");
 
-export type OrganizationMfaNotifierServiceDeps = {
+type OrganizationMfaNotifierServiceDeps = {
   accounts: TwoStepVerificationRepository;
   mail: OrganizationMfaRequirementMailChannel;
   emails: Pick<IdentityEmailService, "resolveEmail">;

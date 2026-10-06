@@ -39,12 +39,13 @@ function mount(app: Partial<LicensingApi>) {
       label: "Hosted Connect",
     }),
   });
-  return (operation: string, body: unknown) =>
+  return (operation: string, body: unknown, signal?: AbortSignal) =>
     hono.fetch(
       new Request(`http://api.test/api/internal/gateway/connect/${operation}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
+        signal,
       }),
     );
 }
@@ -56,6 +57,29 @@ const CALLER = {
 };
 
 describe("a hosted call on the gateway's control plane", () => {
+  /** @scenario A hosted judgement stops when the calling install hangs up */
+  it("hands the judge the signal of the request, which aborts when the install hangs up", async () => {
+    const classifyForHostedCaller = vi.fn().mockResolvedValue({
+      verdicts: [],
+      input_tokens: 0,
+      is_text_truncated: false,
+      charged_usd: 0,
+    });
+    const call = mount({ classifyForHostedCaller });
+    const hangUp = new AbortController();
+
+    await call(
+      "instant-evals-classify",
+      { ...CALLER, payload: { text: "t", questions: [] } },
+      hangUp.signal,
+    );
+
+    const handed = classifyForHostedCaller.mock.calls[0]?.[0].signal;
+    expect(handed.aborted).toBe(false);
+    hangUp.abort();
+    expect(handed.aborted).toBe(true);
+  });
+
   it("judges under the key and organization the gateway resolved", async () => {
     const classifyForHostedCaller = vi.fn().mockResolvedValue({
       verdicts: [{ questionId: "annoyed", probability: 0.8 }],

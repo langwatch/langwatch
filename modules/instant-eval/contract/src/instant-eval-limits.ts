@@ -1,7 +1,7 @@
 /**
  * Every ceiling an Instant Eval run is bounded by, in one place.
  *
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 /** Rows a run judges when the caller asks for no particular number. */

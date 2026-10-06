@@ -1,8 +1,8 @@
 import { HandledError } from "@langwatch/handled-error";
 import { modelCostListInputSchema, type ModelCost } from "@langwatch/model-provider-contract";
 
-import type { ModelCostProjectScope } from "../app/model-provider.members.ts";
 import type { ModelCostRepository } from "../repositories/model-cost.repository.ts";
+import type { ModelCostProjectScope } from "./model-provider-project-scope.service.ts";
 
 /**
  * Lists a project's stored cost rules without the full `ModelProviderApi` graph (auth, credential

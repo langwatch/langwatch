@@ -21,7 +21,7 @@ export interface LangWatchQLParameter {
 }
 
 /** A LangWatchQL table as one query block named it. */
-export interface LangWatchQLTableReference {
+interface LangWatchQLTableReference {
   /** Qualified and lowercased, the way {@link AcceptedLangWatchQL.tables} is. */
   readonly table: string;
   /** The alias the block gave it, lowercased. Absent when it was named directly. */
@@ -32,7 +32,7 @@ export interface LangWatchQLTableReference {
  * One equality a `JOIN` was written on, with each side exactly as the caller wrote it —
  * `t.TraceId`, not a resolved column.
  */
-export interface LangWatchQLJoinEdge {
+interface LangWatchQLJoinEdge {
   readonly left: string;
   readonly right: string;
 }
@@ -183,7 +183,7 @@ export interface Frame {
 }
 
 /** What a top-level `SELECT` declared about how many rows it returns. */
-export interface TopLevelLimit {
+interface TopLevelLimit {
   /** Whether it named its own `LIMIT`; an `OFFSET` alone does not bound a row count. */
   readonly hasLimit: boolean;
   readonly hasOffset: boolean;

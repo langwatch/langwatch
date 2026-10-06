@@ -90,7 +90,7 @@ export function hasAdminCredentials(
  * still holds the claim, so the mapping cannot be inferred from status names
  * that merely sound inactive (00i settlement 5).
  */
-export interface ProviderAccountReader {
+interface ProviderAccountReader {
   id: string;
   name: string;
   providerAccountId: string | null;
@@ -100,7 +100,7 @@ export interface ProviderAccountReader {
 }
 
 /** The config key naming which report of an account a source reads. */
-export const REPORT_FIELD = "report";
+const REPORT_FIELD = "report";
 
 function extractReport(parserConfig: Record<string, unknown> | null | undefined): string | null {
   const value = parserConfig?.[REPORT_FIELD];

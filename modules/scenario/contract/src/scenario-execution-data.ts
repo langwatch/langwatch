@@ -330,6 +330,16 @@ export const ExecutionContextSchema = z.object({
 });
 export type ExecutionContext = z.infer<typeof ExecutionContextSchema>;
 
+/**
+ * Where a child posts a code or workflow turn: straight to the one engine (self-hosted), or to
+ * the control plane's relay with the project key (per-project engines). The parent chooses.
+ */
+export const ExecuteSyncRouteSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("direct"), nlpServiceUrl: z.string() }),
+  z.object({ mode: z.literal("relay"), relayBaseUrl: z.string() }),
+]);
+export type ExecuteSyncRoute = z.infer<typeof ExecuteSyncRouteSchema>;
+
 /** Model configuration - LLM settings */
 export const ModelConfigSchema = z.object({
   defaultModel: z.string(),
@@ -427,6 +437,8 @@ export const ChildProcessJobDataSchema = z
      *  fallback as the simulator, from the scenarios.judge default. */
     judgeModelParams: LiteLLMParamsSchema.optional(),
     nlpServiceUrl: z.string(),
+    /** Absent on a job queued before the route existed: the child posts to `nlpServiceUrl`. */
+    executeSyncRoute: ExecuteSyncRouteSchema.optional(),
     target: TargetConfigSchema,
     /**
      * Total time (ms) the judge waits at verdict for an http target's remote traces to
@@ -473,7 +485,8 @@ export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;
 export const AgentTestTurnJobSchema = z.object({
   kind: z.literal("agent-test-turn"),
   adapterData: TargetAdapterDataSchema,
-  nlpServiceUrl: z.string(),
+  /** Where a code or workflow agent's turn posts, chosen by the same rule as a simulation's. */
+  executeSyncRoute: ExecuteSyncRouteSchema,
   parameters: runParameterValuesSchema.default({}),
   message: z.string(),
   /** The call-budget ceiling the turn answers inside (ADR-128). */

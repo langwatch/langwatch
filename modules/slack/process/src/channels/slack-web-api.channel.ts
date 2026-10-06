@@ -15,7 +15,7 @@ export type SlackIdentityResult =
  * two are the whole reason a caller can tell infrastructure from a bad token.
  */
 const SLACK_TRANSPORT_FAILURES = ["request_failed", "bad_response"] as const;
-export type SlackTransportFailure = (typeof SLACK_TRANSPORT_FAILURES)[number];
+type SlackTransportFailure = (typeof SLACK_TRANSPORT_FAILURES)[number];
 
 export function isSlackTransportFailure(error: string): error is SlackTransportFailure {
   return SLACK_TRANSPORT_FAILURES.some((failure) => failure === error);

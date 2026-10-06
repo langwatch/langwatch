@@ -58,20 +58,26 @@ export function getLogLevelFromStatusCode(statusCode: number): "info" | "warn" |
  * + `fault`) so this package doesn't import the HandledError class. Returns
  * undefined for unhandled errors.
  */
-export function handledFaultOf(error: unknown): "customer" | "platform" | "provider" | undefined {
+export function handledFaultOf(
+  error: unknown,
+): "customer" | "platform" | "provider" | "presumed_platform" | undefined {
   if (!error || typeof error !== "object") return undefined;
   const e = error as Record<string, unknown>;
   if (typeof e.code !== "string" || typeof e.httpStatus !== "number") {
     return undefined;
   }
   const fault = e.fault;
-  return fault === "customer" || fault === "platform" || fault === "provider" ? fault : undefined;
+  return fault === "customer" ||
+    fault === "platform" ||
+    fault === "provider" ||
+    fault === "presumed_platform"
+    ? fault
+    : undefined;
 }
 
 /**
- * Request log level, fault-aware: a handled error logs by fault —
- * `customer` warns (expected, spike-watched), `platform`/`provider` errors
- * (incident); unhandled stays status-based. Same rule the tRPC logger applies.
+ * Request log level by fault, as the tRPC logger does: `customer` warns (spike-watched);
+ * `platform`, `provider` and `presumed_platform` error (incident); unhandled goes by status.
  */
 export function getLogLevelForRequest(
   error: unknown,
@@ -79,7 +85,7 @@ export function getLogLevelForRequest(
 ): "info" | "warn" | "error" {
   const fault = handledFaultOf(error);
   if (fault === "customer") return "warn";
-  if (fault === "platform" || fault === "provider") return "error";
+  if (fault === "platform" || fault === "provider" || fault === "presumed_platform") return "error";
   return getLogLevelFromStatusCode(statusCode);
 }
 

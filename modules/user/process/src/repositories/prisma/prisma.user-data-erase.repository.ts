@@ -22,7 +22,7 @@ type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClie
  * by design — the one place in the product that discovers and removes a single user's data
  * across every organization they touched, across ~25 tables no single feature's port fronts.
  */
-export type GdprUserDataEraseDatabase = {
+type GdprUserDataEraseDatabase = {
   user: Delegate<"user", "findUnique" | "delete">;
   organization: Delegate<"organization", "findMany" | "deleteMany">;
   organizationUser: Delegate<"organizationUser", "count" | "deleteMany" | "groupBy">;
@@ -91,6 +91,7 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
       where: { members: { some: { userId } }, NOT: { members: { every: { userId } } } },
       select: { id: true, name: true },
     });
+    if (organizations.length === 0) return [];
     const counts = await this.database.organizationUser.groupBy({
       by: ["organizationId"],
       where: { organizationId: { in: organizations.map((organization) => organization.id) } },
@@ -168,6 +169,7 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
     organizationIds: string[];
     userId: string;
   }): Promise<GdprOrganizationRow[]> {
+    if (organizationIds.length === 0) return Promise.resolve([]);
     return this.database.team.findMany({
       where: { organizationId: { in: organizationIds }, members: { some: { NOT: { userId } } } },
       select: { id: true, name: true },

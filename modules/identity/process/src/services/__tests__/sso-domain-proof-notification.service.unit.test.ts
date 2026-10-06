@@ -3,7 +3,7 @@
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { SsoDomainProofMail } from "../../app/identity.members.ts";
+import type { SsoDomainProofMail } from "../../channels/sso-domain-proof-mail.channel.ts";
 import {
   SsoDomainProofNotificationService,
   UnaddressedSsoDomainProofNotifications,

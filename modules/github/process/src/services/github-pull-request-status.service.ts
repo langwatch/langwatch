@@ -28,7 +28,7 @@ export interface GithubPullRequestRef {
   prNumber: number;
 }
 
-export interface GithubPullRequestLiveStatus extends GithubPullRequestRef {
+interface GithubPullRequestLiveStatus extends GithubPullRequestRef {
   status: GithubPullRequestStatus;
   /** "live" when GitHub answered (or answered recently), "snapshot" otherwise. */
   source: "live" | "snapshot";
@@ -36,7 +36,7 @@ export interface GithubPullRequestLiveStatus extends GithubPullRequestRef {
   mappedAt: ContractLiveStatus["mappedAt"];
 }
 
-export interface GithubPullRequestStatusServiceDeps {
+interface GithubPullRequestStatusServiceDeps {
   repository: GithubPullRequestsRepository;
   installations: GithubInstallationsService;
   appTokens: GithubAppTokenCache;

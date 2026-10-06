@@ -1,3 +1,4 @@
+import { toDate, type Instant } from "@langwatch/time";
 import {
   workflowDslSchema,
   workflowSchema,
@@ -56,6 +57,7 @@ const workflowFieldSourceRowsSchema = z.array(
 );
 const workflowSummaryRowsSchema = z.array(z.object({ id: z.string(), name: z.string() }));
 const workflowIdRowSchema = z.object({ id: z.string() });
+const workflowProjectIdRowsSchema = z.array(z.object({ projectId: z.string() }));
 const workflowVersionsRowSchema = z.object({ versions: z.array(z.unknown()) });
 
 const mapWorkflow = (row: unknown): Workflow => {
@@ -163,6 +165,15 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
           }
         : {}),
     };
+  }
+
+  async findProjectIds(): Promise<string[]> {
+    const rows = await this.database.workflow.findMany({
+      where: { archivedAt: null },
+      select: { projectId: true },
+      distinct: ["projectId"],
+    });
+    return workflowProjectIdRowsSchema.parse(rows).map((row) => row.projectId);
   }
 
   async findAll(input: { projectId: string }): Promise<Workflow[]> {
@@ -313,10 +324,10 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
     id: string;
     projectId: string;
     dsl: WorkflowDsl;
-    updatedAt: Date;
+    updatedAt: Instant;
   }): Promise<boolean> {
     const written = await this.database.workflowVersion.updateMany({
-      where: { id: input.id, projectId: input.projectId, updatedAt: input.updatedAt },
+      where: { id: input.id, projectId: input.projectId, updatedAt: toDate(input.updatedAt) },
       data: { dsl: input.dsl },
     });
 

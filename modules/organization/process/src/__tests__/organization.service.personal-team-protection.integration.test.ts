@@ -18,7 +18,6 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { OrganizationSettingsSecret } from "../app/organization.members.ts";
 import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository.ts";
 import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository.ts";
 import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository.ts";
@@ -28,11 +27,6 @@ import { PersonalWorkspaceIdentityService } from "../services/personal-workspace
 import { TeamIdentityService } from "../services/team-identity.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
-
-const passthroughSecrets: OrganizationSettingsSecret = {
-  encrypt: (value) => value,
-  decrypt: (value) => value,
-};
 
 /**
  * The personal check runs before any binding is written, so a writer that
@@ -57,7 +51,10 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
   const prisma = connection.client as PrismaClient;
 
   const organizations = OrganizationService.create({
-    repository: PrismaOrganizationRepository.create(prisma),
+    repository: PrismaOrganizationRepository.create({
+      database: prisma,
+      cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+    }),
     teams: PrismaTeamRepository.create(prisma),
     groups: PrismaGroupRepository.create(prisma),
     identities: PersonalWorkspaceIdentityService.create(),
@@ -65,7 +62,6 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
     groupIdentities: GroupIdentityService.create(),
     authz: unusedAuthz,
     grants: noopGrantsWriter,
-    settingsSecrets: passthroughSecrets,
   });
 
   const testNamespace = `pw-protect-${nanoid(8)}`;

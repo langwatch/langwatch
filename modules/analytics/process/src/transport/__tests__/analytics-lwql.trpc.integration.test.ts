@@ -1,11 +1,9 @@
 import { createTrpcRuntime, TrpcRootDefinition } from "@langwatch/api/trpc";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
@@ -20,7 +18,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { AnalyticsModule } from "../../app/analytics.app.ts";
-import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
+import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { analyticsLwqlTrpcTransport } from "../analytics-lwql.trpc.ts";
 
 type Setup = Parameters<typeof AnalyticsModule.create>[0];
@@ -31,8 +29,6 @@ const PROJECT = { projectId: "project-1" };
 function membersHolding(held: readonly string[]) {
   return trpcTestMembers<TestContext>({ permits: (permission) => held.includes(permission) });
 }
-
-const allowEveryRequest: RateLimiter = { check: async () => ({ allowed: true }) };
 
 /** The app as production composes it, with no LangWatchQL identity provisioned. */
 async function callerFor({ switchOn, held }: { switchOn: boolean; held: readonly string[] }) {
@@ -46,14 +42,7 @@ async function callerFor({ switchOn, held }: { switchOn: boolean; held: readonly
       traces: createApiFixture<TraceApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
-    members: {
-      clickhouse: createApiFixture<ClickHouseQueryClient>(),
-      rateLimiter: allowEveryRequest,
-      publicBaseUrl: "https://app.langwatch.test",
-      clickhouseAdmin: { configured: false },
-      databaseTarget: { configured: false },
-      prisma: createApiFixture<LwqlProvisioningDatabase>({}, "prisma"),
-    },
+    repositories: MemoryAnalyticsRepositories.create(),
     config: {
       langwatchQl: {
         url: void 0,
@@ -64,6 +53,7 @@ async function callerFor({ switchOn, held }: { switchOn: boolean; held: readonly
         accessModelMode: void 0,
         sqlSingleNode: void 0,
       },
+      publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: createApiFixture<Setup["secrets"]>(),

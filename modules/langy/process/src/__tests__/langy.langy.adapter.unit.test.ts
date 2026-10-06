@@ -17,6 +17,7 @@ import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
+import type { LangyRelayConnection } from "@langwatch/langy-contract";
 import type {
   LangyConversationCommands,
   LangyTurnTechnicalMembers,
@@ -32,7 +33,6 @@ import type { OnboardingApi } from "@langwatch/onboarding-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -42,9 +42,10 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyModule } from "../app/langy.app.ts";
-import { createLangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
+import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 import { MemoryLangyRepositories } from "../repositories/memory/memory.langy.repositories.ts";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
+import { PrismaLangyRepositories } from "../repositories/prisma/prisma.langy.repositories.ts";
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
 import type { LangyEventingMembers } from "../services/langy-postgres.service.ts";
 import { LangyPostgresService } from "../services/langy-postgres.service.ts";
@@ -78,7 +79,16 @@ function commands(): LangyConversationCommands {
   };
 }
 
-function composition(turns: LangyTurnTechnicalMembers) {
+function composition(
+  members: Omit<LangyTurnTechnicalMembers, "tokenBuffer" | "accessStore" | "handoffStore">,
+) {
+  const rows = MemoryLangyRepositories.create();
+  const turns: LangyTurnTechnicalMembers = {
+    ...members,
+    tokenBuffer: rows.tokenBuffer.open(),
+    accessStore: rows.turnAccess,
+    handoffStore: rows.turnHandoff,
+  };
   return {
     commands: commands(),
     credentials: {
@@ -92,7 +102,9 @@ function composition(turns: LangyTurnTechnicalMembers) {
       },
     },
     turns,
-    feedbackPrompts: null,
+    feedbackPrompts: createApiFixture<LangyFeedbackPromptRepository>(),
+    blockMetrics: LangyBlockMetricsOtelService.create(),
+    openRelay: () => createApiFixture<LangyRelayConnection>(),
   };
 }
 
@@ -100,7 +112,7 @@ describe("LangyPostgresService", () => {
   it("shares the memoized generic stores with every eventing consumer", () => {
     const database: LangyDatabase = undefined!;
     const instance = LangyPostgresService.create({
-      repositories: createLangyDatabaseRepositories(database),
+      repositories: PrismaLangyRepositories.create(database),
     });
 
     const first: LangyEventingMembers = instance.eventing();
@@ -117,9 +129,6 @@ describe("LangyPostgresService", () => {
     const options = composition({
       models: { resolve: vi.fn() },
       worker: null,
-      tokenBuffer: null,
-      accessStore: null,
-      handoffStore: null,
       permits: {
         reserve: vi.fn(),
         release: vi.fn(),
@@ -137,7 +146,7 @@ describe("LangyPostgresService", () => {
     });
     const database: LangyDatabase = undefined!;
     const instance = LangyPostgresService.create({
-      repositories: createLangyDatabaseRepositories(database),
+      repositories: PrismaLangyRepositories.create(database),
     });
 
     const first = instance.build(options);
@@ -155,7 +164,7 @@ describe("LangyPostgresService", () => {
         metrics.install();
         try {
           const instance = LangyPostgresService.create({
-            repositories: createLangyDatabaseRepositories(undefined!),
+            repositories: PrismaLangyRepositories.create(undefined!),
           });
           const service = instance.build({
             ...compositionOptions(),
@@ -183,7 +192,7 @@ describe("LangyPostgresService", () => {
       /** @scenario "transports share one Langy capability" */
       it("hands back the one service the adapter built, not a second graph", async () => {
         const instance = LangyPostgresService.create({
-          repositories: createLangyDatabaseRepositories(undefined!),
+          repositories: PrismaLangyRepositories.create(undefined!),
         });
         const service = instance.build(compositionOptions());
 
@@ -199,7 +208,7 @@ describe("LangyPostgresService", () => {
       /** @scenario "composition hides persistence" */
       it("receives the contract service, with no repository or database on its surface", () => {
         const instance = LangyPostgresService.create({
-          repositories: createLangyDatabaseRepositories(undefined!),
+          repositories: PrismaLangyRepositories.create(undefined!),
         });
 
         const service = instance.build(compositionOptions());
@@ -208,10 +217,33 @@ describe("LangyPostgresService", () => {
         expect(publicSurfaceOf(service).filter((name) => PERSISTENCE_WORDS.test(name))).toEqual([]);
       });
 
+      /** @scenario "Langy owns its subordinate subjects" */
+      it("reaches conversations, turns, messages, credentials and relay frames through the one service", () => {
+        const instance = LangyPostgresService.create({
+          repositories: PrismaLangyRepositories.create(undefined!),
+        });
+
+        const surface = publicSurfaceOf(instance.build(compositionOptions()));
+
+        const capabilityBySubject = {
+          conversations: ["getPage", "getById", "forkById", "deleteById"],
+          turns: ["startConversationTurn", "stopTurn", "ingestAgentTurnResult"],
+          messages: ["recordUserMessage", "getEventsAfter"],
+          credentials: ["findRunToken", "revokeWorkerSessionKey"],
+          "relay frames": ["openRelayConnection"],
+        };
+        for (const [subject, methods] of Object.entries(capabilityBySubject)) {
+          expect({ subject, missing: methods.filter((name) => !surface.includes(name)) }).toEqual({
+            subject,
+            missing: [],
+          });
+        }
+      });
+
       /** @scenario "application transports use the flat contract" */
       it("publishes every capability as a flat method, naming no subordinate among them", () => {
         const instance = LangyPostgresService.create({
-          repositories: createLangyDatabaseRepositories(undefined!),
+          repositories: PrismaLangyRepositories.create(undefined!),
         });
 
         const service = instance.build(compositionOptions());
@@ -257,9 +289,6 @@ function compositionOptions() {
   return composition({
     models: { resolve: vi.fn() },
     worker: null,
-    tokenBuffer: null,
-    accessStore: null,
-    handoffStore: null,
     permits: { reserve: vi.fn(), release: vi.fn(), check: vi.fn() },
     perDayPrCap: 0,
     sessionKeys: { mint: vi.fn(), revoke: vi.fn() },
@@ -299,12 +328,6 @@ async function createApp(): Promise<LangyModule> {
       notifications: createApiFixture<NotificationService>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
-    members: {
-      publicBaseUrl: undefined,
-      prisma: undefined!,
-      redis: createApiFixture<RedisConnection>(),
-      rateLimiter: { check: async () => ({ allowed: true }) },
-    },
     config: {
       agentUrl: undefined,
       workerCallbackUrl: undefined,
@@ -313,6 +336,7 @@ async function createApp(): Promise<LangyModule> {
       gatewayInternalUrl: undefined,
       gatewayPublicUrl: undefined,
       gatewayLegacyUrl: undefined,
+      publicBaseUrl: undefined,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: noSecrets,

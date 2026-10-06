@@ -1,13 +1,14 @@
 import { TransportSelection } from "@langwatch/api/hosting/selection";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
 import type { ConfigOwner } from "@langwatch/config";
-import type { ProcessMemberSource } from "@langwatch/process-stores";
+import type { ModuleApiToken } from "@langwatch/module";
 import {
   ConsumerPipelines,
   ProducerPipelines,
   type PipelineParticipation,
 } from "@langwatch/process-stores/pipelines";
 
+import type { BootedRuntime } from "./application.ts";
 import type { InstallableServerFeature } from "./feature-installer.ts";
 import type { ServedApplication } from "./server.ts";
 
@@ -18,17 +19,18 @@ export type ProcessModule = InstallableServerFeature<never> & {
 export function isProcessModule(owner: ConfigOwner): owner is ProcessModule {
   return "install" in owner && typeof owner.install === "function";
 }
-/** A booted application: the server hosts it, and only the tasks role answers `tasks` (§9). */
+/**
+ * A booted application: the server hosts it, it answers a module's Api by token only
+ * (§13), and only the tasks role answers `tasks` (§9).
+ */
 export type BootedApplication = ServedApplication &
-  Readonly<{
-    tasks<Task>(isTask: (contribution: unknown) => contribution is Task): readonly Task[];
-  }>;
-/** What one role boots: its modules, its pipelines' participation, and what it supplies. */
+  Readonly<{ service<Api>(token: ModuleApiToken<Api>): Api }> &
+  Pick<BootedRuntime<unknown>, "tasks">;
+/** What one role boots: its modules, its pipelines' participation and, on the api, transports. */
 export type ProcessBootInput = Readonly<{
   role: "api" | "worker" | "tasks";
   modules: readonly ProcessModule[];
   pipelines: PipelineParticipation;
-  members: Readonly<Record<string, ProcessMemberFactory>>;
   transports?: TransportSelection;
 }>;
 
@@ -37,29 +39,12 @@ export interface ProcessBoot {
   boot(input: ProcessBootInput): Promise<BootedApplication>;
 }
 
-/**
- * How a process builds a member of its own. Called once the stores are open,
- * so a supplied member may be composed over `prisma` or any other store.
- */
-export type ProcessMemberFactory = (members: ProcessMemberSource) => unknown;
-
 /** A container installs the modules its server's config named; the role decides its pipelines. */
 class ProcessContainer {
-  protected members: Record<string, ProcessMemberFactory> = {};
   protected constructor(
     protected readonly runtime: ProcessBoot,
     protected readonly modules: readonly ProcessModule[],
   ) {}
-
-  /**
-   * One member this process answers itself, beyond what its stores supply.
-   * A module claiming a name no store carries is answered here or refused
-   * at boot by module and member. Built once the stores are open.
-   */
-  withMember(name: string, build: ProcessMemberFactory): this {
-    this.members[name] = build;
-    return this;
-  }
 }
 
 export class ApiProcessContainer extends ProcessContainer {
@@ -73,21 +58,14 @@ export class ApiProcessContainer extends ProcessContainer {
     return this;
   }
 
-  boot(): Promise<ServedApplication> {
+  boot(): Promise<Omit<BootedApplication, "tasks">> {
     if (!this.#transports)
       throw new Error("surface must be selected with exposeTransports before boot.");
     const selected = this.#transports.selected;
-    for (const module of this.modules) {
-      for (const transport of module.transports ?? []) {
-        if (!surfaceOpened(selected, transport.protocol))
-          throw new Error(`${module.name} needs surface.${transport.protocol}.`);
-      }
-    }
     return this.runtime.boot({
       role: "api",
-      modules: this.modules,
+      modules: this.modules.map((module) => withOpenedSurfaces(module, selected)),
       pipelines: new ProducerPipelines().produce(),
-      members: this.members,
       transports: this.#transports,
     });
   }
@@ -98,12 +76,11 @@ export class WorkerProcessContainer extends ProcessContainer {
     super(runtime, modules);
   }
 
-  boot(): Promise<ServedApplication> {
+  boot(): Promise<Omit<BootedApplication, "tasks">> {
     return this.runtime.boot({
       role: "worker",
       modules: this.modules,
       pipelines: new ConsumerPipelines().consume(),
-      members: this.members,
     });
   }
 }
@@ -119,9 +96,22 @@ export class TasksProcessContainer extends ProcessContainer {
       role: "tasks",
       modules: this.modules,
       pipelines: new ProducerPipelines().produce(),
-      members: this.members,
     });
   }
+}
+
+/**
+ * A module installs whatever surfaces this process selected; a transport for one it did
+ * not select is skipped, never refused (§4 D3).
+ */
+function withOpenedSurfaces(
+  module: ProcessModule,
+  selected: TransportSelection["selected"],
+): ProcessModule {
+  const transports = module.transports ?? [];
+  const opened = transports.filter((transport) => surfaceOpened(selected, transport.protocol));
+  if (opened.length === transports.length) return module;
+  return { ...module, transports: opened };
 }
 
 /** A socket rides the process's one upgrade router, which every api process opens. */

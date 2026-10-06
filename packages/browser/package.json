@@ -131,6 +131,10 @@
       "types": "./dist/transport.d.ts",
       "default": "./src/transport.ts"
     },
+    "./testing-transport": {
+      "types": "./dist/testing-transport.d.ts",
+      "default": "./src/testing-transport.ts"
+    },
     "./browser-rpc": {
       "types": "./dist/browser-rpc.d.ts",
       "default": "./src/browser-rpc.ts"

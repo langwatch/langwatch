@@ -6,12 +6,9 @@
  * @see modules/dashboard/specs/dashboards-v1.feature
  */
 
-import {
-  type UiProcedureCall,
-  UiProcedureRefusal,
-} from "@langwatch/browser-host/testing-transport";
+import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import type { DashboardVisibility } from "@langwatch/dashboard-contract";
-import { explainAnyError } from "@langwatch/error-presentation/presentation";
+import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";

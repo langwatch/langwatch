@@ -8,7 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@langwatch/handled-error": fileURLToPath(
-        new URL("../../../packages/handled-error/src/index.ts", import.meta.url),
+        new URL("../../../packages/handled-error/src", import.meta.url),
       ),
     },
   },

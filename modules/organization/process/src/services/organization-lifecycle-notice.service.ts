@@ -10,6 +10,7 @@ import type {
   RecordInviteAcceptedCommandData,
   RecordMembersInvitedCommandData,
   RecordPersonalWorkspaceProvisionedCommandData,
+  RecordPresenceSettingChangedCommandData,
   RecordSignedUpCommandData,
 } from "../eventing/organization-lifecycle.events.ts";
 
@@ -22,6 +23,7 @@ export type OrganizationLifecycleSenders = Readonly<{
   recordInviteAccepted: Sender<RecordInviteAcceptedCommandData>;
   recordIntegrationMethodChosen: Sender<RecordIntegrationMethodChosenCommandData>;
   recordPersonalWorkspaceProvisioned: Sender<RecordPersonalWorkspaceProvisionedCommandData>;
+  recordPresenceSettingChanged: Sender<RecordPresenceSettingChangedCommandData>;
 }>;
 
 /**
@@ -91,6 +93,29 @@ export class OrganizationLifecycleNoticeService {
       userId: input.userId,
       selection: selection.data,
     });
+  }
+
+  /** The organization's presence switch changed; presence folds it from its own side (§9). */
+  presenceSettingChanged(
+    input: Readonly<{
+      organizationId: string;
+      presenceEnabled: boolean;
+      changedByUserId: string | null;
+    }>,
+  ): void {
+    this.#send(this.#senders?.recordPresenceSettingChanged, {
+      ...this.#envelope(input.organizationId),
+      ...input,
+    });
+  }
+
+  /** The backfill's record of a stored setting; throws, so the task fails rather than skips. */
+  async recordStoredPresenceSetting(
+    input: Readonly<{ organizationId: string; presenceEnabled: boolean }>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordPresenceSettingChanged;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input, backfilled: true });
   }
 
   #envelope(tenantId: string) {

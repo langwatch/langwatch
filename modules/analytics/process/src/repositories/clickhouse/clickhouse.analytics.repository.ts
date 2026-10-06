@@ -30,7 +30,7 @@ import { buildRollupTimeseriesQuery } from "./clickhouse.rollup-timeseries-query
 import { buildSlimTimeseriesQuery } from "./clickhouse.slim-timeseries-query.mapper.ts";
 import { parseTimeseriesRows } from "./clickhouse.timeseries-row-parser.mapper.ts";
 
-export class AnalyticsClientUnavailableError extends Error {
+class AnalyticsClientUnavailableError extends Error {
   constructor(public readonly tenantId: string) {
     super(`ClickHouse client not available for tenant ${tenantId}`);
     this.name = "AnalyticsClientUnavailableError";

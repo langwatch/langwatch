@@ -15,7 +15,6 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { memoryRateLimiter } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -24,7 +23,6 @@ import { describe, expect, it } from "vitest";
 import { MemoryCostAttributionPolicyRepository } from "../../repositories/memory/memory.cost-attribution-policy.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { GovernanceModule } from "../governance.app.ts";
-import type { GovernanceEncryptor } from "../governance.members.ts";
 
 async function buildApp() {
   const costAttributionPolicies = MemoryCostAttributionPolicyRepository.create({
@@ -51,11 +49,6 @@ async function buildApp() {
       auditLog: createApiFixture<AuditLogApi>(),
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
-    },
-    members: {
-      encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
-      rateLimiter: memoryRateLimiter(),
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

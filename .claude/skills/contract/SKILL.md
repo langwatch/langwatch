@@ -17,17 +17,17 @@ It imports no framework runtime and no other half (see the `module` skill).
 
 ## What lives in `contract/src/`
 
-| File | Holds | Example |
-|---|---|---|
-| `<name>.ts`, `<concern>.ts` | Zod schemas plus `z.infer` types | `monitor/contract/src/monitor.ts` |
-| `<name>.api.ts` | the `*Api` interface and its token | `monitor.api.ts` |
-| `<name>.errors.ts` | `HandledError` subclasses | `monitor.errors.ts` |
-| `<name>.trpc.ts` | `defineTrpcContract` declarations | `monitor.trpc.ts` |
-| `<name>-trpc.schemas.ts` | tRPC input and answer schemas | `monitor-trpc.schemas.ts` |
-| `<name>-rest.schemas.ts` | REST wire schemas, distinct from domain | `monitor-rest.schemas.ts` |
-| `<name>.events.ts`, `.commands.ts`, `.queries.ts` | eventing vocabulary | `automation.events.ts` |
-| `<name>.config.ts` | the module's config schema (§6) | `automation.config.ts` |
-| `index.ts` | `export *` of the above | `monitor/contract/src/index.ts` |
+| File                                              | Holds                                   | Example                           |
+| ------------------------------------------------- | --------------------------------------- | --------------------------------- |
+| `<name>.ts`, `<concern>.ts`                       | Zod schemas plus `z.infer` types        | `monitor/contract/src/monitor.ts` |
+| `<name>.api.ts`                                   | the `*Api` interface and its token      | `monitor.api.ts`                  |
+| `<name>.errors.ts`                                | `HandledError` subclasses               | `monitor.errors.ts`               |
+| `<name>.trpc.ts`                                  | `defineTrpcContract` declarations       | `monitor.trpc.ts`                 |
+| `<name>-trpc.schemas.ts`                          | tRPC input and answer schemas           | `monitor-trpc.schemas.ts`         |
+| `<name>-rest.schemas.ts`                          | REST wire schemas, distinct from domain | `monitor-rest.schemas.ts`         |
+| `<name>.events.ts`, `.commands.ts`, `.queries.ts` | eventing vocabulary                     | `automation.events.ts`            |
+| `<name>.config.ts`                                | the module's config schema (§6)         | `automation.config.ts`            |
+| `index.ts`                                        | `export *` of the above                 | `monitor/contract/src/index.ts`   |
 
 The filename grammar is `packages/oxlint-rules/grammar/feature-layout-policy.mjs`
 (contract suffixes: `app`, `commands`, `errors`, `events`, `queries`,
@@ -77,7 +77,9 @@ export class MonitorNotFoundError extends HandledError {
   declare readonly code: "monitor_not_found";
   constructor(readonly monitorId: string) {
     super("monitor_not_found", "Monitor not found.", {
-      httpStatus: 404, fault: "customer", meta: { monitorId },
+      httpStatus: 404,
+      fault: "customer",
+      meta: { monitorId },
       ...remediation("monitor_not_found"),
     });
     this.name = "MonitorNotFoundError";
@@ -115,8 +117,9 @@ Adding a hypothetical `monitor.archive` (not in the tree):
 - **Re-parsing.** Parse once where a value enters untyped (a transport, a
   channel's inbound message); it travels as its `z.infer` type afterwards (§3.2).
 - **Config and peer-dependency declarations** (the `<name>.config.ts` slice,
-  what the module demands of its process) are the future `module-dependencies`
-  skill. A contract may only carry the schema; do not invent supply tokens here.
+  what the module demands of its process) are the `module-dependencies` skill.
+  `<name>.config.ts` carries the slice, the secret handles and the browser
+  projection (§6); there are no supply tokens (§15).
 - **A hand-written client or router type.** The browser client derives from the
   declarations (`@langwatch/api/web`), never a router type (§3.4).
 - **Naming from the §15 list.** Look there before inventing any helper name.

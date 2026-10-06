@@ -4,16 +4,18 @@ import {
   type ProcessEventEnvelope,
 } from "@langwatch/eventing";
 
-import type {
-  IngestionPullListingOutcomeChannel,
-  IngestionPullMetricsSink,
-  IngestionPullOutcomeChannel,
-  IngestionPullRunner,
-  IngestionPullScheduler,
-} from "../../app/governance.members.ts";
-import { IngestionPullListingService } from "../../services/ingestion-pull-listing.service.ts";
-import { IngestionPullService } from "../../services/ingestion-pull.service.ts";
 import {
+  type IngestionPullListingOutcomeChannel,
+  IngestionPullListingService,
+} from "../../services/ingestion-pull-listing.service.ts";
+import type { IngestionPullMetricsSink } from "../../services/ingestion-pull-metrics.service.ts";
+import {
+  type IngestionPullOutcomeChannel,
+  type IngestionPullRunner,
+  IngestionPullService,
+} from "../../services/ingestion-pull.service.ts";
+import {
+  type IngestionPullScheduler,
   INGESTION_PULL_PROCESS_NAME,
   IngestionPullProcess,
   type IngestionPullProcessState,

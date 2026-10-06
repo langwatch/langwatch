@@ -135,7 +135,7 @@ func mergeHook(settings map[string]any, command, matcher string) (bool, error) {
 		if hook == nil {
 			continue
 		}
-		if !updateGateHook(entry, hook, command, matcher) {
+		if !updateGateHook(entry, hook, gateSpec{command: command, matcher: matcher}) {
 			return false, nil
 		}
 		hooks["PreToolUse"] = entries
@@ -148,9 +148,16 @@ func mergeHook(settings map[string]any, command, matcher string) (bool, error) {
 	return true, nil
 }
 
+// gateSpec is the gate hook as it should be installed: its command and the
+// tool matcher it runs for.
+type gateSpec struct {
+	command, matcher string
+}
+
 // updateGateHook brings an already-installed gate up to date, reporting whether
 // anything changed.
-func updateGateHook(entry any, hook map[string]any, command, matcher string) bool {
+func updateGateHook(entry any, hook map[string]any, gate gateSpec) bool {
+	command, matcher := gate.command, gate.matcher
 	isCommandChanged := hook["command"] != command
 	if isCommandChanged {
 		// The nested hook's own command, not the entry around it: an entry may

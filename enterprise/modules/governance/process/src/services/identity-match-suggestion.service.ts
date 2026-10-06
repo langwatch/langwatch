@@ -17,7 +17,7 @@ import {
 export const MAX_SUGGESTIONS_PER_PERSON = 5;
 
 /** What one pass did, and how much work the prefilter saved. */
-export interface SuggestionPassOutcome {
+interface SuggestionPassOutcome {
   peopleConsidered: number;
   pairsScored: number;
   suggestionsWritten: number;
@@ -46,7 +46,7 @@ function scoreAgainstMembers({
   return { pairsScored, kept: scored.slice(0, MAX_SUGGESTIONS_PER_PERSON) };
 }
 
-export interface IdentityMatchSuggestionDependencies {
+interface IdentityMatchSuggestionDependencies {
   discoveredPeople: DiscoveredPersonRepository;
   matches: IdentityMatchRepository;
   suggestions: IdentityMatchSuggestionRepository;

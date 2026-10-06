@@ -15,12 +15,10 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  GroupIdentity,
-  PersonalWorkspaceIdentity,
-  TeamIdentity,
-} from "../../app/organization.members.ts";
+import type { GroupIdentity } from "../../services/group-identity.service.ts";
 import { OrganizationService } from "../../services/organization.service.ts";
+import type { PersonalWorkspaceIdentity } from "../../services/personal-workspace-identity.service.ts";
+import type { TeamIdentity } from "../../services/team-identity.service.ts";
 import { GroupRepository } from "../group.repository.ts";
 import type { OrganizationRepository } from "../organization.repository.ts";
 import { TeamRepository } from "../team.repository.ts";
@@ -216,12 +214,15 @@ function buildService(options?: {
     groupIdentities: {} as GroupIdentity,
     authz: authzApi,
     grants: authzApi,
-    settingsSecrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
   });
   return { service, teams, calls };
 }
 
 describe("OrganizationService team membership", () => {
+  /**
+   * @scenario "A non-manager reads team membership"
+   * @scenario "Team membership is projected from grants"
+   */
   it("reads role-binding-only members, collapses duplicate roles and redacts other email addresses", async () => {
     const { service } = buildService({
       memberBindings: [
@@ -246,19 +247,24 @@ describe("OrganizationService team membership", () => {
     });
   });
 
+  /** @scenario "A non-member gets a team by slug" */
   it("throws the same not-found error when a slug exists but the caller is not a member", async () => {
     const { service } = buildService({
       memberBindings: [memberBinding("someone_else", "ADMIN")],
     });
-    await expect(
-      service.getTeamBySlugForMember({
-        organizationId: "org_1",
-        slug: "shared",
-        userId: "caller",
-      }),
-    ).rejects.toBeInstanceOf(TeamNotFoundError);
+    const refusedAsOutsider = await service
+      .getTeamBySlugForMember({ organizationId: "org_1", slug: "shared", userId: "caller" })
+      .catch((error: unknown) => error);
+    const refusedAsMissing = await service
+      .getTeamBySlugForMember({ organizationId: "org_1", slug: "no-such-team", userId: "caller" })
+      .catch((error: unknown) => error);
+
+    expect(refusedAsOutsider).toBeInstanceOf(TeamNotFoundError);
+    expect(refusedAsMissing).toBeInstanceOf(TeamNotFoundError);
+    expect(refusedAsOutsider).toMatchObject({ code: (refusedAsMissing as TeamNotFoundError).code });
   });
 
+  /** @scenario "Team membership is projected from grants" */
   it("edits only the displayed binding and preserves an additive custom binding", async () => {
     const { service, calls } = buildService({
       accessBindings: [
@@ -384,6 +390,7 @@ describe("OrganizationService team membership", () => {
     expect(calls.attach).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A team edit would remove the last administrator" */
   it("refuses removal of the last effective admin before fencing or revoking", async () => {
     const { service, teams, calls } = buildService({
       accessBindings: [accessBinding({ id: "admin", userId: "admin", role: "ADMIN" })],
@@ -400,7 +407,10 @@ describe("OrganizationService team membership", () => {
     expect(calls.revoke).not.toHaveBeenCalled();
   });
 
-  /** @scenario "A team administered only through a group accepts member edits" */
+  /**
+   * @scenario "A team administered only through a group accepts member edits"
+   * @scenario "A group supplies the remaining administrator"
+   */
   it("counts members of an admin group when applying the last-admin guard", async () => {
     const groups = new MemoryGroups();
     groups.members.set("group", [{ userId: "group_admin", name: null, email: null, image: null }]);
@@ -435,6 +445,56 @@ describe("OrganizationService team membership", () => {
         actor: { type: "user", id: "admin" },
       }),
     ).rejects.toBeInstanceOf(TeamLastAdminRequiredError);
+  });
+});
+
+describe("given a team form save that adds, changes and removes members", () => {
+  const members = [
+    { userId: "admin", role: "ADMIN" as const },
+    { userId: "kept", role: "VIEWER" as const },
+    { userId: "joiner", role: "MEMBER" as const },
+  ];
+  const accessBindings = () => [
+    accessBinding({ id: "admin", userId: "admin", role: "ADMIN" }),
+    accessBinding({ id: "kept", userId: "kept", role: "MEMBER" }),
+    accessBinding({ id: "leaver", userId: "leaver", role: "MEMBER" }),
+  ];
+  const save = (service: ReturnType<typeof buildService>["service"]) =>
+    service.updateTeamWithMembers({
+      teamId: team.id,
+      name: team.name,
+      members,
+      caller: { type: "user", id: "admin" },
+      actor: { type: "user", id: "admin" },
+    });
+
+  describe("when every write succeeds", () => {
+    /** @scenario "A team membership write partially fails" */
+    it("attaches the replacement access, then changes roles, and revokes removed access last", async () => {
+      const { service, calls } = buildService({ accessBindings: accessBindings() });
+
+      await save(service);
+
+      const order = (call: typeof calls.attach) => call.mock.invocationCallOrder[0] ?? NaN;
+      expect(order(calls.attach)).toBeLessThan(order(calls.change));
+      expect(order(calls.change)).toBeLessThan(order(calls.revoke));
+      expect(calls.revoke).toHaveBeenCalledWith(
+        expect.objectContaining({ bindingIds: ["leaver"] }),
+      );
+    });
+  });
+
+  describe("when the write fails part way", () => {
+    /** @scenario "A team membership write partially fails" */
+    it("has revoked nothing, so access is retained rather than lost", async () => {
+      const { service, calls } = buildService({ accessBindings: accessBindings() });
+      calls.change.mockRejectedValueOnce(new Error("write failed"));
+
+      await expect(save(service)).rejects.toThrow("write failed");
+
+      expect(calls.attach).toHaveBeenCalled();
+      expect(calls.revoke).not.toHaveBeenCalled();
+    });
   });
 });
 

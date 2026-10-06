@@ -72,7 +72,7 @@ func DiffRest(base, candidate map[string]any, moduleOf func(method, path string)
 	if err != nil {
 		return RestParity{}, err
 	}
-	changes, err := openapidiff.Diff(base, candidate, "", "")
+	changes, err := openapidiff.Diff(base, candidate, openapidiff.Scope{})
 	if err != nil {
 		return RestParity{}, err
 	}

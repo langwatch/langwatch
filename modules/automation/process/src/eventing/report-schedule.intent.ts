@@ -15,7 +15,7 @@ export const reportDispatchIntentSchema = z.object({
   slot: z.number().int(),
   requestId: z.string().min(1).optional(),
 });
-export type ReportDispatchIntent = z.infer<typeof reportDispatchIntentSchema>;
+type ReportDispatchIntent = z.infer<typeof reportDispatchIntentSchema>;
 
 /** Renders and sends one report slot; the outbox retries it, so it must tolerate a repeat. */
 export interface ReportDispatcher {

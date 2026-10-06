@@ -278,6 +278,19 @@ ENV NODE_ENV=production
 ENV pnpm_config_verify_deps_before_run=false
 # The api process listens on API_PORT (6560 unset); the image serves on 5560.
 ENV API_PORT=5560
+
+# Prisma's version check to checkpoint.prisma.io would run during the
+# `prisma migrate deploy` every start does. LangWatch never uses it.
+ENV CHECKPOINT_DISABLE=1
+
+# Every tiktoken encoding file, so token counting reads it from disk instead of
+# downloading it from openaipublic.blob.core.windows.net at runtime (about 8 MB).
+# The script resolves tiktoken from the working directory, so it runs in the
+# worker app, which depends on it.
+ENV TIKTOKENS_PATH=/app/tiktoken
+COPY dev/scripts/download-tiktoken-encodings.mjs ./dev/scripts/download-tiktoken-encodings.mjs
+RUN cd apps/worker && node ../../dev/scripts/download-tiktoken-encodings.mjs "$TIKTOKENS_PATH"
+
 EXPOSE 5560
 
 # Set bash as the default shell

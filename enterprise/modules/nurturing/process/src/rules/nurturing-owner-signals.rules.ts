@@ -3,6 +3,7 @@ import type { SessionStartedEventData, SsoAutoAddedEventData } from "@langwatch/
 import type {
   CheckoutCompletedEventData,
   SubscriptionChangedEventData,
+  SubscriptionStartedEventData,
 } from "@langwatch/enterprise-billing-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import type {
@@ -26,6 +27,7 @@ import type {
   FirstTraceRecordedEventData,
   TraceReceivedEventData,
 } from "@langwatch/trace-contract";
+import type { UserLifecycleEventData } from "@langwatch/user-contract";
 import type { WorkflowCreatedEventData } from "@langwatch/workflow-contract";
 
 import { isConnectedAgentRunSucceeded } from "./nurturing-scenario-run.rules.ts";
@@ -35,7 +37,7 @@ type OwnerEvent<Data> = Readonly<{ data: Data; aggregateId: string }>;
 /** An owner's event whose data names no tenant: the delivery context's is the event's own. */
 type TenantEvent<Data> = OwnerEvent<Data> & Readonly<{ tenantId: string }>;
 
-/** The picks reach nurturing as `guided_onboarding_paths`, the finished steps as progress. */
+/** The picks reach nurturing as `guided_onboarding_paths`, every other step as progress. */
 export function guidedOnboardingSignal({
   data,
   aggregateId,
@@ -56,10 +58,13 @@ export function guidedOnboardingSignal({
         event: data.event,
         previousPaths: data.previousPaths,
         paths: data.state.paths,
+        payload: data.payload,
       };
     case "provider_connected":
+    case "provider_skipped":
     case "tour_completed":
     case "tour_skipped":
+    case "tour_replayed":
     case "path_completed":
       return {
         kind: "guided_onboarding_progress",
@@ -154,6 +159,22 @@ export function subscriptionChangedSignal({
   };
 }
 
+/** A subscription that became active, once per transition: keyed by it and its instant. */
+export function subscriptionStartedSignal({
+  data,
+  aggregateId,
+}: OwnerEvent<SubscriptionStartedEventData>): NurturingSignal {
+  return {
+    kind: "subscription_started",
+    sourceEventId: `${aggregateId}:${data.subscriptionId}:${data.occurredAt}`,
+    tenantId: data.tenantId,
+    occurredAt: data.occurredAt,
+    organizationId: data.organizationId,
+    memberUserIds: data.memberUserIds,
+    plan: data.plan,
+  };
+}
+
 /** A completed checkout reaches PostHog as `subscription_created` and the organization group. */
 export function checkoutCompletedSignal({
   data,
@@ -183,6 +204,24 @@ export function sessionStartedSignal({
     userId: data.userId,
     // Auth records only a member of an organization, so nurturing never makes a ghost person.
     hasOrganization: true,
+  };
+}
+
+/**
+ * A person's own sign-up, from user's registration or auth's sign-up fact. Keyed by the person
+ * alone, so a redelivery or a second owner reporting the same person is one signed_up.
+ */
+export function userRegisteredSignal({
+  data,
+}: {
+  data: Pick<UserLifecycleEventData, "tenantId" | "userId" | "occurredAt">;
+}): NurturingSignal {
+  return {
+    kind: "user_registered",
+    sourceEventId: data.userId,
+    tenantId: data.tenantId,
+    occurredAt: data.occurredAt,
+    userId: data.userId,
   };
 }
 

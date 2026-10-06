@@ -231,13 +231,17 @@ describe("the operator's directory sync oversight", () => {
     /** @scenario "The mapping detail is the operator's, not the customer's" */
     it("shows the identifier the directory knows them by, per connection", async () => {
       await identities.rememberDirectoryIdentity({
+        organizationId: ORG,
         connectionId: CONNECTION,
         externalId: "u-1",
+        releasedConnectionIds: [],
         userId: "user_sam",
       });
       await identities.rememberDirectoryIdentity({
+        organizationId: ORG,
         connectionId: "other-connection",
         externalId: "u-1",
+        releasedConnectionIds: [],
         userId: "user_other",
       });
 

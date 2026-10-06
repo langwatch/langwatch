@@ -21,7 +21,7 @@ import type { SsoBreakGlassBindingRepository } from "../repositories/sso-connect
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** One person, as the module that owns membership names them (ADR-129). */
-export interface SsoBreakGlassPerson {
+interface SsoBreakGlassPerson {
   userId: string;
   name: string | null;
   email: string | null;

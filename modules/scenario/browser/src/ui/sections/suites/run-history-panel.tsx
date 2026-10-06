@@ -135,7 +135,7 @@ export function RunHistoryPanel({
   const startDateMs = period.startDate.epochMilliseconds;
   const endDateMs = period.endDate.epochMilliseconds;
   const { allRuns, allScenarioSetIds, hasMore, loadMore, isLoading, error, refetch } =
-    useRunHistoryPagination({ scenarioSetId, startDateMs, sseConnected });
+    useRunHistoryPagination({ scenarioSetId, startDateMs, sseConnected, adaptivePolling: true });
 
   // CSV export, scoped to whatever this panel is currently showing.
   const {

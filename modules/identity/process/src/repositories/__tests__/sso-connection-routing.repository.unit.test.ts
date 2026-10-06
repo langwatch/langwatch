@@ -1,3 +1,4 @@
+import { organizationConnectionsOf } from "@langwatch/identity-contract";
 import type { SsoConnection } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
 
@@ -358,6 +359,63 @@ describe.each(tiers)("SSO connection routing ($name)", ({ build }) => {
       const offered = await routing.findActiveConnections();
 
       expect(offered[0]).toMatchObject({ allowsJit: true, configured: true });
+    });
+  });
+
+  describe("given the connections a native social sign-up is checked against", () => {
+    const PASSWORD = { id: "password", kind: "password", connectionId: null } as const;
+
+    const governedBy = async ({ fixture, email }: { fixture: Fixture; email: string }) => {
+      const router = SignInRouterService.create({
+        domains: build(fixture),
+        policy: {
+          resolvePolicy: async () => ({
+            defaultMethods: [PASSWORD],
+            localMethods: [PASSWORD],
+            federationLicensed: true,
+            selfHosted: false,
+          }),
+        },
+        breakGlass: { allow: async () => true },
+        accounts: { findAccountMethods: async () => null },
+        recorder: { decided: () => undefined },
+      });
+
+      return organizationConnectionsOf(await router.route({ identifier: email }));
+    };
+
+    /** @scenario "A domain the connection never proved is not the connection's" */
+    it("names no connection for an address on a domain the live connection never proved", async () => {
+      const fixture = { rows: [row({ id: "ssoc_acme" })], registered: ["ssoc_acme"] };
+
+      await expect(governedBy({ fixture, email: "sam@acme.example" })).resolves.toEqual([
+        "ssoc_acme",
+      ]);
+      await expect(governedBy({ fixture, email: "sam@notacme.example" })).resolves.toEqual([]);
+    });
+
+    /** @scenario "A connection still being set up governs nobody" */
+    it("names no connection while the connection that proved the domain is still a draft", async () => {
+      const fixture = {
+        rows: [row({ id: "ssoc_acme", state: "DRAFT" })],
+        registered: ["ssoc_acme"],
+      };
+
+      await expect(governedBy({ fixture, email: "sam@acme.example" })).resolves.toEqual([]);
+    });
+
+    /** @scenario "A domain whose proof has lapsed still sends them to the provider" */
+    it("still names the connection when the proof of its domain has lapsed", async () => {
+      const fixture = {
+        rows: [
+          row({ id: "ssoc_acme", domainVerifications: [{ ...PROVED, proofState: "LAPSED" }] }),
+        ],
+        registered: ["ssoc_acme"],
+      };
+
+      await expect(governedBy({ fixture, email: "sam@acme.example" })).resolves.toEqual([
+        "ssoc_acme",
+      ]);
     });
   });
 

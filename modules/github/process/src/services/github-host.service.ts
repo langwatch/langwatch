@@ -1,6 +1,6 @@
 const GITHUB_DOT_COM = "github.com";
 
-export type GithubHostConfig = {
+type GithubHostConfig = {
   host?: string;
 };
 

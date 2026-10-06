@@ -8,7 +8,10 @@ const read = (environment: Record<string, string | undefined>) =>
 
 describe("ops server configuration", () => {
   describe("given a deployment says nothing about backup metrics", () => {
-    /** @scenario "A feature's defaults are the values a deployment already runs on" */
+    /**
+     * @scenario "A feature's defaults are the values a deployment already runs on"
+     * @scenario "a deployment that says nothing keeps collecting backup status"
+     */
     it("keeps collection on, so live monitoring is not disarmed by omission", () => {
       expect(read({}).collectClickHouseBackupMetrics).toBe(true);
       expect(read({ CLICKHOUSE_BACKUP_METRICS_ENABLED: "" }).collectClickHouseBackupMetrics).toBe(
@@ -24,6 +27,17 @@ describe("ops server configuration", () => {
         expect(
           read({ CLICKHOUSE_BACKUP_METRICS_ENABLED: value }).collectClickHouseBackupMetrics,
         ).toBe(false);
+      }
+    });
+  });
+
+  describe("given a deployment sets a value backup metrics do not recognise", () => {
+    /** @scenario "an unrecognised value is treated as enabled" */
+    it("keeps collection on rather than disarming monitoring", () => {
+      for (const value of ["banana", "2", "enabled"]) {
+        expect(
+          read({ CLICKHOUSE_BACKUP_METRICS_ENABLED: value }).collectClickHouseBackupMetrics,
+        ).toBe(true);
       }
     });
   });

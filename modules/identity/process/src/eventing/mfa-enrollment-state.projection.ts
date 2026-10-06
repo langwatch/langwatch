@@ -36,51 +36,51 @@ export const mfaEnrolledEventSchema = z.object({
   type: z.literal(MFA_ENROLLED_EVENT_TYPE),
   data: mfaEnrolledPayloadSchema,
 });
-export type MfaEnrolledEvent = z.infer<typeof mfaEnrolledEventSchema>;
+type MfaEnrolledEvent = z.infer<typeof mfaEnrolledEventSchema>;
 
 export const mfaConfirmedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(MFA_CONFIRMED_EVENT_TYPE),
   data: mfaConfirmedPayloadSchema,
 });
-export type MfaConfirmedEvent = z.infer<typeof mfaConfirmedEventSchema>;
+type MfaConfirmedEvent = z.infer<typeof mfaConfirmedEventSchema>;
 
 export const mfaEnrollmentExpiredEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(MFA_ENROLLMENT_EXPIRED_EVENT_TYPE),
   data: mfaEnrollmentExpiredPayloadSchema,
 });
-export type MfaEnrollmentExpiredEvent = z.infer<typeof mfaEnrollmentExpiredEventSchema>;
+type MfaEnrollmentExpiredEvent = z.infer<typeof mfaEnrollmentExpiredEventSchema>;
 
 export const mfaDisabledEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(MFA_DISABLED_EVENT_TYPE),
   data: mfaDisabledPayloadSchema,
 });
-export type MfaDisabledEvent = z.infer<typeof mfaDisabledEventSchema>;
+type MfaDisabledEvent = z.infer<typeof mfaDisabledEventSchema>;
 
 export const backupCodeConsumedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(BACKUP_CODE_CONSUMED_EVENT_TYPE),
   data: backupCodeConsumedPayloadSchema,
 });
-export type BackupCodeConsumedEvent = z.infer<typeof backupCodeConsumedEventSchema>;
+type BackupCodeConsumedEvent = z.infer<typeof backupCodeConsumedEventSchema>;
 
 export const backupCodesRegeneratedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(BACKUP_CODES_REGENERATED_EVENT_TYPE),
   data: backupCodesRegeneratedPayloadSchema,
 });
-export type BackupCodesRegeneratedEvent = z.infer<typeof backupCodesRegeneratedEventSchema>;
+type BackupCodesRegeneratedEvent = z.infer<typeof backupCodesRegeneratedEventSchema>;
 
 export const mfaVerificationFailedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(MFA_VERIFICATION_FAILED_EVENT_TYPE),
   data: mfaVerificationFailedPayloadSchema,
 });
-export type MfaVerificationFailedEvent = z.infer<typeof mfaVerificationFailedEventSchema>;
+type MfaVerificationFailedEvent = z.infer<typeof mfaVerificationFailedEventSchema>;
 
-export const mfaEventSchema = z.discriminatedUnion("type", [
+const mfaEventSchema = z.discriminatedUnion("type", [
   mfaEnrolledEventSchema,
   mfaConfirmedEventSchema,
   mfaEnrollmentExpiredEventSchema,

@@ -11,7 +11,6 @@ import {
 } from "@langwatch/dashboard-contract";
 import { generate } from "@langwatch/ksuid";
 
-import type { DashboardBoardAudience } from "#app/dashboard.members";
 import type {
   DashboardWidgetRow,
   DashboardWidgetRepository,
@@ -23,6 +22,19 @@ import type {
 } from "#repositories/dashboard-widget.repository";
 
 type Viewed = Readonly<{ viewer?: DashboardViewer }>;
+
+/** Which boards a viewer may see, for the blocks placed on them. */
+export interface DashboardBoardAudience {
+  isVisibleTo(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer?: DashboardViewer;
+  }): Promise<boolean>;
+  findVisibleDashboardIds(input: {
+    projectId: string;
+    viewer?: DashboardViewer;
+  }): Promise<string[]>;
+}
 
 /**
  * Every widget operation first asks analytics whether the project may use the

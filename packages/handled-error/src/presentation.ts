@@ -309,6 +309,10 @@ const label = (map: Record<string, string>, key: string): string | undefined => 
 
 const presentations = {
   // ---- traces & spans ----
+  annotation_not_found: {
+    title: "Annotation not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
   trace_not_found: {
     title: "Trace not found",
     describe: () =>
@@ -354,10 +358,6 @@ const presentations = {
     title: "This query read too much data",
     describe: () => "Narrow the time range or add filters so the query reads less.",
   },
-  time_range_too_wide: {
-    title: "Time range is too wide",
-    describe: () => "Pick a shorter range and try again.",
-  },
   page_too_deep: {
     title: "That page is too deep to open by number",
     describe: () => "Narrow the time range or filters, or step forward with Next.",
@@ -375,6 +375,13 @@ const presentations = {
     describe: (error) => {
       const field = str(error, "field", "");
       return field ? `There's no field called "${field}".` : "";
+    },
+  },
+  filter_value_refused: {
+    title: "This filter can't be answered here",
+    describe: (error) => {
+      const field = str(error, "field", "");
+      return field ? `Ask about "${field}" with a statement instead.` : "";
     },
   },
   lwql_unknown_identifier: {
@@ -398,6 +405,10 @@ const presentations = {
   lwql_unparseable: {
     title: "This query couldn't be read",
     describe: () => "Check the SQL syntax and try again.",
+  },
+  lwql_busy: {
+    title: "Queries are queued up right now",
+    describe: () => "Too many queries were running at once. Try again in a few seconds.",
   },
   lwql_not_permitted: {
     title: "This query isn't allowed here",
@@ -791,6 +802,11 @@ const presentations = {
     title: "This evaluation needs an evaluator",
     describe: () =>
       "Pick an existing evaluator or create one first, then attach it to the evaluation.",
+  },
+  monitor_parameters_unused: {
+    title: "These settings belong to the evaluator",
+    describe: () =>
+      "This evaluation runs with its evaluator's settings. Change them on the evaluator instead.",
   },
   monitor_not_found: {
     title: "Online evaluation not found",
@@ -3294,11 +3310,16 @@ const presentations = {
   instant_eval_not_enabled: {
     title: "Instant Evals aren't available yet",
     describe: () =>
-      "This project can't run Instant Evals. Ask us to turn them on for your workspace.",
+      "Instant Evals are off for this organization. Ask an organization admin how to switch them on, or contact us.",
   },
   instant_eval_not_found: {
     title: "That run doesn't exist",
     describe: () => "The run may have been deleted, or the id may belong to another project.",
+  },
+  instant_eval_opt_in_not_offered: {
+    title: "Ask us to switch Instant Evals on",
+    describe: () =>
+      "LangWatch turns on Instant Evals for enterprise plans and self-hosted installs. Contact us to get them.",
   },
   instant_eval_query_budget_exceeded: {
     title: "That's too much text to judge in one query",
@@ -3426,11 +3447,6 @@ const presentations = {
     title: "No such subsystem",
     describe: () =>
       "Ask for one of the subsystems this platform reports on, or drop the name to get the whole platform.",
-  },
-  platform_health_unauthorized: {
-    title: "That platform health key was not accepted",
-    describe: () =>
-      "Send the monitoring key this deployment was configured with as a bearer token. Check it is current and copied in full.",
   },
   platform_health_unhealthy: {
     title: "The platform is not healthy",
@@ -3641,6 +3657,23 @@ const presentations = {
   dataset_name_taken: {
     title: "That name is taken",
     describe: () => "Pick a different name for this dataset.",
+  },
+  developer_seat_no_shared_access: {
+    // Not a field to correct: the seat sets the ceiling. The scope can be a
+    // team, a project or the organization, so the copy names the seat.
+    title: "A Developer seat has no shared access",
+    describe: (error) => {
+      const scopeName = str(error, "scopeName", "");
+      const scope = scopeName ? ` on "${scopeName}"` : "";
+      return `A Developer seat works in its own project only, so no role can be given${scope}. Move them to a Member seat to give them shared access.`;
+    },
+  },
+  developer_seat_restricted: {
+    // A Developer seat reaches its own project only (ADR-143). No admin can
+    // grant a role here, so the copy names the seat rather than a permission.
+    title: "This is outside your Developer seat",
+    describe: () =>
+      "A Developer seat works in your own project only. Ask an admin for a Member seat if you need shared projects.",
   },
   dataset_column_type_change_unsupported: {
     // Customer fault in the ADR-045 sense: they asked for something the format
@@ -4174,6 +4207,13 @@ const presentations = {
     },
   },
 
+  trigger_graph_immutable: {
+    title: "This alert stays on its graph",
+    describe: () =>
+      "An alert keeps the graph it was created on. Create an alert on the " +
+      "graph you want and delete this one.",
+  },
+
   trigger_kind_immutable: {
     title: "This cannot become a different kind of automation",
     describe: () =>
@@ -4670,6 +4710,10 @@ const presentations = {
   malformed_request: {
     title: "That request couldn't be read",
     describe: () => "Check the format of what was sent, then try again.",
+  },
+  unsupported_media_type: {
+    title: "That request was sent in the wrong format",
+    describe: () => "Send the body with the Content-Type this endpoint reads, then try again.",
   },
   // ==========================================================================
   // Codes raised by the Go services (generated into `goErrorCodes` by
@@ -5695,13 +5739,28 @@ const presentations = {
     title: "This key can no longer be shown",
     describe: () => "Create a new key if you did not save it.",
   },
+  secret_unreadable: {
+    title: "Something went wrong on our side",
+    describe: () =>
+      "A project secret is stored but cannot be read on this deployment. An operator needs to check its encryption key.",
+  },
+  web_push_endpoint_refused: {
+    title: "Push notifications aren't available in this browser",
+    describe: () =>
+      "This browser's push service is not one LangWatch sends to, so notifications stay in the open tab.",
+  },
   unsupported_parameter: {
     title: "That provider can't honor one of your parameters",
     describe: () => "Remove the parameter named in the message, or pick a model that supports it.",
   },
   connect_budget_above_contract_maximum: {
     title: "Cap above the agreed maximum",
-    describe: () => "Choose a hosted usage cap at or below the maximum agreed for this license.",
+    describe: (error) => {
+      const maximum = num(error, "maximumUsd", 0);
+      return maximum > 0
+        ? `The highest cap you can set is ${maximum.toFixed(2)} USD. Contact LangWatch to raise it.`
+        : "Contact LangWatch to raise the maximum.";
+    },
   },
   connect_budget_not_set: {
     title: "No hosted usage budget yet",
@@ -5957,6 +6016,7 @@ const FAULT_TITLES: Record<HandledErrorFault, string> = {
   customer: "Check your input",
   platform: "Something went wrong on our end",
   provider: "A connected service didn't respond",
+  presumed_platform: "Something went wrong on our end",
 };
 
 /**

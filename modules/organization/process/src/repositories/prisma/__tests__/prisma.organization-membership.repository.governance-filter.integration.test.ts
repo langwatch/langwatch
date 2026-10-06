@@ -58,6 +58,7 @@ describe.skipIf(!DB_URL)(
       prisma = connection.client as PrismaClient;
       repository = PrismaOrganizationMembershipRepository.create({
         database: prisma,
+        cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
         grants: noopGrantsWriter,
       });
 
@@ -150,6 +151,7 @@ describe.skipIf(!DB_URL)(
       });
 
       /** @scenario A member's organization listing leaves out the hidden governance project */
+      /** @scenario The hidden Governance Project never appears in any other user-visible Project surface */
       it("filters out the internal_governance project", async () => {
         const orgs = await repository.findAllForUser({
           userId: testUser.id,

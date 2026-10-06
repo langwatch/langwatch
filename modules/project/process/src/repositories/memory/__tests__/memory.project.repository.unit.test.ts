@@ -240,6 +240,7 @@ describe("MemoryProjectRepository", () => {
   });
 
   describe("when the internal governance project is minted twice at once", () => {
+    /** @scenario "A feature ensures an internal project" */
     it("answers the winner rather than a second project", async () => {
       const { repository } = seeded();
 

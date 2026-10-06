@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Encryption } from "@langwatch/process-stores";
 
 import type { GovernanceRepositories } from "../governance.repositories.ts";
 import { PrismaAiToolCatalogRepository } from "./prisma.ai-tool-catalog.repository.ts";
@@ -26,11 +27,12 @@ import { PrismaSpendSpikeAnomalyRepository } from "./prisma.spend-spike-anomaly.
  * written through the one tenant-keyed Prisma client the process holds.
  */
 export class PostgresGovernanceRepositories {
-  static readonly requires = ["prisma"] as const;
+  static readonly requires = ["prisma", "encryption"] as const;
 
-  static create(
-    members: Readonly<{ prisma: PrismaClient }>,
-  ): Omit<
+  static create({
+    prisma,
+    encryption,
+  }: Readonly<{ prisma: PrismaClient; encryption: Encryption }>): Omit<
     GovernanceRepositories,
     | "activityMonitor"
     | "anomalySpend"
@@ -39,9 +41,8 @@ export class PostgresGovernanceRepositories {
     | "rollupErasure"
     | "ocsfEvents"
     | "suppressionSnapshot"
+    | "rateLimits"
   > {
-    const { prisma } = members;
-
     return {
       aiTools: PrismaAiToolCatalogRepository.create(prisma),
       anomalyRules: PrismaAnomalyRuleRepository.create(prisma),
@@ -54,7 +55,10 @@ export class PostgresGovernanceRepositories {
       identityMatchSuggestions: PrismaIdentityMatchSuggestionRepository.create(prisma),
       ingestionPullLifecycle: PrismaIngestionPullLifecycleRepository.create(prisma),
       ingestionPullRuns: PrismaIngestionPullRunProjectionRepository.create(prisma),
-      ingestionSources: PrismaIngestionSourceRepository.create(prisma),
+      ingestionSources: PrismaIngestionSourceRepository.create({
+        database: prisma,
+        cipher: encryption,
+      }),
       ingestionTemplates: PrismaIngestionTemplateRepository.create(prisma),
       setupState: PrismaGovernanceSetupStateRepository.create(prisma),
       spendSpikeAnomalies: PrismaSpendSpikeAnomalyRepository.create(prisma),

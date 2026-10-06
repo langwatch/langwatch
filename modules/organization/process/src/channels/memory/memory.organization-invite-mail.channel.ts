@@ -1,4 +1,4 @@
-import type { OrganizationInviteMail } from "../../app/organization.members.ts";
+import type { OrganizationInviteMail } from "../organization-invite-mail.channel.ts";
 import { OrganizationInviteMailChannel } from "../organization-invite-mail.channel.ts";
 
 type Sent<Name extends keyof OrganizationInviteMail> = Parameters<OrganizationInviteMail[Name]>[0];

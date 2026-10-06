@@ -30,12 +30,12 @@ const LINK_REFUSALS = {
 } as const satisfies Record<Exclude<SsoMigrationMemberMove, "matched">, string>;
 
 /** Which organizations a person belongs to — the module that owns them. */
-export interface SsoMigrationMemberships {
+interface SsoMigrationMemberships {
   organizationIdsForMember(args: { userId: string }): Promise<string[]>;
 }
 
 /** The trail a connection's sign-ins leave, written by whoever owns it. */
-export interface SsoAuthenticationTrail {
+interface SsoAuthenticationTrail {
   record(args: {
     connectionId: string;
     userId: string;
@@ -43,7 +43,7 @@ export interface SsoAuthenticationTrail {
   }): Promise<void>;
 }
 
-export interface SsoMigrationCallbackServiceDeps {
+interface SsoMigrationCallbackServiceDeps {
   connections: SsoConnectionReadRepository;
   users: IdentityUsersRepository;
   memberships: SsoMigrationMemberships;

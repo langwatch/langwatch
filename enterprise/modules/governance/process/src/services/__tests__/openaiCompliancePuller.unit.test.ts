@@ -13,7 +13,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GovernanceObjectStore } from "../../app/governance.members.ts";
+import type { GovernanceObjectStore } from "../../channels/object-store.channel.ts";
 import { OpenAiComplianceReferencePullerService } from "../openai-compliance-puller.service.ts";
 
 const stub = vi.hoisted(() => ({

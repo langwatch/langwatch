@@ -295,3 +295,27 @@ describe("given the Langy panel is open", () => {
     });
   });
 });
+
+describe("given the Langy panel is open in floating mode", () => {
+  /** @scenario "The header rail carries a one-click layout toggle" */
+  it("offers Dock to side, becomes Float once docked, and keeps both layouts in the overflow menu", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    const dock = await screen.findByRole("button", { name: "Dock to the side" });
+    expect((await actionsCluster()).contains(dock)).toBe(true);
+    await user.hover(dock);
+    expect(await screen.findByText("Dock to side")).toBeInTheDocument();
+
+    await user.click(dock);
+
+    expect(useLangyStore.getState().panelMode).toBe("sidebar");
+    const float = await screen.findByRole("button", { name: "Float the panel" });
+    expect((await actionsCluster()).contains(float)).toBe(true);
+    expect(screen.queryByRole("button", { name: "Dock to the side" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "More Langy options" }));
+    expect(await screen.findByRole("menuitem", { name: "Floating" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Sidebar" })).toBeInTheDocument();
+  });
+});

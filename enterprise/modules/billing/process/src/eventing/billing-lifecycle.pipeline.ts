@@ -14,25 +14,29 @@ import {
 
 import type { BillingModule } from "../app/billing.app.ts";
 import {
-  BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
-  seatLimitReachedSubscriber,
-} from "./seat-limit-reached.subscriber.ts";
-import {
   RecordCheckoutCompletedCommand,
   RecordSubscriptionChangedCommand,
+  RecordSubscriptionStartedCommand,
 } from "./billing-lifecycle.commands.ts";
 import {
   checkoutCompletedEventSchema,
   subscriptionChangedEventSchema,
+  subscriptionStartedEventSchema,
   type BillingLifecycleEvent,
   type RecordCheckoutCompletedCommandData,
   type RecordSubscriptionChangedCommandData,
+  type RecordSubscriptionStartedCommandData,
 } from "./billing-lifecycle.events.ts";
+import {
+  BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
+  seatLimitReachedSubscriber,
+} from "./seat-limit-reached.subscriber.ts";
 
 export type BillingLifecyclePipeline = StaticPipelineDefinition<
   BillingLifecycleEvent,
   Record<string, Projection>,
   | { name: "recordSubscriptionChanged"; payload: RecordSubscriptionChangedCommandData }
+  | { name: "recordSubscriptionStarted"; payload: RecordSubscriptionStartedCommandData }
   | { name: "recordCheckoutCompleted"; payload: RecordCheckoutCompletedCommandData }
 >;
 
@@ -48,8 +52,13 @@ export function buildBillingLifecyclePipeline({
     name: BILLING_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: BILLING_LIFECYCLE_AGGREGATE_TYPE }),
   })
-    .withEvents([subscriptionChangedEventSchema, checkoutCompletedEventSchema])
+    .withEvents([
+      subscriptionChangedEventSchema,
+      subscriptionStartedEventSchema,
+      checkoutCompletedEventSchema,
+    ])
     .withCommand("recordSubscriptionChanged", RecordSubscriptionChangedCommand)
+    .withCommand("recordSubscriptionStarted", RecordSubscriptionStartedCommand)
     .withCommand("recordCheckoutCompleted", RecordCheckoutCompletedCommand)
     .withPeerSubscriber(
       BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,

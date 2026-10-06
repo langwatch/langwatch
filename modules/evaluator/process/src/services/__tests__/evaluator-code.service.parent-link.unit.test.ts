@@ -68,6 +68,7 @@ function doNotTraceOf(event: StudioClientEvent): unknown {
 
 describe("EvaluatorCodeService execute", () => {
   describe("when the caller hands it no parent trace", () => {
+    /** @scenario "A code evaluator emits no spans when the target trace has no parent link" */
     it("asks the engine not to emit spans", async () => {
       const { service, sent } = buildService();
 

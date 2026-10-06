@@ -28,7 +28,10 @@ import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 import type * as zodModule from "zod";
 
-import type { AuthDirectory, AuthDirectoryProject } from "../app/auth.members.ts";
+import type {
+  AuthDirectoryRepository,
+  AuthDirectoryProject,
+} from "../repositories/auth-directory.repository.ts";
 import type { CliAccessProject } from "./api-rest-credentials.service.ts";
 import {
   type CliDeviceApprovalFrame,
@@ -53,7 +56,7 @@ const CLI_LOGIN_UNKNOWN_DEVICE_LABEL = "unknown-device";
 const GOVERNANCE_RELEASE_FLAG: FeatureFlagKey = "release_ui_ai_governance_enabled";
 
 /** The personal workspace a device session names. */
-export type CliPersonalWorkspace = Readonly<{
+type CliPersonalWorkspace = Readonly<{
   team: Readonly<{ id: string }>;
   project: Readonly<{ id: string; slug: string; name: string }>;
 }>;
@@ -84,7 +87,7 @@ export interface CliDeviceFlowCollaborators {
    * re-derived from rows, not trusted from the record: an admin can disable a
    * seat between approve and exchange.
    */
-  directory: () => AuthDirectory;
+  directory: () => AuthDirectoryRepository;
   /** The person a browser cookie names, for the three approval-page routes. */
   session: (headers: Headers) => Promise<CliBrowserSession | null>;
   /**
@@ -503,7 +506,7 @@ type CliRotatedSession = CliMintedSession &
   Readonly<{ project?: Readonly<{ id: string; slug: string; name: string }> }>;
 
 /** One rotation of a refresh token, for the CLI's `/refresh` and for any peer holding a pair. */
-export async function rotateRefreshToken({
+async function rotateRefreshToken({
   flow,
   refreshToken: refresh_token,
   projectRef,
@@ -749,7 +752,10 @@ async function issueLockedProjectSession({
   });
 }
 
-/** The person and live project behind a bound access bearer; anything else is `invalid_credentials`. */
+/**
+ * The person and live project behind a bound access bearer; anything else is
+ * `invalid_credentials`.
+ */
 async function accessProjectOf({
   flow,
   authorization,
@@ -940,6 +946,21 @@ async function approveProject({
     throw refused(
       "personal_project_not_allowed",
       "Another user's personal project can't back your session. Pick a shared team project, or your own personal workspace.",
+      400,
+    );
+  }
+
+  // A Developer seat (ADR-171) works in its own personal project only; naming the seat tells the
+  // person what to pick instead of a role nobody can grant them.
+  const ownsPersonalProject = project.isPersonal && project.ownerUserId === person.id;
+  if (
+    !ownsPersonalProject &&
+    (await flow.directory().findActiveMemberRole({ userId: person.id, organizationId })) ===
+      "DEVELOPER"
+  ) {
+    throw refused(
+      "developer_seat_personal_only",
+      "A Developer seat works in its own personal project only. Pick your personal workspace.",
       400,
     );
   }

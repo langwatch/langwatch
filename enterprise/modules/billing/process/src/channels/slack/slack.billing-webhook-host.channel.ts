@@ -3,7 +3,7 @@ import type { SubscriptionNotificationPayload } from "@langwatch/enterprise-bill
 import { BillingWebhookHost } from "../billing-webhook-host.channel.ts";
 
 /** The Slack alerts a subscription change posts, as the notice service sends them. */
-export type BillingWebhookSlackNotices = {
+type BillingWebhookSlackNotices = {
   sendSlackSubscriptionEvent(payload: SubscriptionNotificationPayload): Promise<void>;
   sendSlackBillingThresholdFailureAlert(input: {
     stripeSubscriptionId: string;

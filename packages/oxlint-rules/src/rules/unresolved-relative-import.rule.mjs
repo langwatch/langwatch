@@ -98,7 +98,7 @@ export const unresolvedRelativeImportRule = defineRule({
   messages: {
     unresolved: {
       what: "`{{specifier}}` names no file on disk.",
-      why: "A stale `dist/*.d.ts` keeps diagnostics green, so only a test run finds it.",
+      why: "A stale `dist/*.d.ts` keeps diagnostics green, so only a test run finds it. Read the `repo-tree` skill.",
       fix:
         "Point it at the file's new path, or delete the line if the file is gone; a move " +
         "leaves these in batches, so resolve the whole file in one pass.",

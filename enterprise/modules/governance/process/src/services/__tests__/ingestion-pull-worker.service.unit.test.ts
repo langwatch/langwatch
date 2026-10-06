@@ -14,27 +14,29 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type Instant, Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import type {
+  GovernanceOcsfEventSink,
+  GovernanceOcsfEventInput,
+} from "../../repositories/governance.repositories.ts";
+import type {
+  IngestionPullSourceReader,
+  UnpricedUsageWindow,
+} from "../../repositories/ingestion-source.repository.ts";
+import type { ErasureSuppressionCheck } from "../../rules/erasure-suppression.rules.ts";
+import type { IngestionPullDiagnosticsSink } from "../ingestion-pull-log.service.ts";
 import {
-  type GovernanceEncryptor,
-  type GovernanceOcsfEventSink,
   type GovernanceTraceIngestionClient,
   type GovernanceTraceRequest,
-  type GovernanceOcsfEventInput,
-  type IngestionPullDiagnosticsSink,
-  type IngestionPullSourceReader,
   type PulledUsageDispatcher,
   type PulledUsageEntitlements,
-  type PulledUsageRateReader,
-} from "../../app/governance.members.ts";
-import type { UnpricedUsageWindow } from "../../repositories/ingestion-source.repository.ts";
-import type { ErasureSuppressionCheck } from "../../rules/erasure-suppression.rules.ts";
-import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
-import {
   IngestionPullDeadlineExceededError,
   IngestionPullWorkerConfiguration,
   IngestionPullWorkerService,
 } from "../ingestion-pull-worker.service.ts";
-import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
+import {
+  type PulledUsageRateReader,
+  PulledUsagePricingService,
+} from "../pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 import { PullerRegistryService } from "../puller-registry.service.ts";
 
@@ -157,15 +159,6 @@ class FakeTraceIngestion implements GovernanceTraceIngestionClient {
   }));
 }
 
-class IdentityEncryption implements GovernanceEncryptor {
-  encrypt(value: string): string {
-    return value;
-  }
-  decrypt(value: string): string {
-    return value;
-  }
-}
-
 class FakeRates implements PulledUsageRateReader {
   rate(): { costNanoUsd: number; rateVersion: string } {
     return { costNanoUsd: 0, rateVersion: "test" };
@@ -213,7 +206,6 @@ function worker(input: {
   const service = IngestionPullWorkerService.create({
     sources: new FakeSources(input.source === undefined ? ingestionSource() : input.source),
     registry,
-    credentials: IngestionCredentialsService.create(new IdentityEncryption()),
     projects: fakeProjects(input.traceDestination),
     sink,
     usageEntitlement: entitlement,

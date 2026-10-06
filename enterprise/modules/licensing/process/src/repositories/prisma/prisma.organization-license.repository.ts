@@ -4,18 +4,18 @@ import { toDate } from "@langwatch/time";
 
 import type {
   OrganizationLicenseCandidate,
-  OrganizationLicenseStorage,
+  OrganizationLicenseRepository,
   StoredLicense,
-} from "../../app/licensing.members.ts";
+} from "../organization-license.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type OrganizationLicenseDatabase = Pick<PrismaClient, "organization">;
+type OrganizationLicenseDatabase = Pick<PrismaClient, "organization">;
 
 /** The activated licence key, read off and written onto the organization row it is stored on. */
-export class PrismaOrganizationLicenseRepository implements OrganizationLicenseStorage {
+export class PrismaOrganizationLicenseRepository implements OrganizationLicenseRepository {
   static create(database: OrganizationLicenseDatabase): PrismaOrganizationLicenseRepository {
     return new PrismaOrganizationLicenseRepository(database);
   }

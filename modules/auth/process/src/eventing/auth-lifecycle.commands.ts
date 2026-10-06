@@ -1,4 +1,8 @@
-import { SESSION_STARTED_EVENT_TYPE, SSO_AUTO_ADDED_EVENT_TYPE } from "@langwatch/auth-contract";
+import {
+  SESSION_STARTED_EVENT_TYPE,
+  SIGNED_UP_EVENT_TYPE,
+  SSO_AUTO_ADDED_EVENT_TYPE,
+} from "@langwatch/auth-contract";
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 
@@ -6,12 +10,16 @@ import {
   AUTH_LIFECYCLE_EVENT_VERSION,
   AUTH_USER_AGGREGATE_TYPE,
   RECORD_SESSION_STARTED_COMMAND_TYPE,
+  RECORD_SIGNED_UP_COMMAND_TYPE,
   RECORD_SSO_AUTO_ADDED_COMMAND_TYPE,
   type RecordSessionStartedCommandData,
   recordSessionStartedCommandDataSchema,
+  type RecordSignedUpCommandData,
+  recordSignedUpCommandDataSchema,
   type RecordSsoAutoAddedCommandData,
   recordSsoAutoAddedCommandDataSchema,
   type SessionStartedEvent,
+  type SignedUpEvent,
   type SsoAutoAddedEvent,
 } from "./auth-lifecycle.events.ts";
 
@@ -75,6 +83,38 @@ export class RecordSsoAutoAddedCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordSsoAutoAddedCommandData): string {
+    return payload.userId;
+  }
+}
+
+/** Records a person's sign-up; once per person, however often it is reported. */
+export class RecordSignedUpCommand implements CommandHandler<
+  Command<RecordSignedUpCommandData>,
+  SignedUpEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_SIGNED_UP_COMMAND_TYPE,
+    recordSignedUpCommandDataSchema,
+    "Record that a new person signed up",
+  );
+
+  handle(command: Command<RecordSignedUpCommandData>): SignedUpEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<SignedUpEvent>({
+        aggregateType: AUTH_USER_AGGREGATE_TYPE,
+        aggregateId: data.userId,
+        tenantId: createTenantId(command.tenantId),
+        type: SIGNED_UP_EVENT_TYPE,
+        version: AUTH_LIFECYCLE_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.userId}:signed_up`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordSignedUpCommandData): string {
     return payload.userId;
   }
 }

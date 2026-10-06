@@ -43,9 +43,9 @@ describe("the local folder's socket", () => {
   /** @scenario "The langy module declares the local folder's socket where main served it" */
   it("is declared among the langy module's transports at main's path", () => {
     expect(CONTROL_CONNECT_PATH).toBe("/api/v1/langy/control/connect");
-    expect(langyProcessModule.transports.some((transport) => transport.protocol === "websocket")).toBe(
-      true,
-    );
+    expect(
+      langyProcessModule.transports.some((transport) => transport.protocol === "websocket"),
+    ).toBe(true);
   });
 
   /** @scenario "An upgrade to the local folder's socket reaches langy with the session key" */

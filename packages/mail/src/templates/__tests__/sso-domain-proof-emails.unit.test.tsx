@@ -15,6 +15,7 @@ class RecordingMailer extends TestMailer {
 
 describe("sendSsoDomainProofLapsedEmail", () => {
   describe("when the grace ran out and the record is still missing", () => {
+    /** @scenario "The administrators are told when the record goes, and again when it is too late" */
     it("says what stopped and that existing members are unaffected", async () => {
       const mailer = new RecordingMailer();
 

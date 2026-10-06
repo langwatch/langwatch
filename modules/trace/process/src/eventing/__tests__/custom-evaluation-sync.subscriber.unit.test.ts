@@ -268,6 +268,7 @@ describe("customEvaluationSync subscriber", () => {
   });
 
   describe("when span has evaluation events", () => {
+    /** @scenario "An SDK-reported evaluation reaches Evaluation's own command" */
     it("dispatches reportEvaluation for each evaluation", async () => {
       const handler = createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([
@@ -290,6 +291,7 @@ describe("customEvaluationSync subscriber", () => {
       expect(call.evaluationId).toMatch(/^eval_md5_[a-f0-9]{32}$/);
     });
 
+    /** @scenario "An SDK-reported evaluation reaches Evaluation's own command" */
     it("derives the evaluator ID from the injected slug rule, verbatim", async () => {
       const handler = createCustomEvaluationSyncHandler(deps);
       const span = makeOtlpSpan([{ name: "My Custom Eval", score: 0.5 }]);

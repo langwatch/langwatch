@@ -20,13 +20,14 @@ import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contra
 import { nowInstant, Temporal } from "@langwatch/time";
 import type { z } from "zod";
 
-import type { LangyConversationCommands, LocalControlRuntime } from "../app/langy.members.ts";
+import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
 import type { ConnectedWorkspace } from "../repositories/langy-local-presence.repository.ts";
 import { workspaceChannel } from "../rules/langy-local-control-keys.rules.ts";
 import { controlRequestState } from "../rules/langy-local-control-request-state.rules.ts";
 import { conversationTitle, conversationUrl } from "../rules/langy-local-session-text.rules.ts";
 import { reconcileSkipPolicy } from "../rules/langy-local-skip-policy.rules.ts";
 import { ControlRequestService } from "./langy-local-control-request.service.ts";
+import type { LocalControlRuntime } from "./langy-local-control-runtime.service.ts";
 import type { LangyLocalWorkspaceService } from "./langy-local-workspace.service.ts";
 import type { LangyPanelAccessService } from "./langy-panel-access.service.ts";
 import type { LangyService } from "./langy.service.ts";
@@ -136,14 +137,22 @@ export class LangyPanelLocalService {
     connected: boolean;
   }) {
     const now = nowInstant().epochMilliseconds;
-    if (open) return controlRequestState({ open, latest: null, claimed: false, connected, now });
+    if (open)
+      return controlRequestState({
+        open,
+        latest: { kind: "no_request_recorded" },
+        claimed: false,
+        connected,
+        now,
+      });
     const latest = await this.members.conversations.getLatestLocalControlRequest({
       projectId,
       conversationId,
     });
-    const claimed = latest
-      ? await this.members.runtime.requests.wasApproved(latest.requestId)
-      : false;
+    const claimed =
+      latest.kind === "recorded"
+        ? await this.members.runtime.requests.wasApproved(latest.request.requestId)
+        : false;
     return controlRequestState({ open, latest, claimed, connected, now });
   }
 

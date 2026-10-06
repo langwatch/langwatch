@@ -37,8 +37,6 @@
     "lint": "node dev/nx/lint.mjs",
     "lint:changed": "node dev/nx/lint.mjs --changed",
     "lint:architecture": "pnpm --filter @langwatch/architecture-enforcer lint",
-    "lint:oxlint": "oxlint --quiet --config .oxlintrc.jsonc .",
-    "lint:oxlint:ci": "oxlint --quiet --format=github --config .oxlintrc.jsonc .",
     "lint:fix": "oxlint --fix --quiet --config .oxlintrc.jsonc .",
     "format": "oxfmt --write --disable-nested-config .",
     "format:check": "oxfmt --check --disable-nested-config .",
@@ -63,6 +61,7 @@
     "typecheck:all": "nx run-many -t typecheck",
     "typecheck:affected": "nx affected -t typecheck",
     "build:affected": "nx affected -t build",
+    "lint:types": "node dev/nx/lint.mjs --types",
     "lint:types:affected": "nx affected -t lint:types"
   },
   "devDependencies": {

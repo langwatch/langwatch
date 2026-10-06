@@ -145,26 +145,8 @@ func isSGRFinal(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= '
 // rotated or truncated, so the accumulated state is discarded and the parse
 // starts over from the beginning.
 func (f *FileJobs) ingestCombined() {
-	file, err := os.Open(f.combined)
-	if err != nil {
-		return
-	}
-	defer func() { _ = file.Close() }()
-	info, err := file.Stat()
-	if err != nil {
-		return
-	}
-	if info.Size() < f.offset {
-		f.offset, f.carry, f.lanes = 0, "", nil
-	}
-	if info.Size() == f.offset {
-		return
-	}
-	if _, err := file.Seek(f.offset, io.SeekStart); err != nil {
-		return
-	}
-	data, err := io.ReadAll(file)
-	if err != nil {
+	data, ok := f.readAppended()
+	if !ok {
 		return
 	}
 	f.offset += int64(len(data))
@@ -180,6 +162,32 @@ func (f *FileJobs) ingestCombined() {
 		}
 		f.lanes[lane] = append(f.lanes[lane], text)
 	}
+}
+
+// readAppended reads the combined stream from the parsed offset, resetting the
+// parse when the stream shrank; false when there is nothing new or it cannot
+// be read.
+func (f *FileJobs) readAppended() ([]byte, bool) {
+	file, err := os.Open(f.combined)
+	if err != nil {
+		return nil, false
+	}
+	defer func() { _ = file.Close() }()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, false
+	}
+	if info.Size() < f.offset {
+		f.offset, f.carry, f.lanes = 0, "", nil
+	}
+	if info.Size() == f.offset {
+		return nil, false
+	}
+	if _, err := file.Seek(f.offset, io.SeekStart); err != nil {
+		return nil, false
+	}
+	data, err := io.ReadAll(file)
+	return data, err == nil
 }
 
 // laneOutput is each one-shot lane's lines as parsed so far, with the carried

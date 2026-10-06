@@ -93,6 +93,7 @@ Reusable framework decisions live with their packages:
 | [166](./166-grant-scoped-data-access.md)                               | Grant-scoped data access                                                                                                   | Accepted                  |
 | [167](./167-outbound-delivery.md)                                      | Outbound delivery: each destination kind owns its sending                                                                  | Accepted                  |
 | [168](./168-one-process-dev-with-debounced-module-reload.md)           | One-process dev with debounced module reload                                                                               | Proposed                  |
+| [171](./171-developer-seat.md)                                         | The Developer seat, a member who owns a personal project and nothing shared                                                | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

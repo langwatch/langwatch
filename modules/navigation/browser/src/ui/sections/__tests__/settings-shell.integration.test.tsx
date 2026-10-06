@@ -81,6 +81,7 @@ function readySettingsShellState(): NavigationShellReadyState {
     currentRoute: undefined,
     activeProductId: null,
     isSettingsRoute: true,
+    seatRefusal: null,
     showDevelopmentIndicator: false,
     isCompactSidebar: false,
     isMobile: false,

@@ -1,7 +1,7 @@
 /**
  * The `instantEval` process manager's state, intents and payload boundary, all
  * persisted verbatim: ids, counts and instants, never a statement or a verdict.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import { INSTANT_EVAL_OUTCOMES } from "@langwatch/instant-eval-contract";
@@ -29,15 +29,7 @@ export const INSTANT_EVAL_STALL_THRESHOLD_MS = 15 * 60 * 1000;
 export const INSTANT_EVAL_CANCEL_GRACE_MS = 2 * 60 * 1000;
 
 /** What a run is doing. */
-export const INSTANT_EVAL_PHASES = [
-  "idle",
-  "planning",
-  "running",
-  "cancelling",
-  "terminal",
-] as const;
-
-export type InstantEvalPhase = (typeof INSTANT_EVAL_PHASES)[number];
+const INSTANT_EVAL_PHASES = ["idle", "planning", "running", "cancelling", "terminal"] as const;
 
 export const instantEvalPlanIntentSchema = z.object({
   runId: z.string(),

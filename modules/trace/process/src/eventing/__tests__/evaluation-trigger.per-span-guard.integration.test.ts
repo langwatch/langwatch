@@ -17,12 +17,14 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  type TraceEvaluationDispatch,
-  type TraceEvaluationLoopMetrics,
-  type TraceEvaluationLoopBlockReason,
-  type TraceEvaluationMonitor,
-} from "../../app/trace.members.ts";
+import type {
+  TraceEvaluationLoopMetrics,
+  TraceEvaluationLoopBlockReason,
+} from "../../services/trace-evaluation-loop-metrics.service.ts";
+import type {
+  TraceEvaluationDispatch,
+  TraceEvaluationMonitor,
+} from "../evaluation-trigger.subscriber.ts";
 import { createEvaluationTriggerSubscriber } from "../evaluation-trigger.subscriber.ts";
 
 const TRACE_ID = "trace-1";

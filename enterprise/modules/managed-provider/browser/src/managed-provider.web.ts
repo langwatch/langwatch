@@ -4,12 +4,14 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { ManagedModelProviderAlertToken } from "@langwatch/enterprise-managed-provider-contract";
 
-export const managedProviderWeb = defineBrowserModule("managed-provider").withCapabilities({
-  managedModelProviderAlert: {
+export const managedProviderWeb = defineBrowserModule("managed-provider").lends(
+  ManagedModelProviderAlertToken,
+  {
     load: async () => ({
       default: (await import("./ui/sections/managed-provider-alert/index.ts"))
         .ManagedModelProviderAlert,
     }),
   },
-});
+);

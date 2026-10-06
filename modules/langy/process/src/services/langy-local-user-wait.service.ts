@@ -44,7 +44,7 @@ import {
 } from "../rules/langy-local-user-wait-record.rules.ts";
 
 /** One poll of a card, or `gone` once its record has expired. */
-export type UserWaitPoll = { outcome: "polled"; answer: PollWaitResponse } | { outcome: "gone" };
+type UserWaitPoll = { outcome: "polled"; answer: PollWaitResponse } | { outcome: "gone" };
 export class UserWaitService {
   private readonly store: SessionStateStore;
   private readonly events: UserWaitEvents;

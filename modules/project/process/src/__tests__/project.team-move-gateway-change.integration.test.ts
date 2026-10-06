@@ -51,7 +51,11 @@ describe.skipIf(!DB_URL)("given a project in one of two teams of an organization
   const projects = ProjectService.create({
     created: ProjectCreatedNoticeService.create({
       logger: { error: () => void 0 },
-      projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+      projects: {
+        findWithOrgAdmin: async () => null,
+        findIdsByOrganization: async () => [],
+        findWithTeam: async () => null,
+      },
     }),
     repository: PrismaProjectRepository.create({ prisma }),
     credentials,
@@ -173,7 +177,11 @@ describe.skipIf(!DB_URL)("given a project in one of two teams of an organization
       const racingProjects = ProjectService.create({
         created: ProjectCreatedNoticeService.create({
           logger: { error: () => void 0 },
-          projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+          projects: {
+            findWithOrgAdmin: async () => null,
+            findIdsByOrganization: async () => [],
+            findWithTeam: async () => null,
+          },
         }),
         repository: PrismaProjectRepository.create({ prisma: racingPrisma }),
         credentials,

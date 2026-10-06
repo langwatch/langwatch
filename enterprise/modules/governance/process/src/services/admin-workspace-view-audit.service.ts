@@ -12,11 +12,9 @@ import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
 
-import type {
-  GovernanceDiagnosticsSink,
-  GovernanceOcsfEventWriter,
-} from "../app/governance.members.ts";
+import type { GovernanceOcsfEventWriter } from "../repositories/governance.repositories.ts";
 import { OCSF_ACTIVITY, OCSF_SEVERITY } from "../rules/ocsf-codes.rules.ts";
+import type { GovernanceDiagnosticsSink } from "./governance-policy.service.ts";
 
 type WorkspaceTeams = Pick<OrganizationApi, "getTeam" | "getTeamWithMembers">;
 type WorkspaceAuditLog = Pick<AuditLogApi, "record" | "hasRecordedSince">;

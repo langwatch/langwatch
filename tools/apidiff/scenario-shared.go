@@ -7,7 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // sharedSeedFile records the isolated projects and organizations already
@@ -53,26 +54,6 @@ func recordOfShard(shard *shardContext, org bool) shardRecord {
 	return record
 }
 
-// lockFile holds a named flock under dir for one lane at a time; the lock
-// goes with the process, or when the returned func runs.
-func lockFile(dir, name, waiting string, progress func(string)) (func(), error) {
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return nil, err
-	}
-	file, err := os.OpenFile(filepath.Join(dir, name), os.O_CREATE|os.O_RDWR, 0o600) // #nosec G304 -- the tool's own run directory.
-	if err != nil {
-		return nil, err
-	}
-	if syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) != nil {
-		progress(waiting)
-		if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
-			_ = file.Close()
-			return nil, err
-		}
-	}
-	return func() { _ = file.Close() }, nil
-}
-
 func loadSharedRecord(path string) sharedRecord {
 	record := sharedRecord{Stacks: map[string]stackRecord{}}
 	if content, err := os.ReadFile(path); err == nil { // #nosec G304 -- the tool's own seed record.
@@ -102,7 +83,7 @@ func saveSharedRecord(path string, record sharedRecord) error {
 func (runner *scenarioRunner) seedShared(needs scenarioNeeds) {
 	side := runner.sides[0]
 	say := func(text string) { fmt.Fprintln(runner.options.Progress, text) }
-	unlock, err := lockFile(runner.options.SeedDir, sharedSeedLock, "scenarios: another lane is seeding the shared stack; waiting", say)
+	unlock, err := diffkit.Lock(diffkit.LockOptions{Dir: runner.options.SeedDir, Name: sharedSeedLock, Waiting: "scenarios: another lane is seeding the shared stack; waiting", Progress: say})
 	if err != nil {
 		side.projects, side.orgs = failedShards(needs, "seed lock: "+err.Error())
 		return

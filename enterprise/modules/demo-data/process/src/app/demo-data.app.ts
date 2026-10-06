@@ -8,19 +8,19 @@ import {
   type SeedRunReport,
 } from "@langwatch/enterprise-demo-data-contract";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant } from "@langwatch/time";
 
 import { buildDemoDataPipeline } from "../eventing/demo-data.pipeline.ts";
 import { DemoDataService } from "../services/demo-data.service.ts";
 
-const DEMO_DATA_READS = ["logger"] as const;
+const logger = createLogger("langwatch:demo-data");
 
 type DemoDataSetup = FeatureSetup<
   typeof DemoDataModule.dependencies,
-  MembersRead<typeof DEMO_DATA_READS>,
+  never,
   DemoDataConfig | undefined
 >;
 
@@ -31,7 +31,6 @@ export class DemoDataModule implements DemoDataApiContract {
     organizations: OrganizationApi,
   };
   static readonly config = demoDataConfig;
-  static readonly reads = DEMO_DATA_READS;
 
   readonly #seeds: DemoDataService;
 
@@ -39,12 +38,12 @@ export class DemoDataModule implements DemoDataApiContract {
     this.#seeds = seeds;
   }
 
-  static create({ dependencies, members, config }: DemoDataSetup): DemoDataModule {
+  static create({ dependencies, config }: DemoDataSetup): DemoDataModule {
     return new DemoDataModule(
       DemoDataService.create({
         organizations: dependencies.organizations,
         demoOrgIds: config?.demoOrgIds,
-        logger: members.logger,
+        logger,
         now: () => nowInstant(),
       }),
     );

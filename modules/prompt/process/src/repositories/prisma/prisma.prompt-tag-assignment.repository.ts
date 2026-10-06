@@ -18,7 +18,7 @@ const logger = createLogger("langwatch:prompt-version-tags");
 /**
  * The client slice tag assignments bind to.
  */
-export type PromptTagAssignmentDatabase = Pick<
+type PromptTagAssignmentDatabase = Pick<
   PrismaClient,
   "promptTagAssignment" | "llmPromptConfigVersion"
 >;

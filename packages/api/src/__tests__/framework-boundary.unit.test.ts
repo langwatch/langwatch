@@ -7,7 +7,19 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import type { PermissionDecision } from "@langwatch/authorization";
+import { defineTrpcContract, moduleApi } from "@langwatch/module";
+import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
+
+import type { Authorize } from "../access/access.ts";
+import type { TrpcAuditSink } from "../hosting/api-door.ts";
+import { SessionReader } from "../hosting/session-reader.ts";
+import { composeTrpcRouters } from "../trpc/compose.ts";
+import { TrpcHost } from "../trpc/host.ts";
+import { defineTrpcRouter } from "../trpc/runtime.ts";
+import { createApiDouble } from "./api-double.ts";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const sourceRoot = join(packageRoot, "src");
@@ -107,6 +119,96 @@ describe("the @langwatch/api package boundary", () => {
       );
 
       expect(offences).toEqual([]);
+    });
+  });
+
+  describe("given a mutation that changes authorization facts", () => {
+    const AUTHZ_RUNTIME_SPECIFIER =
+      /^@langwatch\/authz-(process|contract|browser)(?:\/|$)|grants?-ledger|^@langwatch\/[a-z-]*grants?(?:\/|$)/;
+    const PRISMA_SPECIFIER = /^(@prisma\/|@langwatch\/prisma-client)/;
+
+    interface GrantApi {
+      attach(input: { projectId: string }): Promise<{ attached: boolean }>;
+    }
+
+    const GrantApi = moduleApi<GrantApi>()("authz");
+
+    function grantRouter() {
+      return defineTrpcRouter(
+        GrantApi,
+        defineTrpcContract("grants")
+          .mutation("attach")
+          .withInput(z.object({ projectId: z.string() }))
+          .withOutput(z.object({ attached: z.boolean() }))
+          .build(),
+      )
+        .procedure("attach")
+        .withPermission("organization:manage", { via: "projectId" })
+        .handle(({ app, input }) => app.attach(input))
+        .build();
+    }
+
+    async function attachThrough(audit: TrpcAuditSink | undefined) {
+      const authz = createApiDouble<Authorize>({
+        getDecision: async (): Promise<PermissionDecision> => ({
+          permitted: true,
+          organizationRole: "ADMIN",
+        }),
+        checkScopeLineage: async () => ({ kind: "consistent" }),
+      });
+      const trpc = TrpcHost.create({
+        sessions: SessionReader.create({ verify: async () => ({ userId: "sam" }) }),
+        authz,
+        ...(audit ? { audit } : {}),
+        logger: { warn: () => {}, error: () => {} },
+      });
+      const application: GrantApi = { attach: async () => ({ attached: true }) };
+      trpc.mount(composeTrpcRouters("grants", [grantRouter()]), () => application);
+
+      const request = new Request(`http://api.test${TrpcHost.path}/grants.attach`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: "project-1" }),
+      });
+      const response = await fetchRequestHandler({
+        endpoint: TrpcHost.path,
+        req: request,
+        router: trpc.router,
+        createContext: () => trpc.context({ request }),
+      });
+
+      return (await response.json()) as { result?: { data?: unknown } };
+    }
+
+    /** @scenario "The authorization engine and ledger remain application-owned" */
+    it("imports no authz runtime, grants ledger or Prisma, and names no engine cutover", () => {
+      const offences = files.flatMap((file) =>
+        importSpecifiers(file)
+          .filter(
+            (specifier) =>
+              AUTHZ_RUNTIME_SPECIFIER.test(specifier) || PRISMA_SPECIFIER.test(specifier),
+          )
+          .map((specifier) => `${file.slice(packageRoot.length + 1)} imports ${specifier}`),
+      );
+      const cutoverNames = files.filter((file) =>
+        /cutover|isOnEngine|AUTHZ_ENGINE_MIGRATION/.test(readFileSync(file, "utf8")),
+      );
+
+      expect(offences).toEqual([]);
+      expect(cutoverNames.map((file) => file.slice(packageRoot.length + 1))).toEqual([]);
+    });
+
+    /** @scenario "The authorization engine and ledger remain application-owned" */
+    it("emits its audit row only through the sink the application installed", async () => {
+      const rows: Parameters<TrpcAuditSink["record"]>[0][] = [];
+
+      const answered = await attachThrough({ record: (entry) => void rows.push(entry) });
+      const unrecorded = await attachThrough(void 0);
+
+      expect(answered.result?.data).toEqual({ attached: true });
+      expect(rows).toEqual([expect.objectContaining({ userId: "sam", action: "grants.attach" })]);
+      expect(unrecorded.result?.data).toEqual({ attached: true });
+      expect(rows).toHaveLength(1);
     });
   });
 });

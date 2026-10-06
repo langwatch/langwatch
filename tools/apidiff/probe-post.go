@@ -313,9 +313,11 @@ var organizationLevelReads = map[string]bool{
 }
 
 // catalogReads answer every caller the same fixed identifiers (checkup's
-// check ids), so an owner ID showing up there proves nothing.
+// check ids, the LWQL catalogue's filter ids), so an owner ID showing up there
+// proves nothing.
 var catalogReads = map[string]bool{
-	"GET /api/checkup": true,
+	"GET /api/checkup":         true,
+	"GET /api/query/reference": true,
 }
 
 func (engine *probeEngine) foreignKeys() []foreignKey {

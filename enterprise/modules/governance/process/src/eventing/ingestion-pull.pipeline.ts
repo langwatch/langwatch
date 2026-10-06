@@ -51,7 +51,7 @@ import { INGESTION_PULL_PROCESS_NAME } from "./ingestion-pull.process.ts";
 
 type EventingIngestionPullEvent = IngestionPullProcessingEvent & Event;
 
-export type IngestionPullEventingAdapterOptions = {
+type IngestionPullEventingAdapterOptions = {
   runStatusStore: StateProjectionStore<IngestionPullRunStatusData>;
   /** Absent until a process composes the pull runner; commands and run status still land. */
   process?: IngestionPullProcess;
@@ -63,7 +63,7 @@ export type IngestionPullDefinition = StaticPipelineDefinition<
   RegisteredCommand
 >;
 
-export const INGESTION_PULL_PIPELINE_NAME = "ingestion_pull_processing" as const;
+const INGESTION_PULL_PIPELINE_NAME = "ingestion_pull_processing" as const;
 
 export class IngestionPullEventingAdapter {
   private constructor(private readonly options: IngestionPullEventingAdapterOptions) {}

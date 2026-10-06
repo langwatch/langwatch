@@ -7,8 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 import { TraceIOExtractionService } from "#services/trace-io-extraction.service";
-
-import { TraceReadFullIo } from "../trace-composition.build.ts";
+import { TraceReadFullIoService } from "#services/trace-read-full-io.service";
 
 function capturedSpan(spanAttributes: NormalizedSpan["spanAttributes"]): NormalizedSpan {
   return {
@@ -41,7 +40,7 @@ function capturedSpan(spanAttributes: NormalizedSpan["spanAttributes"]): Normali
 }
 
 describe("Trace full IO composition", () => {
-  const io = TraceReadFullIo.create(
+  const io = TraceReadFullIoService.create(
     TraceIOExtractionService.create(TraceCanonicalisationService.create()),
   );
 

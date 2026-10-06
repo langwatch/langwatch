@@ -34,6 +34,7 @@ function graph(inputs: { identifier: string; type: string }[]) {
 }
 
 describe("workflow mapping fields", () => {
+  /** @scenario "Linked features discover workflow fields without reading workflow tables" */
   it("preserves named multi-output fields instead of inventing an output field", () => {
     const outputFields = [
       { identifier: "answer", type: "str" },
@@ -47,6 +48,7 @@ describe("workflow mapping fields", () => {
     });
   });
 
+  /** @scenario "Linked features discover workflow fields without reading workflow tables" */
   it.each([null, void 0, {}, { nodes: "corrupted" }])(
     "marks unreadable persisted graphs as unresolved: %j",
     (dsl) => {

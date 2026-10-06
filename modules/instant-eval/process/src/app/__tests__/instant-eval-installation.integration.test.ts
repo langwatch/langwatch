@@ -2,14 +2,15 @@
  * Instant Evals installed the way a process installs it, over the memory tier
  * and real peer resolution: no ClickHouse, no queue, no HTTP.
  * @vitest-environment node
- * @see specs/instant-evals/instant-eval-api.feature
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 import type {
   AnalyticsApi,
   LangWatchQLJudgementCall,
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -17,12 +18,14 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi, GatewayPricedSpend } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
+  INSTANT_EVAL_REQUEST_TYPE,
   InstantEvalApi,
   type InstantEvalActor,
   InstantEvalMemoryJudgeInProductionError,
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
-import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/process";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp, type ModuleSecretsScope } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import {
   type ProjectApi,
@@ -36,6 +39,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantEvalProcessModule } from "../../instant-eval.module.ts";
+import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";
@@ -85,8 +89,6 @@ function judgeSecrets(judgeKey: string | undefined): ModuleSecretsScope {
   );
   return (owner, declared) => resolver.scopeTo(owner, declared);
 }
-
-const instantEval = withMemoryRepositories(instantEvalProcessModule);
 
 const CREATED = new Date("2026-01-01T00:00:00.000Z");
 
@@ -139,6 +141,7 @@ function projectWithTeam(id: string): ProjectWithTeam {
 /** The peers a run resolves through, each answering the one question it asks. */
 function installation({
   isReleased = true,
+  isOptedIn = false,
   isFreePlan = true,
   classifier = "jev",
   judgeKey = "test-judge-key",
@@ -147,8 +150,14 @@ function installation({
   isConnectOn = false,
   nodeEnvironment = "test",
   analytics = {},
+  isSaas = true,
+  planType,
+  mayManageOrganization = true,
+  recordOptIn = async () => undefined,
 }: {
   isReleased?: boolean;
+  /** Whether the organization switched Instant Evals on itself, as organization answers. */
+  isOptedIn?: boolean;
   isFreePlan?: boolean;
   classifier?: "jev" | "null" | "memory" | undefined;
   /** `null` is an install that configured no key of its own. */
@@ -161,10 +170,16 @@ function installation({
   nodeEnvironment?: string;
   /** Analytics operations a test answers itself, over the defaults below. */
   analytics?: Partial<AnalyticsApi>;
+  isSaas?: boolean;
+  /** The active plan's tier, which decides whether the switch is offered at all. */
+  planType?: string;
+  /** What authz answers for `organization:manage` on the project's organization. */
+  mayManageOrganization?: boolean;
+  recordOptIn?: OrganizationApi["recordInstantEvalsOptIn"];
 } = {}) {
   return (
     createApp({ role: "api", secrets: judgeSecrets(judgeKey ?? undefined) })
-      .withModules([instantEval])
+      .withModules([instantEvalProcessModule])
       .withConfig({
         "instant-eval": {
           classifier,
@@ -174,10 +189,11 @@ function installation({
           tenantTokensPerSecond: 150_000,
           isBounded,
           queryTokenBudget: 4_000_000,
+          isSaas,
+          nodeEnvironment,
         },
       })
       .withStores(memoryStores())
-      .withMember("nodeEnvironment", nodeEnvironment)
       // The api role sends commands; what drains them is the worker's, and the
       // pipeline has its own tests.
       .withEventing(
@@ -186,8 +202,6 @@ function installation({
           processStore: InMemoryProcessStore.createForTesting(),
         }),
       )
-      // The shared bucket, the holds and the cancel hints each have a twin.
-      .withKeyvalue(null)
       .provide({
         analytics: createApiFixture<AnalyticsApi>({
           isLangWatchQLAvailable: () => true,
@@ -210,13 +224,21 @@ function installation({
           findWithTeam: async (id) => projectWithTeam(id),
         }),
         entitlement: createApiFixture<EntitlementApi>({
-          getActivePlan: async () => planFor({ free: isFreePlan }),
+          getActivePlan: async () => ({
+            ...planFor({ free: isFreePlan }),
+            ...(planType ? { type: planType } : {}),
+          }),
         }),
         gateway: createApiFixture<GatewayApi>(gateway),
         licensing: createApiFixture<LicensingApi>({
           isConnectServiceEnabled: async () => isConnectOn,
         }),
         trace: createApiFixture<TraceApi>({}),
+        organization: createApiFixture<OrganizationApi>({
+          isInstantEvalsOptedIn: async () => isOptedIn,
+          recordInstantEvalsOptIn: recordOptIn,
+        }),
+        authz: createApiFixture<AuthzApi>({ can: async () => mayManageOrganization }),
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async () => isReleased,
         }),
@@ -268,6 +290,16 @@ describe("given a process that installs Instant Evals over the memory tier", () 
         await expect(
           codeOf(api.createRun({ projectId: PROJECT, actor: ACTOR, input: runOf() })),
         ).resolves.toBe("instant_eval_not_enabled");
+      });
+    });
+  });
+
+  describe("when a project's flag is off and its organization switched Instant Evals on", () => {
+    /** @scenario "An organization that switched itself on is judged without the flag" */
+    it("may judge, from the organization's switch", async () => {
+      await withInstallation({ isReleased: false, isOptedIn: true }, async (api) => {
+        await expect(api.isReleased({ projectId: PROJECT })).resolves.toBe(true);
+        await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(true);
       });
     });
   });
@@ -521,6 +553,57 @@ describe("given a hosted Connect call judged on LangWatch Cloud", () => {
     });
   });
 
+  describe("when a classify call is judged and its spend recorded under the managed key", () => {
+    /** @scenario A classify call is judged and metered under the customer organization */
+    it("answers verdicts and input tokens, then records an instant_eval row at the list rate", async () => {
+      const recorded: GatewayPricedSpend[] = [];
+      const gateway: Partial<GatewayApi> = {
+        recordPricedSpend: async (input) => {
+          recorded.push(input);
+          return { status: "recorded" };
+        },
+      };
+
+      const judgement = await withInstallation(
+        { classifier: "memory", judgeKey: null, gateway },
+        async (api) => {
+          const judged = await api.classify({
+            projectId: PROJECT,
+            text: "Thank you for your patience while we looked into it.",
+            questions: [{ id: "polite", kind: "boolean", instructions: "is it polite?" }],
+          });
+          const { costUsd, priceUsd } = api.priceOf({ inputTokens: judged.inputTokens });
+          await api.recordSpendForHostedCalls({
+            projectId: PROJECT,
+            virtualKeyId: "vk-managed",
+            inputTokens: judged.inputTokens,
+            requests: 1,
+            costUsd,
+            priceUsd,
+            occurredAt: HOSTED_SPEND.occurredAt,
+          });
+          return judged;
+        },
+      );
+
+      expect(judgement.verdicts.map((verdict) => verdict.questionId)).toEqual(["polite"]);
+      expect(judgement.inputTokens).toBeGreaterThan(0);
+      const listPriceNanoUsd =
+        (judgement.inputTokens / 1_000_000) *
+        INSTANT_EVAL_PRICING.usdPerMillionInputTokens *
+        INSTANT_EVAL_PRICING.markup *
+        1_000_000_000;
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0]).toMatchObject({
+        organizationId: ORGANIZATION,
+        virtualKeyId: "vk-managed",
+        requestType: INSTANT_EVAL_REQUEST_TYPE,
+        inputTokens: judgement.inputTokens,
+      });
+      expect(Math.abs((recorded[0]?.costNanoUsd ?? 0) - listPriceNanoUsd)).toBeLessThanOrEqual(2);
+    });
+  });
+
   describe("when the spend spine is not registered", () => {
     /** @scenario "Hosted spend is refused while the spend spine is not registered" */
     it("throws, so the caller keeps the spend and tries again", async () => {
@@ -532,6 +615,67 @@ describe("given a hosted Connect call judged on LangWatch Cloud", () => {
           );
         },
       );
+    });
+  });
+});
+
+describe("given an organization's own Instant Evals switch", () => {
+  describe("when a member who may manage the organization reads the offer", () => {
+    it("offers the switch on the hosted service", async () => {
+      const access = await withInstallation({ isReleased: false }, (api) =>
+        api.getOptInAccess({ projectId: PROJECT, userId: "member-1" }),
+      );
+
+      expect(access).toEqual({ released: false, offer: "enable" });
+    });
+  });
+
+  describe("when a member who may not manage the organization reads the offer", () => {
+    it("tells them to ask an admin", async () => {
+      const access = await withInstallation(
+        { isReleased: false, mayManageOrganization: false },
+        (api) => api.getOptInAccess({ projectId: PROJECT, userId: "member-1" }),
+      );
+
+      expect(access.offer).toBe("ask_admin");
+    });
+  });
+
+  describe("when the switch is thrown", () => {
+    it("records the project's own organization and the member", async () => {
+      const recorded: unknown[] = [];
+      const access = await withInstallation(
+        {
+          isReleased: false,
+          recordOptIn: async (input) => {
+            recorded.push(input);
+          },
+        },
+        (api) => api.optIn({ projectId: PROJECT, userId: "member-1" }),
+      );
+
+      expect(access).toEqual({ released: true, offer: "enable" });
+      expect(recorded).toEqual([{ organizationId: ORGANIZATION, userId: "member-1" }]);
+    });
+  });
+
+  describe("when an enterprise organization's switch is thrown", () => {
+    it("refuses it by code and records nothing", async () => {
+      const recorded: unknown[] = [];
+
+      await expect(
+        withInstallation(
+          {
+            isReleased: false,
+            planType: "ENTERPRISE",
+            recordOptIn: async (input) => {
+              recorded.push(input);
+            },
+          },
+          (api) => api.optIn({ projectId: PROJECT, userId: "member-1" }),
+        ),
+      ).rejects.toMatchObject({ code: "instant_eval_opt_in_not_offered" });
+      expect(recorded).toEqual([]);
     });
   });
 });

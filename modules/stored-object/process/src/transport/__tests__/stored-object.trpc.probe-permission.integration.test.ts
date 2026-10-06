@@ -19,10 +19,10 @@ import {
   createStoredObjectTestApp,
 } from "../../app/__tests__/stored-object.fixture.ts";
 import type {
-  StoredObjectFileReader,
   StoredObjectFileStreamRead,
   StoredObjectProbe,
-} from "../../app/stored-object.members.ts";
+} from "../../rules/stored-object-file-access.rules.ts";
+import type { StoredObjectFileReader } from "../../services/stored-objects.service.ts";
 import { storedObjectTrpcTransport } from "../stored-object.trpc.ts";
 
 const PROJECT = "project_1";
@@ -54,7 +54,7 @@ function viewer(
 ) {
   const files = new PurposeFiles();
   const permissions = new GrantedStoredObjectPermissions(granted, denialReason);
-  const app = createStoredObjectTestApp({ members: { files }, permissions });
+  const app = createStoredObjectTestApp({ parts: { files }, permissions });
   const trpc = initTRPC.context<TestContext>().create();
 
   const anyOf = async (input: {

@@ -4,7 +4,7 @@ import type { LangyTurnServiceDeps } from "./langy-turn-shared.service.ts";
 
 const logger = createLogger("langwatch:langy:turn-attempt");
 
-export interface LangyTurnAttemptIdentity {
+interface LangyTurnAttemptIdentity {
   projectId: string;
   userId: string;
   idempotencyKey: string;

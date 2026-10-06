@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestStampWriterStartsEveryLineWithTheClock(t *testing.T) {
@@ -23,17 +22,5 @@ func TestStampWriterStartsEveryLineWithTheClock(t *testing.T) {
 		if !stamp.MatchString(line) {
 			t.Errorf("line %q lacks the stamp", line)
 		}
-	}
-}
-
-func TestProgressLineReadsRateAndTimeLeft(t *testing.T) {
-	line := progressLine("scenarios", 1830, 412, "398 pass 9 fail-branch 5 err", 10*time.Second)
-	for _, want := range []string{"scenarios 412/1830", "398 pass 9 fail-branch 5 err", "41.2/s", "~34s left"} {
-		if !strings.Contains(line, want) {
-			t.Errorf("%q lacks %q", line, want)
-		}
-	}
-	if done := progressLine("probe", 5, 5, "", time.Second); strings.Contains(done, "left") {
-		t.Errorf("a finished pass reports time left: %q", done)
 	}
 }

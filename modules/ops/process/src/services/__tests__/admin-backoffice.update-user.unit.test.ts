@@ -159,16 +159,16 @@ class RefusingAudit extends AdminAuditSink {
   }
 }
 
+type AuditCase = [
+  string,
+  AdminOperationInput["resource"],
+  AdminOperationInput["method"],
+  AdminOperationInput["params"],
+];
+
 describe("AdminBackofficeService audit before write", () => {
   /** @scenario "A Back office write is audited before it is applied" */
-  it.each<
-    [
-      string,
-      AdminOperationInput["resource"],
-      AdminOperationInput["method"],
-      AdminOperationInput["params"],
-    ]
-  >([
+  it.each<AuditCase>([
     [
       "a user update with side effects",
       "user",

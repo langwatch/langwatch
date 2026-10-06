@@ -29,7 +29,13 @@ function isStaleHeld({ held, scopeKey }: { held: Held | undefined; scopeKey: str
   return held !== undefined && held.scopeKey !== scopeKey;
 }
 
-function joinableMint({ inFlight, scopeKey }: { inFlight: InFlight | undefined; scopeKey: string }) {
+function joinableMint({
+  inFlight,
+  scopeKey,
+}: {
+  inFlight: InFlight | undefined;
+  scopeKey: string;
+}) {
   return inFlight?.scopeKey === scopeKey ? inFlight.promise : undefined;
 }
 
@@ -43,7 +49,13 @@ function settledInFlight({
   return inFlight?.promise === promise ? undefined : inFlight;
 }
 
-function settledMintingIn({ current, startedIn }: { current: string | undefined; startedIn: string }) {
+function settledMintingIn({
+  current,
+  startedIn,
+}: {
+  current: string | undefined;
+  startedIn: string;
+}) {
   return current === startedIn ? undefined : current;
 }
 

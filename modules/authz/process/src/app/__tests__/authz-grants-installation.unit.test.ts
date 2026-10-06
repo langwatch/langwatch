@@ -5,32 +5,40 @@
  * answered by the composed app. @see specs/rbac/grants-rest-api.feature
  */
 import { AuthzApi } from "@langwatch/authz-contract";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { EventSourcing, EventStoreProducerOnly, InMemoryProcessStore } from "@langwatch/eventing";
+import { createApp, ResourceScope } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import { authzProcessModule } from "../../authz.module.ts";
+import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
 import { authzGrantRest } from "../../transport/authz-grant.rest.ts";
 import { authzRoleBindingRest } from "../../transport/authz-role-binding.rest.ts";
 
+const AUTHZ_CONFIG = {
+  authz: {
+    epochCacheEnabled: false,
+    demoProjectId: undefined,
+    demoProjectUserId: undefined,
+    demoProjectSlug: undefined,
+  },
+};
+
+function eventing() {
+  return new EventSourcing({
+    enabled: false,
+    processStore: InMemoryProcessStore.createForTesting(),
+  });
+}
+
 function process() {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(authzProcessModule)])
-    .withConfig({
-      authz: {
-        epochCacheEnabled: false,
-        demoProjectId: undefined,
-        demoProjectUserId: undefined,
-        demoProjectSlug: undefined,
-      },
-    })
-    .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
-    .withKeyvalue(redisDouble())
-    .withEventing(
-      new EventSourcing({ enabled: false, processStore: InMemoryProcessStore.createForTesting() }),
-    )
+    .withModules([authzProcessModule])
+    .withConfig(AUTHZ_CONFIG)
+    .withStores(memoryStores())
+    .withEventing(eventing())
     .provide({});
 }
 
@@ -68,5 +76,74 @@ describe("given a process that installed authz", () => {
     } finally {
       await runtime.stop();
     }
+  });
+});
+
+type InstallSecrets = NonNullable<Parameters<typeof authzProcessModule.install>[0]["secrets"]>;
+
+describe("given a process with dispatch and no database", () => {
+  /** @scenario A process with no database composes no AuthZ service */
+  it("refuses the live install naming the database it cannot supply", async () => {
+    const resources = new ResourceScope();
+
+    await expect(
+      authzProcessModule.install({
+        resources,
+        config: undefined,
+        members: {},
+        repositorySelection: { tier: "live", members: { redis: redisDouble() } },
+        role: "api",
+        secrets: createApiFixture<InstallSecrets>(),
+        resolve: () => undefined,
+      }),
+    ).rejects.toThrow(/prisma/);
+    await resources.close();
+  });
+});
+
+async function ledgerOf(role: "api" | "worker") {
+  const eventSourcing = new EventSourcing({
+    enabled: true,
+    eventStore: EventStoreProducerOnly.create({ processName: `langwatch-${role}` }),
+    queueFactory: () => ({
+      async send() {},
+      async sendBatch() {},
+      async waitUntilReady() {},
+      async close() {},
+    }),
+    consumersEnabled: false,
+    executionTarget: role,
+  });
+  const runtime = await createApp({ role })
+    .withModules([authzProcessModule])
+    .withConfig(AUTHZ_CONFIG)
+    .withStores(memoryStores())
+    .withEventing(eventSourcing)
+    .provide({})
+    .boot();
+  try {
+    const pipeline = eventSourcing.getPipeline(AUTHZ_GRANT_PIPELINE_NAME);
+    return { kind: pipeline.constructor.name, commands: Object.keys(pipeline.commands) };
+  } finally {
+    await runtime.stop();
+  }
+}
+
+describe("given a background worker composing its own graph", () => {
+  /** @scenario The worker mounts the grants ledger itself */
+  it("mounts the ledger without an AuthZ capability, as the pipeline the api process registers", async () => {
+    const worker = await ledgerOf("worker");
+    const application = await ledgerOf("api");
+
+    expect(worker.kind).not.toBe("DisabledPipeline");
+    expect(worker.commands).toEqual([
+      "attachGrant",
+      "changeGrantRole",
+      "revokeGrant",
+      "defineRole",
+      "changeRolePermissions",
+      "deleteRole",
+    ]);
+    expect(worker).toEqual(application);
   });
 });

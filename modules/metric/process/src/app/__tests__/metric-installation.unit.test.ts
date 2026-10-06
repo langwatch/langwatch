@@ -3,20 +3,12 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { MetricApi } from "@langwatch/metric-contract";
 import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { metricProcessModule } from "../../metric.module.ts";
-
-/**
- * The one member `MetricModule` declares reading (`reads: ["clickhouse"]`). This
- * suite prepares only, so the pipeline's own append repository is never reached.
- */
-function unreachableClickHouse() {
-  return clickHouseQueryClientDouble();
-}
 
 const GAUGE_REQUEST = {
   resourceMetrics: [
@@ -39,7 +31,7 @@ const GAUGE_REQUEST = {
 function process(redactMetricAttributes: DataPrivacyApi["redactMetricAttributes"]) {
   return createApp({ role: "api" })
     .withModules([metricProcessModule])
-    .withAnalytical(unreachableClickHouse())
+    .withStores(memoryStores())
     .withConfig({ metric: { processingShards: void 0 } })
     .provide({
       "data-privacy": createApiFixture<DataPrivacyApi>({ redactMetricAttributes }),

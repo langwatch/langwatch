@@ -16,7 +16,7 @@ export const authzEngineGateReadFailuresTotal = new Counter({
 
 const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = ["finalized"];
 
-export type AuthzCutoverGateOptions = {
+type AuthzCutoverGateOptions = {
   repository: AuthzCutoverRepository;
   logger?: Logger;
   cache?: PerOrganizationCachedGateService;

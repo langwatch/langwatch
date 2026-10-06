@@ -14,7 +14,7 @@ import {
   Verdict,
 } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioRunExportDownloadService } from "../scenario-run-export-download.service.ts";
 import { ScenarioRunExportService } from "../scenario-run-export.service.ts";
@@ -90,6 +90,35 @@ describe("ScenarioRunExportDownloadService", () => {
         event: expect.stringContaining('"type":"progress"'),
       }),
     );
+  });
+
+  describe("given an export of criteria on 2026-07-28", () => {
+    afterEach(() => vi.useRealTimers());
+
+    /** @scenario "The file downloads with a descriptive name" */
+    it("names the file by project, subject, date and mode", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-07-28T09:15:00.000Z"));
+      const simulations = createApiFixture<SimulationService>({
+        countRunsForExport: async () => 1,
+        listRunsForExport: async () => ({ runs: [run()], hasMore: false }),
+      });
+      const service = ScenarioRunExportDownloadService.create({
+        auditLog: createApiFixture<AuditLogApi>({
+          record: async () => ({ id: "audit", occurredAt: 0 }),
+        }),
+        exports: ScenarioRunExportService.create(simulations),
+        presence: createApiFixture<PresenceApi>({ publishProjectEvent: async () => {} }),
+      });
+
+      const download = await service.download({
+        request: { projectId: "my-project", mode: "criteria" },
+        userId: "user_1",
+      });
+
+      expect(download.filename).toBe("my-project - Scenario Runs - 2026-07-28 - criteria.csv");
+      await bytes(download.stream);
+    });
   });
 
   /** @scenario "Cancelling an export prevents the CSV sweep from starting" */

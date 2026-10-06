@@ -48,6 +48,7 @@ function virtualKeyRecord(
 
 describe("PersonalVirtualKeyIssuerService", () => {
   describe("when a personal key is issued", () => {
+    /** @scenario "Any member can mint their own default personal VK, scoped to their personal project" */
     it("mints a project-scoped virtual key through the gateway and maps it back", async () => {
       const createVirtualKey = vi.fn().mockResolvedValue({
         virtualKey: virtualKeyRecord(),

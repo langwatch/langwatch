@@ -14,13 +14,13 @@ import type { RunActor } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type {
-  ExperimentRunEventStream,
-  ExperimentRunStreamMessage,
-} from "../channels/experiment-run-event-stream.channel.ts";
 import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
 import type { ExperimentRunStartedEventData } from "../eventing/experiment-run-events.process.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
+import type {
+  ExperimentRunEventStreamRepository,
+  ExperimentRunStreamMessage,
+} from "../repositories/experiment-run-event-stream.repository.ts";
 import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
 import type { ExperimentRunRefusals } from "../rules/experiment-run-availability.rules.ts";
 import { ExperimentCarriedBoardService } from "./experiment-carried-board.service.ts";
@@ -41,7 +41,7 @@ export type WorkbenchRunPipeline = Readonly<{
     ExperimentRunCommandDispatcherService,
     "startExperimentRun" | "completeExperimentRun" | "abortExperimentRun"
   >;
-  stream: ExperimentRunEventStream;
+  stream: ExperimentRunEventStreamRepository;
   folds: ExperimentRunFoldRepository;
   abort: ExperimentRunAbortRepository;
   /** This deployment's public origin, for the link a polled run answers with. */

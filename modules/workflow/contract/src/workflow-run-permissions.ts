@@ -21,14 +21,14 @@ const nodeSchema = z.looseObject({
     .optional(),
 });
 
-function permissionOfNode(node: z.infer<typeof nodeSchema>): WorkflowRunPermission | undefined {
-  if (node.type === "evaluator") return "evaluations:manage";
-  if (node.type === "custom") return "workflows:manage";
+function permissionsOfNode(node: z.infer<typeof nodeSchema>): readonly WorkflowRunPermission[] {
+  if (node.type === "evaluator") return ["evaluations:manage"];
+  if (node.type === "custom") return ["workflows:manage"];
   const callsWorkflow = node.data?.parameters?.some(
     ({ identifier, value }) => identifier === "agent_type" && value === "workflow",
   );
 
-  return node.type === "agent" && callsWorkflow ? "workflows:manage" : undefined;
+  return node.type === "agent" && callsWorkflow ? ["workflows:manage"] : [];
 }
 
 /**
@@ -52,8 +52,7 @@ export function runKeyPermissions({
     const parsed = nodeSchema.safeParse(candidate);
     if (!parsed.success) continue;
     if (eventType === "execute_component" && parsed.data.id !== nodeId) continue;
-    const permission = permissionOfNode(parsed.data);
-    if (permission) needed.add(permission);
+    for (const permission of permissionsOfNode(parsed.data)) needed.add(permission);
   }
 
   return RUN_PERMISSION_ORDER.filter((permission) => needed.has(permission));

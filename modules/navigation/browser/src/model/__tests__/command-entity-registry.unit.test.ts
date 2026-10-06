@@ -45,7 +45,7 @@ describe("entityRegistry", () => {
 });
 
 /**
- * @see specs/navigation/command-bar-agent-address.feature
+ * @see modules/navigation/specs/command-bar-agent-address.feature
  * The palette used to write `?drawer.open=agentViewer`, a drawer name
  * with no registry entry and no component — enter did nothing. Pins the
  * three real editors and the two cases that have none.

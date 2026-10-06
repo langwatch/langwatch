@@ -12,11 +12,15 @@ export const RequestsTab = ({ requests }: { requests: RequestEntry[] }) => (
       caption="S3 requests"
       rows={requests}
       rowKey={(entry) => `${entry.at.toISOString()} ${entry.method} ${pathOf(entry)}`}
-      empty={
-        <SimEmpty title="No requests yet" hint="The last 500 S3 requests are listed here." />
-      }
+      empty={<SimEmpty title="No requests yet" hint="The last 500 S3 requests are listed here." />}
       columns={[
-        { key: "method", header: "Method", cell: (entry) => entry.method, mono: true, width: "6rem" },
+        {
+          key: "method",
+          header: "Method",
+          cell: (entry) => entry.method,
+          mono: true,
+          width: "6rem",
+        },
         { key: "path", header: "Path", cell: pathOf, mono: true },
         {
           key: "status",

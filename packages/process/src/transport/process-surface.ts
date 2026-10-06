@@ -50,7 +50,7 @@ export async function processSurface({
     stores: { database: true, redis: true },
     bundle,
     storage: {},
-    internalBearers: new Map([["cron", cron]]),
+    internalBearers: { cron },
     instanceAdmin,
     trustedProxies: config.trustedProxies,
     executionProxyBaseUrl,

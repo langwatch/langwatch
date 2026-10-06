@@ -2,7 +2,7 @@
  * A page that stopped before its last row: what is kept, and where the run
  * resumes. A cancellation and an expiring lease both stop a page, and either
  * way the classifications that came back were paid for, so they are written.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {
@@ -56,7 +56,7 @@ export interface InstantEvalStoppablePage {
   readonly cancellation?: { readonly unjudgedRows: readonly number[] };
 }
 
-export interface InstantEvalPageCut {
+interface InstantEvalPageCut {
   /** The rows the page keeps: everything up to and including the last judged row. */
   readonly rows: readonly Record<string, unknown>[];
   /** Indexes into `rows` that carry no verdict because of the stop. */

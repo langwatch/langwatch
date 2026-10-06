@@ -2,6 +2,8 @@
 import {
   SESSION_STARTED_EVENT_TYPE,
   sessionStartedEventDataSchema,
+  SIGNED_UP_EVENT_TYPE,
+  signedUpEventDataSchema,
   SSO_AUTO_ADDED_EVENT_TYPE,
   ssoAutoAddedEventDataSchema,
 } from "@langwatch/auth-contract";
@@ -10,6 +12,8 @@ import {
   checkoutCompletedEventDataSchema,
   SUBSCRIPTION_CHANGED_EVENT_TYPE,
   subscriptionChangedEventDataSchema,
+  SUBSCRIPTION_STARTED_EVENT_TYPE,
+  subscriptionStartedEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import {
@@ -66,6 +70,7 @@ import {
   TRACE_RECEIVED_EVENT_TYPE,
   traceReceivedEventDataSchema,
 } from "@langwatch/trace-contract";
+import { USER_REGISTERED_EVENT_TYPE, userLifecycleEventDataSchema } from "@langwatch/user-contract";
 import {
   WORKFLOW_CREATED_EVENT_TYPE,
   workflowCreatedEventDataSchema,
@@ -88,7 +93,9 @@ import {
   signedUpSignal,
   ssoAutoAddedSignal,
   subscriptionChangedSignal,
+  subscriptionStartedSignal,
   traceReceivedSignal,
+  userRegisteredSignal,
   workflowCreatedSignal,
 } from "../rules/nurturing-owner-signals.rules.ts";
 import { nurturingSignalKey, RecordNurturingSignalCommand } from "./nurturing-signal.commands.ts";
@@ -180,6 +187,14 @@ export function buildNurturingPipeline(deps: {
         return deps.deliver({ key: nurturingSignalKey(signal), signal });
       },
     })
+    .withPeerSubscriber("subscriptionStarted", {
+      eventType: SUBSCRIPTION_STARTED_EVENT_TYPE,
+      data: subscriptionStartedEventDataSchema,
+      handle: (data, { aggregateId }) => {
+        const signal = subscriptionStartedSignal({ data, aggregateId });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
     .withPeerSubscriber("checkoutCompleted", {
       eventType: CHECKOUT_COMPLETED_EVENT_TYPE,
       data: checkoutCompletedEventDataSchema,
@@ -209,6 +224,22 @@ export function buildNurturingPipeline(deps: {
       data: organizationSignedUpEventDataSchema,
       handle: (data, { aggregateId }) => {
         const signal = signedUpSignal({ data, aggregateId });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("userRegistered", {
+      eventType: USER_REGISTERED_EVENT_TYPE,
+      data: userLifecycleEventDataSchema,
+      handle: (data) => {
+        const signal = userRegisteredSignal({ data });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("authSignedUp", {
+      eventType: SIGNED_UP_EVENT_TYPE,
+      data: signedUpEventDataSchema,
+      handle: (data) => {
+        const signal = userRegisteredSignal({ data });
         return deps.deliver({ key: nurturingSignalKey(signal), signal });
       },
     })

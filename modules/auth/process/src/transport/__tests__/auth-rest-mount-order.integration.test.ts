@@ -18,7 +18,11 @@ import { authRest, type AuthDoorApi } from "../auth.rest.ts";
 
 const BASE_URL = "https://app.test";
 
-type CliPlane = { bootstrap(): { plane: string }; projectKey(): { plane: string } };
+type CliPlane = {
+  bootstrap(): { plane: string };
+  projectKey(): { plane: string };
+  deviceCode(): { plane: string };
+};
 
 const CliPlaneApi = moduleApi<CliPlane>()("governance");
 
@@ -34,6 +38,10 @@ const cliPlaneRest = defineRestRouter(CliPlaneApi)
   .withAccess(CLI_PLANE_DOOR)
   .withOutput(z.object({ plane: z.string() }))
   .handle(({ app }) => app.bootstrap())
+  .post("/api/auth/cli/device-code", "startCliDeviceCode")
+  .withAccess(CLI_PLANE_DOOR)
+  .withOutput(z.object({ plane: z.string() }))
+  .handle(({ app }) => app.deviceCode())
   .post("/api/auth/cli/project-key", "readCliProjectKey")
   .withAccess(CLI_PLANE_DOOR)
   .withOutput(z.object({ plane: z.string() }))
@@ -69,6 +77,7 @@ function mountedInInstallOrder() {
   host.mount(cliPlaneRest.router(), () => ({
     bootstrap: () => ({ plane: "bootstrap" }),
     projectKey: () => ({ plane: "project-key" }),
+    deviceCode: () => ({ plane: "device-code" }),
   }));
 
   return { app: host.app, handler };
@@ -86,6 +95,23 @@ describe("given the /api/auth family mounted before a later family serving /api/
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ plane: "bootstrap" });
+      expect(world.handler).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the CLI asks for a device code", () => {
+    /** @scenario "The CLI device grant still reaches its own routes" */
+    it("answers from the device grant rather than Better Auth's catch-all", async () => {
+      const world = mountedInInstallOrder();
+
+      const response = await world.app.request(`${BASE_URL}/api/auth/cli/device-code`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ plane: "device-code" });
       expect(world.handler).not.toHaveBeenCalled();
     });
   });

@@ -9,7 +9,7 @@ import {
   USAGE_UNKNOWN,
   type ProjectUsageCount,
   type ProjectUsageCounts,
-} from "../app/entitlement.members.ts";
+} from "./usage-enforcement.service.ts";
 
 /** A warning to decide, with the per-project counts its total was summed from. */
 export type CountedUsageReading = SendUsageLimitWarningInput & {

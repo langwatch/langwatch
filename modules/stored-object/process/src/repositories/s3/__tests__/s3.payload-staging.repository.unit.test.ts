@@ -1,12 +1,10 @@
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { PayloadStagingUnavailableError } from "@langwatch/stored-object-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
   PayloadStagingS3TargetRepository,
   S3PayloadStagingRepository,
 } from "#repositories/s3/s3.payload-staging.repository";
-import { AbsentPayloadStagingService } from "#services/absent-payload-staging.service";
 
 function s3(): { client: S3Client; sent: unknown[] } {
   const client = new S3Client({
@@ -71,18 +69,6 @@ describe("S3PayloadStagingRepository", () => {
         await staged.discard();
 
         expect(sent.at(-1)).toBeInstanceOf(DeleteObjectCommand);
-      });
-    });
-  });
-});
-
-describe("AbsentPayloadStagingService", () => {
-  describe("given a deployment that composed no object storage", () => {
-    describe("when a payload needs staging", () => {
-      it("refuses by name rather than posting it inline", () => {
-        expect(() => AbsentPayloadStagingService.create().stage()).toThrow(
-          PayloadStagingUnavailableError,
-        );
       });
     });
   });

@@ -1,3 +1,4 @@
+import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
  * `POST /api/workflows/:id/evaluate` over the runtime a process mounts it on:
@@ -9,6 +10,7 @@ import {
   createRestRuntime,
   projectRestFacts,
 } from "@langwatch/api/rest";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { NotFoundError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
@@ -18,7 +20,7 @@ import {
 } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { createWorkflowRest, workflowEvaluationRunCeiling } from "../workflow.rest.ts";
+import { createWorkflowRest } from "../workflow.rest.ts";
 
 const started: WorkflowEvaluationStarted = {
   runId: "run_1",
@@ -29,7 +31,8 @@ const started: WorkflowEvaluationStarted = {
 
 function buildApi(options: {
   triggerEvaluation: WorkflowApi["triggerEvaluation"];
-  mayReadRuns?: boolean;
+  /** What the key holds; every permission when absent. A missing one refuses as the door does. */
+  held?: readonly AuthzPermission[];
 }) {
   const app = createApiFixture<WorkflowApi>(
     { triggerEvaluation: options.triggerEvaluation },
@@ -38,7 +41,14 @@ function buildApi(options: {
 
   const runtime = createRestRuntime({
     identity: {
-      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } as const }),
+      authenticate: ({ permissions }) => {
+        const missing = permissions.find(
+          (permission) => !(options.held ?? permissions).includes(permission),
+        );
+        if (missing) throw new ApiKeyPermissionDeniedError(missing);
+
+        return { actor: null, scope: { tier: "project", id: "project-1" } as const };
+      },
     },
   });
 
@@ -52,7 +62,6 @@ function buildApi(options: {
         viewerUserId: null,
         actorId: "project-key-1",
       })),
-      bindRestMiddleware(workflowEvaluationRunCeiling, () => options.mayReadRuns ?? true),
     ],
   });
 
@@ -178,14 +187,23 @@ describe("POST /api/workflows/:id/evaluate", () => {
   });
 
   describe("given a key that cannot read the run it would start", () => {
-    it("hands the ceiling's verdict to the trigger, which refuses it", async () => {
+    /** @scenario A workflows-only key cannot start a run it could not read */
+    it("refuses 403 naming evaluations:view before the trigger is reached", async () => {
       const triggerEvaluation = vi.fn<WorkflowApi["triggerEvaluation"]>(async () => started);
 
-      await post(buildApi({ triggerEvaluation, mayReadRuns: false }), "workflow_1");
-
-      expect(triggerEvaluation).toHaveBeenCalledWith(
-        expect.objectContaining({ callerMayReadRuns: false }),
+      const response = await post(
+        buildApi({ triggerEvaluation, held: ["workflows:create"] }),
+        "workflow_1",
+        { dataset_id: "dataset_123", data: [{ input: "x" }] },
       );
+
+      // Asked at the door, so it refuses before the body is validated, as main did.
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({
+        code: "api_key_permission_denied",
+        meta: { permission: "evaluations:view" },
+      });
+      expect(triggerEvaluation).not.toHaveBeenCalled();
     });
   });
 

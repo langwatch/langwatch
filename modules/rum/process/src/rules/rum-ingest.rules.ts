@@ -41,7 +41,7 @@ export function collectorHeaders(raw: string | undefined): Readonly<Record<strin
 }
 
 /** Parsed header pairs, lower-cased and emptied of blanks, over a JSON content type. */
-export function collectorHeadersFrom(
+function collectorHeadersFrom(
   pairs: Readonly<Record<string, string>>,
 ): Readonly<Record<string, string>> {
   const headers: Record<string, string> = { "content-type": "application/json" };
@@ -62,7 +62,7 @@ type CollectorSource = Readonly<{
   headers: Readonly<Record<string, string>>;
 }>;
 
-export type CollectorTarget =
+type CollectorTarget =
   | Readonly<{
       configured: true;
       tracesUrl: string;

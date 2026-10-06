@@ -5,11 +5,8 @@
  */
 
 import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
-import { createUiQueryClient } from "@langwatch/browser-host/query-client";
-import {
-  answeringUiTransport,
-  type UiProcedureAnswer,
-} from "@langwatch/browser-host/testing-transport";
+import { createUiQueryClient } from "@langwatch/browser/query-client";
+import { answeringUiTransport, type UiProcedureAnswer } from "@langwatch/browser/testing-transport";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render } from "@testing-library/react";
 import type { ReactElement } from "react";

@@ -18,7 +18,7 @@ import {
 import type * as apiKeyContractModule from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 import { projectIdentitySchema, type ProjectIdentity } from "@langwatch/project-contract";
-import { Temporal, fromDate, nowInstant, type Instant } from "@langwatch/time";
+import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import {
@@ -183,7 +183,9 @@ export class ApiKeyTokenResolutionService {
       await this.hold({ key: unknownKey(hash), value: "1", ttlMs });
       return null;
     }
-    const heldProjectId = withProject ? (projectId ?? onlyProjectId(answer.grants)) : null;
+    const grantedProjectIds = findGrantedProjectIds(answer.grants);
+    const soleProjectId = grantedProjectIds.length === 1 ? grantedProjectIds[0] : undefined;
+    const heldProjectId = withProject ? (projectId ?? soleProjectId ?? null) : null;
     const project = heldProjectId ? await this.findProjectIdentity(heldProjectId) : null;
     const ttlMs = Math.min(
       this.sinceRead({ startedMs, ttlMs: API_KEY_ANSWER_TTL_MS }),
@@ -333,7 +335,9 @@ export class ApiKeyTokenResolutionService {
     }
     const apiKey = held.answer;
 
-    const effectiveProjectId = projectId ?? onlyProjectId(apiKey.grants);
+    const grantedProjectIds = findGrantedProjectIds(apiKey.grants);
+    const soleProjectId = grantedProjectIds.length === 1 ? grantedProjectIds[0] : undefined;
+    const effectiveProjectId = projectId ?? soleProjectId;
     if (!effectiveProjectId) {
       return null;
     }
@@ -449,18 +453,17 @@ export class ApiKeyTokenResolutionService {
   }
 }
 
-/** The one project a key's own grants name, when they name exactly one. */
-function onlyProjectId(
+/** The distinct projects a key's own grants name; a key bound to exactly one answers it alone. */
+function findGrantedProjectIds(
   bindings: readonly Pick<ApiKeyBinding, "scopeType" | "scopeId">[],
-): string | null {
+): string[] {
   const projectIds = new Set(
     bindings.flatMap((binding) =>
       binding.scopeType === "PROJECT" && binding.scopeId ? [binding.scopeId] : [],
     ),
   );
-  const [only] = projectIds;
 
-  return projectIds.size === 1 && only ? only : null;
+  return [...projectIds];
 }
 
 /** Concurrent reads of one token in this process share one promise, dropped once it settles. */
@@ -490,7 +493,9 @@ function tokenHash(token: string): string {
 function parseHeld(raw: string): unknown {
   try {
     return JSON.parse(raw, (field, value: unknown) =>
-      DATE_FIELDS.has(field) && typeof value === "string" ? new Date(value) : value,
+      DATE_FIELDS.has(field) && typeof value === "string"
+        ? toDate(Temporal.Instant.from(value))
+        : value,
     );
   } catch {
     return undefined;

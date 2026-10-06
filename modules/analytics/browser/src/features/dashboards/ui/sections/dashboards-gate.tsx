@@ -1,6 +1,6 @@
 /** Every Dashboards screen opens through this: loading, the app's not-found page, or the screen. */
 
-import { UiPageLoading, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
+import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
 import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";

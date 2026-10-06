@@ -20,6 +20,7 @@ import { vi } from "vitest";
 import { z } from "zod";
 
 import { SilentLogger } from "../../__tests__/fixtures/graph-activity.fixture.ts";
+import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
 import { MemoryAutomationStore } from "../../repositories/memory/memory.automation.store.ts";
 import { MemoryTriggerFireHistoryRepository } from "../../repositories/memory/memory.trigger-fire-history.repository.ts";
 import { AutomationProviderRegistryService } from "../../services/automation-provider-registry.service.ts";
@@ -249,13 +250,16 @@ export function createPublicApiRig(
   const service = AutomationPublicApiService.create({
     automation,
     rules: { getProjectIdentity: async () => ({ name: "Acme", slug: TEST_PROJECT.slug }) },
-    providers: AutomationProviderRegistryService.create(MARKING_CRYPTO),
+    providers: AutomationProviderRegistryService.create(sealWith(MARKING_CRYPTO)),
     slackConnections: AutomationSlackConnectionService.create({
       slack,
       projects: { getOrganizationId: async () => "organization_1" },
-      crypto: MARKING_CRYPTO,
+      triggers: sealWith(MARKING_CRYPTO),
     }),
-    slackDestinations: SlackDestinationService.create({ slack, crypto: MARKING_CRYPTO }),
+    slackDestinations: SlackDestinationService.create({
+      slack,
+      triggers: sealWith(MARKING_CRYPTO),
+    }),
     filterValidation: TriggerFilterValidationService.create({
       evaluators: {
         findById: async (input) => {

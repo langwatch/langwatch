@@ -6,7 +6,8 @@
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import type { GatewayAudit, GatewayChangeEvents } from "../../../app/gateway.members.ts";
+import type { GatewayAuditRepository } from "../../gateway-audit.repository.ts";
+import type { GatewayChangeEventsRepository } from "../../gateway-change-event.repository.ts";
 import { PrismaGatewayCacheRuleRepository } from "../prisma.gateway-cache-rule.repository.ts";
 
 const storedRow = {
@@ -79,13 +80,13 @@ function recordingPorts() {
       },
       since: () => Promise.resolve({ currentRevision: 1n, events: [] }),
       currentRevision: () => Promise.resolve(1n),
-    } satisfies GatewayChangeEvents,
+    } satisfies GatewayChangeEventsRepository,
     auditPort: {
       append: (input: { action: string }, transaction?: unknown) => {
         audits.push({ action: input.action, inTransaction: transaction !== undefined });
         return Promise.resolve();
       },
-    } satisfies GatewayAudit,
+    } satisfies GatewayAuditRepository,
   };
 }
 

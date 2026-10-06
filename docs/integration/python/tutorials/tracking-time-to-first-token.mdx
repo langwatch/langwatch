@@ -145,6 +145,6 @@ In **Analytics > LLM Metrics** you get time-to-first-token graphs with the usual
 
 ## Troubleshooting
 
-- **TTFT shows "—" in the table**: the trace has no LLM span reporting any of the signals above. For non-streaming calls this is expected, there is no "first token" moment distinct from the response itself.
+- **TTFT shows an empty dash in the table**: the trace has no LLM span reporting any of the signals above. For non-streaming calls this is expected, there is no "first token" moment distinct from the response itself.
 - **Value looks wrong by orders of magnitude**: check the units. `first_token_at` is an epoch timestamp in milliseconds; `gen_ai.server.time_to_first_token` and `first_token_ms` are durations in milliseconds.
-- **You set timestamps but nothing shows**: make sure the values go through `span.update(timestamps=...)` rather than mutating `span.timestamps` in place.
+- **You set timestamps but no timing shows**: make sure the values go through `span.update(timestamps=...)` rather than mutating `span.timestamps` in place.

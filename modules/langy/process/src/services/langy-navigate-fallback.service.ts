@@ -17,7 +17,7 @@ import type {
 } from "./langy-navigate-resource-locator.service.ts";
 
 /** The platform address a navigate opens, or `dropped` when nothing answers to the id. */
-export type LangyNavigateResolution = { outcome: "resolved"; url: string } | { outcome: "dropped" };
+type LangyNavigateResolution = { outcome: "resolved"; url: string } | { outcome: "dropped" };
 
 const DROPPED: LangyNavigateResolution = { outcome: "dropped" };
 

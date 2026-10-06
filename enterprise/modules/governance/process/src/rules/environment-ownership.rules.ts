@@ -30,7 +30,7 @@
 import { isSameEnvironment } from "./dataverse-environment-service.rules.ts";
 
 /** The config key naming the environment a source reads conversations from. */
-export const ENVIRONMENT_URL_FIELD = "environmentUrl";
+const ENVIRONMENT_URL_FIELD = "environmentUrl";
 
 /** A source that already reads some conversation environment. */
 export interface EnvironmentReader {

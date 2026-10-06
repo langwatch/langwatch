@@ -39,3 +39,5 @@ export * from "./model-provider.config.ts";
 export * from "./model-provider-availability.ts";
 export * from "./model-selection.ts";
 export * from "./model-options.ts";
+export * from "./model-picker.ts";
+export * from "./edit-model-provider-form.ts";

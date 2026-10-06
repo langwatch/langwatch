@@ -19,7 +19,6 @@ import { itemsListed, listingRefused } from "./provider-listing.rules.ts";
 
 export {
   type ListingRefusal as AgentListingRefusal,
-  type ListingRefusalReason as AgentListingRefusalReason,
   refusalFromStatus,
   refusalFromThrown,
 } from "./provider-listing.rules.ts";

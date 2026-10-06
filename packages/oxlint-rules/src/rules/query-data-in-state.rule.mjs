@@ -74,7 +74,7 @@ export const queryDataInStateRule = defineRule({
     queryCopiedToState: {
       what: "Query data is copied into state by `{{origin}}`.",
       why: "A second copy of server state goes stale and fights the cache's refetch, invalidation and optimistic updates.",
-      fix: "Read the query result directly in render; keep only the user's own edits in state and overlay them on the query data.",
+      fix: "Read the query result directly in render; keep only the user's own edits in state and overlay them on the query data. Read the `browser-module` skill.",
     },
   },
   create(context) {

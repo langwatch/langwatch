@@ -5,13 +5,10 @@
  */
 
 import { openai } from "@ai-sdk/openai";
+import { guidedKickoffPartOf, guidedPathContinuationLine } from "@langwatch/onboarding-contract";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import {
-  guidedKickoffPartOf,
-  guidedPathContinuationLine,
-} from "../../src/shell/features/guided-onboarding/model/kickoff.ts";
 import {
   assertPathCompletedAfterSkill,
   attachKickoffConversation,

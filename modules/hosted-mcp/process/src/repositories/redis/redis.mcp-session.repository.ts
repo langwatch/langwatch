@@ -5,6 +5,7 @@ import type { Cluster, Redis } from "ioredis";
 import { z } from "zod";
 
 import {
+  type McpSessionCipher,
   McpSessionRepository,
   type McpSessionRecordLookup,
   type McpSessionTransport,
@@ -29,17 +30,31 @@ function hashApiKey(apiKey: string): string {
   return createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
 }
 
-/** Session records in Redis. With no Redis every write is dropped and every read is missing. */
+/**
+ * Session records in Redis, the key sealed with the deployment's cipher. With no Redis every
+ * write is dropped and every read is missing.
+ */
 export class RedisMcpSessionRepository extends McpSessionRepository {
   readonly #redis: Redis | Cluster | null;
+  readonly #cipher: McpSessionCipher;
 
-  private constructor({ redis }: { redis: Redis | Cluster | null }) {
+  private constructor({
+    redis,
+    cipher,
+  }: {
+    redis: Redis | Cluster | null;
+    cipher: McpSessionCipher;
+  }) {
     super();
     this.#redis = redis;
+    this.#cipher = cipher;
   }
 
-  static create({ redis }: { redis: Redis | Cluster | null }): RedisMcpSessionRepository {
-    return new RedisMcpSessionRepository({ redis });
+  static create(input: {
+    redis: Redis | Cluster | null;
+    cipher: McpSessionCipher;
+  }): RedisMcpSessionRepository {
+    return new RedisMcpSessionRepository(input);
   }
 
   isAvailable(): boolean {
@@ -50,16 +65,15 @@ export class RedisMcpSessionRepository extends McpSessionRepository {
     transport,
     sessionId,
     apiKey,
-    encryptedApiKey,
     projectId,
   }: {
     transport: McpSessionTransport;
     sessionId: string;
     apiKey: string;
-    encryptedApiKey: string;
     projectId?: string;
   }): Promise<void> {
     if (!this.#redis) return;
+    const encryptedApiKey = this.#cipher.encrypt(apiKey);
     const layout = LAYOUT[transport];
     const setKey = `${layout.byKey}${hashApiKey(apiKey)}`;
     await this.#redis.set(
@@ -100,7 +114,7 @@ export class RedisMcpSessionRepository extends McpSessionRepository {
     const stored = storedSessionSchema.parse(JSON.parse(data));
     return {
       kind: "found",
-      encryptedApiKey: stored.encryptedApiKey,
+      apiKey: this.#cipher.decrypt(stored.encryptedApiKey),
       projectId: stored.projectId,
     };
   }

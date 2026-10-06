@@ -10,7 +10,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { ModelProviderCredentialCipher } from "../../../app/model-provider.members.ts";
+import { ModelProviderCredentialCipher } from "../../model-provider.repository.ts";
 import { PrismaModelProviderCredentialMapper } from "../prisma.model-provider-credential.mapper.ts";
 
 /**

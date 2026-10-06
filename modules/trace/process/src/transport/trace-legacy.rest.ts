@@ -1,5 +1,11 @@
-import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  resolver,
+  type RestProtocolRefusal,
+} from "@langwatch/api/rest";
 import type { PrincipalRef } from "@langwatch/authorization";
+import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { toEpochMs } from "@langwatch/time";
@@ -15,6 +21,7 @@ import {
   type Span,
   type Trace,
   type TraceLegacyListInput,
+  type TraceSharedFiltersInput,
   type TracesForProjectResult,
 } from "@langwatch/trace-contract";
 import { HTTPException } from "hono/http-exception";
@@ -27,6 +34,7 @@ import {
   generateAsciiTree,
   toLLMModeTrace,
 } from "#rules/trace-formatting.rules";
+import { unkeyedLegacyFilterViolations } from "#rules/trace-legacy-filter-keys.rules";
 import { traceLegacySearchBodySchema } from "#rules/trace-legacy-search-body.rules";
 
 import { tracesRestCredential } from "./traces.rest.ts";
@@ -101,8 +109,9 @@ export interface TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw> {
   formatSpansDigest(input: { spans: Span[] }): Promise<string>;
 }
 
-/** The four fields the legacy search body adds to the shared filter input. */
+/** The legacy search body's own fields, plus the shared filter map its transport inspects. */
 export type TraceLegacySearchFields = Readonly<{
+  filters?: TraceSharedFiltersInput["filters"];
   startDate: string | number;
   endDate: string | number;
   pageSize?: number | undefined;
@@ -282,6 +291,19 @@ async function unshareLegacyTrace({
   return answer({ status: "success" }, 200);
 }
 
+/**
+ * Main's 400 for a search body not sent as JSON, in the sentence it has always written;
+ * every other refusal (401, 403, 413) stays on the family's boundary, as before.
+ */
+const searchMalformedBody: RestProtocolRefusal = ({ failure, response }) =>
+  HandledError.isHandled(failure) && failure.code === "malformed_request"
+    ? response.write({
+        status: 400,
+        mediaType: PRODUCES_JSON,
+        body: JSON.stringify({ error: "Invalid body" }),
+      })
+    : response.decline();
+
 /** `searchLegacyTraces`: the deprecated search, behind the project door. */
 async function searchLegacyTraces({
   app,
@@ -304,6 +326,13 @@ async function searchLegacyTraces({
     return answer({ error: app.describeValidationError(parsed.error) }, 400);
   }
   const params = parsed.data as TraceLegacySearchFields & Record<string, unknown>;
+  const unkeyed = unkeyedLegacyFilterViolations({
+    filters: params.filters,
+    offersFilterString: false,
+  });
+  if (unkeyed.length > 0) {
+    return answer({ error: unkeyed.map((violation) => violation.message).join(" ") }, 400);
+  }
 
   const format = params.format ?? (params.llmMode ? "digest" : "json");
 
@@ -449,11 +478,15 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   // The body is the evidence: it is read once and parsed by the family's own
   // schema, so a malformed payload earns the sentence a deployed SDK parses.
   .post("/api/trace/search", "searchLegacyTraces")
-  .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withPermission("traces:view")
   .withMiddleware(tracesRestCredential)
-  .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
+  .withResponse("protocol", {
+    produces: PRODUCES_JSON,
+    because: LEGACY_PROTOCOL_REASON,
+    refusal: searchMalformedBody,
+  })
   .withDocs({
     operationId: "postApiTraceSearch",
     summary: "Search traces",

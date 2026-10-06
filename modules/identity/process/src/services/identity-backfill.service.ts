@@ -23,7 +23,7 @@ import {
 } from "./identity-backfill-plan.service.ts";
 import type { IdentitySecretCarryService } from "./identity-secret-carry.service.ts";
 
-export const IDENTITY_BACKFILL_ACTOR = {
+const IDENTITY_BACKFILL_ACTOR = {
   type: "system" as const,
   id: "system:identity-backfill",
 };

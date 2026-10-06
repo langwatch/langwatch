@@ -20,7 +20,7 @@ import type { SsoConnectionRegistrationSlot } from "../sso-connection-registrati
 
 /** The `User` row as the memory tier keeps it, plus the opaque payload a
  *  newborn commit carries through. */
-export interface MemoryUserRow {
+interface MemoryUserRow {
   id: string;
   email: string | null;
   emailVerified: boolean;

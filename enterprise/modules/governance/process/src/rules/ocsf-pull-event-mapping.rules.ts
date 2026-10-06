@@ -15,7 +15,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
-import type { GovernanceOcsfEventInput } from "../app/governance.members.ts";
+import type { GovernanceOcsfEventInput } from "../repositories/governance.repositories.ts";
 import { OCSF_ACTIVITY, OCSF_SEVERITY } from "./ocsf-codes.rules.ts";
 
 /**

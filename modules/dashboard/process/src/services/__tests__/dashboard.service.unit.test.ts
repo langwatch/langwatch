@@ -11,8 +11,8 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { FixedDashboardAudience } from "../../app/__tests__/dashboard.fixture.ts";
-import type { WorkbenchAccess } from "../../app/dashboard.members.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
+import type { WorkbenchAccess } from "../dashboard.service.ts";
 import { DashboardService } from "../dashboard.service.ts";
 
 class FixedWorkbenchAccess implements WorkbenchAccess {

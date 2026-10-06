@@ -1,5 +1,47 @@
 # Changelog
 
+## [3.20.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.20.0...langwatch@v3.20.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* **sso:** self-hosted sign-in sends colleagues straight to the sole live connection ([#8411](https://github.com/langwatch/langwatch/issues/8411)) ([82be095](https://github.com/langwatch/langwatch/commit/82be095b69a5d5bdcdb3b03f673ab232779ab3f5))
+
+
+### Miscellaneous
+
+* review nits on the test doubles and the discovery example ([99e4f0e](https://github.com/langwatch/langwatch/commit/99e4f0e06383ba04228197549262e8f2e6a0b9c9))
+* **sso:** review nits on the discovery example and the test doubles ([#8410](https://github.com/langwatch/langwatch/issues/8410)) ([99e4f0e](https://github.com/langwatch/langwatch/commit/99e4f0e06383ba04228197549262e8f2e6a0b9c9))
+
+## [3.20.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.4...langwatch@v3.20.0) (2026-10-01)
+
+
+### Features
+
+* **self-hosting:** third-party calls off by default, managed models only for langwatch/ models ([#8396](https://github.com/langwatch/langwatch/issues/8396)) ([9deb5ab](https://github.com/langwatch/langwatch/commit/9deb5ab54decc5169b0942b1e0ccd2e36b32f558))
+
+
+### Bug Fixes
+
+* **docs:** restore the cache-busted redirect and find it by source in docs-release ([710cdd8](https://github.com/langwatch/langwatch/commit/710cdd88194a45b8f006cfd43deb34e12b24c448))
+* **docs:** unblock docs-release, find the cache-busted redirect by source ([#8407](https://github.com/langwatch/langwatch/issues/8407)) ([710cdd8](https://github.com/langwatch/langwatch/commit/710cdd88194a45b8f006cfd43deb34e12b24c448))
+* **self-hosting:** autogen-off and Argo CD installs, gateway ingress, PDBs, activation codes in the license variable, SSO without restart ([#8399](https://github.com/langwatch/langwatch/issues/8399)) ([0a300c1](https://github.com/langwatch/langwatch/commit/0a300c1dab1cbd2f3c1ba909542a136751ec1e3c))
+* **sso:** edit a connection's identity provider, trust discovery endpoint origins, name the remaining refusals ([#8409](https://github.com/langwatch/langwatch/issues/8409)) ([1ce6d47](https://github.com/langwatch/langwatch/commit/1ce6d473566a73b7a2253195eff6c2a3b1d917bc))
+
+## [3.19.4](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.3...langwatch@v3.19.4) (2026-10-01)
+
+
+### Bug Fixes
+
+* **pii:** keep known span kinds out of strict name detection ([#8384](https://github.com/langwatch/langwatch/issues/8384)) ([08c9bfa](https://github.com/langwatch/langwatch/commit/08c9bfacc23f145fac2bddc3dc4749389b59de88)), closes [#8383](https://github.com/langwatch/langwatch/issues/8383)
+* **sso:** link Entra ID and SAML sign-ins on self-hosted, match the Entra issuer ([#8405](https://github.com/langwatch/langwatch/issues/8405)) ([18b8555](https://github.com/langwatch/langwatch/commit/18b85556bb0ab4fe56df0324ab767aaf28bbb945))
+* **traces:** has:feedback, has:annotation and flat keyed filters; docs ([#8336](https://github.com/langwatch/langwatch/issues/8336)) ([2cd705c](https://github.com/langwatch/langwatch/commit/2cd705cfa984901f566146aa21236125acc5a311))
+
+
+### Documentation
+
+* **self-hosting:** clearer secrets and external database guidance for Helm and ArgoCD ([#8398](https://github.com/langwatch/langwatch/issues/8398)) ([e907f80](https://github.com/langwatch/langwatch/commit/e907f80860adce753d84dbb2d62aa4864dd8cb81))
+
 ## [3.19.3](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.2...langwatch@v3.19.3) (2026-09-30)
 
 

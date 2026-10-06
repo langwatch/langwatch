@@ -442,4 +442,33 @@ describe("given an organization admin editing a member's access", () => {
       expect(store.rowFor({ userId: MEMBER_ID, scopeId: SHARED_TEAM_ID })?.role).toBe("VIEWER");
     });
   });
+
+  describe("given the member is on a Developer seat", () => {
+    /** @scenario A Developer cannot be given a role on a shared team */
+    it("refuses even a Viewer row on a shared team, writing nothing", async () => {
+      const { store, save } = world({ seat: "DEVELOPER" });
+
+      await expect(
+        save({
+          bindingIdsToDelete: [],
+          bindingsToCreate: [{ role: "VIEWER", scopeType: "TEAM", scopeId: SHARED_TEAM_ID }],
+        }),
+      ).rejects.toMatchObject({ code: "developer_seat_no_shared_access" });
+
+      expect(
+        store.countMatching((row) => row.userId === MEMBER_ID && row.scopeId === SHARED_TEAM_ID),
+      ).toBe(0);
+    });
+
+    it("refuses a row on a shared project", async () => {
+      const { save } = world({ seat: "DEVELOPER" });
+
+      await expect(
+        save({
+          bindingIdsToDelete: [],
+          bindingsToCreate: [{ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        }),
+      ).rejects.toMatchObject({ code: "developer_seat_no_shared_access" });
+    });
+  });
 });

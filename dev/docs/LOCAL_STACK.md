@@ -176,7 +176,7 @@ worker first. Production runs three Node deployments.
 | `pnpm dev:api` + `pnpm dev:worker`       | the production process shape; use when a blocked worker job must not read as API latency |
 
 Both Node lanes restart on change, debounced by
-`LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (default 750 ms); the Go lane restarts through
+`LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (default 2000 ms); the Go lane restarts through
 `air` on successful builds only. The Go services auto-start when the toolchain is
 on PATH and reuse an existing listener from another worktree. Opt out per
 service with `LANGWATCH_SKIP_AIGATEWAY=1`, `LANGWATCH_SKIP_NLP=1` or

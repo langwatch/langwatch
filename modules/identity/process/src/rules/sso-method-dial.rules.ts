@@ -13,7 +13,7 @@ export interface SsoMethodConfiguration {
 }
 
 /** The connection a sign-in would be sent to, as dialing sees it. */
-export interface SsoMethodDialRequest {
+interface SsoMethodDialRequest {
   source: SsoConnectionSource;
   /** The grandfathered pin, or the connection id a registration is keyed by. */
   methodId: string;

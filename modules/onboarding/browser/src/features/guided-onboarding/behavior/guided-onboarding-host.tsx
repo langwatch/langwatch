@@ -4,14 +4,13 @@
  * Also lends the tour its sidebar and governance actions, over the host.
  * @see specs/features/onboarding/guided-tour.feature
  */
-import type { GuidedPath } from "@langwatch/onboarding-contract";
+import type { GuidedKickoffTourStatus, GuidedPath } from "@langwatch/onboarding-contract";
 import { type MutableRefObject, useEffect, useMemo, useRef } from "react";
 
 import { onboardingApi } from "../../../behavior/onboarding-api.ts";
 import { registerOnboardingExperiment } from "../../../behavior/onboarding-experiment-registration.ts";
 import { useRequiredSession } from "../../../behavior/use-required-session.ts";
 import { useOnboardingHost, type OnboardingHostApi } from "../../../model/onboarding-host.ts";
-import type { GuidedKickoffTourStatus } from "../model/kickoff.ts";
 import {
   buildKickoff,
   firstNameOf,

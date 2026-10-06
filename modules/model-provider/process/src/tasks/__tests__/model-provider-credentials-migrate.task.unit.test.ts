@@ -1,19 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ModelProviderCredentialCipher } from "../../app/model-provider.members.ts";
 import type { ModelProviderMigrationDatabase } from "../../rules/model-provider-migration.rules.ts";
 import { ModelProviderCredentialsMigrateTask } from "../model-provider-credentials-migrate.task.ts";
-
-/** A cipher with the deployment's shape and none of its cryptography. */
-class ReversingCipher extends ModelProviderCredentialCipher {
-  encrypt(value: string): string {
-    return `encrypted:${value}`;
-  }
-
-  decrypt(value: string): string {
-    return value.replace(/^encrypted:/, "");
-  }
-}
 
 function emptyDatabase() {
   return {
@@ -23,14 +11,12 @@ function emptyDatabase() {
 }
 
 describe("ModelProviderCredentialsMigrateTask", () => {
-  describe("given a database with no project-scoped providers and a configured key", () => {
+  describe("given a database with no project-scoped providers", () => {
     /** @scenario "The legacy credential and custom-model migrations read only provider rows" */
     it("is named model-provider-migrate-credentials and runs to completion", async () => {
       const database = emptyDatabase();
-      const cipher = new ReversingCipher();
       const task = ModelProviderCredentialsMigrateTask.create({
         database: () => database,
-        cipher: () => cipher,
       });
       expect(task.name).toBe("model-provider-migrate-credentials");
 

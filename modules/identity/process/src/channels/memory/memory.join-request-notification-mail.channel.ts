@@ -1,4 +1,4 @@
-import type { JoinRequestNotificationMail } from "../../app/identity.members.ts";
+import type { JoinRequestNotificationMail } from "../join-request-notification-mail.channel.ts";
 import { JoinRequestNotificationMailChannel } from "../join-request-notification-mail.channel.ts";
 
 type Sent = {

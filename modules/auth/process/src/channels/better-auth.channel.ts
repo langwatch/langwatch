@@ -71,12 +71,8 @@ export type BetterAuthAccountPin = { pinned: true; data: { id: string } } | { pi
  * would fail the ceremony.
  */
 export abstract class BetterAuthAnnouncements {
-  /** The product-analytics trail. */
-  abstract trackServerEvent(input: {
-    userId: string;
-    event: string;
-    properties?: Readonly<Record<string, unknown>>;
-  }): void;
+  /** Nurturing, when a new person signs up; it derives PostHog signed_up. Ids only. */
+  abstract signUpNurturing(input: { userId: string }): void;
 
   /** An error that was caught and swallowed, reported where operators look. */
   abstract reportError(error: unknown): void;

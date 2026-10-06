@@ -702,6 +702,36 @@ describe("handleTrpcCallLogging", () => {
         expect(capture).not.toHaveBeenCalled();
       });
 
+      /** @scenario "An undeclared fault at 5xx is logged and reported as the platform's" */
+      it("logs a presumed platform fault at error", () => {
+        class UndeclaredBoom extends HandledError {
+          constructor() {
+            super("undeclared_boom", "upstream timed out", { httpStatus: 503 });
+          }
+        }
+        const log = createMockLog();
+        const cause = new UndeclaredBoom();
+
+        handleTrpcCallLogging({
+          ...baseArgs,
+          result: {
+            ok: false,
+            error: new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: cause.message, cause }),
+          },
+          log,
+          capture: vi.fn(),
+        });
+
+        expect(log.error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            handledErrorCode: "undeclared_boom",
+            handledErrorFault: "presumed_platform",
+          }),
+          "trpc call",
+        );
+        expect(log.warn).not.toHaveBeenCalled();
+      });
+
       /**
        * An upstream that never answered is not our error budget. tRPC v10
        * cannot express 502, so without preferring the handled status every

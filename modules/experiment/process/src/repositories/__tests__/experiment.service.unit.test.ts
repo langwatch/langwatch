@@ -20,6 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ExperimentExecution } from "../../services/experiment-run-command-dispatcher.service.ts";
 import { NoopExperimentWorkbenchUpdates } from "../../services/experiment-workbench.service.ts";
 import { ExperimentService } from "../../services/experiment.service.ts";
+import type { ExperimentDspyRetentionRepository } from "../experiment-dspy-retention.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import type { ExperimentRepository, ExperimentRowState } from "../experiment.repository.ts";
@@ -317,7 +318,7 @@ class MemoryExperimentExecution extends ExperimentExecution {
 class MemoryExperimentDspyRepository extends ExperimentDspyRepository {
   values: ExperimentDspyStep[] = [];
 
-  async upsert(input: ExperimentDspyStep): Promise<void> {
+  async upsert({ step: input }: { step: ExperimentDspyStep }): Promise<void> {
     this.values = this.values.filter(
       (value) =>
         !(
@@ -384,6 +385,7 @@ const build = (
       repository,
       runRepository,
       dspyRepository,
+      dspyRetention: createApiFixture<ExperimentDspyRetentionRepository>(),
       execution,
       slugify: (value) => value.toLowerCase().replaceAll(" ", "-"),
       newId: () => "generated",

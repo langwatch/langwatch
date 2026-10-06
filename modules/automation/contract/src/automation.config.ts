@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, publicBaseUrl, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 const positiveCount = z.coerce.number().int().positive();
@@ -16,6 +16,8 @@ export const automationServerConfig = Config.define((c) => ({
     "TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE",
     positiveCount.default(5_000),
   ),
+  /** The deployment's public origin (the shared leaf); absent, nothing sent links back. */
+  publicBaseUrl,
 }));
 
 export type AutomationServerConfig = ConfigOf<typeof automationServerConfig>;

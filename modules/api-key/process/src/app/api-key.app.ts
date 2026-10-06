@@ -12,6 +12,7 @@ import {
   type ApiKeyTeam,
   type ApiKeyUser,
   type CreateApiKeyInput,
+  type CreateIngestionKeyInput,
   type MintRunKeyInput,
   type NamedApiKeyBinding,
   type UpdateApiKeyInput,
@@ -44,13 +45,9 @@ import { credentialsSecret, Secret, sessionSecret, type ScopedSecrets } from "@l
 import type { Instant } from "@langwatch/time";
 
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
-import { MemoryApiKeyAnswerCacheRepository } from "../repositories/memory/memory.api-key-answer-cache.repository.ts";
-import {
-  RedisApiKeyAnswerCacheRepository,
-  type ApiKeyAnswerCacheRedis,
-} from "../repositories/redis/redis.api-key-answer-cache.repository.ts";
 import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
+import { IngestionKeyMintService } from "../services/ingestion-key-mint.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
 import { RunKeyMintService } from "../services/run-key-mint.service.ts";
 
@@ -67,7 +64,7 @@ type ApiKeyDependencies = Readonly<{
 }>;
 
 // Module dependencies from the process: repositories, peer APIs, the HMAC pepper's secrets.
-// This list IS the complete member set.
+// This list is everything the module is built from.
 export type ApiKeySetup = Readonly<{
   repositories: ApiKeyRepositories;
   dependencies: Readonly<{
@@ -76,8 +73,8 @@ export type ApiKeySetup = Readonly<{
     projects: ProjectApi;
   }>;
   secrets: ScopedSecrets;
-  /** Where every pod shares its token answers: Redis, else this process's memory. */
-  members: Readonly<{ redis: ApiKeyAnswerCacheRedis | null }>;
+  /** API-key declares no config slice. */
+  config?: undefined;
 }>;
 
 /** What a key may create: the caller's own personal key, or an admin's key. */
@@ -142,7 +139,6 @@ export class ApiKeyModule implements ApiKeyApi {
     projects: ProjectApi,
   };
 
-  static readonly reads = ["redis"] as const;
   /** Main's pepper chain, first set wins: API_KEY_PEPPER, CREDENTIALS_SECRET, NEXTAUTH_SECRET. */
   static readonly secrets = {
     pepper: Secret.load("API_KEY_PEPPER", { optional: true }),
@@ -153,12 +149,9 @@ export class ApiKeyModule implements ApiKeyApi {
   static async create(setup: ApiKeySetup): Promise<ApiKeyModule> {
     const pepper = await apiKeyPepper(setup.secrets);
     const authorization = setup.dependencies.authorization;
-    const { redis } = setup.members;
     const service = ApiKeyService.create({
       repository: setup.repositories.apiKeys,
-      answers: redis
-        ? RedisApiKeyAnswerCacheRepository.create({ redis })
-        : MemoryApiKeyAnswerCacheRepository.create(),
+      answers: setup.repositories.answers,
       authz: authorization,
       grants: authorization,
       organizations: setup.dependencies.organizations,
@@ -177,18 +170,27 @@ export class ApiKeyModule implements ApiKeyApi {
     });
     const runKeys = RunKeyMintService.create({ apiKeys: service, authz: authorization });
 
-    return new ApiKeyModule(service, authorization, runKeys);
+    const ingestionKeys = IngestionKeyMintService.create({ apiKeys: service });
+
+    return new ApiKeyModule({ service, authorization, runKeys, ingestionKeys });
   }
 
-  private constructor(service: ApiKeyService, authorization: AuthzApi, runKeys: RunKeyMintService) {
-    this.#service = service;
-    this.#authorization = authorization;
-    this.#runKeys = runKeys;
+  private constructor(deps: {
+    service: ApiKeyService;
+    authorization: AuthzApi;
+    runKeys: RunKeyMintService;
+    ingestionKeys: IngestionKeyMintService;
+  }) {
+    this.#service = deps.service;
+    this.#authorization = deps.authorization;
+    this.#runKeys = deps.runKeys;
+    this.#ingestionKeys = deps.ingestionKeys;
   }
 
   readonly #service: ApiKeyService;
   readonly #authorization: AuthzApi;
   readonly #runKeys: RunKeyMintService;
+  readonly #ingestionKeys: IngestionKeyMintService;
 
   /**
    * The service itself, for the one thing this application deliberately is not about: turning a
@@ -211,6 +213,9 @@ export class ApiKeyModule implements ApiKeyApi {
     input: ApiKeyTokenResolutionInput,
   ): Promise<ResolvedApiKeyCredential | null> {
     return this.#service.findResolvedToken(input);
+  }
+  createIngestionKey(input: CreateIngestionKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
+    return this.#ingestionKeys.createIngestionKey(input);
   }
   mintRunKey(input: MintRunKeyInput): Promise<string> {
     return this.#runKeys.mintRunKey(input);

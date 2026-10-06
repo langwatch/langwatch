@@ -42,7 +42,7 @@ class StubInvites implements Pick<OrganizationApi, "applyPendingInvite"> {
 }
 
 class StubAnnouncements implements BetterAuthAnnouncements {
-  readonly trackServerEvent = vi.fn();
+  readonly signUpNurturing = vi.fn();
   readonly reportError = vi.fn();
   announceSignup(): never {
     throw new Error("unused");

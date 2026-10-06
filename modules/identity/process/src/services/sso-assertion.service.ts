@@ -80,7 +80,7 @@ const REFUSALS: Record<
   },
 };
 
-export interface SsoAssertionServiceDeps {
+interface SsoAssertionServiceDeps {
   connections: SsoConnectionReadRepository;
   registrants: SsoRegistrantReads;
   /** Absent in the suites that do not exercise the lapsed path. */

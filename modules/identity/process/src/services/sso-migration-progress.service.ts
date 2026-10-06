@@ -1,6 +1,7 @@
 import type { LegacySsoAccessQuery } from "@langwatch/auth-contract";
 import {
   breakGlassIsLive,
+  type BreakGlassBinding,
   SsoConnectionInvalidTransitionError,
   ssoMigrationRouteOf,
   type SsoConnectionLifecycleState,
@@ -48,7 +49,7 @@ export interface SsoMigrationMemberships {
  * Unanswered means this installation provisions nobody, which is what
  * `not-applicable` says.
  */
-export interface SsoMigrationDirectoryReads {
+interface SsoMigrationDirectoryReads {
   readSyncStatus(args: {
     organizationId: string;
     legacyConnectionId: string;
@@ -76,10 +77,12 @@ export interface SsoMigrationFinalizationEvidence {
   legacyAccessRetired: boolean;
 }
 
-export interface SsoMigrationProgressServiceDeps {
+interface SsoMigrationProgressServiceDeps {
   connections: SsoConnectionReadRepository;
   evidence: SsoMigrationEvidenceRepository;
   breakGlass: SsoBreakGlassRepository;
+  /** Whether a grant's holder could actually sign in with a password. */
+  holderCanWalkIn: (args: { organizationId: string; userId: string }) => Promise<boolean>;
   memberships: SsoMigrationMemberships;
   legacyAccess: SsoLegacyAccessReads;
   directory?: SsoMigrationDirectoryReads;
@@ -94,7 +97,7 @@ export interface SsoMigrationReading {
 }
 
 /** The pair, and the page size the journey asks for. */
-export interface SsoMigrationProgressRequest {
+interface SsoMigrationProgressRequest {
   organizationId: string;
   /** Which replacement, when the caller names one; the newest otherwise. */
   connectionId?: string;
@@ -196,7 +199,7 @@ export class SsoMigrationProgressService {
     const blockers = migrationBlockers({
       selectedRoute,
       testSignInDone: testSignIn.done,
-      liveRecoveryCount: bindings.filter((binding) => breakGlassIsLive({ binding, nowMs })).length,
+      liveRecoveryCount: await this.countWalkableWaysBackIn({ organizationId, bindings, nowMs }),
       quietComplete: quiet.complete,
       scimStatus,
       sharedLegacyIdentifiers: false,
@@ -291,6 +294,25 @@ export class SsoMigrationProgressService {
     });
 
     return accounts === 0;
+  }
+
+  /** A grant held by somebody who holds no password is not a way back in. */
+  private async countWalkableWaysBackIn({
+    organizationId,
+    bindings,
+    nowMs,
+  }: {
+    organizationId: string;
+    bindings: readonly BreakGlassBinding[];
+    nowMs: number;
+  }): Promise<number> {
+    let walkable = 0;
+    for (const binding of bindings) {
+      if (!breakGlassIsLive({ binding, nowMs })) continue;
+      if (await this.deps.holderCanWalkIn({ organizationId, userId: binding.userId }))
+        walkable += 1;
+    }
+    return walkable;
   }
 
   private async readScimStatus(pair: MigrationPair): Promise<SsoMigrationScimStatus> {

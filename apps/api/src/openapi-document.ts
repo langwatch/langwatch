@@ -26,6 +26,7 @@ const closed: RestIdentity = {
   identify: refuse,
   identifyOptional: refuse,
   authorize: refuse,
+  authorizePlatform: refuse,
 };
 
 type InstalledModule = Readonly<{

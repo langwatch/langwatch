@@ -6,12 +6,12 @@ import { advanceSettlement, NO_SETTLEMENT_STREAKS } from "../rules/langy-turn-se
 import { LangyTurnSettlementWaiterService } from "./langy-turn-settlement-waiter.service.ts";
 
 /** How often the settlement watcher consults the durable fold + heartbeat. */
-export const SETTLEMENT_POLL_MS = 5_000;
+const SETTLEMENT_POLL_MS = 5_000;
 /**
  * Consecutive settled reads required before synthesizing a terminal, so a single
  * projection blip can never end a live stream.
  */
-export const SETTLEMENT_CONFIRM_POLLS = 2;
+const SETTLEMENT_CONFIRM_POLLS = 2;
 
 /** The two reads a tail makes on the token buffer. */
 export interface TurnTailBuffer {
@@ -55,7 +55,7 @@ interface TailDeps {
  * it when the turn stops beating.
  */
 /** `stopped`: the stream ended (reader gone, real terminal seen) before any verdict. */
-export type MissedTerminalWatch = SettlementOutcome | { kind: "stopped" };
+type MissedTerminalWatch = SettlementOutcome | { kind: "stopped" };
 
 const STOPPED: MissedTerminalWatch = { kind: "stopped" };
 

@@ -390,3 +390,30 @@ func writeWaiterFixture(t *testing.T, dir string, pid int, claim WaiterClaim) {
 		t.Fatalf("write: %v", err)
 	}
 }
+
+func TestHolderSnapshotsListsLiveClaimsAndDropsStaleOnes(t *testing.T) {
+	s := New(t.TempDir())
+	if got := s.HolderSnapshots("checks"); got != nil {
+		t.Fatalf("no holders registered, got %v", got)
+	}
+	release, err := s.ClaimHolder(os.Getpid(), "checks", HolderClaim{Label: "lint", StartedAt: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := s.HolderSnapshots("checks")
+	if len(got) != 1 || got[0].PID != os.Getpid() || got[0].Label != "lint" {
+		t.Fatalf("want the one live holder, got %v", got)
+	}
+	release()
+	if got := s.HolderSnapshots("checks"); len(got) != 0 {
+		t.Fatalf("a released holder must disappear, got %v", got)
+	}
+	expired, err := s.ClaimHolder(os.Getpid(), "checks", HolderClaim{Label: "old", StartedAt: time.Now().Add(-2 * HeavyRunClaimTTL)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer expired()
+	if got := s.HolderSnapshots("checks"); len(got) != 0 {
+		t.Fatalf("a claim past the TTL must be dropped, got %v", got)
+	}
+}

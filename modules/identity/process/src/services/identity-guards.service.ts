@@ -25,12 +25,12 @@ import {
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
 
-import type { IdentifierIdentity } from "../app/identity.members.ts";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
 import { computeIdentifierHash } from "../rules/identifier-hash.rules.ts";
 import { assertDetachKeepsWayBack } from "../rules/identity-detach.rules.ts";
+import type { IdentifierIdentity } from "./crypto-identifier-identity.service.ts";
 
 /**
  * The identity guards (ADR-101 §2): what runs BEFORE any fact exists — the

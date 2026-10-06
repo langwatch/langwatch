@@ -61,7 +61,6 @@ import type {
   AutomationTraceFilterCompiler,
   AutomationWebhookStoredParams,
 } from "../app/automation.app.ts";
-import type { AutomationLogger } from "../app/automation.members.ts";
 import {
   extractCheckKeys,
   notifyingActionOr,
@@ -74,7 +73,7 @@ import {
 import { buildRetryAfterMessage } from "../rules/retry-after-message.rules.ts";
 import type { AutomationRulesService } from "./automation-rules.service.ts";
 import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
-import type { AutomationService } from "./automation.service.ts";
+import type { AutomationLogger, AutomationService } from "./automation.service.ts";
 import type { SlackDestinationService } from "./slack-destination.service.ts";
 import type { TriggerFilterValidationService } from "./trigger-filter-validation.service.ts";
 
@@ -90,7 +89,7 @@ const TEST_FIRE_WINDOW_SECONDS = 60;
 const TEST_FIRE_MAX_PER_WINDOW = 10;
 
 /** What the authoring service reaches. */
-export interface AutomationAuthoringCollaborators {
+interface AutomationAuthoringCollaborators {
   automation: AutomationService;
   rules: AutomationRulesService;
   monitors: MonitorApi;

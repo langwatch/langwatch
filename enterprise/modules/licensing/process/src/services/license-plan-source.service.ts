@@ -6,7 +6,7 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import { HandledError } from "@langwatch/handled-error";
 
-import type { OrganizationLicense } from "../app/licensing.members.ts";
+import type { OrganizationLicense } from "../repositories/organization-license.repository.ts";
 
 /** An organization that no longer exists holds no licence: plan reads answer unlicensed. */
 const unlicensedWhenMissing = (error: unknown): { licenseKey: null } => {

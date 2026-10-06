@@ -6,6 +6,7 @@
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../behavior/organization-api.ts", () => ({
@@ -44,8 +45,11 @@ const renderForm = () => {
   return { onSubmit };
 };
 
-const markAsLiteMember = () => {
-  fireEvent.click(screen.getByText("Lite Member"));
+/** Picks the Lite Member seat from the Seat select, the way an admin does. */
+const markAsLiteMember = async () => {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("combobox", { name: "Seat" }));
+  await user.click(await screen.findByRole("option", { name: /Lite Member/ }));
 };
 
 const removeTheAssignedTeam = () => {
@@ -68,10 +72,10 @@ describe("AddMembersForm", () => {
   describe("given the invite is for a lite member", () => {
     describe("when a team is still assigned", () => {
       /** @scenario Inviting a Lite Member with no team warns that they will see nothing */
-      it("says nothing, because the team is what they will see", () => {
+      it("says nothing, because the team is what they will see", async () => {
         renderForm();
 
-        markAsLiteMember();
+        await markAsLiteMember();
 
         expect(screen.queryByTestId(WARNING)).toBeNull();
       });
@@ -79,20 +83,20 @@ describe("AddMembersForm", () => {
 
     describe("when the assigned team is removed", () => {
       /** @scenario Inviting a Lite Member with no team warns that they will see nothing */
-      it("warns that the person will not be able to see anything", () => {
+      it("warns that the person will not be able to see anything", async () => {
         renderForm();
 
-        markAsLiteMember();
+        await markAsLiteMember();
         removeTheAssignedTeam();
 
         expect(screen.getByTestId(WARNING)).toBeTruthy();
       });
 
       /** @scenario Inviting a Lite Member with no team warns that they will see nothing */
-      it("names adding a team as the way out, and says it can wait", () => {
+      it("names adding a team as the way out, and says it can wait", async () => {
         renderForm();
 
-        markAsLiteMember();
+        await markAsLiteMember();
         removeTheAssignedTeam();
 
         const warning = screen.getByTestId(WARNING).textContent ?? "";
@@ -104,7 +108,7 @@ describe("AddMembersForm", () => {
       it("still sends the lite invitation with no team, because assigning one later is allowed", async () => {
         const { onSubmit } = renderForm();
 
-        markAsLiteMember();
+        await markAsLiteMember();
         removeTheAssignedTeam();
         enterEmail(EMAIL);
         sendInvites();

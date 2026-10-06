@@ -7,8 +7,8 @@ import type {
 } from "@langwatch/trace-contract";
 import { NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
 
-import { TraceAttributeRedactionService } from "../services/trace-attribute-redaction.service.ts";
-import { TraceViewerProtectionsService } from "../services/trace-viewer-protections.service.ts";
+import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
+import { canReadCapturedContent } from "./trace-viewer-protections.rules.ts";
 
 /**
  * Gates for v2 trace read DTOs: enforces same Protections on both transports
@@ -67,7 +67,7 @@ export function gateSessionTitle<T extends { codingAgent: { title: string | null
 }): (T & {
   codingAgent: (NonNullable<T["codingAgent"]> & SessionTitleRedactionFlag) | null;
 })[] {
-  const contentVisible = TraceViewerProtectionsService.canReadCapturedContent(protections);
+  const contentVisible = canReadCapturedContent(protections);
   return sessions.map((session) => {
     const codingAgent = session.codingAgent as NonNullable<T["codingAgent"]> | null;
     return {
@@ -85,7 +85,7 @@ export function gateSessionTitle<T extends { codingAgent: { title: string | null
 }
 
 /** What {@link gateSessionTitle} adds to a row's coding-agent enrichment. */
-export interface SessionTitleRedactionFlag {
+interface SessionTitleRedactionFlag {
   /** True only when a title existed and this viewer may not read it. */
   titleRedacted: boolean;
 }
@@ -99,7 +99,7 @@ export function gateResources({
   protections: Protections;
 }): TraceResourceInfoDto {
   const redact = (attrs: Record<string, string>): Record<string, string> =>
-    TraceAttributeRedactionService.create(protections.hiddenAttributes).redact(attrs) ?? attrs;
+    createAttributeRedactor({ hidden: protections.hiddenAttributes })(attrs) ?? attrs;
   return {
     ...resources,
     resourceAttributes: redact(resources.resourceAttributes),
@@ -141,7 +141,7 @@ export function gateEvaluations({
  * Internal cost-classification markers filtered from drawer resource view.
  * Fixed set, independent of viewer. Applied before gateResources.
  */
-export const HIDDEN_RESOURCE_ATTRS: ReadonlySet<string> = new Set([NON_BILLABLE_ATTR]);
+const HIDDEN_RESOURCE_ATTRS: ReadonlySet<string> = new Set([NON_BILLABLE_ATTR]);
 
 export function withoutHiddenResourceAttrs(attrs: Record<string, string>): Record<string, string> {
   let hasHidden = false;

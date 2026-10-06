@@ -8,7 +8,7 @@ import {
   type ResolvePlanInput,
 } from "@langwatch/enterprise-licensing-contract";
 
-import type { OrganizationLicense } from "../app/licensing.members.ts";
+import type { OrganizationLicense } from "../repositories/organization-license.repository.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
 export type LicensingEntitlementSourceMode = "cloud" | "self-hosted";

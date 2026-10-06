@@ -93,6 +93,7 @@ describe("sealed projections (ARCHITECTURE §9)", () => {
     expectTypeOf(narrowHandler).not.toMatchTypeOf<SubscriberSpec<RunEvent>["handler"]>();
   });
 
+  /** @scenario "A projection subscriber infers its committed document" */
   it("types a projection subscriber with its fold's state through the fold's name", () => {
     const pipeline = runPipeline().withProjectionSubscriber("onCount", {
       fold: "counter",
@@ -111,6 +112,7 @@ describe("sealed projections (ARCHITECTURE §9)", () => {
     expect(register).not.toThrow();
   });
 
+  /** @scenario "A projection subscriber infers its committed document" */
   it("rejects a subscriber naming a fold the pipeline never registered", () => {
     const ignore = async () => {};
     expect(() =>

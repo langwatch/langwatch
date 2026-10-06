@@ -76,6 +76,15 @@ describe("AgentTypeSelectorDrawer", () => {
     expect(onSelect).toHaveBeenCalledWith("code");
   });
 
+  /** @scenario "Choosing Code Agent in the AgentTypeSelectorDrawer opens the AgentCodeEditorDrawer" */
+  it("opens the code editor when no caller takes the choice", () => {
+    render(<AgentTypeSelectorDrawer open />, { wrapper: Wrapper });
+
+    fireEvent.click(screen.getByTestId("agent-type-code"));
+
+    expect(drawer.openDrawer).toHaveBeenCalledExactlyOnceWith("agentCodeEditor");
+  });
+
   it("reports workflow selection", async () => {
     const { onSelect } = renderDrawer();
 

@@ -1,4 +1,4 @@
-import { type AgentWithFields, secretReferenceOf } from "@langwatch/agent-contract";
+import { type AgentWithFields, readSecretReference } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
 import type {
   AgentComponent,
@@ -240,7 +240,7 @@ export function draftSettingsWithoutCredentials(
 }
 
 function keepReference(value: string): string {
-  return secretReferenceOf(value) === void 0 ? "" : value;
+  return readSecretReference(value).isReference ? value : "";
 }
 
 function blankAuth(auth: HttpAuth | undefined): HttpAuth | undefined {

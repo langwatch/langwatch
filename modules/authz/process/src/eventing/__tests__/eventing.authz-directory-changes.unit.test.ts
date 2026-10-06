@@ -6,6 +6,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { EventingAuthzGrantRepository } from "../../repositories/eventing/eventing.authz-grant.repository.ts";
+import { EventingAuthzReadRepository } from "../../repositories/eventing/eventing.authz-read.repository.ts";
+import { PrismaAuthzLedgerReadRepository } from "../../repositories/prisma/prisma.authz-ledger-read.repository.ts";
 
 const ORG_ID = "org_acme";
 
@@ -24,7 +26,8 @@ function repositoryOver({
   return {
     findMany,
     repository: EventingAuthzGrantRepository.create({
-      database: database as never,
+      reads: PrismaAuthzLedgerReadRepository.create({ prisma: database as never }),
+      lineage: EventingAuthzReadRepository.create(database as never),
       writer: {} as never,
     }),
   };

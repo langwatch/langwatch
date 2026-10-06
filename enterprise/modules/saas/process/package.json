@@ -29,6 +29,7 @@
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "posthog-node": "catalog:",
     "zod": "catalog:"
   },

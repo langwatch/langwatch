@@ -1,4 +1,5 @@
 import type { AuthRepositories } from "../auth.repositories.ts";
+import { MemoryAuthRateLimitRepository } from "./memory.auth-rate-limit.repository.ts";
 import { MemoryAuthSessionRepository } from "./memory.auth-session.repository.ts";
 import { MemoryAuthDatabase } from "./memory.auth.database.ts";
 import { MemoryCliDeviceSessionRepository } from "./memory.cli-device-session.repository.ts";
@@ -21,6 +22,7 @@ export class MemoryAuthRepositories {
   readonly signUpTokens: AuthRepositories["signUpTokens"];
   readonly signInLocks: MemorySignInAttemptLockRepository;
   readonly signInSecurity: MemorySignInSecuritySettingsRepository;
+  readonly rateLimits: MemoryAuthRateLimitRepository;
 
   private constructor(memory: MemoryAuthDatabase) {
     this.sessions = MemoryAuthSessionRepository.create({ memory });
@@ -28,5 +30,6 @@ export class MemoryAuthRepositories {
     this.signUpTokens = MemorySignUpVerificationTokenRepository.create({ memory });
     this.signInLocks = MemorySignInAttemptLockRepository.create();
     this.signInSecurity = MemorySignInSecuritySettingsRepository.create();
+    this.rateLimits = MemoryAuthRateLimitRepository.create();
   }
 }

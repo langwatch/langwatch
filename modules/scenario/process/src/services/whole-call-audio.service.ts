@@ -17,7 +17,7 @@ export const ELEVENLABS_CONVERSATION_ID_ATTR = "voice.elevenlabs.conversation_id
  * union: a phone run is streamed from a Twilio recording, an ElevenLabs run
  * from the conversation audio, and the two carry materially different ids.
  */
-export type WholeCallAudioHandle =
+type WholeCallAudioHandle =
   | { kind: "twilio"; callSid: string }
   | { kind: "elevenlabs"; conversationId: string };
 
@@ -53,7 +53,7 @@ function extractAttributesHandle(
 }
 
 /** What resolving a call's audio reaches outside itself. */
-export interface WholeCallAudioCollaborators {
+interface WholeCallAudioCollaborators {
   /** The run the audio belongs to, read for the trace ids its messages carry. */
   simulations: Pick<SimulationService, "findScenarioRunData">;
   /** One trace's normalized spans, read for the attributes they carry. */

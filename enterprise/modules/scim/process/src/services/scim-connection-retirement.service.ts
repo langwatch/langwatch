@@ -24,7 +24,7 @@ const RETIRING_STATES: ReadonlySet<string> = new Set(["TEARDOWN_PENDING"]);
 const RETIRING_REPLACEMENT_PHASES: ReadonlySet<string> = new Set(["FINALIZING", "FINALIZED"]);
 
 /** The one thing retirement does to this module's rows. */
-export interface ScimTokenRetirement {
+interface ScimTokenRetirement {
   revokeTokensForConnection(input: {
     organizationId: string;
     connectionId: string;

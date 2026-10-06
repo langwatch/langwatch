@@ -164,11 +164,11 @@ import {
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
+import type { GovernanceHttpClient } from "../channels/governance-http.channel.ts";
 import { governanceListingChannels } from "../channels/governance-listing-channels.registry.ts";
 import { HttpAnomalyAlertChannel } from "../channels/http/http.anomaly-alert.channel.ts";
 import { ClaudeComplianceReferencePullerAdapter } from "../channels/http/http.claude-compliance.channel.ts";
@@ -244,12 +244,12 @@ import { DefaultGovernanceSetupStateService } from "../services/governance-setup
 import { GovernanceTraceFactsService } from "../services/governance-trace-facts.service.ts";
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
-import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import { IngestionPullLifecycleService } from "../services/ingestion-pull-lifecycle.service.ts";
 import { IngestionPullListingService } from "../services/ingestion-pull-listing.service.ts";
 import { IngestionPullLogService } from "../services/ingestion-pull-log.service.ts";
 import { IngestionPullMetricsService } from "../services/ingestion-pull-metrics.service.ts";
 import { IngestionPullWorkerService } from "../services/ingestion-pull-worker.service.ts";
+import type { PulledUsageDispatcher } from "../services/ingestion-pull-worker.service.ts";
 import { IngestionPullService } from "../services/ingestion-pull.service.ts";
 import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
 import { IngestionSourceReadService } from "../services/ingestion-source-read.service.ts";
@@ -283,11 +283,6 @@ import {
   type SpendSpikeEvaluationSummary,
 } from "../services/spend-spike-anomaly-evaluator.service.ts";
 import { SuppressionSnapshotService } from "../services/suppression-snapshot.service.ts";
-import type {
-  GovernanceEncryptor,
-  GovernanceHttpClient,
-  PulledUsageDispatcher,
-} from "./governance.members.ts";
 
 const logger = createLogger("langwatch:governance");
 
@@ -421,7 +416,7 @@ export interface GovernanceAppDependencies {
   permissions: Pick<AuthzService, "getDecision">;
 }
 
-/** How a process installs this application: its peers, its members, its repositories. */
+/** How a process installs this application: its peers, its config, its secrets, its repositories. */
 type GovernanceSetup = Readonly<{
   dependencies: FeatureSetup<
     typeof GovernanceModule.dependencies,
@@ -431,19 +426,11 @@ type GovernanceSetup = Readonly<{
   config: GovernanceConfig | undefined;
   resources: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["resources"];
   secrets: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["secrets"];
-  members: Readonly<{
-    encryption: GovernanceEncryptor;
-    isSaas: boolean;
-    /** The process's own fact, absent where the deployment named no `BASE_HOST`. */
-    publicBaseUrl?: string | undefined;
-  }> &
-    Readonly<{ rateLimiter: RateLimiter }>;
   repositories: GovernanceRepositories;
 }>;
 
 export class GovernanceModule implements GovernanceRestApi {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
-  static readonly reads = ["encryption", "isSaas", "publicBaseUrl", "rateLimiter"] as const;
   /**
    * The peer modules this application reads. A peer is never a member:
    * the process resolves each token and hands the app the peer's own API, so
@@ -475,7 +462,6 @@ export class GovernanceModule implements GovernanceRestApi {
 
   static async create({
     config,
-    members,
     dependencies,
     repositories,
     secrets,
@@ -523,10 +509,8 @@ export class GovernanceModule implements GovernanceRestApi {
       },
       repositories,
       erasureSuppression,
-      encryption: members.encryption,
-      gatewayBaseUrl: governanceGatewayBaseUrl({ config, isSaas: members.isSaas }),
-      publicBaseUrl: members.publicBaseUrl,
-      rateLimiter: members.rateLimiter,
+      gatewayBaseUrl: governanceGatewayBaseUrl({ config }),
+      publicBaseUrl: config?.publicBaseUrl,
       ingestRateLimitDisabled: config?.ingestRateLimitDisabled ?? false,
     });
   }
@@ -537,10 +521,8 @@ export class GovernanceModule implements GovernanceRestApi {
     dependencies,
     repositories,
     erasureSuppression,
-    encryption,
     gatewayBaseUrl,
     publicBaseUrl,
-    rateLimiter,
     ingestRateLimitDisabled,
   }: {
     ottl: GovernanceOttlGateway;
@@ -548,15 +530,12 @@ export class GovernanceModule implements GovernanceRestApi {
     dependencies: GovernanceAppDependencies;
     repositories: GovernanceRepositories;
     erasureSuppression: ErasureSuppressionService;
-    encryption: GovernanceEncryptor;
     gatewayBaseUrl: string;
     publicBaseUrl: string | undefined;
-    rateLimiter: RateLimiter;
     ingestRateLimitDisabled: boolean;
   }) {
     this.dependencies = dependencies;
     this.repositories = repositories;
-    this.encryption = encryption;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
     this.activityMonitor = ActivityMonitorService.create({
       repository: repositories.activityMonitor,
@@ -731,7 +710,6 @@ export class GovernanceModule implements GovernanceRestApi {
         disable: (input) => this.ingestionPullSender("disable").send(input),
       },
     });
-    const ingestionCredentials = IngestionCredentialsService.create(encryption);
     this.ingestionSources = IngestionSourceService.create({
       repository: repositories.ingestionSources,
       projects: dependencies.projects,
@@ -742,10 +720,9 @@ export class GovernanceModule implements GovernanceRestApi {
           ),
       },
       lifecycle: { sync: (source) => this.pullLifecycle.sync(toPullLifecycleSource(source)) },
-      credentials: ingestionCredentials,
       secrets: ingestionSecrets,
       destinations: PullDestinationService.create(),
-      providerAccounts: HttpProviderAccountChannel.create({ credentials: ingestionCredentials }),
+      providerAccounts: HttpProviderAccountChannel.create(),
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
     this.ottl = ottl;
@@ -754,10 +731,9 @@ export class GovernanceModule implements GovernanceRestApi {
       pullRuns: repositories.ingestionPullRuns,
       projects: dependencies.projects,
     });
-    // Stored credentials seal under the process's CREDENTIALS_SECRET, the key main sealed them with.
+    // The source store opens stored credentials under CREDENTIALS_SECRET, the key main sealed them with.
     const sourceCredentials = SourceCredentialAccessService.create({
       sources: repositories.ingestionSources,
-      credentials: IngestionCredentialsService.create(encryption),
     });
     const http: GovernanceHttpClient = { fetch: ssrfSafeFetch };
     this.http = http;
@@ -807,6 +783,7 @@ export class GovernanceModule implements GovernanceRestApi {
         if (session.projectLocked) throw new OrganizationInvalidCredentialsError();
         return session;
       },
+      permitted: (input) => this.dependencies.permissions.getDecision(input),
     });
     this.cliAccessService = GovernanceCliAccessService.create({
       sessions: dependencies.auth,
@@ -847,7 +824,7 @@ export class GovernanceModule implements GovernanceRestApi {
     this.ingestService = GovernanceIngestService.create({
       access: GovernanceIngestAccessService.create({
         sources: this.ingestionSources,
-        rateLimiter,
+        rateLimits: repositories.rateLimits,
         rateLimitDisabled: ingestRateLimitDisabled,
       }),
       receiver: GovernanceIngestReceiverService.create({
@@ -904,7 +881,6 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly identityMatches: IdentityMatchService;
   private readonly identityMatchSuggestions: IdentityMatchSuggestionService;
   private readonly repositories: GovernanceRepositories;
-  private readonly encryption: GovernanceEncryptor;
   private readonly http: GovernanceHttpClient;
   private ingestionPullCommands: EventingSenders | undefined;
   private pulledUsageCommands: EventingSenders | undefined;
@@ -1052,7 +1028,6 @@ export class GovernanceModule implements GovernanceRestApi {
     const worker = IngestionPullWorkerService.create({
       sources: repositories.ingestionSources,
       registry: pullers,
-      credentials: IngestionCredentialsService.create(this.encryption),
       projects: dependencies.projects,
       sink: repositories.ocsfEvents,
       usageEntitlement: {
@@ -1614,7 +1589,8 @@ export class GovernanceModule implements GovernanceRestApi {
       by,
       feature: "ANOMALY_RULES",
     });
-    return this.anomalyRules.list(input.organizationId);
+    const rules = await this.anomalyRules.list(input.organizationId);
+    return rules.map((rule) => this.anomalyRules.forReader(rule));
   }
 
   async anomalyRuleGetById(
@@ -1626,7 +1602,7 @@ export class GovernanceModule implements GovernanceRestApi {
       by,
       feature: "ANOMALY_RULES",
     });
-    return this.anomalyRules.getById(input);
+    return this.anomalyRules.forReader(await this.anomalyRules.getById(input));
   }
 
   async anomalyRuleCreate(
@@ -1638,9 +1614,10 @@ export class GovernanceModule implements GovernanceRestApi {
       by,
       feature: "ANOMALY_RULES",
     });
-    return this.anomalyRules.createRule(input).catch((error: unknown) => {
+    const created = await this.anomalyRules.createRule(input).catch((error: unknown) => {
       throw this.anomalyRuleConfigError(error, input.ruleType);
     });
+    return this.anomalyRules.forReader(created);
   }
 
   async anomalyRuleUpdate(
@@ -1652,9 +1629,10 @@ export class GovernanceModule implements GovernanceRestApi {
       by,
       feature: "ANOMALY_RULES",
     });
-    return this.anomalyRules.updateRule(input).catch((error: unknown) => {
+    const updated = await this.anomalyRules.updateRule(input).catch((error: unknown) => {
       throw this.anomalyRuleConfigError(error, input.ruleType);
     });
+    return this.anomalyRules.forReader(updated);
   }
 
   async anomalyRuleArchive(
@@ -1666,7 +1644,7 @@ export class GovernanceModule implements GovernanceRestApi {
       by,
       feature: "ANOMALY_RULES",
     });
-    return this.anomalyRules.archive(input);
+    return this.anomalyRules.forReader(await this.anomalyRules.archive(input));
   }
 
   /** A config that fails its schema is main's handled complaint; any other failure passes through. */

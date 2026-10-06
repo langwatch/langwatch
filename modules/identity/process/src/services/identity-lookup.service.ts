@@ -22,7 +22,6 @@ import {
 } from "@langwatch/identity-contract";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { RateLimiter } from "@langwatch/process-stores";
 import { Temporal } from "@langwatch/time";
 
 import type { IdentityHistoryRepository } from "../repositories/identity-history.repository.ts";
@@ -31,6 +30,7 @@ import type {
   LookupDomainClaimRow,
   LookupIdentifierRow,
 } from "../repositories/identity-lookup.repository.ts";
+import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import type { IdentityService } from "./identity.service.ts";
 import type { LinkProposalService } from "./link-proposal.service.ts";
@@ -44,7 +44,7 @@ export interface IdentityLookupServiceDeps {
   links: Pick<LinkProposalService, "confirmLink" | "rejectLink">;
   authorization: Pick<AuthzApi, "can">;
   auditLog: AuditLogApi;
-  rateLimiter: RateLimiter;
+  rateLimiter: IdentityRateLimitRepository;
   sessions: Pick<
     AuthApi,
     "listBrowserSessions" | "revokeAllBrowserSessions" | "endBrowserSessionsForIdentifier"

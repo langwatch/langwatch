@@ -126,6 +126,7 @@ function SessionProbe({
     transport,
     session: reading,
     scope: reading.status === "loading" ? RESOLVING : scope,
+    isPublicRoute: false,
   });
   return (
     <div>

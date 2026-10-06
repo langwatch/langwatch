@@ -251,10 +251,17 @@ Feature: Voice agents: reach an agent by phone
 
   @unit
   Scenario: A voice worker opens a quick tunnel when no public base URL is configured
-    Given no public base URL is configured and the tunnel fallback is left on
+    Given no public base URL is configured and the tunnel fallback is on
     When the worker environment is read and its public URL is resolved
     Then it does not fail, opens a cloudflared quick tunnel on the websocket port
     And it waits until the tunnel's host resolves before treating it as ready
+
+  @unit
+  Scenario: A self-hosted production worker opens no quick tunnel unless enabled
+    Given a production worker that is not LangWatch Cloud, with no public base URL and VOICE_TUNNEL unset
+    When the worker environment is read
+    Then the tunnel fallback is off, so the worker makes no call to Cloudflare
+    And setting VOICE_TUNNEL to true turns it on, while LangWatch Cloud and local development keep it on by default
 
   @unit
   Scenario: A voice worker's public URL tunnel fails fast when it never becomes reachable

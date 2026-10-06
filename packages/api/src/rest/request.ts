@@ -29,6 +29,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z, ZodIssue, ZodSchema } from "zod";
 
 import { RESOLVED_ERROR, type ResolvedError } from "../errors.ts";
+import type { RestIdentity } from "../hosting/api-door.ts";
 import type { ResponseCache } from "../ports.ts";
 import { parseApiSchema, type ApiSchema, type ApiSchemaOutput } from "../schema.ts";
 import type { RestDoorCredential } from "./declaration.ts";
@@ -40,7 +41,6 @@ import {
   type Declined,
   type ServiceContext,
 } from "./response.ts";
-import type { RestIdentity } from "../hosting/api-door.ts";
 
 // Validation: install the hook so failures reach the route's onError (ADR-045).
 
@@ -151,7 +151,7 @@ function violationOf(issue: ZodIssue, input: unknown): FieldViolation {
  * Hono raises this as an `HTTPException` before any schema runs; this only
  * gives it a code.
  */
-class MalformedRequestError extends HandledError {
+export class MalformedRequestError extends HandledError {
   constructor(args: { target: keyof ValidationTargets; detail: string }) {
     super("malformed_request", `The ${TARGET_NOUN[args.target]} could not be parsed.`, {
       httpStatus: 400,
@@ -435,7 +435,19 @@ export type RestRawBodyForm = "text" | "bytes" | "stream";
  * characters a sender wrote, spacing included - so nothing parses it: the form
  * the handler reads it in, and the media type the document publishes for it.
  */
-export type RestRawBody = Readonly<{ form: RestRawBodyForm; mediaType: string }>;
+export type RestRawBody = Readonly<{
+  form: RestRawBodyForm;
+  mediaType: string;
+  /** Present exactly when the route named its media type: what any other type is refused with. */
+  mismatch?: RestMediaTypeMismatch;
+}>;
+
+/**
+ * How a raw-body route refuses a Content-Type it does not read (Alex, 2026-10-05, E9): 415, or
+ * main's 400 where the legacy family and the collector keep it, or `accepted`: the type is only
+ * documented and any is read, as main's routes that never asked the header did.
+ */
+export type RestMediaTypeMismatch = "unsupported_media_type" | "malformed_request" | "accepted";
 
 /** What the handler is handed for the form it asked for. */
 export type RawBodyValue<Form extends RestRawBodyForm> = Form extends "text"

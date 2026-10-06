@@ -50,12 +50,14 @@ import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contrac
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 
-import {
-  type ActivityMonitorRepository,
-  type ActivityMonitorTenant,
-  type GovernanceClickHouseClient,
-  type GovernanceClickHouseResolver,
-} from "../../app/governance.members.ts";
+import type {
+  ActivityMonitorRepository,
+  ActivityMonitorTenant,
+} from "../activity-monitor.repository.ts";
+import type {
+  GovernanceClickHouseClient,
+  GovernanceClickHouseResolver,
+} from "../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 
 /**
  * Whitelist mapping from external sort field names to the aggregate

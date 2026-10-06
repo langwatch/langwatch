@@ -19,7 +19,7 @@ import type { VoiceSessionInfrastructure } from "./voice-call.service.ts";
  * simulation run lifecycle, both from the module's composition, not a
  * global locator — so a unit test composes it against in-memory fakes.
  */
-export interface VoiceCallRunWriterCollaborators {
+interface VoiceCallRunWriterCollaborators {
   agents: {
     findById(input: { projectId: string; id: string }): Promise<{ id: string } | null>;
   };
@@ -83,7 +83,7 @@ function runMetadata({
  * with that scenario's simulated runs. Always present: only a scenario call is
  * ever written as a run (#8020).
  */
-export interface VoiceRunScenario {
+interface VoiceRunScenario {
   scenarioId: string;
   scenarioSetId: string;
 }

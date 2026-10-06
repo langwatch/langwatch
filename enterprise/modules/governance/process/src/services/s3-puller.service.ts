@@ -34,11 +34,9 @@ import { nowInstant } from "@langwatch/time";
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
 
-import type {
-  GovernanceObjectStore,
-  IngestionPullDiagnosticsSink,
-} from "../app/governance.members.ts";
-import { silentIngestionPullDiagnostics } from "../app/governance.members.ts";
+import type { GovernanceObjectStore } from "../channels/object-store.channel.ts";
+import type { IngestionPullDiagnosticsSink } from "./ingestion-pull-log.service.ts";
+import { silentIngestionPullDiagnostics } from "./ingestion-pull-log.service.ts";
 
 const MAX_FILES_PER_RUN = 100;
 const MAX_BYTES_PER_FILE = 50 * 1024 * 1024; // 50 MB safety cap

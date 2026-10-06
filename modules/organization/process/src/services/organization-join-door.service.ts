@@ -15,16 +15,16 @@ import type {
 } from "@langwatch/organization-contract";
 import { Temporal, toDate } from "@langwatch/time";
 
+import type { OrganizationDirectory } from "./organization-directory.service.ts";
 import type {
-  OrganizationDirectory,
   OrganizationJoinRequestState,
   OrganizationJoinRequests,
-} from "../app/organization.members.ts";
+} from "./organization-join-requests.service.ts";
 
 /** Shown where the ledger knows a requester's id but nobody's name. */
 const UNNAMED_COLLEAGUE = "A colleague";
 
-export interface OrganizationJoinDoorDependencies {
+interface OrganizationJoinDoorDependencies {
   readonly joinRequests: OrganizationJoinRequests;
   readonly directory: OrganizationDirectory;
 }
@@ -160,6 +160,7 @@ export class OrganizationJoinDoorService {
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      joinerRole?: JoinRequestJoining["joinerRole"];
       actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged> {
@@ -170,6 +171,8 @@ export class OrganizationJoinDoorService {
       next: change.next,
       previousDomains: [...change.previousDomains],
       nextDomains: [...change.nextDomains],
+      previousJoinerRole: change.previousJoinerRole,
+      nextJoinerRole: change.nextJoinerRole,
     };
   }
 }

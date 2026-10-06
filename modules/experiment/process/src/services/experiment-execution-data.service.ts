@@ -222,10 +222,9 @@ export class ExperimentExecutionDataService {
   }
 
   /**
-   * Everything a run needs before its first row: the dataset it evaluates and every prompt, agent,
-   * workflow and evaluator its targets name. A missing target is refused with an
-   * ExperimentEvaluationInputError rather than run around, so a deleted target stops the run
-   * instead of emptying a column.
+   * Everything a run needs before its first row: the dataset and every prompt, agent, workflow and
+   * evaluator its targets name. A missing target is refused with an ExperimentEvaluationInputError,
+   * so a deleted target stops the run instead of emptying a column.
    */
   async loadExecutionData({
     projectId,

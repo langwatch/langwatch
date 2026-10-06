@@ -60,7 +60,8 @@ export const analyticsLegacyRest: Readonly<{
   .withAddressing("literal")
 
   .post("/api/analytics", "postApiAnalytics")
-  .withRawBody("text", { mediaType: "application/json" })
+  // Main parsed the body as JSON under any Content-Type; a mislabelled one is still read.
+  .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withPermission("analytics:view")
   .responds({ 200: analyticsTimeseriesResponseSchema, 400: legacySentenceErrorSchema })

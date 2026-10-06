@@ -6,6 +6,12 @@ import type {
   ProcessIntent,
   ProcessStore,
 } from "@langwatch/eventing";
+import {
+  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+  GATEWAY_SPEND_FAILED_EVENT_TYPE,
+  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+} from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 import {
@@ -17,10 +23,6 @@ import {
 import type { WebhookDeliveryEvent } from "../eventing/webhook-governance-delivery.intent.ts";
 import { webhookSpendDeliveryRequestedEventSchema } from "../eventing/webhook-spend-delivery.intent.ts";
 import {
-  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
-  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
-  GATEWAY_SPEND_FAILED_EVENT_TYPE,
-  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
   INITIAL_WEBHOOK_DELIVERY_STATE,
   WEBHOOK_SEND_MAX_ATTEMPTS,
   deliverSchema,
@@ -107,7 +109,7 @@ export interface WebhookDeliveryProcessDeps {
  * inbox source id so re-delivering recently-delivered envelopes cannot
  * collide with their historical batches and silently no-op.
  */
-export type WebhookReplayInput = {
+type WebhookReplayInput = {
   organizationId: string;
   endpoint: WebhookEndpointView;
   envelope: SendBatchPayload["envelopes"][number];

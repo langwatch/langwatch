@@ -62,6 +62,8 @@ function doorOver(store: KeyStore): ApiRestCredentialsService {
       hasApiKeyPermission: () => Promise.reject(new Error("the key door asks no permission")),
       getApiKeyProjectDecision: () => Promise.reject(new Error("the key door asks no permission")),
       hasProjectPermission: () => Promise.reject(new Error("the key door asks no permission")),
+      listApiKeyBindings: () => Promise.reject(new Error("the key door asks no permission")),
+      getScope: () => Promise.reject(new Error("the key door reads no scope")),
     },
     cliProjects: {
       getCliAccessProject: () => Promise.reject(new Error("the key door reads no CLI session")),
@@ -95,6 +97,7 @@ const store = new KeyStore(
     ],
   ]),
   new Map<string, OrganizationApiKeyResolution>([
+    ["sk-lw-project", { ok: false, reason: "wrong_credential_class" }],
     [
       "sk-lw-org",
       {
@@ -131,6 +134,43 @@ describe("the key door", () => {
       expect(credential.organizationId).toBe("org-1");
       credential.markUsed();
       expect(store.used).not.toContain("legacy-key");
+    });
+  });
+
+  describe("given an empty or whitespace-only Bearer token beside an X-Auth-Token", () => {
+    /** @scenario Empty or whitespace-only Bearer token does not poison X-Auth-Token fallback */
+    it.each(["Bearer ", "Bearer    ", "Bearer"])(
+      "falls through to the X-Auth-Token credential when Authorization is %j",
+      async (authorization) => {
+        const credential = await door.identifyKey({
+          request: request({ authorization, "x-auth-token": "legacy-key" }),
+        });
+
+        expect(credential.principal).toEqual({ kind: "project", projectId: "project-1" });
+      },
+    );
+  });
+
+  describe("given an Authorization: Basic header beside an X-Auth-Token", () => {
+    /** @scenario Authorization header from a proxy does not poison X-Auth-Token fallback */
+    it("uses the X-Auth-Token, which wins over Basic", async () => {
+      const credential = await door.identifyKey({
+        request: request({
+          authorization: `Basic ${btoa("proxy-user:proxy-password")}`,
+          "x-auth-token": "legacy-key",
+        }),
+      });
+
+      expect(credential.principal).toEqual({ kind: "project", projectId: "project-1" });
+    });
+
+    /** @scenario Authorization Basic is read when no X-Auth-Token is sent */
+    it("reads the Basic credential when no X-Auth-Token is sent", async () => {
+      const credential = await door.identifyKey({
+        request: request({ authorization: `Basic ${btoa("project-1:legacy-key")}` }),
+      });
+
+      expect(credential.principal).toEqual({ kind: "project", projectId: "project-1" });
     });
   });
 
@@ -190,6 +230,37 @@ describe("the key door", () => {
 });
 
 /** @see specs/security/api-endpoint-authorization.feature */
+describe("the organization door", () => {
+  describe("given a token that matches no key at all", () => {
+    /** @scenario "A credential that resolves to nothing is not blamed on its class" */
+    it("is refused as invalid credentials, naming no credential class", async () => {
+      const refusal = await door
+        .identifyOrganization({ request: request({ authorization: "Bearer sk-lw-typo" }) })
+        .then(
+          () => new Error("the door admitted the request"),
+          (error: unknown) => error,
+        );
+
+      expect(refusal).toMatchObject({ code: "invalid_credentials", httpStatus: 401 });
+      expect((refusal as Error).message).not.toMatch(/project|organization/i);
+    });
+
+    /** @scenario "A project key on an organization endpoint is told exactly that" */
+    it("tells a project key from it, naming the class the endpoint needs and the one presented", async () => {
+      const refusal = await door
+        .identifyOrganization({ request: request({ authorization: "Bearer sk-lw-project" }) })
+        .then(
+          () => new Error("the door admitted the request"),
+          (error: unknown) => error,
+        );
+
+      expect(refusal).toMatchObject({ code: "credential_class_mismatch", httpStatus: 401 });
+      expect((refusal as Error).message).toMatch(/requires an organization API key/);
+      expect((refusal as Error).message).toMatch(/a project key was presented/);
+    });
+  });
+});
+
 describe("the project door", () => {
   describe("given a live key that reaches several projects and names none", () => {
     /** @scenario "A key that reaches several projects and names none is told to name one" */
@@ -199,9 +270,9 @@ describe("the project door", () => {
     ] as const)("is told to name a project, %s", async (_name, method) => {
       const asked = request({ authorization: "Bearer sk-lw-org" });
 
-      expect(await refusalCode(door[method]({ request: asked, permission: "traces:view" }))).toBe(
-        "project_required",
-      );
+      expect(
+        await refusalCode(door[method]({ request: asked, permissions: ["traces:view"] })),
+      ).toBe("project_required");
     });
   });
 
@@ -232,6 +303,8 @@ describe("a project-bound CLI access token", () => {
       authz: {
         hasApiKeyPermission: () => Promise.reject(new Error("an access token asks no key grant")),
         getApiKeyProjectDecision: () => Promise.reject(new Error("an access token asks no key")),
+        listApiKeyBindings: () => Promise.reject(new Error("an access token lists no grants")),
+        getScope: () => Promise.reject(new Error("an access token reads no scope")),
         hasProjectPermission: (input) => {
           asked.push(input);
           return Promise.resolve(holds);
@@ -251,7 +324,7 @@ describe("a project-bound CLI access token", () => {
     it("authenticates as that person on that project, asking their own access", async () => {
       const credential = await tokenDoor(true).authenticate({
         request: bearer,
-        permission: "traces:view",
+        permissions: ["traces:view"],
       });
 
       expect(credential.project.id).toBe("project-1");
@@ -273,7 +346,7 @@ describe("a project-bound CLI access token", () => {
     it("authenticates as that person on the bound project", async () => {
       const credential = await tokenDoor(true).authenticate({
         request: request({ "x-auth-token": "lw_at_session" }),
-        permission: "traces:view",
+        permissions: ["traces:view"],
       });
 
       expect(credential.actsAsPerson).toEqual({ userId: "user-9" });
@@ -300,7 +373,7 @@ describe("a project-bound CLI access token", () => {
     it("is refused as a permission denial", async () => {
       expect(
         await refusalCode(
-          tokenDoor(false).authenticate({ request: bearer, permission: "traces:view" }),
+          tokenDoor(false).authenticate({ request: bearer, permissions: ["traces:view"] }),
         ),
       ).toBe("api_key_permission_denied");
     });

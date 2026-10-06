@@ -11,15 +11,15 @@ import type {
   SessionGroupsQuery,
   SessionGroupsRepository,
 } from "../../../repositories/session-groups.repository.ts";
-import {
-  SessionGroupsService as TraceSessionGroupsCursorService,
-  SessionGroupsService,
-} from "../../trace-session-groups.service.ts";
 /**
  * @see specs/traces-v2/sessions-lens.feature
  * Sessions lens service: cursor codec, DTO mapping, and the coding-agent enrichment overlay.
  */
-import { VisibilityWindowService } from "../../trace-visibility-window.service.ts";
+import { teaserOf } from "../../../rules/trace-visibility-teaser.rules.ts";
+import {
+  SessionGroupsService as TraceSessionGroupsCursorService,
+  SessionGroupsService,
+} from "../../trace-session-groups.service.ts";
 
 /** Records the coding-agent lookups and rejects unexpected peer calls. */
 class TestCodingAgentApi {
@@ -667,7 +667,7 @@ describe("SessionGroupsService", () => {
       });
 
       const codingAgent = result.sessions[0]!.codingAgent!;
-      expect(codingAgent.title).toBe(VisibilityWindowService.teaserOf(title));
+      expect(codingAgent.title).toBe(teaserOf(title));
       expect(codingAgent.title).not.toBe(title);
       // Where the session ran is operational metadata, not conversation
       // content, so the window does not touch it.

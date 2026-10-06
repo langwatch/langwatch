@@ -11,10 +11,7 @@ import {
 } from "@langwatch/webhook-contract";
 import { z } from "zod";
 
-export interface AutomationWebhookSecretCrypto {
-  encrypt(value: string): string;
-  decrypt(value: string): string;
-}
+import type { TriggerSecretSeal } from "../repositories/trigger.repository.ts";
 
 export type AutomationWebhookStoredParams = {
   url: string;
@@ -69,15 +66,15 @@ const webhookStoredActionParamsSchema = z
 
 export type WebhookStoredActionParams = AutomationWebhookStoredParams;
 
-/** Owns webhook secret persistence and redaction. Crypto is process
- * configuration and is bound once when the service is composed. */
+/** Owns webhook secret persistence and redaction; the trigger repository
+ * seals and opens each stored secret (ARCHITECTURE.md §3.2). */
 export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
-  private constructor(private readonly crypto: AutomationWebhookSecretCrypto) {
+  private constructor(private readonly triggers: TriggerSecretSeal) {
     super();
   }
 
-  static create(crypto: AutomationWebhookSecretCrypto): AutomationWebhookSecretsService {
-    return new AutomationWebhookSecretsService(crypto);
+  static create(triggers: TriggerSecretSeal): AutomationWebhookSecretsService {
+    return new AutomationWebhookSecretsService(triggers);
   }
 
   parseStored(value: unknown): WebhookStoredActionParams {
@@ -92,25 +89,28 @@ export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
     },
     now?: Instant,
   ): string[] {
-    return AutomationWebhookSecretsService.decryptSigningSecrets(params, this.crypto, now);
+    return AutomationWebhookSecretsService.decryptSigningSecrets(params, this.triggers, now);
   }
 
   decryptHeaders(params: {
     headersEncrypted?: string;
     headers?: Record<string, string>;
   }): Record<string, string> {
-    return AutomationWebhookSecretsService.decryptHeaders(params, this.crypto);
+    return AutomationWebhookSecretsService.decryptHeaders(params, this.triggers);
   }
 
   persist(input: {
     incoming: WebhookActionParams;
     existing?: WebhookStoredActionParams | null;
   }): WebhookStoredActionParams {
-    return AutomationWebhookSecretsService.persistActionParams({ ...input, crypto: this.crypto });
+    return AutomationWebhookSecretsService.persistActionParams({
+      ...input,
+      triggers: this.triggers,
+    });
   }
 
   redact(params: WebhookStoredActionParams): WebhookActionParams {
-    return AutomationWebhookSecretsService.redactActionParams(params, this.crypto);
+    return AutomationWebhookSecretsService.redactActionParams(params, this.triggers);
   }
 
   private static decryptSigningSecrets(
@@ -119,7 +119,7 @@ export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
       previousSigningSecretEncrypted?: string;
       previousSigningSecretExpiresAt?: number;
     },
-    crypto: AutomationWebhookSecretCrypto,
+    triggers: TriggerSecretSeal,
     now: Instant = nowInstant(),
   ): string[] {
     if (!params.signingSecretEncrypted) return [];
@@ -128,19 +128,22 @@ export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
       params.previousSigningSecretExpiresAt !== undefined &&
       params.previousSigningSecretExpiresAt > now.epochMilliseconds;
     return [
-      crypto.decrypt(params.signingSecretEncrypted),
+      triggers.openSecret({ sealed: params.signingSecretEncrypted }),
       ...(previousIsValid && params.previousSigningSecretEncrypted
-        ? [crypto.decrypt(params.previousSigningSecretEncrypted)]
+        ? [triggers.openSecret({ sealed: params.previousSigningSecretEncrypted })]
         : []),
     ];
   }
 
   private static decryptHeaders(
     params: { headersEncrypted?: string; headers?: Record<string, string> },
-    crypto: AutomationWebhookSecretCrypto,
+    triggers: TriggerSecretSeal,
   ): Record<string, string> {
     if (params.headersEncrypted) {
-      return JSON.parse(crypto.decrypt(params.headersEncrypted)) as Record<string, string>;
+      return JSON.parse(triggers.openSecret({ sealed: params.headersEncrypted })) as Record<
+        string,
+        string
+      >;
     }
     return params.headers ?? {};
   }
@@ -148,17 +151,19 @@ export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
   private static persistActionParams({
     incoming,
     existing,
-    crypto,
+    triggers,
   }: {
     incoming: WebhookActionParams;
     existing?: WebhookStoredActionParams | null;
-    crypto: AutomationWebhookSecretCrypto;
+    triggers: TriggerSecretSeal;
   }): WebhookStoredActionParams {
     AutomationWebhookSecretsService.assertKeptSecretsStayWithTheirDestination({
       incoming,
       existing,
     });
-    const saved = existing ? AutomationWebhookSecretsService.decryptHeaders(existing, crypto) : {};
+    const saved = existing
+      ? AutomationWebhookSecretsService.decryptHeaders(existing, triggers)
+      : {};
     const resolved: Record<string, string> = {};
     for (const [name, value] of Object.entries(incoming.headers)) {
       if (value === WEBHOOK_HEADER_VALUE_KEPT) {
@@ -171,9 +176,9 @@ export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
     return {
       ...rest,
       ...(Object.keys(resolved).length > 0
-        ? { headersEncrypted: crypto.encrypt(JSON.stringify(resolved)) }
+        ? { headersEncrypted: triggers.sealSecret({ plain: JSON.stringify(resolved) }) }
         : {}),
-      ...AutomationWebhookSecretsService.persistSigningSecret({ incoming, existing, crypto }),
+      ...AutomationWebhookSecretsService.persistSigningSecret({ incoming, existing, triggers }),
     };
   }
 
@@ -224,11 +229,11 @@ export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
   private static persistSigningSecret({
     incoming,
     existing,
-    crypto,
+    triggers,
   }: {
     incoming: WebhookActionParams;
     existing?: WebhookStoredActionParams | null;
-    crypto: AutomationWebhookSecretCrypto;
+    triggers: TriggerSecretSeal;
   }): Partial<WebhookStoredActionParams> {
     const submitted = incoming.signingSecret;
     if (submitted === WEBHOOK_HEADER_VALUE_KEPT) {
@@ -236,13 +241,13 @@ export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
     }
     if (!submitted) return {};
     const current = existing?.signingSecretEncrypted
-      ? crypto.decrypt(existing.signingSecretEncrypted)
+      ? triggers.openSecret({ sealed: existing.signingSecretEncrypted })
       : null;
     if (current === submitted)
       return AutomationWebhookSecretsService.keepStoredSigningSecret(existing);
-    if (!current) return { signingSecretEncrypted: crypto.encrypt(submitted) };
+    if (!current) return { signingSecretEncrypted: triggers.sealSecret({ plain: submitted }) };
     return {
-      signingSecretEncrypted: crypto.encrypt(submitted),
+      signingSecretEncrypted: triggers.sealSecret({ plain: submitted }),
       previousSigningSecretEncrypted: existing?.signingSecretEncrypted,
       previousSigningSecretExpiresAt:
         nowInstant().epochMilliseconds + WEBHOOK_PREVIOUS_SECRET_TTL_MS,
@@ -251,9 +256,9 @@ export class AutomationWebhookSecretsService extends AutomationWebhookProvider {
 
   private static redactActionParams(
     params: WebhookStoredActionParams,
-    crypto: AutomationWebhookSecretCrypto,
+    triggers: TriggerSecretSeal,
   ): WebhookActionParams {
-    const names = Object.keys(AutomationWebhookSecretsService.decryptHeaders(params, crypto));
+    const names = Object.keys(AutomationWebhookSecretsService.decryptHeaders(params, triggers));
     const {
       headersEncrypted: _drop,
       headers: _dropLegacy,

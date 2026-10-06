@@ -160,6 +160,7 @@ describe("the action of an empty pane", () => {
 
   describe("given an action that creates the page's own thing", () => {
     /** @scenario "An empty pane action is drawn as the house header button" */
+    /** @scenario "An empty pane's action is weighted by what it does" */
     it("is drawn exactly as the house header button", () => {
       renderInChakra(paneWith("primary"));
 
@@ -169,6 +170,7 @@ describe("the action of an empty pane", () => {
 
   describe("given a way out that only changes what is shown", () => {
     /** @scenario "A quieter empty pane action is drawn quieter than the house button" */
+    /** @scenario "An empty pane's action is weighted by what it does" */
     it("is drawn quieter than the house button", () => {
       renderInChakra(paneWith("secondary"));
 

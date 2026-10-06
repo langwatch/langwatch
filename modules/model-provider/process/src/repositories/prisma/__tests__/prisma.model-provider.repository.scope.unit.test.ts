@@ -15,7 +15,7 @@ import { z } from "zod";
 import {
   ModelProviderCredentialCodec,
   type CustomKeysRead,
-} from "../../../app/model-provider.members.ts";
+} from "../../model-provider.repository.ts";
 import { PrismaModelProviderRepository } from "../prisma.model-provider.repository.ts";
 
 const ORGANIZATION_ID = "organization-1";

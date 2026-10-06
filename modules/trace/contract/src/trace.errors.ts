@@ -101,6 +101,20 @@ export class FilterFieldUnknownError extends HandledError {
   }
 }
 
+/** A filter value the trace view cannot answer exactly: refused, never guessed at. */
+export class FilterValueRefusedError extends HandledError {
+  declare readonly code: "filter_value_refused";
+
+  constructor({ field, reason }: { readonly field: string; readonly reason: string }) {
+    super("filter_value_refused", reason, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { field },
+    });
+    this.name = "FilterValueRefusedError";
+  }
+}
+
 export class SpanNotFoundError extends NotFoundError {
   declare readonly code: "span_not_found";
 
@@ -233,11 +247,11 @@ export class TraceAiQueryUnavailableError extends HandledError {
 export class TraceCapabilityUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
 
-  constructor(processName: string, capability: string) {
+  constructor(role: string, capability: string) {
     super("service_unavailable", "This part of the product is not available on this deployment", {
       httpStatus: 503,
       fault: "platform",
-      meta: { process: processName, capability },
+      meta: { process: role, capability },
     });
     this.name = "TraceCapabilityUnavailableError";
   }

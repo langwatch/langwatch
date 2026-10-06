@@ -1,12 +1,18 @@
 /**
- * What guided onboarding tells Customer.io.
+ * What guided onboarding tells Customer.io and PostHog.
  * @see specs/features/customer-io-nurturing-integration.feature
+ * @see specs/analytics/posthog-guided-onboarding.feature
  */
-import type { GuidedOnboardingState } from "@langwatch/onboarding-contract";
+import {
+  ONBOARDING_EXPERIMENT_PROPERTY,
+  type GuidedOnboardingState,
+  type GuidedPath,
+} from "@langwatch/onboarding-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   fireGuidedOnboardingPaths,
+  fireGuidedOnboardingPostHog,
   fireGuidedOnboardingProgress,
   guidedOnboardingOrgTraits,
   guidedOnboardingPersonTraits,
@@ -251,5 +257,136 @@ describe("the traits a guided onboarding state reads as", () => {
         state: { ...EMPTY, tourSkippedAt: "2026-09-05T10:00:00.000Z" },
       }),
     ).toEqual({ onboarding_variant: "classic", guided_onboarding_tour: "skipped" });
+  });
+});
+
+describe("fireGuidedOnboardingProgress() for steps Customer.io is not told of", () => {
+  /** @scenario "skipping the provider, replaying the tour and attaching a conversation send nothing" */
+  it("decides no call for a provider skipped or a tour replayed", () => {
+    for (const event of ["provider_skipped", "tour_replayed"] as const) {
+      expect(
+        fireGuidedOnboardingProgress({
+          userId: "user-1",
+          organizationId: "org-1",
+          event,
+          payload: {},
+          state: EMPTY,
+        }),
+      ).toEqual([]);
+    }
+  });
+});
+
+describe("fireGuidedOnboardingPostHog()", () => {
+  const POSTHOG_EVENTS = [
+    "paths_selected",
+    "path_begun",
+    "provider_connected",
+    "provider_skipped",
+    "tour_completed",
+    "tour_skipped",
+    "tour_replayed",
+    "path_completed",
+  ] as const;
+
+  function decide({
+    event,
+    payload = {},
+    paths = [],
+    currentPath,
+  }: {
+    event: (typeof POSTHOG_EVENTS)[number];
+    payload?: Record<string, string | string[] | number | undefined>;
+    paths?: GuidedPath[];
+    currentPath?: GuidedPath;
+  }) {
+    return fireGuidedOnboardingPostHog({
+      userId: "user-1",
+      organizationId: "org_1",
+      event,
+      payload,
+      paths,
+      currentPath,
+    });
+  }
+
+  /** @scenario "selecting paths tracks the paths and the primary path" */
+  it("carries the picked paths and the first as the primary path", () => {
+    expect(decide({ event: "paths_selected", paths: ["gateway", "llmops"] })).toMatchObject({
+      userId: "user-1",
+      event: "guided_onboarding_paths_selected",
+      properties: { paths: ["gateway", "llmops"], primary_path: "gateway" },
+    });
+  });
+
+  /** @scenario "skipping the provider is tracked" */
+  it("names the provider skip as its own event", () => {
+    expect(decide({ event: "provider_skipped" })).toMatchObject({
+      event: "guided_onboarding_provider_skipped",
+    });
+  });
+
+  /** @scenario "completing, skipping and replaying the tour are tracked with the current path" */
+  it("names each tour step and carries the current path", () => {
+    expect(
+      (["tour_completed", "tour_skipped", "tour_replayed"] as const).map((event) => {
+        const decided = decide({ event, currentPath: "gateway" });
+        return [decided.event, decided.properties.path];
+      }),
+    ).toEqual([
+      ["guided_onboarding_tour_completed", "gateway"],
+      ["guided_onboarding_tour_skipped", "gateway"],
+      ["guided_onboarding_tour_replayed", "gateway"],
+    ]);
+  });
+
+  /** @scenario "beginning and completing a path are tracked with the path" */
+  it("carries the path named in the payload for a path begun and completed", () => {
+    expect(
+      (["path_begun", "path_completed"] as const).map((event) => {
+        const decided = decide({ event, payload: { path: "llmops" } });
+        return [decided.event, decided.properties.path];
+      }),
+    ).toEqual([
+      ["guided_onboarding_path_begun", "llmops"],
+      ["guided_onboarding_path_completed", "llmops"],
+    ]);
+  });
+
+  /** @scenario "connecting a provider tracks the provider and the model, never a key" */
+  it("carries the provider and the model and drops any other payload field", () => {
+    const decided = decide({
+      event: "provider_connected",
+      payload: { provider: "openai", model: "gpt-5", apiKey: "sk-secret" },
+    });
+
+    expect(decided.properties).toMatchObject({
+      provider: "openai",
+      model: "gpt-5",
+      organization_id: "org_1",
+    });
+    expect(JSON.stringify(decided)).not.toContain("sk-secret");
+  });
+
+  /** @scenario "every guided event sets the onboarding person properties" */
+  it("sets the onboarding person properties on every event", () => {
+    for (const event of POSTHOG_EVENTS) {
+      expect(decide({ event, paths: ["gateway", "llmops"] }).properties).toMatchObject({
+        $set: {
+          onboarding_variant: "guided",
+          onboarding_paths: ["gateway", "llmops"],
+          onboarding_primary_path: "gateway",
+        },
+      });
+    }
+  });
+
+  /** @scenario "every guided onboarding event carries the experiment property" */
+  it("carries the experiment property on every event", () => {
+    for (const event of POSTHOG_EVENTS) {
+      expect(decide({ event }).properties).toMatchObject({
+        [ONBOARDING_EXPERIMENT_PROPERTY]: "guided",
+      });
+    }
   });
 });

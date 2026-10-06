@@ -64,6 +64,7 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
@@ -79,6 +80,7 @@ import { agentPlatformUrl } from "../rules/agent-platform-url.rules.ts";
 import { agentWithResolvedFields, declaredAgentParameters } from "../rules/agent-view.rules.ts";
 import { AgentCopyService } from "../services/agent-copy.service.ts";
 import { AgentHttpSecretsService } from "../services/agent-http-secrets.service.ts";
+import { AgentVoiceReleaseService } from "../services/agent-voice-release.service.ts";
 import { AgentService } from "../services/agent.service.ts";
 import {
   ConnectedAgentPresenceService,
@@ -95,22 +97,13 @@ import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
 const THREAD_KSUID_RESOURCE = "thread";
 
 /**
- * Shapes restated rather than imported from `@langwatch/process-stores`: a
- * module depends on contracts. `publicBaseUrl` is the process's own fact,
- * absent where the deployment named no `BASE_HOST`.
- */
-type AgentMembers = Readonly<{
-  publicBaseUrl: string | undefined;
-}>;
-
-/**
  * The relay behind connected agents runs on the live tier's Redis session
  * state, so a deployment that named no Redis refuses at boot naming this
  * module rather than starting with the relay quietly switched off.
  */
 type AgentSetup = FeatureSetup<
   typeof AgentModule.dependencies,
-  AgentMembers,
+  never,
   AgentServerConfig,
   AgentRepositories
 >;
@@ -121,6 +114,8 @@ export class AgentModule implements AgentApi {
   static readonly dependencies = {
     apiKeys: ApiKeyApi,
     auditLog: AuditLogApi,
+    /** Voice agents are written only where `release_voice_agents_enabled` is on (AC29). */
+    featureFlags: FeatureFlagApi,
     permissions: AuthzApi,
     projects: ProjectApi,
     scenarios: ScenarioApi,
@@ -130,12 +125,11 @@ export class AgentModule implements AgentApi {
     users: UserApi,
     workflows: WorkflowApi,
   };
-  /** Both names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["publicBaseUrl"] as const;
 
   readonly #agents: AgentService;
   readonly #presence = ConnectedAgentPresenceService.create();
   readonly #copies: AgentCopyService;
+  readonly #voiceRelease: AgentVoiceReleaseService;
   readonly #connected: ConnectedAgentService | undefined;
   readonly #httpTesting: HttpAgentTestService;
   readonly #httpSecrets: AgentHttpSecretsService;
@@ -147,17 +141,22 @@ export class AgentModule implements AgentApi {
   readonly #workflows: WorkflowApi;
   readonly #publicBaseUrl: string;
 
-  private constructor({ repositories, dependencies, members, config, resources }: AgentSetup) {
+  private constructor({ repositories, dependencies, config, resources }: AgentSetup) {
     this.#agents = AgentService.create(repositories.agents);
     this.#httpSecrets = AgentHttpSecretsService.create({
       secrets: dependencies.secrets,
       agents: this.#agents,
     });
+    this.#voiceRelease = AgentVoiceReleaseService.create({
+      featureFlags: dependencies.featureFlags,
+      projects: dependencies.projects,
+    });
     this.#copies = AgentCopyService.create({
       repository: repositories.agents,
       workflows: dependencies.workflows,
+      voiceRelease: this.#voiceRelease,
     });
-    this.#publicBaseUrl = members.publicBaseUrl ?? "";
+    this.#publicBaseUrl = config.publicBaseUrl ?? "";
     this.#auditLog = dependencies.auditLog;
     this.#permissions = dependencies.permissions;
     this.#projects = dependencies.projects;
@@ -220,10 +219,17 @@ export class AgentModule implements AgentApi {
   }
 
   async create(input: CreateAgentCommand): Promise<AgentWithFields> {
+    await this.#voiceRelease.assertWritable({ type: input.type, projectIds: [input.projectId] });
     return this.#withFields(await this.#agents.create(await this.#httpSecrets.forCreate(input)));
   }
 
   async update(input: UpdateAgentCommand): Promise<AgentWithFields> {
+    // A config-only save of a stored voice agent names no type, so the stored row is asked too.
+    const type =
+      input.type === "voice"
+        ? input.type
+        : (await this.#agents.getById({ id: input.id, projectId: input.projectId })).type;
+    await this.#voiceRelease.assertWritable({ type, projectIds: [input.projectId] });
     return this.#withFields(await this.#agents.update(await this.#httpSecrets.forUpdate(input)));
   }
 

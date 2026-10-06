@@ -10,6 +10,7 @@ import {
   type DashboardWidget,
   type DashboardWidgetDefinitionInput,
   type LangWatchQLBudgetOverflowMode,
+  type LangWatchQLCaller,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
@@ -25,6 +26,7 @@ import {
   DashboardsNotEnabledError,
   SavedWorkbenchChartDashboardNotFoundError,
   SavedWorkbenchChartNotFoundError,
+  dashboardConfig,
   type Dashboard,
   type DashboardGraphCountScope,
   type DashboardSourcePresence,
@@ -39,6 +41,7 @@ import {
   type SavedWorkbenchChart,
   type SavedWorkbenchChartDefinitionUpdate,
   type DashboardUsageCount,
+  type DashboardServerConfig,
 } from "@langwatch/dashboard-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
@@ -46,17 +49,15 @@ import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/pr
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
 import { dashboardPlatformUrl } from "../rules/dashboard-platform-url.rules.ts";
 import { DashboardWidgetService } from "../services/dashboard-widget.service.ts";
-import { DashboardService } from "../services/dashboard.service.ts";
+import {
+  type DashboardAudience,
+  DashboardService,
+  type WorkbenchAccess,
+} from "../services/dashboard.service.ts";
 import { SavedViewService } from "../services/saved-view.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../services/saved-workbench-chart-policy.service.ts";
 import { SavedWorkbenchChartService } from "../services/saved-workbench-chart.service.ts";
 import { SourcePresenceService } from "../services/source-presence.service.ts";
-import type {
-  DashboardAudience,
-  DashboardsRollout,
-  WorkbenchAccess,
-  WorkbenchCaller,
-} from "./dashboard.members.ts";
 
 type DashboardDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
@@ -65,19 +66,29 @@ type DashboardDependencies = Readonly<{
   authz: typeof AuthzApi;
 }>;
 
-/**
- * Shapes restated rather than imported: a module depends on contracts.
- * `publicBaseUrl` is the process's own fact, drilled in — absent where the
- * deployment named no `BASE_HOST`.
- */
-type DashboardMembers = Readonly<{ publicBaseUrl: string | undefined }>;
-
 type DashboardSetup = FeatureSetup<
   DashboardDependencies,
-  DashboardMembers,
-  undefined,
+  never,
+  DashboardServerConfig,
   DashboardRepositories
 >;
+
+/** The member's own content protections, and the identity a session-authenticated run uses. */
+interface WorkbenchCaller {
+  resolveProtections(input: {
+    actorId: string;
+    projectId: string;
+  }): Promise<LangWatchQLProtections>;
+  resolveRunCaller(input: {
+    actorId: string;
+    projectId: string;
+  }): Promise<Readonly<{ project: LangWatchQLCaller; protections: LangWatchQLProtections }>>;
+}
+
+/** The `release_dashboards` rollout, resolved for one project. */
+interface DashboardsRollout {
+  isDashboardsEnabled(input: { projectId: string }): Promise<boolean>;
+}
 
 /**
  * Thin adapter to AnalyticsApi: forwards rollout gate and RBAC checks while
@@ -151,7 +162,8 @@ export class DashboardModule implements DashboardApi {
     projects: ProjectApi,
     authz: AuthzApi,
   };
-  static readonly reads = ["publicBaseUrl"] as const;
+  /** The shared deployment origin, absent where the deployment named no `BASE_HOST`. */
+  static readonly config = dashboardConfig;
 
   #dashboards: DashboardService;
   #charts: SavedWorkbenchChartService;
@@ -237,7 +249,7 @@ export class DashboardModule implements DashboardApi {
       },
       workbench: { access: workbenchAccess, caller: workbenchCaller },
       rollout: new AnalyticsDashboardsRollout(analytics),
-      publicBaseUrl: setup.members.publicBaseUrl,
+      publicBaseUrl: setup.config.publicBaseUrl,
     });
   }
 
@@ -609,6 +621,8 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart[]> {
+    await this.#requireWorkbench(input.projectId);
+
     const [charts, visibleIds] = await Promise.all([
       this.#charts.getAll({ projectId: input.projectId }),
       this.#dashboards.findVisibleDashboardIds(input),
@@ -618,11 +632,13 @@ export class DashboardModule implements DashboardApi {
   }
 
   /** One saved chart, with its query, parameters and specification. */
-  getSavedWorkbenchChart(input: {
+  async getSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
     viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
+    await this.#requireWorkbench(input.projectId);
+
     return this.#getVisibleChart(input);
   }
 

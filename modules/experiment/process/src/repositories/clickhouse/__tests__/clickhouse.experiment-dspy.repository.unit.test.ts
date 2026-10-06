@@ -51,11 +51,10 @@ describe("ClickHouseExperimentDspyRepository", () => {
     const retention = new FixedRetention();
     const repository = ClickHouseExperimentDspyRepository.create({
       resolveClient: async () => null,
-      retention,
       telemetry,
     });
 
-    await expect(repository.upsert(step())).resolves.toBeUndefined();
+    await expect(repository.upsert({ step: step(), retention })).resolves.toBeUndefined();
     await expect(
       repository.findAll({ tenantId: "project_1", experimentId: "experiment_1" }),
     ).resolves.toEqual([]);
@@ -107,12 +106,12 @@ describe("ClickHouseExperimentDspyRepository", () => {
     };
     const repository = ClickHouseExperimentDspyRepository.create({
       resolveClient: async () => client,
-      retention: new FixedRetention(),
       telemetry,
     });
 
-    await repository.upsert(
-      step({
+    await repository.upsert({
+      retention: new FixedRetention(),
+      step: step({
         examples: [
           { hash: "example_1", example: {}, pred: {}, score: 0.4 },
           { hash: "example_2", example: {}, pred: {}, score: 0.6 },
@@ -130,7 +129,7 @@ describe("ClickHouseExperimentDspyRepository", () => {
         ],
         updatedAt: 2_000,
       }),
-    );
+    });
 
     const written = insert.mock.calls[0]?.[0]?.values[0];
     expect(written).toBeDefined();
@@ -169,7 +168,6 @@ describe("ClickHouseExperimentDspyRepository", () => {
     };
     const repository = ClickHouseExperimentDspyRepository.create({
       resolveClient: async () => client,
-      retention: new FixedRetention(),
       telemetry,
     });
 

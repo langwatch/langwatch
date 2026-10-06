@@ -31,6 +31,11 @@ const CONFIG: OpsServerConfig = {
   productAnalytics: { key: undefined, host: undefined },
   cloudOps: false,
   adminEmails: [],
+  nodeEnvironment: "production",
+  isSaas: false,
+  publicBaseUrl: "https://langwatch.acme.test",
+  serviceVersion: "3.17.0",
+  otelResourceAttributes: undefined,
 };
 
 const PROJECT: Project = {
@@ -82,12 +87,12 @@ function checkup() {
 
 function service() {
   return OpsCheckupService.create({
-    members: {
+    facts: {
       isSaas: false,
       serviceVersion: "3.17.0",
       publicBaseUrl: "https://langwatch.acme.test",
       nodeEnvironment: "production",
-      processName: "langwatch-api",
+      processRole: "web",
     },
     config: CONFIG,
     peers: {

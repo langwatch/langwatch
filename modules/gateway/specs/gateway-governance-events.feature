@@ -1,7 +1,7 @@
-Feature: Gateway records its governance facts and hands them to webhook delivery
+Feature: Gateway records its governance facts for webhook delivery
   A budget crossing and a virtual key lifecycle change are gateway's facts, recorded on
-  gateway's governance_events_processing pipeline under main's stored names, and handed
-  to webhook delivery by a subscriber (ARCHITECTURE §9: no relay module).
+  gateway's governance_events_processing pipeline under main's stored names. Webhook
+  subscribes to them from its own side (ARCHITECTURE §5, §9: no relay module).
 
   @unit
   Scenario: Spend below the warn line records no crossing
@@ -22,12 +22,6 @@ Feature: Gateway records its governance facts and hands them to webhook delivery
     Then the lifecycle key is its subject, action and instant
     And the crossing key is its budget, bucket, kind and period
     And both append to governance_subject aggregates at main's event version
-
-  @unit
-  Scenario: A recorded crossing is handed to webhook delivery under its own key
-    Given a crossing recorded on gateway's governance pipeline
-    When the worker's subscriber handles it
-    Then webhook delivery is asked once, named by the crossing's idempotency key
 
   @unit
   Scenario: A key lifecycle change is recorded by gateway for delivery

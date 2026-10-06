@@ -5,7 +5,10 @@
  */
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import { PostgresPromptRepositories } from "../repositories/prisma/prisma.prompt.repositories.ts";
+import { PrismaPromptTagAssignmentRepository } from "../repositories/prisma/prisma.prompt-tag-assignment.repository.ts";
+import { PrismaPromptTagRepository } from "../repositories/prisma/prisma.prompt-tag.repository.ts";
+import type { PostgresPromptRepositories } from "../repositories/prisma/prisma.prompt.repositories.ts";
+import { PrismaLlmConfigRepository } from "../repositories/prisma/prisma.prompt.repository.ts";
 import { PromptTagService } from "../services/prompt-tag.service.ts";
 import { PromptVersionService } from "../services/prompt-version.service.ts";
 import { PromptService } from "../services/prompt.service.ts";
@@ -17,14 +20,14 @@ export function promptServiceFixture({
   database: Parameters<typeof PostgresPromptRepositories.create>[0]["prisma"];
   modelProviders: ModelProviderApi;
 }): PromptService {
-  const repositories = PostgresPromptRepositories.create({ prisma: database });
+  const tags = PrismaPromptTagRepository.create({ prisma: database });
 
   return PromptService.create({
-    repository: repositories.configs,
+    repository: PrismaLlmConfigRepository.create({ prisma: database }),
     versionService: PromptVersionService.create(),
-    tagRepository: repositories.tagAssignments,
-    promptTagRepository: repositories.tags,
-    tagService: PromptTagService.create(repositories.tags),
+    tagRepository: PrismaPromptTagAssignmentRepository.create({ prisma: database }),
+    promptTagRepository: tags,
+    tagService: PromptTagService.create(tags),
     modelProviders,
   });
 }

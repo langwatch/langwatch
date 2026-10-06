@@ -120,12 +120,11 @@ describe.skipIf(!databaseUrl)("Scenario and run-plan model persistence", () => {
     projectId = project.id;
 
     scenarios = ScenarioService.create({
-      repository: PrismaScenarioRepository.create(db),
+      repository: PrismaScenarioRepository.create(db, new TestSecretCipher()),
       simulations: createApiFixture<SimulationService>(),
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),
       clock: new TestClock(),
-      secretCipher: new TestSecretCipher(),
     });
   });
 

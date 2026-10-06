@@ -366,7 +366,9 @@ const enterpriseRootTargetCheck: DependencyCheck = (pkg, target, dependency) => 
   };
 };
 
-/** Apps carry both tiers; a core module imports an enterprise contract like a peer's (record §11). */
+/**
+ * Apps carry both tiers; a core module imports an enterprise contract like a peer's (record §11).
+ */
 const enterpriseDirectionCheck: DependencyCheck = (pkg, target, dependency) => {
   const isAllowedEdge = pkg.kind === "application" || target.kind === "contract";
   const crossesIntoEnterprise = !pkg.enterprise && target.enterprise && !isAllowedEdge;

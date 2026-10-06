@@ -95,6 +95,7 @@ describe("given AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS is set", () =
 describe("given STORED_OBJECTS_BACKEND is azure in a token-based auth mode with no account key", () => {
   describe("when dataset storage is resolved for a project", () => {
     /** @scenario "Dataset storage is selected without dereferencing an absent account key" */
+    /** @scenario "A token-mode write path resolves without consulting a shared key" */
     it("selects the Azure account without reading a key", async () => {
       const { destination, refusal } = await objectStorageFor({
         production: true,

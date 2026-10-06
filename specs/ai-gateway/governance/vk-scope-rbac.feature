@@ -146,12 +146,13 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # ============================================================================
 
   @integration
-  Scenario: Any authenticated user can lazy-mint their own personal VK via CLI device-flow
+  Scenario: Any member can mint their own default personal VK, scoped to their personal project
     Given user "leo@acme.test" is a member of organization "acme"
     And "leo@acme.test" has NO explicit `virtualKeys:manage` grant
-    When "leo@acme.test" runs `langwatch login --device` and completes the device flow
-    Then a personal VK is minted with `principalUserId="leo@acme.test"` and scope ORGANIZATION "acme"
-    And the user receives the secret in the CLI bootstrap response
+    When "leo@acme.test" asks for their default personal VK, as `langwatch login --device` does on its first ask
+    Then a personal VK is minted with `principalUserId="leo@acme.test"` and scope PROJECT on their personal workspace's project
+    And it carries their personal team's default routing policy, when there is one
+    And the user receives the secret once, with the gateway's base URL
 
   @integration
   Scenario: A user can view their own personal VK without any explicit grant
@@ -165,7 +166,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     Given user "leo@acme.test" has a personal VK "vk_leo"
     And user "maya@acme.test" has only `virtualKeys:view` at ORGANIZATION "acme" (no viewOtherPersonal)
     When "maya@acme.test" calls `api.personalVirtualKeys.list` with `targetUserId="leo@acme.test"`
-    Then the call returns 403 FORBIDDEN
+    Then the call is refused 403 permission_denied
     And the message names the missing perm: "virtualKeys:viewOtherPersonal"
 
   @integration
@@ -180,19 +181,19 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # ============================================================================
 
   @integration
-  Scenario: Existing org admins automatically gain virtualKeys:viewOtherPersonal on migrate
-    Given the LegacyRoles migration adds `virtualKeys:viewOtherPersonal` to OrganizationUserRole.ADMIN + TeamUserRole.ADMIN templates
-    And an existing customer org has user "old-admin@acme.test" with OrganizationUserRole.ADMIN binding
-    When the migration applies
-    Then "old-admin@acme.test" can call `api.personalVirtualKeys.list` for other users immediately on next request
+  Scenario: Existing org admins hold virtualKeys:viewOtherPersonal from the role template, with no migration
+    Given the OrganizationUserRole.ADMIN and TeamUserRole.ADMIN templates carry `virtualKeys:viewOtherPersonal`
+    And an existing customer org has user "old-admin@acme.test" with an OrganizationUserRole.ADMIN binding
+    When "old-admin@acme.test" calls `api.personalVirtualKeys.list` for another user
+    Then the other user's personal VKs are answered
     And no per-org backfill is required
     And the RoleBinding rows themselves are untouched (template lookup is at runtime)
 
   @integration
   Scenario: Org member roles do NOT gain virtualKeys:viewOtherPersonal
-    Given a user with OrganizationUserRole.MEMBER binding
-    When the migration applies
-    Then calling `api.personalVirtualKeys.list` for another user still returns 403
+    Given a user with an OrganizationUserRole.MEMBER binding
+    When they call `api.personalVirtualKeys.list` for another user
+    Then the call is refused 403 permission_denied
 
   # ============================================================================
   # No-short-circuit regression contract

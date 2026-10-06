@@ -16,7 +16,7 @@ import type { SuiteRunModelsResolver } from "./suite-run-models.service.ts";
 const logger = createLogger("langwatch:suite-run:service");
 
 /** Everything one suite run needs, resolved by the caller before it starts. */
-export type SuiteExecutionRequest = {
+type SuiteExecutionRequest = {
   suiteId: string;
   projectId: string;
   activeScenarioIds: string[];

@@ -6,7 +6,8 @@ import type {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { EventSubscriberDefinition, ProcessManagerDefinition } from "@langwatch/eventing";
 
-import { AutomationScheduledIntent, AutomationSettlementExecutor } from "../../app/automation.members.ts";
+import { AutomationScheduledIntent } from "../../eventing/graph-alert-sweep.intent.ts";
+import { AutomationSettlementExecutor } from "../../eventing/trigger-settlement.intent.ts";
 import {
   type AutomationsPipelineDeps,
   createAutomationsPipeline,

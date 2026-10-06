@@ -28,6 +28,29 @@ export class MonitorEvaluatorRequiredError extends HandledError {
   }
 }
 
+/**
+ * The evaluator's own settings win at run time, so `parameters` that disagree
+ * with them would save cleanly and never run. Refused instead.
+ */
+export class MonitorParametersUnusedError extends HandledError {
+  declare readonly code: "monitor_parameters_unused";
+
+  constructor(readonly evaluatorId: string) {
+    super(
+      "monitor_parameters_unused",
+      "This monitor runs with its evaluator's settings, so these parameters would never be used. " +
+        "Change the evaluator's settings instead, or send parameters as an empty object.",
+      {
+        meta: { field: "parameters", evaluatorId },
+        httpStatus: 422,
+        fault: "customer",
+        ...remediation("monitor_parameters_unused"),
+      },
+    );
+    this.name = "MonitorParametersUnusedError";
+  }
+}
+
 /** The monitor names a check this platform runs no evaluator for. */
 export class MonitorCheckTypeUnknownError extends HandledError {
   declare readonly code: "monitor_check_type_unknown";

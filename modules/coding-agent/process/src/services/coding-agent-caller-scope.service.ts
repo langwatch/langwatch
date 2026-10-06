@@ -3,11 +3,11 @@
 // through batched probe to prevent REST/page drift.
 import type { CodingAgentContributorProject } from "@langwatch/coding-agent-contract";
 
+import type { CodingAgentCallerScopeDirectory } from "./coding-agent-scope-directory.service.ts";
 import type {
-  CodingAgentCallerScopeDirectory,
   CodingAgentScopeCaller,
   CodingAgentScopePermissions,
-} from "../app/coding-agent.members.ts";
+} from "./coding-agent-scope-permissions.service.ts";
 
 export interface CallerProjectScope {
   /** Projects the caller may read. Work outside it never appears. */

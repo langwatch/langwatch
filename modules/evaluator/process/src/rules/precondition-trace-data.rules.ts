@@ -16,7 +16,7 @@ type PreconditionTrace = Readonly<{
 }>;
 
 /** A collector trace and its spans, as the precondition matchers read them. */
-export function buildPreconditionTraceDataFromTrace({
+function buildPreconditionTraceDataFromTrace({
   trace,
   spans,
 }: {

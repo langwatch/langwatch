@@ -8,7 +8,7 @@ import type {
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createPresenceTestProjects,
+  createPresenceTestSettings,
   RecordingPresenceBroadcast,
   RecordingPresenceDiagnostics,
 } from "../../app/__tests__/presence.fixture.ts";
@@ -51,7 +51,7 @@ async function createPresence(options: { enabled: boolean; sessions?: PresenceSe
   return PresenceService.create({
     repository,
     broadcast: new RecordingPresenceBroadcast(),
-    projects: createPresenceTestProjects(options.enabled),
+    settings: await createPresenceTestSettings(options.enabled),
     diagnostics: new RecordingPresenceDiagnostics(),
   });
 }

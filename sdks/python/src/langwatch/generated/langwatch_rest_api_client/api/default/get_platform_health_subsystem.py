@@ -72,7 +72,7 @@ def _build_response(
 def sync_detailed(
     check: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     trigger_id: str | Unset = UNSET,
     workflow_id: str | Unset = UNSET,
 ) -> Response[GetPlatformHealthSubsystemResponse200 | GetPlatformHealthSubsystemResponse503]:
@@ -110,7 +110,7 @@ def sync_detailed(
 def sync(
     check: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     trigger_id: str | Unset = UNSET,
     workflow_id: str | Unset = UNSET,
 ) -> GetPlatformHealthSubsystemResponse200 | GetPlatformHealthSubsystemResponse503 | None:
@@ -143,7 +143,7 @@ def sync(
 async def asyncio_detailed(
     check: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     trigger_id: str | Unset = UNSET,
     workflow_id: str | Unset = UNSET,
 ) -> Response[GetPlatformHealthSubsystemResponse200 | GetPlatformHealthSubsystemResponse503]:
@@ -179,7 +179,7 @@ async def asyncio_detailed(
 async def asyncio(
     check: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     trigger_id: str | Unset = UNSET,
     workflow_id: str | Unset = UNSET,
 ) -> GetPlatformHealthSubsystemResponse200 | GetPlatformHealthSubsystemResponse503 | None:

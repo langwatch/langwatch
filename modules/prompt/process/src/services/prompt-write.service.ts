@@ -27,7 +27,7 @@ import type { PromptTagLookupService } from "./prompt-tag-lookup.service.ts";
 import type { PromptVersionService } from "./prompt-version.service.ts";
 import type { VersionedPrompt } from "./prompt.service.ts";
 
-export type PromptUpdateInput = Omit<UpdatePromptCommand, "data"> & {
+type PromptUpdateInput = Omit<UpdatePromptCommand, "data"> & {
   data: UpdatePromptCommand["data"] & {
     handle?: string;
     scope?: PromptScope;
@@ -39,7 +39,7 @@ type VersionedPromptMapper = (
   tags: { name: string; versionId: string }[],
 ) => VersionedPrompt;
 
-export type CreatePromptParams = {
+type CreatePromptParams = {
   // Config data
   projectId: string;
   organizationId?: string;

@@ -1,14 +1,18 @@
 import type { LedgerActor } from "@langwatch/authorization";
 import type { EventingCommandSender } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 
 import type { RecordUserLifecycleCommandData } from "../eventing/user-lifecycle.events.ts";
 
 type Change = { userId: string; actor: LedgerActor; at: Instant };
 
+const logger = createLogger("langwatch:user:lifecycle-notice");
+
 export type UserLifecycleSenders = Readonly<{
   recordUserDeactivated: Pick<EventingCommandSender<RecordUserLifecycleCommandData>, "send">;
   recordUserReactivated: Pick<EventingCommandSender<RecordUserLifecycleCommandData>, "send">;
+  recordUserRegistered: Pick<EventingCommandSender<RecordUserLifecycleCommandData>, "send">;
 }>;
 
 /**
@@ -35,6 +39,17 @@ export class UserLifecycleNoticeService {
 
   async reactivated({ userId, actor, at }: Change): Promise<void> {
     await this.#connected().recordUserReactivated.send(this.#data({ userId, actor, at }));
+  }
+
+  /**
+   * A self-service registration, for nurturing's signed_up milestone. Best effort, as main's
+   * analytics call was: the account already exists, so a lost fact never fails the sign-up.
+   */
+  async registered({ userId, at }: { userId: string; at: Instant }): Promise<void> {
+    const data = { tenantId: userId, userId, occurredAt: at.epochMilliseconds };
+    await this.#connected()
+      .recordUserRegistered.send(data)
+      .catch((error: unknown) => logger.warn({ error, userId }, "user registered fact not sent"));
   }
 
   #connected(): UserLifecycleSenders {

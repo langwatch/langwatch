@@ -417,6 +417,7 @@ describe("a group belongs to the connection that pushed it", () => {
 
       expect(identities.assertWritable).toHaveBeenCalledTimes(2);
       expect(identities.assertWritable).toHaveBeenCalledWith({
+        organizationId: expect.any(String),
         connectionId: OKTA,
         userId: "user-1",
       });
@@ -449,9 +450,11 @@ describe("a group belongs to the connection that pushed it", () => {
         );
         repository.findGroupMemberIds = vi.fn(async () => [FOREIGN]);
         const identities = {
-          assertWritable: vi.fn(async ({ userId }: { connectionId: string; userId: string }) => {
-            if (userId === FOREIGN) throw new ScimWriteOutsideConnectionError({ userId });
-          }),
+          assertWritable: vi.fn(
+            async ({ userId }: { connectionId: string | null; userId: string }) => {
+              if (userId === FOREIGN) throw new ScimWriteOutsideConnectionError({ userId });
+            },
+          ),
         };
 
         const refusal = await foreignMemberWrite({

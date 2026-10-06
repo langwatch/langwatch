@@ -1,3 +1,4 @@
+import type { ApiKeyAnswerCacheRepository } from "./api-key-answer-cache.repository.ts";
 import type { ApiKeyRepository } from "./api-key.repository.ts";
 
 /**
@@ -7,4 +8,6 @@ import type { ApiKeyRepository } from "./api-key.repository.ts";
  */
 export interface ApiKeyRepositories {
   readonly apiKeys: ApiKeyRepository;
+  /** The token answers every pod shares; Postgres stays the truth. */
+  readonly answers: ApiKeyAnswerCacheRepository;
 }

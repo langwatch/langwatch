@@ -1,6 +1,12 @@
 import { afterAll, describe, expect, it } from "vitest";
 
-import { defineRule, renderMessage, renderTemplate } from "../src/define-rule.mjs";
+import {
+  defineRule,
+  renderEscapeTail,
+  renderMessage,
+  renderTemplate,
+  WHY_MAX_LENGTH,
+} from "../src/define-rule.mjs";
 import { createFixtureWorkspace, runRule } from "../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
@@ -37,9 +43,10 @@ function ruleReportingOn(nodeType, { applies } = {}) {
 
 describe("given a rule declared through defineRule", () => {
   describe("when a message is rendered", () => {
-    it("joins what and fix, and leaves why out of the printed message", () => {
+    /** @scenario "Every finding prints what, a one-line why and fix" */
+    it("joins what, why and fix in that order", () => {
       expect(renderTemplate({ what: "A is wrong.", why: "Because.", fix: "Do B." })).toBe(
-        "A is wrong. Do B.",
+        "A is wrong. Because. Do B.",
       );
     });
 
@@ -53,9 +60,11 @@ describe("given a rule declared through defineRule", () => {
   });
 
   describe("when the rule object is built", () => {
-    it("derives meta.messages from what plus fix", () => {
+    it("derives meta.messages from what, why and fix", () => {
       expect(ruleReportingOn("FunctionDeclaration").meta.messages).toEqual({
-        named: "`{{name}}` is declared at the top level of {{path}}. Move it onto the class.",
+        named:
+          "`{{name}}` is declared at the top level of {{path}}." +
+          " A top-level declaration is a module's public surface. Move it onto the class.",
       });
     });
 
@@ -88,7 +97,7 @@ describe("given a rule declared through defineRule", () => {
       expect(found[0].message).toBe(
         "`alpha` is declared at the top level of" +
           " modules/agent/process/src/services/agent.service.ts." +
-          " Move it onto the class.",
+          " A top-level declaration is a module's public surface. Move it onto the class.",
       );
     });
 
@@ -129,6 +138,71 @@ describe("given a rule declared through defineRule", () => {
       });
 
       expect(found).toHaveLength(1);
+    });
+  });
+
+  describe("when a message gives no one-line why", () => {
+    const declaring = (why) => () =>
+      defineRule({
+        name: "whyless-rule",
+        messages: { bare: { what: "A is wrong.", why, fix: "Do B." } },
+        create: () => ({}),
+      });
+
+    /** @scenario "A message without a one-line why is refused when the rule is declared" */
+    it("refuses a missing, empty, multi-line or over-long why", () => {
+      expect(declaring(undefined)).toThrow(/whyless-rule\/bare gives no `why`/);
+      expect(declaring("  ")).toThrow(/gives no `why`/);
+      expect(declaring("One.\nTwo.")).toThrow(/longer than one line/);
+      expect(declaring("x".repeat(WHY_MAX_LENGTH + 1))).toThrow(/longer than one line/);
+      expect(declaring("x".repeat(WHY_MAX_LENGTH))).not.toThrow();
+    });
+  });
+
+  describe("when a rule opts in to a justified disable", () => {
+    const escapable = (escape) =>
+      defineRule({
+        name: "escapable-rule",
+        escape,
+        messages: {
+          drift: {
+            what: "The binding parses the body.",
+            why: "The framework parses it.",
+            fix: "Use `.withInput`.",
+          },
+        },
+        create: () => ({}),
+      });
+
+    /** @scenario "An escapable rule's message ends with the one escape sentence" */
+    it("appends the escape sentence after what, why and fix", () => {
+      const rule = escapable({ framework: "the API framework" });
+
+      expect(rule.meta.messages.drift).toBe(
+        "The binding parses the body. The framework parses it. Use `.withInput`." +
+          " If the API framework genuinely cannot" +
+          " express this case, extend it, or disable this line with `-- <why it cannot>`; if the" +
+          " case is confusing, stop and ask the human before disabling.",
+      );
+      expect(rule.meta.docs.escape).toEqual({ framework: "the API framework" });
+    });
+
+    it("renders the tail as one sentence naming the framework", () => {
+      expect(renderEscapeTail({ framework: "X" })).toMatch(/^If X genuinely cannot[^.]*\.$/);
+    });
+
+    it("refuses an escape that names no framework", () => {
+      expect(() => escapable({ framework: " " })).toThrow(/escape\.framework/);
+    });
+  });
+
+  describe("when a rule does not opt in", () => {
+    /** @scenario "A house rule's message carries no escape sentence" */
+    it("prints what, why and fix alone and records no escape", () => {
+      const rule = ruleReportingOn("FunctionDeclaration");
+
+      expect(rule.meta.messages.named).not.toMatch(/disable/);
+      expect(rule.meta.docs.escape).toBeUndefined();
     });
   });
 });

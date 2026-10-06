@@ -22,7 +22,7 @@ export interface SsoTestArrivalMemberships {
   findOrganization(args: { organizationId: string }): Promise<{ id: string; name: string } | null>;
 }
 
-export interface SsoTestArrivalServiceDeps {
+interface SsoTestArrivalServiceDeps {
   accounts: SsoTestArrivalAccounts;
   connections: SsoConnectionReadRepository;
   memberships: SsoTestArrivalMemberships;

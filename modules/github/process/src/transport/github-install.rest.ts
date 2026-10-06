@@ -1,7 +1,7 @@
 /**
  * The GitHub App installation flow: the session-gated start, the Setup URL,
  * the HMAC-verified webhook and the two `github-langy` aliases.
- * @see specs/integrations/github-connection.feature
+ * @see modules/integration/specs/github-connection.feature
  */
 import { randomBytes } from "node:crypto";
 

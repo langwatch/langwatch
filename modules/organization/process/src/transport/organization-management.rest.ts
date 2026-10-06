@@ -148,7 +148,10 @@ const inviteWire = (
   createdAt: invite.createdAt,
 });
 
-/** The team's role in the shape `createInvitations` accepts: built-in, or `custom:<id>`. */
+/**
+ * The team's role in the shape `createInvitations` accepts (built-in, or `custom:<id>`);
+ * `customRoleId` travels beside it.
+ */
 const requestedTeamRole = (team: { role: string; customRoleId?: string | undefined }) =>
   team.role === "CUSTOM" && team.customRoleId
     ? (`custom:${team.customRoleId}` as const)
@@ -184,8 +187,8 @@ export const organizationManagementRest: Readonly<{
       "Update the organization profile. Partial: only the fields present are written, and the response is exactly what a subsequent GET returns.",
   })
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
-  .handle(async ({ app, input, scope }) => {
-    await app.updateSettings({ organizationId: scope.id, ...input });
+  .handle(async ({ app, input, scope, actor }) => {
+    await app.updateSettings({ organizationId: scope.id, ...input }, deriveCaller(actor));
 
     return app.getSettings({ organizationId: scope.id });
   })
@@ -338,9 +341,10 @@ export const organizationManagementRest: Readonly<{
         invites: input.invites.map((invite) => ({
           email: invite.email,
           role: invite.role as OrganizationUserRole,
-          teams: invite.teams.map((team) => ({
+          teams: (invite.teams ?? []).map((team) => ({
             teamId: team.teamId,
             role: requestedTeamRole(team),
+            ...(team.customRoleId ? { customRoleId: team.customRoleId } : {}),
           })),
         })),
       },

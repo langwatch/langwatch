@@ -1,7 +1,7 @@
 import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApp } from "../src/application.ts";
+import { ApplicationBuilder } from "../src/application.ts";
 import {
   DuplicateProviderError,
   FeatureApiUnavailableError,
@@ -35,6 +35,7 @@ interface OrganizationApi {
 const OrganizationApi = moduleApi<OrganizationApi>()("organization");
 
 describe("process-owned feature references", () => {
+  /** @scenario "Reciprocal API dependencies bind before readiness" */
   it("forwards through the bound app only after readiness", async () => {
     const apis = new LocalFeatureApis();
     apis.declare(OrganizationApi);
@@ -240,7 +241,7 @@ function processMembers(harness: Harness = { events: [] }) {
 }
 
 function graph(harness: Harness, reversed = false, role: ServerRole = "api") {
-  const builder = createApp({ role, members: processMembers(harness) });
+  const builder = new ApplicationBuilder({ role, members: processMembers(harness) });
   return builder.withModules(reversed ? [organization, project] : [project, organization]);
 }
 
@@ -293,13 +294,14 @@ describe("feature APIs", () => {
       .provides(ProjectApi)
       .build();
     await expect(
-      createApp({ role: "api", members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withModules([legacy])
         .boot(),
     ).rejects.toThrow("defineProcessModule().withApi()");
     expect(events).toEqual([]);
   });
 
+  /** @scenario "Reciprocal API dependencies bind before readiness" */
   it.each(["api", "worker"] satisfies ServerRole[])(
     "binds mutual APIs once before returning the %s runtime",
     async (role) => {
@@ -330,6 +332,7 @@ describe("feature APIs", () => {
     ]);
   });
 
+  /** @scenario "Incomplete API bindings fail before publication" */
   it("rejects constructor access even when that peer was constructed earlier", async () => {
     const events: string[] = [];
     await expect(graph({ events, inspectPeer: true }).boot()).rejects.toBeInstanceOf(
@@ -360,7 +363,7 @@ describe("feature APIs", () => {
   it("rejects a missing API before constructing anything", async () => {
     const events: string[] = [];
     await expect(
-      createApp({ role: "api", members: processMembers({ events }) })
+      new ApplicationBuilder({ role: "api", members: processMembers({ events }) })
         .withModules([project])
         .boot(),
     ).rejects.toBeInstanceOf(MissingProviderError);
@@ -378,6 +381,7 @@ describe("feature APIs", () => {
     await runtime.stop();
   });
 
+  /** @scenario "Client reflection cannot expose application internals" */
   it("does not expose implementation objects or evaluate implementation getters", async () => {
     const runtime = await graph({ events: [] }).boot();
     const api = runtime.service(ProjectApi);
@@ -387,6 +391,7 @@ describe("feature APIs", () => {
     await runtime.stop();
   });
 
+  /** @scenario "Local forwarding preserves application values and errors" */
   it("preserves argument, result, error identity, and method this binding", async () => {
     const runtime = await graph({ events: [] }).boot();
     const api = runtime.service(ProjectApi);
@@ -416,7 +421,7 @@ describe("feature APIs", () => {
   });
 
   it("rejects two distinct token objects claiming the same feature identity", async () => {
-    const builder = createApp({ role: "api", members: processMembers() }).withModules([
+    const builder = new ApplicationBuilder({ role: "api", members: processMembers() }).withModules([
       project,
       defineProcessModule("project").withApi(ProjectModule).build(),
     ]);
@@ -465,7 +470,7 @@ describe("feature APIs", () => {
 
     /** @scenario "The process supplies a capability a module of that name does not answer for" */
     it("keeps the module's own API and the process's apart", async () => {
-      const runtime = await createApp({ role: "api", members: processMembers() })
+      const runtime = await new ApplicationBuilder({ role: "api", members: processMembers() })
         .withModules([project, grantedOrganization])
         .withProvided(ProjectGrant, { grant: () => "granted" })
         .boot();
@@ -478,7 +483,7 @@ describe("feature APIs", () => {
     /** @scenario "A module cannot answer for a capability the process already supplied" */
     it("refuses a module answering for the very token the process handed over", async () => {
       await expect(
-        createApp({ role: "api", members: processMembers() })
+        new ApplicationBuilder({ role: "api", members: processMembers() })
           .withModules([project, organization])
           .withProvided(ProjectApi, {
             name: async () => "provided",
@@ -498,13 +503,14 @@ describe("feature APIs", () => {
     const declaration = defineProcessModule("organization").withApi(ProjectModule).build();
 
     await expect(
-      createApp({ role: "api", members: processMembers({ events }) })
+      new ApplicationBuilder({ role: "api", members: processMembers({ events }) })
         .withModules([declaration])
         .boot(),
     ).rejects.toThrow('cannot provide API "project"');
     expect(events).toEqual([]);
   });
 
+  /** @scenario "Retained clients close after startup or cleanup failure" */
   it("invalidates retained APIs after a start failure", async () => {
     const startFailure = new Error("start failed");
     const runtime = await graph({ events: [] })
@@ -520,6 +526,7 @@ describe("feature APIs", () => {
     expect(() => api.name()).toThrow(FeatureApiUnavailableError);
   });
 
+  /** @scenario "Retained clients close after startup or cleanup failure" */
   it("invalidates retained APIs after cleanup failure", async () => {
     const cleanupFailure = new Error("cleanup failed");
     const runtime = await graph({ events: [] })

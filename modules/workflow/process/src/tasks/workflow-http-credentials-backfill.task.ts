@@ -1,12 +1,6 @@
-import {
-  httpAgentConfigStoringSecrets,
-  type AgentApi,
-  type HttpAgentConfig,
-} from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
+import { fromDate } from "@langwatch/time";
 import type { WorkflowDsl, WorkflowVersion } from "@langwatch/workflow-contract";
 
 import type { WorkflowHttpSecrets } from "../app/workflow.app.ts";
@@ -15,21 +9,25 @@ import type { WorkflowRepository } from "../repositories/workflow.repository.ts"
 const logger = createLogger("langwatch:tasks:backfill-http-credentials-to-secrets");
 
 type BackfillPeers = Readonly<{
-  organizations: Pick<OrganizationApi, "findAllIds">;
-  projects: Pick<ProjectApi, "listIdsByOrganization">;
-  agents: Pick<AgentApi, "getAll" | "update">;
   workflows: Pick<
     WorkflowRepository,
-    "findAll" | "findById" | "findPublishedVersion" | "updateVersionDslIfUnchanged"
+    | "findProjectIds"
+    | "findAll"
+    | "findById"
+    | "findPublishedVersion"
+    | "updateVersionDslIfUnchanged"
   >;
   httpSecrets: WorkflowHttpSecrets;
 }>;
 
-/** Moves the tokens typed inline before they became project secrets; once and idempotently. */
+/**
+ * Moves the tokens typed inline into workflow versions before they became project secrets;
+ * once and idempotently. HTTP agents are agent's own `backfill-http-agent-credentials-to-secrets`.
+ */
 export class WorkflowHttpCredentialsBackfillTask extends Task {
   readonly name = "backfill-http-credentials-to-secrets";
   readonly description =
-    "Stores literal HTTP credentials of agents and of workflows' latest and published versions as project secrets.";
+    "Stores literal HTTP credentials of workflows' latest and published versions as project secrets. Idempotent; safe to run before or after backfill-http-agent-credentials-to-secrets.";
 
   private constructor(private readonly peers: BackfillPeers) {
     super();
@@ -40,27 +38,11 @@ export class WorkflowHttpCredentialsBackfillTask extends Task {
   }
 
   async run({ signal }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    for (const organizationId of await this.peers.organizations.findAllIds()) {
-      const projectIds = await this.peers.projects.listIdsByOrganization({ organizationId });
-      for (const projectId of projectIds) {
-        signal.throwIfAborted();
-        await this.agentsOf(projectId);
-        await this.workflowsOf(projectId);
-      }
+    for (const projectId of await this.peers.workflows.findProjectIds()) {
+      signal.throwIfAborted();
+      await this.workflowsOf(projectId);
     }
-    logger.info("Finished moving inline HTTP credentials into project secrets");
-  }
-
-  private async agentsOf(projectId: string): Promise<void> {
-    for (const agent of await this.peers.agents.getAll({ projectId })) {
-      if (agent.type !== "http" || !(await holdsLiteral(agent.config))) continue;
-      try {
-        await this.peers.agents.update({ id: agent.id, projectId, config: agent.config });
-        logger.info({ projectId, agentId: agent.id }, "agent credentials moved to secrets");
-      } catch (error) {
-        logger.error({ error, projectId, agentId: agent.id }, "agent credentials left in place");
-      }
-    }
+    logger.info("Finished moving inline workflow HTTP credentials into project secrets");
   }
 
   private async workflowsOf(projectId: string): Promise<void> {
@@ -81,10 +63,7 @@ export class WorkflowHttpCredentialsBackfillTask extends Task {
     }
   }
 
-  private async versionOf(input: {
-    projectId: string;
-    version: WorkflowVersion;
-  }): Promise<void> {
+  private async versionOf(input: { projectId: string; version: WorkflowVersion }): Promise<void> {
     const { projectId, version } = input;
     const nodes = Array.isArray(version.dsl.nodes) ? version.dsl.nodes : [];
     const moved: unknown[] = [];
@@ -99,7 +78,7 @@ export class WorkflowHttpCredentialsBackfillTask extends Task {
       id: version.id,
       projectId,
       dsl,
-      updatedAt: version.updatedAt,
+      updatedAt: fromDate(version.updatedAt),
     });
     if (written) {
       logger.info({ projectId, versionId: version.id }, "version credentials moved to secrets");
@@ -123,7 +102,12 @@ export class WorkflowHttpCredentialsBackfillTask extends Task {
       return Array.isArray(nodes) ? nodes[0] : input.node;
     } catch (error) {
       logger.error(
-        { error, projectId: input.projectId, versionId: input.versionId, nodeId: nodeIdOf(input.node) },
+        {
+          error,
+          projectId: input.projectId,
+          versionId: input.versionId,
+          ...nodeIdFields(input.node),
+        },
         "node credentials left in place",
       );
       return input.node;
@@ -131,23 +115,8 @@ export class WorkflowHttpCredentialsBackfillTask extends Task {
   }
 }
 
-function nodeIdOf(node: unknown): string | undefined {
+function nodeIdFields(node: unknown): { nodeId?: string } {
   return typeof node === "object" && node !== null && "id" in node && typeof node.id === "string"
-    ? node.id
-    : undefined;
-}
-
-/** Whether the config holds a credential that is not a `{{ secrets.NAME }}` reference. */
-async function holdsLiteral(config: HttpAgentConfig): Promise<boolean> {
-  let found = false;
-  await httpAgentConfigStoringSecrets({
-    config,
-    owner: "probe",
-    reference: async ({ value }) => {
-      found = true;
-      return value;
-    },
-  });
-
-  return found;
+    ? { nodeId: node.id }
+    : {};
 }

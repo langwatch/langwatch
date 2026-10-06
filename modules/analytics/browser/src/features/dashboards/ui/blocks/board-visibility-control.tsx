@@ -7,7 +7,7 @@
 import { Box, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { DASHBOARD_VISIBILITIES, type DashboardVisibility } from "@langwatch/dashboard-contract";
 import { Menu } from "@langwatch/design-system/menu";
-import { explainAnyError } from "@langwatch/error-presentation/presentation";
+import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { Building2, Check, Lock, type LucideIcon, Share2, Users } from "lucide-react";
 
 import {

@@ -19,7 +19,8 @@ export {
   codexAuxiliarySessionFacts,
   HELPER_THREAD_ID_ATTR,
   isCodexTemporaryStructuredRequestSpan,
-  queuedThreadIdOf,
+  queuedThreadOf,
+  type QueuedThread,
   REQUEST_QUEUE_SPAN_NAME,
 } from "./telemetry/codex-helper-thread.ts";
 export {
@@ -40,3 +41,4 @@ export type {
 export * from "./injected-notice.ts";
 export * from "./leading-context.ts";
 export * from "./coding-agent-span-admission.ts";
+export * from "./coding-agent-lent-components.ts";

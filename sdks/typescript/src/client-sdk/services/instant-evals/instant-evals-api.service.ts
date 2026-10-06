@@ -55,7 +55,7 @@ export class InstantEvalsApiError extends Error {
  * Typed client for Instant Evals (`/api/v1/instant-evals`): a run judges one LangWatchQL statement
  * that projects `TraceId` and an eval column. Progress is polled; the project comes from the
  * credential.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 export class InstantEvalsApiService {
   private readonly apiClient: LangwatchApiClient;

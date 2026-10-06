@@ -142,6 +142,22 @@ describe("given a deployment that offers passkeys", () => {
     });
   });
 
+  describe("when the offer from the address field is waiting on the device", () => {
+    /** @scenario The passkey offered from the address field never draws a waiting state */
+    it("changes nothing on the card while the ceremony is pending", async () => {
+      const { container, getByLabelText, queryByRole } = render(<Door enabled />);
+      const before = container.innerHTML;
+
+      fireEvent.pointerDown(getByLabelText("Email"));
+      await waitFor(() => expect(passkeyMock).toHaveBeenCalledWith({ autoFill: true }));
+      await flush();
+
+      expect(container.innerHTML).toBe(before);
+      expect(queryByRole("status")).toBeNull();
+      expect(queryByRole("progressbar")).toBeNull();
+    });
+  });
+
   describe("when this deployment offers no passkeys", () => {
     it("starts nothing, gestures or not", async () => {
       const { getByLabelText } = render(<Door enabled={false} />);

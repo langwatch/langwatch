@@ -36,13 +36,13 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
+import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
 
 /**
@@ -204,7 +204,7 @@ async function spentUsdFor({
   now?: Instant;
 }): Promise<string[]> {
   const budgets = await prisma.gatewayBudget.findMany({ where: { id: { in: budgetIds } } });
-  const spends = await chRepo.getSpendForBudgetsAcrossTenants(
+  const spends = await chRepo.findSpendForBudgetsAcrossTenants(
     [PROJECT_ID],
     budgetIds.map((id) => toBudgetRow(budgets.find((b) => b.id === id)!)),
     now,
@@ -486,7 +486,7 @@ describe.skipIf(!databaseUrl || !chUrl)("sibling budgets on one virtual key", ()
           const budget = toBudgetRow(
             await prisma.gatewayBudget.findUniqueOrThrow({ where: { id } }),
           );
-          return chRepo.getBucketSpendBreakdownForBudget({
+          return chRepo.findBucketSpendBreakdownForBudget({
             budget,
             tenantIds: [PROJECT_ID],
             boundaries: [],

@@ -1,7 +1,7 @@
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 
-import type { TraceMediaStore } from "../app/trace.members.ts";
 import { TraceContentExtractionService } from "./trace-content-extraction.service.ts";
+import type { TraceMediaStore } from "./trace-stored-media-store.service.ts";
 
 const SCENARIO_EVENT_MEDIA_FILENAME = "scenario-event-media";
 

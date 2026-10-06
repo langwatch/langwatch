@@ -11,7 +11,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createPresenceTestProjects,
+  createPresenceTestSettings,
   RecordingPresenceDiagnostics,
 } from "../../app/__tests__/presence.fixture.ts";
 import type { PresenceBroadcast } from "../../app/presence.app.ts";
@@ -41,16 +41,15 @@ function tracesAt(traceId: string | null, panel?: "flame"): PresenceLocation {
   } as PresenceLocation;
 }
 
-function createService() {
+async function createService() {
   let clockMs = 1_000_000;
   const now = () => clockMs;
   const repository = MemoryPresenceRepository.create({ now });
   const broadcast = new RecordingBroadcast();
-  const projects = createPresenceTestProjects();
   const service = PresenceService.create({
     repository,
     broadcast,
-    projects,
+    settings: await createPresenceTestSettings(),
     diagnostics: new RecordingPresenceDiagnostics(),
     now,
   });
@@ -85,7 +84,7 @@ describe("given a project several people are working in", () => {
   describe("when one person opens two browser tabs", () => {
     /** @scenario "A user with two browser tabs has two independent sessions" */
     it("keeps one session per tab, each carrying that tab's own location", async () => {
-      const { service } = createService();
+      const { service } = await createService();
       await service.update(heartbeat(alice, "tab-one", tracesAt("T1")));
       await service.update(heartbeat(alice, "tab-two", tracesAt("T2")));
 
@@ -104,7 +103,7 @@ describe("given a project several people are working in", () => {
   describe("when a session stops sending heartbeats", () => {
     /** @scenario "A session that stops sending heartbeats expires from presence" */
     it("drops out of the project's session list once its window has passed", async () => {
-      const { service, advanceSeconds } = createService();
+      const { service, advanceSeconds } = await createService();
       await service.update(heartbeat(alice, "tab-one", tracesAt("T1")));
 
       advanceSeconds(PRESENCE_TTL_SECONDS - 1);
@@ -118,7 +117,7 @@ describe("given a project several people are working in", () => {
   describe("when a client sends a leave signal", () => {
     /** @scenario "Leaving the project removes the session immediately" */
     it("tells peers the session left and removes it before its window expires", async () => {
-      const { service, broadcast, advanceSeconds } = createService();
+      const { service, broadcast, advanceSeconds } = await createService();
       await service.update(heartbeat(alice, "tab-one", tracesAt("T1")));
 
       advanceSeconds(1);
@@ -132,7 +131,7 @@ describe("given a project several people are working in", () => {
   describe("when somebody moves to a different trace", () => {
     /** @scenario "Updating location fans out a single update delta" */
     it("publishes one update carrying the same session id, not a second join", async () => {
-      const { service, broadcast } = createService();
+      const { service, broadcast } = await createService();
       await service.update(heartbeat(bob, "bob-tab", tracesAt(null)));
       await service.update(heartbeat(alice, "tab-one", tracesAt(null)));
       const before = broadcast.events().length;
@@ -151,7 +150,7 @@ describe("given a project several people are working in", () => {
   describe("when a heartbeat repeats the location it already reported", () => {
     /** @scenario "A session that re-reports the same location is a no-op for peers" */
     it("publishes nothing to peers and pushes the expiry window out again", async () => {
-      const { service, broadcast, advanceSeconds } = createService();
+      const { service, broadcast, advanceSeconds } = await createService();
       const location = tracesAt("T1", "flame");
       await service.update(heartbeat(alice, "tab-one", location));
       const before = broadcast.events().length;
@@ -168,7 +167,7 @@ describe("given a project several people are working in", () => {
   describe("when a client reports where it is looking", () => {
     /** @scenario "Presence does not transmit cursor coordinates or text selection" */
     it("accepts only the lens, the route and the view", async () => {
-      const { service } = createService();
+      const { service } = await createService();
       await service.update(heartbeat(alice, "tab-one", tracesAt("T1", "flame")));
 
       const [stored] = await service.list({ projectId: PROJECT });

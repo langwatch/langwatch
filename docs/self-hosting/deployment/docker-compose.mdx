@@ -15,14 +15,16 @@ Docker Compose is the quickest way to try LangWatch locally. It runs the full st
 ```bash
 # Clone the repository
 git clone https://github.com/langwatch/langwatch.git
-cd langwatch/infra
+cd langwatch
 
-# Copy the example environment file
-cp ../.env.example .env
+# Copy the example environment file, then replace its placeholder secrets (see Configuration)
+cp .env.example .env
 
 # Start all services
-docker compose up
+docker compose -f infra/compose.yml --project-directory . up
 ```
+
+The compose file lives at `infra/compose.yml` and reads `.env` at the repository root, so run every `docker compose` command from the repository root with `-f infra/compose.yml --project-directory .`. The commands below use that form.
 
 LangWatch is available at **http://localhost:5560**.
 
@@ -49,10 +51,12 @@ Services with no host port bind no port on the host's interfaces, so they do not
 Edit `.env` to customize your deployment. Key variables:
 
 ```bash
-# Required: generate a secret for each
-API_TOKEN_JWT_SECRET=your-jwt-secret
-CREDENTIALS_SECRET=your-encryption-key
+# Required: replace the placeholders that .env.example ships
+# Signs sessions. Generate with: openssl rand -base64 32
 NEXTAUTH_SECRET=your-session-secret
+# Encrypts stored credentials and peppers API key hashes.
+# Must be exactly 64 hex characters. Generate with: openssl rand -hex 32
+CREDENTIALS_SECRET=your-64-hex-character-key
 
 # Optional: shared credential the app authenticates to the NLP service with.
 # Every container in the stack reads this file, so one value covers both sides.
@@ -65,44 +69,44 @@ LANGWATCH_NLP_INTERNAL_SECRET=
 LANGWATCH_LICENSE_KEY=
 ```
 
-See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. Keep `CREDENTIALS_SECRET` stable once LangWatch holds data: changing it makes stored credentials unreadable and invalidates API keys. See [Security](/self-hosting/security#credentials-secret). See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
 ## Common Operations
 
 ### Start in the background
 
 ```bash
-docker compose up -d
+docker compose -f infra/compose.yml --project-directory . up -d
 ```
 
 ### View logs
 
 ```bash
 # All services
-docker compose logs -f
+docker compose -f infra/compose.yml --project-directory . logs -f
 
 # Specific service
-docker compose logs -f app
+docker compose -f infra/compose.yml --project-directory . logs -f app
 ```
 
 ### Stop services
 
 ```bash
-docker compose down
+docker compose -f infra/compose.yml --project-directory . down
 ```
 
 ### Update to latest version
 
 ```bash
-docker compose pull
-docker compose up -d
+docker compose -f infra/compose.yml --project-directory . pull
+docker compose -f infra/compose.yml --project-directory . up -d
 ```
 
 ### Reset data
 
 ```bash
-docker compose down -v  # Removes volumes (all data)
-docker compose up
+docker compose -f infra/compose.yml --project-directory . down -v  # Removes volumes (all data)
+docker compose -f infra/compose.yml --project-directory . up
 ```
 
 ## Customization

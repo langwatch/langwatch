@@ -7,13 +7,11 @@
 import { VirtualKeyRevokedError, type VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 
-import {
-  type GatewayAudit,
-  type GatewayChangeEvents,
-  type GatewayTransaction,
-  type GatewayGovernanceSignals,
-} from "../app/gateway.members.ts";
+import type { GatewayAuditRepository } from "../repositories/gateway-audit.repository.ts";
+import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
+import type { GatewayTransactionRepository } from "../repositories/gateway-transaction.repository.ts";
 import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
+import type { GatewayGovernanceSignals } from "./gateway-governance-events.service.ts";
 import type { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
 import {
   VirtualKeyValidationService,
@@ -21,10 +19,10 @@ import {
 } from "./virtual-key-validation.service.ts";
 
 export class VirtualKeyStatusService {
-  private readonly transactions: GatewayTransaction;
+  private readonly transactions: GatewayTransactionRepository;
   private readonly repository: GatewayVirtualKeyRepository;
-  private readonly changeEvents: GatewayChangeEvents;
-  private readonly auditLog: GatewayAudit;
+  private readonly changeEvents: GatewayChangeEventsRepository;
+  private readonly auditLog: GatewayAuditRepository;
   private readonly validation: VirtualKeyValidationService;
   private readonly budgets: VirtualKeyBudgetService;
   private readonly governanceSignals?: GatewayGovernanceSignals;
@@ -38,10 +36,10 @@ export class VirtualKeyStatusService {
     budgets,
     governanceSignals,
   }: {
-    transactions: GatewayTransaction;
+    transactions: GatewayTransactionRepository;
     repository: GatewayVirtualKeyRepository;
-    changeEvents: GatewayChangeEvents;
-    auditLog: GatewayAudit;
+    changeEvents: GatewayChangeEventsRepository;
+    auditLog: GatewayAuditRepository;
     validation: VirtualKeyValidationService;
     budgets: VirtualKeyBudgetService;
     governanceSignals?: GatewayGovernanceSignals;
@@ -56,10 +54,10 @@ export class VirtualKeyStatusService {
   }
 
   static create(input: {
-    transactions: GatewayTransaction;
+    transactions: GatewayTransactionRepository;
     repository: GatewayVirtualKeyRepository;
-    changeEvents: GatewayChangeEvents;
-    auditLog: GatewayAudit;
+    changeEvents: GatewayChangeEventsRepository;
+    auditLog: GatewayAuditRepository;
     validation: VirtualKeyValidationService;
     budgets: VirtualKeyBudgetService;
     governanceSignals?: GatewayGovernanceSignals;

@@ -1,9 +1,16 @@
-import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 /**
  * @vitest-environment jsdom
  * @see specs/licensing/proration-preview.feature
  */
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { uiDeclarations } from "@langwatch/browser-host/declarations";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import {
+  SeatProrationPreviewToken,
+  type SeatProrationPreviewProps,
+} from "@langwatch/enterprise-billing-contract";
 import { act, cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -11,6 +18,34 @@ import { GlobalUpgradeModal } from "../global-upgrade-modal.tsx";
 
 const renderGate = (isSaaS: boolean) =>
   renderWithDesignSystem(<GlobalUpgradeModal isSaaS={isSaaS} />);
+
+/** Billing's price, as its declaration lends it; it only names the seats it was handed. */
+function LentPrice({ variant }: SeatProrationPreviewProps) {
+  return <p>Priced {variant.newSeats} seats</p>;
+}
+
+const billingLendsThePrice = {
+  ...createUiCapabilitiesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),
+  declarations: uiDeclarations([
+    {
+      name: "billing",
+      installation: {
+        capabilities: {},
+        lends: [{ token: SeatProrationPreviewToken, load: async () => ({ default: LentPrice }) }],
+      },
+    },
+  ]),
+};
+
+const openSevenSeats = () =>
+  act(() => {
+    useUpgradeModalStore.getState().openSeats({
+      organizationId: "org-1",
+      currentSeats: 5,
+      newSeats: 7,
+      onConfirm: () => Promise.resolve(),
+    });
+  });
 
 describe("<GlobalUpgradeModal/>", () => {
   afterEach(() => {
@@ -90,18 +125,27 @@ describe("<GlobalUpgradeModal/>", () => {
     });
   });
 
-  describe("when a seat update waits to be confirmed and nothing fills the price slot", () => {
+  describe("when a seat update waits to be confirmed and billing lends the price", () => {
+    it("renders billing's lent preview with the seats the change asks for", async () => {
+      renderWithDesignSystem(
+        <UiCapabilityContextProvider value={billingLendsThePrice}>
+          <GlobalUpgradeModal isSaaS={true} />
+        </UiCapabilityContextProvider>,
+      );
+
+      openSevenSeats();
+
+      // The lent chunk loads lazily; under a busy runner it takes longer than the default second.
+      expect(await screen.findByText("Priced 7 seats", {}, { timeout: 5000 })).toBeInTheDocument();
+      expect(screen.queryByText("Seat management is not available in this deployment.")).toBeNull();
+    });
+  });
+
+  describe("when a seat update waits to be confirmed and no module lends the price", () => {
     it("says seat management is unavailable rather than rendering an empty dialog", async () => {
       renderGate(true);
 
-      act(() => {
-        useUpgradeModalStore.getState().openSeats({
-          organizationId: "org-1",
-          currentSeats: 5,
-          newSeats: 7,
-          onConfirm: () => Promise.resolve(),
-        });
-      });
+      openSevenSeats();
 
       expect(
         await screen.findByText("Seat management is not available in this deployment."),

@@ -7,18 +7,31 @@ import {
 } from "@langwatch/model-provider-contract";
 import type { LanguageModel } from "ai";
 
-import type { ModelCostProject, ModelProviderCodexHandle } from "../app/model-provider.members.ts";
 import { handleForParameters } from "../rules/execution-handle.rules.ts";
 import {
   getProjectModelProviders,
   type LegacyModelProviderExecution,
   prepareLitellmParams,
 } from "../rules/legacy-model-provider.rules.ts";
+import type { ModelCostProject } from "./model-provider-project-scope.service.ts";
+
+/**
+ * The handle a Codex model executes through, via the AI gateway's Responses endpoint — not this
+ * feature's vertical, so a process with no gateway credential passes nothing and the cascade
+ * refuses codex models by name; every other provider is unaffected.
+ */
+abstract class ModelProviderCodexHandle {
+  abstract resolve(input: {
+    projectId: string;
+    model: string;
+    featureKey: string;
+  }): Promise<LanguageModel>;
+}
 
 /**
  * Returns a Vercel AI SDK model handle for the given project + feature.
  */
-export type ModelProviderExecutionHandleInput = {
+type ModelProviderExecutionHandleInput = {
   projectId: string;
   model?: string;
   featureKey?: string;
@@ -29,7 +42,7 @@ export type ModelProviderExecutionHandleInput = {
  * every helper in this file narrows to the same shape instead of each
  * spelling out its own slice of `ModelProviderApi`.
  */
-export type ModelProviderResolutionGateway = Pick<
+type ModelProviderResolutionGateway = Pick<
   ModelProviderApi,
   "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders" | "prepareExecution"
 >;

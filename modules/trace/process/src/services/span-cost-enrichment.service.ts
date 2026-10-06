@@ -1,13 +1,23 @@
-import { findMatchingModelCost, type ModelCostRate } from "@langwatch/model-provider-contract";
-import type { OtlpSpan } from "@langwatch/trace-contract";
 import {
+  findMatchingModelCost,
+  type ModelCostRate,
+  type ModelCost,
+} from "@langwatch/model-provider-contract";
+import {
+  type OtlpSpan,
   ATTR_KEYS,
   CLAUDE_CODE_LLM_REQUEST_SPAN_NAME,
   CODEX_TURN_SPAN_NAME,
 } from "@langwatch/trace-contract";
 
-import type { TraceModelCostCatalog } from "../app/trace.members.ts";
 import { SpanModelNameService } from "./span-model-name.service.ts";
+
+/** The project's own model-cost rules, as record-time cost enrichment reads
+ * them. Deliberately not the coding-agent estimator shape: this reads per-project
+ * overrides matched by regex against model names. */
+export interface TraceModelCostCatalog {
+  listCosts(input: { projectId: string }): Promise<ModelCost[]>;
+}
 
 /**
  * Attribute keys that may contain model names (checked in priority order).

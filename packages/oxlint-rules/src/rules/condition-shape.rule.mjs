@@ -83,7 +83,7 @@ export const conditionShapeRule = defineRule({
     ternaryInTest: {
       what: "This test has a ternary inside it.",
       why: WHY,
-      fix: "Move the ternary out of the test: decide it in the branch it belongs to, not inside this condition.",
+      fix: "Move the ternary out of the test: decide it in the branch it belongs to, not inside this condition. Read the `testing` skill.",
     },
   },
   options: {

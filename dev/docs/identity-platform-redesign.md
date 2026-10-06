@@ -7,6 +7,12 @@ Self-hosted auth, per-org SSO, MFA, passkeys, SCIM, join-requests — built on t
 **Precondition:** the unified authorization program (**ADR-092**, as reshaped by **ADR-110** — a grant is its own aggregate, one migration per organization, and finishing it IS the switch; #7358, #7404) has **landed on `main`** (checked 2026-08-23): `GrantsService.attach/offboard` is the membership writer, checks go through `.permission()` / `getApp().permissions`, and the engine gate reads the migration's `finalized` status and nothing else. This epic consumes that API; it does not build it. The authz program hands this one two ready-made pieces: the `@langwatch/system-migrations` package (landed, #7079, #7337; carries D01's backfill and D04's grandfathering; cloud pacing is per-organization enrollment and nothing else), and the ADR-110 in-place rollout shape (new head born clean, adoption by ids stable across retries, a migration that states facts and checks once, `finalized` as the only switch for reads and writes, held tenants with outstanding facts named, rollback as a status change) this epic transplants wholesale, re-tenanted to users.
 **Review history:** Notion round 1 (identifiers storage, Redis resilience, self-hosted single-SSO priority, join-requests + invitation resilience); corpus audit round 2 (`review-spec` against `specs/` + `dev/docs/adr/` — findings folded in below); restructure round 3 (RBAC assumed done; epic → deliverables → delivery plan).
 
+> **Historical (marked 2026-10-05):** this epic was written against the monolith, before
+> `platform/app` was deleted. Enterprise SSO now lives in `enterprise/modules/sso`, SCIM in
+> `enterprise/modules/scim`, the event-sourcing framework is `packages/eventing` (ARCHITECTURE.md §9)
+> and the identity pipeline is `modules/identity/process/src/eventing`. "Investigation on
+> `origin/main`" below describes main's tree; check the current tree before treating any other path as live.
+
 # Overview
 
 LangWatch's auth already migrated from NextAuth/Auth0-as-library to better-auth (done on `main`), but enterprise identity still runs through Auth0 as a broker: one auth method per deployment, enterprise SSO reduced to two strings on `Organization` set by hand, no SAML, no MFA, no passkeys, and SCIM writing membership tables directly. Support pain is structural — identity states exist that the product can't see and support can't fix without DB surgery.
@@ -72,7 +78,7 @@ Requirements are stated here at domain level; the normative, implementable versi
 
 ## Domain: Authorization consumption (not construction)
 
-- New permissions `sso:view`, `sso:manage` are registered directly in `packages/authz/src/registry.ts` (org-scope only), and gate directory sync as well — the directory provisions against a connection, so one pair covers both — the shared registry package, not app code (`server/authz/registry.ts` does not exist; app-side authorization lives at `server/app-layer/authz`). IT-admin custom role = `CustomRole` row holding only those permissions.
+- New permissions `sso:view`, `sso:manage` are registered directly in `packages/authorization/src/registry.ts` (org-scope only), and gate directory sync as well — the directory provisions against a connection, so one pair covers both — the shared registry package, not module code. IT-admin custom role = `CustomRole` row holding only those permissions.
 - All identity writes with authorization consequences go through `grants.*`. All UI gating uses `useCan`/`RequireCan`; all tRPC gating uses `.permission()`/`authz.require`.
 - PATs need nothing from this program: they are already edge-resolved principals with owner-ceiling intersection.
 
@@ -296,7 +302,7 @@ Thirteen deliverables, each independently shippable and flag-gated. Normative de
 
 Cross-deliverable conventions:
 
-- Pipeline layout `platform/app/src/server/event-sourcing/pipelines/identity/` per the langy/automations doctrine (ADR-049/052); type identifiers in `schemas/typeIdentifiers.ts`.
+- Pipeline layout `modules/identity/process/src/eventing/`, a `definePipeline` pipeline (ARCHITECTURE.md §9).
 - The **identity adapter** (R10): the `database` contract as a routing facade over the stock prismaAdapter row engine; reads pass through, domain-significant writes become commands dispatched waited — better-auth reads its own write back immediately because command → event → apply completes before the adapter returns. A small endpoint-hook plugin stamps ceremony context (flow, request metadata, actor) onto request-scoped storage so the adapter knows _why_ a row is being written; protocol failures/`APIError`s still emit events (they feed the ops "why?" view).
 - Testing: in-memory `EventSourcing` harness + `InMemoryProcessStore`; replay-parity tests for the `Identifier` projection.
 

@@ -7,7 +7,7 @@ Feature: Eventing framework boundary and pipeline authoring
   So that its consistency guarantees are visible and invalid combinations are
   rejected before the application starts
 
-  @typecheck @architecture
+  @typecheck @architecture @unit
   Scenario: An aggregate declares its type once
     Given an aggregate definition with its identifier and allowed events
     When a pipeline is defined for that aggregate
@@ -27,7 +27,7 @@ Feature: Eventing framework boundary and pipeline authoring
     When the application builds its event catalogue
     Then construction fails with both conflicting owners identified
 
-  @typecheck @projection
+  @typecheck @projection @unimplemented
   Scenario: A ClickHouse map projection requires its consistency dependencies
     Given an inline ClickHouse map projection
     When its definition omits a stable key, repository or Redis cache
@@ -41,7 +41,7 @@ Feature: Eventing framework boundary and pipeline authoring
     Then the event is mapped without reading prior projection state
     And the latest document is written to ClickHouse and its Redis cache
 
-  @typecheck @projection
+  @typecheck @projection @unimplemented
   Scenario: A ClickHouse fold projection requires a Redis-backed read path
     Given an inline ClickHouse fold projection
     When its definition omits initial state, evolution, repository, cache or version
@@ -56,7 +56,7 @@ Feature: Eventing framework boundary and pipeline authoring
     Then the pure evolution receives the cached version
     And the evolved document is persisted and written through to the cache
 
-  @typecheck @projection
+  @typecheck @projection @unimplemented
   Scenario: A Postgres projection exposes only its own substrate contract
     Given an inline Postgres projection
     When its definition supplies initial state, evolution, version and repository
@@ -78,7 +78,7 @@ Feature: Eventing framework boundary and pipeline authoring
     Then the subscriber is staged with the event context
     And no projection document is present in its handler contract
 
-  @typecheck @subscriber
+  @typecheck @subscriber @unit
   Scenario: A projection subscriber infers its committed document
     Given a projection registered earlier in the pipeline
     When a projection subscriber is declared after that projection by name

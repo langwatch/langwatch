@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Spec: specs/navigation/product-sidebars.feature
+ * Spec: modules/navigation/specs/product-sidebars.feature
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";

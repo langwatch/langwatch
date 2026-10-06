@@ -20,7 +20,7 @@ describe("EntitlementModule.assertWithinUsageLimit", () => {
     /** @scenario "An organization past its monthly allowance is refused with the plan limit" */
     it("throws the plan limit with the reading it decided from", async () => {
       const app = createEntitlementTestApp({
-        members: {
+        infrastructure: {
           baseline: free,
           counter: TestUsageCounter.create(1_000).withLimit({
             exceeded: true,
@@ -49,9 +49,10 @@ describe("EntitlementModule.assertWithinUsageLimit", () => {
 
   describe("given an organization within its monthly allowance", () => {
     /** @scenario "An organization within its monthly allowance is let through" */
+    /** @scenario "Work within the monthly allowance is let through" */
     it("resolves without refusing", async () => {
       const app = createEntitlementTestApp({
-        members: { baseline: free, counter: TestUsageCounter.create(10) },
+        infrastructure: { baseline: free, counter: TestUsageCounter.create(10) },
       });
 
       await expect(

@@ -199,7 +199,11 @@ describe("PrismaAuthzManagedGrantRepository", () => {
     database.$queryRaw.mockResolvedValue([{ principalType: "GROUP", principalId: "group-1" }]);
 
     await expect(
-      repository.findRoleHolderPrincipals({ organizationId: "org-1", roleId: "role-1", limit: 501 }),
+      repository.findRoleHolderPrincipals({
+        organizationId: "org-1",
+        roleId: "role-1",
+        limit: 501,
+      }),
     ).resolves.toEqual([{ type: "group", id: "group-1" }]);
     const [strings, ...values] = database.$queryRaw.mock.calls[0] ?? [];
     expect(String(strings)).toMatch(/SELECT DISTINCT[\s\S]*"revokedAt" IS NULL[\s\S]*LIMIT/);

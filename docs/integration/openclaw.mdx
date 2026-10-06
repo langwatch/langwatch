@@ -110,7 +110,7 @@ When **disabled**, you still get the full trace structure, token counts, latency
 | `diagnostics.otel.logs`           | Export logs                         | `false`      |
 | `diagnostics.otel.headers`        | Auth headers (include your API key) | `{}`         |
 | `diagnostics.otel.serviceName`    | Service name in traces              | `"openclaw"` |
-| `diagnostics.otel.sampleRate`     | Sampling rate (0.0–1.0)             | `1.0`        |
+| `diagnostics.otel.sampleRate`     | Sampling rate (0.0 to 1.0)             | `1.0`        |
 | `diagnostics.otel.captureContent` | Include message content in traces   | `false`      |
 
 For high-volume deployments, consider reducing `sampleRate` to control costs. A rate of `0.1` samples 10% of traces.

@@ -145,4 +145,29 @@ describe("IngestionTemplateService", () => {
       }),
     );
   });
+
+  describe("when a retired platform copy is still stored and the catalog is synchronised twice", () => {
+    /** @scenario "The platform ingestion template catalog reconciles idempotently" */
+    it("archives and disables the retired copy and creates no duplicate on the repeat", async () => {
+      const retired = template({
+        id: "platform-retired",
+        slug: "claude_cowork",
+        organizationId: null,
+        platformPublished: true,
+        enabled: true,
+      });
+      const { store, repository } = seeded([retired]);
+      const service = IngestionTemplateService.create({ repository });
+
+      const first = await service.syncPlatformCatalog();
+      const countAfterFirst = store.ingestionTemplates.length;
+      const second = await service.syncPlatformCatalog();
+
+      expect(first.archived).toBe(1);
+      expect(store.ingestionTemplates.find((row) => row.id === retired.id)?.enabled).toBe(false);
+      expect(second.archived).toBe(0);
+      expect(second.created).toBe(0);
+      expect(store.ingestionTemplates).toHaveLength(countAfterFirst);
+    });
+  });
 });

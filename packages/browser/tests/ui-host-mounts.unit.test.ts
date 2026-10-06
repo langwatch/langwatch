@@ -37,7 +37,9 @@ describe("findUnmountedHostOwners", () => {
   });
 
   it("does not refuse a host the composing shell mounts outside any module", () => {
-    const navigation = defineBrowserModule("navigation").withHosts({ requires: ["NavigationHost"] });
+    const navigation = defineBrowserModule("navigation").withHosts({
+      requires: ["NavigationHost"],
+    });
 
     expect(
       findUnmountedHostOwners({ modules: [navigation], mountedByShell: ["NavigationHost"] }),

@@ -52,6 +52,7 @@ function mountedDoor() {
 
 describe("the OTLP logs door", () => {
   describe("given an exporter posts to main's canonical path or one of its aliases", () => {
+    /** @scenario "An endpoint that already named a signal" */
     it.each([
       "/api/otel/v1/logs",
       "/api/otel/v1/traces/v1/logs",

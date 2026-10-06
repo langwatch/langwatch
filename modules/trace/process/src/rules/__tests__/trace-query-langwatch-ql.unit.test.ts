@@ -1,7 +1,7 @@
 /**
  * The filter language against the LangWatchQL trace view: what it compiles,
  * what it names as out of reach, and whether it still agrees with the facets.
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 
 import { FilterParseError, type LangWatchQLTraceFilter } from "@langwatch/trace-contract";
@@ -80,10 +80,11 @@ describe("given a filter compiled against the LangWatchQL trace view", () => {
     });
 
     it("refuses ok, which it would have to guess at", () => {
-      expect(compile({ filter: "status:ok" })).toMatchObject({
+      expect(compile({ filter: "status:ok" })).toEqual({
         kind: "refused",
         field: "status",
-        reason: expect.stringMatching(/only ask for status:error/),
+        reason:
+          'A shorthand filter can only ask for status:error. Ask for "ok" with a statement instead.',
       });
     });
   });

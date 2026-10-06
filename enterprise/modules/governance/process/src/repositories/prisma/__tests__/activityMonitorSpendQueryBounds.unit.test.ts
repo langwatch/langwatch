@@ -9,12 +9,12 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
+import type { ActivityMonitorService } from "../../../services/ingestion-source-activity.service.ts";
 import type {
   GovernanceClickHouseClient,
   GovernanceClickHouseResult,
   GovernanceClickHouseResolver,
-} from "../../../app/governance.members.ts";
-import type { ActivityMonitorService } from "../../../services/ingestion-source-activity.service.ts";
+} from "../../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 
 type ClickHouseCall = Parameters<GovernanceClickHouseClient["query"]>[0];
 

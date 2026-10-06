@@ -26,7 +26,7 @@ const CLOSED_STATES = new Set(["DISCARDED", "REJECTED", "TORN_DOWN"]);
 /** How many stragglers the setup read carries; the section pages for more. */
 const MIGRATION_PAGE_SIZE = 25;
 
-export interface SsoSetupServiceDeps {
+interface SsoSetupServiceDeps {
   connections: SsoConnectionReadRepository;
   breakGlass: SsoBreakGlassRepository;
   /** The trail a sign-in through the connection leaves, which is what says

@@ -331,6 +331,32 @@ describe("asking for a record", () => {
     });
     expect(JSON.stringify(stated)).not.toContain(issued.record.value);
   });
+
+  /** @scenario "A hosted administrator claims a domain and is given the record straight away" */
+  it("hands the administrator the record with no review in the way, and routes nothing yet", async () => {
+    await reachRegistered();
+
+    const claim = await ceremony.claimDomain({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      domain: DOMAIN,
+      actor: ANA,
+      proof: "dns-txt",
+    });
+    const issued = await ceremony.proveDomain({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      domain: DOMAIN,
+      actor: ANA,
+      proof: "dns-txt",
+    });
+
+    expect(claim).toEqual({ waitsForReview: false, disputed: false, verified: false });
+    expect(issued.proved).toBe(false);
+    if (issued.proved) return;
+    expect(issued.record.name).toBe(ssoDnsRecordName({ domain: DOMAIN }));
+    expect((await stateOf())?.verifiedDomains).toEqual([]);
+  });
 });
 
 describe("what the record says about itself", () => {

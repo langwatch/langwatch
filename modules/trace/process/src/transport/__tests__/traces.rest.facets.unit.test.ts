@@ -1,10 +1,9 @@
 import {
+  canonicalErrorResponse,
   bindRestMiddleware,
   createRestRuntime,
   projectRestFacts,
-  type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
 /**
  * `GET /api/v1/traces/facets`: the discovery payload with no `field`, one
  * field's paged values with one - registered before `:traceId` so "facets"
@@ -13,7 +12,6 @@ import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceListRead } from "@langwatch/trace-contract";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { createTraceAppHarness } from "../../app/__tests__/support/trace-app.harness.ts";
@@ -23,13 +21,6 @@ import { TraceFacetValuesService } from "../../services/trace-facet-values.servi
 import { TraceTopicNamingService } from "../../services/trace-topic-naming.service.ts";
 import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
-
-const boundaryErrorHandler: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    return c.json({ error: error.code }, (error.httpStatus ?? 500) as ContentfulStatusCode);
-  }
-  return c.json({ error: "internal_server_error" }, 500);
-};
 
 function mount(
   overrides: Readonly<{
@@ -79,7 +70,7 @@ function mount(
   const hono = runtime.mount(tracesRest.router(), {
     app: () => stub,
     credential: "project",
-    onError: boundaryErrorHandler,
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({
         projectSlug: "project-one",
@@ -157,7 +148,7 @@ describe("GET /api/v1/traces/facets", () => {
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toMatchObject({
-        error: "trace_attribute_values_withheld",
+        code: "trace_attribute_values_withheld",
       });
       expect(readFacetValues).not.toHaveBeenCalled();
     });

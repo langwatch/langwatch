@@ -9,7 +9,7 @@ import {
   InviteNotFoundError,
 } from "@langwatch/organization-contract";
 
-import type { OrganizationInviteMail } from "../app/organization.members.ts";
+import type { OrganizationInviteMail } from "../channels/organization-invite-mail.channel.ts";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import {
   type InviteAssignableRoles,

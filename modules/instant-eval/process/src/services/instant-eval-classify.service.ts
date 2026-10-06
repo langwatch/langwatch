@@ -2,7 +2,7 @@
  * One classification asked for on its own, outside any run: the search bar
  * routing a sentence. Counted, never metered — a question of a few hundred
  * tokens per Enter is below the spend spine's noise floor (ADR-144).
- * @see specs/instant-evals/classifier.feature
+ * @see modules/instant-eval/specs/classifier.feature
  */
 
 import type { InstantEvalJudgement, InstantEvalQuestion } from "@langwatch/instant-eval-contract";

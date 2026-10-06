@@ -18,7 +18,7 @@ import type {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type DatasetDatabase = Pick<PrismaClient, "dataset" | "datasetRecord">;
+type DatasetDatabase = Pick<PrismaClient, "dataset" | "datasetRecord">;
 
 export class PrismaDatasetRepository
   extends PrismaRepository.for("Dataset", "DatasetRecord")

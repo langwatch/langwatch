@@ -30,12 +30,7 @@ import { DIRECTORY_REPORT_ACTION } from "./microsoft-graph-directory.rules.ts";
 import type { ListingRefusal, ProviderListing } from "./provider-listing.rules.ts";
 import { itemsListed, listingRefused } from "./provider-listing.rules.ts";
 
-export {
-  type ListingRefusal as PeopleListingRefusal,
-  type ListingRefusalReason as PeopleListingRefusalReason,
-  refusalFromStatus,
-  refusalFromThrown,
-} from "./provider-listing.rules.ts";
+export { type ListingRefusal as PeopleListingRefusal } from "./provider-listing.rules.ts";
 
 /**
  * One person a provider listed.

@@ -233,6 +233,7 @@ function makeSummary(overrides: Partial<TraceSummaryData> = {}): TraceSummaryDat
 }
 
 describe("legacy full-read summary characterization", () => {
+  /** @scenario "Full-read characterization preserves storage and projected summary distinctions" */
   it("preserves the span-time baseline, topic identities, and reserved token metrics", () => {
     const trace = mapTraceSummaryToTrace(
       makeSummary({
@@ -276,6 +277,32 @@ describe("legacy full-read summary characterization", () => {
       },
     });
     expect(trace.timestamps.started_at).not.toBe(1_700_000_000_900);
+  });
+
+  /** @scenario "Full-read characterization preserves storage and projected summary distinctions" */
+  it("reports the trace summary's own rollups rather than recomputing them from spans or other rollups", () => {
+    const trace = mapTraceSummaryToTrace(
+      makeSummary({
+        totalCost: 0.5,
+        totalPromptTokenCount: 10,
+        totalCompletionTokenCount: 20,
+        totalDurationMs: 1234,
+        attributes: { "langwatch.analytics.total_cost": "99", "langwatch.timeseries.tokens": "99" },
+      }),
+      [
+        makeSpan({
+          metrics: { prompt_tokens: 999, completion_tokens: 999, cost: 9 },
+        }),
+      ],
+      "project-1",
+    );
+
+    expect(trace.metrics).toMatchObject({
+      total_cost: 0.5,
+      prompt_tokens: 10,
+      completion_tokens: 20,
+      total_time_ms: 1234,
+    });
   });
 });
 

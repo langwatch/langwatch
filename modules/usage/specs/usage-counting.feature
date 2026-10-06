@@ -6,20 +6,20 @@ Feature: Usage owns all counting
   See dev/docs/ARCHITECTURE.md §3 (usage owns all counting) and §11 (usage decides, billing only sends).
   Behaviour is main's: the same allowance, thresholds, counts and warning cadence.
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: Ingest past the monthly allowance is refused with the plan limit
     Given an organization whose month's count has reached its plan's allowance
     When a trace arrives at OTLP ingest for one of its projects
     Then the ingest is refused with ERR_PLAN_LIMIT and status 402
     And the refusal carries the count, the allowance and the plan name
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: A scenario event past the monthly allowance is refused with the plan limit
     Given an organization whose month's count has reached its plan's allowance
     When a scenario event is posted for one of its projects
     Then the event is refused with ERR_PLAN_LIMIT and status 402
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: Work within the monthly allowance is let through
     Given an organization whose month's count is below its plan's allowance
     When a caller checks the organization's usage limit
@@ -71,7 +71,7 @@ Feature: Usage owns all counting
     Then the organization's admins are mailed once, naming each project and its count
     And the warning is recorded against the month so a later 90% reading sends nothing
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: Billing reports the month's total to Stripe from usage's month_counted event
     Given a month_counted event for an organization with billable events counted this month
     When billing's subscriber handles the event

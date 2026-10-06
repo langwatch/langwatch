@@ -127,15 +127,6 @@ export const presenceUpdateRequestSchema = z
   .strict();
 export type PresenceUpdateRequest = z.infer<typeof presenceUpdateRequestSchema>;
 
-export const presenceHeartbeatInputSchema = z
-  .object({
-    ...presenceUpdateRequestSchema.shape,
-    /** Who is publishing, as the boundary authenticated them. */
-    userId: z.string().min(1),
-  })
-  .strict();
-export type PresenceHeartbeatInput = z.infer<typeof presenceHeartbeatInputSchema>;
-
 export const presenceLeaveRequestSchema = z
   .object({
     projectId: z.string().min(1),
@@ -175,15 +166,6 @@ export const presenceCursorRequestSchema = z
   })
   .strict();
 export type PresenceCursorRequest = z.infer<typeof presenceCursorRequestSchema>;
-
-export const presenceCursorTickInputSchema = z
-  .object({
-    ...presenceCursorRequestSchema.shape,
-    /** Who is publishing, as the boundary authenticated them. */
-    userId: z.string().min(1),
-  })
-  .strict();
-export type PresenceCursorTickInput = z.infer<typeof presenceCursorTickInputSchema>;
 
 /** The cursors of one anchor, minus the subscriber's own. */
 export const presenceCursorSubscriptionSchema = z

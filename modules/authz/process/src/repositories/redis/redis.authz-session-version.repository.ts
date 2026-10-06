@@ -1,10 +1,10 @@
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import { AuthzSessionVersionRepository } from "../authz-session-version.repository.ts";
 
 const SESSION_VERSION_KEY_PREFIX = "authz:session-version:";
 
-export type AuthzSessionVersionRedis = Pick<ProcessMembers["redis"], "get" | "incr">;
+export type AuthzSessionVersionRedis = Pick<RedisConnection, "get" | "incr">;
 
 /** Redis-backed session version, one counter per user and never expired. */
 export class RedisAuthzSessionVersionRepository extends AuthzSessionVersionRepository {

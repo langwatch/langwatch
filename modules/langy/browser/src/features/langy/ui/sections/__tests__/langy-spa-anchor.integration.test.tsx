@@ -40,6 +40,7 @@ describe("LangySpaAnchor", () => {
   describe("given an in-app destination", () => {
     beforeEach(() => renderAnchor("/acme/simulations/scenarios"));
 
+    /** @scenario "A card's links behave like links" */
     it("stays a real link, so copying and previewing the address still work", () => {
       expect(screen.getByRole("link")).toHaveAttribute("href", "/acme/simulations/scenarios");
     });
@@ -50,12 +51,14 @@ describe("LangySpaAnchor", () => {
       expect(event.defaultPrevented).toBe(true);
     });
 
+    /** @scenario "A card's links behave like links" */
     it("leaves a command-click to the browser, which is what it means", () => {
       const event = click({ metaKey: true });
       expect(push).not.toHaveBeenCalled();
       expect(event.defaultPrevented).toBe(false);
     });
 
+    /** @scenario "A card's links behave like links" */
     it("leaves a middle-click to the browser too", () => {
       const event = click({ button: 1 });
       expect(push).not.toHaveBeenCalled();
@@ -66,6 +69,7 @@ describe("LangySpaAnchor", () => {
   describe("given a destination outside the app", () => {
     // Untouched on purpose: the panel's own external-link guard has to be able
     // to see this click.
+    /** @scenario "A link out of LangWatch is left alone" */
     it("neither routes it nor swallows it", () => {
       renderAnchor("https://docs.langwatch.ai/scenarios");
       const event = click();

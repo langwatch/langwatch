@@ -3,10 +3,7 @@
  * @see modules/dashboard/specs/dashboards-v1.feature
  */
 
-import {
-  type UiProcedureCall,
-  UiProcedureRefusal,
-} from "@langwatch/browser-host/testing-transport";
+import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
 import { describe, expect, it } from "vitest";

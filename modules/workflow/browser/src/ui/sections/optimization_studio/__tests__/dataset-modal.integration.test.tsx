@@ -1,17 +1,23 @@
 import {
+  UiCapabilityContextProvider,
+  type UiCapabilities,
+} from "@langwatch/browser-host/capabilities";
+import {
   uiDeclarations,
   type UiDatasetEditorTableProps,
-  type UiDatasetPickerListProps,
 } from "@langwatch/browser-host/declarations";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 /**
  * @vitest-environment jsdom
  *
  * Workflow dataset dialog (picker/editor on entry-point node).
  * Uses real store; mocks tRPC transport and drawer registry.
  */
+import { DatasetPickerListToken, type DatasetPickerListProps } from "@langwatch/dataset-contract";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -39,30 +45,6 @@ const datasetLends = uiDeclarations([
     name: "dataset",
     installation: {
       capabilities: {
-        datasetPickerList: {
-          load: async () => ({
-            default: ({ onSelect }: UiDatasetPickerListProps) => (
-              <div data-testid="dataset-picker">
-                <button
-                  type="button"
-                  data-testid="dataset-card-turn 10"
-                  onClick={() =>
-                    onSelect({
-                      datasetId: "ds-1",
-                      name: "turn 10",
-                      columnTypes: [
-                        { name: "query", type: "string" },
-                        { name: "context", type: "string" },
-                      ],
-                    })
-                  }
-                >
-                  turn 10
-                </button>
-              </div>
-            ),
-          }),
-        },
         datasetEditorTable: {
           load: async () => ({
             default: ({
@@ -93,14 +75,51 @@ const datasetLends = uiDeclarations([
           }),
         },
       },
+      lends: [
+        {
+          token: DatasetPickerListToken,
+          load: async () => ({
+            default: ({ onSelect }: DatasetPickerListProps) => (
+              <div data-testid="dataset-picker">
+                <button
+                  type="button"
+                  data-testid="dataset-card-turn 10"
+                  onClick={() =>
+                    onSelect({
+                      datasetId: "ds-1",
+                      name: "turn 10",
+                      columnTypes: [
+                        { name: "query", type: "string" },
+                        { name: "context", type: "string" },
+                      ],
+                    })
+                  }
+                >
+                  turn 10
+                </button>
+              </div>
+            ),
+          }),
+        },
+      ],
     },
   },
 ]);
 
-vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  useUiDeclarations: () => datasetLends,
-}));
+const capabilities: UiCapabilities = {
+  ...createUiCapabilitiesFromHost({
+    route: () => ({ params: {}, query: {} }),
+    navigate: () => void 0,
+  }),
+  declarations: datasetLends,
+};
+
+/** Renders under the capabilities that carry dataset's lends, as the shell would. */
+function renderWithLends(ui: ReactElement) {
+  return renderWithDesignSystem(
+    <UiCapabilityContextProvider value={capabilities}>{ui}</UiCapabilityContextProvider>,
+  );
+}
 
 vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({
@@ -229,7 +248,7 @@ describe("Workflow dataset dialog", () => {
   describe("when choosing a dataset", () => {
     /** @scenario Choose opens the shared dataset picker */
     it("opens the picker dataset lends", async () => {
-      renderWithDesignSystem(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />);
+      renderWithLends(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />);
 
       expect(await screen.findByTestId("dataset-picker")).toBeInTheDocument();
     });
@@ -238,7 +257,7 @@ describe("Workflow dataset dialog", () => {
     it("attaches the picked dataset to the node and merges its columns into the outputs", async () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
-      renderWithDesignSystem(<DatasetModal open={true} onClose={onClose} node={ENTRY_NODE} />);
+      renderWithLends(<DatasetModal open={true} onClose={onClose} node={ENTRY_NODE} />);
 
       await user.click(await screen.findByTestId("dataset-card-turn 10"));
 
@@ -260,7 +279,7 @@ describe("Workflow dataset dialog", () => {
     it("opens dataset's upload drawer by name and binds what it creates", async () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
-      renderWithDesignSystem(<DatasetModal open={true} onClose={onClose} node={ENTRY_NODE} />);
+      renderWithLends(<DatasetModal open={true} onClose={onClose} node={ENTRY_NODE} />);
 
       await user.click(screen.getByTestId("upload-csv-dataset"));
 
@@ -289,7 +308,7 @@ describe("Workflow dataset dialog", () => {
     /** @scenario New dataset button opens the dataset editor directly */
     it("drafts an inline dataset and opens the editor, no CSV upload required", async () => {
       const user = userEvent.setup();
-      renderWithDesignSystem(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />);
+      renderWithLends(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />);
 
       await user.click(screen.getByTestId("new-draft-dataset"));
 
@@ -303,7 +322,7 @@ describe("Workflow dataset dialog", () => {
     /** @scenario Creating a dataset sets it as the active dataset */
     it("attaches the draft to the node as its active dataset", async () => {
       const user = userEvent.setup();
-      renderWithDesignSystem(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />);
+      renderWithLends(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />);
 
       await user.click(screen.getByTestId("new-draft-dataset"));
 
@@ -327,7 +346,7 @@ describe("Workflow dataset dialog", () => {
         ] as never,
       });
       const user = userEvent.setup();
-      renderWithDesignSystem(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />);
+      renderWithLends(<DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} />);
 
       await user.click(screen.getByTestId("new-draft-dataset"));
 
@@ -359,7 +378,7 @@ describe("Workflow dataset dialog", () => {
         ] as never,
       });
       const user = userEvent.setup();
-      renderWithDesignSystem(
+      renderWithLends(
         <DatasetModal open={true} onClose={vi.fn()} node={ENTRY_NODE} editingDataset={draft} />,
       );
 

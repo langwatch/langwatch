@@ -2,22 +2,12 @@
  * `POST /api/scenario/generate` binds body projectId to the declared permission target.
  * @vitest-environment node
  */
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { type ScenarioApi, type ScenarioGenerateResponse } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { scenarioGenerateRest } from "../scenario-generate.rest.ts";
-
-const boundaryErrorHandler: RestErrorHandler = (error, context) => {
-  if (HandledError.isHandled(error)) {
-    return context.json({ code: error.code }, (error.httpStatus ?? 500) as ContentfulStatusCode);
-  }
-
-  return context.json({ error: "internal_server_error" }, 500);
-};
 
 function buildApi(permitted = true) {
   const generateScenario = vi.fn<ScenarioApi["generateScenario"]>(async () => ({
@@ -38,7 +28,7 @@ function buildApi(permitted = true) {
   });
   const hono = runtime.mount(scenarioGenerateRest.router(), {
     app: () => app,
-    onError: boundaryErrorHandler,
+    onError: canonicalErrorResponse,
   });
   const generate = (projectId = "project_1") =>
     hono.request("http://api.test/api/scenario/generate", {

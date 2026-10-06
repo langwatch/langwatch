@@ -45,7 +45,7 @@ const NUMERIC_OP_MAP: Record<string, string> = {
  * Field translators for categorical/range filters on single-row and cross-table predicates.
  */
 
-function translateNumericField({
+export function translateNumericField({
   columnExpr,
   tag,
   negated,
@@ -92,7 +92,7 @@ function translateNumericField({
   }
 }
 
-function translateStringField({
+export function translateStringField({
   columnExpr,
   tag,
   negated,

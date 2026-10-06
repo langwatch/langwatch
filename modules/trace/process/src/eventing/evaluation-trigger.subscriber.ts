@@ -1,6 +1,7 @@
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
+import type { MonitorSummary } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   SYNTHETIC_TRACE_SPAN_NAMES,
@@ -10,16 +11,25 @@ import {
 } from "@langwatch/trace-contract";
 
 import type {
-  TraceEvaluationDispatch,
   TraceEvaluationLoopBlockReason,
   TraceEvaluationLoopMetrics,
-  TraceEvaluationMonitor,
-} from "../app/trace.members.ts";
+} from "../services/trace-evaluation-loop-metrics.service.ts";
 import {
   defineOriginGuardedTraceSubscriber,
   type TraceSummarySubscriber,
 } from "./origin-guarded.subscriber.ts";
 import { MAX_PROCESSED_SPANS } from "./trace-summary.projection.ts";
+
+/** Queues an online-evaluator run for an ingested trace; Evaluation owns its delay and dedup. */
+export interface TraceEvaluationDispatch {
+  send(data: ExecuteEvaluationCommandData): Promise<void>;
+}
+
+/** The monitors an ingested trace should be evaluated against. Narrowing
+ * this port (not the whole MonitorService) makes the read composable. */
+export interface TraceEvaluationMonitor {
+  getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]>;
+}
 
 const CAUSALITY_LOOP_GUARD_DISABLED_FLAG = "ops_es_causality_loop_guard_disabled";
 

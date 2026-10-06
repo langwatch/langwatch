@@ -4,7 +4,7 @@ import { FEATURE_PREFIX } from "@langwatch/oxlint-rules/grammar/feature-layout-p
 import ts from "typescript";
 
 import type { ArchitectureViolation } from "../../types.ts";
-import { sourceFile, sourceText } from "../../workspace/module-graph.ts";
+import { defineTreeFacts, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 const MAX_MODULE_LINES = 500;
@@ -89,8 +89,13 @@ function complexityOf(node: ts.Node): number {
   return complexity;
 }
 
-function measureService(path: string): ServiceMeasurement {
-  const file = sourceFile({ file: path });
+function measureTree({
+  file: path,
+  source: file,
+}: {
+  file: string;
+  source: ts.SourceFile;
+}): ServiceMeasurement {
   const lines = sourceText({ file: path }).split("\n");
 
   const measurement: ServiceMeasurement = {
@@ -122,6 +127,9 @@ function measureService(path: string): ServiceMeasurement {
 
   return measurement;
 }
+
+/** Measured wherever a service file is parsed, so the whole-tree reading pays for the parse. */
+const measureService = defineTreeFacts({ accept: isStrictService, derive: measureTree });
 
 function exceeds(measurement: ServiceMeasurement, ceiling: ServiceMeasurement): boolean {
   const exceedsSize =

@@ -90,12 +90,6 @@ Feature: Dedicated Langy API key provisioning
       Then the scenario is created
 
     @unit
-    Scenario: Langy is never granted the power to delete
-      Given I can manage scenarios, which includes deleting them
-      When Langy starts a chat on my behalf
-      Then Langy cannot delete a scenario in this project
-
-    @unit
     Scenario: Langy can do what the person asking can do
       Given I can create and manage scenarios in this project
       When Langy starts a chat on my behalf

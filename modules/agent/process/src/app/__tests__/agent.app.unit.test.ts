@@ -27,8 +27,11 @@ const connected = {
 describe("AgentModule connected views", () => {
   it("reports the parameters and live instance registered through its connected runtime", async () => {
     const { app, resources } = createAgentAppFixture({
-      config: { replicaCount: 1, relayMaxPayloadMb: void 0 },
-      members: { publicBaseUrl: "https://langwatch.test" },
+      config: {
+        replicaCount: 1,
+        relayMaxPayloadMb: void 0,
+        publicBaseUrl: "https://langwatch.test",
+      },
       apiKeys: createApiFixture<ApiKeyApi>({
         findResolvedToken: async () => ({
           type: "legacyProjectKey",

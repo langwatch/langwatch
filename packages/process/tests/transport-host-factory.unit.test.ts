@@ -2,7 +2,7 @@ import type { FeatureRestHost, TransportPeers } from "@langwatch/api";
 import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
-import { createApp } from "../src/application.ts";
+import { ApplicationBuilder } from "../src/application.ts";
 import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { MissingTransportPeerError } from "../src/transport-peers.ts";
 import { memberSourceOf } from "./member-source.ts";
@@ -49,7 +49,7 @@ const datasetModule = defineProcessModule("dataset")
 describe("given a process whose doors are built from its own modules", () => {
   describe("when the application names its doors as a factory", () => {
     it("runs the factory once every module's app is resolved", async () => {
-      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
+      const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports((peers) => ({ rest: doorFrom(peers) }))
         .withModules([datasetModule])
         .boot();
@@ -61,7 +61,7 @@ describe("given a process whose doors are built from its own modules", () => {
 
     it("runs it before anything is mounted, so no door reads a half-built graph", async () => {
       const order: string[] = [];
-      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
+      const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports((peers) => {
           order.push("doors built");
           const catalogue = peers.app(CatalogueApi);
@@ -84,7 +84,7 @@ describe("given a process whose doors are built from its own modules", () => {
 
     it("answers nothing for a peer this build installed no module for", async () => {
       let found: unknown = "unset";
-      await createApp({ role: "api", members: memberSourceOf({}) })
+      await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports((peers) => {
           found = peers.find(MissingApi);
           return {};
@@ -96,7 +96,7 @@ describe("given a process whose doors are built from its own modules", () => {
     });
 
     it("refuses by token when a door is built from a module this build never installed", async () => {
-      const booting = createApp({ role: "api", members: memberSourceOf({}) })
+      const booting = new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
         .withTransports((peers) => ({ rest: doorFrom(peers) }))
         .withModules([])
         .boot();
@@ -107,7 +107,7 @@ describe("given a process whose doors are built from its own modules", () => {
 
     it("never runs the factory in a role that serves no door", async () => {
       let ran = false;
-      await createApp({ role: "worker", members: memberSourceOf({}) })
+      await new ApplicationBuilder({ role: "worker", members: memberSourceOf({}) })
         .withTransports(() => {
           ran = true;
           return {};

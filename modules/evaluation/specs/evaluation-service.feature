@@ -56,6 +56,7 @@ Feature: Evaluation service boundary
     Then the trace is read through that user's own read-time protections
     And the call is never refused for want of a composed trace evaluation runtime
 
+  @unit
   Scenario: API and workers share the same service
     Given the process has composed one Evaluation service
     When an API handler or worker reads a run
@@ -348,3 +349,11 @@ Feature: Evaluation service boundary
     When its lifecycle fact is recorded
     Then the fact carries the project, the evaluation, its evaluator type, score and verdict
     And it names no admin and no organization count
+
+  @integration
+  Scenario: An evaluate request that fails validation answers 400 with the sentence
+    Given a project API key that may manage evaluations
+    When an evaluate door receives a JSON body that omits the data the evaluator scores
+    Then it answers 400 with the validation sentence under error
+    And the refusal is logged with the zod issues
+    And the evaluator is not run

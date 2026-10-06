@@ -6,20 +6,15 @@ import {
 } from "@langwatch/eventing";
 import {
   APPROVE_JOIN_COMMAND_TYPE,
-  type ApproveJoinCommandData,
   approveJoinCommandDataSchema,
   EXPIRE_JOIN_COMMAND_TYPE,
-  type ExpireJoinCommandData,
   expireJoinCommandDataSchema,
   type JoinRequestCommand,
   REJECT_JOIN_COMMAND_TYPE,
   REQUEST_JOIN_COMMAND_TYPE,
-  type RejectJoinCommandData,
-  type RequestJoinCommandData,
   rejectJoinCommandDataSchema,
   requestJoinCommandDataSchema,
   WITHDRAW_JOIN_COMMAND_TYPE,
-  type WithdrawJoinCommandData,
   withdrawJoinCommandDataSchema,
 } from "@langwatch/identity-contract";
 import type { ZodTypeAny, z } from "zod";
@@ -93,7 +88,6 @@ export const RequestJoinCommand = joinRequestCommand({
   description: "Ask an organization on a verified domain to let you in",
   verb: "requestJoin",
 });
-export type RequestJoinPayload = RequestJoinCommandData;
 
 export const ApproveJoinCommand = joinRequestCommand({
   type: APPROVE_JOIN_COMMAND_TYPE,
@@ -102,7 +96,6 @@ export const ApproveJoinCommand = joinRequestCommand({
     "Approve a pending join request — by an admin, the domain policy, or an invitation that answered it",
   verb: "approveJoin",
 });
-export type ApproveJoinPayload = ApproveJoinCommandData;
 
 export const RejectJoinCommand = joinRequestCommand({
   type: REJECT_JOIN_COMMAND_TYPE,
@@ -110,7 +103,6 @@ export const RejectJoinCommand = joinRequestCommand({
   description: "Reject a pending join request, without recording a reason",
   verb: "rejectJoin",
 });
-export type RejectJoinPayload = RejectJoinCommandData;
 
 export const WithdrawJoinCommand = joinRequestCommand({
   type: WITHDRAW_JOIN_COMMAND_TYPE,
@@ -119,7 +111,6 @@ export const WithdrawJoinCommand = joinRequestCommand({
     "Withdraw a pending join request — the requester cancelling, or an accepted invitation answering it",
   verb: "withdrawJoin",
 });
-export type WithdrawJoinPayload = WithdrawJoinCommandData;
 
 export const ExpireJoinCommand = joinRequestCommand({
   type: EXPIRE_JOIN_COMMAND_TYPE,
@@ -127,4 +118,3 @@ export const ExpireJoinCommand = joinRequestCommand({
   description: "Expire a join request nobody answered inside the window",
   verb: "expireJoin",
 });
-export type ExpireJoinPayload = ExpireJoinCommandData;

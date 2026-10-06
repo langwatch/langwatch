@@ -26,6 +26,8 @@ export class NlpLambdaRuntimeService {
     resolver: NlpLambdaArnResolver;
     /** This deployment's engine image. A change invalidates every entry. */
     imageUri: string;
+    /** This deployment's function configuration. A change invalidates every entry. */
+    configFingerprint: string;
     ttlSeconds?: number;
     logger?: Pick<Logger, "warn">;
   }): NlpLambdaRuntimeService {
@@ -39,6 +41,7 @@ export class NlpLambdaRuntimeService {
       cache: NlpLambdaArnCache;
       resolver: NlpLambdaArnResolver;
       imageUri: string;
+      configFingerprint: string;
       ttlSeconds?: number;
       logger?: Pick<Logger, "warn">;
     },
@@ -89,7 +92,8 @@ export class NlpLambdaRuntimeService {
       return null;
     }
 
-    if (entry.imageUri !== this.options.imageUri) {
+    const { imageUri, configFingerprint } = this.options;
+    if (entry.imageUri !== imageUri || entry.configFingerprint !== configFingerprint) {
       // Removed rather than left to expire: the stale ARN is the answer every
       // other pod would keep serving for the rest of the window.
       await this.forget(key, projectId);
@@ -101,9 +105,9 @@ export class NlpLambdaRuntimeService {
   }
 
   private async resolveAndShare(projectId: string): Promise<string> {
-    const { imageUri } = this.options;
+    const { imageUri, configFingerprint } = this.options;
     const arn = await this.options.resolver.resolve({ projectId, imageUri });
-    const entry: NlpLambdaArnEntry = { arn, imageUri };
+    const entry: NlpLambdaArnEntry = { arn, imageUri, configFingerprint };
     try {
       await this.options.cache.set({
         key: this.keyFor(projectId),
@@ -135,7 +139,7 @@ export class NlpLambdaRuntimeService {
         return null;
       }
 
-      const { arn, imageUri } = parsed as Record<string, unknown>;
+      const { arn, imageUri, configFingerprint } = parsed as Record<string, unknown>;
       if (typeof arn !== "string" || arn === "") {
         return null;
       }
@@ -144,7 +148,12 @@ export class NlpLambdaRuntimeService {
         return null;
       }
 
-      return { arn, imageUri };
+      // An entry written before the fingerprint existed reads as a miss.
+      if (typeof configFingerprint !== "string" || configFingerprint === "") {
+        return null;
+      }
+
+      return { arn, imageUri, configFingerprint };
     } catch {
       return null;
     }

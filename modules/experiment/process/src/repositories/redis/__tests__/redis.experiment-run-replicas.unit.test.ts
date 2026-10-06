@@ -1,9 +1,9 @@
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 /**
  * @vitest-environment node
  * The run's folds and stop signal every replica shares through the deployment's Redis.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { Cluster, Redis } from "ioredis";
 import { describe, expect, it } from "vitest";
 
 import type { ExperimentRunProgressState } from "../../experiment-run-fold.repository.ts";
@@ -11,9 +11,9 @@ import { RedisExperimentRunAbortRepository } from "../redis.experiment-run-abort
 import { RedisExperimentRunFoldRepository } from "../redis.experiment-run-fold.repository.ts";
 
 /** The three Redis commands the run's folds and stop signal use, over one map. */
-function redisKeys(): ProcessMembers["redis"] {
+function redisKeys(): Redis | Cluster {
   const keys = new Map<string, string>();
-  return createApiFixture<ProcessMembers["redis"]>(
+  return createApiFixture<Redis | Cluster>(
     {
       get: async (key: unknown) => keys.get(String(key)) ?? null,
       set: async (...args: unknown[]) => {

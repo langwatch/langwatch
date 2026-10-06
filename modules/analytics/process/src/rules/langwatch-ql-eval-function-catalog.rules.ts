@@ -256,10 +256,3 @@ export function statementMightCallEvalFunction(sql: string): boolean {
 export function isEvalFunctionName(name: string): boolean {
   return LWQL_EVAL_FUNCTION_CATALOG.some((definition) => definition.name === name.toLowerCase());
 }
-
-/** Whether a validated statement actually judges anything. */
-export function callsEvalFunction(calls: readonly { readonly function: string }[]): boolean {
-  return calls.some((call) =>
-    LWQL_EVAL_FUNCTION_CATALOG.some((definition) => definition.name === call.function),
-  );
-}

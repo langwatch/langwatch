@@ -19,7 +19,9 @@ import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TraceSpanCostSuggestion } from "../../services/span-cost-suggestion.service.ts";
 import { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
+import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import { traceLegacyRest } from "../../transport/trace-legacy.rest.ts";
 import { tracesRestCredential } from "../../transport/traces.rest.ts";
@@ -31,7 +33,6 @@ import {
   type TracesSessionGroupsReader,
   type TracesSpanReader,
 } from "../trace.app.ts";
-import type { TraceLegacyRead } from "../trace.members.ts";
 import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 
 const PROJECT = {
@@ -63,7 +64,6 @@ function bootTraceApp(options: {
     plans: createApiFixture<PlanProvider>({}, "plans"),
     dataPrivacy: createApiFixture<DataPrivacyApi>({}, "data privacy"),
     fallbackVisibilityDays: 30,
-    processName: "test",
   });
   vi.spyOn(protections, "resolveForApiKey").mockResolvedValue({ canSeeCosts: true });
   const unread = () => Promise.reject(new Error("this suite reads a trace only by id"));
@@ -82,8 +82,9 @@ function bootTraceApp(options: {
     findSpanForPromptStudio: unread,
   };
 
-  const app = TraceModule.create({
+  const app = TraceModule.fromDependencies({
     storedObjects: createApiFixture<StoredObjectApi>(),
+    spanCostSuggestions: createApiFixture<TraceSpanCostSuggestion>(),
     traces: {
       existence: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],

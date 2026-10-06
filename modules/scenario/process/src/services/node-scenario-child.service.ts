@@ -38,7 +38,7 @@ import type { VoicePublicUrl } from "./voice-public-url.service.ts";
 
 const logger = createLogger("langwatch:scenarios:child-process");
 
-export interface ScenarioChildParentEnvironment {
+interface ScenarioChildParentEnvironment {
   path?: string;
   home?: string;
   user?: string;
@@ -76,12 +76,12 @@ export interface ScenarioChildProcessConfig {
   parentEnvironment: ScenarioChildParentEnvironment;
 }
 
-export interface ScenarioChildTelemetry {
+interface ScenarioChildTelemetry {
   endpoint: string;
   apiKey: string;
 }
 
-export type ScenarioChildProcessResult = {
+type ScenarioChildProcessResult = {
   success: boolean;
   error?: string;
   reasoning?: string;
@@ -138,6 +138,7 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
       jobData: input.jobData,
       labels: input.environment.labels,
       telemetry: input.environment.telemetry,
+      callerEnv: input.environment.callerEnv,
     });
     const spawnConfig = ChildProcessSpawnService.create().resolve({
       packageRoot: this.options.config.packageRoot,
@@ -330,6 +331,8 @@ function buildChildEnvironmentValue(input: {
   jobData: ExecutionJobData;
   labels: string[];
   telemetry: ScenarioChildTelemetry;
+  /** The caller's provider keys; forwarded to a voice child only, whatever the caller passes. */
+  callerEnv?: Record<string, string> | undefined;
 }): NodeJS.ProcessEnv {
   return buildBaseEnvironmentValue({
     config: input.config,
@@ -345,6 +348,7 @@ function buildChildEnvironmentValue(input: {
     extra:
       input.jobData.target.type === "voice"
         ? {
+            ...input.callerEnv,
             ...voicePublicUrlEnvironment(input.config.voicePublicUrl),
             BASE_HOST: input.config.baseHost,
           }

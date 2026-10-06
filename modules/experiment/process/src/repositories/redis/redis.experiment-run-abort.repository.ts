@@ -3,7 +3,7 @@
  * replica answers from the same instance.
  */
 import { createLogger } from "@langwatch/observability";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { Cluster, Redis } from "ioredis";
 
 import { ExperimentRunAbortRepository } from "../experiment-run-abort.repository.ts";
 
@@ -15,11 +15,11 @@ const ABORT_KEY_PREFIX = "eval_v3_abort:";
 const ABORT_TTL_SECONDS = 3600;
 
 export class RedisExperimentRunAbortRepository extends ExperimentRunAbortRepository {
-  static create(options: { redis: ProcessMembers["redis"] }): RedisExperimentRunAbortRepository {
+  static create(options: { redis: Redis | Cluster }): RedisExperimentRunAbortRepository {
     return new RedisExperimentRunAbortRepository(options.redis);
   }
 
-  private constructor(private readonly redis: ProcessMembers["redis"]) {
+  private constructor(private readonly redis: Redis | Cluster) {
     super();
   }
 

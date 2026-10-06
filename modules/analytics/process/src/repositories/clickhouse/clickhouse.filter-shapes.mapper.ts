@@ -1,7 +1,7 @@
 import type { FilterOption } from "../filter-options.repository.ts";
 
 /** Trace's translation of the other filters a picker is narrowed by. */
-export type FilterOptionsScope = {
+type FilterOptionsScope = {
   conditions: string[];
   params: Record<string, unknown>;
 };
@@ -20,7 +20,7 @@ export type ClickHouseFilterQueryParams = {
 /**
  * ClickHouse tables that support filter queries.
  */
-export type ClickHouseFilterTable = "trace_summaries" | "stored_spans" | "evaluation_runs";
+type ClickHouseFilterTable = "trace_summaries" | "stored_spans" | "evaluation_runs";
 
 export type ClickHouseFilterDefinition = {
   /**

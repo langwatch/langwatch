@@ -57,7 +57,7 @@ Feature: The back office answers over HTTP
     Then the answer is the same nothing an unmounted door would give
 
   @integration
-  Scenario: Every back-office resource the console lists answers
+  Scenario: Every instance admin resource the console lists answers
     Given a signed-in member of instance staff
     When the console reads users, organizations, projects and subscriptions
     Then each one answers with the list the console renders

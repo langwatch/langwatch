@@ -32,7 +32,7 @@ When more than one LLM span in a trace reports a TTFT, the trace-level value is 
 
 <Note>
   If you stream through the Vercel AI SDK with `experimental_telemetry` enabled, TTFT is captured
-  automatically from `ai.response.msToFirstChunk`, nothing to do.
+  automatically from `ai.response.msToFirstChunk`, with no extra step.
 </Note>
 
 ## Setting TTFT manually
@@ -139,5 +139,5 @@ In **Analytics > LLM Metrics** you get time-to-first-token graphs with the usual
 
 ## Troubleshooting
 
-- **TTFT shows "—" in the table**: the trace has no LLM span reporting any of the signals above. For non-streaming calls this is expected, there is no "first token" moment distinct from the response itself.
+- **TTFT shows an empty dash in the table**: the trace has no LLM span reporting any of the signals above. For non-streaming calls this is expected, there is no "first token" moment distinct from the response itself.
 - **Value looks wrong by orders of magnitude**: check the units. `gen_ai.server.time_to_first_token` is a duration in milliseconds; `first_token_at` inside `langwatch.timestamps` is an epoch timestamp in milliseconds.

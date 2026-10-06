@@ -49,7 +49,10 @@ describe("the trace settle window", () => {
 
 describe("traceSpanMetricsSync handler", () => {
   describe("when the settled trace carries a scenario run id", () => {
-    /** @scenario "Scenario's subscriber publishes metrics after the trace settles" */
+    /**
+     * @scenario "Scenario's subscriber publishes metrics after the trace settles"
+     * @scenario "Scenario and Experiment metrics are published from the worker"
+     */
     it("reads trace's summary, then sends computeRunMetrics in pull mode at the span's time", async () => {
       const { handle, findSummary, computeRunMetrics } = setup(summary());
 

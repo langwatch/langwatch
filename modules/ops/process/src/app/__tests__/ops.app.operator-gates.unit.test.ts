@@ -54,6 +54,8 @@ describe("given the platform-operator grant answers through authz", () => {
   });
 
   /** @scenario "Operator gates ask the platform-operator grant" */
+  /** @scenario "The operator scope of a platform operator is platform" */
+  /** @scenario "The operator scope of a user outside the operator list is none, never a refusal" */
   it("answers the operator scope as an answer, never a refusal", async () => {
     expect(await app.operatorScope(VIEWER)).toEqual({ kind: "platform" });
     expect(await app.operatorScope(OUTSIDER)).toEqual({ kind: "none" });
@@ -61,13 +63,7 @@ describe("given the platform-operator grant answers through authz", () => {
   });
 
   /** @scenario "Operator gates ask the platform-operator grant" */
-  it("admits staff on ops:view and refuses a non-holder", async () => {
-    expect((await app.admitStaff(VIEWER)).id).toBe(VIEWER.id);
-    await expect(app.admitStaff(OUTSIDER)).rejects.toMatchObject({ code: "permission_denied" });
-  });
-
-  /** @scenario "Operator gates ask the platform-operator grant" */
-  it("hides the admin door from a non-holder as not found, and demands manage for writes", async () => {
+  it("demands manage for an instance-admin write, hidden as not found", async () => {
     const run = (actor: OpsOperator, method: "getList" | "update") =>
       app.runAdminOperation({
         actor,
@@ -77,8 +73,8 @@ describe("given the platform-operator grant answers through authz", () => {
         params: {},
       });
 
-    await expect(run(OUTSIDER, "getList")).rejects.toMatchObject({ code: "not_found" });
     await expect(run(VIEWER, "update")).rejects.toMatchObject({ code: "not_found" });
+    await expect(run(OUTSIDER, "update")).rejects.toMatchObject({ code: "not_found" });
   });
 });
 
@@ -122,6 +118,7 @@ describe("given an impersonating operator in the Back office", () => {
   );
 
   /** @scenario "An impersonating operator cannot deactivate or reactivate an account from the back office" */
+  /** @scenario "An impersonating admin stays the acting person" */
   it("still lets the impersonating operator update a user's other fields", async () => {
     backOfficeCalls.length = 0;
     await expect(run("update", { name: "Renamed" })).resolves.toEqual({

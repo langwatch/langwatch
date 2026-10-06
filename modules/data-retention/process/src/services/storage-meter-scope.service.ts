@@ -10,7 +10,7 @@ import type { RetentionActor } from "./data-retention-policy.service.ts";
 import type { RetentionPermissionsService } from "./retention-permissions.service.ts";
 import type { StorageMeterService } from "./storage-meter.service.ts";
 
-export type StorageMeterScopeServiceOptions = Readonly<{
+type StorageMeterScopeServiceOptions = Readonly<{
   meter: Pick<StorageMeterService, "getTotalStorageBytes" | "getTotalStorageBytesForTenants">;
   directory: DataRetentionDirectoryReader;
   permissions: RetentionPermissionsService;

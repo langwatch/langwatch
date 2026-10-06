@@ -22,8 +22,8 @@ export interface ScenarioGenerationDependencies {
   modelProviders: ModelProviderApi;
 }
 
-export const SCENARIO_GENERATE_FEATURE_KEY = "scenarios.generator";
-export const SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS = 30_000;
+const SCENARIO_GENERATE_FEATURE_KEY = "scenarios.generator";
+const SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS = 30_000;
 const SCENARIO_GENERATE_MAX_RETRIES = 1;
 const logger = createLogger("langwatch:scenario:generation");
 

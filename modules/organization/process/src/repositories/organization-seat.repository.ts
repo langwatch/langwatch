@@ -8,4 +8,6 @@ export abstract class OrganizationSeatRepository {
   abstract getMemberCount(organizationId: string): Promise<number>;
   /** Members holding a LITE seat right now, live invitations included. */
   abstract getMembersLiteCount(organizationId: string): Promise<number>;
+  /** Members holding a Developer seat (ADR-171): counted, never capped. */
+  abstract getMembersDeveloperCount(organizationId: string): Promise<number>;
 }

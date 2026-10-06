@@ -9,6 +9,39 @@ import { withinAnIdempotencyKey } from "./idempotency-key.mjs";
 
 const FOREIGN_ID_MODULES = new Set(["nanoid", "nanoid/non-secure", "uuid"]);
 
+// The one `randomUUID()` the rule allows, by file and enclosing function: the
+// feature-flag visitor id its contract types as `z.string().uuid()`. Ruling
+// "anonymous-id UUID", .claude/coordinator/rulings-2026-10-05.md (Alex).
+export const UUID_VISITOR_ID_MINTS = Object.freeze([
+  {
+    workspacePath: "modules/feature-flag/browser/src/behavior/anonymous-id.ts",
+    functionName: "generateId",
+  },
+]);
+
+const FUNCTION_TYPES = new Set([
+  "FunctionDeclaration",
+  "FunctionExpression",
+  "ArrowFunctionExpression",
+]);
+
+function enclosingFunctionName(node) {
+  let current = node.parent;
+  while (current && !FUNCTION_TYPES.has(current.type)) current = current.parent;
+  if (current?.id?.type === "Identifier") return current.id.name;
+  if (current?.parent?.type === "VariableDeclarator") return current.parent.id?.name;
+
+  return undefined;
+}
+
+function mintsTheVisitorId(node, file) {
+  const functionName = enclosingFunctionName(node);
+
+  return UUID_VISITOR_ID_MINTS.some(
+    (mint) => mint.workspacePath === file.workspacePath && mint.functionName === functionName,
+  );
+}
+
 function isFeatureOrProcessSource(file) {
   if (file.kind === "application") return true;
 
@@ -42,7 +75,7 @@ export const idGenerationOriginRule = defineRule({
     foreignIdModule: {
       what: "`{{name}}` mints ids outside the house scheme.",
       why: "A second id scheme neither sorts by time nor names its kind, and two schemes in one table are a migration.",
-      fix: 'Import `generate` from `@langwatch/ksuid` and mint it with its kind: `generate("{{kindPrefix}}").toString()`.',
+      fix: 'Import `generate` from `@langwatch/ksuid` and mint it with its kind: `generate("{{kindPrefix}}").toString()`. Read the `backend` skill.',
     },
     randomUuid: {
       what: "`randomUUID()` mints an id outside the house scheme.",
@@ -66,6 +99,7 @@ export const idGenerationOriginRule = defineRule({
       CallExpression(node) {
         if (calleeName(node.callee) !== "randomUUID") return;
         if (withinAnIdempotencyKey(node)) return;
+        if (mintsTheVisitorId(node, file)) return;
 
         context.report({ node: node.callee, messageId: "randomUuid", data: { kindPrefix } });
       },

@@ -30,8 +30,11 @@ function seatDecision({
   activePlanSource?: "license" | "subscription" | "free";
   pricingModel?: string;
 }): SeatDecision {
+  // A Developer seat (ADR-171) sits in neither metered pool, so it adds no full seat.
   const newFullMembers = invites.filter(
-    (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
+    (invite) =>
+      invite.orgRole === OrganizationUserRole.ADMIN ||
+      invite.orgRole === OrganizationUserRole.MEMBER,
   ).length;
   if (newFullMembers === 0 || !limitInfo) return { kind: "proceed" };
   const newSeats = limitInfo.current + newFullMembers;

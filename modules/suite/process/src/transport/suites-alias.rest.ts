@@ -40,11 +40,7 @@ import {
 } from "@langwatch/suite-contract";
 import { z } from "zod";
 
-import {
-  suiteCallerKeyFact,
-  suiteSurfaceFact,
-  toRunItemsWire,
-} from "../rules/suite-wire-v1.rules.ts";
+import { suiteRunOriginFact, toRunItemsWire } from "../rules/suite-wire-v1.rules.ts";
 
 const logger = createLogger("langwatch:api:suites");
 
@@ -520,15 +516,15 @@ export function createSuitesAliasRest(): Readonly<{
           "Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets, the repeat count and the models are read from the body.",
         responses: notFound,
       })
-      .withMiddleware(projectRestFacts, suiteSurfaceFact, suiteCallerKeyFact)
-      .handle(({ app, input: body, scope }, project, surface, callerKey) =>
+      .withMiddleware(projectRestFacts, suiteRunOriginFact)
+      .handle(({ app, input: body, scope }, project, origin) =>
         runSuite({
           app,
           input: body,
           projectId: scope.id,
           viewerUserId: project.viewerUserId,
-          surface,
-          callerKey,
+          surface: origin.surface,
+          callerKey: origin.callerKey,
         }),
       )
 

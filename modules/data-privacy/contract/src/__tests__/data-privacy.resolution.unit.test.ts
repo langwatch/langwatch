@@ -19,6 +19,7 @@ describe("resolveDataPrivacy", () => {
     expect(resolveDataPrivacy({ rows: [], facts })).toEqual(PLATFORM_DEFAULT_DATA_PRIVACY);
   });
 
+  /** @scenario "The nearest scope wins while patterns accumulate" */
   it("resolves fields from the narrowest scope and unions patterns", () => {
     const resolved = resolveDataPrivacy({
       facts,

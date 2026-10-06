@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
- * The signup form's own choke point: it writes the account row itself, so it
- * owns the `signed_up` milestone - and a rejected registration tracks nothing.
+ * The signup form's own choke point: it writes the account row itself, so it records
+ * user's registered fact, from which nurturing derives `signed_up`; a refusal records nothing.
  * @see specs/licensing/sso-license-gating.feature
  */
 import { InvalidAuthOriginError } from "@langwatch/auth-contract";
@@ -9,14 +9,14 @@ import {
   EmailAlreadyRegisteredError,
   UserRegistrationNotAvailableError,
 } from "@langwatch/user-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   REFUSED_ADDRESS_PROOF,
   UNCONFIRMED_ADDRESS_PROOF,
   createUserTestApp,
   createUserTestAuth,
-  createUserTestInfrastructure,
+  createUserTestLifecycle,
   createUserTestOrganizations,
 } from "./user.fixture.ts";
 
@@ -38,35 +38,54 @@ function register(
 
 describe("registering a credential account", () => {
   describe("when registration succeeds", () => {
-    /** @scenario Email-mode registration tracks the PostHog signed_up milestone exactly once */
-    it("tracks the signed_up analytics event with the new account id", async () => {
-      const trackServerEvent = vi.fn();
-      const members = createUserTestInfrastructure({ analytics: { trackServerEvent } });
-      const app = createUserTestApp({ members });
+    /** @scenario "A self-service registration is recorded as user's fact" */
+    it("records one registered fact for the new account", async () => {
+      const lifecycle = createUserTestLifecycle();
+      const app = createUserTestApp({ lifecycle: lifecycle.senders });
 
       const created = await register(app);
 
       expect(created.id).toEqual(expect.any(String));
-      expect(trackServerEvent).toHaveBeenCalledTimes(1);
-      expect(trackServerEvent).toHaveBeenCalledWith({
-        userId: created.id,
-        event: "signed_up",
-      });
+      expect(lifecycle.recorded).toEqual([
+        {
+          type: "registered",
+          data: { tenantId: created.id, userId: created.id, occurredAt: expect.any(Number) },
+        },
+      ]);
+    });
+  });
+
+  describe("when user's registered fact cannot be sent", () => {
+    /** @scenario "A registration stands even when user's registered fact cannot be sent" */
+    it("still creates the account and answers it", async () => {
+      const { senders } = createUserTestLifecycle();
+      const failing = {
+        ...senders,
+        recordUserRegistered: {
+          send: async () => {
+            throw new Error("event store unavailable");
+          },
+        },
+      };
+      const app = createUserTestApp({ lifecycle: failing });
+
+      const created = await register(app);
+
+      await expect(app.findById({ id: created.id })).resolves.toMatchObject({ email: "a@x.com" });
     });
   });
 
   describe("when the email is already registered", () => {
-    /** @scenario A rejected registration tracks no PostHog signed_up milestone */
-    it("refuses and tracks no signed_up analytics event", async () => {
-      const trackServerEvent = vi.fn();
-      const members = createUserTestInfrastructure({ analytics: { trackServerEvent } });
-      const app = createUserTestApp({ members });
+    /** @scenario "A refused registration records no registered fact" */
+    it("refuses and records no second registered fact", async () => {
+      const lifecycle = createUserTestLifecycle();
+      const app = createUserTestApp({ lifecycle: lifecycle.senders });
 
       await register(app);
-      trackServerEvent.mockClear();
+      lifecycle.recorded.length = 0;
 
       await expect(register(app)).rejects.toBeInstanceOf(EmailAlreadyRegisteredError);
-      expect(trackServerEvent).not.toHaveBeenCalled();
+      expect(lifecycle.recorded).toEqual([]);
     });
   });
 
@@ -181,15 +200,14 @@ describe("registering a credential account", () => {
   describe("when the address proof is refused", () => {
     /** @scenario "No credential is collected until the confirmation link is opened" */
     it("refuses as an expired verification and creates no account", async () => {
-      const trackServerEvent = vi.fn();
-      const members = createUserTestInfrastructure({ analytics: { trackServerEvent } });
-      const app = createUserTestApp({ members });
+      const lifecycle = createUserTestLifecycle();
+      const app = createUserTestApp({ lifecycle: lifecycle.senders });
 
       await expect(
         register(app, "sam@acme.com", { addressProof: REFUSED_ADDRESS_PROOF }),
       ).rejects.toMatchObject({ code: "identity_verification_expired" });
       await expect(app.findByEmail({ email: "sam@acme.com" })).resolves.toBeNull();
-      expect(trackServerEvent).not.toHaveBeenCalled();
+      expect(lifecycle.recorded).toEqual([]);
     });
   });
 

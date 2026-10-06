@@ -14,7 +14,11 @@ import type {
   ObjectStorageDestination,
   StoredObjectAddress,
 } from "./members.ts";
-import { resolveAzureCredentials } from "./object-storage-azure-credentials.ts";
+import {
+  AzureBackendMisconfiguredError,
+  resolveAzureCredentials,
+  type AzureCredentials,
+} from "./object-storage-azure-credentials.ts";
 import { azureBackend } from "./object-storage-azure.ts";
 import {
   UnknownStorageProjectError,
@@ -24,6 +28,41 @@ import {
 import { filesystemBackend } from "./object-storage-filesystem.ts";
 import { s3Backend, s3Client } from "./object-storage-s3.ts";
 import type { TenantDirectory } from "./tenant-directory.ts";
+
+/**
+ * Built on first use, so an Azure block that is incomplete refuses the project that needs it
+ * and never one whose own S3 account answers instead.
+ */
+function lazyBackend(build: () => ObjectBackend): ObjectBackend {
+  let built: ObjectBackend | undefined;
+  const held = () => (built ??= build());
+  return {
+    get destination() {
+      return held().destination;
+    },
+    write: async (at, body, facts) => held().write(at, body, facts),
+    read: async (at) => held().read(at),
+    digest: async (at) => held().digest(at),
+    remove: async (at) => held().remove(at),
+    signUpload: async (at, facts) => held().signUpload(at, facts),
+    signDownload: async (at, facts) => held().signDownload(at, facts),
+    probe: async () => held().probe(),
+  };
+}
+
+/** The retained Azure block when it can read; an unusable one declines quietly. */
+function legacyAzureCredentials(config: ObjectStorageConfig): AzureCredentials | undefined {
+  if (config.backend === "azure" || !config.legacyAzure) return undefined;
+  try {
+    return resolveAzureCredentials(config.legacyAzure, {
+      purpose: "read",
+      backend: config.backend,
+    });
+  } catch (error) {
+    if (error instanceof AzureBackendMisconfiguredError) return undefined;
+    throw error;
+  }
+}
 
 function sharedBackend(options: {
   config: ObjectStorageConfig;
@@ -41,7 +80,9 @@ function sharedBackend(options: {
       return s3Backend({ client, bucket, clock });
     }
     case "azure":
-      return azureBackend({ credentials: resolveAzureCredentials(config.azure), clock });
+      return lazyBackend(() =>
+        azureBackend({ credentials: resolveAzureCredentials(config.azure), clock }),
+      );
     case "file": {
       const root = config.root.trim();
       if (!root) throw new Error("Object storage selected the filesystem without a root.");
@@ -115,6 +156,22 @@ export function buildObjectStorage(options: {
   const clients: S3Client[] = [];
   const shared = sharedBackend({ config, clock, clients });
   const accounts = privateBackends({ accounts: config.privateAccounts ?? [], clock, clients });
+  const legacyAzure = legacyAzureCredentials(config);
+  const legacyContainers = new Map<string, ObjectBackend>();
+
+  /** The retained account serves any container a location records, as main's read driver did. */
+  const legacyAzureFor = (location: ObjectStorageDestination): ObjectBackend | undefined => {
+    if (!legacyAzure || location.kind !== "azure") return undefined;
+    if (location.accountName !== legacyAzure.accountName) return undefined;
+    const kept = legacyContainers.get(location.container);
+    if (kept) return kept;
+    const backend = azureBackend({
+      credentials: { ...legacyAzure, container: location.container },
+      clock,
+    });
+    legacyContainers.set(location.container, backend);
+    return backend;
+  };
 
   const place = (projectId: string) => placeProject({ projectId, shared, accounts, directory });
 
@@ -123,7 +180,9 @@ export function buildObjectStorage(options: {
     const placed = await place(at.projectId);
     const { location } = at;
     if (!location) return placed;
-    const backend = [placed, shared].find((held) => sameDestination(held.destination, location));
+    const backend =
+      [placed, shared].find((held) => sameDestination(held.destination, location)) ??
+      legacyAzureFor(location);
     if (!backend) throw new UnreachableStorageLocationError(location.kind, at.key);
     return backend;
   };

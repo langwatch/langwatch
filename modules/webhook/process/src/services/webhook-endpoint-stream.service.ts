@@ -30,7 +30,7 @@ const logger = createLogger("langwatch:webhooks:endpoint-stream");
  * the api's `WebhookModule` both compose over this same service, so a replay
  * append never needs the process manager's dispatch/plan/prune graph.
  */
-export interface WebhookEndpointStreamDeps {
+interface WebhookEndpointStreamDeps {
   processStore: ProcessStore;
   now?: () => number;
 }

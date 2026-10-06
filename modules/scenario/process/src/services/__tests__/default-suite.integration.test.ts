@@ -85,12 +85,11 @@ let projectId = "";
 function service(): ScenarioServiceContract {
   const simulations = createApiFixture<SimulationService>();
   return ScenarioServiceContract.create({
-    repository: PrismaScenarioRepository.create(database()),
+    repository: PrismaScenarioRepository.create(database(), new TestSecretCipher()),
     simulations,
     ids: new ScenarioIds(),
     testSuiteIds: new TestSuiteIds(),
     clock: new TestClock(),
-    secretCipher: new TestSecretCipher(),
   });
 }
 

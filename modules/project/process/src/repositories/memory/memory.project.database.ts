@@ -6,7 +6,7 @@ import type { Instant } from "@langwatch/time";
  * The organization columns the project reads reach through a team: the two
  * effective toggles and the admin the first-trace milestone is told about.
  */
-export type MemoryOrganizationRow = Readonly<{
+type MemoryOrganizationRow = Readonly<{
   id: string;
   name: string;
   presenceEnabled: boolean;

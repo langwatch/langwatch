@@ -15,14 +15,14 @@ import {
 } from "../elevenlabs-conversation.channel.ts";
 
 /** What this channel reads of an answered fetch, and nothing else. */
-export interface ConversationResponse {
+interface ConversationResponse {
   ok: boolean;
   status: number;
   json(): Promise<unknown>;
 }
 
 /** The fenced fetch seam, injected so a test never opens a socket. */
-export type FencedConversationFetch = (
+type FencedConversationFetch = (
   validated: SsrfValidationResult,
   init: FencedFetchOptions,
   tls: EgressTlsPolicy,

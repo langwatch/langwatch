@@ -228,6 +228,14 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // security headers, the browser inbox — specs/setup/mail-sink.feature) are
   // satisfied by Go tests and by nothing else.
   "services/mailsim",
+  // The other simulators haven runs (LLM, storage, analytics, voice) and the
+  // diff and fuzz suites: their specs/setup scenarios bind only from Go tests.
+  "services/llmsim",
+  "services/storagesim",
+  "services/analyticssim",
+  "services/voicesim",
+  "tools/diffsuite",
+  "tools/fuzz",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
   // binary content parts, metadata hoisting, data capture) are satisfied by Go
   // tests and by nothing else, so without this root those scenarios could only
@@ -311,7 +319,6 @@ const LEGACY_UNBOUND: string[] = [
   "specs/langy/langy-github-prs.feature",
   "specs/langy/langy-plan-progress.feature",
   "specs/langy/langy-projection-independent-reactions.feature",
-  "specs/langy/langy-turn-recovery.feature",
 ];
 
 /**
@@ -422,7 +429,6 @@ const LEGACY_INERT: string[] = [
   "specs/components/code-block-editor.feature",
   "specs/data-retention/data-size-metering.feature",
   "specs/data-retention/monitoring.feature",
-  "specs/data-retention/plan-gated-retention-menu.feature",
   "specs/data-retention/trace-pinning.feature",
   "specs/data-retention/ttl-activation.feature",
   "specs/data-retention/visibility-window-teaser-redaction.feature",
@@ -511,7 +517,6 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/dual-pricing-model.feature",
   "specs/licensing/enforcement-hono-api.feature",
   "specs/licensing/license-lifecycle-e2e.feature",
-  "specs/licensing/license-page-styling.feature",
   "specs/licensing/license-status-ui.feature",
   // Every scenario is parked @unimplemented: the free-plan scenario-set cap this file
   // describes has no enforcement code on this branch.
@@ -737,10 +742,6 @@ const LEGACY_PARTIAL: string[] = [
   "specs/analytics/dashboard-rest-api.feature",
   "specs/analytics/event-sourced-analytics-materialization.feature",
   "specs/automations/authoring-drawer.feature",
-  // Reason: left LEGACY_INERT when its two default-layout scenarios (trace
-  // excerpts, the default Slack message) gained bindings; the other
-  // nineteen Liquid-template scenarios stay untagged.
-  "specs/automations/notification-templates.feature",
   "specs/automations/process-manager-dispatch.feature",
   "specs/ci/path-filters.feature",
   // Reason: reached this branch from main already partially tagged, and its

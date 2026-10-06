@@ -66,6 +66,19 @@ Feature: Composing the graph-alert vertical outside the application
     And nothing is sent to Slack
 
   @unit
+  Scenario: A webhook secret sealed by an earlier release opens through the live trigger repository
+    Given a webhook automation whose headers and signing secret an earlier release sealed with this deployment's key
+    When the live trigger repository reads the row and the delivery opens them
+    Then the headers and the signing secret are in plaintext
+
+  @unit
+  Scenario: What the live trigger repository seals, an earlier release opens
+    Given a secret the live trigger repository sealed
+    When the deployment's cipher opens it as an earlier release did
+    Then it is the secret unchanged
+    And the stored value is not the secret
+
+  @unit
   Scenario: One trigger's failure does not starve the rest
     Given a project with several graph automations
     And evaluating one of them fails

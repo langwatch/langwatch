@@ -36,7 +36,7 @@ import {
   webPushPruneWake,
 } from "./web-push.process.ts";
 
-export const WEB_PUSH_PIPELINE_NAME = "notification_web_push" as const;
+const WEB_PUSH_PIPELINE_NAME = "notification_web_push" as const;
 
 /** A push that cannot go out in about a day is not worth sending: the TTL has lapsed. */
 const WEB_PUSH_MAX_ATTEMPTS = 8;
@@ -76,7 +76,7 @@ export class OutboxWebPushQueue implements WebPushQueue {
   }
 }
 
-export interface WebPushPipelineDeps {
+interface WebPushPipelineDeps {
   webPush: WebPushService;
   processStore: ProcessStore;
 }

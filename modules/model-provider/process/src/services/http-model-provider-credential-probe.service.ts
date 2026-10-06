@@ -15,11 +15,33 @@ import {
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
-import {
-  ModelProviderCredentialProbe,
-  type ModelProviderEgress,
-  type ModelProviderEgressResponse,
-} from "../app/model-provider.members.ts";
+import type {
+  ModelProviderEgress,
+  ModelProviderEgressResponse,
+} from "./ssrf-model-provider-egress.service.ts";
+
+/**
+ * The stored-credential probe, separated from {@link ModelProviderCatalog}
+ * because it's the one answer that leaves the process: a deployment with no
+ * egress can refuse it by name, rather than reporting an unchecked credential as working.
+ */
+export abstract class ModelProviderCredentialProbe {
+  abstract probe(input: {
+    provider: string;
+    customKeys: Record<string, string>;
+  }): Promise<ModelProviderCredentialVerdict>;
+  /**
+   * The stored (or this deployment's own environment) credential, probed
+   * against a caller-overridable base URL. The gateway is passed in, not
+   * held: which rows this probe reads is the application's, not the fence's.
+   */
+  abstract probeStored(input: {
+    projectId: string;
+    provider: string;
+    customBaseUrl: string | undefined;
+    modelProviders: Pick<ModelProviderApi, "findProviderForProject">;
+  }): Promise<ModelProviderCredentialVerdict>;
+}
 
 /**
  * The documented API root and default endpoint of every provider the probe

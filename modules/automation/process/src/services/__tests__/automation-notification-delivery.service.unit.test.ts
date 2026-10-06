@@ -164,6 +164,38 @@ describe("AutomationNotificationDeliveryService", () => {
     });
   });
 
+  describe("given a composed alert delivery adapter holding a webhook transport", () => {
+    /** @scenario "The delivery port stops refusing webhook automations by name" */
+    it("meets the fence's judgement of the address, not a missing sender", async () => {
+      const fenceRefusal =
+        'Webhook for trigger "Error rate": the destination "10.0.0.5" is a private or loopback address, which is not allowed.';
+      const { adapter } = composeDelivery({
+        webhookTransport: {
+          sendRequest: async () => {
+            throw new Error(fenceRefusal);
+          },
+        },
+      });
+
+      const refusal = await adapter
+        .sendWebhook({
+          projectId: "project-1",
+          triggerId: "trigger-1",
+          eventId: "evt_1",
+          url: "http://10.0.0.5/hook",
+          body: "{}",
+          triggerName: "Error rate",
+        })
+        .then(
+          () => null,
+          (error: unknown) => error as Error,
+        );
+
+      expect(refusal?.message).toBe(fenceRefusal);
+      expect(refusal?.message).not.toContain("no outbound webhook sender");
+    });
+  });
+
   /**
    * The digest most automations send (when the author hasn't written a custom
    * subject or body). Spec: specs/automations/worker-automation-settlement-conversion.feature

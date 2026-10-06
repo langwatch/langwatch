@@ -2,7 +2,12 @@ import type { ScopedSecrets } from "@langwatch/secrets";
 
 import { clickhouseRoutesOf } from "./clickhouse-routes.ts";
 import { storesOwner, type StoresConfig } from "./config-owner.ts";
-import type { ClickHousePrivateRoute, ObjectStorageConfig, ProcessConfig } from "./config.ts";
+import type {
+  ClickHousePrivateRoute,
+  ObjectStorageAzureConfig,
+  ObjectStorageConfig,
+  ProcessConfig,
+} from "./config.ts";
 import { buildProcessStores, type ProcessStores } from "./create-members.ts";
 import type { PipelineParticipation } from "./pipeline-selection.ts";
 
@@ -40,38 +45,48 @@ function s3Credentials(values: StorageSecrets) {
   };
 }
 
+function azureConfigOf(options: {
+  settings: StoresConfig["objectStorage"]["azure"];
+  values: StorageSecrets;
+  production: boolean;
+}): ObjectStorageAzureConfig {
+  const { settings, values, production } = options;
+  const { allowInsecureTokenEndpointForTests, ...azure } = settings;
+  return {
+    ...azure,
+    ...(values.accountKey ? { accountKey: values.accountKey } : {}),
+    allowInsecureTokenEndpointForTests: !production && allowInsecureTokenEndpointForTests === "1",
+  };
+}
+
 function objectStorageConfig(options: {
   settings: StoresConfig["objectStorage"];
   values: StorageSecrets;
   production: boolean;
 }): ObjectStorageConfig {
   const { settings, values, production } = options;
-  const backend = settings.backend ?? (settings.s3.bucket ? "s3" : "file");
+  const bucket = settings.s3.bucket?.trim();
+  const backend = settings.backend ?? (bucket ? "s3" : "file");
+  const azure = azureConfigOf({ settings: settings.azure, values, production });
+  const file = { backend: "file", root: settings.localRoot ?? DEFAULT_LOCAL_STORAGE_ROOT } as const;
   switch (backend) {
     case "s3":
+      // The legacy S3 selector with no bucket keeps its documented local-filesystem fallback.
+      if (!bucket) return { ...file, legacyAzure: azure };
       return {
         backend,
         s3: {
-          bucket: settings.s3.bucket ?? "",
+          bucket,
           ...(settings.s3.endpoint ? { endpoint: settings.s3.endpoint } : {}),
           ...(settings.s3.region ? { region: settings.s3.region } : {}),
           ...s3Credentials(values),
         },
+        legacyAzure: azure,
       };
-    case "azure": {
-      const { allowInsecureTokenEndpointForTests, ...azure } = settings.azure;
-      return {
-        backend,
-        azure: {
-          ...azure,
-          ...(values.accountKey ? { accountKey: values.accountKey } : {}),
-          allowInsecureTokenEndpointForTests:
-            !production && allowInsecureTokenEndpointForTests === "1",
-        },
-      };
-    }
+    case "azure":
+      return { backend, azure };
     case "file":
-      return { backend, root: settings.localRoot ?? DEFAULT_LOCAL_STORAGE_ROOT };
+      return { ...file, legacyAzure: azure };
   }
 }
 

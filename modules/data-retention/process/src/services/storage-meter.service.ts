@@ -1,4 +1,3 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   storageMeterTenantInputSchema,
   storageMeterTenantsInputSchema,
@@ -11,21 +10,10 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import type { StorageMeterCacheRepository } from "../repositories/storage-meter-cache.repository.ts";
+import type { StorageMeterRepository } from "../repositories/storage-meter.repository.ts";
 
 const logger = createLogger("langwatch:data-retention:metering");
 const STORAGE_FRESH_MS = 5 * 60 * 1_000;
-const METERING_MAX_EXECUTION_SECONDS = 45;
-const METERING_CLICKHOUSE_SETTINGS = {
-  max_threads: 2,
-  max_execution_time: METERING_MAX_EXECUTION_SECONDS,
-} as const;
-
-const storageMeterRowSchema = z
-  .object({ total: z.union([z.string(), z.number()]).nullable().optional() })
-  .strict();
-
-const storageMeterRowsSchema = z.array(storageMeterRowSchema);
-
 const storageBreakdownSchema = z
   .object({
     totalBytes: z.number().finite().nonnegative(),
@@ -49,16 +37,16 @@ type StorageMeterCategoryTotals = {
 
 export class StorageMeterService {
   static create(options: {
-    /** The process's one ClickHouse client, which routes each read itself. */
-    clickhouse: ClickHouseQueryClient;
+    /** What each tenant holds on disk, read from the store that holds it. */
+    meter: StorageMeterRepository;
     cache: StorageMeterCacheRepository;
     now?: () => number;
   }): StorageMeterService {
-    return new StorageMeterService(options.clickhouse, options.cache, options.now ?? Date.now);
+    return new StorageMeterService(options.meter, options.cache, options.now ?? Date.now);
   }
 
   private constructor(
-    private readonly clickhouse: ClickHouseQueryClient,
+    private readonly meter: StorageMeterRepository,
     private readonly cache: StorageMeterCacheRepository,
     private readonly now: () => number,
   ) {}
@@ -131,15 +119,7 @@ export class StorageMeterService {
     let failures = 0;
     for (const table of PRODUCTION_STORAGE_METER_TABLES) {
       try {
-        const { rows } = await this.clickhouse.query<unknown>({
-          tenantId,
-          table,
-          kind: "read",
-          sql: `SELECT sum(_size_bytes) AS total FROM ${table} WHERE TenantId = {tenantId:String}`,
-          params: { tenantId },
-          settings: METERING_CLICKHOUSE_SETTINGS,
-        });
-        const tableBytes = this.parseTotal(rows);
+        const tableBytes = await this.meter.getTableBytes({ tenantId, table });
         const category = RETENTION_TABLE_CATEGORY_MAP[table];
         byCategory[category] += tableBytes;
       } catch (error) {
@@ -186,20 +166,8 @@ export class StorageMeterService {
   }
 
   private async queryTotalBytes(tenantId: string): Promise<number> {
-    const unions = PRODUCTION_STORAGE_METER_TABLES.map(
-      (table) => `SELECT sum(_size_bytes) AS t FROM ${table} WHERE TenantId = {tenantId:String}`,
-    ).join("\n  UNION ALL\n  ");
-
     try {
-      const { rows } = await this.clickhouse.query<unknown>({
-        tenantId,
-        kind: "read",
-        sql: `SELECT sum(t) AS total FROM (\n  ${unions}\n)`,
-        params: { tenantId },
-        settings: METERING_CLICKHOUSE_SETTINGS,
-      });
-
-      return this.parseTotal(rows);
+      return await this.meter.getTenantBytes({ tenantId });
     } catch (error) {
       logger.warn(
         { tenantId, error },
@@ -209,13 +177,5 @@ export class StorageMeterService {
 
       return breakdown.totalBytes;
     }
-  }
-
-  private parseTotal(rows: unknown): number {
-    const parsed = storageMeterRowsSchema.parse(rows);
-    const value = parsed[0]?.total ?? 0;
-    const total = typeof value === "number" ? value : Number(value);
-
-    return z.number().finite().nonnegative().parse(total);
   }
 }

@@ -14,12 +14,12 @@ rules hold that line in browser code.
 
 ## Decision
 
-| Rule                                  | Layer  | Meaning                                                                                                                                |
-| ------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `langwatch/effect-derives-state`      | plugin | An effect whose whole body copies a value derived from its dependencies into state is a second render; derive during render.           |
-| `langwatch/query-data-in-state`       | plugin | Server data is not copied into `useState` or a store; it stays in React Query.                                                         |
-| `langwatch/browser-store-containment` | plugin | zustand's `create` appears only under `behavior/`, and a module's `<name>.web.ts` exports no store.                                    |
-| `langwatch/no-redux`                  | plugin | `redux`, `react-redux` and `@reduxjs/toolkit` are not imported in browser code.                                                        |
+| Rule                                  | Layer  | Meaning                                                                                                                      |
+| ------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `langwatch/effect-derives-state`      | plugin | An effect whose whole body copies a value derived from its dependencies into state is a second render; derive during render. |
+| `langwatch/query-data-in-state`       | plugin | Server data is not copied into `useState` or a store; it stays in React Query.                                               |
+| `langwatch/browser-store-containment` | plugin | zustand's `create` appears only under `behavior/`, and a module's `<name>.web.ts` exports no store.                          |
+| `langwatch/no-redux`                  | plugin | `redux`, `react-redux` and `@reduxjs/toolkit` are not imported in browser code.                                              |
 
 ## References
 

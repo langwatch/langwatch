@@ -45,7 +45,6 @@ import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -55,6 +54,7 @@ import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import type { VirtualKeyService } from "../services/virtual-key.service.ts";
+import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 import { seededCustomKeys } from "./support/seeded-custom-keys.ts";
 import { PostgresVirtualKeyAdapter } from "./testing.ts";
 
@@ -586,7 +586,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
         },
       ]);
 
-      const spends = await chRepo.getSpendForTargetsAcrossTenants(
+      const spends = await chRepo.findSpendForTargetsAcrossTenants(
         [PROJECT_ID],
         [filtered, unfiltered].map((r) => ({
           budgetId: r.budget.id,
@@ -719,7 +719,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
       const unfilteredBudget = await prisma.gatewayBudget.findUniqueOrThrow({
         where: { id: BUDGET_GROUP_ID },
       });
-      const spends = await chRepo.getSpendForBudgetsAcrossTenants(
+      const spends = await chRepo.findSpendForBudgetsAcrossTenants(
         [PROJECT_ID],
         [toBudgetRow(unfilteredBudget), toBudgetRow(filteredBudget)],
       );

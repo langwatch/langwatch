@@ -27,7 +27,7 @@ export type LangyTurnSettlementReader = {
 
 /** One turn's live edge over a borrowed blocking connection; `release` gives it back. */
 export type LangyTurnBufferWatch = { buffer: LangyTokenBufferRepository; release: () => void };
-export type OpenLangyTurnBuffer = () => LangyTurnBufferWatch | null;
+export type OpenLangyTurnBuffer = () => LangyTurnBufferWatch;
 
 const bufferedPollMs = 5_000;
 const fallbackPollMs = 750;
@@ -219,17 +219,12 @@ export class LangyTurnSettlementWaiterService {
   }
 
   private armBufferWatch(input: {
-    openBuffer: OpenLangyTurnBuffer | null;
+    openBuffer: OpenLangyTurnBuffer;
     conversationId: string;
     turnId: string;
     signal: AbortSignal;
   }): { terminalSeen: Promise<void> | null; release: () => void } {
-    const opened = input.openBuffer?.();
-    if (!opened) {
-      return { terminalSeen: null, release: () => {} };
-    }
-
-    const { buffer, release } = opened;
+    const { buffer, release } = input.openBuffer();
 
     return {
       terminalSeen: this.watchBufferForTerminal(buffer, input).catch(() => this.neverSettles()),
@@ -256,7 +251,7 @@ export class LangyTurnSettlementWaiterService {
 
   async awaitTurnSettlement(input: {
     langy: LangyTurnSettlementReader;
-    openBuffer: OpenLangyTurnBuffer | null;
+    openBuffer: OpenLangyTurnBuffer;
     projectId: string;
     conversationId: string;
     turnId: string;

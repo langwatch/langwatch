@@ -1,6 +1,17 @@
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 
-import type { TraceMediaStore } from "../app/trace.members.ts";
+/** Where media lifted out of a span's content is put. Reused by the extraction
+ * path to store bytes and get back the id to rewrite span attributes to. */
+export interface TraceMediaStore {
+  storeFromBytes: (input: {
+    projectId: string;
+    purpose: string;
+    ownerKind: string;
+    ownerId: string;
+    mediaType: string;
+    bytes: Buffer;
+  }) => Promise<{ id: string; mediaType: string; isDuplicate: boolean }>;
+}
 
 const TRACE_MEDIA_FILENAME = "trace-media";
 

@@ -4,6 +4,7 @@ import type { EvaluationLifecycleCompletedEventData } from "@langwatch/evaluatio
 import type { ProjectCreatedEventData } from "@langwatch/project-contract";
 import type { SimulationRunFinishedEventData } from "@langwatch/scenario-contract";
 
+import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import type { NurturingMilestonesRepository } from "../repositories/nurturing-milestones.repository.ts";
 import {
   evaluationCompletedSignal,
@@ -15,7 +16,7 @@ const COUNTED_WINDOW_SECONDS = 7 * 24 * 60 * 60;
 
 type MilestonesDependencies = Readonly<{
   milestones: NurturingMilestonesRepository;
-  claims: Readonly<{ claim(key: string, ttlSeconds: number): Promise<boolean> }>;
+  claims: NurturingClaimRepository;
 }>;
 
 /**

@@ -15,6 +15,7 @@ import {
   PrismaGatewayAdapter,
   type GatewayService,
 } from "@langwatch/gateway-process/testing";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -23,14 +24,14 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
-import type {
-  PulledUsageLedgerRepository,
-  PulledUsageLedgerRow,
-} from "../app/governance.members.ts";
 import {
   PulledUsageLedgerIntent,
   type WritePulledUsagePayload,
 } from "../eventing/pulled-usage-ledger.intent.ts";
+import type {
+  PulledUsageLedgerRepository,
+  PulledUsageLedgerRow,
+} from "../repositories/pulled-usage-ledger.repository.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;
@@ -279,7 +280,11 @@ describe.skipIf(!databaseUrl)(
       gateway = PrismaGatewayAdapter.create({
         database: prisma,
         projects: suiteProjects(),
-        organizations: {} as never,
+        // The key's principal reads its groups; this suite seeds none, so no group budget applies.
+        organizations: createApiFixture<OrganizationApi>(
+          { listGroupsForMember: async () => [] },
+          "OrganizationApi",
+        ),
         evaluators: {} as never,
         monitors: {} as never,
         changes: {} as never,
@@ -462,6 +467,7 @@ describe.skipIf(!databaseUrl)(
 
     describe("given a team whose spending is already at its limit", () => {
       /** @scenario "Pulled cost never blocks spending" */
+      /** @scenario "A homed pulled row still never counts against spending limits" */
       it("records the pulled cost, does not trip the limit with it, and still allows the team's requests", async () => {
         // The team is at $0.99 of a $1 limit through the gateway.
         await writeGatewayDebit(NEARLY_SPENT_NANO);

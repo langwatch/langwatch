@@ -5,18 +5,16 @@
  */
 
 import { Box, Spinner, VStack } from "@chakra-ui/react";
+import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { nowInstant } from "@langwatch/time";
-import { UiPageLoading, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
 import { useState, type ReactNode } from "react";
 
+import { useDashboardAutoRefresh } from "../../../../behavior/use-dashboard-auto-refresh.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { HandledErrorAlert } from "../../../../ui/elements/handled-error-alert.tsx";
 import { CreateDashboardWidgetDrawer } from "../../../../ui/sections/create-dashboard-widget-drawer.tsx";
 import { DashboardRefreshStatus } from "../../../../ui/sections/dashboard-auto-refresh-menu.tsx";
-import {
-  DashboardRefreshedAtContext,
-  useDashboardAutoRefresh,
-} from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
+import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
 import { useBlockPickerAddress } from "../../behavior/use-block-picker-address.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
 import { useBoardPeriod } from "../../behavior/use-board-period.ts";

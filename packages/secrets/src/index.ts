@@ -7,9 +7,11 @@ export {
   credentialsSecret,
   gatewayInternalSecret,
   internalSlackSignupsWebhook,
+  nlpInternalSecret,
   openAiApiKey,
   sessionSecret,
   signInProviderSecrets,
+  telemetryExporterHeaders,
   virtualKeyPepper,
 } from "./shared-secrets.ts";
 export {

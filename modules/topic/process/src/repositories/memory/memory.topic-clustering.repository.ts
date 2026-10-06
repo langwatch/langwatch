@@ -84,12 +84,6 @@ export class MemoryTopicClusteringRepository extends TopicClusteringRepository {
     );
   }
 
-  findAlreadyScheduledProjectIds(projectIds: string[]): Promise<string[]> {
-    return Promise.resolve(
-      projectIds.filter((id) => this.store.clustering.get(id)?.scheduled === true),
-    );
-  }
-
   /** Keyset paging, ascending by id and strictly after the cursor. */
   private page(
     params: { afterId: string | null; take: number },

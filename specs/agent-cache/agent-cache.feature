@@ -59,8 +59,8 @@ Feature: The agent cache
   Rule: An entry is written by name and read back by name
 
     @unit @regression
-    Scenario: The installed agent cache is served from the process's own members
-      Given a gateway installed with the process's Redis connection and encryption
+    Scenario: The installed agent cache is served from the gateway's own repositories
+      Given a gateway installed over its own repositories
       When the caller stores, claims, reads and removes an entry
       Then each call answers from the store instead of failing as unmounted
 

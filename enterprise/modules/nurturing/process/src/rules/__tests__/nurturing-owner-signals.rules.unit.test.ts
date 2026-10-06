@@ -13,6 +13,7 @@ import {
   experimentRanSignal,
   guidedOnboardingSignal,
   subscriptionChangedSignal,
+  subscriptionStartedSignal,
 } from "../nurturing-owner-signals.rules.ts";
 
 const recorded: Omit<GuidedOnboardingRecordedEventData, "event"> = {
@@ -42,6 +43,7 @@ describe("guidedOnboardingSignal", () => {
       event: "paths_selected",
       previousPaths: [],
       paths: ["gateway", "llmops"],
+      payload: {},
     });
   });
 
@@ -57,6 +59,32 @@ describe("guidedOnboardingSignal", () => {
       payload: { path: "gateway" },
       state: recorded.state,
     });
+  });
+});
+
+describe("guidedOnboardingSignal for the steps only PostHog is told of", () => {
+  it("raises a provider skip and a tour replay as progress, with the current path", () => {
+    for (const event of ["provider_skipped", "tour_replayed"] as const) {
+      expect(
+        guidedOnboardingSignal({
+          aggregateId: "org-1",
+          data: { ...recorded, event, state: { ...recorded.state, currentPath: "gateway" } },
+        }),
+      ).toMatchObject({
+        kind: "guided_onboarding_progress",
+        event,
+        state: { currentPath: "gateway" },
+      });
+    }
+  });
+
+  it("carries the path a path_begun names, so PostHog can track it", () => {
+    expect(
+      guidedOnboardingSignal({
+        aggregateId: "org-1",
+        data: { ...recorded, event: "path_begun", payload: { path: "governance" } },
+      }),
+    ).toMatchObject({ kind: "guided_onboarding_paths", payload: { path: "governance" } });
   });
 });
 
@@ -171,6 +199,32 @@ describe("subscriptionChangedSignal", () => {
       sourceEventId: "org-1:subscription:false:7",
       memberUserIds: ["user-1", "user-2"],
       hasSubscription: false,
+    });
+  });
+});
+
+describe("subscriptionStartedSignal", () => {
+  it("carries the plan and every member, keyed by the subscription and its instant", () => {
+    expect(
+      subscriptionStartedSignal({
+        aggregateId: "org-1",
+        data: {
+          tenantId: "org-1",
+          occurredAt: 8,
+          organizationId: "org-1",
+          subscriptionId: "sub-1",
+          plan: "LAUNCH",
+          memberUserIds: ["user-1", "user-2"],
+        },
+      }),
+    ).toEqual({
+      kind: "subscription_started",
+      sourceEventId: "org-1:sub-1:8",
+      tenantId: "org-1",
+      occurredAt: 8,
+      organizationId: "org-1",
+      memberUserIds: ["user-1", "user-2"],
+      plan: "LAUNCH",
     });
   });
 });

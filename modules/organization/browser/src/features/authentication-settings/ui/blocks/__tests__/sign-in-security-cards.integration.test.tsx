@@ -40,6 +40,24 @@ describe("the account lockout card", () => {
 });
 
 describe("the session limits card", () => {
+  describe("given session limits are off and custom limits are chosen", () => {
+    /** @scenario "The window is offered with the numbers the control asks for" */
+    it("offers an idle timeout of one day, a maximum left unset, and says saving signs out the idle", async () => {
+      renderCard(
+        <SessionLimitCard settings={SIGN_IN_SECURITY_OFF} saving={false} onSave={vi.fn()} />,
+      );
+
+      await userEvent.click(screen.getByText("Custom session limits"));
+
+      expect((screen.getByTestId("session-limit-idle") as HTMLInputElement).value).toBe("1440");
+      expect((screen.getByTestId("session-limit-maximum") as HTMLInputElement).value).toBe("");
+      expect(screen.getByTestId("session-limit-save")).toBeTruthy();
+      expect(
+        screen.getByText("Saving signs out sessions already past the new limit."),
+      ).toBeTruthy();
+    });
+  });
+
   describe("given a maximum shorter than the idle timeout", () => {
     it("warns that it would never be reached and offers no save", () => {
       renderCard(

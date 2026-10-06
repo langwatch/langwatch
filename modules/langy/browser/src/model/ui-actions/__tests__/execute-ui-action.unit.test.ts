@@ -76,6 +76,7 @@ describe("executeUiAction", () => {
     // specs/langy/langy-ui-actions.feature, "An action that arrives while its
     // page is still mounting is held for that page" — scenario lines requested
     // of the coordinator; the binding lands with them.
+    /** @scenario "An action that arrives while its page is still mounting is held for that page" */
     it("claims at once and runs the handler as soon as the page registers it", async () => {
       const legs = makeLegs();
       const run = vi.fn(() => ({ targetId: "t2" }));
@@ -107,6 +108,7 @@ describe("executeUiAction", () => {
 
     // specs/langy/langy-ui-actions.feature, "A page that never finishes
     // mounting reports it instead of leaving the agent waiting".
+    /** @scenario "A page that never finishes mounting reports it instead of leaving the agent waiting" */
     it("completes as failed with the page-not-ready code when the hold runs out", async () => {
       const legs = makeLegs();
 

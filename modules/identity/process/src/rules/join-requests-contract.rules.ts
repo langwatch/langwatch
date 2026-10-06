@@ -3,7 +3,11 @@
  * often somebody may ask and look, how long a rejection holds them off, and the narrow
  * collaborator shapes the service is given rather than reaching for.
  */
-import { type DomainJoinSetting, type JoinSettingChange } from "@langwatch/identity-contract";
+import {
+  type DomainJoinSetting,
+  type JoinerRole,
+  type JoinSettingChange,
+} from "@langwatch/identity-contract";
 
 import type {
   JoinCandidateRepository,
@@ -90,11 +94,12 @@ export interface JoinOfferDismissals {
 export interface JoinSetting {
   read(args: {
     organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }>;
+  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[]; joinerRole: JoinerRole }>;
   write: (args: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     joinDomains: string[];
+    joinerRole: JoinerRole;
   }) => Promise<void>;
 }
 

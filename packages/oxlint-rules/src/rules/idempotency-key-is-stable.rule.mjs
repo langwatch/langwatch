@@ -62,7 +62,7 @@ export const idempotencyKeyIsStableRule = defineRule({
     mintedAtCallSite: {
       what: "`{{name}}` is minted here by `{{source}}`, so every retry sends a different key and nothing is deduplicated.",
       why: "A key that changes per attempt is a field on the wire, not a guarantee: the server sees each retry as a new operation.",
-      fix: "Derive it from the request's own content, or bind it once for the operation it identifies — `useState(() => crypto.randomUUID())` for a form, a key threaded from the caller for a mutation — and pass that binding here.",
+      fix: "Derive it from the request's own content, or bind it once for the operation it identifies — `useState(() => crypto.randomUUID())` for a form, a key threaded from the caller for a mutation — and pass that binding here. Read the `eventing-and-worker` skill.",
     },
   },
   create(context, _file) {

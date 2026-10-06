@@ -7,6 +7,7 @@ const PORT = 3300;
 
 describe("VoicePublicUrlService", () => {
   describe("given a configured public origin", () => {
+    /** @scenario "An explicit public base URL always wins over the tunnel fallback" */
     it("answers it and opens no tunnel", async () => {
       const tunnel = MemoryVoicePublicUrlTunnelChannel.create({ url: "https://tunnel.test" });
 
@@ -51,6 +52,7 @@ describe("VoicePublicUrlService", () => {
       expect(tunnel.closed).toBe(1);
     });
 
+    /** @scenario "A failed voice tunnel boot records its reason for the phone run error" */
     it("stays up without an origin when the tunnel fails, naming why", async () => {
       const tunnel = MemoryVoicePublicUrlTunnelChannel.create({
         failure: "spawn cloudflared ENOENT",

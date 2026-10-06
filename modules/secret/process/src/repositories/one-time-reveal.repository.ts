@@ -1,12 +1,11 @@
 import type { OneTimeRevealKind } from "@langwatch/secret-contract";
 
-/** A parked reveal, as the store holds it: never the plaintext. */
+/** A parked reveal. The live store seals the secret at rest, so a dump lists no plaintext. */
 export type StoredReveal = {
   kind: OneTimeRevealKind;
   keyId: string;
   preview: string;
-  /** The secret, sealed with the process's own cipher. */
-  sealed: string;
+  secret: string;
 };
 
 /** What a read-and-delete found, if anything. */

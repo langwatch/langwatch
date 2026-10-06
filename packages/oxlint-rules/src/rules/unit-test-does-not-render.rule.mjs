@@ -32,7 +32,7 @@ export const unitTestDoesNotRenderRule = defineRule({
     unitTestImportsRenderer: {
       what: "`{{specifier}}` renders components, and `{{name}}` is not named as an integration test.",
       why: "A test that renders a component and mocks its boundaries is an integration test.",
-      fix: "Rename the file to `{{target}}` and leave the content unchanged.",
+      fix: "Rename the file to `{{target}}` and leave the content unchanged. Read the `testing` skill.",
     },
   },
   create(context, file) {

@@ -55,6 +55,10 @@ const mockNewCountCancel = vi.fn().mockResolvedValue(undefined);
 const mockNewCountInvalidate = vi.fn().mockResolvedValue(undefined);
 const mockDiscoverCancel = vi.fn().mockResolvedValue(undefined);
 const mockDiscoverInvalidate = vi.fn().mockResolvedValue(undefined);
+const mockHeaderInvalidate = vi.fn().mockResolvedValue(undefined);
+const mockSpanTreeInvalidate = vi.fn().mockResolvedValue(undefined);
+const mockEvalsInvalidate = vi.fn().mockResolvedValue(undefined);
+let openDrawerTraceId: string | null = null;
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
@@ -76,9 +80,9 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
           cancel: mockDiscoverCancel,
           invalidate: mockDiscoverInvalidate,
         },
-        header: { invalidate: vi.fn().mockResolvedValue(undefined) },
-        spanTree: { invalidate: vi.fn().mockResolvedValue(undefined) },
-        evals: { invalidate: vi.fn().mockResolvedValue(undefined) },
+        header: { invalidate: mockHeaderInvalidate },
+        spanTree: { invalidate: mockSpanTreeInvalidate },
+        evals: { invalidate: mockEvalsInvalidate },
         spanDetail: { invalidate: vi.fn().mockResolvedValue(undefined) },
         spanLangwatchSignals: {
           invalidate: vi.fn().mockResolvedValue(undefined),
@@ -92,9 +96,9 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
 
 // Mocking the module rather than the barrel keeps the rest of the package real for the hook.
 vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
-  getTraceDrawer: () => ({ traceId: null, occurredAtMs: null }),
+  getTraceDrawer: () => ({ traceId: openDrawerTraceId, occurredAtMs: null }),
   useTraceDrawer: (selector: (s: unknown) => unknown) =>
-    selector({ traceId: null, occurredAtMs: null }),
+    selector({ traceId: openDrawerTraceId, occurredAtMs: null }),
 }));
 
 // Mutable live-updates mode — mutated in beforeEach / test body.
@@ -135,6 +139,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   capturedOnTraceSummaryUpdated = null;
+  openDrawerTraceId = null;
   liveUpdatesMode = "live";
   visibleIdsResult = { ids: new Set(), topTimestamp: undefined, page: 1 };
 });
@@ -153,6 +158,36 @@ async function flushNewCountDebounce() {
 // ─── Tests ────────────────────────────────────────────────────────────────
 
 describe("useTraceFreshness", () => {
+  describe("given the drawer is open for trace abc123", () => {
+    /** @scenario "Open drawer is invalidated for affected traces" */
+    it("invalidates that trace's header, span tree and evals when an update names it", async () => {
+      openDrawerTraceId = "abc123";
+      renderHook(() => useTraceFreshness());
+
+      await act(async () => {
+        capturedOnTraceSummaryUpdated!(["abc123"]);
+      });
+
+      const key = { projectId: expect.any(String), traceId: "abc123" };
+      expect(mockHeaderInvalidate).toHaveBeenCalledWith(key);
+      expect(mockSpanTreeInvalidate).toHaveBeenCalledWith(key);
+      expect(mockEvalsInvalidate).toHaveBeenCalledWith(key);
+    });
+
+    it("leaves the drawer's reads alone when the update names other traces", async () => {
+      openDrawerTraceId = "abc123";
+      renderHook(() => useTraceFreshness());
+
+      await act(async () => {
+        capturedOnTraceSummaryUpdated!(["other"]);
+      });
+
+      expect(mockHeaderInvalidate).not.toHaveBeenCalled();
+      expect(mockSpanTreeInvalidate).not.toHaveBeenCalled();
+      expect(mockEvalsInvalidate).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given the user is on page 1 and a visible trace is updated", () => {
     describe("when an SSE trace_summary_updated arrives for a visible traceId", () => {
       it("pulses that row and does NOT invalidate list", async () => {

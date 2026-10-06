@@ -1,4 +1,4 @@
-import { type HttpHeader, secretReferenceOf } from "@langwatch/agent-contract";
+import { type HttpHeader, readSecretReference } from "@langwatch/agent-contract";
 import { Button, HStack, Input, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Plus, X } from "lucide-react";
@@ -39,11 +39,14 @@ function HeaderValueField({
   onChange: (value: string) => void;
   testId: string;
 }) {
-  const name = secretReferenceOf(header.value);
-  if (name !== void 0) {
+  const reference = readSecretReference(header.value);
+  if (reference.isReference) {
     return (
       <HStack flex={2}>
-        <SecretReferenceLine name={name} {...(disabled ? {} : { onReplace: () => onChange("") })} />
+        <SecretReferenceLine
+          name={reference.name}
+          {...(disabled ? {} : { onReplace: () => onChange("") })}
+        />
       </HStack>
     );
   }

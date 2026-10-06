@@ -26,12 +26,12 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import WebSocket from "ws";
 
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
-import type { LocalControlRuntime } from "../../app/langy.members.ts";
 import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
 import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
 import type { LocalCallLookup } from "../../services/langy-local-call-dispatcher.service.ts";
 import { LocalControlConnectionService } from "../../services/langy-local-control-connection.service.ts";
 import { LocalControlLongPollService } from "../../services/langy-local-control-long-poll.service.ts";
+import type { LocalControlRuntime } from "../../services/langy-local-control-runtime.service.ts";
 import { LangyLocalControlRuntimeService } from "../../services/langy-local-control-runtime.service.ts";
 import { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
 import {
@@ -1093,6 +1093,7 @@ describe("given a folder the developer stops sharing", () => {
   });
 
   /** @scenario "The chat says the folder is gone" */
+  /** @scenario "A disconnected folder is asked for again" */
   it("writes the disconnect into the transcript, and starts no turn for it", async () => {
     const key = await approvedSessionKey(podA);
     const { cli } = await shareFolder(podA, key);

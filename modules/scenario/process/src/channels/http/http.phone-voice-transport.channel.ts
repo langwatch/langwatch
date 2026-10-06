@@ -81,7 +81,7 @@ export interface TwilioAdapterLike {
 export type PhoneAgentAdapter = AgentAdapter & TwilioAdapterLike;
 
 /** The phone runner, whose adapter keeps its call controls visible to the caller. */
-export type PhoneTransportRunner = Omit<VoiceTransportRunner, "createAgentAdapter"> & {
+type PhoneTransportRunner = Omit<VoiceTransportRunner, "createAgentAdapter"> & {
   createAgentAdapter(input: VoiceAgentAdapterRequest): PhoneAgentAdapter;
 };
 
@@ -123,12 +123,12 @@ const defaultTwilioAgentFactory: TwilioAgentFactory = (options) => {
  * show at a glance whether the run used the voice worker's own hostname or
  * fell back to the app's.
  */
-export type PublicBaseUrlSource = "VOICE_PUBLIC_BASE_URL" | "BASE_HOST";
+type PublicBaseUrlSource = "VOICE_PUBLIC_BASE_URL" | "BASE_HOST";
 
 /** Malformed VOICE_PUBLIC_BASE_URL or BASE_HOST: SDK has no validation so
  * bad URL reaches Twilio as error 11100; fail early with env var name.
  */
-export class VoicePublicBaseUrlInvalidError extends Error {
+class VoicePublicBaseUrlInvalidError extends Error {
   constructor(envVarName: PublicBaseUrlSource, value: string) {
     super(
       `${envVarName} is not a valid http(s) URL: "${value}". The Twilio ` +
@@ -156,8 +156,9 @@ export class VoicePublicBaseUrlMissingError extends Error {
         `unset, resolved source: ${source}). The app's BASE_HOST runs no voice ` +
         `media listener, so Twilio would dial a URL nothing answers and the ` +
         `call would fail with error 31920 after a 120s timeout. Set ` +
-        `VOICE_PUBLIC_BASE_URL, or ensure cloudflared is installed so the ` +
-        `worker can mint a tunnel at boot.${reasonSuffix}`,
+        `VOICE_PUBLIC_BASE_URL, or set VOICE_TUNNEL=true (off by default on ` +
+        `self-hosted installs) with cloudflared installed so the worker can ` +
+        `mint a tunnel at boot.${reasonSuffix}`,
     );
     this.name = "VoicePublicBaseUrlMissingError";
   }
@@ -199,7 +200,7 @@ export function derivePublicBaseUrl(environment: PhoneTransportEnvironment): str
 
 /** Same resolution as {@link derivePublicBaseUrl}, but also reports which env
  *  var the value came from, so a caller can log it alongside the value. */
-export function derivePublicBaseUrlWithSource(
+function derivePublicBaseUrlWithSource(
   environment: PhoneTransportEnvironment,
 ): { value: string; source: PublicBaseUrlSource } | undefined {
   const fromWorker = environment.voicePublicBaseUrl?.trim();
@@ -243,7 +244,7 @@ function mintPhoneStreamNonce(): string {
 }
 
 /** The dependencies the phone runner is built from; a fake Twilio adapter stands in, in tests. */
-export interface PhoneTransportDeps {
+interface PhoneTransportDeps {
   twilioAgentFactory?: TwilioAgentFactory;
   environment: PhoneTransportEnvironment;
   /** The IPC round trip that registers the nonce with the parent; faked in tests. */

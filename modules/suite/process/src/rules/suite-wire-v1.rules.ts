@@ -26,26 +26,23 @@ import {
 import { z } from "zod";
 
 /**
- * Which surface started a run, as `X-LangWatch-Surface` spells it. Declared
- * here because all three suite families record it on the runs they queue, and
- * bound once by the process that reads the header.
+ * Where a run was started from, bound once by the process: the surface as `X-LangWatch-Surface`
+ * spells it, and the API key the run started with so the run's own key holds no more. The key is
+ * null for a legacy API key or a project-bound access token, which have no key row.
  */
-export const suiteSurfaceFact = defineRestMiddleware("suiteSurface", z.string().nullable());
-
-/**
- * The API key a run was started with, so the run's own key holds no more; null for a legacy
- * API key or a project-bound access token, which have no key row.
- */
-export const suiteCallerKeyFact = defineRestMiddleware(
-  "suiteCallerKey",
-  z.string().min(1).nullable(),
+export const suiteRunOriginFact = defineRestMiddleware(
+  "suiteRunOrigin",
+  z.object({
+    surface: z.string().nullable(),
+    callerKey: z.string().min(1).nullable(),
+  }),
 );
 
-export const suiteFieldWireSchema = suiteFieldDefinitionSchema.describe(
+const suiteFieldWireSchema = suiteFieldDefinitionSchema.describe(
   "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it.",
 );
 
-export const suiteFieldsWireSchema = z
+const suiteFieldsWireSchema = z
   .array(suiteFieldWireSchema)
   .max(MAX_SUITE_FIELDS)
   .describe(
@@ -53,7 +50,7 @@ export const suiteFieldsWireSchema = z
   );
 
 /** The configuration a run plan holds, as a caller sends it. */
-export const runPlanConfigWireSchema = z.object({
+const runPlanConfigWireSchema = z.object({
   scope: runPlanScopeSchema,
   targets: z
     .array(suiteTargetSchema)
@@ -233,8 +230,6 @@ export const testSuiteWireSchema = z.object({
     .describe("Where to open this test suite in the LangWatch platform."),
 });
 
-export type TestSuiteWire = z.infer<typeof testSuiteWireSchema>;
-
 /** One test suite with the scenarios filed in it, named. */
 export const testSuiteDetailWireSchema = z.object({
   ...testSuiteWireSchema.shape,
@@ -279,8 +274,7 @@ export const testSuiteUpdateInputSchema = z.object({
     ),
 });
 
-export type SuiteTargetWire = z.infer<typeof suiteTargetSchema>;
-export type RunPlanRunResultWire = z.infer<typeof runPlanRunResultSchema>;
+type RunPlanRunResultWire = z.infer<typeof runPlanRunResultSchema>;
 
 /**
  * The runs a call queued, as the wire shape.

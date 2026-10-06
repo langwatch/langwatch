@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
-import type { JoinRequestNotificationMail } from "../app/identity.members.ts";
+import type { JoinRequestNotificationMail } from "../channels/join-request-notification-mail.channel.ts";
 import type {
   JoinRequestAdmin,
   JoinRequestAudienceRepository,
@@ -13,14 +13,14 @@ import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.
 const logger = createLogger("langwatch:identity:join-request-adapters");
 
 /** The organization's plan, read only for the fields the seat census needs. */
-export type JoinRequestNotifierPlans = {
+type JoinRequestNotifierPlans = {
   getActivePlan(input: {
     organizationId: string;
   }): Promise<{ maxMembers: number; planSource?: string; overrideAddingLimitations?: boolean }>;
 };
 
 /** How many full members an organization holds, for the same seat census as the plan check. */
-export type JoinRequestNotifierMemberships = {
+type JoinRequestNotifierMemberships = {
   getMemberCount(organizationId: string): Promise<number>;
 };
 

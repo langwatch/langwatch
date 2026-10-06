@@ -16,7 +16,7 @@ import type {
   CodingAgentPullRequestAssignmentService,
 } from "./coding-agent-pull-request-assignment.service.ts";
 
-export interface PullRequestAttribution {
+interface PullRequestAttribution {
   /**
    * The candidate sessions scaled to their share of THIS pull request, ready
    * to be grouped and summed exactly like whole sessions were. A session with

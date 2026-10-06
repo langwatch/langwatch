@@ -3,7 +3,7 @@
 import { nowInstant } from "@langwatch/time";
 
 /** A minute: a stale minute costs a minute of writes; a read per fold costs the hot path. */
-export const SNAPSHOT_TTL_MS = 60_000;
+const SNAPSHOT_TTL_MS = 60_000;
 
 /** What one refresh reads: which digests are suppressed, and which organization owns a tenant. */
 export interface SuppressionSnapshotData {
@@ -11,7 +11,7 @@ export interface SuppressionSnapshotData {
   organizationByTenant: Map<string, string>;
 }
 
-export type SuppressionSnapshotLoader = () => Promise<SuppressionSnapshotData>;
+type SuppressionSnapshotLoader = () => Promise<SuppressionSnapshotData>;
 
 /**
  * The suppression list as the synchronous fold can read it: serves what it holds, refreshes

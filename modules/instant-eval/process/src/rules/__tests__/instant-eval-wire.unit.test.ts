@@ -1,7 +1,7 @@
 /**
  * What a caller reads back: the status published lowercase, the row cap as
  * `limit`, and the hydration plan not at all.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { describe, expect, it } from "vitest";

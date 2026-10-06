@@ -35,7 +35,7 @@ import { EventingAuthzAuditAdapter } from "./authz-grant.subscriber.ts";
 
 export const AUTHZ_GRANT_PIPELINE_NAME = "authz_grant" as const;
 
-export interface EventingAuthzAdapterOptions {
+interface EventingAuthzAdapterOptions {
   authzGrantsWriteStore: AuthzGrantProjectionRepository;
   authzAuditTrailStore: AuthzAuditTrailRepository;
   /** Absent on the consumer-only twin, which bumps no session version. */

@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, isSaas, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /** Boot overrides for the request-bounds registry (`@langwatch/plans`); key
@@ -18,6 +18,8 @@ const requestBoundsSchema = z
 
 export const entitlementConfig = Config.define((c) => ({
   requestBounds: c.env("LANGWATCH_REQUEST_BOUNDS", requestBoundsSchema),
+  /** The shared leaf: Cloud reads plans from billing's subscriptions; an install, its licence. */
+  isSaas,
 }));
 
 export type EntitlementConfig = ConfigOf<typeof entitlementConfig>;

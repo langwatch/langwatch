@@ -10,11 +10,7 @@ export class FakeCliSessions implements McpCliSessions {
   readonly refresh = new Map<string, Bound>();
   #counter = 0;
 
-  issueProjectCliSession({
-    userId,
-    organizationId,
-    projectId,
-  }: Bound & { clientLabel: string }) {
+  issueProjectCliSession({ userId, organizationId, projectId }: Bound & { clientLabel: string }) {
     return Promise.resolve(this.#mint({ userId, organizationId, projectId }));
   }
 

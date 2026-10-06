@@ -2,7 +2,7 @@
  * The reads a run performs, each a pass Analytics wraps around the caller's own
  * statement after re-validating it, run as the project's restricted identity. A result cut
  * short is an error here, never a shorter answer.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {

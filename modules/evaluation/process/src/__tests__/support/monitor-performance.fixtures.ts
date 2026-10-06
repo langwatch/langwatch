@@ -360,4 +360,3 @@ export const seedMonitorPerformance = async ({
     clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
   });
 };
-

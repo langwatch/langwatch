@@ -6,6 +6,7 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
+import type { ScimHeldConnections } from "./scim-directory-identity.service.ts";
 import type { ScimGrantAuthority } from "./scim-grants.service.ts";
 import type { ScimSyncLifecycle } from "./scim-sync-lifecycle.service.ts";
 import { ScimService } from "./scim.service.ts";
@@ -24,6 +25,7 @@ export class PostgresScimService {
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     tokenPepper: string | undefined;
+    connections: ScimHeldConnections;
   }): ScimServiceContract {
     return ScimService.create({
       prisma: options.repository,
@@ -35,6 +37,7 @@ export class PostgresScimService {
       lifecycle: options.lifecycle,
       provenOffboarding: options.provenOffboarding,
       tokenPepper: options.tokenPepper,
+      connections: options.connections,
     });
   }
 }

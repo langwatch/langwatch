@@ -42,7 +42,7 @@ export const emDashInCopyRule = defineRule({
     emDashInCopy: {
       what: 'This user-facing text contains an em dash: "{{excerpt}}".',
       why: "The copy guidelines ban em dashes in customer-facing prose.",
-      fix: "Replace the em dash with a comma, a colon, or parentheses.",
+      fix: "Replace the em dash with a comma, a colon, or parentheses. Read the `linting` skill.",
     },
   },
   create(context, _file) {

@@ -131,7 +131,7 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost:
 		s.serveProvider(w, r, path)
 	default:
-		writeError(w, isAnthropic(path), http.StatusMethodNotAllowed, "llmsim answers POST here")
+		writeError(w, providerError{anthropic: isAnthropic(path), status: http.StatusMethodNotAllowed, message: "llmsim answers POST here"})
 	}
 }
 
@@ -142,60 +142,84 @@ func isAnthropic(path string) bool {
 // serveProvider answers one provider call and records it for the console.
 func (s *Server) serveProvider(w http.ResponseWriter, r *http.Request, path string) {
 	started := time.Now()
-	anthropic := isAnthropic(path)
-	rec := record{At: started, Path: path, Dialect: "openai", Status: http.StatusOK}
-	if anthropic {
-		rec.Dialect = "anthropic"
+	pc := &providerCall{w: w, anthropic: isAnthropic(path)}
+	pc.rec = record{At: started, Path: path, Dialect: "openai", Status: http.StatusOK}
+	if pc.anthropic {
+		pc.rec.Dialect = "anthropic"
 	}
 	defer func() {
-		rec.LatencyMs = float64(time.Since(started).Microseconds()) / 1000
-		s.calls.add(rec)
+		pc.rec.LatencyMs = float64(time.Since(started).Microseconds()) / 1000
+		s.calls.add(pc.rec)
 	}()
-	fail := func(status int, message string) {
-		rec.Status, rec.Error = status, message
-		writeError(w, anthropic, status, message)
+	body, ok := s.readProviderBody(pc, r)
+	if !ok {
+		return
 	}
+	s.routeProvider(pc, r, body)
+}
 
-	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+// providerCall is one provider call in flight: its response, its dialect and
+// the record the console shows.
+type providerCall struct {
+	w         http.ResponseWriter
+	anthropic bool
+	rec       record
+}
+
+func (pc *providerCall) fail(status int, message string) {
+	pc.rec.Status, pc.rec.Error = status, message
+	writeError(pc.w, providerError{anthropic: pc.anthropic, status: status, message: message})
+}
+
+// readProviderBody reads the JSON body, refusing it when it does not parse
+// or when the call asked for a forced error.
+func (s *Server) readProviderBody(pc *providerCall, r *http.Request) (map[string]json.RawMessage, bool) {
+	raw, err := io.ReadAll(http.MaxBytesReader(pc.w, r.Body, maxBodyBytes))
 	var body map[string]json.RawMessage
 	if err == nil {
 		err = json.Unmarshal(raw, &body)
 	}
 	if err != nil {
-		fail(http.StatusBadRequest, "request body is not a JSON object: "+err.Error())
-		return
+		pc.fail(http.StatusBadRequest, "request body is not a JSON object: "+err.Error())
+		return nil, false
 	}
-	rec.Request = recordedBody(raw, s.cfg.MaxBodyBytes)
-	rec.Model = str(body["model"])
-	if status := s.forcedStatus(r.Header, rec.Model); status != 0 {
+	pc.rec.Request = recordedBody(raw, s.cfg.MaxBodyBytes)
+	pc.rec.Model = str(body["model"])
+	if status := s.forcedStatus(r.Header, pc.rec.Model); status != 0 {
 		if status == http.StatusTooManyRequests {
-			w.Header().Set("Retry-After", "1")
+			pc.w.Header().Set("Retry-After", "1")
 		}
-		fail(status, fmt.Sprintf("llmsim forced a %d for model %q", status, rec.Model))
-		return
+		pc.fail(status, fmt.Sprintf("llmsim forced a %d for model %q", status, pc.rec.Model))
+		return nil, false
 	}
+	return body, true
+}
 
+// routeProvider answers the call by its path: chat completions, messages,
+// token counts or embeddings.
+func (s *Server) routeProvider(pc *providerCall, r *http.Request, body map[string]json.RawMessage) {
+	w, path := pc.w, pc.rec.Path
 	var req request
 	switch {
 	case strings.HasSuffix(path, "/chat/completions"):
 		req = parseOpenAI(body)
 	case strings.HasSuffix(path, "/messages/count_tokens"):
 		writeJSON(w, map[string]int{"input_tokens": parseAnthropic(body).promptTokens()})
-		rec.Mode = "count_tokens"
+		pc.rec.Mode = "count_tokens"
 		return
 	case strings.HasSuffix(path, "/messages"):
 		req = parseAnthropic(body)
 	case strings.HasSuffix(path, "/embeddings"):
-		rec.Dialect, rec.Mode = "embeddings", "embeddings"
+		pc.rec.Dialect, pc.rec.Mode = "embeddings", "embeddings"
 		writeEmbeddings(w, body)
 		return
 	default:
-		fail(http.StatusNotFound, "llmsim does not serve "+r.URL.Path)
+		pc.fail(http.StatusNotFound, "llmsim does not serve "+r.URL.Path)
 		return
 	}
 	rep := s.answer(r.Header, req)
-	rec.Mode, rec.Stream, rec.InputTokens, rec.OutputTokens, rec.Response = rep.Mode, req.stream, rep.In, rep.Out, &rep
-	if anthropic {
+	pc.rec.Mode, pc.rec.Stream, pc.rec.InputTokens, pc.rec.OutputTokens, pc.rec.Response = rep.Mode, req.stream, rep.In, rep.Out, &rep
+	if pc.anthropic {
 		s.writeAnthropic(w, req, rep)
 	} else {
 		s.writeOpenAI(w, req, rep)
@@ -241,8 +265,17 @@ func (s *Server) rng(h http.Header, req request) *mrand.Rand {
 	return mrand.New(mrand.NewPCG(binary.LittleEndian.Uint64(sum[:8]), binary.LittleEndian.Uint64(sum[8:16])))
 }
 
+// providerError is an error answer: its status, its message, and whether the
+// caller speaks the Anthropic dialect rather than the OpenAI one.
+type providerError struct {
+	anthropic bool
+	status    int
+	message   string
+}
+
 // writeError answers in the caller's own dialect, so its SDK maps the status.
-func writeError(w http.ResponseWriter, anthropic bool, status int, message string) {
+func writeError(w http.ResponseWriter, e providerError) {
+	anthropic, status, message := e.anthropic, e.status, e.message
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	kind := "api_error"

@@ -20,6 +20,7 @@ import {
   type GithubServerConfig,
   githubConfig,
   type GithubRepository,
+  githubSecrets,
   type GithubUsageCount,
   type GithubWebhookEnvelope,
 } from "@langwatch/github-contract";
@@ -29,15 +30,11 @@ import {
 } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
-import { credentialsSecret, Secret, sessionSecret } from "@langwatch/secrets";
 
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
 import { installErrorHtml, installSuccessHtml } from "../rules/github-install-response.rules.ts";
 import { parsePullRequestEvent } from "../rules/github-pull-request-event.rules.ts";
-import type {
-  GithubWebhookDelivery,
-  GithubWebhookReceipt,
-} from "../rules/github-webhook.rules.ts";
+import type { GithubWebhookDelivery, GithubWebhookReceipt } from "../rules/github-webhook.rules.ts";
 import { GithubAppTokenService } from "../services/github-app-token.service.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
 import type { BranchMappingRequest } from "../services/github-branch-demand.service.ts";
@@ -144,7 +141,7 @@ type GithubSetup = FeatureSetup<
 >;
 
 /** What a graph needs beside its rows to answer for a GitHub App. */
-export type GithubComposition = Readonly<{
+type GithubComposition = Readonly<{
   repositories: GithubRepositories;
   organization: OrganizationApiContract;
   project: Pick<ProjectApiContract, "getOrganizationId" | "touchCodingAgentPullRequestSeen">;
@@ -217,13 +214,7 @@ export class GithubModule implements GithubApiContract {
     codingAgents: CodingAgentApi,
   };
   static readonly config = githubConfig;
-  static readonly secrets = {
-    privateKey: Secret.load("GITHUB_LANGY_PRIVATE_KEY", { optional: true }),
-    webhookSecret: Secret.load("GITHUB_LANGY_WEBHOOK_SECRET", { optional: true }),
-    /** Main's install-state key: CREDENTIALS_SECRET, else NEXTAUTH_SECRET. */
-    signingKey: credentialsSecret,
-    signingKeyFallback: sessionSecret,
-  } as const;
+  static readonly secrets = githubSecrets;
 
   readonly #service: GithubFeatureService;
   readonly #branchMaintenance: GithubBranchMaintenance;
@@ -385,9 +376,12 @@ export class GithubModule implements GithubApiContract {
       appId: config.appId ?? "",
       privateKey: await secrets.into(GithubModule.secrets.privateKey, (value) => value ?? ""),
     };
-    const signingKey =
-      (await secrets.into(GithubModule.secrets.signingKey, (value) => value ?? "")) ||
-      (await secrets.into(GithubModule.secrets.signingKeyFallback, (value) => value ?? ""));
+    const signingKey = await secrets.into(GithubModule.secrets.signingKey, (credentials) =>
+      secrets.into(
+        GithubModule.secrets.signingKeyFallback,
+        (session) => credentials || session || "",
+      ),
+    );
     const hostConfig = config.host === undefined ? {} : { hostConfig: { host: config.host } };
 
     return new GithubModule({

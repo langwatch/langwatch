@@ -25,8 +25,13 @@ export {
   formatError,
   ProjectInputMismatchError,
   InvalidApiVersionError,
+  KeyKindRefusedError,
+  MediaTypeMalformedRequestError,
   PayloadTooLargeError,
+  PlatformPermissionDeniedError,
+  PlatformSurfaceHiddenError,
   ScopeInputMismatchError,
+  UnsupportedMediaTypeError,
 } from "./errors.ts";
 
 export type { RateLimiter, ResponseCache, UpgradeHandler } from "./ports.ts";

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -30,7 +31,7 @@ import {
   Users,
   UserX,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api, type RouterOutputs } from "../../../behavior/governance-api.ts";
 import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
@@ -60,7 +61,6 @@ import {
   samplePeopleRows,
 } from "../../../features/people/model/sample-people.ts";
 import { AssignDepartmentDialog } from "../../../features/people/ui/assign-department-dialog.tsx";
-import { CreateDepartmentDrawer } from "../../../features/people/ui/create-department-drawer.tsx";
 import { PeopleFilterBar } from "../../../features/people/ui/people-filter-bar.tsx";
 import {
   departmentNameForActor,
@@ -133,13 +133,27 @@ function usePeopleTab() {
   return { tab, selectTab };
 }
 
-/** `?add=1` on the address asks for the create drawer once, then is cleared, as on main. */
-function useAddDepartmentDeepLink({ canManage, open }: { canManage: boolean; open: () => void }) {
+const ADD_DEPARTMENT_DRAWER = "addDepartment";
+
+/**
+ * `?add=1` on the address asks for the create drawer once and is then cleared; the tab and the
+ * open drawer stay. A reader without the grant has the request cleared and no drawer asked for.
+ */
+function useAddDepartmentDeepLink({ canManage }: { canManage: boolean }) {
   const [searchParams, setSearchParams] = useGovernanceSearchParams();
+  const { openDrawer } = useDrawer();
   const requested = searchParams.get("add") === "1";
+  const drawerOpen = searchParams.get("drawer.open");
+  const asked = useRef(false);
   useEffect(() => {
-    if (!requested) return;
-    if (canManage) open();
+    if (!requested) {
+      asked.current = false;
+      return;
+    }
+    if (canManage && drawerOpen !== ADD_DEPARTMENT_DRAWER && !asked.current) {
+      asked.current = true;
+      openDrawer(ADD_DEPARTMENT_DRAWER);
+    }
     setSearchParams(
       (previous) => {
         const params = new URLSearchParams(previous);
@@ -148,7 +162,7 @@ function useAddDepartmentDeepLink({ canManage, open }: { canManage: boolean; ope
       },
       { replace: true },
     );
-  }, [requested, canManage, open, setSearchParams]);
+  }, [requested, canManage, drawerOpen, openDrawer, setSearchParams]);
 }
 
 const SPEND_SORT_FIELDS: readonly SpendSortField[] = ["spend", "requests", "lastActivity"];
@@ -453,9 +467,8 @@ function PeoplePage() {
   const summary = usePeopleSummary(screen);
 
   const [assigning, setAssigning] = useState<PeopleRow | null>(null);
-  // Local state opens it; `?add=1` opens it too, via the deep-link hook.
-  const [creatingDepartment, setCreatingDepartment] = useState(false);
-  useAddDepartmentDeepLink({ canManage, open: () => setCreatingDepartment(true) });
+  const { openDrawer } = useDrawer();
+  useAddDepartmentDeepLink({ canManage });
 
   return (
     <GovernanceLayout pageTitle="People · AI Governance · LangWatch">
@@ -466,7 +479,7 @@ function PeoplePage() {
         showRunMatch={!bodyOffersMatch}
         isRunningMatch={runMatch.isRunning}
         onRunMatch={runMatch.run}
-        onAddDepartment={() => setCreatingDepartment(true)}
+        onAddDepartment={() => openDrawer(ADD_DEPARTMENT_DRAWER)}
       />
 
       <PageLayout.Container>
@@ -498,13 +511,6 @@ function PeoplePage() {
         open={assigning !== null}
         onClose={() => setAssigning(null)}
         onAssigned={screen.refreshers.refreshAssignments}
-      />
-
-      <CreateDepartmentDrawer
-        organizationId={screen.orgId}
-        open={creatingDepartment}
-        onOpenChange={setCreatingDepartment}
-        onCreated={screen.refreshers.refreshDepartments}
       />
     </GovernanceLayout>
   );

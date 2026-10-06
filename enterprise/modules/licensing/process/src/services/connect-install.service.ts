@@ -17,9 +17,9 @@ import {
   ConnectServiceNotEntitledError,
   DEFAULT_LICENSE_PUBLIC_KEY,
 } from "@langwatch/enterprise-licensing-contract";
+import type { GatewayConnectUpstream } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 
-import type { ConnectUpstreamSlot } from "../app/licensing.members.ts";
 import type { ConnectGatewayChannel } from "../channels/connect-gateway.channel.ts";
 import type {
   ConnectOrganizationRecord,
@@ -32,9 +32,19 @@ import {
 } from "../rules/connect-entitlement.rules.ts";
 import { licenseKeyFingerprint } from "../rules/license-key.rules.ts";
 import type { InstanceIdentityService } from "./instance-identity.service.ts";
+import type { LicenseLogger } from "./license.service.ts";
+
+/** How long the settings read waits for the hosted usage route before showing it unavailable. */
+const USAGE_READ_TIMEOUT_MS = 10_000;
+
+/** Codes that mean LangWatch was not reached; every other refusal is shown as one. */
+const USAGE_UNREACHABLE_CODES: ReadonlySet<string> = new Set([
+  "connect_unreachable",
+  "hosted_service_unavailable",
+]);
 
 /** What a deployment decided about Connect, before any license has its say. */
-export interface ConnectDeployment {
+interface ConnectDeployment {
   /**
    * False only where an operator switched Connect off. True is not a claim that
    * anything is reachable: the license decides that.
@@ -44,7 +54,7 @@ export interface ConnectDeployment {
   readonly licenseEndpoint: string;
 }
 
-export interface ConnectInstallServiceDependencies {
+interface ConnectInstallServiceDependencies {
   readonly organizations: ConnectOrganizationRepository;
   readonly identity: InstanceIdentityService;
   readonly cryptography: LicenseCryptography;
@@ -57,6 +67,8 @@ export interface ConnectInstallServiceDependencies {
   readonly publicKey?: string;
   /** The install gateway's hosted provider slot, where one is composed. */
   readonly upstream?: ConnectUpstreamSlot;
+  /** Where a failed usage read is recorded; absent, it is not. */
+  readonly logger?: LicenseLogger;
 }
 
 /** The hosted service the install's gateway slot serves. */
@@ -180,26 +192,51 @@ export class ConnectInstallService {
 
     const [credential] = await this.findCredential(organizationId);
     if (!credential) {
-      return { ...base, licensed: false, entitledServices: null, usage: null, refusal: null };
+      return {
+        ...base,
+        licensed: false,
+        entitledServices: null,
+        usage: null,
+        refusal: null,
+        isUsageUnavailable: false,
+      };
     }
 
     try {
-      const usage = await this.gateway().usage({ credential });
+      const usage = await this.gateway().usage({
+        credential,
+        signal: AbortSignal.timeout(USAGE_READ_TIMEOUT_MS),
+      });
       return {
         ...base,
         licensed: true,
         entitledServices: usage.services,
         usage,
         refusal: null,
+        isUsageUnavailable: false,
       };
     } catch (error) {
-      if (!HandledError.isHandled(error)) throw error;
+      if (HandledError.isHandled(error) && !USAGE_UNREACHABLE_CODES.has(error.code)) {
+        return {
+          ...base,
+          licensed: true,
+          entitledServices: null,
+          usage: null,
+          refusal: { code: error.code, meta: error.meta },
+          isUsageUnavailable: false,
+        };
+      }
+      this.deps.logger?.error(
+        { error, organizationId },
+        "hosted usage read failed, showing usage as unavailable",
+      );
       return {
         ...base,
         licensed: true,
         entitledServices: null,
         usage: null,
-        refusal: { code: error.code, meta: error.meta },
+        refusal: null,
+        isUsageUnavailable: true,
       };
     }
   }
@@ -344,4 +381,14 @@ function syncOf(organization: ConnectOrganizationRecord | null): ConnectSyncView
     lastSyncAt: organization?.lastSyncAt?.toString() ?? null,
     lastError: organization?.lastSyncError ? { code: organization.lastSyncError } : null,
   };
+}
+
+/**
+ * The hosted provider slot the install's own gateway adds for one organization,
+ * which the gateway owns. Licensing sets it only while managed models may be
+ * reached, and clears it on every other change of license, service or Connect.
+ */
+export interface ConnectUpstreamSlot {
+  set(params: GatewayConnectUpstream): Promise<void>;
+  clear(params: { organizationId: string }): Promise<void>;
 }

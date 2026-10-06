@@ -35,8 +35,8 @@ export const SHARE_LINK_PERMISSION = AUTHZ_SHARE_PERMISSION;
 /** The Grant table's principal and scope vocabularies. Both are the stored
  *  spellings from `@langwatch/authz-contract`, not restatements of them — a kind
  *  added to the vocabulary appears in the column type with no edit here. */
-export type GrantPrincipalTypeDb = StoredPrincipalKind;
-export type GrantScopeTypeDb = StoredScopeTier;
+type GrantPrincipalTypeDb = StoredPrincipalKind;
+type GrantScopeTypeDb = StoredScopeTier;
 
 /** Kept as a name because call sites read better for it; the translation
  *  itself is the vocabulary's, so there is no second table to go stale. */
@@ -49,7 +49,7 @@ const PRINCIPAL_FROM_DB = PRINCIPAL_KIND_FROM_STORED;
  *  `ShareLinkRow.resourceType` in the read port: the stored spelling is the
  *  stored spelling, and the mapping between it and the ledger's lowercase
  *  one lives at exactly one seam. */
-export type GrantResourceKindDb = "TRACE" | "THREAD";
+type GrantResourceKindDb = "TRACE" | "THREAD";
 
 /** The single seam for the ledger's lowercase resource kind ↔ the Grant/
  *  ShareLink tables' uppercase spelling - `authz-read.grants.repository.ts`
@@ -178,7 +178,7 @@ export interface CompatShareLinkRowShape {
  *  so it stays future-head-only. Exported so the read repository's own
  *  (DB-keyed) visibility lookup can be derived from this one rather than
  *  restated - see `SHARE_VISIBILITY_BY_PRINCIPAL_DB` below. */
-export const SHARE_VISIBILITY_BY_PRINCIPAL: Partial<
+const SHARE_VISIBILITY_BY_PRINCIPAL: Partial<
   Record<LedgerPrincipalType, CompatShareLinkRowShape["visibility"]>
 > = {
   anyone: "PUBLIC",
@@ -206,13 +206,13 @@ export const SHARE_VISIBILITY_BY_PRINCIPAL_DB: Record<
  *  `SHARE_VISIBILITY_BY_PRINCIPAL` above. The one seam a share link's
  *  audience translation lives at: the cutover import and the platform's
  *  `LedgerShareRepository` used to carry the same switch independently. */
-export type ShareLinkAudience =
+type ShareLinkAudience =
   | { type: "anyone"; id: null }
   | { type: "organization"; id: string }
   | { type: "project"; id: string };
 
 /** A grant's legacy-table row, or the outcome that the legacy tables cannot hold it. */
-export type CompatProjection<Row> = { kind: "compat"; row: Row } | { kind: "noCompatForm" };
+type CompatProjection<Row> = { kind: "compat"; row: Row } | { kind: "noCompatForm" };
 
 const NO_COMPAT_FORM: { kind: "noCompatForm" } = { kind: "noCompatForm" };
 

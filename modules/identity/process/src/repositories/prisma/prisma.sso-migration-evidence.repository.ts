@@ -8,7 +8,7 @@ import type {
 } from "../sso-migration-evidence.repository.ts";
 
 /** The two models the pair's evidence is read through. */
-export type PrismaSsoMigrationEvidenceDatabase = Pick<
+type PrismaSsoMigrationEvidenceDatabase = Pick<
   PrismaClient,
   "account" | "identifier" | "ssoAuthenticationActivity" | "$queryRaw"
 >;

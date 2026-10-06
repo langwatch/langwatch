@@ -4,11 +4,11 @@ import { IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME } from "../rules/identit
 import type { SsoConnectionGrandfatherService } from "./sso-connection-grandfather.service.ts";
 
 /**
- * D04 — the connection grandfather as the runner sees it (ADR-117 §5): the
- * `SystemMigration` contract over `SsoConnectionGrandfatherService`.
- * Spec: specs/identity/sso-connection-lifecycle.feature.
+ * D04, the connection grandfather as the runner sees it (ADR-117 §5): the `SystemMigration`
+ * contract over `SsoConnectionGrandfatherService`. Tenant = organization; a routing
+ * disagreement holds it, and sign-in never changes either way.
  */
-export class IdentitySsoConnectionGrandfatherMigrationService implements SystemMigration {
+export class IdentityConnectionGrandfatherMigrationService implements SystemMigration {
   // Never rename: the stable state-table key.
   readonly name = IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME;
   readonly title = "Enterprise SSO connection history";
@@ -16,23 +16,16 @@ export class IdentitySsoConnectionGrandfatherMigrationService implements SystemM
     "Records each organization's existing enterprise sign-in setup as " +
     "connection history, and checks that it routes people exactly where the " +
     "current setup does. Sign-in behavior does not change.";
-  // Dark preparation: the connection projection decides nothing until the
-  // routing flag is flipped, so finalizing changes nothing customer-visible.
+  // Dark preparation: the connection projection decides nothing until the routing flag flips.
   readonly requiresOperatorConfirmation = false;
-  // Ships inert on self-hosted until a release flips this after the cloud
-  // rollout has soaked (the in-place doctrine's release act).
-  readonly runsAutomaticallyOnSelfHosted = false;
-  // The soaking posture on cloud, and the same decision as the flag above
-  // for the same reason: this ships dark, so it reaches only the
-  // organizations an operator has enrolled, and the rollout widens
-  // deliberately. A release flips it once the pass has run for the
-  // organizations that existed and must start reaching new ones on its own.
-  readonly enrolledAutomatically = false;
+  // Main: startup runs it on its own, with no enrollment or preparatory release.
+  readonly runsAutomaticallyOnSelfHosted = true;
+  readonly enrolledAutomatically = true;
 
   static create(
     grandfather: Pick<SsoConnectionGrandfatherService, "migrateOrganization">,
-  ): IdentitySsoConnectionGrandfatherMigrationService {
-    return new IdentitySsoConnectionGrandfatherMigrationService(grandfather);
+  ): IdentityConnectionGrandfatherMigrationService {
+    return new IdentityConnectionGrandfatherMigrationService(grandfather);
   }
 
   private constructor(
@@ -40,10 +33,7 @@ export class IdentitySsoConnectionGrandfatherMigrationService implements SystemM
   ) {}
 
   async migrateTenant({ tenantId }: { tenantId: string }): Promise<TenantMigrationOutcome> {
-    // Nothing here consults `previous`: the pass re-derives the same command
-    // id from the organization and the guard states nothing for a connection
-    // that already exists, so there is no partial state a failed pass could
-    // leave behind that a full pass does not redo.
+    // The pass re-derives the same command id per organization, so a repeat is a no-op.
     return this.grandfather.migrateOrganization({ organizationId: tenantId });
   }
 }

@@ -12,13 +12,6 @@ import {
   PersonalWorkspaceNotManagedHereError,
 } from "@langwatch/organization-contract";
 
-import {
-  type OrganizationGrantCache,
-  type OrganizationPromptSeed,
-  type OrganizationSeatLicense,
-  type OrganizationSessionRevocation,
-  type OrganizationPlanUser,
-} from "../app/organization.members.ts";
 import type {
   OrganizationMembershipRepository,
   UpdateMemberRoleResult,
@@ -34,6 +27,27 @@ import type {
   OrganizationGrantCeilingService,
   OrganizationIntendedGrant,
 } from "./organization-grant-ceiling.service.ts";
+import type { OrganizationPromptSeed } from "./organization-prompt-seed.service.ts";
+import type {
+  OrganizationSeatLicense,
+  OrganizationPlanUser,
+} from "./organization-seat-license.service.ts";
+
+/**
+ * The live browser sessions a revoked seat has to lose — not optional decoration, since a
+ * seat revoked without the session revoked leaves the person working until the token expires.
+ */
+export interface OrganizationSessionRevocation {
+  revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
+}
+
+/**
+ * The authorization snapshots cached for one organization. Disabling a membership is a plain
+ * column write, not a grant write, so nothing else retires those snapshots.
+ */
+export interface OrganizationGrantCache {
+  invalidateOrganization(input: { organizationId: string }): Promise<void>;
+}
 
 /**
  * The union of permissions granted by the custom roles behind these team bindings, empty

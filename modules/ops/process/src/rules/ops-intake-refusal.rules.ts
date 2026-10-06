@@ -36,12 +36,19 @@ export function bugReportRefusal(failure: Error): OpsDoorRefusal {
   return { status, body: { error: "Invalid report", details: { formErrors, fieldErrors } } };
 }
 
+/** The name the EXPLAIN route's bearer door refuses under. */
+export const OPS_OPERATOR_DOOR = "ops-operator";
+
 /**
  * An operator EXPLAIN refusal in the `{ message }` the operator tool parses:
  * the first failing field prefixes its message, as main's `path: message` did.
+ * Every refusal of the door, an unset or blank secret's included, is main's 401.
  */
 export function operatorExplainRefusal(failure: Error): OpsDoorRefusal {
   if (!HandledError.isHandled(failure)) return { status: 500, body: UNHANDLED };
+  if (failure.meta.surface === OPS_OPERATOR_DOOR) {
+    return { status: 401, body: { message: "Unauthorized" } };
+  }
 
   const status = (failure.httpStatus ?? 500) >= 400 ? (failure.httpStatus ?? 500) : 500;
   if (failure.code === "malformed_request") {

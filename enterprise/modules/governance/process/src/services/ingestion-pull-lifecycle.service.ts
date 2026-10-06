@@ -1,16 +1,34 @@
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 
 import type {
-  GovernanceDiagnosticsSink,
-  IngestionPullLifecycleChannel,
-  IngestionPullTenantResolver,
-} from "../app/governance.members.ts";
-import { silentGovernanceDiagnostics } from "../app/governance.members.ts";
-import type {
   IngestionPullLifecycleRepository,
   IngestionPullLifecycleSource,
 } from "../repositories/ingestion-pull-lifecycle.repository.ts";
 import { schedulerWillPull } from "../rules/pull-schedule.rules.ts";
+import type { GovernanceDiagnosticsSink } from "./governance-policy.service.ts";
+import { silentGovernanceDiagnostics } from "./governance-policy.service.ts";
+
+export interface IngestionPullTenantResolver {
+  resolveTenantId(organizationId: string): Promise<string>;
+}
+
+export interface IngestionPullLifecycleChannel {
+  configure(input: {
+    tenantId: string;
+    occurredAt: number;
+    sourceId: string;
+    cron: string;
+    configVersion: string;
+    cursor: string | null;
+  }): Promise<void>;
+
+  disable(input: {
+    tenantId: string;
+    occurredAt: number;
+    sourceId: string;
+    configVersion: string;
+  }): Promise<void>;
+}
 
 export class IngestionPullLifecycleService {
   private readonly repository: IngestionPullLifecycleRepository;

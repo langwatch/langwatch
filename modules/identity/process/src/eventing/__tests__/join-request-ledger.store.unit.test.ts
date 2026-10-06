@@ -18,7 +18,10 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { IdentityEventing, IdentityPipelineCommand } from "../../app/identity.members.ts";
+import type {
+  IdentityEventing,
+  IdentityPipelineCommand,
+} from "../identity-command-senders.store.ts";
 import { JoinRequestLedgerStore } from "../join-request-ledger.store.ts";
 import type { JoinRequestFoldState } from "../join-request-state.projection.ts";
 

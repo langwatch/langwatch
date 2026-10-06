@@ -1,5 +1,4 @@
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
-import type { UiSlotProps } from "@langwatch/browser-host/slots";
 import { Dialog } from "@langwatch/design-system/dialog";
 import {
   Box,
@@ -10,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import type { SeatProrationPreviewProps } from "@langwatch/enterprise-billing-contract";
 import { Crown } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
@@ -114,15 +114,11 @@ function PreviewBody({
 }
 
 /**
- * What a seat change costs, and the button that confirms it. Fills the
- * upgrade dialog's `seatProrationPreview` slot — licensing owns the dialog,
+ * What a seat change costs, and the button that confirms it. Lent to the
+ * upgrade dialog by `SeatProrationPreviewToken` — licensing owns the dialog,
  * billing the price. specs/licensing/proration-preview.feature.
  */
-export function SeatProrationPreview({
-  variant,
-  open,
-  onClose,
-}: UiSlotProps["seatProrationPreview"]) {
+export function SeatProrationPreview({ variant, open, onClose }: SeatProrationPreviewProps) {
   const [isConfirming, setIsConfirming] = useState(false);
 
   const preview = billingApi.subscription.previewProration.useQuery(

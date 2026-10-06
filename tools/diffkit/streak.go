@@ -35,6 +35,7 @@ type Streak struct {
 	tripped *Stopped
 }
 
+// NewStreak returns a Streak that trips after limit consecutive harness errors.
 func NewStreak(limit int) *Streak {
 	return &Streak{limit: limit, causes: map[string]int{}}
 }

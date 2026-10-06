@@ -6,6 +6,7 @@ import { CustomRoleIdRequiredError } from "@langwatch/authz-contract";
 import type { OrganizationUserRole } from "@langwatch/organization-contract";
 import {
   CustomRoleNotAssignableError,
+  DeveloperSeatNoSharedAccessError,
   TeamNotInOrganizationError,
   TeamUserRole,
 } from "@langwatch/organization-contract";
@@ -19,7 +20,10 @@ import {
   type InviteTeamsResolution,
   type TeamAssignmentInput,
 } from "../rules/invite-contracts.rules.ts";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
+import {
+  holdsSharedAccess,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "../rules/member-role-constraints.rules.ts";
 
 export class InviteTeamAssignmentService {
   static create(deps: InviteServiceDependencies): InviteTeamAssignmentService {
@@ -60,6 +64,13 @@ export class InviteTeamAssignmentService {
     invite: CreateInvitesInviteInput;
     isStrict: boolean;
   }): Promise<InviteTeamsResolution> {
+    // A Developer is invited onto no team; every other seat still names one (ADR-171).
+    if (!holdsSharedAccess(invite.role)) {
+      if ((invite.teams?.length ?? 0) > 0 || invite.teamIds?.trim()) {
+        throw new DeveloperSeatNoSharedAccessError();
+      }
+      return { kind: "teams", teamAssignments: [], teamIdsString: "" };
+    }
     if (invite.teams && invite.teams.length > 0) {
       return this.resolveExplicitInviteTeams({
         organizationId,

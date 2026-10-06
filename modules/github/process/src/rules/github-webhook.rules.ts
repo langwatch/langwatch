@@ -23,7 +23,7 @@ export type GithubWebhookDelivery = {
 };
 
 /** X-Hub-Signature-256 over the exact bytes GitHub sent, compared in constant time. */
-export function isGithubWebhookSignatureValid({
+function isGithubWebhookSignatureValid({
   rawBody,
   signature,
   secret,

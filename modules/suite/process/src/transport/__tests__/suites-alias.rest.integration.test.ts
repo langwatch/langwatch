@@ -52,6 +52,36 @@ describe("given the project holds one run plan", () => {
   });
 });
 
+describe("given a create body carrying fields the alias does not have", () => {
+  const createScheduled = (world: ReturnType<typeof mountSuiteFamilies>["world"]) => ({
+    name: "Nightly Plan",
+    scenarioIds: [world.addScenario().id],
+    targets: [{ type: "http", referenceId: world.addAgent().id }],
+    schedule: "0 2 * * *",
+    cron: "0 2 * * *",
+  });
+
+  it("answers 422 validation_error naming the fields", async () => {
+    const { api, world } = mountSuiteFamilies();
+
+    const response = await api.post(BASE, createScheduled(world));
+
+    expect(response.status).toBe(422);
+    const body = await response.text();
+    expect(JSON.parse(body)).toMatchObject({ code: "validation_error" });
+    expect(body).toContain("schedule");
+    expect(body).toContain("cron");
+  });
+
+  it("stores no run plan", async () => {
+    const { api, world } = mountSuiteFamilies();
+
+    await api.post(BASE, createScheduled(world));
+
+    expect([...world.plans.values()].some((plan) => plan.name === "Nightly Plan")).toBe(false);
+  });
+});
+
 describe("given a suite id the project does not hold", () => {
   /** @scenario "A refused suites request still carries the deprecation headers" */
   it("names its successor on the refusal too", async () => {

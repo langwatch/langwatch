@@ -1,3 +1,7 @@
+# Untagged scenarios below are @unimplemented: they describe the v0 mocked dashboard (summary cards, By user,
+# anomaly and ingestion strips, Preview badge). The overview screen that replaced it is covered by other specs;
+# no test asserts these rows, and the permission copy and heading differ from the current screens.
+
 Feature: AI Gateway Governance — Admin Oversight Dashboard
   As an organization admin (Persona 3 from gateway.md), I need a single
   page that gives me a bird's-eye view of every AI agent / IDE tool /
@@ -31,7 +35,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
   # Page scaffold + permission gate
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @admin-oversight @permission
+  @bdd @ui @admin-oversight @permission @unimplemented
   Scenario: A user without the governance read grant is refused the dashboard
     # The page gate is `governance:view`, the same grant the Governance
     # product is offered on. Delegation of the panels inside it is covered by
@@ -42,7 +46,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
     Then she is shown the existing settings-permission "Access Restricted"
       page
 
-  @bdd @ui @admin-oversight @permission
+  @bdd @ui @admin-oversight @permission @unimplemented
   Scenario: An org admin reaches the dashboard
     When the admin navigates to "/governance"
     Then the page renders with the heading "Governance Overview"
@@ -60,14 +64,14 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
   # Top summary cards (cross-cutting org totals)
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @admin-oversight @summary
+  @bdd @ui @admin-oversight @summary @unimplemented
   Scenario: Top of the page shows three org-wide summary cards
     When the dashboard renders for an org with traffic
     Then there is a "Spent this month" card with USD total + month-over-month delta
     And a "Active AI users this month" card with count + new-users-this-week sub-line
     And a "Anomaly alerts (open)" card with count + severity breakdown
 
-  @bdd @ui @admin-oversight @summary @empty
+  @bdd @ui @admin-oversight @summary @empty @unimplemented
   Scenario: Empty-state copy when no traffic this month
     Given the organization has zero traces / no ingestion sources / no
       personal VKs issued yet
@@ -84,7 +88,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
   # Per-user breakdown
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @admin-oversight @per-user
+  @bdd @ui @admin-oversight @per-user @unimplemented
   Scenario: A "By user" section lists every user's AI spend this month
     When the dashboard renders for an org with N active users
     Then a "By user" section shows a table of:
@@ -99,7 +103,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
       "/governance/users/<userId>" (route wiring follows in a
       sibling slice; v0 link can be a no-op)
 
-  @bdd @ui @admin-oversight @per-user @permissions
+  @bdd @ui @admin-oversight @per-user @permissions @unimplemented
   Scenario: Per-user rows respect the admin's RBAC scope
     Given the admin has "activityMonitor:view" but only on org "acme"
     When the dashboard renders
@@ -111,7 +115,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
   # Anomaly alerts list
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @admin-oversight @anomalies
+  @bdd @ui @admin-oversight @anomalies @unimplemented
   Scenario: An "Active anomaly alerts" section lists open alerts (newest first)
     When the dashboard renders for an org with K open alerts
     Then a section shows the alerts in a list, newest first, each with:
@@ -124,7 +128,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
     And each alert has an "Investigate" link that opens the alert detail
       drawer (drawer wiring follows in a sibling slice; v0 can be a no-op)
 
-  @bdd @ui @admin-oversight @anomalies @empty
+  @bdd @ui @admin-oversight @anomalies @empty @unimplemented
   Scenario: Empty-state for anomalies
     Given there are no open alerts
     When the dashboard renders
@@ -135,7 +139,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
   # IngestionSource health strip
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @admin-oversight @ingestion-health
+  @bdd @ui @admin-oversight @ingestion-health @unimplemented
   Scenario: A "Ingestion sources" health strip shows status of each
     Given the org has IngestionSources configured
     When the dashboard renders
@@ -149,7 +153,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
       "/governance/inventory/<sourceId>" (link wiring
       follows in a sibling slice)
 
-  @bdd @ui @admin-oversight @ingestion-health @empty
+  @bdd @ui @admin-oversight @ingestion-health @empty @unimplemented
   Scenario: Empty-state when no IngestionSources are configured yet
     Given the org has zero IngestionSources
     When the dashboard renders
@@ -161,7 +165,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
   # Mocked-data caveat (for v0; real-data wire-up follows D2)
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @admin-oversight @mocked-v0
+  @bdd @ui @admin-oversight @mocked-v0 @unimplemented
   Scenario: v0 ships with deterministic mock data (admins see a "Preview" badge)
     When the dashboard renders in v0 (release_ui_ai_governance_enabled is
       on but the backend D2 aggregation queries don't exist yet)
@@ -176,14 +180,14 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
   # Accessibility
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @admin-oversight @a11y
+  @bdd @ui @admin-oversight @a11y @unimplemented
   Scenario: All interactive elements are keyboard-operable
     When the admin tabs through the page
     Then every card / row link / chip can receive focus
     And focus rings are visible
     And screen readers announce section headings as <h2>
 
-  @bdd @ui @admin-oversight @a11y
+  @bdd @ui @admin-oversight @a11y @unimplemented
   Scenario: The anomaly section uses aria-live="polite"
     Given the admin keeps the page open while an alert fires server-side
     When the new alert arrives via tRPC poll / websocket (future iter)

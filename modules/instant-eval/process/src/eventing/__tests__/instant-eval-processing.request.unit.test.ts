@@ -2,7 +2,7 @@
  * The start of the loop: what a requested run asks for, what a plan turns into,
  * and what the payload view carries into either. Pure state logic, so every
  * case here is one input against one state.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {

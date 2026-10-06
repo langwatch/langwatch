@@ -18,15 +18,17 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  type TraceEvaluationDispatch,
-  type TraceEvaluationLoopMetrics,
-  type TraceEvaluationLoopBlockReason,
-  type TraceEvaluationMonitor,
-} from "../../app/trace.members.ts";
 import { TraceAttributeAccumulationService } from "../../services/trace-attribute-accumulation.service.ts";
+import type {
+  TraceEvaluationLoopMetrics,
+  TraceEvaluationLoopBlockReason,
+} from "../../services/trace-evaluation-loop-metrics.service.ts";
 import { TraceOriginService } from "../../services/trace-origin.service.ts";
 import { needsOriginResolution } from "../deferred-origin.process.ts";
+import type {
+  TraceEvaluationDispatch,
+  TraceEvaluationMonitor,
+} from "../evaluation-trigger.subscriber.ts";
 import {
   createEvaluationTriggerSubscriber,
   detectCausalityLoop,
@@ -723,6 +725,22 @@ describe("createEvaluationTriggerSubscriber — the deferred-origin loop guard",
     const state = foldState({
       attributes: {
         "langwatch.origin": "evaluation",
+        "langwatch.reserved.causality_depth": "1",
+      },
+    });
+
+    await run(built, originResolvedEvent(), state);
+
+    expect(dispatch.sent).toEqual([]);
+    expect(metrics.blocked).toEqual(["depth_fold"]);
+  });
+
+  /** @scenario "A manual evaluation run marks the customer trace it ran against" */
+  it("skips a customer-origin trace once the evaluator's own spans folded a depth into it", async () => {
+    const { built, dispatch, metrics } = subscriber({});
+    const state = foldState({
+      attributes: {
+        "langwatch.origin": "application",
         "langwatch.reserved.causality_depth": "1",
       },
     });

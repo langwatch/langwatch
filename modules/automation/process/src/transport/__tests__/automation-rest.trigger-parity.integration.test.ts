@@ -396,4 +396,56 @@ describe("Feature: automations over the public API express what the dashboard ex
       expect(await response.json()).toMatchObject({ code: "trigger_kind_immutable" });
     });
   });
+
+  describe("when an update names a graph for an alert", () => {
+    const alertRow = triggerRow({
+      id: "alert_1",
+      action: TriggerAction.SEND_EMAIL,
+      triggerKind: "ALERT",
+      customGraphId: "graph_1",
+      actionParams: { members: ["a@example.com"], ...rule },
+    });
+    const patchAlert = (body: Record<string, unknown>) =>
+      createPublicApiRig({ rows: [alertRow, emailRow] }).api.patch("/api/triggers/alert_1", body);
+
+    it("refuses a different graph rather than ignoring the field", async () => {
+      const response = await patchAlert({ customGraphId: "graph_2" });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "trigger_graph_immutable" });
+    });
+
+    it("accepts the graph it already watches, so a read can be written back", async () => {
+      const response = await patchAlert({ customGraphId: "graph_1", name: "Renamed" });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ customGraphId: "graph_1", name: "Renamed" });
+    });
+
+    it("refuses clearing the graph of an alert as a change of kind", async () => {
+      const response = await patchAlert({ customGraphId: null });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "trigger_kind_immutable" });
+    });
+
+    it("refuses a graph on an automation that is not an alert", async () => {
+      const response = await createPublicApiRig({ rows: [emailRow] }).api.patch(
+        "/api/triggers/trigger_1",
+        { customGraphId: "graph_1" },
+      );
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "trigger_kind_immutable" });
+    });
+
+    it("accepts the null a trace automation reads back with", async () => {
+      const response = await createPublicApiRig({ rows: [emailRow] }).api.patch(
+        "/api/triggers/trigger_1",
+        { customGraphId: null },
+      );
+
+      expect(response.status).toBe(200);
+    });
+  });
 });

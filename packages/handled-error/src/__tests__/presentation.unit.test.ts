@@ -285,6 +285,28 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("given a cap above the contract maximum", () => {
+    it("names the maximum the server sent", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "connect_budget_above_contract_maximum",
+          httpStatus: 400,
+          meta: { maximumUsd: 5000 },
+        }),
+      );
+
+      expect(description).toContain("The highest cap you can set is 5000.00 USD");
+    });
+
+    it("still points at LangWatch when the server sent no maximum", () => {
+      const { description } = explainHandledError(
+        shape({ code: "connect_budget_above_contract_maximum", httpStatus: 400 }),
+      );
+
+      expect(description).toBe("Contact LangWatch to raise the maximum.");
+    });
+  });
+
   describe("given a deployment whose dataset storage is not writable", () => {
     /** @scenario The customer reads copy written for the code */
     it("says nothing was saved and that an administrator has to act", () => {
@@ -390,6 +412,12 @@ describe("explainHandledError", () => {
       expect(title).toBe("Something went wrong on our end");
       expect(isRegistered).toBe(false);
     });
+
+    it("titles a presumed platform fault as ours", () => {
+      const { title } = explainHandledError(shape({ code: "", fault: "presumed_platform" }));
+
+      expect(title).toBe("Something went wrong on our end");
+    });
   });
 
   describe("given a mediated LLM call the gateway forwarded from a provider", () => {
@@ -408,6 +436,40 @@ describe("explainHandledError", () => {
         expect(description).toContain("key or its permissions");
       },
     );
+
+    /** @scenario "A provider's own access code reads as a refused credential" */
+    it.each([
+      "access_denied",
+      "permission_denied_error",
+      "authentication_error",
+      "permission_error",
+      "invalid_api_key",
+      "AccessDeniedException",
+    ])("explains the provider's own %s code as a refused credential", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toBe(
+        "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",
+      );
+    });
+
+    /** @scenario "A provider that does not know the model gets its own remediation copy" */
+    it.each([
+      "upstream_not_found",
+      "model_not_found",
+      "not_found_error",
+      "ResourceNotFoundException",
+    ])("explains a %s reason as a model the provider does not serve", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toBe(
+        "The model provider does not serve this model to this key. Check the model name, or pick a different model.",
+      );
+    });
 
     /** @scenario "A provider's own access code reads as a refused credential" */
     it.each([

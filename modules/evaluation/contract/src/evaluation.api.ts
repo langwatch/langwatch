@@ -38,12 +38,14 @@ import type {
   EvaluationRunLookup,
   EvaluationRunsByTraceQuery,
   EvaluationSummariesByTraceIdsQuery,
+  EvaluatorEffectiveSettingsQuery,
   TraceEvaluationsQuery,
 } from "./evaluation.queries.ts";
 import type {
   EvaluationRunOutcome,
   EvaluationWarmup,
   EvaluatorCatalogue,
+  EvaluatorEffectiveSettings,
 } from "./evaluation.responses.ts";
 import type {
   EvaluationExecutionResult,
@@ -93,6 +95,10 @@ export interface EvaluationApi {
   checkGuardrail(input: GuardrailCheckInput): Promise<GuardrailCheckOutcome>;
   /** One saved evaluator, ready to run; throws when no evaluator answers to it. */
   resolveSavedEvaluator(input: SavedEvaluatorLookup): Promise<SavedEvaluatorResolution>;
+  /** The settings a run would use for an evaluator and a monitor's parameters, flag included. */
+  getEvaluatorEffectiveSettings(
+    input: EvaluatorEffectiveSettingsQuery,
+  ): Promise<EvaluatorEffectiveSettings>;
   /** One monitor by slug, or null. */
   findMonitorBySlug(input: EvaluationSlugLookup): Promise<EvaluationMonitorSummary | null>;
   /** One dataset by slug, or null. */

@@ -5,7 +5,7 @@ Feature: Design system foundations and boundary
   I want one typed and accessible LangWatch design system
   So that feature packages render consistently without importing the app
 
-  @architecture @typecheck
+  @architecture @typecheck @unit
   Scenario: The design system is browser safe
     Given a consumer imports @langwatch/design-system
     Then its graph contains Chakra, React and approved browser dependencies
@@ -33,7 +33,7 @@ Feature: Design system foundations and boundary
     Then that composed system is used
     And no nested provider replaces it with Chakra's default system
 
-  @typecheck @architecture
+  @typecheck @architecture @unit
   Scenario: Only deliberate component entry points are importable
     Given a consumer imports a supported design-system component
     Then the component is available from its named package export

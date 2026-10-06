@@ -8,7 +8,7 @@ export const MATCH_EVIDENCE_KIND = {
   HUMAN_CONFIRMED: "human_confirmed",
 } as const;
 
-export type MatchEvidenceKind = (typeof MATCH_EVIDENCE_KIND)[keyof typeof MATCH_EVIDENCE_KIND];
+type MatchEvidenceKind = (typeof MATCH_EVIDENCE_KIND)[keyof typeof MATCH_EVIDENCE_KIND];
 
 /** Why automatic linking halted for a person; stored on the person so a recompute cannot clear it. */
 export const MATCH_SUSPENSION_REASON = {
@@ -17,10 +17,9 @@ export const MATCH_SUSPENSION_REASON = {
   CONTRADICTS_OPEN_LINK: "contradicts_open_link",
 } as const;
 
-export type MatchSuspensionReason =
-  (typeof MATCH_SUSPENSION_REASON)[keyof typeof MATCH_SUSPENSION_REASON];
+type MatchSuspensionReason = (typeof MATCH_SUSPENSION_REASON)[keyof typeof MATCH_SUSPENSION_REASON];
 
-export interface DiscoveredIdentity {
+interface DiscoveredIdentity {
   rawActorId: string;
   displayText: string;
   openLinkUserId?: string | null;
@@ -32,23 +31,23 @@ export interface OrganizationAccountIndex {
   usersByDirectoryId: ReadonlyMap<string, readonly string[]>;
 }
 
-export interface AutoLinkDecision {
+interface AutoLinkDecision {
   outcome: "link";
   userId: string;
   evidenceKind: MatchEvidenceKind;
 }
 
-export interface SuspendDecision {
+interface SuspendDecision {
   outcome: "suspend";
   reason: MatchSuspensionReason;
   candidateUserIds: string[];
 }
 
-export interface NoActionDecision {
+interface NoActionDecision {
   outcome: "no_action";
 }
 
-export type MatchDecision = AutoLinkDecision | SuspendDecision | NoActionDecision;
+type MatchDecision = AutoLinkDecision | SuspendDecision | NoActionDecision;
 
 /** A bare address, lowercased and trimmed; anything else (a display form, an opaque id) is none. */
 export function normalizeEmail(text: string): string | null {

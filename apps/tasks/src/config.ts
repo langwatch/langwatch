@@ -6,12 +6,9 @@ import {
   type ConfigOf,
 } from "@langwatch/config";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { storesOwner } from "@langwatch/process-stores/config";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { Secret, type SecretsChain } from "@langwatch/secrets";
 import { z } from "zod";
-
-import type { SystemMigrationsDataplane } from "./system-migrations-dataplane.ts";
 
 /** The migration runner's own controls. Connection strings are not among them. */
 export const tasksConfig = Config.define((c) => ({
@@ -21,19 +18,20 @@ export const tasksConfig = Config.define((c) => ({
   nodeEnvironment: c.env("NODE_ENV", nodeEnvironmentSchema),
   /** Routing, not a secret: which 1Password account the secrets chain asks. */
   onePasswordAccount: c.env("LANGWATCH_OP_ACCOUNT", z.string().optional()),
+  /** Comma-separated plugin task modules a module task's catalogue also loads. */
+  taskModules: c.env("LANGWATCH_TASK_MODULES", z.string().optional()),
 }));
 
 export type TasksConfig = ConfigOf<typeof tasksConfig>;
 
 /**
- * The two connections this runner opens, and the stores' private ClickHouse routes (the same
- * handle). Declared beside the config so one file states everything the deployment supplies;
- * resolved at the boot seam and never handed to a task as a string.
+ * The two connections this runner opens. Declared beside the config so one file states
+ * everything the deployment supplies; resolved at the boot seam and never handed to a task
+ * as a string.
  */
 export const tasksSecrets = {
   databaseUrl: Secret.load("DATABASE_URL", { optional: true }),
   redisUrl: Secret.load("REDIS_URL", { optional: true }),
-  clickhouseRoutes: storesOwner.secrets.clickhouseRoutes,
 } as const;
 
 export function resolveTasksConfig(source: Readonly<Record<string, unknown>>): TasksConfig {
@@ -68,8 +66,6 @@ export interface TasksDatabase {
 export interface TaskConnections {
   readonly database: TasksDatabase | null;
   readonly redis: RedisConnection | null;
-  /** Which organizations have their own ClickHouse; opened only for the tasks that read it. */
-  readonly dataplane: SystemMigrationsDataplane | null;
 }
 
 export interface TaskInput {

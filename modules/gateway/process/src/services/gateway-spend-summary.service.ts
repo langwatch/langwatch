@@ -12,7 +12,7 @@ import {
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
 
 type GatewayUsageTraces = Pick<
   TraceApi,
@@ -55,7 +55,7 @@ const RECENT_DEBITS_LIMIT = 20;
 export class GatewayUsageService {
   private readonly projects: GatewayUsageProjects;
   private readonly virtualKeys: GatewayUsageVirtualKeys;
-  private readonly chRepo?: GatewayBudgetSpend;
+  private readonly chRepo?: GatewayBudgetSpendRepository;
   private readonly traces: GatewayUsageTraces;
 
   private constructor({
@@ -66,7 +66,7 @@ export class GatewayUsageService {
   }: {
     projects: GatewayUsageProjects;
     virtualKeys: GatewayUsageVirtualKeys;
-    chRepo?: GatewayBudgetSpend;
+    chRepo?: GatewayBudgetSpendRepository;
     traces: GatewayUsageTraces;
   }) {
     this.projects = projects;
@@ -83,7 +83,7 @@ export class GatewayUsageService {
   static create(args: {
     projects: GatewayUsageProjects;
     virtualKeys: GatewayUsageVirtualKeys;
-    chRepo: GatewayBudgetSpend | undefined;
+    chRepo: GatewayBudgetSpendRepository | undefined;
     traces: GatewayUsageTraces;
   }): GatewayUsageService {
     return new GatewayUsageService({

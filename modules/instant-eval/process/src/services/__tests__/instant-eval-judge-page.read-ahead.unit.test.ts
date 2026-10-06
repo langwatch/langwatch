@@ -1,7 +1,7 @@
 /**
  * The next page of a run, read while the current one is judged, and handed to
  * the intent that asks for it so it is read once.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {
@@ -12,8 +12,8 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { instantEvalRunRow } from "../../__tests__/instant-eval.fixtures.ts";
-import type { InstantEvalCancellationChannel } from "../../channels/instant-eval-cancellation.channel.ts";
 import type { InstantEvalJudgeChannel } from "../../channels/instant-eval-judge.channel.ts";
+import type { InstantEvalCancellationRepository } from "../../repositories/instant-eval-cancellation.repository.ts";
 import { MemoryInstantEvalRunRepository } from "../../repositories/memory/memory.instant-eval-run.repository.ts";
 import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 import type {
@@ -107,7 +107,7 @@ class GatedJudge implements InstantEvalJudgeChannel {
   }
 }
 
-class Cancellation implements InstantEvalCancellationChannel {
+class Cancellation implements InstantEvalCancellationRepository {
   isCancelled = false;
 
   async request(): Promise<void> {

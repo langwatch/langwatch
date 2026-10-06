@@ -69,7 +69,7 @@ export function betterAuthTransportFor(
       applyPendingInvite: async () => ({ applied: false }),
     },
     announcements: {
-      trackServerEvent: () => undefined,
+      signUpNurturing: () => undefined,
       reportError: () => undefined,
       announceSignup: () => undefined,
       ssoAutoAddNurturing: () => undefined,

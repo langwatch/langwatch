@@ -21,7 +21,7 @@ export function isReportNumber(value: unknown): value is number {
 }
 
 /** What one report says about its install, each field null where it said nothing usable. */
-export type ReportFields = Readonly<{
+type ReportFields = Readonly<{
   version: string | null;
   installMethod: string | null;
   chartVersion: string | null;

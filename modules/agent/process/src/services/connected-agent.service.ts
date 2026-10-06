@@ -25,7 +25,7 @@ import { ConnectedAgentPresenceService } from "./connected-agent-presence.servic
 import { ConnectedAgentRuntimeService } from "./connected-agent-runtime.service.ts";
 import { AgentSessionService } from "./connected-agent-session.service.ts";
 
-export type ConnectedAgentOptions = {
+type ConnectedAgentOptions = {
   agents: AgentService;
   apiKeys: ApiKeyApi;
   authz: AuthzApi;

@@ -58,7 +58,7 @@ export function deliveryEventType(status: DeliverPayload["status"]): string {
 /** Every outcome fills the same deliver payload. Fields an outcome does
  *  not carry stay at the log's empty values, so the envelope mapper never
  *  special-cases a missing one. */
-export function deliverPayloadFor(
+function deliverPayloadFor(
   outcome: Pick<DeliverPayload, "status" | "gateway_request_id" | "occurred_at"> &
     Partial<DeliverPayload>,
   instance: DeliverInstance,

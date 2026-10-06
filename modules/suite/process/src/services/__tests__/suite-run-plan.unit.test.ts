@@ -1,5 +1,6 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import {
@@ -104,6 +105,7 @@ function buildService(overrides: {
   });
 
   const service = SuiteService.create({
+    featureFlags: createApiFixture<FeatureFlagApi>({}),
     repository,
     scenarios,
     agents,

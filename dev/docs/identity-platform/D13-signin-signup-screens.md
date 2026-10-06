@@ -2,6 +2,12 @@
 
 Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 (identifier model); flips with D03 (same flag: `IDENTITY_ROUTER_V2`)
 
+> **Historical (marked 2026-10-05):** written against main's monolith, before `platform/app` was
+> deleted. Paths under `src/server/`, `server/app-layer/` and `packages/authz*` describe that tree.
+> Today a feature is a module (ARCHITECTURE.md §3), pipelines are `definePipeline` in
+> `modules/<name>/process/src/eventing` (§9), and the permission registry is
+> `packages/authorization/src/registry.ts`. Check the current tree before treating a path below as live.
+
 # Overview
 
 Auth0 owned the auth-screen visuals; retiring it means every screen an unauthenticated person can touch must be rebuilt first-party. This deliverable is that screen set: sign-in, sign-up, method picker, password reset, email verification, and every deny/guidance state — designed as one experience, shipped behind the router flag, with the hook points D06/D07/D12 later fill. It also moves the join-your-team decision to **before** workspace creation, which is where orphaned organizations stop being minted.

@@ -6,8 +6,9 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import { uiSlots } from "@langwatch/browser-host/slots";
+import { uiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
@@ -73,17 +74,25 @@ export class FakeAuthzHost extends AuthzHostApi {
 }
 
 /** Renders a screen inside the Design System's provider and a host. */
-/**
- * Fills the sales slot the way the browser app does; screens under test
- * only ask for the block by name.
- */
-const filledSlots = {
+/** Billing lends the sales card by token, as its declaration does in the browser app. */
+const billingLendsContactSales = {
   ...createUiCapabilitiesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),
-  slots: uiSlots({
-    components: {
-      contactSales: () => <div data-testid="contact-sales-block">Need more?</div>,
+  declarations: uiDeclarations([
+    {
+      name: "billing",
+      installation: {
+        capabilities: {},
+        lends: [
+          {
+            token: ContactSalesToken,
+            load: async () => ({
+              default: () => <div data-testid="contact-sales-block">Need more?</div>,
+            }),
+          },
+        ],
+      },
     },
-  }),
+  ]),
 };
 
 export function renderWithAuthzHost(
@@ -94,7 +103,7 @@ export function renderWithAuthzHost(
     host,
     ...render(
       <ChakraProvider value={defaultSystem}>
-        <UiCapabilityContextProvider value={filledSlots}>
+        <UiCapabilityContextProvider value={billingLendsContactSales}>
           <AuthzHostProvider value={host}>{element}</AuthzHostProvider>
         </UiCapabilityContextProvider>
       </ChakraProvider>,

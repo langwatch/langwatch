@@ -93,10 +93,10 @@ describe("the topic tRPC declaration", () => {
     });
 
     /** @scenario "A contract declares a procedure once, in a browser-safe module" */
-    it("value-imports only zod, the contract entry and its own schemas", () => {
+    it("value-imports only zod, the module framework entry and its own schemas", () => {
       for (const specifier of valueImports(sourceOf("contract/src/topic.trpc.ts"))) {
         expect([specifier, "contract/src/topic.trpc.ts"]).toEqual([
-          expect.stringMatching(/^(?:zod|@langwatch\/api\/contract|\.\/)/),
+          expect.stringMatching(/^(?:zod|@langwatch\/module|\.\/)/),
           "contract/src/topic.trpc.ts",
         ]);
       }

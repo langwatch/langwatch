@@ -4,7 +4,7 @@
  * lazy so monaco, shiki and the OTel SDK stay out of the bundle.
  */
 
-import { type ComponentProps, type ComponentType, lazy } from "react";
+import { type ComponentType, lazy } from "react";
 
 /**
  * `ComponentType`, not `FC`: mounted by the host's feature wrapper
@@ -108,35 +108,3 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
     typeof (value as PromiseLike<unknown>).then === "function"
   );
 }
-
-/**
- * A drawer name, as the address bar spells it. Generic over the registry
- * (`useDrawer<typeof installedDrawers>()`) so per-drawer prop checking works
- * even though drawers are composed rather than named by one module.
- */
-export type DrawerTypeOf<R extends UiDrawerRegistry> = keyof R & string;
-
-/** The props of one named drawer in a registry. */
-export type DrawerPropsOf<R extends UiDrawerRegistry, T extends DrawerTypeOf<R>> = ComponentProps<
-  R[T]
->;
-
-/**
- * Only the callback (function) props of one named drawer.
- *
- * Used for type-safe flow callback registration.
- */
-export type DrawerCallbacksOf<R extends UiDrawerRegistry, T extends DrawerTypeOf<R>> = {
-  [
-    K in keyof DrawerPropsOf<R, T> as DrawerPropsOf<R, T>[K] extends
-      | ((...args: never[]) => unknown)
-      | undefined
-      ? K
-      : never
-  ]?: DrawerPropsOf<R, T>[K];
-};
-
-/** Maps drawer names to their callback props. */
-export type FlowCallbacksRegistryOf<R extends UiDrawerRegistry> = {
-  [T in DrawerTypeOf<R>]?: DrawerCallbacksOf<R, T>;
-};

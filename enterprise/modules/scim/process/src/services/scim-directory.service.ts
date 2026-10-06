@@ -178,6 +178,7 @@ export class ScimDirectoryService {
     }
 
     await this.authorizeMembers({
+      organizationId,
       connectionId,
       memberIds: (request.members ?? []).map((member) => member.value),
     });
@@ -225,6 +226,7 @@ export class ScimDirectoryService {
     // A replacement writes to whoever it leaves out as much as to whoever it
     // names, so the members already in the group are authorized too.
     await this.authorizeMembers({
+      organizationId,
       connectionId,
       memberIds: [
         ...(await this.prisma.findGroupMemberIds({ groupId: group.id })),
@@ -266,6 +268,7 @@ export class ScimDirectoryService {
     // Every operation is authorized before any of them is applied: a patch
     // naming one person this directory owns and one it does not writes neither.
     await this.authorizeMembers({
+      organizationId,
       connectionId,
       memberIds: await this.membership.membersTouchedByPatch({
         groupId: group.id,
@@ -300,7 +303,7 @@ export class ScimDirectoryService {
     // Deleting a group unmembers everyone in it, so a directory that does not
     // own one of them may not delete it — asked before anything is written.
     const memberIds = await this.prisma.findGroupMemberIds({ groupId: group.id });
-    await this.authorizeMembers({ connectionId, memberIds });
+    await this.authorizeMembers({ organizationId, connectionId, memberIds });
 
     // The grants the group carried go first and carry instant enforcement:
     // an IdP that deletes a group has taken that access away. Reconciled to
@@ -407,16 +410,18 @@ export class ScimDirectoryService {
 
   /** A scoped connection may only name people its own directory asserted. */
   private async authorizeMembers({
+    organizationId,
     connectionId,
     memberIds,
   }: {
+    organizationId: string;
     connectionId: string | null;
     memberIds: string[];
   }): Promise<void> {
     if (connectionId === null) return;
 
     for (const userId of new Set(memberIds)) {
-      await this.identities.assertWritable({ connectionId, userId });
+      await this.identities.assertWritable({ organizationId, connectionId, userId });
     }
   }
 

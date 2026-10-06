@@ -9,7 +9,7 @@ import type { Event, ProcessManagerApplier } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import { type PulledUsageLedgerRepository } from "../app/governance.members.ts";
+import type { PulledUsageLedgerRepository } from "../repositories/pulled-usage-ledger.repository.ts";
 import {
   filedCellSchema,
   filedCellFor,

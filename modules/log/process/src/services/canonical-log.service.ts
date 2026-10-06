@@ -16,11 +16,20 @@ import { normalizeOtlpAttributeMap } from "@langwatch/otlp";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
-import {
-  type LogPreparer,
-  type LogPreparationInput,
-  type LogRedaction,
-} from "../app/log.members.ts";
+import type { LogPreparationInput, LogPreparer } from "./log.service.ts";
+
+export interface LogRedaction {
+  redactLog(
+    log: {
+      body: string;
+      attributes: Record<string, string>;
+      resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
+    },
+    piiRedactionLevel: LogPiiRedactionLevel,
+    tenantId?: string,
+  ): Promise<void>;
+}
 
 type UnknownRecord = Record<string, unknown>;
 

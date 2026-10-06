@@ -1,7 +1,7 @@
 /**
  * Accepting a run: the row, then the command that starts it. The row first, so
  * a 202 is never followed by a 404; and a failed dispatch fails the row, which
- * nothing else would stall. @see specs/instant-evals/instant-eval-api.feature
+ * nothing else would stall. @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { generate } from "@langwatch/ksuid";

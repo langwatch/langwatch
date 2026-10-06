@@ -11,7 +11,6 @@
   "files": [
     "./src/index.ts",
     "./src/compat/next-dynamic.ts",
-    "./src/slots.tsx",
     "./src/capabilities.ts",
     "./src/use-router.ts",
     "./src/toaster.ts",

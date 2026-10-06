@@ -5,13 +5,13 @@ import type {
 } from "@langwatch/automation-contract";
 import { type Instant } from "@langwatch/time";
 
-import type { AutomationClock } from "../app/automation.members.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import {
   AutomationSettlementLedgerRepository,
   type AutomationSettlementBreach,
   type AutomationSettlementPersistCap,
 } from "../repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationClock } from "../repositories/automation.repositories.ts";
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import { decidePersistCap } from "../rules/persist-cap.rules.ts";

@@ -30,9 +30,9 @@ import {
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
+import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { FilterSidebarSkeleton } from "../../../elements/explorer/filter-sidebar/filter-sidebar-skeleton.tsx";
 import { SortableSection } from "../../../elements/explorer/filter-sidebar/sortable-section.tsx";

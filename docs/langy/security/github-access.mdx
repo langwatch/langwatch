@@ -14,7 +14,7 @@ Langy contributes to your code in exactly one way: **bot-authored pull requests 
 
 - **No per-user OAuth.** Installing the app does not ask a user to authorize it against their GitHub account. The bot-authored flow uses no user OAuth at all.
 - **The app private key is the only stored credential.** It lives only in the control plane (as `GITHUB_LANGY_PRIVATE_KEY`) and never reaches a worker. When it is unset, the GitHub feature is silently off.
-- **Installation tokens are minted per turn.** Each turn mints a fresh 1-hour installation token, cached in Redis just under its lifetime and never persisted. The worker receives it as the `GH_TOKEN` environment variable only; nothing is written to disk.
+- **Installation tokens are minted per turn.** Each turn mints a fresh 1-hour installation token, cached in Redis just under its lifetime and never persisted. The worker receives it as the `GH_TOKEN` environment variable only; no token is written to disk.
 - **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories, or to a single repository when the turn targets one.
 
 Inside the worker, `git config credential.helper '!gh auth git-credential'` wires `git` to read the token from the environment, so there is no `.gitconfig` or `.git-credentials` on disk.

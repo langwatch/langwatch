@@ -1,7 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
-import type { ModelProviderCredentialCipher } from "#app/model-provider.members";
 import { ModelProviderLegacyMigrationService } from "#services/model-provider-legacy-migration.service";
 
 import type {
@@ -16,10 +15,8 @@ const logger = createLogger("langwatch:task:model-provider-migrate-credentials")
  */
 export async function runModelProviderKeysMigration({
   database,
-  cipher,
 }: {
   database: ModelProviderMigrationDatabase;
-  cipher: ModelProviderCredentialCipher;
 }): Promise<ModelProviderMigrationOutcome> {
   const migrations = ModelProviderLegacyMigrationService.create();
   const rows = await database.findProjectScopedLegacyColumns();
@@ -29,13 +26,13 @@ export async function runModelProviderKeysMigration({
   let skipped = 0;
 
   for (const row of rows) {
-    const encrypted = migrations.encodeModelProviderKeysRow({ row, cipher });
-    if (encrypted === null) {
+    const seal = migrations.planModelProviderKeysSeal({ row });
+    if (seal.outcome === "unchanged") {
       skipped += 1;
       continue;
     }
 
-    await database.updateLegacyColumns({ id: row.id, customKeys: encrypted });
+    await database.updateLegacyColumns({ id: row.id, customKeys: seal.keys });
     updated += 1;
   }
 
@@ -53,24 +50,20 @@ export class ModelProviderCredentialsMigrateTask extends Task {
   readonly name = "model-provider-migrate-credentials";
   readonly description = "Encrypts every ModelProvider customKeys value still stored in plaintext.";
 
-  private constructor(
-    private readonly database: () => ModelProviderMigrationDatabase,
-    private readonly cipher: () => ModelProviderCredentialCipher,
-  ) {
+  private constructor(private readonly database: () => ModelProviderMigrationDatabase) {
     super();
   }
 
   static create({
     database,
-    cipher,
   }: {
+    /** The provider store, which seals each plaintext row with the deployment's cipher. */
     database: () => ModelProviderMigrationDatabase;
-    cipher: () => ModelProviderCredentialCipher;
   }): ModelProviderCredentialsMigrateTask {
-    return new ModelProviderCredentialsMigrateTask(database, cipher);
+    return new ModelProviderCredentialsMigrateTask(database);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    await runModelProviderKeysMigration({ database: this.database(), cipher: this.cipher() });
+    await runModelProviderKeysMigration({ database: this.database() });
   }
 }

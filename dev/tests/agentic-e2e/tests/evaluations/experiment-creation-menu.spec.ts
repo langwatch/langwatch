@@ -6,7 +6,9 @@ test("experiment creation keeps the SDK workflow discoverable", async ({ page },
 
   await page.goto(`/${projectSlug}/evaluations`);
   const newExperiment = page.getByRole("button", { name: "New Experiment" }).first();
-  await expect(newExperiment).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  // The solid primary button renders orange.600 (#DD6B20), as every solid orange does on main:
+  // Langy's `_langyDark` orange.solid replaces the base #ED8926 when the themes merge.
+  await expect(newExperiment).toHaveCSS("background-color", "rgb(221, 107, 32)");
   await newExperiment.click();
   const sdkExperiment = page.getByRole("menuitem", {
     name: /New Experiment via SDK/,
@@ -24,9 +26,10 @@ test("experiment creation keeps the SDK workflow discoverable", async ({ page },
     "background-color",
     "rgb(255, 255, 255)",
   );
+  // The page's one solid primary action (D63), orange as New Experiment above.
   await expect(page.getByRole("button", { name: "New Online Evaluation" }).first()).toHaveCSS(
     "background-color",
-    "rgb(255, 255, 255)",
+    "rgb(221, 107, 32)",
   );
   await expect(page.getByRole("heading", { name: "No online evaluations yet" })).toBeVisible();
   await page.screenshot({

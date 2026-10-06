@@ -2,6 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
+import { SetupWithAgentButtonToken } from "@langwatch/trace-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -20,12 +21,15 @@ const traceLends = uiDeclarations([
   {
     name: "trace",
     installation: {
-      capabilities: {
-        setupWithAgentButton: {
+      lends: [
+        {
+          token: SetupWithAgentButtonToken,
           load: async () => ({
             default: ({ surface }: { surface: string }) => <button>setup {surface}</button>,
           }),
         },
+      ],
+      capabilities: {
         tracePreviewHoverCard: {
           load: async () => ({
             default: ({ traceId, children }: { traceId: string; children: React.ReactNode }) => (

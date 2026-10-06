@@ -5,15 +5,15 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  type LangyBackendActor,
-  type LangyBackendRunResult,
-  type LangyBackendSaveResult,
-  type LangyBackendStateRead,
-  type LangyUiActionBackend,
-  type LangyUiActionDefinition,
-} from "../../app/langy.members.ts";
+import type {
+  LangyBackendActor,
+  LangyBackendRunResult,
+  LangyBackendSaveResult,
+  LangyBackendStateRead,
+  LangyUiActionBackend,
+} from "../langy-ui-action-backend.service.ts";
 import { LangyUiActionBackendService } from "../langy-ui-action-backend.service.ts";
+import type { LangyUiActionDefinition } from "../langy-ui-action-catalog.service.ts";
 
 /** A saved board with one column, small enough to read in a diff. */
 const savedState = () => ({ name: "My experiment", targets: [{ id: "target-1" }] });

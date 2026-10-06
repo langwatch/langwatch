@@ -8,12 +8,45 @@ import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } 
 import { builtinRoleGrants } from "./roles.ts";
 import { audienceMatches, bindingScopeCanGrantPermission } from "./scope.ts";
 
+/**
+ * ADR-171: a Developer holds its personal team and nothing shared. An
+ * ORGANIZATION-scoped binding reaches every project and a group binding
+ * whatever the group maps to, so neither grants a Developer anything.
+ */
+function developerSeatExcludes({
+  binding,
+  grants,
+}: {
+  binding: Pick<CollectedBinding, "scopeType" | "viaGroupId">;
+  grants: CollectedGrants;
+}): boolean {
+  if (grants.organizationRole !== "DEVELOPER") return false;
+  return binding.scopeType === "ORGANIZATION" || Boolean(binding.viaGroupId);
+}
+
+/** A custom role grants exactly its own permissions; an unknown or empty one grants nothing. */
+function customRoleGrants({
+  roleKey,
+  grants,
+  permission,
+}: {
+  roleKey: string;
+  grants: CollectedGrants;
+  permission: string;
+}): boolean {
+  const customRoleId = roleKey.slice("custom:".length);
+  if (customRoleId.length === 0) return false;
+  const customPermissions = grants.customRolePermissions.get(customRoleId);
+  if (!customPermissions || customPermissions.length === 0) return false;
+  return permissionSatisfiedBy({ granted: new Set(customPermissions), requested: permission });
+}
+
 export function bindingGrants({
   binding,
   grants,
   permission,
 }: {
-  binding: Pick<CollectedBinding, "roleKey" | "scopeType">;
+  binding: Pick<CollectedBinding, "roleKey" | "scopeType" | "viaGroupId">;
   grants: CollectedGrants;
   permission: string;
 }): boolean {
@@ -28,19 +61,12 @@ export function bindingGrants({
     return false;
   }
 
+  if (developerSeatExcludes({ binding, grants })) return false;
+
   const { roleKey } = binding;
   // A custom key is authoritative, including grants imported beside a legacy
   // built-in role. Missing or empty role facts never restore that old role.
-  if (roleKey.startsWith("custom:")) {
-    const customRoleId = roleKey.slice("custom:".length);
-    if (customRoleId.length === 0) return false;
-    const customPermissions = grants.customRolePermissions.get(customRoleId);
-    if (!customPermissions || customPermissions.length === 0) return false;
-    return permissionSatisfiedBy({
-      granted: new Set(customPermissions),
-      requested: permission,
-    });
-  }
+  if (roleKey.startsWith("custom:")) return customRoleGrants({ roleKey, grants, permission });
 
   if (roleKey !== "admin" && roleKey !== "member" && roleKey !== "viewer") {
     return false;

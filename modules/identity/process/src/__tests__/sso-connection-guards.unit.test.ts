@@ -6,6 +6,7 @@ import {
   DOMAIN_CLAIMED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
   emptySsoConnection,
+  SSO_CONNECTION_STATES,
   type SsoConnectionFactInput,
   type SsoConnectionState,
   VERIFICATION_REQUESTED_EVENT_TYPE,
@@ -432,6 +433,28 @@ describe("sso connection guards", () => {
   describe("given an ACTIVE connection", () => {
     beforeEach(reachActive);
 
+    /** @scenario "Going live twice costs nothing and states nothing" */
+    it("states no fact and spends no check when it goes live again", async () => {
+      const before = await connections.getConnection({ connectionId: CONNECTION });
+      breakGlass.set(false);
+
+      const { facts, state } = await run(() =>
+        guards.activateConnection({ ...identity, testLoginAccountId: null }),
+      );
+
+      expect(facts).toEqual([]);
+      expect(state).toEqual(before);
+    });
+
+    it("still refuses every other verb not allowed from ACTIVE", async () => {
+      await expect(guards.resumeConnection({ ...identity })).rejects.toMatchObject({
+        code: "sso_connection_invalid_transition",
+      });
+      await expect(guards.completeTeardown({ ...identity })).rejects.toMatchObject({
+        code: "sso_connection_invalid_transition",
+      });
+    });
+
     /** @scenario "Suspension is always available and reversible" */
     it("suspends, stops routing its domains, and resumes", async () => {
       const suspended = await run(() =>
@@ -483,6 +506,24 @@ describe("sso connection guards", () => {
       expect(state.state).toBe("TEARDOWN_PENDING");
       expect(state.tearDownAfterMs).toBe(T0 + 1_000);
     });
+  });
+
+  describe("when a connection that is neither VERIFIED nor ACTIVE goes live", () => {
+    it.each(SSO_CONNECTION_STATES.filter((state) => state !== "VERIFIED" && state !== "ACTIVE"))(
+      "refuses it from %s",
+      async (from) => {
+        connections.seed({
+          ...emptySsoConnection({ connectionId: CONNECTION }),
+          organizationId: ORG,
+          state: from,
+          verifiedDomains: ["acme.com"],
+        });
+
+        await expect(
+          guards.activateConnection({ ...identity, testLoginAccountId: "acc_test" }),
+        ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
+      },
+    );
   });
 
   describe("given a TEARDOWN_PENDING connection", () => {

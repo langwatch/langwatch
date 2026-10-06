@@ -76,8 +76,8 @@ function pricingFaqAnswer(): string {
   return answer[1]!;
 }
 
-const meteredEventTypes = BillableEventsMeterProjection.create({ append: vi.fn() })
-  .build().eventTypes;
+const meteredEventTypes = BillableEventsMeterProjection.create({ append: vi.fn() }).build()
+  .eventTypes;
 
 describe("Billable-event documentation", () => {
   describe("given the meter bills spans, evaluations, experiments and simulations", () => {

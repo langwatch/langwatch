@@ -39,26 +39,40 @@ func stopReason(line string) (string, bool) {
 // Callers hold the suite lock. "other" is never a shared cause: two unrelated
 // errors are not the same error.
 func (suite *suite) verdict() string {
-	stopped, byCause := 0, map[string]int{}
-	for _, tool := range suite.tools {
-		if tool.stop != nil {
-			stopped++
-			byCause[tool.stop.Cause]++
-		}
-	}
+	stopped, byCause := stopTally(suite.tools)
 	switch suite.policy {
 	case "any":
 		if stopped > 0 {
 			return "a tool stopped (policy any)"
 		}
 	case "half", "same-cause":
-		for cause, count := range byCause {
-			if count >= 2 && cause != "other" {
-				return fmt.Sprintf("%d tools stopped with the same cause: %s", count, cause)
-			}
+		if reason := sharedCause(byCause); reason != "" {
+			return reason
 		}
 		if suite.policy == "half" && stopped > 0 && stopped*2 >= len(suite.tools) {
 			return fmt.Sprintf("%d of %d tools stopped (policy half)", stopped, len(suite.tools))
+		}
+	}
+	return ""
+}
+
+// stopTally counts the stopped tools, in all and per cause.
+func stopTally(tools []*tool) (int, map[string]int) {
+	stopped, byCause := 0, map[string]int{}
+	for _, tool := range tools {
+		if tool.stop != nil {
+			stopped++
+			byCause[tool.stop.Cause]++
+		}
+	}
+	return stopped, byCause
+}
+
+// sharedCause is the verdict when two or more tools stopped for one cause other than "other".
+func sharedCause(byCause map[string]int) string {
+	for cause, count := range byCause {
+		if count >= 2 && cause != "other" {
+			return fmt.Sprintf("%d tools stopped with the same cause: %s", count, cause)
 		}
 	}
 	return ""

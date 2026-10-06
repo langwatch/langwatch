@@ -269,9 +269,7 @@ dev/docs/plans/handover-*.md
 
 
 .nx/migrate-runs
-# coordinator scratch: lane handoffs, manifests and archives stay local
-.claude/handoffs/
-.claude/manifests/
+# coordinator scratch: lane archives stay local (handoffs and manifests are above)
 .claude/archives/
 
 # Go profiles (-cpuprofile/-memprofile) and throwaway probe tests

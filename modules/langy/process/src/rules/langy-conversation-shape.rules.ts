@@ -25,7 +25,7 @@ import type {
  * Adoptable ids are the shape a caller may propose. Anything else is refused before it
  * becomes an aggregate key.
  */
-export const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
+const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
 
 /** List-item shape the sidebar renders. Named for the domain, not the column. */
 export type ConversationListItem = {

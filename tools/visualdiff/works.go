@@ -141,16 +141,22 @@ func (owners ScreenOwners) RouteTouches(route string) ([]string, string) {
 			return nil, "declared outside a module and the app (" + owner.file + ")"
 		}
 		matched = true
-		for _, half := range moduleHalves {
-			if owner.module != "" {
-				paths[owner.module+"/"+half] = true
-			}
-		}
+		addModuleHalves(paths, owner.module)
 	}
 	if !matched {
 		return nil, "no module's screens declare " + route
 	}
 	return sortedKeys(paths), ""
+}
+
+// addModuleHalves adds every half of module to paths; no module adds none.
+func addModuleHalves(paths map[string]bool, module string) {
+	if module == "" {
+		return
+	}
+	for _, half := range moduleHalves {
+		paths[module+"/"+half] = true
+	}
 }
 
 // FlowTouches are the paths every screen a flow goes to renders through.

@@ -177,6 +177,12 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     organizationName: z.string(),
   }),
   z.object({
+    /** A person's own sign-up, from user's or auth's fact: PostHog's signed_up, never Customer.io's. */
+    kind: z.literal("user_registered"),
+    ...signalSource,
+    userId: id,
+  }),
+  z.object({
     kind: z.literal("session_started"),
     ...signalSource,
     userId: id,
@@ -197,13 +203,23 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     event: z.enum(["paths_selected", "path_begun"]),
     previousPaths: z.array(guidedPathSchema),
     paths: z.array(guidedPathSchema),
+    payload: z
+      .record(z.string(), z.union([z.string(), z.array(z.string()), z.number()]))
+      .optional(),
   }),
   z.object({
     kind: z.literal("guided_onboarding_progress"),
     ...signalSource,
     userId: id,
     organizationId: id,
-    event: z.enum(["provider_connected", "tour_completed", "tour_skipped", "path_completed"]),
+    event: z.enum([
+      "provider_connected",
+      "provider_skipped",
+      "tour_completed",
+      "tour_skipped",
+      "tour_replayed",
+      "path_completed",
+    ]),
     payload: z.record(z.string(), z.union([z.string(), z.array(z.string()), z.number()])),
     state: guidedOnboardingStateSchema,
   }),
@@ -214,6 +230,14 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     /** Every member of the organization, each told the trait. */
     memberUserIds: z.array(id),
     hasSubscription: z.boolean(),
+  }),
+  z.object({
+    kind: z.literal("subscription_started"),
+    ...signalSource,
+    organizationId: id,
+    /** Every member of the organization, each tracked the event. */
+    memberUserIds: z.array(id),
+    plan: id,
   }),
   z.object({
     kind: z.literal("checkout_completed"),

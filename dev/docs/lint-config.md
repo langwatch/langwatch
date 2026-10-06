@@ -32,7 +32,8 @@ per rule).
 - **`pnpm lint` is the fast oxlint layer, cached per project.** It is `nx run-many -t lint`
   (the `lint` target `dev/nx/lint-plugin.mjs` infers, inputs in `nx.json`) plus one run over
   the files outside every project; `pnpm lint:changed` lints what changed with its
-  dependents, and `pnpm lint:oxlint` is the plain whole-tree run. A file a cross-file
+  dependents, and `pnpm lint:types` is the type-aware pass CI gates on
+  (ARCHITECTURE.md §17; the commands are `dev/docs/TOOLING.md`'s). A file a cross-file
   rule reads from outside its project belongs in `lintGlobals`.
   `pnpm lint:architecture` is the enforcer alone; CI runs the policies already at
   zero by id. Every oxlint rule is in the fast layer: `comment-block-size`, once 46% of

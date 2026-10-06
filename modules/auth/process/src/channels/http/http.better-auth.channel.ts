@@ -1,8 +1,3 @@
-export type {
-  AuthenticationResponseJSON,
-  PublicKeyCredentialCreationOptionsJSON,
-  PublicKeyCredentialRequestOptionsJSON,
-} from "@simplewebauthn/server";
 import { passkey } from "@better-auth/passkey";
 import type {
   SSOUserResolution,
@@ -151,7 +146,7 @@ function refusesCredentialRoute({
 }
 
 /** Whether an organization's own connection governs this address (D04). */
-export type AddressRoutesToConnection = (input: { email: string }) => Promise<boolean>;
+type AddressRoutesToConnection = (input: { email: string }) => Promise<boolean>;
 
 /**
  * A password reset for an address an organization signs in through its own
@@ -195,7 +190,7 @@ export interface SignInAttemptCounter {
  * Records how a counted sign-in attempt went (GAC-09). Its failure is
  * swallowed: the endpoint has answered, so nothing here changes the outcome.
  */
-export async function countSignInAttempt({
+async function countSignInAttempt({
   ctx,
   signInLockout,
 }: {
@@ -820,7 +815,7 @@ export async function resolveSsoUser({
  * The issuers ONE request may reach. Asked per request rather than resolved
  * at boot: a connection registered a minute ago has to be dialable now.
  */
-export interface BetterAuthSsoIssuers {
+interface BetterAuthSsoIssuers {
   issuersForRequest(request: Request | undefined): Promise<string[]>;
   /** The public origins those issuers' discovery documents serve endpoints
    *  from. Absent, only the issuers' own origins are trusted. */
@@ -830,7 +825,7 @@ export interface BetterAuthSsoIssuers {
 /**
  * Everything the deployment's one Better Auth instance is built from.
  */
-export type BetterAuthTransportOptions = Readonly<{
+type BetterAuthTransportOptions = Readonly<{
   /** The Auth service whose sessions this instance mints and revokes. */
   auth: AuthApi;
   /** Where an ID token refused for its issuer is noted for the callback's redirect. */

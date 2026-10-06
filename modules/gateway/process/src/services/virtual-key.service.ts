@@ -8,20 +8,18 @@ import type { ScopeInput, VirtualKeyWithScopes } from "@langwatch/gateway-contra
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type Instant, nowInstant } from "@langwatch/time";
 
-import {
-  type GatewayAudit,
-  type GatewayChangeEvents,
-  type GatewayTransaction,
-  type GatewayVirtualKeyCrypto,
-  type GatewayGovernanceSignals,
-} from "../app/gateway.members.ts";
+import type { GatewayAuditRepository } from "../repositories/gateway-audit.repository.ts";
+import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 import type { GatewayKeyBudgetRepository } from "../repositories/gateway-key-budget.repository.ts";
+import type { GatewayTransactionRepository } from "../repositories/gateway-transaction.repository.ts";
 import type {
   GatewayLicensedKey,
   GatewayVirtualKeyRepository,
 } from "../repositories/gateway-virtual-key.repository.ts";
+import type { GatewayGovernanceSignals } from "./gateway-governance-events.service.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
+import type { GatewayVirtualKeyCrypto } from "./virtual-key-crypto.service.ts";
 import { VirtualKeyProvisioningService } from "./virtual-key-provisioning.service.ts";
 import { VirtualKeyRotationService } from "./virtual-key-rotation.service.ts";
 import { VirtualKeyStatusService } from "./virtual-key-status.service.ts";
@@ -62,13 +60,13 @@ export class VirtualKeyService {
   }
 
   static create(input: {
-    transactions: GatewayTransaction;
+    transactions: GatewayTransactionRepository;
     keyBudgets: GatewayKeyBudgetRepository;
     scopeResolution: GatewayScopeResolutionService;
     projects: ProjectApi;
     repository: GatewayVirtualKeyRepository;
-    changeEvents: GatewayChangeEvents;
-    auditLog: GatewayAudit;
+    changeEvents: GatewayChangeEventsRepository;
+    auditLog: GatewayAuditRepository;
     crypto: GatewayVirtualKeyCrypto;
     governanceSignals?: GatewayGovernanceSignals;
   }): VirtualKeyService {

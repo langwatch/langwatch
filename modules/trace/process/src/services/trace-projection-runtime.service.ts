@@ -1,16 +1,14 @@
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
-import {
-  type TraceIoExtraction,
-  type TraceMediaReferenceResolver,
-  type TraceModelCost,
-  type TraceSpanNormalization,
-} from "../app/trace.members.ts";
 import { SpanCostService } from "./span-cost.service.ts";
+import type { TraceSpanNormalization } from "./span-normalization.service.ts";
 import { SpanStatusService } from "./span-status.service.ts";
 import { SpanTimingService } from "./span-timing.service.ts";
 import { TraceAttributeAccumulationService } from "./trace-attribute-accumulation.service.ts";
 import { TraceIOAccumulationService } from "./trace-io-accumulation.service.ts";
+import type { TraceIoExtraction } from "./trace-io-extraction.service.ts";
+import type { TraceMediaReferenceResolver } from "./trace-media-reference.service.ts";
+import type { TraceModelCost } from "./trace-model-cost.service.ts";
 import { TraceNameResolutionService } from "./trace-name-resolution.service.ts";
 import { TraceOriginService } from "./trace-origin.service.ts";
 import { TracePromptAccumulationService } from "./trace-prompt-accumulation.service.ts";

@@ -1,7 +1,19 @@
 import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import { ModelProviderManagedGateway } from "../app/model-provider.members.ts";
+/**
+ * Whether LangWatch itself supplies a provider's credentials, and with what. The app answers it
+ * from the managed-provider peer; the unmanaged stand-in serves only a runtime composed without it.
+ */
+export abstract class ModelProviderManagedGateway {
+  abstract isManaged(input: { organizationId: string; provider: string }): boolean;
+  abstract prepareParameters(input: {
+    parameters: Record<string, string>;
+    projectId: string;
+    model: string;
+    provider: string;
+  }): Promise<Record<string, string>>;
+}
 
 /**
  * The managed-provider answer taken from the managed-provider module: which organizations

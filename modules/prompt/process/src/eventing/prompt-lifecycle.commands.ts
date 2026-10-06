@@ -19,9 +19,7 @@ import {
   type PromptCreatedEvent,
 } from "./prompt-lifecycle.events.ts";
 
-export const recordPromptCreatedCommandDataSchema = withCommandEnvelope(
-  promptCreatedEventDataSchema,
-);
+const recordPromptCreatedCommandDataSchema = withCommandEnvelope(promptCreatedEventDataSchema);
 export type RecordPromptCreatedCommandData = z.infer<typeof recordPromptCreatedCommandDataSchema>;
 
 /** Records that a project gained a prompt; one event per prompt, however often it is sent. */

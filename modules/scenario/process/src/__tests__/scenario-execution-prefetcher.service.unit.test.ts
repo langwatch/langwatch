@@ -2363,7 +2363,11 @@ describe("prefetchWithFixture, given an http target and a project holding secret
         findById: vi.fn().mockResolvedValue({
           id: "agent_http",
           type: "http",
-          config: { url: "https://api.test/chat", method: "POST" },
+          config: {
+            url: "https://api.test/chat",
+            method: "POST",
+            headers: [{ key: "Authorization", value: "Bearer {{secrets.AGENT_TOKEN}}" }],
+          },
         }),
       },
       projectSecretsFetcher: {
@@ -2393,7 +2397,15 @@ describe("prefetchWithFixture, given a run carrying secret parameter values", ()
         findById: vi.fn().mockResolvedValue({
           id: "agent_http",
           type: "http",
-          config: { url: "https://api.test/chat", method: "POST" },
+          config: {
+            url: "https://api.test/chat",
+            method: "POST",
+            headers: [
+              { key: "X-Project", value: "{{secrets.PROJECT_TOKEN}}" },
+              { key: "X-Run", value: "{{secrets.api_token}}" },
+              { key: "Authorization", value: "Bearer {{secrets.API_TOKEN}}" },
+            ],
+          },
         }),
       },
       projectSecretsFetcher: {
@@ -2735,6 +2747,24 @@ describe("prefetchWithFixture, when the target is a voice agent", () => {
     });
   });
 
+  describe("given a voice target", () => {
+    it("announces no early child environment, since the caller keys arrive with the data", async () => {
+      const deps = createMockDeps({
+        agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+      });
+      const observeChildEnvironment = vi.fn();
+
+      await prefetchScenarioData({
+        context: defaultContext,
+        target: voiceTarget,
+        deps,
+        observeChildEnvironment,
+      });
+
+      expect(observeChildEnvironment).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given the project has no OpenAI provider", () => {
     it("carries an empty caller env", async () => {
       const deps = createMockDeps({
@@ -2753,6 +2783,65 @@ describe("prefetchWithFixture, when the target is a voice agent", () => {
         type: "voice",
         callerEnv: {},
       });
+    });
+  });
+});
+
+describe("prefetchWithFixture, when choosing where the child posts a turn", () => {
+  const routeConfig = {
+    langwatchEndpoint: "http://app:5560",
+    nlpServiceUrl: "http://langwatch_nlp:5561",
+    legacyDefaultModel: DEFAULT_MODEL,
+    publicBaseUrl: "https://app.example.com",
+  };
+
+  async function routeFor({
+    perProjectEngines,
+    langwatchEndpoint = routeConfig.langwatchEndpoint,
+  }: {
+    perProjectEngines: boolean;
+    langwatchEndpoint?: string;
+  }) {
+    const deps = createMockDeps({
+      perProjectEngines,
+      promptFetcher: {
+        findByIdOrHandle: vi.fn().mockResolvedValue({
+          id: "prompt_123",
+          prompt: "You are helpful",
+          messages: [],
+          model: "openai/gpt-4",
+        }),
+      },
+    });
+    const result = await createTestScenarioExecutionPrefetcherService(deps, {
+      ...routeConfig,
+      langwatchEndpoint,
+    }).prefetch({ context: defaultContext, target: { type: "prompt", referenceId: "prompt_123" } });
+    if (!result.success) throw new Error(`expected a prepared run, got ${result.error}`);
+    return result.data.executeSyncRoute;
+  }
+
+  /** @scenario "A deployment with per-project engines relays" */
+  it("relays through the endpoint the platform hands out as itself", async () => {
+    expect(await routeFor({ perProjectEngines: true })).toEqual({
+      mode: "relay",
+      relayBaseUrl: "http://app:5560",
+    });
+  });
+
+  /** @scenario "A deployment with per-project engines relays" */
+  it("relays through the public origin when no endpoint is configured", async () => {
+    expect(await routeFor({ perProjectEngines: true, langwatchEndpoint: "" })).toEqual({
+      mode: "relay",
+      relayBaseUrl: "https://app.example.com",
+    });
+  });
+
+  /** @scenario "A deployment with one engine posts to it directly" */
+  it("posts straight to the engine the deployment configured", async () => {
+    expect(await routeFor({ perProjectEngines: false })).toEqual({
+      mode: "direct",
+      nlpServiceUrl: "http://langwatch_nlp:5561",
     });
   });
 });

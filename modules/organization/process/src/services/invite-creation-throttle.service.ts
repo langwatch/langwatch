@@ -7,7 +7,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { InvitesRateLimitedError } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { OrganizationInviteRateLimit } from "../app/organization.members.ts";
+import type { OrganizationInviteRateLimitRepository } from "../repositories/organization-invite-rate-limit.repository.ts";
 
 export const INVITE_CREATION_WINDOW_SECONDS = 60 * 60;
 
@@ -18,7 +18,7 @@ export const INVITE_CREATION_WINDOW_SECONDS = 60 * 60;
  */
 export class InviteCreationThrottleService {
   static create(deps: {
-    rateLimit: OrganizationInviteRateLimit;
+    rateLimit: OrganizationInviteRateLimitRepository;
     plans: Pick<EntitlementApi, "requestBound">;
   }): InviteCreationThrottleService {
     return new InviteCreationThrottleService(deps);
@@ -26,7 +26,7 @@ export class InviteCreationThrottleService {
 
   private constructor(
     private readonly deps: Readonly<{
-      rateLimit: OrganizationInviteRateLimit;
+      rateLimit: OrganizationInviteRateLimitRepository;
       plans: Pick<EntitlementApi, "requestBound">;
     }>,
   ) {}

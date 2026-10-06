@@ -1,7 +1,7 @@
 /**
  * A run's judgements: isolated by project, paged by the sort key with a
  * cursor that never repeats a row, narrowed to one question or to the
- * matches. @see specs/instant-evals/instant-eval-api.feature
+ * matches. @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { Temporal } from "@langwatch/time";

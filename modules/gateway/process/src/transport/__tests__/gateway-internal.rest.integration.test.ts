@@ -10,11 +10,12 @@ import type {
 } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi, type Mock } from "vitest";
 
-import type { GatewayChangeEvents } from "../../app/gateway.members.ts";
 import { gatewayProcessModule } from "../../gateway.module.ts";
+import type { GatewayChangeEventsRepository } from "../../repositories/gateway-change-event.repository.ts";
 import {
   GatewayGuardrailRepository,
   type GatewayGuardrailCheckRow,
@@ -36,8 +37,10 @@ import {
 const ORGANIZATION_ID = "organization-1";
 
 /** The revision feed, as the long poll reads it. */
-function testChangeEvents(): GatewayChangeEvents & { since: Mock<GatewayChangeEvents["since"]> } {
-  const since = vi.fn<GatewayChangeEvents["since"]>(async () => ({
+function testChangeEvents(): GatewayChangeEventsRepository & {
+  since: Mock<GatewayChangeEventsRepository["since"]>;
+} {
+  const since = vi.fn<GatewayChangeEventsRepository["since"]>(async () => ({
     currentRevision: 42n,
     events: [
       {
@@ -208,8 +211,10 @@ describe("the gateway internal control plane", () => {
     /** @scenario "The ingest door accepts a drained batch and prices it on the way in" */
     it("accepts a drained batch and dispatches it priced", async () => {
       const commands = testSpendCommandSenders();
+      // The outcome names no virtual key, so the attribution join never asks the directory.
       const app = mountGatewayInternalRest({
         store: {} as GatewayInternalStoreRepository,
+        projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
         spend: { commands, rating: ModelCatalogGatewaySpendRatingService.create() },
       });
 

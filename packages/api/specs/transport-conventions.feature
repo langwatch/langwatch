@@ -69,6 +69,13 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Then it answers the family's canonical envelope exactly as before
 
     @integration
+    Scenario: A protocol refusal that declines a failure leaves it to the family's boundary
+      Given a protocol route whose refusal renders only the failures its protocol has a document for
+      When the door refuses the caller with a failure the refusal declines
+      Then it answers exactly what a route with no refusal renderer answers
+      And a failure the refusal does not decline still answers in the protocol's document
+
+    @integration
     Scenario: A protocol answer with no content names no media type
       Given a protocol route whose handler writes a 204 with no body
       When it answers
@@ -153,6 +160,49 @@ Feature: The REST runtime renders what a transport may not hand-roll
       When the REST boundary renders the error
       Then it is the 409 conflict
 
+  Rule: A 5xx body is kept only when the class declares the failure the caller's
+
+    @unit
+    Scenario: A 5xx the class does not declare the caller's stays masked
+      Given a HandledError declaring a platform fault at 503, a HandledError at 503 declaring no fault, or a plain thrown Error
+      When the REST boundary renders it
+      Then the answer is the opaque internal_error body at the error's status, with no meta
+
+    @unit
+    Scenario: A 5xx the class declares the caller's keeps its body
+      Given a HandledError declaring a customer fault at 503 with meta
+      When the REST boundary renders it
+      Then the answer carries its own code, message and meta at 503
+
+  Rule: A 5xx whose class declares no fault is presumed the platform's
+
+    @unit
+    Scenario: An undeclared fault at 5xx is presumed the platform's
+      Given a HandledError at 503 whose class declares no fault, raised here or relayed from a herr envelope
+      Then its fault is presumed_platform
+
+    @unit
+    Scenario: An undeclared fault below 5xx stays the caller's
+      Given a HandledError at 422 whose class declares no fault
+      Then its fault is customer
+
+    @unit
+    Scenario: A declared fault wins over the status
+      Given a HandledError declaring a fault at any status
+      Then its fault is the one it declared
+
+    @unit
+    Scenario: An undeclared fault at 5xx is logged and reported as the platform's
+      Given a HandledError with a presumed_platform fault
+      When a request or call fails with it
+      Then the failure is logged at error level with handledErrorFault presumed_platform
+
+    @unit
+    Scenario: A presumed platform fault goes on the wire as itself
+      Given a HandledError with a presumed_platform fault
+      When it is serialized for a client over tRPC or REST
+      Then the fault reads presumed_platform and the REST error schema accepts it
+
   Rule: Running out of database connections is a retryable wait, not a fault
 
     @integration
@@ -167,3 +217,56 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Given a family whose own error handler answers anything unhandled as a 500
       When its service's store could not get a Postgres connection in time
       Then the family's handler is handed the handled 503, and the answer is a 503 with Retry-After
+
+  Rule: A raw body is read only under the media type its route declared (Alex, 2026-10-05, E9)
+
+    @integration
+    Scenario: A raw body sent under another media type is refused with 415 before the handler
+      Given a route that reads its raw body and declares the media type it reads
+      When it is called with a body under another media type, or with no Content-Type at all
+      Then it is refused with 415 and the code unsupported_media_type, and the handler is not reached
+      And a body under the declared type, with parameters or in another letter case, reaches the handler as sent
+
+    @integration
+    Scenario: A route that keeps main's 400 declares it, and its protocol renders it
+      Given a route that declares an unmatched media type a malformed request, as the legacy family and the collector do
+      When it is called with a body under another media type
+      Then it is refused with 400 and the code malformed_request, and the handler is not reached
+      And a protocol route that declares its own refusal document renders that 400 in it
+
+    @integration
+    Scenario: A route that read any media type on main declares it accepted and still documents its own
+      Given a route that declares its media type accepted, as main's routes that never asked the Content-Type do
+      When it is called with a JSON body under text/plain, or with no Content-Type at all
+      Then the handler is handed the body as sent
+      And its OpenAPI document still publishes the body under the media type it declared
+
+    @integration
+    Scenario: A refused credential is answered before the media type is checked
+      Given a raw-body route behind a credential door that declares its media type
+      When a caller presents no credential and a body under another media type
+      Then it is refused with 401, never 415 or 400, and the handler is not reached
+
+    @integration
+    Scenario: A raw body route that names no media type of its own is not checked
+      Given a raw-body route that names no media type, so publishes its form's default
+      When it is called with a body under any media type
+      Then the handler is handed the body as sent
+      And a route that declares a refusal for a media type it never named, or names a media type with parameters or a wildcard, refuses to build
+
+  Rule: A JSON body may be an array, handed under the field its route names (Alex, 2026-10-05, E1)
+
+    @integration
+    Scenario: An array body is validated as sent and handed under the field its route names
+      Given a route whose JSON input is an array of objects, declared to be handed under one field
+      When it is called with an array whose items match
+      Then the handler is handed the array under that field, beside the route's path and query fields
+      And malformed JSON and an absent body are refused with 400 malformed_request, before the handler
+      And an item the schema refuses is refused with 422 validation_error, before the handler
+      And the document publishes the array itself as the required request body
+
+    @unit
+    Scenario: An array body's field is checked against the route's other fields where it is written
+      Given a route that declares an array body
+      When it names no field, or a field its path or query already declares
+      Then the declaration is refused where it is written, naming the route or the field

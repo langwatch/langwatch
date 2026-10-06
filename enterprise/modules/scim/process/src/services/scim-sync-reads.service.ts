@@ -20,10 +20,19 @@ export class ScimSyncReadsService {
     return new ScimSyncReadsService(deps.syncs, deps.activity);
   }
 
+  #activity: ScimSyncActivityRepository | null;
+
   private constructor(
     private readonly syncs: ScimSyncReadRepository,
-    private readonly activity: ScimSyncActivityRepository | null,
-  ) {}
+    activity: ScimSyncActivityRepository | null,
+  ) {
+    this.#activity = activity;
+  }
+
+  /** The sync log, once the scim_sync pipeline this process runs hands over its own store. */
+  readActivityFrom(activity: ScimSyncActivityRepository): void {
+    this.#activity = activity;
+  }
 
   /** Newest first. Empty where the organization has never synced. */
   async findForOrganization({
@@ -62,14 +71,15 @@ export class ScimSyncReadsService {
     return this.syncs.findByConnectionForOperator(input);
   }
 
-  /** Refused by name where this process composed no event stack: an empty log would read
-   *  as a quiet directory. */
+  /** Refused by name where no scim_sync pipeline handed this process its log: an empty log
+   *  would read as a quiet directory. */
   async findActivity(input: {
     organizationId: string;
     connectionId: string;
     limit: number;
   }): Promise<ScimSyncActivityEntry[]> {
-    if (!this.activity) throw new ScimCapabilityUnavailableError("SCIM directory activity");
-    return [...(await this.activity.findActivity(input))];
+    const activity = this.#activity;
+    if (!activity) throw new ScimCapabilityUnavailableError("SCIM directory activity");
+    return [...(await activity.findActivity(input))];
   }
 }

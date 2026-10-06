@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * Archiving a test suite over real rows: its scenarios and its run-plan row go
- * together. @see specs/suites/test-suites.feature
- */
 import { randomUUID } from "node:crypto";
 
 import { createLogger } from "@langwatch/observability";
@@ -14,10 +9,17 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+/**
+ * @vitest-environment node
+ * Archiving a test suite over real rows: its scenarios and its run-plan row go
+ * together. @see specs/suites/test-suites.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nowInstant, Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import type { ScenarioSecretCipher } from "../../../app/scenario.app.ts";
 import { PrismaScenarioRepository } from "../scenario.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -104,7 +106,10 @@ describe.skipIf(!databaseUrl)("archiving a test suite", () => {
       ["scenario", { projectId }],
       ["simulationSuite", { projectId }],
     ]);
-    repository = PrismaScenarioRepository.create(database());
+    repository = PrismaScenarioRepository.create(
+      database(),
+      createApiFixture<ScenarioSecretCipher>(),
+    );
   });
 
   afterAll(async () => {

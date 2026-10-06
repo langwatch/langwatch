@@ -22,6 +22,7 @@ import {
   type RouterOutputs,
 } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
+import { directoryOwnershipCopy } from "../../model/group-source.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
 import { IdentityChip } from "../elements/identity-row.tsx";
 import { OrganizationUserRoleField } from "../elements/organization-user-role-field.tsx";
@@ -215,14 +216,23 @@ export function MemberAccessEditor({
               editor.setPendingGrantAdditions((prev) => prev.filter((_, j) => j !== index))
             }
           />
-          <GrantInputRow
-            ref={editor.grantInputRef}
-            organizationId={organizationId}
-            onAdd={editor.stageAddition}
-            onReadyChange={editor.setHasDraftGrant}
-            organizationRole={editor.pendingRole}
-            buttonLabel="Assign role"
-          />
+          {/* A Developer seat (ADR-171) can be given no shared access at all, so
+              there is no row to add: the seat is the whole answer. */}
+          {editor.pendingRole === OrganizationUserRole.DEVELOPER ? (
+            <Text fontSize="xs" color="fg.muted" data-testid="developer-no-access">
+              A Developer seat works in its own project only. Move them to a Member seat to give
+              them access to a team or project.
+            </Text>
+          ) : (
+            <GrantInputRow
+              ref={editor.grantInputRef}
+              organizationId={organizationId}
+              onAdd={editor.stageAddition}
+              onReadyChange={editor.setHasDraftGrant}
+              organizationRole={editor.pendingRole}
+              buttonLabel="Assign role"
+            />
+          )}
         </Box>
       )}
 
@@ -420,7 +430,7 @@ function MemberGroups({
               {group.scimSource ? (
                 <IdentityChip
                   label="Directory"
-                  title={`Membership of this group is managed by ${group.scimSource}.`}
+                  title={directoryOwnershipCopy({ source: group.scimSource })}
                 />
               ) : null}
             </HStack>
@@ -511,6 +521,12 @@ function useMemberAccessEditor({
   };
 
   useEffect(() => {
+    // A Developer seat (ADR-171) holds nothing shared: every staged row goes,
+    // the way the save deletes every stored one.
+    if (pendingRole === OrganizationUserRole.DEVELOPER) {
+      setPendingGrantAdditions([]);
+      return;
+    }
     if (pendingRole !== OrganizationUserRole.EXTERNAL) return;
     setPendingGrantAdditions(stagedRowsForLiteSeat);
   }, [pendingRole]);

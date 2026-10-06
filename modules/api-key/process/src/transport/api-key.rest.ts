@@ -7,7 +7,6 @@ import {
   ApiKeyAdminRequiredError,
   ApiKeyApi,
   ApiKeyScopeViolationError,
-  INGESTION_PERMISSIONS,
   apiKeyRestCreateSchema,
   apiKeyRestDetailSchema,
   apiKeyRestListSchema,
@@ -217,36 +216,6 @@ const refuseNonAdminPrivilegedMint = async ({
 };
 
 type ApiKeyRestCreate = z.infer<typeof apiKeyRestCreateSchema>;
-
-/**
- * The one shape a person's project session may mint: personal, their own, one CUSTOM binding to
- * that project, holding exactly INGESTION_PERMISSIONS. Expiry is the caller's; none never expires.
- */
-const isIngestionShape = ({
-  input,
-  projectId,
-  callerUserId,
-}: {
-  input: ApiKeyRestCreate;
-  projectId: string;
-  callerUserId: string;
-}): boolean => {
-  const [binding, ...extra] = input.bindings ?? [];
-  const permissions = [...(input.permissions ?? [])].toSorted();
-
-  return (
-    input.keyType === "personal" &&
-    (input.assignedToUserId === undefined || input.assignedToUserId === callerUserId) &&
-    (input.projectIds ?? []).length === 0 &&
-    binding !== undefined &&
-    extra.length === 0 &&
-    binding.role === "CUSTOM" &&
-    binding.scopeType === "PROJECT" &&
-    binding.scopeId === projectId &&
-    input.permissionMode === "restricted" &&
-    permissions.join(",") === [...INGESTION_PERMISSIONS].toSorted().join(",")
-  );
-};
 
 /**
  * The one shape a person's project session may mint as its full-access key: personal, their own,
@@ -566,27 +535,11 @@ export const apiKeyRest: Readonly<{
   })
   .withMiddleware(apiKeyIngestionCaller)
   .handle(async ({ app, input, scope }, caller) => {
-    const { principal } = caller;
-    if (principal?.type !== "user") {
-      throw new ApiKeyScopeViolationError("Only a person's sign-in session mints an ingestion key");
-    }
-    const userId = principal.id;
-    if (!isIngestionShape({ input, projectId: scope.id, callerUserId: userId })) {
-      throw new ApiKeyScopeViolationError(
-        "An ingestion key is personal, bound to this one project, and holds only ingestion",
-      );
-    }
-
-    const result = await app.create({
-      name: input.name,
-      description: input.description,
-      userId,
-      createdByUserId: userId,
+    const result = await app.createIngestionKey({
+      key: input,
+      principal: caller.principal,
       organizationId: caller.organizationId,
-      expiresAt: input.expiresAt,
-      permissionMode: "restricted",
-      permissions: [...INGESTION_PERMISSIONS],
-      bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: scope.id }],
+      projectId: scope.id,
     });
 
     return {

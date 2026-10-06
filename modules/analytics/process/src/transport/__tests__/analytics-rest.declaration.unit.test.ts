@@ -79,7 +79,11 @@ describe("given the legacy analytics REST family", () => {
     });
 
     it("reads its own body, so the refusal sentence is built from the schema's failure", () => {
-      expect(route?.rawBody).toEqual({ form: "text", mediaType: "application/json" });
+      expect(route?.rawBody).toEqual({
+        form: "text",
+        mediaType: "application/json",
+        mismatch: "accepted",
+      });
     });
 
     it("declares the 400 refusal as an answer rather than leaving it to a boundary", () => {

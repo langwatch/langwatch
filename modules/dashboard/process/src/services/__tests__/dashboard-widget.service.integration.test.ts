@@ -26,8 +26,8 @@ import type {
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createDashboardTestAnalytics } from "../../app/__tests__/dashboard.fixture.ts";
-import type { DashboardBoardAudience } from "../../app/dashboard.members.ts";
 import { PrismaDashboardWidgetRepository } from "../../repositories/prisma/prisma.dashboard-widget.repository.ts";
+import type { DashboardBoardAudience } from "../dashboard-widget.service.ts";
 import { DashboardWidgetService } from "../dashboard-widget.service.ts";
 
 /** Visibility is the dashboard service's; these cases are about grid rows and project scope. */

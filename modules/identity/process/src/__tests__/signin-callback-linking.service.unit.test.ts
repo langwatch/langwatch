@@ -1,3 +1,4 @@
+import { DEFAULT_SSO_ARRIVAL_POLICY, emptySsoConnection } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -157,8 +158,9 @@ describe("the SSO callback's linking decision", () => {
     });
 
     /** @scenario "An unverified orphan is never auto-linked" */
+    /** @scenario "The evidence rule also guards a method added to an established account" */
     it("refuses the same way when the IdP itself asserts nothing verified", async () => {
-      const { service, proposals } = build({ byEmail: [candidate()] });
+      const { service, directory, proposals } = build({ byEmail: [candidate()] });
 
       await expect(service.complete({ ...ASSERTION, emailVerified: false })).rejects.toMatchObject({
         code: "identity_link_proposed",
@@ -167,6 +169,7 @@ describe("the SSO callback's linking decision", () => {
       expect(proposals.proposeLink).toHaveBeenCalledWith(
         expect.objectContaining({ reason: "unverified_orphan" }),
       );
+      expect(directory.linkProviderAccount).not.toHaveBeenCalled();
     });
   });
 
@@ -252,6 +255,19 @@ describe("the SSO callback's linking decision", () => {
         service.complete({ ...ASSERTION, arrivalPolicy: "refuse" }),
       ).rejects.toMatchObject({ code: "identity_jit_disabled" });
 
+      expect(directory.provisionUser).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A connection registered before the question turns new arrivals away" */
+    it("refuses an arrival on an unanswered connection even where allowsJit admits", async () => {
+      const { service, directory } = build();
+      const unanswered = emptySsoConnection({ connectionId: "conn_acme" }).arrivalPolicy;
+
+      expect(unanswered).toBe(DEFAULT_SSO_ARRIVAL_POLICY);
+      expect(unanswered).toBe("refuse");
+      await expect(
+        service.complete({ ...ASSERTION, allowsJit: true, arrivalPolicy: unanswered }),
+      ).rejects.toMatchObject({ code: "identity_jit_disabled" });
       expect(directory.provisionUser).not.toHaveBeenCalled();
     });
 

@@ -101,7 +101,14 @@ export interface ProjectApi {
     }>,
     by: Readonly<{ id: string }>,
   ): Promise<Project>;
-  updateSettings(input: Readonly<UpdateProjectInput & { projectId: string }>): Promise<Project>;
+  /**
+   * Stored-object credentials (`s3Endpoint`, `s3AccessKeyId`, `s3SecretAccessKey`)
+   * arrive as plaintext and are sealed on write; reads answer them as stored.
+   */
+  updateSettings(
+    input: Readonly<UpdateProjectInput & { projectId: string }>,
+    by: Readonly<{ id: string }>,
+  ): Promise<Project>;
   archive(input: Readonly<{ projectId: string }>): Promise<{ alreadyArchived: boolean }>;
   /** The live project a legacy `apiKey` column names, or nothing. */
   findIdByLegacyApiKey(input: Readonly<{ token: string }>): Promise<string | null>;

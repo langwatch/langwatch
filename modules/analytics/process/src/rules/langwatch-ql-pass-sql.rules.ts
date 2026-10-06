@@ -1,7 +1,7 @@
 /**
  * The fixed wrappers a pass runs an accepted statement inside, and the values they bind. The
  * statement goes into a subquery character for character; the wrapper only decides which of its
- * rows come back. @see specs/instant-evals/instant-eval-pipeline.feature
+ * rows come back. @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {
@@ -14,12 +14,12 @@ import {
 } from "@langwatch/analytics-contract";
 
 /** The trace identity every pass orders, pages and restricts by. */
-export const LWQL_PASS_TRACE_COLUMN = "TraceId";
+const LWQL_PASS_TRACE_COLUMN = "TraceId";
 
 const SPAN_COLUMN: LangWatchQLPassKeyColumn = "SpanId";
 
 /** One composed pass: the wrapper's text and the values its own parameters take. */
-export interface LangWatchQLComposedPass {
+interface LangWatchQLComposedPass {
   readonly sql: string;
   readonly parameters: Readonly<Record<string, unknown>>;
 }

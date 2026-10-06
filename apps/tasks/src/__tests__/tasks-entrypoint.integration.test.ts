@@ -24,7 +24,7 @@ describe("apps/tasks entrypoint", () => {
         ["--filter", "@langwatch/tasks", "task", "prisma-migrate"],
         { cwd: new URL("../../../..", import.meta.url).pathname, env: environment },
       );
-      const container = await execFileAsync("pnpm", ["-s", "task", "prisma-migrate"], {
+      const container = await execFileAsync("pnpm", ["--silent", "task", "prisma-migrate"], {
         cwd: new URL("../..", import.meta.url).pathname,
         env: environment,
       });
@@ -38,7 +38,7 @@ describe("apps/tasks entrypoint", () => {
     /** @scenario "The task process validates its configuration before a migration runs" */
     /** @scenario Configuration is validated before any migration runs */
     it("refuses before it builds the catalogue or runs a task", async () => {
-      const failure = execFileAsync("pnpm", ["-s", "task", "prisma-migrate"], {
+      const failure = execFileAsync("pnpm", ["--silent", "task", "prisma-migrate"], {
         cwd: new URL("../..", import.meta.url).pathname,
         env: { ...environment, NODE_ENV: "invalid" },
       });

@@ -1,10 +1,16 @@
 /**
  * Telemetry is an everyone-sends-to-one-place concern, so it declares its
  * config slice and secret handles at its framework owner exactly as a module
- * does (§6). The handles come from `@langwatch/observability`, which reads them.
+ * does (§6). The exporter headers are the shared handle rum also reads.
  */
-import { Config, telemetryExporterEndpoint } from "@langwatch/config";
-import { metricsScrapeTokenSecret, otlpHeadersSecret } from "@langwatch/observability/node";
+import {
+  Config,
+  otelResourceAttributes,
+  serviceVersion,
+  telemetryExporterEndpoint,
+} from "@langwatch/config";
+import { metricsScrapeTokenSecret } from "@langwatch/observability/node";
+import { telemetryExporterHeaders } from "@langwatch/secrets/shared-secrets";
 import { z } from "zod";
 
 const optionalString = z.preprocess(
@@ -21,8 +27,9 @@ export const observabilityOwner = {
   config: Config.define((c) => ({
     otlpEndpoint: telemetryExporterEndpoint,
     environment: c.env("ENVIRONMENT", z.string().min(1).default("local")),
-    serviceVersion: c.env("SERVICE_VERSION", optionalString),
-    resourceAttributes: c.env("OTEL_RESOURCE_ATTRIBUTES", optionalString),
+    /** The shared release leaves, so a module reporting its version holds the same instances. */
+    serviceVersion,
+    resourceAttributes: otelResourceAttributes,
     tracesSampleRatio: c.env("OTEL_TRACES_SAMPLER_ARG", z.coerce.number().min(0).max(1).optional()),
     logs: {
       format: c.env("LOG_FORMAT", z.enum(["pretty", "json"]).optional()),
@@ -47,7 +54,7 @@ export const observabilityOwner = {
     },
   })),
   secrets: {
-    otlpHeaders: otlpHeadersSecret,
+    otlpHeaders: telemetryExporterHeaders,
     metricsScrapeToken: metricsScrapeTokenSecret,
   },
 } as const;

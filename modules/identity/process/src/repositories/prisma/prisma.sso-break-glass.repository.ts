@@ -13,7 +13,7 @@ import type {
 import { SsoBreakGlassRepository } from "../sso-break-glass.repository.ts";
 
 /** The models the ways back in are kept in, plus the transaction runner. */
-export type PrismaSsoBreakGlassDatabase = PrismaClient;
+type PrismaSsoBreakGlassDatabase = PrismaClient;
 
 type ActivationRecoveryReservationRow = {
   commandId: string;

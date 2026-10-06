@@ -1,7 +1,7 @@
 /**
  * What a pass wraps around the caller's statement, how it pages, and how it
  * samples. Every case holds the caller's text inside the wrapper character for
- * character. @see specs/instant-evals/instant-eval-pipeline.feature
+ * character. @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {

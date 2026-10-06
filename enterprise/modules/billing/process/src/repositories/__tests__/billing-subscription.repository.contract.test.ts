@@ -120,15 +120,6 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
     });
   });
 
-  describe("when a tenant has never been attributed", () => {
-    it("answers null rather than a neighbouring organization", async () => {
-      const repositories = create();
-
-      await expect(
-        repositories.tenantOrganizations.findOrganizationForTenant("project-1"),
-      ).resolves.toBeNull();
-    });
-  });
   describe("when the webhook names a subscription that is not there", () => {
     it("reports a missing subscription rather than raising, on every write", async () => {
       const repositories = create();

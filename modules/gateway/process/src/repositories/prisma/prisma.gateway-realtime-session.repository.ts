@@ -15,7 +15,7 @@ import {
 } from "../gateway-realtime-session.repository.ts";
 
 /** The client slice realtime sessions are booked and settled through. */
-export type GatewayRealtimeSessionDatabase = Pick<
+type GatewayRealtimeSessionDatabase = Pick<
   PrismaClient,
   "gatewayRealtimeSession" | "virtualKey" | "$transaction" | "$executeRaw"
 >;

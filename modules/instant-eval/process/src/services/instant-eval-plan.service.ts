@@ -1,7 +1,7 @@
 /**
  * Planning a run: how many rows it will judge, and how large a page should be.
  * Two reads and no judging, because a page of long threads costs more memory.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { LangWatchQLAppFunctionCall } from "@langwatch/analytics-contract";
@@ -22,7 +22,7 @@ import type {
 } from "./instant-eval-run-context.service.ts";
 
 /** The Analytics peer, narrowed to the one question the page size asks it. */
-export interface InstantEvalKeyCapSource {
+interface InstantEvalKeyCapSource {
   langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[] }): number;
 }
 

@@ -1,7 +1,7 @@
 /**
  * What the family refuses before a handler runs: the ceilings a request is
  * bounded by are schema rules, so a query past one never reaches the service.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 import { describe, expect, it } from "vitest";
 

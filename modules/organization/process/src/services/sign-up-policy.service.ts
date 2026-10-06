@@ -22,7 +22,7 @@ export interface SignUpPolicySettings {
   adminEmails: readonly string[];
 }
 
-export interface SignUpPolicyDependencies {
+interface SignUpPolicyDependencies {
   settings: SignUpPolicySettings;
   repository: SignUpPolicyRepository;
   /** Whether any account exists, and whether one holds the platform-operator grant. */

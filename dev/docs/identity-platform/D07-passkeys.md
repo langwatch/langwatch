@@ -2,6 +2,12 @@
 
 Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D03 (picker hook point) · Flag: `PASSKEYS_ENABLED` · Specs: `specs/identity/passkeys.feature`
 
+> **Historical (marked 2026-10-05):** written against main's monolith, before `platform/app` was
+> deleted. Paths under `src/server/`, `server/app-layer/` and `packages/authz*` describe that tree.
+> Today a feature is a module (ARCHITECTURE.md §3), pipelines are `definePipeline` in
+> `modules/<name>/process/src/eventing` (§9), and the permission registry is
+> `packages/authorization/src/registry.ts`. Check the current tree before treating a path below as live.
+
 # Overview
 
 Passkeys become first-class identifiers: WebAuthn ceremonies via the official plugin, protocol state in the plugin's table, and mirror rows in `Identifier` so the identifiers model stays conceptually uniform ("how does this person sign in" shows passkeys alongside everything else).

@@ -19,6 +19,7 @@ import {
 import {
   PROJECT_CREATED_EVENT_TYPE,
   PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE,
+  PROJECT_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
   type ProjectCreatedEventData,
   projectCreatedEventDataSchema,
 } from "@langwatch/project-contract";
@@ -29,6 +30,7 @@ import { ProjectCreatedNoticeService } from "../../services/project-created-noti
 import {
   RecordProjectCreatedCommand,
   RecordProjectLegacyKeyRevokedCommand,
+  RecordProjectPresenceSettingChangedCommand,
 } from "../project-lifecycle.commands.ts";
 import type { RecordProjectCreatedCommandData } from "../project-lifecycle.events.ts";
 import { buildProjectLifecyclePipeline } from "../project-lifecycle.pipeline.ts";
@@ -67,6 +69,44 @@ describe("project's lifecycle pipeline", () => {
     expect(event?.type).toBe(PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE);
     expect(event?.aggregateId).toBe("project_1");
     expect(event?.data).toEqual(data);
+  });
+
+  describe("when a project's presence setting is recorded", () => {
+    const presence = (data: { occurredAt: number; backfilled?: boolean }) =>
+      new RecordProjectPresenceSettingChangedCommand().handle({
+        tenantId: createTenantId("project_1"),
+        aggregateId: "project_1",
+        type: RecordProjectPresenceSettingChangedCommand.schema.type,
+        data: {
+          tenantId: "project_1",
+          projectId: "project_1",
+          organizationId: "org_acme",
+          presenceEnabled: false,
+          ...(data.backfilled ? { backfilled: true } : { changedByUserId: "user_1" }),
+          occurredAt: data.occurredAt,
+        },
+      });
+
+    /** @scenario "A changed project presence setting is recorded as project's fact" */
+    it("records a change on the project, carrying who changed it, keyed on its moment", async () => {
+      const [first] = await presence({ occurredAt: 1 });
+      const [second] = await presence({ occurredAt: 2 });
+
+      expect(first?.type).toBe(PROJECT_PRESENCE_SETTING_CHANGED_EVENT_TYPE);
+      expect(first?.aggregateId).toBe("project_1");
+      expect(first?.data).toMatchObject({ presenceEnabled: false, changedByUserId: "user_1" });
+      expect(first?.data.backfilled).toBeUndefined();
+      expect(first?.idempotencyKey).not.toBe(second?.idempotencyKey);
+    });
+
+    /** @scenario "Existing projects' presence settings are recorded by the backfill, idempotently" */
+    it("keys a backfilled setting once per project, so a re-run collapses", async () => {
+      const [first] = await presence({ occurredAt: 1, backfilled: true });
+      const [rerun] = await presence({ occurredAt: 2, backfilled: true });
+
+      expect(first?.idempotencyKey).toBe("project_1:presence-setting:backfilled");
+      expect(rerun?.idempotencyKey).toBe(first?.idempotencyKey);
+    });
   });
 
   it("hosts no reaction on its own events", () => {
@@ -113,7 +153,11 @@ describe("given organization records a newly created personal workspace", () => 
     const heard = vi.fn(async (_data: ProjectCreatedEventData) => void 0);
     const notice = ProjectCreatedNoticeService.create({
       logger: { error: () => void 0 },
-      projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+      projects: {
+        findWithOrgAdmin: async () => null,
+        findIdsByOrganization: async () => [],
+        findWithTeam: async () => null,
+      },
     });
     const eventing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
     const organization = eventing.register(organizationStandIn());
@@ -123,6 +167,7 @@ describe("given organization records a newly created personal workspace", () => 
     notice.connect({
       recordProjectCreated: lifecycle.commands.recordProjectCreated,
       recordProjectLegacyKeyRevoked: lifecycle.commands.recordProjectLegacyKeyRevoked,
+      recordPresenceSettingChanged: lifecycle.commands.recordPresenceSettingChanged,
     });
     eventing.register(createdListener(heard));
 

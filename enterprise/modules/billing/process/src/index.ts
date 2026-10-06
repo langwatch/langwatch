@@ -18,7 +18,6 @@ export {
   subscriptionTrpcTransport,
   type BillingSubscriber,
 } from "./transport/subscription.trpc.ts";
-export type { PostgresBillingPersistence } from "./repositories/prisma/prisma.postgres.repository.ts";
 export type { BillingCheckpoint } from "./repositories/billing-checkpoint.repository.ts";
 export type { BillingOrganizationCacheRepository } from "./repositories/billing-organization-cache.repository.ts";
 export {
@@ -40,14 +39,27 @@ export {
   type ProviderInvoice,
 } from "./channels/connected-invoicing.channel.ts";
 export { connectedInvoicingChannels } from "./channels/connected-invoicing-channels.registry.ts";
-export type { ConnectedBillingAccountRecord, ConnectedCreditGrantRecord, ConnectedInvoiceRecord, ConnectedSeatChangeRecord, PendingRenewal } from "./repositories/connected-billing.repository.ts";
+export type {
+  ConnectedBillingAccountRecord,
+  ConnectedCreditGrantRecord,
+  ConnectedInvoiceRecord,
+  ConnectedSeatChangeRecord,
+  PendingRenewal,
+} from "./repositories/connected-billing.repository.ts";
 export type { ConnectedBillingDatabase } from "./repositories/prisma/prisma.connected-billing.repository.ts";
 export type { ConnectedBillingTerms } from "./services/connected-billing.service.ts";
-export type { CommitDrawdown, ConnectedCustomer, ConnectedStatement, ConnectedStatementSources, MonthlyStatementRunSummary, StatementSeats, StatementSpendLine } from "./services/connected-monthly-statement.service.ts";
+export type {
+  CommitDrawdown,
+  ConnectedCustomer,
+  ConnectedStatement,
+  ConnectedStatementSources,
+  MonthlyStatementRunSummary,
+  StatementSeats,
+  StatementSpendLine,
+} from "./services/connected-monthly-statement.service.ts";
 export { ConnectedStatementMailChannel } from "./channels/connected-statement-mail.channel.ts";
 export { connectedStatementMailChannels } from "./channels/connected-statement-mail-channels.registry.ts";
 export type { BillableEventsWindow } from "./repositories/billable-events.repository.ts";
-export type { TenantOrganizationRepository } from "./repositories/tenant-organization.repository.ts";
 /**
  * What a process composes billing's process-side work from. The repositories
  * and services behind these stay private to this feature server.
@@ -55,13 +67,9 @@ export type { TenantOrganizationRepository } from "./repositories/tenant-organiz
 export {
   createBillableEventsQuery,
   createBillingOrganizationCache,
-  createBillingTenantOrganizations,
   createDeploymentPlanSources,
   createStripeUsageReporting,
 } from "./billing.module.ts";
-export type { BillingTenantOrganizationCache } from "./services/tenant-organization.service.ts";
-export type { BillingTenantOrganizationCacheRedis } from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
-export type { BillingTenantOrganizationDatabase } from "./repositories/prisma/prisma.tenant-organization.repository.ts";
 export type { BillingSubscriptionRepository } from "./repositories/subscription.repository.ts";
 export type { BillingCooldownCache } from "./services/billing-alert-cooldown.service.ts";
 export type {

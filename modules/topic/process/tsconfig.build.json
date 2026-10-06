@@ -51,7 +51,7 @@
       "path": "../../../packages/process/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/process-stores/tsconfig.build.json"
+      "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"

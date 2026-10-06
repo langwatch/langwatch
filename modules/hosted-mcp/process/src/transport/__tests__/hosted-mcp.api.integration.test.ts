@@ -20,10 +20,11 @@ import {
 } from "vitest";
 
 import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
+import { LiveHostedMcpRepositories } from "../../repositories/live/live.hosted-mcp.repositories.ts";
+import type { McpSessionCipher } from "../../repositories/mcp-session.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
 import { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
 import type { McpHandler } from "../../services/mcp-endpoint.service.ts";
-import type { McpApiKeyCipher } from "../../services/mcp-oauth-token.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
@@ -90,7 +91,7 @@ const sessionGrant = new FakeSessionGrant();
 const cliSessions = new FakeCliSessions();
 
 /** Identity "encryption", so a test can read the value it expected to be stored. */
-class ReversibleTestCipher implements McpApiKeyCipher {
+class ReversibleTestCipher implements McpSessionCipher {
   encrypt(text: string): string {
     return `encrypted:${text}`;
   }
@@ -343,11 +344,13 @@ let handler: McpHandler;
 
 beforeAll(async () => {
   handler = HostedMcpModule.fromDependencies({
-    redis: redisDouble(mockRedis),
+    repositories: LiveHostedMcpRepositories.create({
+      redis: redisDouble(mockRedis),
+      encryption: new ReversibleTestCipher(),
+    }),
     projects: new FakeProjectLookup(),
     grants: sessionGrant,
     cliSessions,
-    cipher: new ReversibleTestCipher(),
     address: HeaderMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",
   }).createHandler();

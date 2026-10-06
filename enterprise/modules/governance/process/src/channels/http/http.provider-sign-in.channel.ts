@@ -3,7 +3,7 @@
 import { ProviderSignInError } from "@langwatch/enterprise-governance-contract";
 import { z } from "zod";
 
-import type { GovernanceHttpClient } from "../../app/governance.members.ts";
+import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 import type { ProviderSignInChannel } from "../provider-sign-in.channel.ts";
 
 const TOKEN_TIMEOUT_MS = 15_000;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { GovernanceObjectStore } from "../../app/governance.members.ts";
+import type { GovernanceObjectStore } from "../object-store.channel.ts";
 
 /** A source's bucket in memory: it lists and reads what a test seeded, in key order. */
 export class MemoryObjectStoreChannel implements GovernanceObjectStore {

@@ -8,7 +8,7 @@ import {
 
 type Actor = Readonly<{ id: string }>;
 
-export type ProjectRequestOptions = Readonly<{
+type ProjectRequestOptions = Readonly<{
   projects: ProjectApi;
   probePermission: (input: {
     permission: "project:delete";

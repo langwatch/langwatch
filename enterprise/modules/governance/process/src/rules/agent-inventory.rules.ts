@@ -14,7 +14,7 @@ import {
 } from "./agent-inventory-rows.rules.ts";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "./dataverse-environment-service.rules.ts";
 
-export type AgentInventory = { rows: GovernanceAgentRow[]; unknownProviders: string[] };
+type AgentInventory = { rows: GovernanceAgentRow[]; unknownProviders: string[] };
 
 /** Closed: a provider with no chip is dropped and reported, never filed under Custom. */
 const SOURCE_BY_PROVIDER: ReadonlyMap<string, AgentSource> = new Map([

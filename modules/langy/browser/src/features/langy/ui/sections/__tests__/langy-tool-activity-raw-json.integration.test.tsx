@@ -38,10 +38,26 @@ function skillMessage(): UIMessage {
   };
 }
 
-function renderActivity() {
+function cardlessCliMessage(): UIMessage {
+  return {
+    id: "assistant-2",
+    role: "assistant",
+    parts: [
+      {
+        type: "tool-bash",
+        toolCallId: "call-2",
+        state: "output-available",
+        input: { command: "langwatch docs integration/python/openai" },
+        output: "# OpenAI integration\nInstall the SDK.",
+      } as never,
+    ],
+  };
+}
+
+function renderActivity(message: UIMessage = skillMessage()) {
   return render(
     <DesignSystemProvider forcedTheme="light">
-      <LangyToolActivity message={skillMessage()} />
+      <LangyToolActivity message={message} />
     </DesignSystemProvider>,
   );
 }
@@ -73,6 +89,23 @@ describe("Langy tool activity raw payload", () => {
 
       expect(screen.queryByRole("button", { name: /raw data/i })).not.toBeInTheDocument();
       expect(container.textContent).not.toContain('"tool"');
+    });
+  });
+
+  describe("given a LangWatch CLI command that has no card", () => {
+    /** @scenario "A CLI command with no card for it falls back to raw activity" */
+    it("renders it as activity and keeps its raw payload inspectable", async () => {
+      devModeRef.current = true;
+      const user = userEvent.setup();
+      const { container } = renderActivity(cardlessCliMessage());
+
+      expect(container.textContent).toContain("Ran a command");
+      expect(container.textContent).not.toContain("call-2");
+
+      await user.click(screen.getByRole("button", { name: "Show raw data" }));
+
+      expect(container.textContent).toContain("langwatch docs integration/python/openai");
+      expect(container.textContent).toContain("output-available");
     });
   });
 });

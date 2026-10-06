@@ -4,15 +4,12 @@
  * `@langwatch/browser-host` capability. ARCHITECTURE.md §10.1.
  */
 
-import {
-  useUiCapabilities,
-  useUiDeclarations,
-  useUiScope,
-} from "@langwatch/browser-host/capabilities";
-import type { UiProjectSwitcherProps } from "@langwatch/browser-host/declarations";
+import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import { useLent } from "@langwatch/browser-host/lent";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
-import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
+import { ProjectSwitcherToken, type ProjectSwitcherProps } from "@langwatch/project-contract";
+import { Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
 import {
   ProjectHostApi,
@@ -38,7 +35,7 @@ class CapabilityProjectHost extends ProjectHostApi {
   private readonly scopeHost: UiScopeHost | undefined;
   private readonly succeededOf: (notice: ProjectSuccessNotice) => void;
   private readonly failedOf: (failure: ProjectFailureNotice) => void;
-  private readonly Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
+  private readonly Switcher: ComponentType<ProjectSwitcherProps> | undefined;
   private readonly openOverlayOf: (name: string, props?: Record<string, unknown>) => void;
 
   constructor(options: {
@@ -49,7 +46,7 @@ class CapabilityProjectHost extends ProjectHostApi {
     scopeHost: UiScopeHost | undefined;
     succeededOf: (notice: ProjectSuccessNotice) => void;
     failedOf: (failure: ProjectFailureNotice) => void;
-    Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
+    Switcher: ComponentType<ProjectSwitcherProps> | undefined;
     openOverlayOf: (name: string, props?: Record<string, unknown>) => void;
   }) {
     super();
@@ -84,7 +81,7 @@ class CapabilityProjectHost extends ProjectHostApi {
     return this.isFeatureEnabledOf(flag);
   }
 
-  /** The switcher project lends by declaration (ARCHITECTURE §10); null where none is declared. */
+  /** The switcher project lends by token (ARCHITECTURE §10); null where none is lent. */
   projectSwitcher(): ReactNode | null {
     const { Switcher } = this;
     if (!Switcher) return null;
@@ -119,13 +116,8 @@ export default function ProjectHostMount({ children }: { children?: ReactNode })
   const scope = useUiScope();
   const { organizationId, projectId } = scope.activeScope();
   const scopeHost = scope.scopeHost();
-  const declarations = useUiDeclarations();
   const { openDrawer } = useDrawer();
-  // `lazy` once per declaration, never per render, so the switcher is not remounted.
-  const Switcher = useMemo(() => {
-    const [lent] = declarations.declared("projectSwitcher");
-    return lent ? lazy(lent.capability.load) : void 0;
-  }, [declarations]);
+  const Switcher = useLent(ProjectSwitcherToken);
 
   const organizations = projectApi.organization.getAll.useQuery(
     { isDemo: false },

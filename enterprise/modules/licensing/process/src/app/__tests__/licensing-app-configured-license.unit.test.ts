@@ -1,115 +1,84 @@
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { ResourceScope } from "@langwatch/process";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * Specs: specs/licensing/configured-license-forms.feature and
  * specs/licensing/sso-license-gating.feature
  */
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import { ResourceScope } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ENTERPRISE_LICENSE_KEY, TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
-import { MemoryConnectLicenseChannel } from "../../channels/memory/memory.connect-license.channel.ts";
+import { createTestLicensingApp, ENTERPRISE_LICENSE_KEY } from "../../__tests__/testing.ts";
+import { ScriptedConnectHost } from "../../channels/__tests__/support/scripted-connect-fetch.ts";
 import { MemoryConnectOrganizationRepository } from "../../repositories/memory/memory.connect-organization.repository.ts";
 import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memory.instance-identity.repository.ts";
-import { LicensingModule } from "../licensing.app.ts";
-import type { LicenseStorage, StoredLicense } from "../licensing.members.ts";
+import { MemoryOrganizationLicenseRepository } from "../../repositories/memory/memory.organization-license.repository.ts";
 
 const CODE = "LW-A1B2-C3D4-E5F6-G7H8";
 
-class OneOrganizationStorage implements LicenseStorage {
-  license: string | null = null;
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
-  async getOrganizationLicense(): Promise<{ licenseKey: string | null }> {
-    return { licenseKey: this.license };
-  }
+/** The Connect host the install redeems at, reached over the runtime's own fetch. */
+function connectHost(): ScriptedConnectHost {
+  const host = new ScriptedConnectHost().answers(200, {
+    license: ENTERPRISE_LICENSE_KEY,
+    planType: "ENTERPRISE",
+    maxMembers: 100,
+    expiresAt: "2030-12-31T23:59:59Z",
+    services: [],
+  });
+  vi.stubGlobal("fetch", host.fetch);
+  return host;
+}
 
-  async findOrganizationsWithLicense() {
-    return this.license ? [{ organizationId: "org-old", licenseKey: this.license }] : [];
-  }
-
-  async organizationExists(): Promise<boolean> {
-    return true;
-  }
-
-  async storeLicense(_organizationId: string, license: StoredLicense): Promise<void> {
-    this.license = license.licenseKey;
-  }
-
-  async removeLicense(): Promise<void> {
-    this.license = null;
-  }
-
-  async getMemberCount(): Promise<number> {
-    return 0;
-  }
-
-  async getMembersLiteCount(): Promise<number> {
-    return 0;
-  }
+/** What reached the host's activation route: the code it carried and the install it named. */
+function activations(host: ScriptedConnectHost) {
+  return host.sent
+    .filter(({ url }) => url.endsWith("/v1/license/activate"))
+    .map(({ headers }) => ({
+      code: headers.authorization?.replace(/^Bearer /, ""),
+      instanceId: headers["x-langwatch-instance"],
+    }));
 }
 
 async function bootWithConfiguredValue(value: string) {
-  const storage = new OneOrganizationStorage();
-  const host = MemoryConnectLicenseChannel.create({
-    activationAnswer: {
-      license: ENTERPRISE_LICENSE_KEY,
-      planType: "ENTERPRISE",
-      maxMembers: 100,
-      expiresAt: "2030-12-31T23:59:59Z",
-      services: [],
-    },
-  });
+  const host = connectHost();
+  const licenses = MemoryOrganizationLicenseRepository.create(new Map([["org-old", null]]));
   const resources = new ResourceScope();
-  const app = await LicensingModule.create({
+  const app = await createTestLicensingApp({
+    repositories: {
+      organizationLicenses: licenses,
+      connectOrganizations: MemoryConnectOrganizationRepository.create({
+        rows: new Map([
+          [
+            "org-old",
+            {
+              organizationId: "org-old",
+              license: null,
+              servicesDisabled: [],
+              lastSyncAt: null,
+              lastSyncError: null,
+            },
+          ],
+        ]),
+      }),
+      instanceIdentity: MemoryInstanceIdentityRepository.create({
+        seed: { instanceId: "instance-1" },
+      }),
+    },
     dependencies: {
-      instantEval: createApiFixture<InstantEvalApi>(),
-      projects: createApiFixture<ProjectApi>(),
-      gateway: createApiFixture<GatewayApi>(),
-      organizations: createApiFixture<OrganizationApi>(),
+      gateway: createApiFixture<GatewayApi>({
+        setConnectUpstreamInternal: async () => undefined,
+        clearConnectUpstreamInternal: async () => undefined,
+      }),
     },
-    members: {
-      infrastructure: {
-        repository: storage,
-        configuredAuthProvider: () => null,
-        platformSsoAllowed: async () => true,
-        authProviderIsMounted: () => true,
-        reportSigningFailure: () => {},
-        connect: {
-          organizations: MemoryConnectOrganizationRepository.create({
-            rows: new Map([
-              [
-                "org-old",
-                {
-                  organizationId: "org-old",
-                  license: null,
-                  servicesDisabled: [],
-                  lastSyncAt: null,
-                  lastSyncError: null,
-                },
-              ],
-            ]),
-          }),
-          identity: MemoryInstanceIdentityRepository.create({ seed: { instanceId: "instance-1" } }),
-          licenseHost: host,
-          instanceLicenseKey: () => undefined,
-          newInstanceId: () => "instance-1",
-          version: () => "test",
-        },
-      },
-      isSaas: false,
-      serviceVersion: "test",
-    },
-    config: { ...TEST_LICENSING_CONFIG, connectDisabled: false },
+    config: { connectDisabled: false },
+    secrets: { LANGWATCH_LICENSE_KEY: value },
     resources,
-    secrets: new ScopedSecrets(async (handle, build) =>
-      build(handle.id === "LANGWATCH_LICENSE_KEY" ? value : undefined),
-    ),
   });
-  return { app, host, storage, services: resources.sealServices() };
+  const storedLicense = async () => (await licenses.getOrganizationLicense("org-old")).licenseKey;
+  return { app, host, storedLicense, services: resources.sealServices() };
 }
 
 describe("LicensingModule with a configured license value", () => {
@@ -126,13 +95,13 @@ describe("LicensingModule with a configured license value", () => {
 
     /** @scenario "an activation code in the license variable is redeemed at boot" */
     it("redeems it at start with this install's instance id and stores the license", async () => {
-      const { app, host, storage, services } = await bootWithConfiguredValue(CODE);
+      const { app, host, storedLicense, services } = await bootWithConfiguredValue(CODE);
       expect(services.map(({ name }) => name)).toEqual(["configured license activation"]);
 
       for (const service of services) await service.start();
 
-      expect(host.activations).toEqual([{ code: "LWA1B2C3D4E5F6G7H8", instanceId: "instance-1" }]);
-      expect(storage.license).toBe(ENTERPRISE_LICENSE_KEY);
+      expect(activations(host)).toEqual([{ code: "LWA1B2C3D4E5F6G7H8", instanceId: "instance-1" }]);
+      expect(await storedLicense()).toBe(ENTERPRISE_LICENSE_KEY);
       expect(await app.inspectPlatformAccess()).toMatchObject({ allowed: true });
     });
 
@@ -155,7 +124,7 @@ describe("LicensingModule with a configured license value", () => {
 
       expect(services).toEqual([]);
       expect(await app.inspectPlatformAccess()).toMatchObject({ allowed: true });
-      expect(host.activations).toEqual([]);
+      expect(activations(host)).toEqual([]);
     });
   });
 });

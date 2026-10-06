@@ -33,6 +33,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",
     "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/analytics-filters": "workspace:*",
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
@@ -66,6 +67,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/redaction": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/share-contract": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",

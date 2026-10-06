@@ -15,7 +15,9 @@ export class GrantPlatformOperatorTask extends Task {
   readonly description =
     "Grants the platform-operator role to the existing, active account an email address belongs to.";
 
-  private constructor(private readonly operators: Pick<OpsModule, "grantPlatformOperatorAsSystem">) {
+  private constructor(
+    private readonly operators: Pick<OpsModule, "grantPlatformOperatorAsSystem">,
+  ) {
     super();
   }
 

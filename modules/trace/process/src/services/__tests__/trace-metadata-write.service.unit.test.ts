@@ -2,7 +2,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceSpanIngest } from "../../app/trace.members.ts";
+import type { TraceSpanIngest } from "../trace-metadata-write.service.ts";
 import { TraceMetadataWriteService } from "../trace-metadata-write.service.ts";
 
 async function recordedFor(metadata: Record<string, string | string[]>) {

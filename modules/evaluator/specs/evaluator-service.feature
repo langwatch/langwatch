@@ -23,6 +23,7 @@ Feature: Evaluator service boundary
     And both answer an absence with undefined rather than a refusal
     And neither answers with a row belonging to another project
 
+  @unit
   Scenario: Evaluator persistence stays behind the server boundary
     Given an evaluator is loaded from Postgres
     When the repository maps the row

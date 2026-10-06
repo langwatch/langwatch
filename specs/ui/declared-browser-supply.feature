@@ -32,7 +32,7 @@ Feature: A browser cannot boot without what its web modules declared
 
   Rule: the supply required is exactly what the installed web modules declared
 
-    @unit @unimplemented
+    @unit
     Scenario: A browser installing one module is asked only for that module's needs
       Given a single installed web module that declares one screen and no configuration
       When the composition supplies a document and a transport
@@ -120,15 +120,9 @@ Feature: A browser cannot boot without what its web modules declared
   # Drawers and commands
   # ---------------------------------------------------------------------------
 
-  Rule: a drawer is opened by a name and with props the drawer declared
+  Rule: a drawer is opened by a name the module declared
 
-    @unit @unimplemented
-    Scenario: Opening a drawer with props it does not take fails the build
-      Given a drawer declared with its own props
-      When a caller opens it with a property the drawer does not declare
-      Then the build fails, naming the drawer and the property
-
-    @unit @unimplemented
+    @unit
     Scenario: Two modules declaring one drawer name fail the build
       Given two installed web modules declaring the same drawer name
       Then the build fails, naming both modules and the drawer
@@ -163,12 +157,6 @@ Feature: A browser cannot boot without what its web modules declared
   # ---------------------------------------------------------------------------
 
   Rule: a module reads only the flags it declared
-
-    @unit @unimplemented
-    Scenario: Reading an undeclared flag fails the build
-      Given a module that declared one browser-visible flag
-      When it reads a different one
-      Then the build fails, naming the module and the flag
 
     @unit @unimplemented
     Scenario: Declaring a flag that does not exist fails the build
@@ -207,14 +195,14 @@ Feature: A browser cannot boot without what its web modules declared
       Then it refuses before the first render
       And the reader is shown named copy, not a blank page
 
-    @integration @unimplemented
+    @unit
     Scenario: A module refuses the value it was given
       Given an injected configuration whose slice fails a module's own schema
       When the browser boots
       Then it refuses before the first render, naming the module
       And the refusal never repeats the value it refused
 
-    @integration @unimplemented
+    @unit
     Scenario: A configuration that parses draws no screen before it is checked
       Given an injected configuration every installed module accepts
       When the browser boots
@@ -250,7 +238,7 @@ Feature: A browser cannot boot without what its web modules declared
 
   Rule: the browser renders only when nothing is outstanding
 
-    @unit @unimplemented
+    @unit
     Scenario: Rendering with a supply outstanding fails the build
       Given installed modules that require a transport
       When the composition calls render without supplying one

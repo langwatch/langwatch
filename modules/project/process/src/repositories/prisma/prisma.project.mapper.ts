@@ -15,7 +15,7 @@ export const PROJECT_IDENTITY_SELECT = {
   team: { select: { organizationId: true } },
 } as const;
 
-export type ProjectIdentityRow = {
+type ProjectIdentityRow = {
   id: string;
   name: string;
   slug: string;

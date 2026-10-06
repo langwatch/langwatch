@@ -8,13 +8,13 @@ import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import type {
-  GovernanceDiagnosticsSink,
   AnomalySpendReader,
   AnomalySpendSourceFilter,
-} from "../app/governance.members.ts";
-import { silentGovernanceDiagnostics } from "../app/governance.members.ts";
+} from "../repositories/governance.repositories.ts";
 import type { SpendSpikeAnomalyRepository } from "../repositories/spend-spike-anomaly.repository.ts";
 import type { AnomalyAlertDispatcherService } from "./anomaly-alert-dispatcher.service.ts";
+import type { GovernanceDiagnosticsSink } from "./governance-policy.service.ts";
+import { silentGovernanceDiagnostics } from "./governance-policy.service.ts";
 
 const BASELINE_WINDOWS = 6;
 

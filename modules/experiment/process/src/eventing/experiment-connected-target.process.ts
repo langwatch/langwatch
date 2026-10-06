@@ -27,7 +27,7 @@ export const CONNECTED_BUSY_RETRY_BUDGET_MS = 60_000;
 export const CONNECTED_REQUEST_SLACK_MS = 15_000;
 
 /** What the column sends for one row. */
-export type ConnectedTargetCall = {
+type ConnectedTargetCall = {
   messages: ProtocolMessage[];
   params: Record<string, string | number | boolean>;
 };

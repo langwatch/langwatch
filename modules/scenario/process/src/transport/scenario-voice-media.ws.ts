@@ -2,7 +2,7 @@ import { RawSocketProtocol } from "@langwatch/api";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 
 /** Where Twilio dials back for a phone run's media, on the worker's own port. */
-export const VOICE_MEDIA_PATH = "/twilio/:nonce";
+const VOICE_MEDIA_PATH = "/twilio/:nonce";
 
 export function createScenarioVoiceMediaDoor(): RawSocketProtocol<ScenarioApi> {
   return RawSocketProtocol.create<ScenarioApi>({

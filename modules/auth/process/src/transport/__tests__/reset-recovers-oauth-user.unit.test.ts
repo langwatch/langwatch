@@ -119,3 +119,89 @@ describe("password reset for an OAuth-born user (upstream premise pin)", () => {
     });
   });
 });
+
+describe("a credential user's password reset and sign-in refusals (upstream premise pin)", () => {
+  const EMAIL = "sam@example.com";
+  const OLD_PASSWORD = "old-password-1";
+  let db: MemoryDB;
+  let auth: ReturnType<typeof buildAuth>;
+  let token: string;
+
+  const credentialPassword = () =>
+    db.account!.find((a) => a.providerId === "credential")?.password as string;
+
+  beforeEach(async () => {
+    db = { user: [], session: [], account: [], verification: [] };
+    let resetUrl: string | undefined;
+    auth = buildAuth(db, (url) => {
+      resetUrl = url;
+    });
+    await auth.api.signUpEmail({ body: { email: EMAIL, password: OLD_PASSWORD, name: "Sam" } });
+    await auth.api.requestPasswordReset({
+      body: { email: EMAIL, redirectTo: "/auth/reset-password" },
+    });
+    token = new URL(resetUrl!).pathname.split("/").pop()!;
+  });
+
+  describe("when a token that already changed the password is submitted again", () => {
+    it("refuses it as an invalid token and changes neither the credential nor the sessions", async () => {
+      await auth.api.resetPassword({ body: { token, newPassword: "first-new-password" } });
+      const credentialAfterReset = credentialPassword();
+      const sessionsAfterReset = db.session!.length;
+
+      await expect(
+        auth.api.resetPassword({ body: { token, newPassword: "second-new-password" } }),
+      ).rejects.toMatchObject({ body: { code: "INVALID_TOKEN" } });
+
+      expect(credentialPassword()).toBe(credentialAfterReset);
+      expect(db.session).toHaveLength(sessionsAfterReset);
+      await expect(
+        auth.api.signInEmail({ body: { email: EMAIL, password: "first-new-password" } }),
+      ).resolves.toMatchObject({ user: { email: EMAIL } });
+    });
+  });
+
+  describe("when a token that has expired is submitted", () => {
+    it("refuses it as an invalid token and changes neither the credential nor the sessions", async () => {
+      db.verification!.forEach((row) => {
+        row.expiresAt = new Date(Date.now() - 1_000);
+      });
+      const credentialBefore = credentialPassword();
+      const sessionsBefore = db.session!.length;
+
+      await expect(
+        auth.api.resetPassword({ body: { token, newPassword: "late-new-password" } }),
+      ).rejects.toMatchObject({ body: { code: "INVALID_TOKEN" } });
+
+      expect(credentialPassword()).toBe(credentialBefore);
+      expect(db.session).toHaveLength(sessionsBefore);
+      await expect(
+        auth.api.signInEmail({ body: { email: EMAIL, password: OLD_PASSWORD } }),
+      ).resolves.toMatchObject({ user: { email: EMAIL } });
+    });
+  });
+
+  describe("when a wrong password and an unknown address are each submitted", () => {
+    it("refuses both with the same generic error and creates nothing", async () => {
+      const usersBefore = db.user!.length;
+      const accountsBefore = db.account!.length;
+      const sessionsBefore = db.session!.length;
+
+      const wrongPassword = await auth.api
+        .signInEmail({ body: { email: EMAIL, password: "not-the-password" } })
+        .catch((error: unknown) => error);
+      const unknownAddress = await auth.api
+        .signInEmail({ body: { email: "nobody@example.com", password: "any-password-1" } })
+        .catch((error: unknown) => error);
+
+      expect(wrongPassword).toMatchObject({ body: { code: "INVALID_EMAIL_OR_PASSWORD" } });
+      expect(unknownAddress).toMatchObject({ body: { code: "INVALID_EMAIL_OR_PASSWORD" } });
+      expect((unknownAddress as { body: unknown }).body).toEqual(
+        (wrongPassword as { body: unknown }).body,
+      );
+      expect(db.user).toHaveLength(usersBefore);
+      expect(db.account).toHaveLength(accountsBefore);
+      expect(db.session).toHaveLength(sessionsBefore);
+    });
+  });
+});

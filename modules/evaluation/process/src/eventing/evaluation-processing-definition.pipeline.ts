@@ -51,7 +51,7 @@ export type EvaluationProcessingPipeline = StaticPipelineDefinition<
   | { name: "reportEvaluation"; payload: ReportEvaluationCommandData }
 >;
 
-export interface EvaluationProcessingPipelineDeps {
+interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
   evaluationAnalyticsStore: FoldProjectionStore<EvaluationAnalyticsData>;
   evaluationAnalyticsRollupAppendStore: AppendStore<EvaluationAnalyticsRollupRow>;

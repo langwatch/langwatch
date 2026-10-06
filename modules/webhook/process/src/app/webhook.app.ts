@@ -14,7 +14,6 @@ import type {
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
@@ -57,7 +56,9 @@ import { WebhookEventsService } from "../services/webhook-events.service.ts";
 import { WebhookGovernanceDeliveryService } from "../services/webhook-governance-delivery.service.ts";
 import { WebhookHealthService } from "../services/webhook-health.service.ts";
 import { WebhookRequestService } from "../services/webhook-request.service.ts";
+import { WebhookSpendReplayService } from "../services/webhook-spend-replay.service.ts";
 import { WebhookTestBoundsService } from "../services/webhook-test-bounds.service.ts";
+import type { WebhookSpendReplayDoorApi } from "../transport/webhook-spend-replay.rest.ts";
 
 /** Synthetic test-fire ids; sent once and never read back by kind. */
 const TEST_EVENT_KSUID_RESOURCE = "evttest";
@@ -101,7 +102,7 @@ async function recordTestFire(
 const logger = createLogger("langwatch:webhook:app");
 
 /** One endpoint's last hop, as the delivery worker performs it. */
-export type WebhookTestDispatchInput = {
+type WebhookTestDispatchInput = {
   destination: WebhookDestinationConfig;
   organizationId: string;
   endpointId: string;
@@ -147,16 +148,9 @@ export interface WebhookAppDependencies {
   requests?: WebhookRequestService;
 }
 
-const storeReads = ["rateLimiter"] as const;
-
 type WebhookSetup = FeatureSetup<
   typeof WebhookModule.dependencies,
-  MembersRead<typeof storeReads> &
-    Readonly<{
-      isSaas: boolean;
-      /** The proxy spellings, a process fact; SQS deliveries follow them. */
-      outboundProxy: Readonly<Record<string, string | undefined>>;
-    }>,
+  never,
   WebhookServerConfig,
   WebhookRepositories
 >;
@@ -169,13 +163,11 @@ type WebhookDeliveryParts = Readonly<{
   dispatch: () => WebhookDeliveryProcessDeps["dispatch"];
 }>;
 
-export class WebhookModule implements WebhookApiContract {
+export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoorApi {
   static readonly contract = WebhookApi;
   /** The entitlement peer this app's own plan gate reads (`WebhookAccessService`),
    *  and the project peer naming an organization's tenants for the events listing. */
   static readonly dependencies = { entitlement: EntitlementApi, projects: ProjectApi };
-  /** The test-fire door's per-organization counter. */
-  static readonly reads = ["rateLimiter", "isSaas", "outboundProxy"] as const;
   static readonly config = webhookConfig;
 
   static create(input: WebhookSetup): WebhookModule {
@@ -185,11 +177,11 @@ export class WebhookModule implements WebhookApiContract {
     const egress = WebhookEgressService.create({
       caps,
       http: HttpDestinationChannel.create({
-        tls: { rejectUnauthorized: input.members.isSaas },
+        tls: { rejectUnauthorized: input.config.isSaas },
       }),
     });
     const aws = AwsClientConfiguration.create({
-      outboundProxy: sqsProxyResolver(parseOutboundProxyConfig(input.members.outboundProxy)),
+      outboundProxy: sqsProxyResolver(parseOutboundProxyConfig(input.config.outboundProxy)),
     });
     const deliver = WebhookDeliveryService.dispatchThrough({
       destinations: WebhookDestinationDispatchService.create({
@@ -216,7 +208,7 @@ export class WebhookModule implements WebhookApiContract {
       dispatch: deliver,
       testFireBounds: WebhookTestBoundsService.create({
         entitlement: input.dependencies.entitlement,
-        rateLimiter: input.members.rateLimiter,
+        rateLimits: input.repositories.rateLimits,
       }),
       requests: WebhookRequestService.create({
         egress,
@@ -264,6 +256,7 @@ export class WebhookModule implements WebhookApiContract {
     return buildWebhookDeliveryPipeline({
       deliveryProcess: WebhookDeliveryService.create(deps).processManager(),
       governanceProcess: WebhookGovernanceDeliveryService.create(deps).processManager(),
+      gatewayEvents: (request) => this.requestGatewayEventDelivery(request),
     });
   }
 
@@ -408,6 +401,10 @@ export class WebhookModule implements WebhookApiContract {
   };
   appendReplayToEndpointStream: WebhookApiContract["appendReplayToEndpointStream"] = (input) =>
     this.#requeue.appendReplay(input);
+
+  /** `POST /api/gateway/v1/spend-events/replay`, over this module's own endpoints and log. */
+  answerSpendReplay: WebhookSpendReplayDoorApi["answerSpendReplay"] = (input) =>
+    WebhookSpendReplayService.create(this).answerSpendReplay(input);
 
   get #endpointSaves(): WebhookEndpointService {
     return WebhookEndpointService.create({

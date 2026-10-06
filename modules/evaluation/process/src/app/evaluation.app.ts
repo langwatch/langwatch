@@ -41,7 +41,6 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { openAiApiKey, Secret } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -49,7 +48,6 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { langevalsChannels } from "../channels/langevals-channels.registry.ts";
 import { NullLangevalsChannel } from "../channels/null.langevals.channel.ts";
-import { ObjectStorageLangevalsPayloadStaging } from "../channels/object-storage.langevals-payload-staging.channel.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import type { EvaluationLifecyclePipeline } from "../eventing/evaluation-lifecycle.pipeline.ts";
 import {
@@ -93,8 +91,10 @@ import { EvaluationSavedEvaluatorService } from "../services/evaluation-saved-ev
 import { EvaluationSettingsRecoverySwitchService } from "../services/evaluation-settings-recovery-switch.service.ts";
 import { EvaluationSpanDigestService } from "../services/evaluation-span-digest.service.ts";
 import { EvaluationService } from "../services/evaluation.service.ts";
+import { EvaluatorEffectiveSettingsService } from "../services/evaluator-effective-settings.service.ts";
 import { EvaluatorEnvironmentService } from "../services/evaluator-environment.service.ts";
 import { EvaluatorModelEnvService } from "../services/evaluator-model-env.service.ts";
+import { EvaluatorSettingsService } from "../services/evaluator-settings.service.ts";
 import { LangevalsClusteringService } from "../services/langevals-clustering.service.ts";
 import { LangevalsEvaluatorService } from "../services/langevals-evaluator.service.ts";
 import { LangevalsPiiDetectionService } from "../services/langevals-pii-detection.service.ts";
@@ -194,13 +194,13 @@ export interface EvaluationRunAnalytics {
 }
 
 /** The monitors and datasets an evaluate call addresses by slug. */
-export interface EvaluationSlugDirectory {
+interface EvaluationSlugDirectory {
   findMonitorBySlug(input: EvaluationSlugLookup): Promise<EvaluationMonitorSummary | null>;
   findDatasetBySlug(input: EvaluationSlugLookup): Promise<EvaluationSlugMatch | null>;
 }
 
 /** The saved-evaluator directory the `evaluators/{slug|id}` form resolves on. */
-export interface EvaluationSavedEvaluatorDirectory {
+interface EvaluationSavedEvaluatorDirectory {
   resolveForExecution(input: SavedEvaluatorLookup): Promise<SavedEvaluatorResolution>;
 }
 
@@ -209,24 +209,24 @@ export interface EvaluationSavedEvaluatorDirectory {
  * caller's only answer to an unconfigured cascade is the evaluator's own
  * default, so the exception the cascade raises has no consumer on this path.
  */
-export interface EvaluationModelCascade {
+interface EvaluationModelCascade {
   findModelForFeature(input: EvaluationModelLookup): Promise<string | null>;
 }
 
 /** Where a run's cost and a dataset evaluation's rows are written. */
-export interface EvaluationLedger {
+interface EvaluationLedger {
   recordCost(input: EvaluationCostRecord): Promise<EvaluationSlugMatch>;
   recordDatasetRow(input: DatasetEvaluationRow): Promise<void>;
 }
 
 /** The one evaluator runtime this process composed. */
-export interface EvaluationRunner {
+interface EvaluationRunner {
   runEvaluation(input: RunEvaluatorInput): Promise<SingleEvaluationResult>;
 }
 
 type EvaluationSetup = FeatureSetup<
   typeof EvaluationModule.dependencies,
-  MembersRead<typeof EvaluationModule.reads>,
+  never,
   EvaluationServerConfig,
   EvaluationRepositories
 >;
@@ -284,7 +284,6 @@ export class EvaluationModule implements EvaluationApiContract {
     /** The experiment and run history SDK batches and dataset evaluations are written into. */
     experiments: ExperimentApi,
   };
-  static readonly reads = ["objectStorage"] as const;
   static readonly secrets = {
     openAi: openAiApiKey,
     azureContentSafety: Secret.load("AZURE_CONTENT_SAFETY_KEY", { optional: true }),
@@ -311,6 +310,7 @@ export class EvaluationModule implements EvaluationApiContract {
   readonly #commands: EvaluationCommandDispatcherService | undefined;
   readonly #clustering: LangevalsClusteringService;
   readonly #piiDetection: LangevalsPiiDetectionService;
+  readonly #effectiveSettings: EvaluatorEffectiveSettingsService;
   readonly #executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
   readonly #eventing: EvaluationProcessingStoresAdapter;
   readonly #lifecycle: EvaluationLifecycleService | undefined;
@@ -361,6 +361,10 @@ export class EvaluationModule implements EvaluationApiContract {
     });
     this.#commands = commands;
     this.#autoslug = EvaluationNameAutoslugService.create();
+    this.#effectiveSettings = EvaluatorEffectiveSettingsService.create({
+      settings: EvaluatorSettingsService.create(),
+      recovery: EvaluationSettingsRecoverySwitchService.create(dependencies.featureFlags),
+    });
     this.#filterMatching = EvaluationFilterMatchingService.create();
     this.#batchLog = EvaluationBatchLogService.create({
       experiments: members.experiments,
@@ -386,7 +390,7 @@ export class EvaluationModule implements EvaluationApiContract {
   }
 
   private static withEnvironment(
-    { dependencies, repositories, members, config }: EvaluationSetup,
+    { dependencies, repositories, config }: EvaluationSetup,
     environment: EvaluatorEnvironmentService,
   ): EvaluationModule {
     const commands = EvaluationCommandDispatcherService.create();
@@ -394,9 +398,7 @@ export class EvaluationModule implements EvaluationApiContract {
     const langevals = config.langevalsEndpoint
       ? langevalsChannels.live.create({
           config,
-          staging: ObjectStorageLangevalsPayloadStaging.create({
-            objectStorage: members.objectStorage,
-          }),
+          staging: repositories.langevalsStaging,
         })
       : NullLangevalsChannel.create();
     const telemetry = EvaluationExecutionMetricsService.create();
@@ -632,6 +634,8 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#slugs.findDatasetBySlug(input);
   findExperimentBySlug: EvaluationApiContract["findExperimentBySlug"] = (input) =>
     this.#experiments.findBySlug(input);
+  getEvaluatorEffectiveSettings: EvaluationApiContract["getEvaluatorEffectiveSettings"] = (input) =>
+    this.#effectiveSettings.get(input);
   findModelForFeature: EvaluationApiContract["findModelForFeature"] = (input) =>
     this.#models.findModelForFeature(input);
   recordEvaluationCost: EvaluationApiContract["recordEvaluationCost"] = (input) =>

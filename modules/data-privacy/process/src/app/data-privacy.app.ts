@@ -83,7 +83,7 @@ const PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 
 type DataPrivacySetup = FeatureSetup<
   typeof DataPrivacyModule.dependencies,
-  Readonly<{ nodeEnvironment: string | undefined }>,
+  never,
   DataPrivacyServerConfig,
   DataPrivacyRepositories
 >;
@@ -101,7 +101,6 @@ export class DataPrivacyModule implements DataPrivacyApi {
     permissions: AuthzApi,
     evaluation: EvaluationApi,
   };
-  static readonly reads = ["nodeEnvironment"] as const;
   static readonly config = dataPrivacyConfig;
   /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
   static readonly secrets = {
@@ -139,7 +138,6 @@ export class DataPrivacyModule implements DataPrivacyApi {
 
   static async create({
     repositories,
-    members: supplied,
     dependencies,
     config,
     secrets,
@@ -176,7 +174,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
       redaction: OtlpSpanPiiRedactionService.create({
         transport: analysis,
         isLangevalsConfigured: () => analysis.isPresidioConfigured(),
-        isProduction: supplied.nodeEnvironment === "production",
+        isProduction: config.nodeEnvironment === "production",
         piiRedactionMaxAttributeLength: PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
         nativePolicyEnforced: config.enforcement !== "off",
         dataPrivacy: privacy,

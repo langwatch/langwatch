@@ -40,9 +40,9 @@ describe("the connected agents' socket", () => {
   /** @scenario "The agent module declares its socket where main served it" */
   it("is declared among the agent module's transports at main's path", () => {
     expect(CONNECT_PATH).toBe("/api/v1/agents/connect");
-    expect(agentProcessModule.transports.some((transport) => transport.protocol === "websocket")).toBe(
-      true,
-    );
+    expect(
+      agentProcessModule.transports.some((transport) => transport.protocol === "websocket"),
+    ).toBe(true);
   });
 
   /** @scenario "An upgrade to the agent socket reaches the agent module with its headers" */

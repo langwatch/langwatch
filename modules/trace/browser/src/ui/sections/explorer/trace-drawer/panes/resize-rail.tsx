@@ -1,8 +1,12 @@
 import { Box } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useRef } from "react";
 
+import {
+  DRAWER_DEFAULT_WIDTH_PX,
+  DRAWER_MAXIMIZE_EDGE_PX,
+  DRAWER_MIN_WIDTH_PX,
+} from "../../../../../behavior/drawer-chrome.store.ts";
 import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
-import { DRAWER_DEFAULT_WIDTH_PX, DRAWER_MAXIMIZE_EDGE_PX, DRAWER_MIN_WIDTH_PX } from "../../../../../behavior/drawer-chrome.store.ts";
 
 const MAGNET_PX = 32;
 

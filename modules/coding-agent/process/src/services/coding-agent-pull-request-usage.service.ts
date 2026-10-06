@@ -23,7 +23,7 @@ export type CodingAgentUsageRow = {
   nonBilledCostUsd: number | null;
 };
 
-export type CodingAgentContributor = {
+type CodingAgentContributor = {
   projectId: string;
   projectSlug: string;
   contributorLabel: string;
@@ -41,7 +41,7 @@ export type CodingAgentModelUsage = {
   tokensKnown: boolean;
 };
 
-export type CodingAgentUsageTotals = {
+type CodingAgentUsageTotals = {
   sessionsCount: number;
   inputTokens: number;
   outputTokens: number;

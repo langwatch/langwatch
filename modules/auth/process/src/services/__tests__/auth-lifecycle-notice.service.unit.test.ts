@@ -9,11 +9,29 @@ import { AuthLifecycleNoticeService } from "../auth-lifecycle-notice.service.ts"
 function notices(send: (data: unknown) => Promise<void>) {
   const reportError = vi.fn();
   const service = AuthLifecycleNoticeService.create({ reportError });
-  service.connect({ recordSessionStarted: { send }, recordSsoAutoAdded: { send } });
+  service.connect({
+    recordSessionStarted: { send },
+    recordSsoAutoAdded: { send },
+    recordSignedUp: { send },
+  });
   return { service, reportError };
 }
 
 describe("auth's lifecycle notices", () => {
+  it("records a sign-up under the person, ids only", async () => {
+    const sent: unknown[] = [];
+    const { service } = notices(async (data) => {
+      sent.push(data);
+    });
+
+    service.signedUp({ userId: "user_ada" });
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+
+    expect(sent).toEqual([
+      { tenantId: "user_ada", userId: "user_ada", occurredAt: expect.any(Number) },
+    ]);
+  });
+
   it("records a session under the person and an auto-join under the organization, ids only", async () => {
     const sent: unknown[] = [];
     const { service } = notices(async (data) => {

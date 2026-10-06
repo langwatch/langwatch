@@ -39,7 +39,12 @@ export interface TopicClusteringScheduleReader {
   findNextWakeAt(input: { projectId: string }): Promise<Instant | null>;
 }
 
-type TopicSetup = FeatureSetup<typeof TopicModule.dependencies, never, undefined, TopicRepositories>;
+type TopicSetup = FeatureSetup<
+  typeof TopicModule.dependencies,
+  never,
+  undefined,
+  TopicRepositories
+>;
 
 export class TopicModule implements TopicApi {
   static readonly contract = TopicApiToken;
@@ -77,10 +82,14 @@ export class TopicModule implements TopicApi {
     const commands = EventingTopicClusteringCommandsService.create();
     const outcomes = EventingTopicClusteringOutcomeCommandsService.create();
     const metrics = OtelTopicClusteringMetricsService.create();
+    const schedule = EventingTopicClusteringScheduleService.create({
+      processStore: repositories.processStore,
+    });
     const migration = LegacyImportTopicClusteringMigration.create({
       repository: repositories.clustering,
       claims: repositories.claims,
       commands,
+      schedule,
     });
     const runner = TopicClusteringRunner.create({
       traces: dependencies.traces,
@@ -97,9 +106,7 @@ export class TopicModule implements TopicApi {
     return new TopicModule({
       topics: TopicService.create({
         repository: repositories.topics,
-        schedule: EventingTopicClusteringScheduleService.create({
-          processStore: repositories.processStore,
-        }),
+        schedule,
       }),
       commands,
       outcomes,

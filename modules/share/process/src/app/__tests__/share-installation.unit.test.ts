@@ -1,6 +1,6 @@
-import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
 import { ShareApi, ShareLinkNotFoundError } from "@langwatch/share-contract";
-import type Redis from "ioredis";
 import { describe, expect, it } from "vitest";
 
 import { shareProcessModule } from "../../share.module.ts";
@@ -10,20 +10,12 @@ import {
   createShareTestProjects,
 } from "./share.fixture.ts";
 
-function keyvalueWithoutStore(): Redis {
-  const connection: Partial<Redis> = {};
-  return new Proxy(connection, { get: () => async () => null }) as Redis;
-}
-
 function process(role: "api" | "worker") {
-  return createApp({ role })
-    .withModules([withMemoryRepositories(shareProcessModule)])
-    .withKeyvalue(keyvalueWithoutStore())
-    .provide({
-      authz: createShareTestAuthz(),
-      "data-retention": createShareTestDataRetention(),
-      project: createShareTestProjects(),
-    });
+  return createApp({ role }).withModules([shareProcessModule]).withStores(memoryStores()).provide({
+    authz: createShareTestAuthz(),
+    "data-retention": createShareTestDataRetention(),
+    project: createShareTestProjects(),
+  });
 }
 
 describe("share app installation", () => {

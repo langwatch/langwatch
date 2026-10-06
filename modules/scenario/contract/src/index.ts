@@ -116,3 +116,5 @@ export * from "./child-egress-policy.ts";
 export * from "./scenario-log-context.ts";
 export * from "./nlpgo-error-envelope.ts";
 export * from "./voice/voice-child-messages.ts";
+export * from "./media-part.token.ts";
+export * from "./scenario-lent-surfaces.ts";

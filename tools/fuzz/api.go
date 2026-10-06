@@ -103,7 +103,7 @@ func runAPI(ctx context.Context, streams Streams, options Options) error {
 	coverage := Coverage{OperationsTotal: len(operations), OperationsExercised: run.exercisedCount()}
 	timing := Timing{Total: time.Since(started), Seed: seedTook, Fuzzing: fuzzTook, Shrinking: shrinkTook,
 		Requests: int(atomic.LoadInt64(&run.requests)), Findings: len(run.raw)}
-	if err := run.report(runDir, groups, coverage, timing); err != nil {
+	if err := run.report(runDir, runSummary{groups: groups, coverage: coverage, timing: timing}); err != nil {
 		return err
 	}
 	if stopped := run.streak.Stopped(); stopped != nil {
@@ -156,29 +156,46 @@ func (run *apiRun) resolveStack(ctx context.Context) error {
 func (run *apiRun) plan(operations []diffkit.Operation) []job {
 	jobs := make([]job, 0, len(operations)*len(authKinds)*len(Mutations))
 	for _, op := range operations {
-		if run.options.Only != "" && !strings.Contains(op.Path, run.options.Only) {
+		if !run.fuzzes(op) {
 			continue
 		}
-		if isVersionAlias(op.Path) {
-			continue // served, hidden alias: the canonical route is fuzzed instead
-		}
-		hasBody := op.BodySchema != nil
-		hasParams := strings.Contains(op.Path, "{")
-		for _, mutation := range Mutations {
-			if mutation.SchemaInvalid && !hasBody {
-				continue
-			}
-			if (mutation.Foreign || mutation.InvalidID) && !hasParams {
-				continue
-			}
-			for _, auth := range authKinds {
-				jobs = append(jobs, job{op: op, auth: auth, mutation: mutation})
-			}
-		}
+		jobs = append(jobs, jobsFor(op)...)
 	}
 	random := rand.New(rand.NewSource(run.options.Seed)) // #nosec G404 -- reproducibility, not security.
 	random.Shuffle(len(jobs), func(a, b int) { jobs[a], jobs[b] = jobs[b], jobs[a] })
 	return jobs
+}
+
+// fuzzes reports an operation inside -only that is not a version alias: a
+// served, hidden alias whose canonical route is fuzzed instead.
+func (run *apiRun) fuzzes(op diffkit.Operation) bool {
+	if run.options.Only != "" && !strings.Contains(op.Path, run.options.Only) {
+		return false
+	}
+	return !isVersionAlias(op.Path)
+}
+
+// jobsFor is every applicable mutation of op under every auth kind.
+func jobsFor(op diffkit.Operation) []job {
+	var jobs []job
+	for _, mutation := range Mutations {
+		if !mutationApplies(mutation, op) {
+			continue
+		}
+		for _, auth := range authKinds {
+			jobs = append(jobs, job{op: op, auth: auth, mutation: mutation})
+		}
+	}
+	return jobs
+}
+
+// mutationApplies reports a mutation the operation can carry: a schema break
+// needs a body, a foreign or invalid id needs a path parameter.
+func mutationApplies(mutation Mutation, op diffkit.Operation) bool {
+	if mutation.SchemaInvalid && op.BodySchema == nil {
+		return false
+	}
+	return !(mutation.Foreign || mutation.InvalidID) || strings.Contains(op.Path, "{")
 }
 
 func (run *apiRun) fuzz(parent context.Context, jobs []job) {
@@ -188,11 +205,11 @@ func (run *apiRun) fuzz(parent context.Context, jobs []job) {
 	deadline := time.Now().Add(run.options.Duration)
 	queue := make(chan job)
 	var group sync.WaitGroup
-	stop := diffkit.StartTicker(run.streams.Err, "fuzz api:", len(jobs),
-		func() (int, string) {
+	stop := diffkit.Ticker{Out: run.streams.Err, Label: "fuzz api:", Total: len(jobs),
+		Snapshot: func() (int, string) {
 			done := int(atomic.LoadInt64(&run.requests))
 			return done, fmt.Sprintf("%d findings", run.findingsSoFar())
-		})
+		}}.Start()
 	defer stop()
 	for worker := 0; worker < run.options.Workers; worker++ {
 		group.Add(1)
@@ -230,7 +247,7 @@ func (run *apiRun) runJob(ctx context.Context, item job) {
 		JSONExpected: true, SeparateOrg: run.org.Separate, OwnIDs: run.ownIDs(), LatencyCap: LatencyCap, ForeignIDs: request.foreign,
 	})
 	for _, hit := range hits {
-		run.record(item, request, status, hit)
+		run.record(rawFinding{item: item, request: request, status: status, hit: hit})
 	}
 }
 
@@ -244,9 +261,10 @@ func (run *apiRun) file(cause string) {
 	}
 }
 
-func (run *apiRun) record(item job, request builtRequest, status int, hit Hit) {
+func (run *apiRun) record(finding rawFinding) {
+	finding.capturedAt = time.Now().UTC().Format(time.RFC3339)
 	run.mu.Lock()
-	run.raw = append(run.raw, rawFinding{item: item, request: request, status: status, hit: hit, capturedAt: time.Now().UTC().Format(time.RFC3339)})
+	run.raw = append(run.raw, finding)
 	run.mu.Unlock()
 }
 
@@ -254,7 +272,7 @@ func (run *apiRun) record(item job, request builtRequest, status int, hit Hit) {
 func (raw rawFinding) asFinding() Finding {
 	return Finding{
 		Oracle: raw.hit.Oracle, Finding: true, Method: raw.item.op.Method, Route: raw.item.op.Path,
-		Signature: signatureOf(raw.hit.Oracle, raw.item.op.Method, raw.item.op.Path, raw.status),
+		Signature: signatureOf(raw.hit.Oracle, raw.item.op, raw.status),
 		Message:   raw.hit.Message, Status: raw.status, Mutation: raw.item.mutation.Name, Auth: raw.item.auth,
 		Curl: curlOf(raw.request), CapturedAt: raw.capturedAt,
 	}
@@ -324,7 +342,16 @@ func (run *apiRun) do(ctx context.Context, request builtRequest) (int, time.Dura
 	return response.StatusCode, elapsed, body, ""
 }
 
-func (run *apiRun) report(runDir string, groups []Group, coverage Coverage, timing Timing) error {
+// runSummary is what a finished api run reports: its grouped findings, its
+// coverage and its timing.
+type runSummary struct {
+	groups   []Group
+	coverage Coverage
+	timing   Timing
+}
+
+func (run *apiRun) report(runDir string, summary runSummary) error {
+	groups, coverage, timing := summary.groups, summary.coverage, summary.timing
 	writer, err := diffkit.OpenFindingsFile(filepath.Join(runDir, "findings.jsonl"))
 	if err != nil {
 		return err

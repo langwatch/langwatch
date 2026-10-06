@@ -1,8 +1,12 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 /**
  * @vitest-environment jsdom
  * @see specs/features/onboarding/guided-welcome-takeover.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { system } from "@langwatch/design-system/system";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -33,6 +37,21 @@ function renderValue({
     vi.advanceTimersByTime(20_000);
   });
   return { onNext };
+}
+
+function declarationsOf(element: HTMLElement): Map<string, string> {
+  const css = [...document.querySelectorAll("style")].map((tag) => tag.textContent).join("\n");
+  const rule = element.className
+    .split(" ")
+    .flatMap((name) => [...css.matchAll(new RegExp(`\\.${name}\\{([^}]*)\\}`, "g"))])
+    .map((match) => match[1] ?? "")
+    .join(";");
+  return new Map(
+    rule
+      .split(";")
+      .filter((line) => line.includes(":"))
+      .map((line) => [line.slice(0, line.indexOf(":")), line.slice(line.indexOf(":") + 1)]),
+  );
 }
 
 const card = (title: string) => screen.getByRole("button", { name: title });
@@ -102,6 +121,34 @@ describe("ValueScreen", () => {
         path: "llmops",
         order: 2,
       });
+    });
+
+    /** @scenario The pick order reads as white on a filled brand orange square */
+    it("writes the pick number in white on a solid orange square the theme defines", () => {
+      renderValue();
+      fireEvent.click(card("Gateway"));
+      const declarations = declarationsOf(order("gateway"));
+      const orange = system.token("colors.orange.solid");
+      expect(declarations.get("background")).toBe(orange);
+      expect(declarations.get("color")).toBe("var(--chakra-colors-white)");
+      expect(system.token("colors.white")).toBe("#FFFFFF");
+      expect(declarations.get("border-radius")).toBe("6px");
+      expect(declarations.get("background")).not.toBe(
+        declarationsOf(order("llmops")).get("background"),
+      );
+
+      const dir = join(import.meta.dirname, "..");
+      const named = readdirSync(dir)
+        .filter((file) => file.endsWith(".tsx"))
+        .flatMap((file) =>
+          [...readFileSync(join(dir, file), "utf8").matchAll(/"orange\.(\w+)(?:\/\d+)?"/g)].map(
+            (match) => `orange.${match[1]}`,
+          ),
+        );
+      expect(named).toContain("orange.solid");
+      for (const token of new Set(named)) {
+        expect(system.tokens.getByName(`colors.${token}`), token).toBeDefined();
+      }
     });
 
     /** @scenario "Unpicking a card renumbers the ones picked after it" */

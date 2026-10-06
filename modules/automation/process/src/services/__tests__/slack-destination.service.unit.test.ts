@@ -1,7 +1,8 @@
-/** Where a Slack delivery goes. @see specs/automations/slack-connections.feature */
+/** Where a Slack delivery goes. @see modules/slack/specs/slack-connections.feature */
 import type { SlackConnectionSecret } from "@langwatch/slack-contract";
 import { describe, expect, it } from "vitest";
 
+import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
 import { SlackDestinationService } from "../slack-destination.service.ts";
 
 const PROJECT = "project-1";
@@ -19,7 +20,7 @@ function serviceOver(connections: Record<string, SlackConnectionSecret>) {
       return secret ? [secret] : [];
     },
   };
-  return { service: SlackDestinationService.create({ slack, crypto }), reads };
+  return { service: SlackDestinationService.create({ slack, triggers: sealWith(crypto) }), reads };
 }
 
 describe("SlackDestinationService", () => {

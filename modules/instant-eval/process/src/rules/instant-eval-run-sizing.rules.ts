@@ -2,7 +2,7 @@
  * How large one page of a run is. The size of the texts being judged bounds
  * what one worker holds, and the key cap of the statement's own app functions
  * bounds what the hydration stage accepts; the page is the smaller of the two.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { LangWatchQLAppFunctionCall } from "@langwatch/analytics-contract";

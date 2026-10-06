@@ -38,8 +38,9 @@ export const mcpAuthorizeRest = defineRestRouter(McpAuthorizeApi)
   .post("/api/mcp/authorize", "approveMcpAuthorization")
   // The body is read rather than parsed: a blank or absent field is a refusal
   // this route words itself, and may owe the client at its own registered
-  // redirect URI, rather than one a validation envelope can express.
-  .withRawBody("text", { mediaType: "application/json" })
+  // redirect URI, rather than one a validation envelope can express. Main read
+  // the body under any Content-Type, so the media type is documented, not enforced.
+  .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(
     optionalCredential({

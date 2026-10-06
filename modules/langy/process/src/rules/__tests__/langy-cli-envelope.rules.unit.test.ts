@@ -140,6 +140,7 @@ describe("the CLI envelope rules", () => {
   });
 
   describe("given a CLI frame whose output holds no JSON document", () => {
+    /** @scenario "Output with no JSON in it is recorded as it came" */
     it("keeps the raw output and still re-types the frame", () => {
       const frame = normalizeToolFrame({
         frame: bashFrame({
@@ -193,6 +194,8 @@ describe("the CLI envelope rules", () => {
   });
 
   describe("given a CLI frame that errored", () => {
+    /** @scenario "A failed CLI call keeps its error text" */
+    /** @scenario "A failure with no explanation keeps the summary line" */
     it("keeps the error text the CLI printed", () => {
       const frame = normalizeToolFrame({
         frame: bashFrame({
@@ -208,6 +211,7 @@ describe("the CLI envelope rules", () => {
       expect(frame.isError).toBe(true);
     });
 
+    /** @scenario "A command that fails outright still keeps its explanation" */
     it("keeps the failure document when the CLI printed one before exiting", () => {
       const frame = normalizeToolFrame({
         frame: bashFrame({
@@ -277,6 +281,7 @@ describe("the CLI envelope rules", () => {
       expect(frame.isError).toBe(true);
     });
 
+    /** @scenario "A failure the CLI reported keeps everything it reported" */
     it("keeps everything the platform reported about the failure", () => {
       const frame = normalizeToolFrame({
         frame: bashFrame({
@@ -300,6 +305,7 @@ describe("the CLI envelope rules", () => {
   });
 
   describe("given a shell frame that is not a LangWatch CLI call", () => {
+    /** @scenario "A shell command that is not a LangWatch CLI call is left alone" */
     it("passes a plain shell command through untouched", () => {
       const original = bashFrame({ input: { command: "pnpm test:unit" } });
       expect(normalizeToolFrame({ frame: original })).toBe(original);
@@ -308,6 +314,40 @@ describe("the CLI envelope rules", () => {
     it("passes a bash frame carrying no command through untouched", () => {
       const original = bashFrame({ input: { description: "run the tests" } });
       expect(normalizeToolFrame({ frame: original })).toBe(original);
+    });
+  });
+
+  describe("given a CLI call wrapped in shell syntax", () => {
+    const recordedAs = (command: string) =>
+      normalizeToolFrame({ frame: bashFrame({ input: { command } }) }).name;
+
+    /** @scenario "A CLI call wrapped in a directory change is still recognised" */
+    it("records a call after a directory change as the capability it invoked", () => {
+      expect(recordedAs("cd /work/repo && langwatch trace search --format json")).toBe(
+        "langwatch.trace.search",
+      );
+    });
+
+    /** @scenario "A CLI call piped into another program is still recognised" */
+    it("records a call piped into another program as the capability it invoked", () => {
+      expect(recordedAs("langwatch trace search --format json | jq '.traces'")).toBe(
+        "langwatch.trace.search",
+      );
+    });
+
+    /** @scenario "A CLI call with environment variables in front is still recognised" */
+    it("records a call with environment variables in front as the capability it invoked", () => {
+      expect(
+        recordedAs(
+          "LANGWATCH_ENDPOINT=http://localhost LANGWATCH_API_KEY=k langwatch trace search",
+        ),
+      ).toBe("langwatch.trace.search");
+    });
+
+    /** @scenario "A CLI invocation that names no resource and verb is left alone" */
+    it("records a call naming no resource and verb as the plain shell command", () => {
+      expect(recordedAs("langwatch --help")).toBe("bash");
+      expect(recordedAs("langwatch")).toBe("bash");
     });
   });
 

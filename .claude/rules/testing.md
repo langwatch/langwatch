@@ -22,8 +22,11 @@ often broken:
 - Doubles: `createApiFixture<XApi>({…})` from `@langwatch/test-harness/api-fixture` (throws
   by name on anything unconfigured) and `createTestLogger()` from
   `@langwatch/test-harness`. A `{ getById: vi.fn() }` bag is a defect.
-- Installation tests run the production chain with `memoryStores()`
-  (`@langwatch/process-stores`): no datastore, no Docker (ARCHITECTURE.md §13).
+- Installation tests boot the installed list over memory twins with
+  `bootInstalledProcess` (`@langwatch/process`) and `memoryStores()`
+  (`@langwatch/process-stores`): no server, no datastore, no Docker (§13).
+- Feature parity binds every scenario (§13, 2026-10-05): a scenario you touch
+  leaves bound, and new behaviour arrives with its bound scenario.
 - Assert on error `code`, never message prose, and never `instanceof` across a
   serialisation boundary.
 - Integration suites use native services when `LANGWATCH_TEST_CLICKHOUSE_URL`,

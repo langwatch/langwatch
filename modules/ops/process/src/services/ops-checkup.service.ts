@@ -58,12 +58,12 @@ const CANARY_TIMEOUT_MS = 150_000;
 const GATEWAY_PROBE_TIMEOUT_MS = 5_000;
 
 /** The process facts the checkup and the usage report read, drilled in. */
-export type OpsCheckupMembers = Readonly<{
+export type OpsCheckupFacts = Readonly<{
   isSaas: boolean;
   serviceVersion: string;
   publicBaseUrl: string | undefined;
   nodeEnvironment: string | undefined;
-  processName: string;
+  processRole: string;
 }>;
 
 /** Every peer the checkup and the report ask, by the one operation each needs. */
@@ -82,7 +82,7 @@ export type OpsCheckupPeers = UsageReportPeers &
   }>;
 
 export interface OpsCheckupDependencies {
-  readonly members: OpsCheckupMembers;
+  readonly facts: OpsCheckupFacts;
   readonly config: OpsServerConfig;
   readonly peers: OpsCheckupPeers;
   readonly repositories: {
@@ -141,7 +141,7 @@ export class OpsCheckupService {
   }
 
   static create({
-    members,
+    facts,
     config,
     peers,
     repositories,
@@ -152,11 +152,11 @@ export class OpsCheckupService {
       peers,
       opsHealth,
       deployment: () => ({
-        version: members.serviceVersion,
+        version: facts.serviceVersion,
         installMethod: config.usageStats.installMethod ?? "self-hosted",
         chartVersion: config.usageStats.chartVersion,
-        environment: members.nodeEnvironment ?? "unknown",
-        hostname: members.publicBaseUrl,
+        environment: facts.nodeEnvironment ?? "unknown",
+        hostname: facts.publicBaseUrl,
         gatewayConfigured: Boolean(peers.gateway.getDeploymentAddresses().baseUrl),
       }),
     });
@@ -166,7 +166,7 @@ export class OpsCheckupService {
       channel: channels.usageReport,
       install: peers.licensing,
       disabled: config.usageStats.disabled,
-      isSaas: members.isSaas,
+      isSaas: facts.isSaas,
       now: nowInstant,
     });
     const { postgres, clickhouse, redis } = repositories;
@@ -180,9 +180,9 @@ export class OpsCheckupService {
     }): CheckupFacts => ({
       now: nowInstant,
       install: {
-        version: members.serviceVersion,
-        processRole: members.processName,
-        environment: members.nodeEnvironment ?? "unknown",
+        version: facts.serviceVersion,
+        processRole: facts.processRole,
+        environment: facts.nodeEnvironment ?? "unknown",
       },
       postgres: {
         ping: () => postgres.findServerVersion(),
@@ -204,7 +204,7 @@ export class OpsCheckupService {
         OpsCheckupService.gatewayFacts({
           gateway: peers.gateway,
           probes: channels.probes,
-          publicBaseUrl: members.publicBaseUrl,
+          publicBaseUrl: facts.publicBaseUrl,
         }),
       license: async () => licenseView(await peers.licensing.getLicenseStatus(organizationId)),
       connect: async () => {
@@ -283,14 +283,14 @@ export class OpsCheckupService {
         });
         const query = new URLSearchParams(params).toString();
         return channels.probes.get({
-          url: `${members.publicBaseUrl ?? ""}/api/health/${name}${query ? `?${query}` : ""}`,
+          url: `${facts.publicBaseUrl ?? ""}/api/health/${name}${query ? `?${query}` : ""}`,
           headers: { "X-Auth-Token": token, "X-Project-Id": project.id },
           timeoutMs: CANARY_TIMEOUT_MS,
         });
       },
     });
 
-    return new OpsCheckupService(members.isSaas, usageReports, factsFor);
+    return new OpsCheckupService(facts.isSaas, usageReports, factsFor);
   }
 
   checkupFor(input: { organizationId: string; requestedBy: string }): CheckupService {

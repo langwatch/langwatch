@@ -7,11 +7,14 @@ export type {
   EventingParticipation,
   FeatureEventing,
   FeatureEventingSetup,
+  OwnEventsAppend,
+  OwnEventStore,
   PriorEventsQuery,
   PriorEventsRead,
   ReadHintMap,
   ReadHintTarget,
 } from "./pipeline/feature-eventing.ts";
+export { PipelineEventStore, type OwnEventLog } from "./stores/pipelineEventStore.ts";
 
 // Commands
 export type { Command, CommandHandler, CommandHandlerResult } from "./commands/command.ts";

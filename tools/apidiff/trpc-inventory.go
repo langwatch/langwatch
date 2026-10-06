@@ -34,10 +34,17 @@ type InventoryFailed struct {
 // script is written to and removed from after it runs.
 const inventoryScriptName = ".apidiff-trpc-inventory.mjs"
 
+// inventoryLayouts: the first contract-builder checkout, the monolith router
+// on main, then the strict layout (contracts under modules/*/contract and
+// enterprise/modules/*/contract, which branch-trpc.mjs reads).
 var inventoryLayouts = []inventoryCandidate{
-	{"packages/api/src/contract/trpc-contract.ts", inventoryLayout{script: "inventory/branch-trpc.mjs", subdir: "packages/api", command: []string{"node", "--experimental-transform-types"}}},
+	{"packages/api/src/contract/trpc-contract.ts", branchTrpcLayout},
 	{"platform/app/src/server/api/root.ts", inventoryLayout{script: "inventory/main-trpc.mjs", subdir: "platform/app", command: []string{"pnpm", "exec", "tsx"}}},
+	{"modules/*/contract/src", branchTrpcLayout},
+	{"enterprise/modules/*/contract/src", branchTrpcLayout},
 }
+
+var branchTrpcLayout = inventoryLayout{script: "inventory/branch-trpc.mjs", subdir: "packages/api", command: []string{"node", "--experimental-transform-types"}}
 
 func detectInventoryLayout(dir string) (inventoryLayout, error) {
 	layout, ok := detectLayout(dir, inventoryLayouts)

@@ -158,6 +158,9 @@ describe.skipIf(!DB_URL)("OrganizationScopeGraphService over Postgres", () => {
     });
 
     /** @scenario "Archived and internal-governance projects stay out of the graph" */
+    /** @scenario The hidden Governance Project never appears in the ProjectSelector dropdown */
+    /** @scenario The hidden Governance Project never appears in RBAC role binding pickers */
+    /** @scenario The hidden Governance Project never appears in any other user-visible Project surface */
     it("leaves out archived and internal-governance projects", async () => {
       const organization = graphOf(await service.getScopeGraph({ id: ids.caller }));
       const own = organization.teams.find((each) => each.id === team.own);

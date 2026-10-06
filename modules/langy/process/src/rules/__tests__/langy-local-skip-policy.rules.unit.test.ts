@@ -1,7 +1,7 @@
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LocalControlRuntime } from "../../app/langy.members.ts";
+import type { LocalControlRuntime } from "../../services/langy-local-control-runtime.service.ts";
 import { workspaceChannel } from "../langy-local-control-keys.rules.ts";
 import { reconcileSkipPolicy } from "../langy-local-skip-policy.rules.ts";
 

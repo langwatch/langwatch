@@ -1,12 +1,10 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { PostgresGovernanceAdapter } from "../app/governance-policy-composition.build.ts";
-import type { GovernanceEncryptor } from "../app/governance.members.ts";
 import { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
+import { PrismaCostAttributionPolicyRepository } from "../repositories/prisma/prisma.cost-attribution-policy.repository.ts";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
 import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
-import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import { PullDestinationService } from "../services/pull-destination.service.ts";
 
 class MemoryPolicyRepository extends CostAttributionPolicyRepository {
@@ -18,27 +16,18 @@ class MemoryPolicyRepository extends CostAttributionPolicyRepository {
   }
 }
 
-class ReversibleEncryption implements GovernanceEncryptor {
-  encrypt(plaintext: string): string {
-    return plaintext.split("").reverse().join("");
-  }
-  decrypt(ciphertext: string): string {
-    return ciphertext.split("").reverse().join("");
-  }
-}
-
 describe("governance backend services", () => {
-  it("composes Postgres policy behind one public adapter", async () => {
-    const adapter = PostgresGovernanceAdapter.create({
-      database: {
+  it("composes Postgres policy over the Prisma repository", async () => {
+    const policy = PostgresGovernancePolicyService.create(
+      PrismaCostAttributionPolicyRepository.create({
         aiToolEntry: {
           findMany: async () => [{ config: { assistantKind: "codex", bundledPlan: false } }],
         },
-      },
-    });
+      }),
+    );
 
     await expect(
-      adapter.build().policy.isSourceBilled({
+      policy.isSourceBilled({
         organizationId: "org",
         sourceType: "codex",
       }),
@@ -77,17 +66,6 @@ describe("governance backend services", () => {
         projectDepartmentId: "project-department",
       }),
     ).toBe("team-department");
-  });
-
-  it("encrypts only the credential subtree and tolerates legacy plaintext", () => {
-    const service = IngestionCredentialsService.create(new ReversibleEncryption());
-    const sealed = service.encryptParserConfig({
-      adapter: "http_polling",
-      credentials: { token: "secret" },
-    });
-    expect(sealed?.adapter).toBe("http_polling");
-    expect(service.decrypt(sealed?.credentials)).toEqual({ token: "secret" });
-    expect(service.decrypt({ token: "legacy" })).toEqual({ token: "legacy" });
   });
 
   it("pins Databricks credentials to a workspace origin", () => {

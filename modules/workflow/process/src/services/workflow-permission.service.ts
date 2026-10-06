@@ -1,19 +1,17 @@
 import type { AuthzPermission } from "@langwatch/authorization";
-import type { AuthzApi, AuthzPrincipalRef } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 
 import type { WorkflowPermissionProbe } from "../app/workflow.app.ts";
 
 /** Whether one person holds a permission on a project, answered by the authz peer. */
 export class WorkflowPermissionService implements WorkflowPermissionProbe {
-  static create(options: {
-    authz: Pick<AuthzApi, "hasPermission" | "can">;
-  }): WorkflowPermissionService {
+  static create(options: { authz: Pick<AuthzApi, "hasPermission"> }): WorkflowPermissionService {
     return new WorkflowPermissionService(options.authz);
   }
 
-  readonly #authz: Pick<AuthzApi, "hasPermission" | "can">;
+  readonly #authz: Pick<AuthzApi, "hasPermission">;
 
-  private constructor(authz: Pick<AuthzApi, "hasPermission" | "can">) {
+  private constructor(authz: Pick<AuthzApi, "hasPermission">) {
     this.#authz = authz;
   }
 
@@ -22,24 +20,6 @@ export class WorkflowPermissionService implements WorkflowPermissionProbe {
       userId: input.userId,
       permission: input.permission,
       projectId: input.projectId,
-    });
-  }
-
-  /** One permission asked of a credential's principal at the project scope. */
-  holds(input: {
-    principal: AuthzPrincipalRef;
-    project: Readonly<{ id: string; teamId: string; organizationId: string }>;
-    permission: AuthzPermission;
-  }): Promise<boolean> {
-    return this.#authz.can({
-      principal: input.principal,
-      permission: input.permission,
-      scope: {
-        type: "project",
-        id: input.project.id,
-        teamId: input.project.teamId,
-        organizationId: input.project.organizationId,
-      },
     });
   }
 

@@ -10,8 +10,10 @@ import {
   useUiDeployment,
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
-import type { UiProjectSwitcherProps } from "@langwatch/browser-host/declarations";
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
+import { useLent } from "@langwatch/browser-host/lent";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { ProjectSwitcherToken, type ProjectSwitcherProps } from "@langwatch/project-contract";
 import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
 import {
@@ -46,7 +48,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
       /** Whether this deployment can send the invitation rather than only mint a link. */
       hasEmailProvider: boolean;
       isFeatureEnabled: (flag: string) => boolean;
-      openOverlay: (name: string, props?: Record<string, unknown>) => void;
+      openOverlay: <Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>) => void;
       closeOverlay: () => void;
       succeeded: (notice: OrganizationSuccessNotice) => void;
       route: OrganizationRouteReading;
@@ -58,7 +60,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
       failed: (failure: OrganizationFailureNotice) => void;
       overviewCards: readonly AuthenticationOverviewCard[];
       directorySummary: DirectorySummaryBand | undefined;
-      Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
+      Switcher: ComponentType<ProjectSwitcherProps> | undefined;
     },
   ) {
     super();
@@ -104,8 +106,8 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
     return this.deps.isFeatureEnabled(flag);
   }
 
-  openOverlay(name: string, props?: Record<string, unknown>): void {
-    this.deps.openOverlay(name, props);
+  openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.deps.openOverlay(drawer, props);
   }
 
   closeOverlay(): void {
@@ -127,7 +129,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
     this.deps.setQuery(next, options);
   }
 
-  /** The switcher project lends by declaration (ARCHITECTURE §10), as main's audit log header. */
+  /** The switcher project lends by token (ARCHITECTURE §10), as main's audit log header. */
   projectSwitcher(): ReactNode | null {
     const { Switcher } = this.deps;
     if (!Switcher) return null;
@@ -168,7 +170,6 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
   const deployment = useUiDeployment();
   const uiScope = useUiScope();
   const activeScope = uiScope.activeScope();
-  const scopeHost = uiScope.scopeHost();
   const { openDrawer, closeDrawer } = useDrawer();
   const graph = useOrganizationGraph({
     organizationId: activeScope.organizationId ?? void 0,
@@ -195,10 +196,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
     const [lent] = declarations.declared("directorySummary");
     return lent ? lazy(lent.capability.load) : void 0;
   }, [declarations]);
-  const Switcher = useMemo(() => {
-    const [lent] = declarations.declared("projectSwitcher");
-    return lent ? lazy(lent.capability.load) : void 0;
-  }, [declarations]);
+  const Switcher = useLent(ProjectSwitcherToken);
 
   const host = useMemo(
     () =>
@@ -210,17 +208,14 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
         },
         organization: graph.organization,
         hasPermission: (permission) => session.hasPermission(permission),
-        hasOrganizationPermission: (permission) =>
-          scopeHost
-            ? scopeHost.hasOrganizationPermission(permission)
-            : session.hasPermission(permission),
+        hasOrganizationPermission: (permission) => session.hasOrganizationPermission(permission),
         actor: sessionActor ?? void 0,
         activeProject: graph.activeProject?.project,
         isEnterprise: facts.isEnterprise,
         isPlanLoading: facts.isPlanLoading,
         hasEmailProvider: deployment.hasEmailProvider,
         isFeatureEnabled: (flag) => session.isFeatureEnabled(flag),
-        openOverlay: (name, props) => openDrawer(name, props),
+        openOverlay: (drawer, props) => openDrawer(drawer, props),
         closeOverlay: () => closeDrawer(),
         succeeded: (notice) => feedback.succeeded(notice),
         route: { params: reading.params, query: reading.query },
@@ -236,7 +231,6 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
       activeScope.projectId,
       graph,
       session,
-      scopeHost,
       sessionActor,
       facts.isEnterprise,
       facts.isPlanLoading,

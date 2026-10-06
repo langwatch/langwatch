@@ -17,6 +17,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { findGuidedKickoffParts } from "@langwatch/onboarding-contract";
 import {
   AppWindow,
   Braces,
@@ -60,7 +61,6 @@ import {
   guidedPullRequestFromMessages,
   isGuidedConversation,
 } from "../../../guided-onboarding/model/guided-conversation.ts";
-import { guidedKickoffPartOf } from "../../../guided-onboarding/model/kickoff.ts";
 import { useLangyConversationList } from "../../behavior/data/use-langy-conversation-list.ts";
 import { useLangyMessages } from "../../behavior/data/use-langy-messages.ts";
 import {
@@ -766,7 +766,7 @@ function LangyPanel({
                         tourCard:
                           guidedTourRunning || pendingKickoff
                             ? {
-                                kickoff: guidedKickoffPartOf(pendingKickoff?.parts),
+                                kickoff: findGuidedKickoffParts(pendingKickoff?.parts)[0] ?? null,
                                 organizationId: organizationId ?? null,
                               }
                             : null,

@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-export const handledErrorFaultSchema = z.enum(["customer", "platform", "provider"]);
+/** `presumed_platform`: a 5xx whose class declares no fault (ruling 2026-10-05). */
+export const handledErrorFaultSchema = z.enum([
+  "customer",
+  "platform",
+  "provider",
+  "presumed_platform",
+]);
 export type HandledErrorFault = z.output<typeof handledErrorFaultSchema>;
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());

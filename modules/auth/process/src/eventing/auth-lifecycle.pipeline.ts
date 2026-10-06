@@ -9,12 +9,14 @@ import type { AuthModule } from "../app/auth.app.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import {
   RecordSessionStartedCommand,
+  RecordSignedUpCommand,
   RecordSsoAutoAddedCommand,
 } from "./auth-lifecycle.commands.ts";
 import {
   AUTH_LIFECYCLE_PIPELINE_NAME,
   AUTH_USER_AGGREGATE_TYPE,
   sessionStartedEventSchema,
+  signedUpEventSchema,
   ssoAutoAddedEventSchema,
 } from "./auth-lifecycle.events.ts";
 
@@ -23,9 +25,10 @@ function lifecycleCommands() {
     name: AUTH_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: AUTH_USER_AGGREGATE_TYPE }),
   })
-    .withEvents([sessionStartedEventSchema, ssoAutoAddedEventSchema])
+    .withEvents([sessionStartedEventSchema, ssoAutoAddedEventSchema, signedUpEventSchema])
     .withCommand("recordSessionStarted", RecordSessionStartedCommand)
-    .withCommand("recordSsoAutoAdded", RecordSsoAutoAddedCommand);
+    .withCommand("recordSsoAutoAdded", RecordSsoAutoAddedCommand)
+    .withCommand("recordSignedUp", RecordSignedUpCommand);
 }
 
 export type AuthLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;

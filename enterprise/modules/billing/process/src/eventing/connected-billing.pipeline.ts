@@ -39,7 +39,7 @@ import {
 export const CONNECTED_BILLING_PIPELINE_NAME = "connected_billing";
 
 /** The pipeline, over only the app operations it calls. */
-export function buildConnectedBilling({
+function buildConnectedBilling({
   app,
   processStore,
   bootedAt = nowInstant().epochMilliseconds,

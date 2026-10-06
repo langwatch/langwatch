@@ -17,24 +17,28 @@ const NON_NODE_KEYS = new Set([
   "type",
 ]);
 
-function* nodesIn(value) {
-  const items = Array.isArray(value) ? value : [value];
-  for (const item of items) {
-    if (item && typeof item.type === "string") yield item;
-  }
+function isNode(value) {
+  return value !== null && typeof value === "object" && typeof value.type === "string";
 }
 
 /** The direct child nodes of `node`, in key order. */
-export function* childNodes(node) {
-  if (!node) return;
+export function childNodes(node) {
+  const children = [];
+  if (!node) return children;
 
   for (const key of Object.keys(node)) {
-    if (!NON_NODE_KEYS.has(key)) yield* nodesIn(node[key]);
+    if (NON_NODE_KEYS.has(key)) continue;
+    const value = node[key];
+    if (Array.isArray(value)) children.push(...value.filter(isNode));
+    else if (isNode(value)) children.push(value);
   }
+
+  return children;
 }
 
 /**
- * Depth-first walk. A visitor returning `false` skips its own subtree.
+ * Depth-first walk, with no generator or array per node. A visitor returning `false` skips its
+ * own subtree.
  * @param {object | null | undefined} node
  * @param {(node: object) => boolean | void} visitor
  */
@@ -42,5 +46,18 @@ export function walk(node, visitor) {
   if (!node) return;
   if (visitor(node) === false) return;
 
-  for (const child of childNodes(node)) walk(child, visitor);
+  for (const key of Object.keys(node)) {
+    if (!NON_NODE_KEYS.has(key)) walkValue(node[key], visitor);
+  }
+}
+
+/** Walks the node, or each node of the array, one key of a parent holds. */
+function walkValue(value, visitor) {
+  if (!Array.isArray(value)) {
+    if (isNode(value)) walk(value, visitor);
+    return;
+  }
+  for (const item of value) {
+    if (isNode(item)) walk(item, visitor);
+  }
 }

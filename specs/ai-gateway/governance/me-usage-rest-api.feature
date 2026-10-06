@@ -6,6 +6,7 @@ Feature: Personal usage REST API
   Background:
     Given I authenticate with an API key from my personal workspace
 
+  @integration
   Scenario: Reading personal usage for the current month
     When I GET /api/me/usage
     Then the response status is 200
@@ -13,6 +14,7 @@ Feature: Personal usage REST API
     And the body has a "dailyBuckets" array of per-day spend and request counts
     And the body has a "breakdownByModel" array of per-model spend and request counts
 
+  @integration
   Scenario: Reading personal usage for an explicit window
     When I GET /api/me/usage with a start and end time
     Then the response status is 200
@@ -27,16 +29,21 @@ Feature: Personal usage REST API
     And the rollups include this organization's ingestion-source spend
     And the rollups exclude ingestion-source spend from other organizations
 
+  # Gap: behaviour question. The route answers 422 (framework validation_error), the scenario says 400; me-usage.rest.integration.test.ts asserts 422.
+  @unimplemented
   Scenario: A half-specified window is rejected
     When I GET /api/me/usage with only a start time (or only an end time)
     Then the response status is 400
     And the error explains both bounds must be provided together
 
+  # Gap: behaviour question. The route answers 422 (framework validation_error), the scenario says 400; me-usage.rest.integration.test.ts asserts 422.
+  @unimplemented
   Scenario: An inverted window is rejected
     When I GET /api/me/usage with a start time at or after the end time
     Then the response status is 400
     And the error explains the start must be before the end
 
+  @integration
   Scenario: Empty state is safe
     Given my personal workspace has no usage in the window
     When I GET /api/me/usage
@@ -44,6 +51,7 @@ Feature: Personal usage REST API
     And the spend is 0 and there is no most-used model
     And every daily bucket shows zero spend and the per-model breakdown is empty
 
+  @integration
   Scenario: A key cannot read another user's personal usage
     Given I authenticate with a user-bound key that can view another user's personal workspace
     When I GET /api/me/usage for that other workspace
@@ -69,6 +77,7 @@ Feature: Personal usage REST API
     And the refusal carries a named code saying a service key cannot answer for a person
     And no usage is answered for the workspace's owner
 
+  @integration
   Scenario: A shared-workspace API key is rejected
     Given I authenticate with an API key from a shared (non-personal) workspace
     When I GET /api/me/usage
@@ -76,6 +85,7 @@ Feature: Personal usage REST API
     And the refusal carries a named code saying a personal-workspace API key is required
     And the refusal names no internal detail of how the check is made
 
+  @integration
   Scenario: Unauthenticated requests are rejected
     Given I provide no API key
     When I GET /api/me/usage

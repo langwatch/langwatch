@@ -19,10 +19,10 @@ import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.cu
 import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
 import { PrismaTriggerRepository } from "../../repositories/prisma/prisma.trigger.repository.ts";
+import type { TriggerSecretCipher } from "../../repositories/trigger.repository.ts";
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
 import { AutomationGraphActivityService } from "../automation-graph-activity.service.ts";
 import { AutomationGraphDeliveryService } from "../automation-graph-delivery.service.ts";
-import type { AutomationSecretCrypto } from "../automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
 import { SlackDestinationService } from "../slack-destination.service.ts";
 
@@ -59,7 +59,7 @@ const storesConfig: StoresConfig = {
   },
 };
 
-/** The encryption member exactly as a process with no key builds it. */
+/** The cipher a process with no key hands the live trigger repository. */
 async function keylessEncryption(name: string) {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }).withEnv());
   const { members } = await openStores({
@@ -95,14 +95,14 @@ function slackTriggerRow() {
 
 function compose(
   seed: Parameters<typeof createGraphActivityPrismaDouble>[0],
-  over: { delivery?: RecordingDelivery; crypto?: AutomationSecretCrypto } = {},
+  over: { delivery?: RecordingDelivery; crypto?: TriggerSecretCipher } = {},
 ) {
   const secrets = over.crypto ?? crypto;
   const database = createGraphActivityPrismaDouble(seed);
   const clock = frozenAt(FROZEN_NOW);
   const delivery = over.delivery ?? new RecordingDelivery();
   const logger = new SilentLogger();
-  const triggers = PrismaTriggerRepository.create(database.prisma, clock);
+  const triggers = PrismaTriggerRepository.create(database.prisma, clock, secrets);
   const service = AutomationGraphActivityService.create({
     triggers,
     customGraphs: PrismaCustomGraphRepository.create(database.prisma),
@@ -115,10 +115,10 @@ function compose(
     projects: new OneProject(),
     analytics: breachingAnalytics(),
     delivery,
-    webhooks: AutomationWebhookSecretsService.create(secrets),
+    webhooks: AutomationWebhookSecretsService.create(triggers),
     slackDestinations: SlackDestinationService.create({
       slack: { findUsableSlackSecret: async () => [] },
-      crypto: secrets,
+      triggers,
     }),
     emailCaps: AutomationEmailCapService.create({
       store: MemoryAutomationEmailCapRepository.create(),
@@ -221,7 +221,7 @@ describe("AutomationGraphActivityService", () => {
     });
 
     /** @scenario "A process holding no credentials key refuses rather than sending a ciphertext" */
-    it("refuses as the unconfigured encryption member and sends nothing to Slack", async () => {
+    it("refuses naming the missing encryption key and sends nothing to Slack", async () => {
       const keyless = await keylessEncryption("graph-alert-keyless-test");
       const { adapter, delivery } = compose({ triggers: [slackTriggerRow()] }, { crypto: keyless });
 

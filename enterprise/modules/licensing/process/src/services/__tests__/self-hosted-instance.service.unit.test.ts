@@ -2,9 +2,9 @@ import type { IncomingUsageReport } from "@langwatch/enterprise-licensing-contra
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { CloudCustomer, SelfHostedOrgTraits } from "../../app/licensing.members.ts";
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import { MemorySelfHostedInstanceRepository } from "../../repositories/memory/memory.self-hosted-instance.repository.ts";
+import type { CloudCustomer, SelfHostedOrgTraits } from "../self-hosted-crm.service.ts";
 import { SelfHostedCrmService } from "../self-hosted-crm.service.ts";
 import { SelfHostedInstanceService } from "../self-hosted-instance.service.ts";
 

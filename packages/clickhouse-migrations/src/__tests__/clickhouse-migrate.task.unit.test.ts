@@ -148,6 +148,7 @@ describe("clickhouse-migrate task", () => {
   });
 
   describe("when the operator opted out", () => {
+    /** @scenario An operator can skip a migration step that a deploy already applied */
     it("runs nothing for SKIP_CLICKHOUSE_MIGRATE=true", async () => {
       await ClickHouseMigrateTask.create({
         source: {

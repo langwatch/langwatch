@@ -32,7 +32,7 @@ import {
 /** How long the skip choice outlives the socket that carried it. */
 const POLICY_TTL_SECONDS = 6 * 60 * 60;
 
-export interface LocalPresenceOptions {
+interface LocalPresenceOptions {
   store: SessionStateStore;
   now?: () => number;
   presenceTtlMs?: number;

@@ -1,7 +1,7 @@
 import { Temporal } from "@langwatch/time";
 import type { OtlpSpan, SpanReceivedEvent } from "@langwatch/trace-contract";
 
-import { OtlpTraceRequestService } from "../services/otlp-trace-request.service.ts";
+import { convertUnixNanoToUnixMs, normalizeOtlpUnixNano } from "./otlp-span-identity.rules.ts";
 
 /**
  * The latest instant a span time may carry: the `DateTime64(3)` ceiling, and
@@ -42,9 +42,7 @@ function decodeSpanTime({
 }): { valueMs: number } | { unstorable: UnstorableSpanTime } {
   let valueMs: number;
   try {
-    valueMs = OtlpTraceRequestService.convertUnixNanoToUnixMs(
-      OtlpTraceRequestService.normalizeOtlpUnixNano(unixNano),
-    );
+    valueMs = convertUnixNanoToUnixMs(normalizeOtlpUnixNano(unixNano));
   } catch {
     return { unstorable: { field, valueMs: null } };
   }

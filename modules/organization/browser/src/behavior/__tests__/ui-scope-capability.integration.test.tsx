@@ -31,7 +31,8 @@ type Call = { path: string; input: unknown };
 /** The two reads the scope resolves itself from, answered from memory. */
 function recordingTransport({
   teams = [PERSONAL_TEAM, SHARED_TEAM],
-}: { teams?: readonly UiScopeTeam[] } = {}) {
+  sharedTrace = "resolved",
+}: { teams?: readonly UiScopeTeam[]; sharedTrace?: "resolved" | "pending" | "failed" } = {}) {
   const calls: Call[] = [];
   const transport = createApiFixture<UiFeatureApiTransport>({
     query: (path: string, input: unknown) => {
@@ -40,6 +41,8 @@ function recordingTransport({
         case UI_ORGANIZATIONS_PROCEDURE:
           return Promise.resolve(organizationWith({ teams }));
         case UI_SHARED_TRACE_PROCEDURE:
+          if (sharedTrace === "pending") return new Promise(() => {});
+          if (sharedTrace === "failed") return Promise.reject(new Error("token refused"));
           return Promise.resolve({
             project: { id: "proj-shared", name: "Shared", slug: "shared-project" },
           });
@@ -83,12 +86,14 @@ afterEach(() => {
 function ScopeProbe({
   transport,
   session,
+  grants = [],
 }: {
   transport: UiFeatureApiTransport;
   session: UiSessionReading;
+  grants?: readonly string[];
 }) {
   const reading: UiScopeReading = useUiScopeReading({ transport, session });
-  const scope = createBrowserUiScope({ reading, session: new NoGrants(session, reading) });
+  const scope = createBrowserUiScope({ reading, session: new NoGrants(session, reading, grants) });
   const active = scope.activeScope();
   return (
     <div>
@@ -96,6 +101,9 @@ function ScopeProbe({
       <span data-testid="organization">{active.organizationId ?? "none"}</span>
       <span data-testid="project">{active.projectId ?? "none"}</span>
       <span data-testid="host">{scope.scopeHost() ? "published" : "none"}</span>
+      <span data-testid="legacy-can">
+        {String(scope.scopeHost()?.hasPermission("annotations:update") ?? false)}
+      </span>
     </div>
   );
 }
@@ -108,6 +116,7 @@ class NoGrants extends UiSession {
   constructor(
     private readonly reading: UiSessionReading,
     private readonly resolved: UiScopeReading,
+    private readonly grants: readonly string[] = [],
   ) {
     super();
   }
@@ -135,7 +144,7 @@ class NoGrants extends UiSession {
       permissions: {
         status: "ready",
         isLoading: false,
-        can: () => false,
+        can: (permission) => this.grants.includes(permission),
         canInOrganization: () => false,
       },
     };
@@ -146,10 +155,12 @@ function renderScope({
   path,
   transport,
   session = SIGNED_IN,
+  grants,
 }: {
   path: string;
   transport: UiFeatureApiTransport;
   session?: UiSessionReading;
+  grants?: readonly string[];
 }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createMemoryRouter(
@@ -157,7 +168,7 @@ function renderScope({
       path: routePath,
       element: (
         <QueryClientProvider client={queryClient}>
-          <ScopeProbe transport={transport} session={session} />
+          <ScopeProbe transport={transport} session={session} grants={grants} />
         </QueryClientProvider>
       ),
     })),
@@ -273,5 +284,50 @@ describe("given nothing has resolved yet", () => {
     expect(view.getByTestId("status").textContent).toBe("loading");
     expect(view.getByTestId("project").textContent).toBe("none");
     expect(view.getByTestId("host").textContent).toBe("none");
+  });
+});
+
+describe("given a signed-in viewer with an active project opens a share link", () => {
+  const rememberViewersProject = () => {
+    window.localStorage.setItem(UI_SELECTED_TEAM_ID_KEY, JSON.stringify("team-shared"));
+    window.localStorage.setItem(UI_SELECTED_PROJECT_SLUG_KEY, JSON.stringify("acme-app"));
+  };
+
+  /** @scenario "A share route never falls back to the viewer's active project" */
+  it("reads loading while the shared trace query is pending, publishing no project", async () => {
+    rememberViewersProject();
+    const { transport, callsTo } = recordingTransport({ sharedTrace: "pending" });
+
+    const view = renderScope({ path: "/share/token-123", transport });
+
+    await waitFor(() => expect(callsTo(UI_SHARED_TRACE_PROCEDURE)).toHaveLength(1));
+    expect(view.getByTestId("status").textContent).toBe("loading");
+    expect(view.getByTestId("project").textContent).toBe("none");
+  });
+
+  /** @scenario "A share route never falls back to the viewer's active project" */
+  it("reads unavailable when the shared trace query fails, publishing no project", async () => {
+    rememberViewersProject();
+    const { transport } = recordingTransport({ sharedTrace: "failed" });
+
+    const view = renderScope({ path: "/share/token-123", transport });
+
+    await waitFor(() => expect(view.getByTestId("status").textContent).toBe("unavailable"));
+    expect(view.getByTestId("project").textContent).toBe("none");
+  });
+});
+
+describe("given the session holds a grant once the scope has resolved", () => {
+  it("answers the legacy host's permission reader from that same grant", async () => {
+    const { transport } = recordingTransport();
+
+    const view = renderScope({
+      path: "/acme-app/traces",
+      transport,
+      grants: ["annotations:update"],
+    });
+
+    await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-app"));
+    expect(view.getByTestId("legacy-can").textContent).toBe("true");
   });
 });

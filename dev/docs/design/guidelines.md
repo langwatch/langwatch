@@ -108,6 +108,8 @@ LangWatch uses a drawer navigation system that allows drawers to navigate to oth
 
 ```tsx
 import { useDrawer } from "@langwatch/browser-host/drawer";
+// The drawer's token, declared once by its owner (ARCHITECTURE.md §10.1)
+import { ChildDrawerToken } from "../../model/child-drawer.ts";
 
 function ParentDrawer() {
   const { openDrawer, canGoBack, goBack, closeDrawer } = useDrawer();
@@ -125,7 +127,7 @@ function ParentDrawer() {
         </HStack>
       </Drawer.Header>
       <Drawer.Body>
-        <Button onClick={() => openDrawer("childDrawer", { id: "123" })}>Open Child</Button>
+        <Button onClick={() => openDrawer(ChildDrawerToken, { id: "123" })}>Open Child</Button>
       </Drawer.Body>
     </Drawer.Root>
   );
@@ -227,7 +229,7 @@ For validation:
 - **A server rejection that names fields:** Put it back on those fields with `applyHandledErrorToForm`, paired with `<FormServerError form={form} />` for complaints about the submission as a whole.
 
 ```tsx
-// Each feature's `web` package owns its own copy of these helpers (e.g.
+// Each module's browser package owns its own copy of these helpers (e.g.
 // `behavior/errors.tsx`) rather than importing from a shared barrel.
 import { applyHandledErrorToForm, FormServerError, showErrorToast } from "../../behavior/errors";
 

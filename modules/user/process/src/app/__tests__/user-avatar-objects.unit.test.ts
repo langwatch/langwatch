@@ -13,8 +13,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserAvatarNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { avatarObjectStore } from "../user-composition.build.ts";
-import { createUserTestApp, createUserTestInfrastructure } from "./user.fixture.ts";
+import { createUserTestApp } from "./user.fixture.ts";
 
 /** The eight-byte PNG signature, which is all the codec checks. */
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
@@ -32,12 +31,8 @@ async function* bytesOf(chunk: Uint8Array): AsyncIterable<Uint8Array> {
   yield chunk;
 }
 
-function appOver(
-  storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById" | "getReadUrlForPurpose">,
-) {
-  return createUserTestApp({
-    members: createUserTestInfrastructure(avatarObjectStore(storedObjects)),
-  });
+function appOver(storedObjects: StoredObjectApi) {
+  return createUserTestApp({ dependencies: { storedObjects } });
 }
 
 describe("avatar objects over the stored-object store", () => {

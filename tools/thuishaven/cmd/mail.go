@@ -69,13 +69,22 @@ func newMailClient(baseURL string) mailClient {
 	return mailClient{baseURL: strings.TrimRight(baseURL, "/"), http: &http.Client{Timeout: mailHTTPTimeout}}
 }
 
-// do issues one request and decodes a 200 JSON body into into. notFoundErr is
-// returned verbatim on a 404, so callers can give it a message that names what
-// was being looked up rather than "answered 404 Not Found".
-func (c mailClient) do(ctx context.Context, method, path string, query url.Values, into any, notFoundErr error) error {
+// mailRequest is one call to the sink. notFound is returned verbatim on a
+// 404, so callers can give it a message that names what was being looked up
+// rather than "answered 404 Not Found".
+type mailRequest struct {
+	method, path string
+	query        url.Values
+	into         any
+	notFound     error
+}
+
+// do issues one request and decodes a 200 JSON body into r.into.
+func (c mailClient) do(ctx context.Context, r mailRequest) error {
+	method, path := r.method, r.path
 	target := c.baseURL + path
-	if len(query) > 0 {
-		target += "?" + query.Encode()
+	if len(r.query) > 0 {
+		target += "?" + r.query.Encode()
 	}
 	req, err := http.NewRequestWithContext(ctx, method, target, nil)
 	if err != nil {
@@ -88,15 +97,15 @@ func (c mailClient) do(ctx context.Context, method, path string, query url.Value
 	defer func() { _ = resp.Body.Close() }()
 	switch resp.StatusCode {
 	case http.StatusOK:
-		if into == nil {
+		if r.into == nil {
 			return nil
 		}
-		return json.NewDecoder(resp.Body).Decode(into)
+		return json.NewDecoder(resp.Body).Decode(r.into)
 	case http.StatusNoContent:
 		return nil
 	case http.StatusNotFound:
-		if notFoundErr != nil {
-			return notFoundErr
+		if r.notFound != nil {
+			return r.notFound
 		}
 		return fmt.Errorf("%s %s answered 404", method, path)
 	default:
@@ -105,18 +114,28 @@ func (c mailClient) do(ctx context.Context, method, path string, query url.Value
 	}
 }
 
-func (c mailClient) list(ctx context.Context, to, subject string) ([]mailSummary, error) {
-	q := url.Values{}
-	if to != "" {
-		q.Set("to", to)
+// mailFilter narrows a list or a wait to a recipient and a subject; empty
+// fields match everything.
+type mailFilter struct {
+	to, subject string
+}
+
+// addTo sets the filter's non-empty fields on q.
+func (f mailFilter) addTo(q url.Values) url.Values {
+	if f.to != "" {
+		q.Set("to", f.to)
 	}
-	if subject != "" {
-		q.Set("subject", subject)
+	if f.subject != "" {
+		q.Set("subject", f.subject)
 	}
+	return q
+}
+
+func (c mailClient) list(ctx context.Context, filter mailFilter) ([]mailSummary, error) {
 	var out struct {
 		Messages []mailSummary `json:"messages"`
 	}
-	if err := c.do(ctx, http.MethodGet, "/api/messages", q, &out, nil); err != nil {
+	if err := c.do(ctx, mailRequest{method: http.MethodGet, path: "/api/messages", query: filter.addTo(url.Values{}), into: &out}); err != nil {
 		return nil, err
 	}
 	return out.Messages, nil
@@ -125,7 +144,7 @@ func (c mailClient) list(ctx context.Context, to, subject string) ([]mailSummary
 func (c mailClient) get(ctx context.Context, id string) (mailMessage, error) {
 	var msg mailMessage
 	notFound := fmt.Errorf("message %q is not in this stack's inbox", id)
-	if err := c.do(ctx, http.MethodGet, "/api/messages/"+url.PathEscape(id), nil, &msg, notFound); err != nil {
+	if err := c.do(ctx, mailRequest{method: http.MethodGet, path: "/api/messages/" + url.PathEscape(id), into: &msg, notFound: notFound}); err != nil {
 		return mailMessage{}, err
 	}
 	return msg, nil
@@ -133,14 +152,8 @@ func (c mailClient) get(ctx context.Context, id string) (mailMessage, error) {
 
 // wait long-polls the sink; matched is false only on the sink's own 204
 // timeout, never on a network failure (that is returned as an error instead).
-func (c mailClient) wait(ctx context.Context, to, subject string, timeout time.Duration) (mailMessage, bool, error) {
-	q := url.Values{"timeout": {timeout.String()}}
-	if to != "" {
-		q.Set("to", to)
-	}
-	if subject != "" {
-		q.Set("subject", subject)
-	}
+func (c mailClient) wait(ctx context.Context, filter mailFilter, timeout time.Duration) (mailMessage, bool, error) {
+	q := filter.addTo(url.Values{"timeout": {timeout.String()}})
 	target := c.baseURL + "/api/messages/wait?" + q.Encode()
 	// The client's own deadline must outlast the server's requested long-poll
 	// window, or a slow-but-legitimate wait reads as a network failure instead
@@ -172,7 +185,7 @@ func (c mailClient) wait(ctx context.Context, to, subject string, timeout time.D
 }
 
 func (c mailClient) clear(ctx context.Context) error {
-	return c.do(ctx, http.MethodDelete, "/api/messages", nil, nil, nil)
+	return c.do(ctx, mailRequest{method: http.MethodDelete, path: "/api/messages"})
 }
 
 // getHTML reads a message's raw HTML body — not JSON, so it bypasses do's
@@ -225,81 +238,108 @@ func runMail(ctx context.Context, d deps, inv invocation) error {
 	if err != nil {
 		return err
 	}
-	return runMailSubcommand(ctx, inv, asJSON, base)
+	return runMailSubcommand(ctx, inv, mailSink{baseURL: base, asJSON: asJSON})
+}
+
+// mailSink is the sink a subcommand talks to and whether it answers in JSON.
+type mailSink struct {
+	baseURL string
+	asJSON  bool
 }
 
 // runMailSubcommand is every `haven mail` subcommand but `address`, given the
 // sink's base URL — split out so it can be unit-tested against a stub HTTP
 // server implementing the pinned contract, with no Orchestrator involved.
-func runMailSubcommand(ctx context.Context, inv invocation, asJSON bool, baseURL string) error {
-	client := newMailClient(baseURL)
-
+func runMailSubcommand(ctx context.Context, inv invocation, sink mailSink) error {
+	cmd := mailCommand{client: newMailClient(sink.baseURL), asJSON: sink.asJSON}
 	switch inv.args[0] {
 	case "list":
-		messages, err := client.list(ctx, inv.value("--to"), inv.value("--subject"))
-		if err != nil {
-			return err
-		}
-		if asJSON {
-			return printMailJSON(messages)
-		}
-		printMailList(messages)
-		return nil
+		return cmd.list(ctx, inv)
 	case "get":
-		if len(inv.args) < 2 {
-			return errors.New("usage: haven mail get <id> [--html]")
-		}
-		id := inv.args[1]
-		if inv.has("--html") {
-			html, err := client.getHTML(ctx, id)
-			if err != nil {
-				return err
-			}
-			fmt.Println(html)
-			return nil
-		}
-		msg, err := client.get(ctx, id)
-		if err != nil {
-			return err
-		}
-		if asJSON {
-			return printMailJSON(msg)
-		}
-		printMailMessage(msg)
-		return nil
+		return cmd.get(ctx, inv)
 	case "wait":
-		timeout := mailWaitDefaultTimeout
-		if raw := inv.value("--timeout"); raw != "" {
-			dur, err := time.ParseDuration(raw)
-			if err != nil {
-				return fmt.Errorf("--timeout %q is not a valid duration, e.g. 30s: %w", raw, err)
-			}
-			timeout = dur
-		}
-		msg, matched, err := client.wait(ctx, inv.value("--to"), inv.value("--subject"), timeout)
-		if err != nil {
-			return err
-		}
-		if !matched {
-			return fmt.Errorf("no message matched within %s", timeout)
-		}
-		if asJSON {
-			return printMailJSON(msg)
-		}
-		printMailMessage(msg)
-		return nil
+		return cmd.wait(ctx, inv)
 	case "clear":
-		if err := client.clear(ctx); err != nil {
-			return err
-		}
-		if asJSON {
-			return printMailJSON(map[string]bool{"cleared": true})
-		}
-		fmt.Println("inbox cleared")
-		return nil
+		return cmd.clear(ctx)
 	default:
 		return fmt.Errorf("unknown `haven mail` subcommand %q — %s", inv.args[0], mailUsage)
 	}
+}
+
+// mailCommand runs one subcommand against the sink and prints its answer.
+type mailCommand struct {
+	client mailClient
+	asJSON bool
+}
+
+func (cmd mailCommand) list(ctx context.Context, inv invocation) error {
+	messages, err := cmd.client.list(ctx, mailFilter{to: inv.value("--to"), subject: inv.value("--subject")})
+	if err != nil {
+		return err
+	}
+	if cmd.asJSON {
+		return printMailJSON(messages)
+	}
+	printMailList(messages)
+	return nil
+}
+
+func (cmd mailCommand) get(ctx context.Context, inv invocation) error {
+	if len(inv.args) < 2 {
+		return errors.New("usage: haven mail get <id> [--html]")
+	}
+	id := inv.args[1]
+	if inv.has("--html") {
+		html, err := cmd.client.getHTML(ctx, id)
+		if err != nil {
+			return err
+		}
+		fmt.Println(html)
+		return nil
+	}
+	msg, err := cmd.client.get(ctx, id)
+	if err != nil {
+		return err
+	}
+	return cmd.printMessage(msg)
+}
+
+func (cmd mailCommand) wait(ctx context.Context, inv invocation) error {
+	timeout := mailWaitDefaultTimeout
+	if raw := inv.value("--timeout"); raw != "" {
+		dur, err := time.ParseDuration(raw)
+		if err != nil {
+			return fmt.Errorf("--timeout %q is not a valid duration, e.g. 30s: %w", raw, err)
+		}
+		timeout = dur
+	}
+	msg, matched, err := cmd.client.wait(ctx, mailFilter{to: inv.value("--to"), subject: inv.value("--subject")}, timeout)
+	if err != nil {
+		return err
+	}
+	if !matched {
+		return fmt.Errorf("no message matched within %s", timeout)
+	}
+	return cmd.printMessage(msg)
+}
+
+func (cmd mailCommand) clear(ctx context.Context) error {
+	if err := cmd.client.clear(ctx); err != nil {
+		return err
+	}
+	if cmd.asJSON {
+		return printMailJSON(map[string]bool{"cleared": true})
+	}
+	fmt.Println("inbox cleared")
+	return nil
+}
+
+func (cmd mailCommand) printMessage(msg mailMessage) error {
+	if cmd.asJSON {
+		return printMailJSON(msg)
+	}
+	printMailMessage(msg)
+	return nil
 }
 
 func printMailJSON(v any) error {

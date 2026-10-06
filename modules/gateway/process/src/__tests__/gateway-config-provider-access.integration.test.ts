@@ -12,8 +12,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
-import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
@@ -23,6 +22,7 @@ import {
 } from "../services/gateway-config-materialisation.service.ts";
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
+import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
 import { seededCustomKeys } from "./support/seeded-custom-keys.ts";
 
@@ -56,6 +56,16 @@ function createSuiteProjects(): ProjectApi {
         }));
       },
 
+      async listIdsByOrganization(
+        input: Parameters<ProjectApi["listIdsByOrganization"]>[0],
+      ): ReturnType<ProjectApi["listIdsByOrganization"]> {
+        const rows = await prisma.project.findMany({
+          where: { team: { organizationId: input.organizationId } },
+          select: { id: true },
+        });
+        return rows.map((row) => row.id);
+      },
+
       async findTraceDestination(
         projectId: string,
       ): ReturnType<ProjectApi["findTraceDestination"]> {
@@ -82,7 +92,6 @@ function createSuiteProjects(): ProjectApi {
         const project = await projects.findTraceDestination(projectId);
         return project ? { outcome: "resolved", project } : { outcome: "unknown" };
       },
-      listIdsByOrganization: async () => [],
     },
     "SuiteProjectService",
   );
@@ -122,7 +131,7 @@ const MODEL_PROVIDER_IDS = [
 
 let gateway: GatewayService;
 
-const materialiser = (chRepo: GatewayBudgetSpend | null = null) =>
+const materialiser = (chRepo: GatewayBudgetSpendRepository | null = null) =>
   GatewayConfigMaterialiserService.create({
     scopeResolution: GatewayScopeResolutionService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
@@ -140,7 +149,7 @@ const materialiser = (chRepo: GatewayBudgetSpend | null = null) =>
     }),
   });
 
-async function bundleFor(keyId: string, chRepo: GatewayBudgetSpend | null = null) {
+async function bundleFor(keyId: string, chRepo: GatewayBudgetSpendRepository | null = null) {
   const vk = await PrismaGatewayVirtualKeyRepository.create(prisma).findById({
     id: keyId,
     organizationId: ORG_ID,
@@ -433,8 +442,8 @@ describe.skipIf(!databaseUrl)("gateway bundle provider access (real PG)", () => 
 
     /** @scenario "A slow spend read does not hold up the key's config" */
     it("ships the stored spend even when the read ignores its signal", async () => {
-      const ignoresSignal = createApiFixture<GatewayBudgetSpend>({
-        getSpendForBudgetsAcrossTenantsUntil: () => new Promise(() => undefined),
+      const ignoresSignal = createApiFixture<GatewayBudgetSpendRepository>({
+        findSpendForBudgetsAcrossTenantsUntil: () => new Promise(() => undefined),
       });
       const startedAt = nowInstant().epochMilliseconds;
 
@@ -450,8 +459,8 @@ describe.skipIf(!databaseUrl)("gateway bundle provider access (real PG)", () => 
     /** @scenario "A slow spend read does not hold up the key's config" */
     it("ships the stored spend within the deadline and cancels the read", async () => {
       let readSignal: AbortSignal | undefined;
-      const hangingSpendRead = createApiFixture<GatewayBudgetSpend>({
-        getSpendForBudgetsAcrossTenantsUntil: ({ signal }) =>
+      const hangingSpendRead = createApiFixture<GatewayBudgetSpendRepository>({
+        findSpendForBudgetsAcrossTenantsUntil: ({ signal }) =>
           new Promise((_resolve, reject) => {
             readSignal = signal;
             signal.addEventListener("abort", () => reject(signal.reason), { once: true });

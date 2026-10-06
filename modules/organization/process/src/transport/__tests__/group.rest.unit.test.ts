@@ -106,17 +106,23 @@ const alice = { userId: "alice-id", name: "Alice", email: "alice@acme.test", ima
 describe("given the /api/groups family", () => {
   describe("when the organization is below Enterprise", () => {
     /** @scenario The groups family answers 402 below Enterprise, naming GROUPS */
+    /** @scenario "Group endpoints require an Enterprise plan" */
     it("refuses with enterprise_plan_required naming GROUPS before reaching the app", async () => {
       const listGroups = vi.fn();
-      const send = mount({ listGroups }, { enterprise: false });
+      const createGroup = vi.fn();
+      const send = mount({ listGroups, createGroup }, { enterprise: false });
 
       const answer = await send("/api/groups");
+      const write = await send("/api/groups", { method: "POST", body: { name: "Ops" } });
 
+      expect(answer.status).toBe(402);
       expect(await answer.json()).toMatchObject({
         code: "enterprise_plan_required",
         meta: { feature: "GROUPS" },
       });
+      expect(write.status).toBe(402);
       expect(listGroups).not.toHaveBeenCalled();
+      expect(createGroup).not.toHaveBeenCalled();
     });
   });
 

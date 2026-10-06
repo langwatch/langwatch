@@ -23,8 +23,8 @@ vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
 }));
 
 import { setWindowAddress } from "../../../../../../__tests__/window-location-router.ts";
-import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
 import { useFocusSectionStore } from "../../../../../../behavior/focus-section.store.ts";
+import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
 import { TraceCommentList } from "../trace-comment-list.tsx";
 
 const TRACE_ID = "trace-1";

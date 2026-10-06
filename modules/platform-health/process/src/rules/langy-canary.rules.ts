@@ -9,9 +9,9 @@ export const LANGY_CANARY_BUDGET_MS = 55_000;
 /** The one user message every check sends. */
 export const LANGY_CANARY_GREETING = "Hi Langy.";
 
-export type LangyCanaryReason = "timeout" | "turn_failed" | "empty_reply";
+type LangyCanaryReason = "timeout" | "turn_failed" | "empty_reply";
 
-export type LangyCanaryVerdict =
+type LangyCanaryVerdict =
   | { healthy: true }
   | { healthy: false; reason: LangyCanaryReason; cause?: string };
 

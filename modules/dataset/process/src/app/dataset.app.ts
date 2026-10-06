@@ -5,7 +5,9 @@ import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DatasetApi,
+  datasetConfig,
   DatasetNotFoundError,
+  type DatasetServerConfig,
   type DatasetNormalizePayload,
   type AppendStoredObjectToDatasetInput,
   type BatchEvaluationEntry,
@@ -48,7 +50,6 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
 import { generate } from "@langwatch/ksuid";
 import type { FeatureSetup } from "@langwatch/process";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 
@@ -57,7 +58,6 @@ import {
   type DatasetNormalizationDefinition,
 } from "../eventing/dataset-normalization.pipeline.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
-import { ObjectStorageDatasetChunkRepository } from "../repositories/object-storage/object-storage.dataset-chunk.repository.ts";
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
 import { DatasetAttachmentUploadService } from "../services/dataset-attachment-upload.service.ts";
@@ -70,18 +70,10 @@ import { DatasetService } from "../services/dataset.service.ts";
 /** The KSUID resource a new dataset record's id is minted under. */
 const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
 
-/**
- * Shapes restated rather than imported: a module depends on contracts.
- * `publicBaseUrl` is the process's own fact, drilled in — absent where the
- * deployment named no `BASE_HOST`. `platformUrl` refuses by name when it is.
- */
-type DatasetMembers = Pick<ProcessMembers, "objectStorage"> &
-  Readonly<{ publicBaseUrl: string | undefined }>;
-
 type DatasetSetup = FeatureSetup<
   typeof DatasetModule.dependencies,
-  DatasetMembers,
-  undefined,
+  never,
+  DatasetServerConfig,
   DatasetRepositories
 >;
 
@@ -90,7 +82,7 @@ type DatasetSetup = FeatureSetup<
  * naming an experiment instead of a name, and possibly missing name and
  * columns when only patching what already exists.
  */
-export interface DatasetUpsertInput {
+interface DatasetUpsertInput {
   projectId: string;
   /** The dataset being replaced, by id. */
   datasetId?: string;
@@ -118,14 +110,14 @@ export class DatasetModule implements DatasetApi {
     /** Reads the confirmed files a dataset is imported from (ADR-158 §6). */
     storedObjects: StoredObjectApi,
   };
-  /** `publicBaseUrl` is the process's own fact; `objectStorage` is the process's client. */
-  static readonly reads = ["publicBaseUrl", "objectStorage"] as const;
+  /** The shared deployment origin; `platformUrl` refuses by name where no `BASE_HOST` was named. */
+  static readonly config = datasetConfig;
 
   #datasets: DatasetService;
   #attachmentUploads: DatasetAttachmentUploadService;
   #normalization: DatasetNormalizeService;
   #batchEvaluations: DatasetRepositories["batchEvaluations"];
-  #usage: DatasetRepositories["usage"];
+  #count: DatasetRepositories["count"];
   #experiments: ExperimentApi;
   #permissions: AuthzApi;
   readonly #publicBaseUrl: string | undefined;
@@ -133,11 +125,9 @@ export class DatasetModule implements DatasetApi {
   private constructor(
     repositories: DatasetRepositories,
     dependencies: DatasetSetup["dependencies"],
-    members: DatasetMembers,
+    config: DatasetServerConfig,
   ) {
-    const chunks = ObjectStorageDatasetChunkRepository.create({
-      objectStorage: members.objectStorage,
-    });
+    const chunks = repositories.chunks;
 
     this.#normalization = DatasetNormalizeService.create({
       repository: repositories.content,
@@ -175,14 +165,14 @@ export class DatasetModule implements DatasetApi {
       storedObjects: dependencies.storedObjects,
     });
     this.#batchEvaluations = repositories.batchEvaluations;
-    this.#usage = repositories.usage;
+    this.#count = repositories.count;
     this.#experiments = dependencies.experiments;
     this.#permissions = dependencies.permissions;
-    this.#publicBaseUrl = members.publicBaseUrl;
+    this.#publicBaseUrl = config.publicBaseUrl;
   }
 
-  static create({ repositories, dependencies, members }: DatasetSetup): DatasetModule {
-    return new DatasetModule(repositories, dependencies, members);
+  static create({ repositories, dependencies, config }: DatasetSetup): DatasetModule {
+    return new DatasetModule(repositories, dependencies, config);
   }
 
   // ── Datasets ─────────────────────────────────────────────────────────────
@@ -488,7 +478,7 @@ export class DatasetModule implements DatasetApi {
    * serves this family but named no public origin refuses by name.
    */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount> {
-    return this.#usage.countUsage(input);
+    return this.#count.countUsage(input);
   }
 
   platformUrl(input: { projectSlug: string; path: string }): string {

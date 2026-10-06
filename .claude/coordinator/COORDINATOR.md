@@ -52,10 +52,10 @@ This replaces the `/loop` cadence. A recurring loop tick that finds nothing
 changed still pays for the full context on every tick, and the repeated
 "progress" cycles are a large part of why this drive cost what it did.
 
-## 2. At most three active lanes
+## 2. At most six active lanes
 
-Three is the default ceiling. More needs a reason you can say out loud and
-ownership lists you have checked do not intersect.
+Six is the ceiling (ARCHITECTURE.md §18; Alex, 2026-10-05): owned paths
+disjoint at every spawn, never two lanes in one module.
 
 The constraint is not the machine, it is you: every extra lane adds a diff to
 review, a handoff to read, and a chance of two lanes meeting in one file. Two

@@ -8,7 +8,7 @@ export type {
   ClickhouseExperimentRunProcessingRepository,
   ExperimentRunProcessingPipeline,
 } from "./eventing/experiment-run-processing.pipeline.ts";
-export type { ExperimentAppDependencies, ExperimentPeople } from "./app/experiment.app.ts";
+export type { ExperimentAppDependencies } from "./app/experiment.app.ts";
 export { experimentProcessModule } from "./experiment.module.ts";
 export { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 export { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";

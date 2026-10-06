@@ -98,7 +98,7 @@ export const clickhouseTenantIdRule = defineRule({
     missingTenantPredicate: {
       what: "This ClickHouse query reads `{{table}}` without a `TenantId` predicate in that table's own WHERE, so it can return another tenant's rows.",
       why: "No id but TenantId is unique across tenants.",
-      fix: "Add `TenantId = {tenantId:String}` (or `TenantId IN {tenantIds:Array(String)}`) to the WHERE that filters `{{table}}`.",
+      fix: "Add `TenantId = {tenantId:String}` (or `TenantId IN {tenantIds:Array(String)}`) to the WHERE that filters `{{table}}`. Read the `process-module` skill.",
     },
   },
   create(context) {

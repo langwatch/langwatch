@@ -36,7 +36,7 @@ type ComparisonCarrier =
   | { style: "column"; target: TargetConfig };
 
 /** One comparison the configuration asks for: its verdict column, rows, and variants or skip. */
-export type PlannedComparison = {
+type PlannedComparison = {
   /** The column the verdict is stored under. */
   targetId: string;
   evaluatorId: string;

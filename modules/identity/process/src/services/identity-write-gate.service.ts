@@ -4,12 +4,27 @@
  * engine gate (ADR-110: finishing the migration IS the switch). `migrated`
  */
 import { createLogger } from "@langwatch/observability";
-import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
+import {
+  SystemMigrationRecordNotFoundError,
+  type TenantMigrationRecord,
+} from "@langwatch/system-migrations";
 import { Counter, register } from "prom-client";
 
-import type { IdentityWriteGateState } from "../app/identity.members.ts";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../rules/identity-migration-names.rules.ts";
 import { PerSubjectCachedGateService } from "./per-subject-cached-gate.service.ts";
+
+/**
+ * The two migration-state reads the per-user write fork is decided from. A port rather than the
+ * state repository itself: the gate asks two questions of one row family, the runtime composes
+ * whichever store answers them, and nothing here needs the runner's writes.
+ */
+export interface IdentityWriteGateState {
+  /** One tenant's record for a migration; throws `SystemMigrationRecordNotFoundError` if none. */
+  getRecord(input: { migrationName: string; tenantId: string }): Promise<TenantMigrationRecord>;
+
+  /** Whether ANY tenant has finalized this migration. */
+  hasFinalizedTenant(input: { migrationName: string }): Promise<boolean>;
+}
 
 const logger = createLogger("langwatch:identity:write-gate");
 

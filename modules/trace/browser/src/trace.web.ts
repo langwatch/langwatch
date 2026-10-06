@@ -5,6 +5,13 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import {
+  AnnotationQueueConversationToken,
+  RenderInputOutputToken,
+  SetupWithAgentButtonToken,
+  TraceEditButtonToken,
+  TraceIdPeekToken,
+} from "@langwatch/trace-contract";
 
 // Declare the `trace:` slices at install, so langy and annotation read them from first paint.
 import "./behavior/annotation-queue-session.store.ts";
@@ -50,12 +57,6 @@ export const traceWeb = defineBrowserModule("trace")
         default: (await import("./ui/sections/setup-with-agent-button.tsx")).AgentActionsMenu,
       }),
     },
-    annotationQueueConversation: {
-      load: async () => ({
-        default: (await import("./ui/sections/annotation-queue/annotation-queue-conversation.tsx"))
-          .AnnotationQueueConversation,
-      }),
-    },
     conversationThread: {
       load: async () => ({
         default: (await import("./ui/sections/conversation/conversation-thread.tsx"))
@@ -73,30 +74,36 @@ export const traceWeb = defineBrowserModule("trace")
         default: (await import("./ui/sections/presence/presence-menu-item.tsx")).PresenceMenuItem,
       }),
     },
-    renderInputOutput: {
-      load: async () => ({
-        default: (await import("./ui/sections/traces/render-input-output.tsx")).RenderInputOutput,
-      }),
-    },
-    setupWithAgentButton: {
-      load: async () => ({
-        default: (await import("./ui/sections/setup-with-agent-button.tsx")).SetupWithAgentButton,
-      }),
-    },
-    traceEditButton: {
-      load: async () => ({
-        default: (await import("./ui/sections/annotation-queue/trace-edit-button.tsx"))
-          .TraceEditButton,
-      }),
-    },
-    traceIdPeek: {
-      load: async () => ({
-        default: (await import("./ui/sections/explorer/trace-id-peek.tsx")).TraceIdPeek,
-      }),
-    },
     tracePreviewHoverCard: {
       load: async () => ({
         default: (await import("./ui/sections/explorer/trace-id-peek.tsx")).TracePreviewHoverCard,
       }),
     },
+  })
+  .lends(RenderInputOutputToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/traces/render-input-output.tsx")).RenderInputOutput,
+    }),
+  })
+  .lends(TraceIdPeekToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/explorer/trace-id-peek.tsx")).TraceIdPeek,
+    }),
+  })
+  .lends(SetupWithAgentButtonToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/setup-with-agent-button.tsx")).SetupWithAgentButton,
+    }),
+  })
+  .lends(AnnotationQueueConversationToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/annotation-queue/annotation-queue-conversation.tsx"))
+        .AnnotationQueueConversation,
+    }),
+  })
+  .lends(TraceEditButtonToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/annotation-queue/trace-edit-button.tsx"))
+        .TraceEditButton,
+    }),
   });

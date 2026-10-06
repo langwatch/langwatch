@@ -25,7 +25,7 @@ export const retractPulledUsageSchema = z.object({
   observed_at_ms: z.number().int().positive(),
 });
 
-export type RetractPulledUsagePayload = z.infer<typeof retractPulledUsageSchema>;
+type RetractPulledUsagePayload = z.infer<typeof retractPulledUsageSchema>;
 
 /** The envelope every command payload carries; a withdrawal without it fails validation at send. */
 export type RetractCommandEnvelope = {

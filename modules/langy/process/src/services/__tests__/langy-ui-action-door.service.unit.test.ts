@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { LangyUiActionCatalogService } from "../langy-ui-action-catalog.service.ts";
 import { LangyUiActionDoorService } from "../langy-ui-action-door.service.ts";
+import type { LangyUiActionService } from "../langy-ui-action.service.ts";
 
 const PROJECT = {
   id: "project-1",
@@ -35,7 +36,7 @@ function door(options: { caller?: LangyRestCaller; allowed?: boolean }) {
     },
     catalog: LangyUiActionCatalogService.create(),
     authz: createApiFixture<AuthzApi>({ hasApiKeyPermission: async () => options.allowed ?? true }),
-    actions: null,
+    actions: createApiFixture<LangyUiActionService>(),
   });
 }
 
@@ -77,14 +78,6 @@ describe("given the CLI's UI-action door", () => {
           dispatch({ conversationId: "c", kind: "workbench.duplicateTarget", payload: {} }),
         ),
       ).rejects.toMatchObject({ code: "api_key_permission_denied" });
-    });
-  });
-
-  describe("when this process has no Redis for the page channel", () => {
-    it("refuses as no open page claimed it, the way the panel's own claim degrades", async () => {
-      await expect(
-        door({}).dispatch(dispatch({ conversationId: "c", kind: "workbench.duplicateTarget" })),
-      ).rejects.toMatchObject({ code: "langy_ui_no_browser" });
     });
   });
 

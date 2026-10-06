@@ -8,7 +8,7 @@ import {
   type IdentityMatchSuggestionRow,
 } from "../identity-match-suggestion.repository.ts";
 
-export type IdentityMatchSuggestionDatabase = Pick<
+type IdentityMatchSuggestionDatabase = Pick<
   PrismaClient,
   "identityMatchSuggestion" | "$transaction"
 >;

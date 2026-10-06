@@ -1,30 +1,30 @@
 import {
-  SCIM_SYNC_AGGREGATE_TYPE,
+  SCIM_SYNC_EVENT_TYPES,
   type ScimSyncActivityEntry,
   scimSyncIdFor,
 } from "@langwatch/enterprise-scim-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { type EventStore, createTenantId } from "@langwatch/eventing";
+import type { OwnEventStore } from "@langwatch/eventing";
 
 import type { ScimSyncEvent } from "../../eventing/scim-sync-state.projection.ts";
 import { scimSyncActivityOutcome } from "../../rules/scim-sync-activity.rules.ts";
 import { ScimSyncActivityRepository } from "../scim-sync-activity.repository.ts";
 
-/** The one read this repository takes off the store. */
-export type ScimSyncEventReads = Pick<EventStore<ScimSyncEvent>, "getEvents">;
+/** The one read this repository takes off the scim_sync pipeline's own store. */
+export type ScimSyncEventReads = Pick<OwnEventStore, "read">;
+
+const SCIM_SYNC_EVENT_TYPE_SET: ReadonlySet<unknown> = new Set(SCIM_SYNC_EVENT_TYPES);
 
 /**
- * The directory-sync log itself, read through this process's event store.
+ * The directory-sync log itself, read through the scim_sync pipeline's own event store.
  * Every scim_sync payload carries ids, enums and counts only (ADR-101 §4).
  */
 export class EventingScimSyncActivityRepository extends ScimSyncActivityRepository {
-  static create(deps: {
-    eventStore: () => Promise<ScimSyncEventReads>;
-  }): EventingScimSyncActivityRepository {
+  static create(deps: { eventStore: ScimSyncEventReads }): EventingScimSyncActivityRepository {
     return new EventingScimSyncActivityRepository(deps.eventStore);
   }
 
-  private constructor(private readonly eventStore: () => Promise<ScimSyncEventReads>) {
+  private constructor(private readonly eventStore: ScimSyncEventReads) {
     super();
   }
 
@@ -37,14 +37,23 @@ export class EventingScimSyncActivityRepository extends ScimSyncActivityReposito
     connectionId: string;
     limit: number;
   }): Promise<readonly ScimSyncActivityEntry[]> {
-    const store = await this.eventStore();
-    const events = await store.getEvents({
+    const events = await this.eventStore.read({
+      tenantId: organizationId,
       aggregateId: scimSyncIdFor({ connectionId }),
-      context: { tenantId: createTenantId(organizationId) },
-      aggregateType: SCIM_SYNC_AGGREGATE_TYPE,
+      accepts: isScimSyncEvent,
     });
     return events.map(toActivityEntry).toSorted(newestFirst).slice(0, limit);
   }
+}
+
+/** One of the eight facts the scim_sync pipeline declares. */
+function isScimSyncEvent(event: unknown): event is ScimSyncEvent {
+  return (
+    typeof event === "object" &&
+    event !== null &&
+    "type" in event &&
+    SCIM_SYNC_EVENT_TYPE_SET.has(event.type)
+  );
 }
 
 /** Read structurally: every fact carries a subset of the fields the activity words. */

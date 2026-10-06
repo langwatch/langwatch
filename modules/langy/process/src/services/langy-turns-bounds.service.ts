@@ -1,7 +1,8 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { LangyTurnsRateLimitedError } from "@langwatch/langy-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+
+import type { LangyRateLimitRepository } from "../repositories/langy-rate-limit.repository.ts";
 
 /**
  * The tier-effective window every Langy turn starts under. A turn dispatches
@@ -12,7 +13,7 @@ export class LangyTurnsBoundsService {
   static create(deps: {
     entitlement: Pick<EntitlementApi, "requestBound">;
     projects: Pick<ProjectApi, "getOrganizationId">;
-    rateLimiter: RateLimiter;
+    rateLimits: LangyRateLimitRepository;
   }): LangyTurnsBoundsService {
     return new LangyTurnsBoundsService(deps);
   }
@@ -21,7 +22,7 @@ export class LangyTurnsBoundsService {
     private readonly deps: Readonly<{
       entitlement: Pick<EntitlementApi, "requestBound">;
       projects: Pick<ProjectApi, "getOrganizationId">;
-      rateLimiter: RateLimiter;
+      rateLimits: LangyRateLimitRepository;
     }>,
   ) {}
 
@@ -33,7 +34,7 @@ export class LangyTurnsBoundsService {
       key: "langyTurnsPerMinute",
       organizationId,
     });
-    const decision = await this.deps.rateLimiter.check(`langy-turn:${input.projectId}`, {
+    const decision = await this.deps.rateLimits.check(`langy-turn:${input.projectId}`, {
       requests,
       seconds: 60,
     });

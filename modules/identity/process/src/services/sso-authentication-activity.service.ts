@@ -6,7 +6,7 @@ import type { SsoMigrationEvidenceRepository } from "../repositories/sso-migrati
 
 const logger = createLogger("langwatch:identity:sso-activity");
 
-export interface SsoAuthenticationActivityServiceDeps {
+interface SsoAuthenticationActivityServiceDeps {
   connections: SsoConnectionReadRepository;
   activity: SsoMigrationEvidenceRepository;
   now?: () => number;

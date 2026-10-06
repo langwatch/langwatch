@@ -14,7 +14,7 @@ export const nlpLambdaCleanupSweepSchema = z.object({ scheduledFor: z.number().i
 export const nlpLambdaCleanupStateSchema = z.object({
   lastSweepAt: z.number().nullable(),
 });
-export type NlpLambdaCleanupState = z.infer<typeof nlpLambdaCleanupStateSchema>;
+type NlpLambdaCleanupState = z.infer<typeof nlpLambdaCleanupStateSchema>;
 
 type NlpLambdaCleanupIntents = {
   sweep: IntentSpec<typeof nlpLambdaCleanupSweepSchema>;

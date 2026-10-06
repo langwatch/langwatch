@@ -12,6 +12,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { SilentLogger } from "../../__tests__/fixtures/graph-activity.fixture.ts";
+import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
 import {
   createTestSlackConnections,
   createTestSlackDestinations,
@@ -162,7 +163,7 @@ describe("given a stored annotation queue automation", () => {
         .mockImplementation(async (command) => ({ ...queueTrigger(), ...command }));
       const service = authoring(
         { findById: async () => queueTrigger(), update },
-        AutomationProviderRegistryService.create(cipher),
+        AutomationProviderRegistryService.create(sealWith(cipher)),
       );
 
       await service.update({
@@ -193,7 +194,7 @@ describe("given a stored annotation queue automation", () => {
         .mockImplementation(async (command) => ({ ...webhookTrigger(), ...command }));
       const service = authoring(
         { findById: async () => webhookTrigger(), update },
-        AutomationProviderRegistryService.create(cipher),
+        AutomationProviderRegistryService.create(sealWith(cipher)),
       );
 
       await service.update({

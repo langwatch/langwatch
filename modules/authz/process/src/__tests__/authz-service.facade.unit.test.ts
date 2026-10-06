@@ -30,6 +30,7 @@ describe("AuthzService portable facade", () => {
     expect(makeService().service).toBeInstanceOf(AuthzServiceContract);
   });
 
+  /** @scenario "Authorization witnesses can only be minted by the service" */
   /** @scenario "A declared check and an imperative check decide through the same service" */
   /** @scenario "A passing imperative check returns a proof, not a boolean" */
   it("routes declared and imperative checks through the same decision engine", async () => {

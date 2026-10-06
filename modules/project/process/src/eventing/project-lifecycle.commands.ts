@@ -6,13 +6,19 @@ import {
   PROJECT_CREATED_EVENT_VERSION,
   PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE,
   PROJECT_LEGACY_KEY_REVOKED_EVENT_VERSION,
+  PROJECT_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
+  PROJECT_PRESENCE_SETTING_CHANGED_EVENT_VERSION,
 } from "@langwatch/project-contract";
 
 import {
   RECORD_PROJECT_CREATED_COMMAND_TYPE,
   RECORD_PROJECT_LEGACY_KEY_REVOKED_COMMAND_TYPE,
+  RECORD_PROJECT_PRESENCE_SETTING_CHANGED_COMMAND_TYPE,
   type ProjectCreatedEvent,
   type ProjectLegacyKeyRevokedEvent,
+  type ProjectPresenceSettingChangedEvent,
+  type RecordProjectPresenceSettingChangedCommandData,
+  recordProjectPresenceSettingChangedCommandDataSchema,
   type RecordProjectLegacyKeyRevokedCommandData,
   recordProjectLegacyKeyRevokedCommandDataSchema,
   type RecordProjectCreatedCommandData,
@@ -99,6 +105,55 @@ export class RecordProjectLegacyKeyRevokedCommand implements CommandHandler<
 
   static getSpanAttributes(
     payload: RecordProjectLegacyKeyRevokedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/**
+ * Records a project's presence switch. A change is keyed on its moment; a backfill once per
+ * project, so a re-run collapses onto the first.
+ */
+export class RecordProjectPresenceSettingChangedCommand implements CommandHandler<
+  Command<RecordProjectPresenceSettingChangedCommandData>,
+  ProjectPresenceSettingChangedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_PRESENCE_SETTING_CHANGED_COMMAND_TYPE,
+    recordProjectPresenceSettingChangedCommandDataSchema,
+    "Record that a project's presence setting changed",
+  );
+
+  async handle(
+    command: Command<RecordProjectPresenceSettingChangedCommandData>,
+  ): Promise<ProjectPresenceSettingChangedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectPresenceSettingChangedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
+        version: PROJECT_PRESENCE_SETTING_CHANGED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: data.backfilled
+          ? `${data.projectId}:presence-setting:backfilled`
+          : `${data.projectId}:presence-setting:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectPresenceSettingChangedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectPresenceSettingChangedCommandData,
   ): Record<string, string | number | boolean> {
     return {
       "payload.project.id": payload.projectId,

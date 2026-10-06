@@ -1,11 +1,11 @@
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type { TraceModelCost } from "../../app/trace.members.ts";
 import { TraceDerivationSpanReaderRepository } from "../../repositories/trace-derivation-span-reader.repository.ts";
 import { ScenarioRoleMetricsDerivationService } from "../scenario-role-metrics-derivation.service.ts";
 import { SpanCostService } from "../span-cost.service.ts";
 import { TraceEventDerivationService } from "../trace-event-derivation.service.ts";
+import type { TraceModelCost } from "../trace-model-cost.service.ts";
 
 /**
  * Read amplification across a coalesced fold batch: subscribers dispatch

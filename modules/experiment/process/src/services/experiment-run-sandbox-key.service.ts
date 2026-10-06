@@ -14,7 +14,10 @@ import type { LoadedWorkflow } from "./experiment-execution-data.service.ts";
  * Undefined if project has no organization or minting not configured.
  */
 export abstract class ExperimentSandboxCredential {
-  abstract findRunKey(input: { projectId: string; userId: string | null }): Promise<string | undefined>;
+  abstract findRunKey(input: {
+    projectId: string;
+    userId: string | null;
+  }): Promise<string | undefined>;
 }
 
 export class ExperimentRunSandboxKeyService {

@@ -47,7 +47,12 @@ import type {
 } from "./facts.ts";
 import type { IdentityEmailResolution } from "./identity-email.service.ts";
 import type { VerifiedUserDomain } from "./identity-lookup.ts";
-import type { DomainJoinSetting, JoinLookupDecision, JoinOffer } from "./join-matching.ts";
+import type {
+  DomainJoinSetting,
+  JoinerRole,
+  JoinLookupDecision,
+  JoinOffer,
+} from "./join-matching.ts";
 import type {
   ApproveJoinCommandData,
   ExpireJoinCommandData,
@@ -617,6 +622,8 @@ export interface JoinSettingChange {
   next: DomainJoinSetting;
   previousDomains: readonly string[];
   nextDomains: readonly string[];
+  previousJoinerRole: JoinerRole;
+  nextJoinerRole: JoinerRole;
 }
 
 /**
@@ -661,11 +668,13 @@ export interface JoinRequestsApi {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     domains: readonly string[];
+    /** Absent keeps the seat already set (ADR-171). */
+    joinerRole?: JoinerRole;
     actorUserId: string;
   }): Promise<JoinSettingChange>;
   readJoining(args: {
     organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }>;
+  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[]; joinerRole: JoinerRole }>;
   pendingForOrganization(args: { organizationId: string }): Promise<JoinRequestAggregateState[]>;
   automaticJoinsForOrganization(args: {
     organizationId: string;

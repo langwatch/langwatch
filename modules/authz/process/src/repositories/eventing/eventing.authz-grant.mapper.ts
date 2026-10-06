@@ -1,13 +1,13 @@
 import { authzBindingIdentityKey } from "@langwatch/authz-contract";
 
 /** The one principal a binding identity is keyed on. */
-export type BindingIdentityPrincipal = {
+type BindingIdentityPrincipal = {
   userId?: string | null;
   groupId?: string | null;
   apiKeyId?: string | null;
 };
 
-export type BindingIdentityInput = {
+type BindingIdentityInput = {
   principal: BindingIdentityPrincipal;
   scopeType: string;
   scopeId: string;

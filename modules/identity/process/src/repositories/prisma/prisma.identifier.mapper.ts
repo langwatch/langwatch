@@ -33,7 +33,7 @@ export interface IdentifierRow {
  * is not a state to treat as detached — guessing would answer a question
  * about somebody's live sign-in with a value nobody wrote.
  */
-export function parseIdentifierLifecycleState(raw: string): IdentifierLifecycleState {
+function parseIdentifierLifecycleState(raw: string): IdentifierLifecycleState {
   const state = IDENTIFIER_LIFECYCLE_STATES.find((candidate) => candidate === raw);
   if (!state) throw new Error(`Identifier row carries unknown state ${JSON.stringify(raw)}`);
   return state;

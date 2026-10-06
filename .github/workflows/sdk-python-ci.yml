@@ -16,14 +16,18 @@ on:
     # ready_for_review is NOT a default pull_request activity type. Without
     # it, taking a PR out of draft fires no event at all, so the jobs gated
     # on `heavy` below would never get their first non-draft run.
-    types: [opened, synchronize, reopened, ready_for_review]
+    # `labeled` fires for every label; a run starts only for `ci:full`, which
+    # also lifts the draft gate. Any other label is skipped by the gates below.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   pull_request_target:
     types: [labeled]
   merge_group:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  # A label event for any label but `ci:full` gets its own group, so it neither
+  # cancels a running full run nor is cancelled by one.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name != 'ci:full') && format('label-{0}', github.run_id) || github.event.pull_request.number || github.ref }}
   # Supersede an outdated run on a PR branch, never on main: every commit
   # that lands on main has to keep its own validation, and cancelling here
   # would let a merge silently void the run for the commit before it.
@@ -31,12 +35,15 @@ concurrency:
 
 jobs:
   changes:
+    # Skips the whole run for a label event other than `ci:full`.
+    if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
       # Draft PRs keep the cheap signal and release the runner slots;
       # everything heavy returns on ready_for_review and in the merge queue.
-      heavy: ${{ steps.detect.outputs.heavy }}
+      # A PR labelled `ci:full` runs it all, draft or not.
+      heavy: ${{ steps.detect.outputs.heavy == 'true' || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -219,7 +226,7 @@ jobs:
   # satisfied — that's the silent-success footgun we want to avoid.
   sdk-python-complete:
     needs: [changes, test, interpreters, build]
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2

@@ -20,15 +20,13 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { automationPeerSubscribers } from "../../__tests__/fixtures/pipeline-test-harness.ts";
-import type {
-  AutomationEvaluationTraceSummary,
-  AutomationEvaluationTriggerFilter,
-  AutomationGraphActivity,
-  AutomationTriggerMatchRecorder,
-} from "../../app/automation.members.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "../../repositories/automation-trace-trigger-catalogue.repository.ts";
+import type { AutomationEvaluationTraceSummary } from "../../services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationSubscriberService } from "../../services/automation-evaluation-subscriber.service.ts";
+import type { AutomationEvaluationTriggerFilter } from "../../services/automation-evaluation-trigger-filter.service.ts";
+import type { AutomationGraphActivity } from "../../services/automation-graph-activity.service.ts";
 import type { AutomationMatchRecordMetricsSink } from "../../services/automation-match-record-metrics.service.ts";
+import type { AutomationTriggerMatchRecorder } from "../../services/automation-trigger-match-dispatcher.service.ts";
 
 const NOW = 1_800_000_000_000;
 
@@ -339,7 +337,10 @@ describe("AutomationEvaluationSubscriberService", () => {
   });
 
   describe("given a trace the origin guard refuses", () => {
-    /** @scenario "Automation applies trace's origin guard to the folded summary" */
+    /**
+     * @scenario "Automation applies trace's origin guard to the folded summary"
+     * @scenario "A replayed trace does not re-fire an alert"
+     */
     it("records nothing for a trace with no resolved origin", async () => {
       const { reactions, sent } = service({ found: summary({ attributes: {} }) });
 

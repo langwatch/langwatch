@@ -1,4 +1,9 @@
-import { actorSchema, type Actor, type AuthzDeclaredScopeId } from "@langwatch/authorization";
+import {
+  actorSchema,
+  type Actor,
+  type AuthzDeclaredScopeId,
+  type AuthzPermission,
+} from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, validationMeta } from "@langwatch/observability";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
@@ -20,16 +25,25 @@ import {
 } from "../access-policy.ts";
 import {
   assertRouteScopePermission,
+  chosenPermission,
   decide,
   decideEntitlement,
+  decidePlatform,
+  platformRefusal,
   refuseImpersonatedMint,
   routeScopeOf,
   type AccessDenial,
   type Authorize,
   type Credential,
   type Entitlements,
+  type PlatformPermissionDeclaration,
 } from "../access/access.ts";
-import { RateLimitedError, SurfaceUnverifiedError } from "../errors.ts";
+import {
+  MediaTypeMalformedRequestError,
+  RateLimitedError,
+  SurfaceUnverifiedError,
+  UnsupportedMediaTypeError,
+} from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
 import { registerRoutePolicy } from "../route-registry.ts";
@@ -46,6 +60,7 @@ import {
 import {
   DOOR_SCOPE_TIER,
   permissionOf,
+  routePermissions,
   type RestDeprecation,
   type RestDoorCredential,
   type RestRouteAnswers,
@@ -60,6 +75,12 @@ import {
   type IdempotentRunner,
 } from "./idempotency.ts";
 import {
+  assertKeyKind,
+  isKeyDoor,
+  keyCredentialOfDoor,
+  type RestKeyCredential,
+} from "./key-credential.ts";
+import {
   CREDENTIAL_CLASS_BY_DOOR as CREDENTIAL_CLASS,
   deprecatedAlias,
   deprecationNotice,
@@ -70,6 +91,7 @@ import {
   bodyLimit,
   cachedRestAnswer,
   isBodyAbsent,
+  MalformedRequestError,
   loggerMiddleware,
   multipartMiddleware,
   refusingMalformedBody,
@@ -292,7 +314,7 @@ function protocolRefusalScope(route: RestTransportRoute<unknown>): MiddlewareHan
 /**
  * The family's error boundary, except on a route whose protocol declared its own
  * refusal: there the door's, the parser's and the handler's refusals all answer in
- * that protocol's document (ARCHITECTURE.md §8).
+ * that protocol's document (ARCHITECTURE.md §8), save one the refusal declines.
  */
 function protocolRefusals(onError: ErrorHandler): ErrorHandler {
   return (error, context) => {
@@ -301,11 +323,10 @@ function protocolRefusals(onError: ErrorHandler): ErrorHandler {
 
     if (!route || !refusal) return onError(error, context);
 
-    return respondProduced({
-      context,
-      route,
-      result: refusal({ failure: error, response: refusalProducer() }),
-    });
+    const result = refusal({ failure: error, response: refusalProducer() });
+    if (isDeclined(result)) return onError(error, context);
+
+    return respondProduced({ context, route, result });
   };
 }
 
@@ -339,20 +360,18 @@ function assertPortsBound<Api>({
 
     const door = doorOf({ credential: route.credential ?? declaration.credential, ports });
 
-    if (route.permissionTarget && !door.authorize) {
-      throw new Error(
-        `REST ${address} checks "${route.permission}" at the scope its path names, and this ` +
-          "runtime supplied no identity.authorize",
-      );
-    }
+    assertReachDoor({ address, route, credential: route.credential ?? declaration.credential });
 
-    const identified =
-      route.access?.kind === "authenticated" ||
-      route.access?.kind === "deferred" ||
-      ((route.credential ?? declaration.credential) === "browser" &&
-        Boolean(route.permissionTarget));
+    assertAfterBodyPorts({
+      address,
+      route,
+      door,
+      credential: route.credential ?? declaration.credential,
+    });
 
-    if (identified && !door.identify) {
+    const credential = route.credential ?? declaration.credential;
+
+    if (identifiedFirst({ route, credential }) && !door.identify) {
       throw new Error(
         `REST ${address} answers behind the family's door with no permission, and this runtime ` +
           "supplied no identity.identify",
@@ -361,6 +380,8 @@ function assertPortsBound<Api>({
 
     assertCapabilityPorts({ address, route, ports });
 
+    assertDoorQuestions({ address, route, door, credential });
+
     if (route.access?.kind === "optional" && !door.identifyOptional) {
       throw new Error(
         `REST ${address} answers with or without the family's credential, and this runtime ` +
@@ -368,6 +389,115 @@ function assertPortsBound<Api>({
       );
     }
   }
+}
+
+/**
+ * A platform route needs the door's platform question (E4), and a permission behind the CLI
+ * token door needs the question it asks at the token's organization (E8).
+ */
+function assertDoorQuestions({
+  address,
+  route,
+  door,
+  credential,
+}: {
+  address: string;
+  route: RestTransportRoute<unknown>;
+  door: RestIdentity;
+  credential: RestDoorCredential;
+}): void {
+  if (route.permissionPlatform && !door.authorizePlatform) {
+    throw new Error(
+      `REST ${address} asks "${route.permission}" at the platform, and this runtime supplied no ` +
+        "identity.authorizePlatform",
+    );
+  }
+
+  if (credential === "cli_token" && !route.access && !door.authorize) {
+    throw new Error(
+      `REST ${address} asks "${routePermissions(route).join(", ")}" behind the CLI token door, ` +
+        "and that door was built with no way to ask it at the token's organization",
+    );
+  }
+
+  if (route.key && !isKeyDoor(credential)) {
+    throw new Error(
+      `REST ${address} reads the key of the "${credential}" door, which resolves none`,
+    );
+  }
+}
+
+/** Whether the door only identifies the caller, leaving the permission to be asked later. */
+function identifiedFirst({
+  route,
+  credential,
+}: {
+  route: RestTransportRoute<unknown>;
+  credential: RestDoorCredential;
+}): boolean {
+  if (route.access?.kind === "authenticated" || route.access?.kind === "deferred") return true;
+
+  if (route.permissionPlatform) return true;
+
+  return (
+    Boolean(route.permissionBy) || (credential === "browser" && Boolean(route.permissionTarget))
+  );
+}
+
+/**
+ * A permission asked once the body is read needs the door's `authorize`; and a browser session
+ * names no scope, so a choice asked at the credential's own scope would have none.
+ */
+function assertAfterBodyPorts({
+  address,
+  route,
+  door,
+  credential,
+}: {
+  address: string;
+  route: RestTransportRoute<unknown>;
+  door: RestIdentity;
+  credential: RestDoorCredential;
+}): void {
+  if ((route.permissionTarget || route.permissionBy) && !door.authorize) {
+    throw new Error(
+      `REST ${address} checks "${routePermissions(route).join(", ")}" after its door, at a ` +
+        "scope its input names, and this runtime supplied no identity.authorize",
+    );
+  }
+
+  if (!route.permissionBy || route.permissionTarget || credential !== "browser") return;
+
+  const bare = Object.values(route.permissionBy.map).some((entry) => typeof entry === "string");
+
+  if (!bare) return;
+
+  throw new Error(
+    `REST ${address} asks a permission its input chooses at the credential's own scope, and ` +
+      "the browser door resolves none: name the scope on the entry or the route",
+  );
+}
+
+/** A permission reach is the key door's question; behind any other door it has no answer. */
+function assertReachDoor({
+  address,
+  route,
+  credential,
+}: {
+  address: string;
+  route: RestTransportRoute<unknown>;
+  credential: RestDoorCredential;
+}): void {
+  if (!route.permissionReach || credential === "api_key") return;
+
+  // The CLI token's scope is its organization, so asking there is what the door already does.
+  if (credential === "cli_token" && route.permissionReach === "organization") return;
+
+  throw new Error(
+    `REST ${address} asks "${route.permission}" at the reach of a key's grants, and only ` +
+      'the "api_key" door reads a key that names no project (the "cli_token" door takes ' +
+      '{ at: "organization" })',
+  );
 }
 
 /** The store behind each capability a route declared, named when it is missing. */
@@ -506,6 +636,11 @@ function routeStack<Api>({
     : [];
 
   const raw = route.rawBody ? [rawBodyMiddleware(route.rawBody)] : [];
+  const mismatch = route.rawBody?.mismatch;
+  const media =
+    route.rawBody && mismatch !== undefined && mismatch !== "accepted"
+      ? [mediaTypeMiddleware(route.rawBody)]
+      : [];
 
   return [
     ...(route.response?.refusal ? [protocolRefusalScope(route)] : []),
@@ -526,9 +661,10 @@ function routeStack<Api>({
       : []),
     // The door answers before the cap drains a byte (main's order), unless it signs over the
     // body: then the capped bytes are read once, exactly as sent, and it verifies those.
+    // The media type is asked after the door either way (E9): a missing credential answers 401.
     ...(doorReadsBody(route)
-      ? [...cap, ...raw, door]
-      : [door, ...credentialFacts({ route, facts }), ...cap, ...raw]),
+      ? [...cap, ...raw, door, ...media]
+      : [door, ...credentialFacts({ route, facts }), ...media, ...cap, ...raw]),
     ...(route.multipart
       ? [
           multipartMiddleware({
@@ -584,6 +720,14 @@ function authenticateMiddleware({
         request: context.req.raw,
         rawBody: context.get(ROUTE_RAW_BODY),
       });
+
+      // The door is told the admitted kinds; the runtime still refuses one it let through.
+      if (caller && route.keyKinds) {
+        assertKeyKind({
+          key: keyCredentialOfDoor({ door: "project", request: context.req.raw }),
+          admitted: route.keyKinds,
+        });
+      }
 
       callers.set(context, caller);
     }
@@ -653,7 +797,34 @@ function rawBodyMiddleware(rawBody: RestRawBody): MiddlewareHandler {
 
 const TEXT = new TextDecoder();
 
-/** Every deprecated route is reported once per process, on its first call. */
+/** A Content-Type's essence, lower-cased and without parameters; null when none was sent. */
+function mediaTypeEssence(contentType: string | undefined): string | null {
+  const essence = contentType?.split(";")[0]?.trim().toLowerCase();
+
+  return essence ? essence : null;
+}
+
+/** Refuses a body sent under a media type its route did not declare; reads one header, no bytes. */
+function mediaTypeMiddleware(rawBody: RestRawBody): MiddlewareHandler {
+  return async (context, next) => {
+    const received = mediaTypeEssence(context.req.header("content-type"));
+
+    if (received !== rawBody.mediaType) {
+      const refusal = { received, expected: rawBody.mediaType };
+
+      throw rawBody.mismatch === "malformed_request"
+        ? new MediaTypeMalformedRequestError(refusal)
+        : new UnsupportedMediaTypeError(refusal);
+    }
+
+    await next();
+  };
+}
+
+/**
+ * Every deprecated route is reported once per process, on its first call to a runtime that has
+ * a log: a runtime without one does not mark the route, so it cannot swallow the report.
+ */
 const reportedDeprecations = new Set<string>();
 
 function deprecationLog<Api>({
@@ -670,10 +841,10 @@ function deprecationLog<Api>({
   const key = `${family} ${route.operation}`;
 
   return async (context, next) => {
-    if (!reportedDeprecations.has(key)) {
+    if (ports.deprecationLog && !reportedDeprecations.has(key)) {
       reportedDeprecations.add(key);
 
-      ports.deprecationLog?.deprecatedRouteCalled({
+      ports.deprecationLog.deprecatedRouteCalled({
         family,
         operation: route.operation,
         successor: deprecated.successor,
@@ -781,7 +952,7 @@ function validators({
   }
 
   add("query", route.query);
-  add("json", route.input);
+  add("json", route.arrayBody?.schema ?? route.input);
 
   return stack;
 }
@@ -799,6 +970,8 @@ function readingAbsentBody({
   validate: MiddlewareHandler;
 }): MiddlewareHandler {
   if (target !== "json" || route.multipart || route.rawBody) return validate;
+
+  if (route.arrayBody) return absentBodyRefused({ validate });
 
   return absentBodyAsEmptyObject({ schema, validate });
 }
@@ -835,6 +1008,17 @@ function absentBodyAsEmptyObject({
   return Object.assign(middleware, validate);
 }
 
+/** An array route is never a bodiless action, so an absent body is the 400 a broken one is. */
+function absentBodyRefused({ validate }: { validate: MiddlewareHandler }): MiddlewareHandler {
+  const middleware: MiddlewareHandler = async (context, next) => {
+    if (!(await isBodyAbsent(context.req))) return validate(context, next);
+
+    throw new MalformedRequestError({ target: "json", detail: "No body was sent" });
+  };
+
+  return Object.assign(middleware, validate);
+}
+
 /** The one validated handler input: path, query and body fields, flattened. */
 function inputMiddleware({
   route,
@@ -851,7 +1035,8 @@ function inputMiddleware({
 
     const query = route.query ? context.req.valid("query" as never) : undefined;
     const json = route.input ? context.req.valid("json" as never) : undefined;
-    const body = route.multipart ? context.get(ROUTE_FORM_FIELDS) : json;
+    const sent = route.arrayBody ? { [route.arrayBody.as]: json } : json;
+    const body = route.multipart ? context.get(ROUTE_FORM_FIELDS) : sent;
 
     context.set(ROUTE_INPUT, mergeInput({ params, query, body }));
     await next();
@@ -910,13 +1095,11 @@ function decideRouteCaller<Api>({
   caller: RestCaller;
   input: unknown;
 }) {
-  const permission = route.access ? void 0 : permissionOf(route.permission);
-
   return decide({
     declaration: {
       kind: "service-authorized",
       reason: route.access?.reason ?? options.reason ?? HOST_ENFORCED,
-      permissions: permission === void 0 ? [] : [permission],
+      permissions: routePermissions(route),
     },
     caller: { actor: normalizedActor(caller.actor), scope: caller.scope },
     input,
@@ -1035,6 +1218,7 @@ function handlerMiddleware<Api>({
               scope: handlerScopeOf({ route, credential, caller }),
               target,
               session: sessionOf({ route, credential, caller }),
+              key: keyOf({ route, credential, request: context.req.raw }),
             }),
             ...(await resolveFacts({ route, facts, context })),
           ),
@@ -1371,6 +1555,21 @@ function sessionOf({
   return parsed.data;
 }
 
+/** The key the door recorded, for a route that declared its handler reads it (E5). */
+function keyOf({
+  route,
+  credential,
+  request,
+}: {
+  route: RestTransportRoute<unknown>;
+  credential: RestDoorCredential;
+  request: Request;
+}): RestKeyCredential | undefined {
+  if (!route.key || !isKeyDoor(credential)) return undefined;
+
+  return keyCredentialOfDoor({ door: credential, request });
+}
+
 /** What every handler is called with, whichever door let the request in. */
 function handlerArguments<Api>({
   context,
@@ -1381,6 +1580,7 @@ function handlerArguments<Api>({
   scope,
   target,
   session,
+  key,
 }: {
   context: Context;
   route: RestTransportRoute<Api>;
@@ -1390,6 +1590,7 @@ function handlerArguments<Api>({
   scope: AuthzDeclaredScopeId | null;
   target: AuthzDeclaredScopeId | null;
   session?: unknown;
+  key?: RestKeyCredential | undefined;
 }): StoredHandlerArguments<Api> {
   return {
     app: options.app(),
@@ -1398,6 +1599,7 @@ function handlerArguments<Api>({
     scope,
     target,
     session,
+    key,
     signal: context.req.raw.signal,
     request: context.req.raw,
     raw: route.rawBody
@@ -1510,27 +1712,67 @@ async function checkRouteScope({
   input: unknown;
   context: Context;
 }): Promise<AuthzDeclaredScopeId | null> {
-  if (!route.permissionTarget) return null;
+  const asked = askedAfterBody({ route, caller, input, context });
 
-  const permission = permissionOf(route.permission);
+  if (!asked) return null;
 
-  const scopeInput =
-    route.permissionTarget.at === "header"
-      ? headerScopeInput(route, context, route.permissionTarget)
-      : pathScopeInput(route.permissionTarget, input);
+  for (const permission of asked.permissions) {
+    const decision = await requireAuthorize(door)({ caller, permission, target: asked.target });
 
-  const target = routeScopeOf({ param: route.permissionTarget.param, input: scopeInput });
+    assertRouteScopePermission({
+      permission,
+      target: asked.target,
+      decision,
+      ...(ports.denials ? { denials: ports.denials } : {}),
+    });
+  }
 
-  const decision = await requireAuthorize(door)({ caller, permission, target });
+  return asked.named ? asked.target : null;
+}
 
-  assertRouteScopePermission({
-    permission,
-    target,
-    decision,
-    ...(ports.denials ? { denials: ports.denials } : {}),
-  });
+/**
+ * What is asked once the body is read, in order, and where: the permissions a route asks at
+ * the scope its own path names, or the one its input chose. `named` is false when that scope
+ * is the credential's own, which the handler is handed as its scope rather than its target.
+ */
+function askedAfterBody({
+  route,
+  caller,
+  input,
+  context,
+}: {
+  route: RestTransportRoute<unknown>;
+  caller: RestCaller;
+  input: unknown;
+  context: Context;
+}): Readonly<{
+  permissions: readonly AuthzPermission[];
+  target: AuthzDeclaredScopeId;
+  named: boolean;
+}> | null {
+  const chosen = route.permissionBy
+    ? chosenPermission({ declared: route.permissionBy, input })
+    : null;
 
-  return target;
+  if (chosen?.scope) return { permissions: [chosen.permission], target: chosen.scope, named: true };
+
+  const permissions = chosen ? [chosen.permission] : routePermissions(route);
+
+  if (route.permissionTarget) {
+    const scopeInput =
+      route.permissionTarget.at === "header"
+        ? headerScopeInput(route, context, route.permissionTarget)
+        : pathScopeInput(route.permissionTarget, input);
+    const target = routeScopeOf({ param: route.permissionTarget.param, input: scopeInput });
+
+    return { permissions, target, named: true };
+  }
+
+  if (!chosen) return null;
+
+  if (!caller.scope) throw new Error(`REST ${route.operation} chose a permission with no scope`);
+
+  return { permissions, target: caller.scope, named: false };
 }
 
 /**
@@ -1553,14 +1795,58 @@ async function callerOf({
 }): Promise<RestCaller | null> {
   const kind = route.access?.kind;
 
+  if (route.permissionPlatform) {
+    return platformCallerOf({ door, request, platform: route.permissionPlatform });
+  }
+
   if (credential === "browser" && route.permissionTarget) return requireIdentify(door)({ request });
+
+  // Chosen from the input, so asked once the body is read; the door only says who is calling.
+  if (route.permissionBy) {
+    return requireIdentify(door)({ request, ...(rawBody === void 0 ? {} : { rawBody }) });
+  }
 
   if (kind === "optional") return requireIdentifyOptional(door)({ request });
 
   if (kind === "authenticated" || kind === "deferred")
     return requireIdentify(door)({ request, ...(rawBody === void 0 ? {} : { rawBody }) });
 
-  return door.authenticate({ request, permission: permissionOf(route.permission) });
+  return door.authenticate({
+    request,
+    permission: permissionOf(route.permission),
+    permissions: routePermissions(route),
+    ...(route.permissionReach ? { reach: route.permissionReach } : {}),
+    ...(route.keyKinds ? { keyKinds: route.keyKinds } : {}),
+  });
+}
+
+/**
+ * Who calls a platform route (E4): the door identifies, then answers the platform question.
+ * A hidden route answers every refusal, a missing session's included, with the same 404.
+ */
+async function platformCallerOf({
+  door,
+  request,
+  platform,
+}: {
+  door: RestIdentity;
+  request: Request;
+  platform: PlatformPermissionDeclaration;
+}): Promise<RestCaller> {
+  const caller = await Promise.resolve(requireIdentify(door)({ request })).catch(
+    (error: unknown) => {
+      const refused = error instanceof HandledError && error.httpStatus < 500;
+      throw refused && platform.refusal === "hidden" ? platformRefusal(platform) : error;
+    },
+  );
+
+  await decidePlatform({
+    declaration: platform,
+    actor: caller.actor,
+    ask: ({ permission }) => requireAuthorizePlatform(door)({ caller, permission }),
+  });
+
+  return caller;
 }
 
 /**
@@ -1613,6 +1899,17 @@ function requireIdentify(door: RestIdentity): NonNullable<RestIdentity["identify
   if (!identify) throw new Error("REST runtime supplied no identity.identify");
 
   return identify.bind(door);
+}
+
+/** @see assertDoorQuestions, which refuses this before a request arrives. */
+function requireAuthorizePlatform(
+  door: RestIdentity,
+): NonNullable<RestIdentity["authorizePlatform"]> {
+  const authorizePlatform = door.authorizePlatform;
+
+  if (!authorizePlatform) throw new Error("REST runtime supplied no identity.authorizePlatform");
+
+  return authorizePlatform.bind(door);
 }
 
 /** @see assertPortsBound, which refuses these before a request arrives. */
@@ -2463,7 +2760,7 @@ function registryPolicy<Api>({
   return handlerManagedAuth({
     reason: route.access?.reason ?? reason,
     credential: HANDLER_CREDENTIAL[credential],
-    permissions: route.access ? [] : [permissionOf(route.permission)],
+    permissions: routePermissions(route),
   });
 }
 

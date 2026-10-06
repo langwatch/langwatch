@@ -10,6 +10,7 @@ import {
   type Project,
   type UpdateProjectInput,
   DestinationTeamNotFoundError,
+  assertNotGovernanceProject,
   assertPersonalProjectArchivable,
   assertPersonalWorkspaceCreate,
   assertPersonalWorkspaceMove,
@@ -145,6 +146,12 @@ export class ProjectWriteService {
     data: UpdateProjectInput;
   }): Promise<Project> {
     const data = input.data;
+    // Read scoped to the organization: an unscoped refusal would tell a caller
+    // which of another organization's projects is the governance record.
+    const current = await this.repository.findWithTeam(input.id);
+    const owned = current && current.team.organizationId === input.organizationId ? current : null;
+    if (owned) assertNotGovernanceProject(owned.kind);
+
     if (data.teamId) {
       const [team] = await this.findActiveTeam({
         teamId: data.teamId,
@@ -156,14 +163,9 @@ export class ProjectWriteService {
         );
       }
 
-      const current = await this.repository.findWithTeam(input.id);
-      if (
-        current &&
-        current.team.organizationId === input.organizationId &&
-        current.teamId !== data.teamId
-      ) {
+      if (owned && owned.teamId !== data.teamId) {
         assertPersonalWorkspaceMove({
-          isProjectPersonal: current.isPersonal,
+          isProjectPersonal: owned.isPersonal,
           isDestinationTeamPersonal: team.isPersonal,
         });
       }
@@ -181,6 +183,7 @@ export class ProjectWriteService {
   async archive(input: { id: string; organizationId: string }): Promise<ArchivedProject> {
     const existing = await this.repository.findWithTeam(input.id);
     if (existing && existing.team.organizationId === input.organizationId) {
+      assertNotGovernanceProject(existing.kind);
       assertPersonalProjectArchivable(existing.isPersonal);
     }
 

@@ -2,7 +2,7 @@
  * The unit the Instant Evals meter is checkpointed in: ten-thousandths of a
  * dollar, so the running total is an integer and the value Stripe receives is
  * the dollar figure to four places, exactly.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { Temporal } from "@langwatch/time";
@@ -10,7 +10,7 @@ import { Temporal } from "@langwatch/time";
 /** Stripe meter event name for Instant Evals, in dollars to four places. */
 export const INSTANT_EVAL_USD_EVENT_NAME = "langwatch_instant_eval_usd";
 
-export const INSTANT_EVAL_METER_UNITS_PER_USD = 10_000;
+const INSTANT_EVAL_METER_UNITS_PER_USD = 10_000;
 
 const NANO_USD_PER_USD = 1_000_000_000;
 

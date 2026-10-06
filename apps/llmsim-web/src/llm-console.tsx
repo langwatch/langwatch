@@ -30,8 +30,8 @@ const NoCalls = () => (
       title="No calls yet"
       description={
         <>
-          Start the stack with <Code>haven up +llm</Code> so every provider points here, then send
-          a playground message, run an evaluator or ask Langy. Each model call lands in this list.
+          Start the stack with <Code>haven up +llm</Code> so every provider points here, then send a
+          playground message, run an evaluator or ask Langy. Each model call lands in this list.
         </>
       }
     />
@@ -104,9 +104,7 @@ export const LlmConsole = () => {
     else
       content = (
         <SimSplit
-          list={
-            <CallList calls={items} selectedId={selected?.id ?? ""} onSelect={setSelectedId} />
-          }
+          list={<CallList calls={items} selectedId={selected?.id ?? ""} onSelect={setSelectedId} />}
           detail={selected ? <CallDetailPane id={selected.id} /> : undefined}
         />
       );

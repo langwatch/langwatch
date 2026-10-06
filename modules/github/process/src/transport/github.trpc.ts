@@ -1,7 +1,7 @@
 /**
  * The server half of `github.*`: the organization's connection, the
  * repositories it reaches, the live pull-request read and the disconnect.
- * @see specs/integrations/github-connection.feature
+ * @see modules/integration/specs/github-connection.feature
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {

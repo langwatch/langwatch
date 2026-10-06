@@ -10,6 +10,8 @@ import {
   gatewayInternalUrl,
   gatewayLegacyUrl,
   gatewayPublicUrl,
+  isSaas,
+  publicBaseUrl,
   type ConfigOf,
 } from "@langwatch/config";
 import { resolveGatewayBaseUrl } from "@langwatch/config/public-app-config/projection";
@@ -26,11 +28,15 @@ export const governanceSecrets = {
   ottlSigningSecret: gatewayInternalSecret,
 } as const;
 
-/** Where issued personal keys send traffic, where OTTL calls reach the gateway, and the ingest throttle. */
+/** Where issued personal keys send traffic, where OTTL calls reach the gateway, the ingest throttle and this deployment's origin. */
 export const governanceConfig = Config.define((c) => ({
   gatewayPublicUrl,
   gatewayInternalUrl,
   gatewayLegacyUrl,
+  /** The hosted product, whose default gateway is the SaaS one rather than the local one. */
+  isSaas,
+  /** This deployment's public origin (`BASE_HOST`), absent where it named none; the CLI's links lead back to it. */
+  publicBaseUrl,
   /** Main's `LW_INGEST_RATE_LIMIT_DISABLED=1`: tests and dev switch the push receivers' throttle off. */
   ingestRateLimitDisabled: c.env(
     "LW_INGEST_RATE_LIMIT_DISABLED",
@@ -45,14 +51,12 @@ export type GovernanceConfig = ConfigOf<typeof governanceConfig>;
 /** Main's precedence: the public URL, the legacy base URL, then the SaaS or local default. */
 export function governanceGatewayBaseUrl({
   config,
-  isSaas,
 }: {
   config: GovernanceConfig | undefined;
-  isSaas: boolean;
 }): string {
   return resolveGatewayBaseUrl({
     LW_GATEWAY_PUBLIC_URL: config?.gatewayPublicUrl,
     LW_GATEWAY_BASE_URL: config?.gatewayLegacyUrl,
-    IS_SAAS: isSaas,
+    IS_SAAS: config?.isSaas ?? false,
   });
 }

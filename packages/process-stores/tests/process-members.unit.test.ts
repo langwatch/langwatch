@@ -99,6 +99,7 @@ describe("given a process that named no store", () => {
 
 describe("given the members built over one Redis connection", () => {
   describe("when the cache, the idempotency store and the limiter are read", () => {
+    /** @scenario "A service receives its connection as a dependency" */
     it("builds all three over the single connection handed in", () => {
       const calls: string[] = [];
       const redis = redisDouble({
@@ -228,6 +229,17 @@ describe("given the members with no client behind them", () => {
   describe("when the clock is read", () => {
     it("answers the wall clock", () => {
       expect(systemClock().now().epochMilliseconds).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe("given a process that builds its stores from config", () => {
+  describe("when boot reads the member source", () => {
+    /** @scenario "Opened stores state the live tier" */
+    it("states the live tier, so boot never assumes one", () => {
+      const members = buildProcessStores({ config: config() }).members;
+
+      expect(members.tier).toBe("live");
     });
   });
 });

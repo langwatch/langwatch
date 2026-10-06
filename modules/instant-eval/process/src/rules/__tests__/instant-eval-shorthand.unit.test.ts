@@ -1,7 +1,7 @@
 /**
  * The statement each shorthand becomes: the template per target, the window,
  * how questions are named, and the refusals before a statement is written.
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 
 import {

@@ -1,23 +1,12 @@
-/** What trace lends this module through its declaration (ARCHITECTURE.md §3.4, rule 7). */
+/** What trace lends this module by token (ARCHITECTURE.md §10.1). */
 
-import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
-import type { UiSetupWithAgentButtonProps } from "@langwatch/browser-host/declarations";
-import { lazy, Suspense, useMemo } from "react";
+import { Lent } from "@langwatch/browser-host/lent";
+import {
+  SetupWithAgentButtonToken,
+  type SetupWithAgentButtonProps,
+} from "@langwatch/trace-contract";
 
 /** Trace's "Setup via Agent" menu, rendered as trace lends it. */
-export function SetupWithAgentButton(props: UiSetupWithAgentButtonProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("setupWithAgentButton")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function SetupWithAgentButton(props: SetupWithAgentButtonProps) {
+  return <Lent of={SetupWithAgentButtonToken} props={props} />;
 }

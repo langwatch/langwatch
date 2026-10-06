@@ -12,6 +12,7 @@ import {
 } from "../cli-device-flow.service.ts";
 
 describe("CliDeviceFlowService.approveDeviceCode", () => {
+  /** @scenario "A CLI login is not approved while an operator acts as another member" */
   it("A CLI login is not approved while an operator acts as another member", async () => {
     const reached: PropertyKey[] = [];
     const session = async () => ({ id: "member-1", impersonator: { id: "operator-1" } });

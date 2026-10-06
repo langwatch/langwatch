@@ -23,10 +23,10 @@ import type {
  * write rather than being held by the repository, since a repository is
  * built from the connection alone; the app carries it to the three writes that mint a row.
  */
-export type UserCredentialIssuer = Readonly<{ issuer: string }>;
+type UserCredentialIssuer = Readonly<{ issuer: string }>;
 
 /** Whether a mailbox proof already confirmed the address, so the account is born confirmed. */
-export type UserAddressConfirmation = Readonly<{ emailVerified: boolean }>;
+type UserAddressConfirmation = Readonly<{ emailVerified: boolean }>;
 
 export type CreateCredentialUserRow = CreateCredentialUserInput &
   UserCredentialIssuer &

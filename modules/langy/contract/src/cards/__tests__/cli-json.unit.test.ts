@@ -20,6 +20,7 @@ describe("parseCliJson", () => {
   });
 
   describe("given stdout with console noise around the JSON", () => {
+    /** @scenario "The JSON document is lifted out of a noisy stdout" */
     it("lifts the document out of the noise", () => {
       const stdout = [
         "⠋ Searching traces...",

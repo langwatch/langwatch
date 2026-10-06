@@ -24,7 +24,7 @@ func singleOptions(t *testing.T, server string) scenarioOptions {
 
 func runSingle(options scenarioOptions) (int, string) {
 	var report bytes.Buffer
-	code := runScenarioPhase(context.Background(), options, &report, &report)
+	code := runScenarioPhase(context.Background(), scenarioPhase{options: options, report: &report, progress: &report})
 	return code, report.String()
 }
 
@@ -63,7 +63,7 @@ func TestDoneScenariosAreSkippedUnlessFinal(t *testing.T) {
 	t.Cleanup(server.Close)
 	options := singleOptions(t, server.URL)
 	runSingle(options)
-	if _, err := markScenarioDone(options.DoneRoot, "run-1", "create-is-readable", "held", false, time.Now()); err != nil {
+	if _, err := markScenarioDone(options.DoneRoot, scenarioDoneInputs{runID: "run-1", id: "create-is-readable", note: "held", force: false}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	options.RunDir = filepath.Join(options.DoneRoot, ".apidiff", "run-2")
@@ -77,7 +77,7 @@ func TestDoneScenariosAreSkippedUnlessFinal(t *testing.T) {
 	if err := undoScenarioDone(options.DoneRoot, "create-is-readable"); err != nil {
 		t.Error(err)
 	}
-	if _, err := markScenarioDone(options.DoneRoot, "run-1", "nope", "x", false, time.Now()); err == nil {
+	if _, err := markScenarioDone(options.DoneRoot, scenarioDoneInputs{runID: "run-1", id: "nope", note: "x", force: false}, time.Now()); err == nil {
 		t.Error("signed off a scenario the run never had")
 	}
 }
@@ -89,10 +89,10 @@ func TestDoneRefusesAScenarioThatFailed(t *testing.T) {
 	t.Cleanup(server.Close)
 	options := singleOptions(t, server.URL)
 	runSingle(options)
-	if _, err := markScenarioDone(options.DoneRoot, "run-1", "create-is-readable", "x", false, time.Now()); err == nil {
+	if _, err := markScenarioDone(options.DoneRoot, scenarioDoneInputs{runID: "run-1", id: "create-is-readable", note: "x", force: false}, time.Now()); err == nil {
 		t.Error("signed off a failing scenario")
 	}
-	if _, err := markScenarioDone(options.DoneRoot, "run-1", "create-is-readable", "", true, time.Now()); err == nil {
+	if _, err := markScenarioDone(options.DoneRoot, scenarioDoneInputs{runID: "run-1", id: "create-is-readable", note: "", force: true}, time.Now()); err == nil {
 		t.Error("signed off without a note")
 	}
 }

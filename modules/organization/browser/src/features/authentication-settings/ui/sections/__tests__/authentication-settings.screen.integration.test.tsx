@@ -15,7 +15,7 @@ vi.mock("../../../../../behavior/use-join-requests.ts", () => ({
   useJoinRequests: () => ({
     requests: [],
     answeringId: null,
-    joining: { domainJoin: "request", joinDomains: [] },
+    joining: { domainJoin: "request", joinDomains: [], joinerRole: "MEMBER" },
     savingJoining: false,
     setJoining: vi.fn(),
     approve: vi.fn(),
@@ -79,7 +79,10 @@ const hostWith = ({
 
 describe("given an administrator on the Authentication page", () => {
   describe("when the organization has no identity provider connection", () => {
-    /** @scenario "Organization policies remain available without single sign-on" */
+    /**
+     * @scenario "Organization policies remain available without single sign-on"
+     * @scenario "Who may join is asked beside the connection whose domains it reads"
+     */
     it("keeps its policies on the page and says they cover password sign-in", () => {
       renderWithOrganizationHost(
         <AuthenticationSettingsScreen />,

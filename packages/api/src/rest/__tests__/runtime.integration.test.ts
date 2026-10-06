@@ -8,7 +8,7 @@ import type { AuthzPermission } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import { Hono } from "hono";
 import { generateSpecs } from "hono-openapi";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import {
@@ -570,6 +570,23 @@ describe("a family the declaration marked superseded", () => {
       successor: "/api/v1/reports",
       notice: "Use /api/v1/reports instead",
     });
+  });
+
+  it("reports the first call to a runtime with a log, once per process, whatever ran before", async () => {
+    const first = vi.fn();
+    const second = vi.fn();
+
+    await legacyReportsApp().app.request("/api/legacy-reports/health");
+    const logged = legacyReportsApp({ deprecatedRouteCalled: first }).app;
+    await logged.request("/api/legacy-reports/health");
+    await logged.request("/api/legacy-reports/health");
+    await legacyReportsApp({ deprecatedRouteCalled: second }).app.request(
+      "/api/legacy-reports/health",
+    );
+
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(first).toHaveBeenCalledWith(expect.objectContaining({ operation: "readLegacyHealth" }));
+    expect(second).not.toHaveBeenCalled();
   });
 
   /** @scenario "Deprecation reaches the document and the wire" */
@@ -3032,6 +3049,69 @@ describe("two REST families behind different doors", () => {
 
       expect(projectKeyed).toEqual({ status: 422, code: "validation_error", fields: ["name"] });
       expect(publicFamily).toEqual({ status: 422, code: "validation_error", fields: ["email"] });
+    });
+  });
+});
+
+describe("three families mounted on one host", () => {
+  const familyOver = (namespace: string) =>
+    defineRestRouter(AnnotationApi)
+      .withNamespace(namespace)
+      .withVersion(VERSION)
+      .get("/:id", "getById")
+      .withParams(z.object({ id: z.string() }))
+      .withAccess(publicRoute({ reason: "a request-log probe reads no tenant data" }))
+      .withOutput(z.object({ id: z.string() }))
+      .handle(async ({ app, input }) => app.getById({ id: input.id }))
+      .build();
+
+  let host: Hono;
+
+  beforeEach(() => {
+    const runtime = createRestRuntime({
+      identity: { authenticate: () => ({ actor: null, scope: null }) },
+    });
+
+    host = new Hono();
+
+    for (const namespace of ["prompts", "datasets", "monitors"]) {
+      host.route(
+        "/",
+        runtime.mount(familyOver(namespace).router(), {
+          app: () => ({ getById: async ({ id }) => ({ id }) }),
+          onError: createErrorHandler(),
+        }),
+      );
+    }
+  });
+
+  /** @scenario "One request writes one request-log record" */
+  it("writes exactly one request-handled record for one request", async () => {
+    const response = await host.request("/api/datasets/dataset-1");
+
+    expect(response.status).toBe(200);
+
+    const handled = [...recordedLogs.values()]
+      .flat()
+      .filter((row) => row.message === "request handled");
+
+    expect(handled).toHaveLength(1);
+  });
+
+  /** @scenario "The request-log record names the endpoint that answered" */
+  it("names the family and endpoint that resolved the request in its one record", async () => {
+    await host.request("/api/datasets/dataset-1");
+
+    const [record] = [...recordedLogs.values()]
+      .flat()
+      .filter((row) => row.message === "request handled");
+
+    expect(record?.fields).toMatchObject({
+      family: "datasets",
+      route: "GET /:id",
+      url: "/api/datasets/dataset-1",
+      statusCode: 200,
+      duration: expect.any(Number),
     });
   });
 });

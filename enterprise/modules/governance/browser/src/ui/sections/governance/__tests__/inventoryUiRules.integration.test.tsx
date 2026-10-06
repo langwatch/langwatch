@@ -33,6 +33,7 @@ describe("given an admin on the Inventory page", () => {
      * end under `justify="space-between"`, and jsdom lays nothing out.
      */
     /** @scenario "Primary page actions sit top-right in the page header" */
+    /** @scenario "The sample toggle sits top-right and the banner directly under the header" */
     it("puts the page actions at the right of the header, small, none solid", async () => {
       connectTools();
       renderScreenWithReferences();

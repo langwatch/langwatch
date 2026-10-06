@@ -82,7 +82,8 @@ Feature: Reorganizing gateway budgets per team from the CLI
     Scenario: The budget routes take an organization key and hand its caller to the application
       Given the gateway budget routes mounted behind the key door
       When an organization key with no project lists and creates budgets
-      Then the application authorizes the caller the key door resolved
+      Then the key door is asked each route's declared permission
+      And the application is handed the caller the key door resolved
       And a refused caller never reaches the budget write
 
   Rule: Updating a budget answers with its live spend

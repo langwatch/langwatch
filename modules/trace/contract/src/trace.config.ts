@@ -1,9 +1,9 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, publicBaseUrl, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 /**
- * Span pipeline config: lane count and tokenizer settings. Kept in original
- * types so producer/consumer clamp identically and deployments can use existing values.
+ * Span pipeline config: lane count and tokenizer settings, kept in original types so producer
+ * and consumer clamp identically. `publicBaseUrl` is the shared origin `platformUrl` links to.
  */
 export const traceConfig = Config.define((c) => ({
   spanProcessingShards: c.env("TRACE_SPAN_PROCESSING_SHARDS", z.string().optional()),
@@ -14,6 +14,7 @@ export const traceConfig = Config.define((c) => ({
       z.union([z.string(), z.number()]).optional(),
     ),
   },
+  publicBaseUrl,
 }));
 
 export type TraceServerConfig = ConfigOf<typeof traceConfig>;

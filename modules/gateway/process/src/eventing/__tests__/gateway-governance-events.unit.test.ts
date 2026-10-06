@@ -3,14 +3,12 @@ import type {
   RecordBudgetCrossingCommandData,
   RecordVkLifecycleCommandData,
 } from "@langwatch/gateway-contract";
-import type { WebhookGatewayEventDeliveryRequest } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   RecordBudgetCrossingCommand,
   RecordVkLifecycleCommand,
 } from "../gateway-governance-events.intent.ts";
-import { gatewayGovernanceWebhookSubscriber } from "../gateway-governance-webhook.subscriber.ts";
 
 const crossing: RecordBudgetCrossingCommandData = {
   tenantId: "project-1",
@@ -85,32 +83,6 @@ describe("gateway governance facts", () => {
         type: "lw.governance.vk_lifecycle",
         idempotencyKey: "project-1:vk:key-1:rotated:1000",
       });
-    });
-  });
-
-  describe("when a recorded crossing reaches the webhook subscriber", () => {
-    /** @scenario "A recorded crossing is handed to webhook delivery under its own key" */
-    it("asks webhook delivery once, named by the event's idempotency key", async () => {
-      const requests: WebhookGatewayEventDeliveryRequest[] = [];
-      const [event] = await recordCrossing(crossing);
-      if (!event) throw new Error("the command appended nothing");
-
-      await gatewayGovernanceWebhookSubscriber({
-        requestGatewayEventDelivery: async (input) => {
-          requests.push(input);
-        },
-      }).handler(event, {
-        tenantId: "project-1",
-        aggregateId: "budget:budget-1",
-        state: undefined,
-      });
-
-      expect(requests).toEqual([
-        {
-          sourceEventId: "project-1:budget:budget-1:project-1:breached:0",
-          governance: { type: "lw.governance.budget_crossing", data: crossing },
-        },
-      ]);
     });
   });
 });

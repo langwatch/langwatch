@@ -114,20 +114,30 @@ export class AgentTestService {
       voiceTargets: null,
     });
 
-    return new AgentTestService(
+    return new AgentTestService({
       options,
       targetPrefetch,
-      ConnectedTargetService.create(options.agents),
-      ScenarioRunKeyService.create({ apiKeys: options.apiKeys }),
-    );
+      connectedTargets: ConnectedTargetService.create(options.agents),
+      runKeys: ScenarioRunKeyService.create({ apiKeys: options.apiKeys }),
+    });
   }
 
-  private constructor(
-    private readonly options: AgentTestServiceOptions,
-    private readonly targetPrefetch: ScenarioTargetPrefetchService,
-    private readonly connectedTargets: ConnectedTargetService,
-    private readonly runKeys: ScenarioRunKeyService,
-  ) {}
+  private readonly options: AgentTestServiceOptions;
+  private readonly targetPrefetch: ScenarioTargetPrefetchService;
+  private readonly connectedTargets: ConnectedTargetService;
+  private readonly runKeys: ScenarioRunKeyService;
+
+  private constructor(input: {
+    options: AgentTestServiceOptions;
+    targetPrefetch: ScenarioTargetPrefetchService;
+    connectedTargets: ConnectedTargetService;
+    runKeys: ScenarioRunKeyService;
+  }) {
+    this.options = input.options;
+    this.targetPrefetch = input.targetPrefetch;
+    this.connectedTargets = input.connectedTargets;
+    this.runKeys = input.runKeys;
+  }
 
   /** The target a test points at, with a connected agent's ownership already
    * settled, or the refusal an agent no test can run against carries. */
@@ -203,7 +213,9 @@ export class AgentTestService {
       return this.#sendConnectedTurn(input);
     }
 
-    const prefetch = await AgentTestPrefetchService.create().prefetch({
+    const prefetch = await AgentTestPrefetchService.create({
+      workflows: this.options.workflows,
+    }).prefetch({
       context: {
         projectId: input.projectId,
         scenarioId: AGENT_TEST_SCENARIO_ID,
@@ -233,7 +245,7 @@ export class AgentTestService {
       job: {
         kind: "agent-test-turn",
         adapterData: prefetch.data.adapterData,
-        nlpServiceUrl: prefetch.data.nlpServiceUrl,
+        executeSyncRoute: prefetch.data.executeSyncRoute,
         parameters: input.params ?? {},
         message: input.message,
         timeoutMs: this.options.maxCallTimeoutMs,
@@ -301,7 +313,9 @@ export class AgentTestService {
     const batchRunId = generateBatchRunId();
     const setId = getAgentTestSetId(input.projectId);
 
-    const prefetch = await AgentTestPrefetchService.create().prefetch({
+    const prefetch = await AgentTestPrefetchService.create({
+      workflows: this.options.workflows,
+    }).prefetch({
       context: {
         projectId: input.projectId,
         scenarioId: AGENT_TEST_SCENARIO_ID,

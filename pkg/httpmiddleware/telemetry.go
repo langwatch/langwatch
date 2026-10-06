@@ -65,7 +65,7 @@ func Telemetry() func(http.Handler) http.Handler {
 					switch e.Meta["fault"] {
 					case "customer":
 						level = zapcore.WarnLevel
-					case "platform", "provider":
+					case "platform", "provider", "presumed_platform":
 						level = zapcore.ErrorLevel
 					}
 				} else {

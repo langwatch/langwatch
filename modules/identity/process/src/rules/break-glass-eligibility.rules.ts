@@ -1,3 +1,5 @@
+import type { SignInMethodPolicyResolver } from "@langwatch/identity-contract";
+
 /**
  * Senior enough to be trusted with a door the organization does not otherwise
  * have, AND holding the key: an administrator who only ever signed in through
@@ -12,4 +14,14 @@ export function breakGlassHolderEligibility(deps: {
 
     return deps.holdsPassword({ userId });
   };
+}
+
+/**
+ * Whether the deployment's resolved method policy hangs a password door at
+ * all: on cloud a federated provider replaces it unless the instance also
+ * issues its own passwords. A grant is a way in through this door or none.
+ */
+export function passwordDoorMounted(policy: SignInMethodPolicyResolver): () => Promise<boolean> {
+  return async () =>
+    (await policy.resolvePolicy()).defaultMethods.some((method) => method.kind === "password");
 }

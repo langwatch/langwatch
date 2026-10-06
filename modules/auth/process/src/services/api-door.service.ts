@@ -7,12 +7,14 @@ import type {
   TrpcAuditSink,
 } from "@langwatch/api/hosting";
 import {
+  ForbiddenError,
   recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
 } from "@langwatch/api/rest";
 import { recordAuditLogCommandSchema, type AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
 import {
   EnterprisePlanRequiredError,
   isEnterpriseTier,
@@ -29,13 +31,17 @@ import {
 } from "./api-rest-credentials.service.ts";
 import { BrowserSessionVerificationService } from "./browser-session-verification.service.ts";
 
+/** Main's refusal for a plan without the webhook platform, byte for byte. */
+const WEBHOOK_ENDPOINTS_REFUSAL =
+  "The billing events API is an enterprise feature; this organization's plan does not include it.";
+
 export type ApiDoorPeers = Readonly<{
   sessions: Pick<AuthApi, "verifyBrowserSession" | "resolveBrowserSession">;
   apiKeys: ApiRestCredentialPeers["apiKeys"];
   /** Where a project-bound CLI access token is read back to its person and project. */
   cliProjects: ApiRestCredentialPeers["cliProjects"];
   /** The decisions both transports authorize through, and the key ceilings the key doors ask. */
-  authz: ApiDoor["authz"] & ApiRestCredentialPeers["authz"];
+  authz: ApiDoor["authz"] & ApiRestCredentialPeers["authz"] & Pick<AuthzApi, "getScope" | "can">;
   organizations: Pick<OrganizationApi, "getSettings" | "getOrganizationIdByTeamId">;
   entitlements: Pick<EntitlementApi, "getActivePlan">;
   auditLog: Pick<AuditLogApi, "record">;
@@ -51,6 +57,7 @@ export class ApiDoorService {
   readonly #credentials: ApiRestCredentialsService;
   readonly #sessions: BrowserSessionVerificationService;
   readonly #callerCredentials = new WeakMap<RestCaller, ApiOrganizationCredential["resolved"]>();
+  readonly #projectCredentials = new WeakMap<RestCaller, ApiProjectCredential>();
 
   private constructor(peers: ApiDoorPeers) {
     this.#peers = peers;
@@ -69,7 +76,7 @@ export class ApiDoorService {
         const answer = await this.#sessions.verify(request);
         return answer.kind === "caller" ? answer.caller : null;
       },
-      authz: this.#peers.authz,
+      authz: this.#authorize(),
       identities: {
         project: this.#projectDoor(),
         organization: this.#organizationDoor(),
@@ -80,21 +87,70 @@ export class ApiDoorService {
     };
   }
 
+  /** The decisions both transports ask, and the platform grant asked of the operator (E4). */
+  #authorize(): ApiDoor["authz"] {
+    const authz = this.#peers.authz;
+
+    return {
+      getDecision: (input) => authz.getDecision(input),
+      getProjectAnyDecision: (input) => authz.getProjectAnyDecision(input),
+      checkScopeLineage: (input) => authz.checkScopeLineage(input),
+      getSessionVersion: (input) => authz.getSessionVersion(input),
+      getPlatformDecision: async ({ userId, permission }) => ({
+        permitted: await authz.can({
+          principal: { type: "user", id: userId },
+          permission,
+          scope: { type: "platform" },
+        }),
+      }),
+    };
+  }
+
   #projectDoor(): RestIdentity {
     return {
-      authenticate: async ({ request, permission }) =>
-        projectCaller(request, await this.#credentials.authenticate({ request, permission })),
+      authenticate: async ({ request, permissions, keyKinds }) =>
+        this.#projectCaller(
+          request,
+          await this.#credentials.authenticate({
+            request,
+            permissions,
+            ...(keyKinds ? { keyKinds } : {}),
+          }),
+        ),
       identify: async ({ request }) =>
-        projectCaller(request, await this.#credentials.identify({ request })),
+        this.#projectCaller(request, await this.#credentials.identify({ request })),
+      authorize: ({ caller, permission, target }) => {
+        if (target.tier !== "project") {
+          throw new Error(
+            `The project door answers a route-scoped permission at a project, and ` +
+              `"${permission}" was asked at a ${target.tier}`,
+          );
+        }
+        const credential = this.#projectCredentials.get(caller);
+        if (!credential) throw new Error("The project door authorized a caller it did not resolve");
+
+        return this.#credentials.authorizeProjectRoute({
+          credential,
+          permission,
+          projectId: target.id,
+        });
+      },
     };
+  }
+
+  #projectCaller(request: Request, credential: ApiProjectCredential): RestCaller {
+    const caller = projectCaller(request, credential);
+    this.#projectCredentials.set(caller, credential);
+
+    return caller;
   }
 
   #organizationDoor(): RestIdentity {
     return {
-      authenticate: async ({ request, permission }) =>
+      authenticate: async ({ request, permissions }) =>
         this.#organizationCaller(
           request,
-          await this.#credentials.authenticateOrganization({ request, permission }),
+          await this.#credentials.authenticateOrganization({ request, permissions }),
         ),
       identify: async ({ request }) =>
         this.#organizationCaller(
@@ -102,15 +158,22 @@ export class ApiDoorService {
           await this.#credentials.identifyOrganization({ request }),
         ),
       authorize: ({ caller, permission, target }) => {
-        if (target.tier !== "project") {
+        if (target.tier !== "project" && target.tier !== "team") {
           throw new Error(
-            `The organization door answers a route-scoped permission at a project, and ` +
-              `"${permission}" was asked at a ${target.tier}`,
+            `The organization door answers a route-scoped permission at a project or a team, ` +
+              `and "${permission}" was asked at a ${target.tier}`,
           );
         }
         const credential = this.#callerCredentials.get(caller);
         if (!credential) {
           throw new Error("The organization door authorized a caller it did not resolve");
+        }
+        if (target.tier === "team") {
+          return this.#credentials.authorizeOrganizationTeamRoute({
+            credential,
+            permission,
+            teamId: target.id,
+          });
         }
 
         return this.#credentials.authorizeOrganizationRoute({
@@ -134,12 +197,18 @@ export class ApiDoorService {
     return caller;
   }
 
-  /** Any API key, fanned out by the feature rather than pinned to a project here. */
+  /** Any API key, with no project demanded: a permission is asked at the key's own reach. */
   #keyDoor(): RestIdentity {
     return {
-      authenticate: () => {
-        throw new Error("The key door asks no permission: the feature decides what the key reads.");
-      },
+      authenticate: async ({ request, permissions, reach }) =>
+        keyCaller(
+          request,
+          await this.#credentials.authenticateKey({
+            request,
+            permissions,
+            ...(reach ? { reach } : {}),
+          }),
+        ),
       identify: async ({ request }) =>
         keyCaller(request, await this.#credentials.identifyKey({ request })),
     };
@@ -150,7 +219,7 @@ export class ApiDoorService {
     const { entitlements: plans, organizations } = this.#peers;
 
     return {
-      holds: async ({ scope }) => {
+      holds: async ({ entitlement, scope }) => {
         if (scope.tier === "project") {
           throw new Error(`No plan gate reads a project's organization yet (${scope.id})`);
         }
@@ -158,11 +227,19 @@ export class ApiDoorService {
           scope.tier === "organization"
             ? scope.id
             : await organizations.getOrganizationIdByTeamId({ teamId: scope.id });
+        const plan = await plans.getActivePlan({ organizationId });
 
-        return isEnterpriseTier((await plans.getActivePlan({ organizationId })).type);
+        // ADR-072: billing events are sold under the webhook platform's own plan flag.
+        return entitlement === "webhook_endpoints"
+          ? plan.webhookEndpointsEnabled === true
+          : isEnterpriseTier(plan.type);
       },
-      refusal: ({ feature }) =>
-        new EnterprisePlanRequiredError(feature ?? "This operation requires an Enterprise plan"),
+      refusal: ({ entitlement, feature }) =>
+        entitlement === "webhook_endpoints"
+          ? new ForbiddenError(WEBHOOK_ENDPOINTS_REFUSAL)
+          : new EnterprisePlanRequiredError(
+              feature ?? "This operation requires an Enterprise plan",
+            ),
     };
   }
 
@@ -200,8 +277,20 @@ export class ApiDoorService {
             organizationId: entry.organizationId,
             projectId: entry.projectId,
             error: entry.error?.toString(),
+            targetKind: entry.targetKind,
+            targetId: entry.targetId,
+            metadata: entry.metadata,
           }),
         );
+      },
+      /** The organization holding a project or team; null where authz resolves no such scope. */
+      organizationOf: async (scope) => {
+        const ids = scope.tier === "project" ? { projectId: scope.id } : { teamId: scope.id };
+        const resolved = await this.#peers.authz.getScope(ids).catch((error: unknown) => {
+          if (AuthzScopeNotFoundError.is(error)) return null;
+          throw error;
+        });
+        return resolved?.type === scope.tier ? resolved.organizationId : null;
       },
     };
   }

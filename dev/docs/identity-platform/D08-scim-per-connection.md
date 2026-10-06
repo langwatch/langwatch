@@ -3,7 +3,7 @@
 Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D05 (connection-scoped tokens) + **authz precondition checklist (hard)** · Flag: `SCIM_V2_GRANTS`
 
 > **Amendment 2026-09-03:** `platform/app` is deleted. SCIM now lives in
-> `enterprise/modules/scim/{contract,server,web}`; the service this
+> `enterprise/modules/scim/{contract,process,browser}`; the service this
 > note refers to is
 > `enterprise/modules/scim/process/src/services/scim.service.ts`.
 > Verify current shape against that tree before treating paths below as live.

@@ -7,7 +7,7 @@ import {
   type SsoConnectionRegistrationSlot,
 } from "../sso-connection-registration.repository.ts";
 
-export type PrismaSsoConnectionRegistrationDatabase = Pick<
+type PrismaSsoConnectionRegistrationDatabase = Pick<
   PrismaClient,
   "ssoConnection" | "ssoConnectionRegistrationSlot" | "$transaction"
 >;

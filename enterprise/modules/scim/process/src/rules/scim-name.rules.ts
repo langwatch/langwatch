@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /** The two halves a patch named. Both absent means the patch named no name. */
-export interface ScimNameParts {
+interface ScimNameParts {
   givenName?: string;
   familyName?: string;
 }
 
 /** Whether a patch moved the stored name, and what it moved to. */
-export type MergedScimName = { changed: false } | { changed: true; name: string };
+type MergedScimName = { changed: false } | { changed: true; name: string };
 
 /**
  * A display name, patched one half at a time. SCIM carries `givenName` and

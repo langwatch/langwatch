@@ -87,6 +87,9 @@ const GLOBAL_MODELS = [
   "WebPushSubscription",
   // The installation's one VAPID key pair, like InstanceIdentity.
   "WebPushVapidKey",
+  // Authz's record of who is deactivated or erased (ARCHITECTURE.md, "Platform operators are
+  // a grant"): keyed by userId alone and platform-wide, like User; written in raw SQL only.
+  "AuthzUserStanding",
 ] as const;
 
 /**

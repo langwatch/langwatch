@@ -17,7 +17,7 @@ import {
 } from "../rules/recent-items.rules.ts";
 
 /** The owners' existing reads that name and link each touched entity. */
-export type RecentItemsOwners = Readonly<{
+type RecentItemsOwners = Readonly<{
   projects: Pick<ProjectApi, "findSummaryById" | "findOrganizationId">;
   prompts: Pick<PromptApi, "getExistingIds" | "getNamesByIds">;
   workflows: Pick<WorkflowApi, "getById">;

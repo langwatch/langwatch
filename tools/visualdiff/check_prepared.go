@@ -71,18 +71,32 @@ func newestUnder(path string) time.Time {
 			return nil
 		}
 		if entry.IsDir() {
-			if entry.Name() == "__tests__" {
-				return filepath.SkipDir
-			}
-			return nil
+			return skipTestDirs(entry)
 		}
-		if strings.Contains(entry.Name(), ".test.") {
-			return nil
-		}
-		if info, err := entry.Info(); err == nil && info.ModTime().After(newest) {
-			newest = info.ModTime()
+		if modTime, ok := sourceModTime(entry); ok && modTime.After(newest) {
+			newest = modTime
 		}
 		return nil
 	})
 	return newest
+}
+
+// skipTestDirs skips a __tests__ directory and walks into any other.
+func skipTestDirs(entry fs.DirEntry) error {
+	if entry.Name() == "__tests__" {
+		return filepath.SkipDir
+	}
+	return nil
+}
+
+// sourceModTime is a non-test file's modification time, when readable.
+func sourceModTime(entry fs.DirEntry) (time.Time, bool) {
+	if strings.Contains(entry.Name(), ".test.") {
+		return time.Time{}, false
+	}
+	info, err := entry.Info()
+	if err != nil {
+		return time.Time{}, false
+	}
+	return info.ModTime(), true
 }

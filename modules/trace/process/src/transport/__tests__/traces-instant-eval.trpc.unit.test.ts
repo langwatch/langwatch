@@ -1,4 +1,4 @@
-import { createTrpcRuntime } from "@langwatch/api/trpc";
+import { createTrpcRuntime, type TrpcRuntimeAuditEntry } from "@langwatch/api/trpc";
 import { InstantEvalClassifierNotConfiguredError } from "@langwatch/instant-eval-contract";
 /**
  * @vitest-environment node
@@ -33,25 +33,46 @@ const PROGRESS: ExplorerInstantEvalProgress = {
   finishedAtMs: null,
 };
 
-function harness() {
+const OFFERED = { released: false, offer: "enable" } as const;
+
+function harness({ permitted = () => true }: { permitted?: (permission: string) => boolean } = {}) {
   const getExplorerEvalRun = vi.fn<TraceApi["getExplorerEvalRun"]>(async () => PROGRESS);
   const cancelExplorerEvalRun = vi.fn<TraceApi["cancelExplorerEvalRun"]>(async () => PROGRESS);
   // A released project on a deployment with no judge, refused by the run service.
   const estimateExplorerEvalRun = vi.fn<TraceApi["estimateExplorerEvalRun"]>(async () => {
     throw new InstantEvalClassifierNotConfiguredError();
   });
+  const getExplorerEvalAccess = vi.fn<TraceApi["getExplorerEvalAccess"]>(async () => OFFERED);
+  const enableExplorerEvals = vi.fn<TraceApi["enableExplorerEvals"]>(async () => ({
+    released: true,
+    offer: "enable" as const,
+  }));
   const app = createApiFixture<TraceApi>({
+    getExplorerEvalAccess,
+    enableExplorerEvals,
     getExplorerEvalRun,
     cancelExplorerEvalRun,
     estimateExplorerEvalRun,
   });
   const permissions: string[] = [];
+  const auditRows: TrpcRuntimeAuditEntry[] = [];
   const trpc = initTRPC.context<TestContext>().create();
   const members = trpcTestMembers<TestContext>({
     permits: (permission) => {
       permissions.push(permission);
 
-      return true;
+      return permitted(permission);
+    },
+    overrides: {
+      audit: {
+        record: async (entry) => {
+          auditRows.push(entry);
+        },
+        redact: ({ args }) => args,
+        exempt: () => false,
+        organizationOf: async ({ tier, id }) =>
+          tier === "project" && id === "project-1" ? "organization-1" : null,
+      },
     },
   });
   const router = createTrpcRuntime<TestContext>({
@@ -64,13 +85,16 @@ function harness() {
     caller: router.createCaller({ actor: { id: "reader-1" } }),
     cancelExplorerEvalRun,
     getExplorerEvalRun,
+    getExplorerEvalAccess,
+    enableExplorerEvals,
     permissions,
+    auditRows,
   };
 }
 
 describe("given the traces.instantEval tRPC contract", () => {
   describe("when its members are read", () => {
-    it("declares main's four nested procedures", () => {
+    it("declares main's six nested procedures", () => {
       expect(
         Object.entries(tracesInstantEvalTrpc.members).map(([name, member]) => [name, member.kind]),
       ).toEqual([
@@ -78,6 +102,8 @@ describe("given the traces.instantEval tRPC contract", () => {
         ["start", "mutation"],
         ["cancel", "mutation"],
         ["get", "query"],
+        ["access", "query"],
+        ["enable", "mutation"],
       ]);
     });
 
@@ -128,6 +154,69 @@ describe("given the traces.instantEval router", () => {
       ).rejects.toMatchObject({
         cause: { code: "instant_eval_classifier_not_configured", httpStatus: 403 },
       });
+    });
+  });
+});
+
+describe("given the opt-in procedures", () => {
+  describe("when a member reads what the popover offers", () => {
+    it("asks for the reader under analytics:view", async () => {
+      const { caller, getExplorerEvalAccess, permissions } = harness();
+
+      await expect(caller.access({ projectId: "project-1" })).resolves.toEqual(OFFERED);
+      expect(getExplorerEvalAccess).toHaveBeenCalledWith({
+        projectId: "project-1",
+        userId: "reader-1",
+      });
+      expect(permissions).toEqual(["analytics:view"]);
+    });
+  });
+
+  describe("when an organization manager throws the switch", () => {
+    it("switches it on under organization:manage for the caller", async () => {
+      const { caller, enableExplorerEvals, permissions } = harness();
+
+      await expect(caller.enable({ projectId: "project-1" })).resolves.toEqual({
+        released: true,
+        offer: "enable",
+      });
+      expect(enableExplorerEvals).toHaveBeenCalledWith({
+        projectId: "project-1",
+        userId: "reader-1",
+      });
+      expect(permissions).toEqual(["organization:manage"]);
+    });
+  });
+
+  describe("when the switch is thrown", () => {
+    /** @scenario "Switching Instant Eval on is audited against the organization" */
+    it("records the audit row against the project's organization, as main does", async () => {
+      const { caller, auditRows } = harness();
+
+      await caller.enable({ projectId: "project-1" });
+
+      expect(auditRows).toEqual([
+        expect.objectContaining({
+          userId: "reader-1",
+          organizationId: "organization-1",
+          projectId: "project-1",
+          targetKind: "organization",
+          targetId: "organization-1",
+        }),
+      ]);
+    });
+  });
+
+  describe("when a member without organization:manage throws the switch", () => {
+    it("is refused before anything is recorded", async () => {
+      const { caller, enableExplorerEvals } = harness({
+        permitted: (permission) => permission !== "organization:manage",
+      });
+
+      await expect(caller.enable({ projectId: "project-1" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      expect(enableExplorerEvals).not.toHaveBeenCalled();
     });
   });
 });

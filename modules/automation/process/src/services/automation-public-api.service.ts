@@ -22,6 +22,7 @@ import {
   TriggerFilterQueryInvalidError,
   TriggerFiltersRequiredError,
   TriggerFiltersUnsupportedError,
+  TriggerGraphImmutableError,
   TriggerKindImmutableError,
   TriggerNotFoundError,
   TriggerTestFireRateLimitedError,
@@ -49,7 +50,6 @@ import type {
   AutomationTraceFilterCompiler,
   AutomationWebhookStoredParams,
 } from "../app/automation.app.ts";
-import type { AutomationLogger } from "../app/automation.members.ts";
 import type { TriggerFireHistoryRepository } from "../repositories/trigger-fire-history.repository.ts";
 import {
   partitionFilterFields,
@@ -66,7 +66,7 @@ import {
 } from "../rules/trigger-redaction.rules.ts";
 import type { AutomationRulesService } from "./automation-rules.service.ts";
 import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
-import type { AutomationService } from "./automation.service.ts";
+import type { AutomationLogger, AutomationService } from "./automation.service.ts";
 import type { SlackDestinationService } from "./slack-destination.service.ts";
 import type { TriggerFilterValidationService } from "./trigger-filter-validation.service.ts";
 
@@ -94,7 +94,7 @@ export type AutomationPublicApiRows = Pick<
   | "customGraphExistsInProject"
 >;
 
-export interface AutomationPublicApiCollaborators {
+interface AutomationPublicApiCollaborators {
   automation: AutomationPublicApiRows;
   rules: Pick<AutomationRulesService, "getProjectIdentity">;
   providers: AutomationProviderSecrets;
@@ -779,7 +779,7 @@ const storedWebhookSchema = z
   })
   .loose();
 
-/** The channel and the kind are fixed once an automation exists. */
+/** The channel, the kind and an alert's graph are fixed once an automation exists. */
 function assertWhatIsFixedIsUnchanged({
   stored,
   input,
@@ -791,10 +791,28 @@ function assertWhatIsFixedIsUnchanged({
     throw new TriggerActionImmutableError(stored.action);
   }
   const kind = stored.triggerKind.toLowerCase();
+  assertGraphIsUnchanged({ stored, stated: input.customGraphId, kind });
   if (input.graphAlert !== undefined && stored.customGraphId === null)
     throw new TriggerKindImmutableError(kind);
   if (input.report !== undefined && stored.triggerKind !== "REPORT")
     throw new TriggerKindImmutableError(kind);
+}
+
+/** A stated graph must be the stored one: adding or removing a graph changes the kind. */
+function assertGraphIsUnchanged({
+  stored,
+  stated,
+  kind,
+}: {
+  stored: Trigger;
+  stated: string | null | undefined;
+  kind: string;
+}): void {
+  if (stated === undefined || stated === stored.customGraphId) return;
+  if (stored.customGraphId === null || stated === null) {
+    throw new TriggerKindImmutableError(kind);
+  }
+  throw new TriggerGraphImmutableError(stored.customGraphId);
 }
 
 /** Conditions on fields this platform no longer filters on are dropped; only those alone refuse. */

@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repos are intentional no-ops.
 
-import type { AuthzCustomRole, AuthzGrantCaller, GrantScopeTier } from "@langwatch/authz-contract";
+import type { AuthzGrantCaller, GrantScopeTier } from "@langwatch/authz-contract";
 import type {
   CustomRole,
   EnrichedAuditLog as ContractEnrichedAuditLog,
@@ -17,13 +17,14 @@ import type {
   User,
 } from "@langwatch/organization-contract";
 
+import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
 
-export type TeamWithProjects = Team & {
+type TeamWithProjects = Team & {
   projects: Project[];
 };
 
-export type TeamWithProjectsAndMembers = TeamWithProjects & {
+type TeamWithProjectsAndMembers = TeamWithProjects & {
   members: (TeamUser & {
     assignedRole?: CustomRole | null;
   })[];
@@ -34,22 +35,12 @@ export type FullyLoadedOrganization = Organization & {
   teams: TeamWithProjectsAndMembers[];
 };
 
-export type TeamMemberWithUser = TeamUser & {
-  user: Pick<User, "id" | "name" | "email" | "image">;
-  assignedRole?: AuthzCustomRole | null;
-};
-
-export type TeamMemberWithTeam = TeamUser & {
+type TeamMemberWithTeam = TeamUser & {
   team: Team;
   assignedRole?: CustomRole | null;
 };
 
-export type TeamWithProjectsAndMembersAndUsers = Team & {
-  members: TeamMemberWithUser[];
-  projects: Project[];
-};
-
-export type UserWithTeams = User & {
+type UserWithTeams = User & {
   teamMemberships: TeamMemberWithTeam[];
 };
 
@@ -319,6 +310,7 @@ export abstract class OrganizationMembershipRepository {
     organizationId: string,
   ): Promise<{ userId: string; organizationName: string }[]>;
 
+  /** Each organization with its and its projects' S3 endpoint and access key opened. */
   abstract findAllForUser(params: {
     userId: string;
     isDemo: boolean;
@@ -422,15 +414,16 @@ export abstract class OrganizationMembershipRepository {
   }) => Promise<MemberTeamBinding[]>;
 
   /**
-   * Makes somebody a MEMBER, carrying the grant intent an unfinished
-   * admission is resumed from (ADR-129). A row that is already there is
-   * `"already-present"` — a concurrent callback or a retry, not a failure.
+   * Admits somebody on the joiner seat (ADR-171): a MEMBER carries the grant
+   * intent an unfinished admission resumes from (ADR-129), a DEVELOPER none.
+   * A row already there is `"already-present"`: a retry, not a failure.
    */
   abstract createMembership: (input: {
     organizationId: string;
     userId: string;
     pendingAdmissionId: string;
-  }) => Promise<"created" | "already-present">;
+    via: DeveloperAdmissionVia;
+  }) => Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
 
   abstract deleteMember: (input: DeleteMemberInput) => Promise<void>;
 

@@ -4,11 +4,11 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import type { DrawerViewMode } from "../../../../model/trace-drawer-params.ts";
 import {
   selectPeersMatching,
   usePresenceStore,
 } from "../../../../behavior/presence/presence-store.ts";
+import type { DrawerViewMode } from "../../../../model/trace-drawer-params.ts";
 import { PresenceMarker } from "../../../elements/presence/presence-marker.tsx";
 
 interface ModeSwitchProps {

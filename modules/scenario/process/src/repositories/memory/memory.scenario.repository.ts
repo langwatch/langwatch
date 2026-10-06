@@ -38,6 +38,15 @@ export class MemoryScenarioRepository extends ScenarioRepository {
   readonly rows = new Map<string, Scenario>();
   readonly testSuites = new Map<string, ScenarioTestSuite>();
 
+  /** The memory tier holds run secrets in plaintext: nothing it seals outlives the process. */
+  sealRunSecret({ plain }: { plain: string }): string {
+    return plain;
+  }
+
+  openRunSecret({ sealed }: { sealed: string }): string {
+    return sealed;
+  }
+
   async create(
     input: ScenarioCreateInput & { id: string; actor: ScenarioActor },
   ): Promise<Scenario> {

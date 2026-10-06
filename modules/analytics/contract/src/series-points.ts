@@ -12,37 +12,19 @@ export interface SeriesPoint {
   value: number;
 }
 
-/** Reads a numeric series from ordinary and grouped analytics buckets. */
+/**
+ * Reads a numeric series from an ungrouped result; a missing key reads 0.
+ * Per-group values are never summed into one (that adds averages): a reader
+ * that needs one value per bucket queries without `groupBy`.
+ */
 export function extractSeriesPoints(
   buckets: AnalyticsTimeseriesBucket[],
   bucketKey: string,
-  groupBy?: string,
 ): SeriesPoint[] {
   return buckets.map((bucket) => {
-    const direct = bucket[bucketKey];
-    if (typeof direct === "number") return { timestamp: bucket.date, value: direct };
-    const grouped = groupBy ? computeMetricSumAcrossGroups(bucket, groupBy, bucketKey) : void 0;
-    return { timestamp: bucket.date, value: grouped ?? 0 };
+    const value = bucket[bucketKey];
+    return { timestamp: bucket.date, value: typeof value === "number" ? value : 0 };
   });
-}
-
-export function computeMetricSumAcrossGroups(
-  bucket: AnalyticsTimeseriesBucket,
-  groupBy: string,
-  seriesKey: string,
-): number | undefined {
-  const groups = extractGroups(bucket, groupBy);
-  if (!groups) return void 0;
-  let sum = 0;
-  let found = false;
-  for (const metrics of Object.values(groups)) {
-    const value = metrics[seriesKey];
-    if (typeof value === "number") {
-      sum += value;
-      found = true;
-    }
-  }
-  return found ? sum : void 0;
 }
 
 export function extractGroupTotals(

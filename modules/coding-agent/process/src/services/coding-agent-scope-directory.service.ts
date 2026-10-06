@@ -2,10 +2,37 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PaginatedProjects, ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
-import type {
-  CodingAgentCallerScopeDirectory,
-  CodingAgentScopeProject,
-} from "../app/coding-agent.members.ts";
+/** One project of an organization, as the scope rule reads it. */
+export type CodingAgentScopeProject = Readonly<{
+  id: string;
+  name: string;
+  slug: string;
+  teamId: string;
+  /** Whether the project is one person's workspace rather than a shared one. */
+  isPersonal: boolean;
+}>;
+
+/**
+ * The organization's projects, and the person behind each personal workspace.
+ * The project list is enumerated from the ORGANIZATION, never from a request,
+ * so a caller cannot count a project by naming one it may not read.
+ */
+export interface CodingAgentCallerScopeDirectory {
+  /** Every live project of one organization. */
+  listOrganizationProjects(input: {
+    organizationId: string;
+  }): Promise<readonly CodingAgentScopeProject[]>;
+
+  /**
+   * Who each personal workspace belongs to, keyed by team id. Asked only for
+   * personal teams, never a shared one — a shared team's members answer
+   * nothing displays, so reading them would cost a query for nothing.
+   */
+  listPersonalTeamOwnerNames(input: {
+    organizationId: string;
+    teamIds: readonly string[];
+  }): Promise<ReadonlyMap<string, string>>;
+}
 
 /** Same page size organization.app.ts reads an organization's projects at. */
 const ORGANIZATION_PROJECT_PAGE_SIZE = 1_000;

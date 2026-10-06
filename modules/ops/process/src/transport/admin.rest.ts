@@ -1,4 +1,3 @@
-import { publicRoute } from "@langwatch/api/access";
 import {
   defineRestMiddleware,
   defineRestRouter,
@@ -15,17 +14,18 @@ import {
   adminOperationResponseSchema,
   adminResourceParamsSchema,
   OpsApi,
-  opsOperatorSchema,
+  type OpsOperator,
 } from "@langwatch/ops-contract";
 
-export const adminActor = defineRestMiddleware("adminActor", opsOperatorSchema.nullable());
 export const adminAuthSession = defineRestMiddleware("adminAuthSession", adminAuthSessionSchema);
 export const adminAuditRequest = defineRestMiddleware("adminAuditRequest", adminAuditRequestSchema);
 
-const STAFF_RESOLVED_IN_HANDLER =
-  "the back office's browser session is resolved by the route itself, which answers its " +
-  "own refusals; staff is instance membership rather than an RBAC grain, so no API " +
-  "credential opens this door and no permission describes it";
+/** The operator the door admitted, as the back office reads it: who acts, and for whom. */
+function operatorOf(actor: { id: string; impersonatorId?: string }): OpsOperator {
+  return actor.impersonatorId
+    ? { id: actor.id, impersonator: { id: actor.impersonatorId } }
+    : { id: actor.id };
+}
 
 export const adminRest = defineRestRouter(OpsApi)
   .withNamespace("admin")
@@ -34,27 +34,33 @@ export const adminRest = defineRestRouter(OpsApi)
 
   .post("/api/admin/impersonate", "startAdminImpersonation")
   .withInput(adminImpersonationRequestSchema)
-  .withAccess(publicRoute({ reason: STAFF_RESOLVED_IN_HANDLER }))
+  .withCredential("browser")
+  .withPermission("ops:manage", { at: "platform", refusal: "hidden" })
   .withOutput(adminImpersonationStartedSchema)
-  .withMiddleware(adminActor, adminAuthSession, adminAuditRequest)
-  .handle(({ app, input }, ...[actor, session, req]) =>
-    app.startAdminImpersonation({ ...input, actor, session, req }),
+  .withMiddleware(adminAuthSession, adminAuditRequest)
+  .handle(({ app, input, actor }, ...[session, req]) =>
+    app.startAdminImpersonation({ ...input, actor: operatorOf(actor), session, req }),
   )
 
   .delete("/api/admin/impersonate", "stopAdminImpersonation")
   .withInput(adminEmptyRequestSchema)
-  .withAccess(publicRoute({ reason: STAFF_RESOLVED_IN_HANDLER }))
+  .withCredential("browser")
+  .withPermission("ops:manage", { at: "platform", refusal: "hidden" })
   .withOutput(adminImpersonationStoppedSchema)
-  .withMiddleware(adminActor, adminAuthSession, adminAuditRequest)
-  .handle(({ app }, ...[actor, session, req]) =>
-    app.stopAdminImpersonation({ actor, session, req }),
+  .withMiddleware(adminAuthSession, adminAuditRequest)
+  .handle(({ app, actor }, ...[session, req]) =>
+    app.stopAdminImpersonation({ actor: operatorOf(actor), session, req }),
   )
 
   .post("/api/admin/:resource", "runAdminOperation")
   .withParams(adminResourceParamsSchema)
   .withInput(adminOperationBodySchema)
-  .withAccess(publicRoute({ reason: STAFF_RESOLVED_IN_HANDLER }))
+  .withCredential("browser")
+  // A write method also needs ops:manage, which the application asks (the method is in the body).
+  .withPermission("ops:view", { at: "platform", refusal: "hidden" })
   .withOutput(adminOperationResponseSchema)
-  .withMiddleware(adminActor, adminAuditRequest)
-  .handle(({ app, input }, actor, req) => app.runAdminOperation({ ...input, actor, req }))
+  .withMiddleware(adminAuditRequest)
+  .handle(({ app, input, actor }, req) =>
+    app.runAdminOperation({ ...input, actor: operatorOf(actor), req }),
+  )
   .build();

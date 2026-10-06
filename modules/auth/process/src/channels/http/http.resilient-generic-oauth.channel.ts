@@ -10,7 +10,7 @@ type GenericProvider = Awaited<
 >["context"]["socialProviders"][number];
 
 /** Waits between attempts to mount a provider that failed at startup. */
-export const DEFAULT_RETRY_DELAYS_MS = [5_000, 10_000, 30_000, 60_000, 120_000, 300_000] as const;
+const DEFAULT_RETRY_DELAYS_MS = [5_000, 10_000, 30_000, 60_000, 120_000, 300_000] as const;
 
 /**
  * better-auth's genericOAuth plugin, with a provider that cannot initialize left out and retried in

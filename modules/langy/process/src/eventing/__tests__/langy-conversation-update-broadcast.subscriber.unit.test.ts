@@ -64,6 +64,7 @@ describe("Langy conversation update broadcast subscriber", () => {
     expect(deps.broadcast.broadcastToTenant).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A freshness subscriber carries no conversation data" */
   it("publishes only an authorized invalidation after the cursor reaches the event", async () => {
     const deps = makeDeps();
     const subscriber = createLangyConversationUpdateBroadcastSubscriber(deps);

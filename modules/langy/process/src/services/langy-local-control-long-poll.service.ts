@@ -36,7 +36,7 @@ const HTTP_SESSION_TTL_SECONDS = 60;
 /** The most frames one poll answers with. */
 const MAX_FRAMES_PER_POLL = 50;
 
-export interface LocalControlLongPollOptions {
+interface LocalControlLongPollOptions {
   core: LocalControlSessionCoreService;
   holdMs?: number;
   pollIntervalMs?: number;

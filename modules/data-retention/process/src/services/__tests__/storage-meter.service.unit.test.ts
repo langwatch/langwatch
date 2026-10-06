@@ -3,6 +3,7 @@ import { PRODUCTION_STORAGE_METER_TABLES } from "@langwatch/data-retention-contr
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
+import { ClickHouseStorageMeterRepository } from "../../repositories/clickhouse/clickhouse.storage-meter.repository.ts";
 import { RedisStorageMeterCacheRepository } from "../../repositories/redis/redis.storage-meter-cache.repository.ts";
 import { STORAGE_METER_CACHE_TTL_MS } from "../../repositories/storage-meter-cache.repository.ts";
 import { StorageMeterService } from "../storage-meter.service.ts";
@@ -16,7 +17,7 @@ describe("StorageMeterService memory guard", () => {
   function makeService() {
     const query = vi.fn().mockResolvedValue({ rows: [{ total: "42" }] });
     const service = StorageMeterService.create({
-      clickhouse: clientOf(query),
+      meter: ClickHouseStorageMeterRepository.create({ clickhouse: clientOf(query) }),
       cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
     });
     return { service, query };
@@ -50,7 +51,7 @@ describe("StorageMeterService memory guard", () => {
         rows: [{ total: sql.includes("FROM langy_analytics_events") ? "17" : "0" }],
       }));
       const service = StorageMeterService.create({
-        clickhouse: clientOf(query),
+        meter: ClickHouseStorageMeterRepository.create({ clickhouse: clientOf(query) }),
         cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
       });
 
@@ -88,7 +89,7 @@ describe("StorageMeterService memory guard", () => {
       });
       return {
         service: StorageMeterService.create({
-          clickhouse: clientOf(query),
+          meter: ClickHouseStorageMeterRepository.create({ clickhouse: clientOf(query) }),
           cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
         }),
         query,
@@ -154,7 +155,7 @@ describe("StorageMeterService memory guard", () => {
         return { rows: [{ total: String(total) }] };
       });
       const service = StorageMeterService.create({
-        clickhouse: clientOf(query),
+        meter: ClickHouseStorageMeterRepository.create({ clickhouse: clientOf(query) }),
         now: () => t,
         cache: RedisStorageMeterCacheRepository.create({
           ttlMs: STORAGE_METER_CACHE_TTL_MS,
@@ -233,7 +234,7 @@ describe("StorageMeterService memory guard", () => {
           return { rows: [{ total: "42" }] };
         });
         const service = StorageMeterService.create({
-          clickhouse: clientOf(query),
+          meter: ClickHouseStorageMeterRepository.create({ clickhouse: clientOf(query) }),
           now: () => t,
           cache: RedisStorageMeterCacheRepository.create({
             ttlMs: STORAGE_METER_CACHE_TTL_MS,
@@ -262,7 +263,7 @@ describe("StorageMeterService memory guard", () => {
           return { rows: [{ total: "77" }] };
         });
         const service = StorageMeterService.create({
-          clickhouse: clientOf(query),
+          meter: ClickHouseStorageMeterRepository.create({ clickhouse: clientOf(query) }),
           now: () => t,
           cache: RedisStorageMeterCacheRepository.create({
             ttlMs: STORAGE_METER_CACHE_TTL_MS,
@@ -298,7 +299,7 @@ describe("StorageMeterService memory guard", () => {
           return { rows: [{ total: "10" }] };
         });
         const service = StorageMeterService.create({
-          clickhouse: clientOf(query),
+          meter: ClickHouseStorageMeterRepository.create({ clickhouse: clientOf(query) }),
           cache: RedisStorageMeterCacheRepository.create({ ttlMs: STORAGE_METER_CACHE_TTL_MS }),
         });
 

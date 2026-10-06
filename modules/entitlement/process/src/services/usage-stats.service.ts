@@ -12,8 +12,8 @@ import type {
 } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
-import { USAGE_UNKNOWN, type UsageCounter } from "../app/entitlement.members.ts";
 import type { UsageMembershipRepository } from "../repositories/usage-membership.repository.ts";
+import { USAGE_UNKNOWN, type UsageCounter } from "./usage-enforcement.service.ts";
 
 /**
  * The message allowance a plan states when it means "we do not cap this". Stated rather than
@@ -45,10 +45,10 @@ function formatPercent(value: number): string {
 }
 
 /** Threshold at which to show a warning (80% of limit) */
-export const MESSAGE_LIMIT_WARNING_THRESHOLD = 0.8;
+const MESSAGE_LIMIT_WARNING_THRESHOLD = 0.8;
 
 /** The operator a plan is resolved for. */
-export type UsageStatsCaller = PlanProviderUser;
+type UsageStatsCaller = PlanProviderUser;
 
 type UsageStatsSources = {
   membership: UsageMembershipRepository;
@@ -176,6 +176,7 @@ export class UsageStatsService {
       maxMonthlyUsageLimit,
       membersCount: seats.fullMembers,
       membersLiteCount: seats.liteMembers,
+      membersDeveloperCount: seats.developers,
       messageLimitInfo,
       usageUnit,
     };

@@ -10,6 +10,7 @@ import {
   type AuthzGrantCaller,
   type AuthzPrincipalRef,
 } from "@langwatch/authz-contract";
+import { MemberNotFoundError } from "@langwatch/organization-contract";
 import { Temporal, fromDate, nowInstant } from "@langwatch/time";
 
 import type { ApiKeyDependencies } from "./api-key.service.ts";
@@ -61,13 +62,33 @@ export class ApiKeyGrantPolicyService {
   async isOrgAdmin(input: { userId: string; organizationId: string }): Promise<boolean> {
     const bindings = await this.options.authz.listUserBindings(input);
 
-    return bindings.some(
+    const holdsAdminBinding = bindings.some(
       (binding) =>
         isLive(binding) &&
         binding.scopeType === "ORGANIZATION" &&
         binding.scopeId === input.organizationId &&
         binding.role === "ADMIN",
     );
+    if (!holdsAdminBinding) return false;
+
+    return this.seatHoldsOrganizationBinding(input);
+  }
+
+  /**
+   * Neither a Lite Member nor a Developer (ADR-171) holds an organization
+   * binding, admin least of all, so a stale admin row on either seat counts for nothing.
+   */
+  private async seatHoldsOrganizationBinding(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    try {
+      const member = await this.options.organizations.getMember(input);
+      return member.role === "ADMIN" || member.role === "MEMBER";
+    } catch (error) {
+      if (MemberNotFoundError.is(error)) return false;
+      throw error;
+    }
   }
 
   async isOrgAdminApiKey(input: { apiKeyId: string; organizationId: string }): Promise<boolean> {

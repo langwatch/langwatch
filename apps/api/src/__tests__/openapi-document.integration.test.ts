@@ -45,6 +45,7 @@ async function bootedApi() {
     identify: refuse,
     identifyOptional: refuse,
     authorize: refuse,
+    authorizePlatform: refuse,
   };
   const facts = new Map<string, { middleware: { name: string }; resolve: () => never }>();
   for (const module of processModules) {

@@ -36,7 +36,7 @@ export const SIGNAL_EVENTS = {
 export type SelfHostedSignalEvent = (typeof SIGNAL_EVENTS)[SelfHostedSignal];
 
 /** The numbers the signals turn on, held together because they are the argument. */
-export const SIGNAL_THRESHOLDS = {
+const SIGNAL_THRESHOLDS = {
   /** Above a handful of people, a deployment is a team rather than a trial. */
   seats: 25,
   /** A month of this is a workload, not an evaluation. */

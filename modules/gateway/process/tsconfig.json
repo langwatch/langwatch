@@ -32,9 +32,6 @@
       "path": "../../../packages/egress/tsconfig.build.json"
     },
     {
-      "path": "../../entitlement/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {

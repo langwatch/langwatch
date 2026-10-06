@@ -5,13 +5,21 @@ import {
 } from "@langwatch/stored-object-contract";
 
 import {
-  type StoredObjectOwnerLookupSpan,
-  type StoredObjectOwnerLookupTelemetry,
-} from "../app/stored-object.members.ts";
-import {
   type StoredObjectOwnerRepository,
   type StoredObjectOwnerLookupResult,
 } from "../repositories/stored-object-owner.repository.ts";
+
+export type StoredObjectOwnerLookupSpan = Readonly<{
+  setAttribute(name: string, value: string | number | boolean): void;
+}>;
+
+/** Records the owner lookup's fixed database-operation attributes on one span. */
+export interface StoredObjectOwnerLookupTelemetry {
+  withLookupSpan<Result>(
+    input: { id: string },
+    operation: (span: StoredObjectOwnerLookupSpan) => Promise<Result>,
+  ): Promise<Result>;
+}
 
 /**
  * The legacy id-only file URL crosses tenant boundaries solely to identify an

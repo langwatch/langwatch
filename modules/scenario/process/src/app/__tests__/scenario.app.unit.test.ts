@@ -1,13 +1,16 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ResourceOwnership } from "@langwatch/process";
-import type { Encryption } from "@langwatch/process-stores/members";
+import type { RateLimiter } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * `ScenarioModule.queueSimulationRun` — the metadata envelope a queued run carries.
@@ -19,9 +22,9 @@ import type {
   SimulationQueueRun,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import { ScenarioSimulationsUnavailableError } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -30,11 +33,13 @@ import {
   scenarioExecutorPeers,
   scenarioTestSecrets,
   scenarioVoicePeers,
-  scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
+import { simulationRunState } from "../../__tests__/support/simulation-run-state.fixture.ts";
+import { simulationSendersOver } from "../../__tests__/support/simulation-service-fake.fixture.ts";
+import { LiveScenarioRepositories } from "../../repositories/live/live.scenario.repositories.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
-import { ScenarioModule, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
+import { ScenarioModule, type ScenarioSecretCipher } from "../scenario.app.ts";
 
 async function harness() {
   const commands: SimulationQueueRun[] = [];
@@ -64,22 +69,11 @@ async function harness() {
       ...scenarioVoicePeers(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
     },
-    config: scenarioTestConfig,
+    config: { ...scenarioTestConfig, publicBaseUrl: "https://langwatch.test" },
     resources: {} as ResourceOwnership,
     secrets: scenarioTestSecrets,
-    // Nothing below is reached: assembling the envelope reads only its
-    // argument and the run capability. A reach for any of them throws on the
-    // missing property, which is the loud failure we want.
-    members: {
-      ...scenarioHostMembers,
-      redis: null,
-      publicBaseUrl: "https://langwatch.test",
-      clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
-      simulations: simulations as SimulationService,
-      encryption: createApiFixture<Encryption>(),
-      rateLimiter: { check: async () => ({ allowed: true }) },
-    },
   });
+  app.connectSimulationCommands(simulationSendersOver(simulations));
 
   const queue = (overrides: Partial<QueueSimulationRunInput> = {}) =>
     app.queueSimulationRun({
@@ -369,14 +363,18 @@ describe("given a run a suite queued", () => {
 });
 
 describe("ScenarioModule.getRunDataForAllSuites", () => {
-  describe("given a process that composed no simulation reads", () => {
-    it("refuses the read by name instead of crashing on the missing member", async () => {
-      // Neither the member nor the ClickHouse the module would derive it
-      // from: the only shape that still owes the caller a refusal.
+  describe("given a process on memory stores, which open no ClickHouse", () => {
+    it("answers from the run fold the memory tier processes into", async () => {
+      const repositories = MemoryScenarioRepositories.create();
+      const fold = repositories.simulationRunProcessing.runStateStore({
+        defaultRetentionDays: () => 30,
+      });
+      await fold.store(simulationRunState({ ScenarioRunId: "run-1", ScenarioSetId: "" }), {
+        tenantId: createTenantId("project-1"),
+        aggregateId: "run-1",
+      });
       const app = await ScenarioModule.create({
-        repositories: {
-          ...MemoryScenarioRepositories.create(),
-        },
+        repositories,
         dependencies: {
           agents: createApiFixture<AgentApi>(),
           evaluations: createApiFixture<EvaluationApi>(),
@@ -396,32 +394,35 @@ describe("ScenarioModule.getRunDataForAllSuites", () => {
         config: scenarioTestConfig,
         resources: {} as ResourceOwnership,
         secrets: scenarioTestSecrets,
-        members: {
-          ...scenarioHostMembers,
-          redis: null,
-          publicBaseUrl: undefined,
-          // No ClickHouse either: the refusal is what a deployment that
-          // composed neither the member nor the store it derives from owes.
-          clickhouse: undefined as never,
-          simulations: undefined as never,
-          encryption: createApiFixture<Encryption>(),
-          rateLimiter: { check: async () => ({ allowed: true }) },
-        },
       });
 
-      await expect(
-        app.getRunDataForAllSuites({ projectId: "project-1", limit: 20 }),
-      ).rejects.toBeInstanceOf(ScenarioSimulationsUnavailableError);
+      const page = await app.getRunDataForAllSuites({ projectId: "project-1", limit: 20 });
+
+      expect(page).toMatchObject({ changed: true, scenarioSetIds: { "batch-1": "default" } });
+      expect(page.changed && page.runs.map((run) => run.scenarioRunId)).toEqual(["run-1"]);
     });
   });
 });
 
-describe("given a process that supplies no simulations member but does read ClickHouse", () => {
+describe("given a live process whose scenario registry reads ClickHouse", () => {
   /** @scenario "Simulation reads are derived from the deployment's own ClickHouse" */
   it("serves the read from ClickHouse instead of refusing", async () => {
     const asked: { tenantId: string }[] = [];
+    const clickhouse = createApiFixture<ClickHouseQueryClient>({
+      query: <Row>(input: { tenantId: string }) => {
+        asked.push({ tenantId: input.tenantId });
+
+        return Promise.resolve({ rows: [] as Row[] });
+      },
+    });
     const app = await ScenarioModule.create({
-      repositories: MemoryScenarioRepositories.create(),
+      repositories: LiveScenarioRepositories.create({
+        prisma: createApiFixture<PrismaClient>(),
+        clickhouse,
+        redis: memoryRedisDouble(),
+        rateLimiter: createApiFixture<RateLimiter>(),
+        encryption: createApiFixture<ScenarioSecretCipher>(),
+      }),
       dependencies: {
         agents: createApiFixture<AgentApi>(),
         evaluations: createApiFixture<EvaluationApi>(),
@@ -441,21 +442,6 @@ describe("given a process that supplies no simulations member but does read Clic
       config: scenarioTestConfig,
       resources: {} as ResourceOwnership,
       secrets: scenarioTestSecrets,
-      members: {
-        ...scenarioHostMembers,
-        redis: null,
-        publicBaseUrl: undefined,
-        clickhouse: {
-          query: <Row>(input: { tenantId: string }) => {
-            asked.push({ tenantId: input.tenantId });
-
-            return Promise.resolve({ rows: [] as Row[] });
-          },
-        },
-        simulations: undefined as never,
-        encryption: createApiFixture<Encryption>(),
-        rateLimiter: { check: async () => ({ allowed: true }) },
-      },
     });
 
     await expect(

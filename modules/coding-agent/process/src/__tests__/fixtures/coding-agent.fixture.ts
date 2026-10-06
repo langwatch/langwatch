@@ -30,9 +30,10 @@ import {
   projectWithTeamSchema,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
-import { type Instant, Temporal } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { CodingAgentBillingPolicy, CodingAgentClock } from "../../app/coding-agent.members.ts";
+import type { CodingAgentBillingPolicy } from "../../services/coding-agent-cost-attribution.service.ts";
+import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
 import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../../repositories/coding-agent-trace-session.repository.ts";
@@ -249,11 +250,6 @@ export class TestClock implements CodingAgentClock {
 
   nowMs(): number {
     return this.value;
-  }
-
-  /** The process clock member's reading of the same instant. */
-  now(): Instant {
-    return Temporal.Instant.fromEpochMilliseconds(this.value);
   }
 
   set(value: number): void {

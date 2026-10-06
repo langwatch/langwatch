@@ -140,6 +140,7 @@ describe("the instance sign-in method policy", () => {
     });
 
     /** @scenario "A never-licensed installation offers no federated method" */
+    /** @scenario "A never-licensed installation offers no social provider either" */
     it("offers the email and password method set and no federated one", async () => {
       const policy = await SignInMethodPolicyService.create(inputs).resolvePolicy();
 

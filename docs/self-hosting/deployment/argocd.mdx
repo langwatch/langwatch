@@ -15,14 +15,15 @@ If you are not on ArgoCD, the [Kubernetes (Helm)](/self-hosting/deployment/kuber
 
 ## Quick start
 
-The langwatch chart needs two operator-managed Secrets in your target namespace before the first sync:
+The langwatch chart needs these operator-managed Secrets in your target namespace before the first sync:
 
 - `langwatch-app-secrets` holds the app keys + the AI Gateway shared-auth keys. Both `langwatch-app` and the gateway pod mount from this Secret.
 - A ClickHouse credentials Secret (any name, referenced from values via `clickhouse.auth.existingSecret`) holds the ClickHouse password and the Keeper inter-node cluster secret. The deployment composes `CLICKHOUSE_URL` at runtime from the password key, so the Secret name must be a non-default name (the chart's render-time validator fails fast if you leave it at the default `<release>-clickhouse` while `autogen.enabled=false`).
+- A PostgreSQL Secret (`postgresql.auth.existingSecret`, key `postgres-password`) and a Redis Secret (`redis.auth.existingSecret`, key `password`), when the chart runs those databases. With `autogen.enabled=false` the render fails without them. Skip them if you set `postgresql.chartManaged: false` and `redis.chartManaged: false`.
 
 This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo treats them as external and leaves them alone across syncs.
 
-Create both Secrets in the `langwatch` namespace from your secret manager. The keys each one needs depend on which components you run (gateway, Langy, LangWatchQL, replicated ClickHouse); see [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets) for the list.
+Create the Secrets in the `langwatch` namespace from your secret manager. The keys each one needs depend on which components you run (gateway, Langy, LangWatchQL, replicated ClickHouse); see [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets) for the list.
 
 Then apply the Application manifest:
 
@@ -40,7 +41,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.19.3 # x-release-please-version
+    targetRevision: 3.20.1 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -51,6 +52,12 @@ spec:
         clickhouse:
           auth:
             existingSecret: langwatch-clickhouse-creds
+        postgresql:
+          auth:
+            existingSecret: langwatch-postgresql-creds
+        redis:
+          auth:
+            existingSecret: langwatch-redis-creds
         # Add your other overrides here. See "Production overrides" below.
   syncPolicy:
     automated:
@@ -61,7 +68,7 @@ spec:
       - ServerSideApply=true
 ```
 
-If you change the release name or set `autogen.secretNames.app` to a non-default value, also set `gateway.secrets.existingSecretName` to the same Secret name (the chart fails fast at render time if it does not match).
+The app Secret name does not depend on the release name. If you set `secrets.existingSecret` or `autogen.secretNames.app` to a name other than `langwatch-app-secrets`, also set `gateway.secrets.existingSecretName` and `langyagent.secrets.existingSecretName` to that name (the chart fails fast at render time if they do not match).
 
 Apply:
 
@@ -89,7 +96,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.19.3 # x-release-please-version
+      targetRevision: 3.20.1 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -114,7 +121,9 @@ Topic-specific configuration pages:
 
 You can use an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the name you point it at (`secrets.existingSecret`).
 
-The Secret can land in the same sync as the chart. The chart ships no `PreSync` hook that reads it, so pods wait in `CreateContainerConfigError` until the operator writes the Secret, then start on their own.
+The Secret can land in the same sync as the chart, with one ordering rule.
+
+With chart-managed ClickHouse, the LangWatchQL render Job runs at sync wave `-1` and reads the app, PostgreSQL and ClickHouse Secrets. Argo waits for that Job before it applies wave `0`, and the Job fails after 5 minutes if a Secret is missing. Put your `ExternalSecret` (or equivalent) at an earlier wave, for example `argocd.argoproj.io/sync-wave: "-3"`. Other pods wait in `CreateContainerConfigError` until the operator writes the Secret, then start on their own.
 
 <Note>
 **Azure Key Vault:** secret names allow only letters, digits and `-`, so keys like `LW_GATEWAY_INTERNAL_SECRET` cannot be stored under that name. Map them in the `ExternalSecret`:
@@ -137,7 +146,8 @@ When you use the operator-managed pattern from the quick-start (`autogen.enabled
 After the first sync completes, verify the pods are running on the credentials you provided:
 
 ```bash
-kubectl -n langwatch get pods -l 'app.kubernetes.io/component in (app, gateway)' -o wide
+kubectl -n langwatch get pods -l app.kubernetes.io/name=langwatch-app -o wide
+kubectl -n langwatch get pods -l app.kubernetes.io/name=gateway -o wide
 argocd app diff langwatch
 ```
 
@@ -176,6 +186,8 @@ spec:
       jsonPointers:
         - /data
 ```
+
+The block above covers only the app Secret. The chart-managed database Secrets follow the same rule, so add `<release>-clickhouse`, `<release>-postgresql` and `<release>-redis` to `ignoreDifferences` the same way. The LangWatchQL password Secret (`<release>-lwql-passwords`) is a Helm hook, which Argo recreates on every sync with new values and `ignoreDifferences` does not cover. Set `lwql.enabled: false` on this path, or move to operator-managed Secrets.
 
 The recommended path is to flip `autogen.enabled` to `false`, provide the Secrets per the quick-start above, and remove the `ignoreDifferences` block entirely. The legacy path is preserved here for installs that need zero pre-install steps and are willing to apply the trio.
 

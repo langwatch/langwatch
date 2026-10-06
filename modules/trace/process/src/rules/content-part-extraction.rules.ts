@@ -13,7 +13,7 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import type { TraceMediaStore } from "../app/trace.members.ts";
+import type { TraceMediaStore } from "../services/trace-stored-media-store.service.ts";
 
 /**
  * Runtime invariant: a binary content part must carry exactly one of data, url or id, since

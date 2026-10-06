@@ -33,6 +33,9 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
@@ -64,6 +67,9 @@
     },
     {
       "path": "../../secret/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/task/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

@@ -16,7 +16,7 @@ import {
 import type {
   PulledUsageLedgerRepository,
   PulledUsageLedgerRow,
-} from "../../app/governance.members.ts";
+} from "../../repositories/pulled-usage-ledger.repository.ts";
 import {
   PULLED_USAGE_LEDGER_PROCESS_NAME,
   PulledUsageLedgerProcess,

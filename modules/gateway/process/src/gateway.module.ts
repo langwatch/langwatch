@@ -1,10 +1,8 @@
 import {
   bindRestCredential,
   bindRestMiddleware,
-  ForbiddenError,
   keyCredentialOfRequest,
   keyDoorPrincipalOfRequest,
-  organizationCredentialOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
@@ -15,11 +13,14 @@ import { GatewayModule } from "./app/gateway.app.ts";
 import { gatewayGovernanceEventsEventing } from "./eventing/gateway-governance-events.pipeline.ts";
 import { gatewayRealtimeSessionEventing } from "./eventing/gateway-realtime-session.pipeline.ts";
 import { gatewaySpendEventing } from "./eventing/gateway-spend.pipeline.ts";
+import { gatewayRepositories } from "./repositories/gateway-repositories.registry.ts";
 import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
 import {
   GatewayBudgetChangeDedupeService,
   type BudgetChangeEventDedupeService,
 } from "./services/gateway-budget-change-dedupe.service.ts";
+import { TraceDestinationReportTask } from "./tasks/trace-destination-report.task.ts";
+import { VirtualKeyConfigBackfillTask } from "./tasks/virtual-key-config-backfill.task.ts";
 import { agentCacheRest } from "./transport/agent-cache.rest.ts";
 import { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
@@ -33,22 +34,12 @@ import {
   gatewayRestCredential,
 } from "./transport/gateway-platform.rest.ts";
 import { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
-import { gatewaySpendBillingPlanGate, gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
+import { gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 
-export type { GatewayInfrastructure } from "./app/gateway.app.ts";
-
-/**
- * The organization a spend-plan check reads (ADR-072): off the raw request
- * the credential door recorded it against, never a context variable no door
- * here ever sets.
- */
-export function gatewaySpendPlanOrganizationId(context: { req: { raw: Request } }): string {
-  return organizationCredentialOfRequest(context.req.raw).organizationId;
-}
-
 export const gatewayProcessModule = defineProcessModule("gateway")
+  .withRepositories(gatewayRepositories)
   .withApi(GatewayModule)
   .withTransports(
     agentCacheRest,
@@ -66,7 +57,13 @@ export const gatewayProcessModule = defineProcessModule("gateway")
   .withEventing(gatewayGovernanceEventsEventing)
   .withEventing(gatewaySpendEventing)
   .withEventing(gatewayRealtimeSessionEventing)
-  .withTransportFacts(({ app, dependencies }) => {
+  .withTasks(({ repositories }) => [
+    TraceDestinationReportTask.create({ repository: () => repositories.traceDestinationReport }),
+    VirtualKeyConfigBackfillTask.create({
+      repository: () => repositories.virtualKeyConfigBackfill,
+    }),
+  ])
+  .withTransportFacts(({ app }) => {
     if (!(app instanceof GatewayModule)) {
       throw new TypeError("Gateway transport requires its constructed application");
     }
@@ -75,8 +72,7 @@ export const gatewayProcessModule = defineProcessModule("gateway")
       // The gateway control plane is signed rather than bearer-authenticated.
       // It owns the same declared secret as the data-plane client.
       bindRestCredential("internal_secret", () => app.internalDoor()),
-      // Organization-owned rows take any API key; the application asks the
-      // permission at the reach the operation needs.
+      // Organization-owned rows take any API key; the key door asked the route's permission.
       bindRestMiddleware(gatewayKeyCaller, (context) => keyCredentialOfRequest(context.req.raw)),
       // A virtual key route also serves a project-bound access token, as its person.
       bindRestMiddleware(gatewayVirtualKeyCaller, (context) =>
@@ -106,23 +102,6 @@ export const gatewayProcessModule = defineProcessModule("gateway")
       bindRestMiddleware(elevenLabsSignature, (context) => ({
         signature: context.req.header("elevenlabs-signature"),
       })),
-      /**
-       * ADR-072: the reconciliation pull gates under the webhook platform's
-       * plan flag, resolved per request after auth and the permission check.
-       * Fail-closed: a rejected lookup refuses; no plan store refuses at boot.
-       */
-      bindRestMiddleware(gatewaySpendBillingPlanGate, async (context) => {
-        const plan = await dependencies.entitlement.getActivePlan({
-          organizationId: gatewaySpendPlanOrganizationId(context),
-        });
-        if (plan.webhookEndpointsEnabled !== true) {
-          throw new ForbiddenError(
-            "The billing events API is an enterprise feature; this organization's plan does not include it.",
-          );
-        }
-
-        return {};
-      }),
     ];
   });
 

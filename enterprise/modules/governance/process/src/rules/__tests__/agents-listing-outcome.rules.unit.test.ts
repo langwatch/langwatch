@@ -12,8 +12,9 @@
  * and a refusal never picks up a count it does not have.
  */
 
-import { deriveAgentsListingOutcome } from "../agents-listing-outcome.rules.ts";
 import { describe, expect, it } from "vitest";
+
+import { deriveAgentsListingOutcome } from "../agents-listing-outcome.rules.ts";
 
 const row = (outcome: string | null, reason: string | null) => ({
   LastAgentsListingOutcome: outcome,

@@ -12,7 +12,7 @@ import {
   type DiscoveredAgentRow,
 } from "../discovered-agent.repository.ts";
 
-export type DiscoveredAgentDatabase = Pick<PrismaClient, "discoveredAgent">;
+type DiscoveredAgentDatabase = Pick<PrismaClient, "discoveredAgent">;
 
 export class PrismaDiscoveredAgentRepository extends DiscoveredAgentRepository {
   private constructor(private readonly prisma: DiscoveredAgentDatabase) {

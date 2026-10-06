@@ -73,7 +73,7 @@ describe("AgentModule HTTP agent credentials", () => {
     const { agent, values } = await savedHttpAgent();
     const prefix = `HTTP_${agent.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_`;
 
-    expect(Object.keys(values).sort()).toEqual([
+    expect(Object.keys(values).toSorted()).toEqual([
       `${prefix}AUTH_TOKEN`,
       `${prefix}HEADER_X_TENANT_KEY`,
     ]);

@@ -17,12 +17,12 @@ import { TraceAttributeValuesWithheldError } from "@langwatch/trace-contract";
 
 import type { FacetCatalog } from "#rules/trace-facet-registry.rules";
 
+import { createAttributeRedactor } from "../rules/trace-attribute-redaction.rules.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
 import {
   facetValuesCacheKey,
   type FacetValuesParams,
 } from "../rules/trace-list-cache-key.rules.ts";
-import { TraceAttributeRedactionService } from "./trace-attribute-redaction.service.ts";
 import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
 import { TraceTtlCacheService } from "./trace-ttl-cache.service.ts";
 
@@ -55,9 +55,7 @@ function mayReadAttributeValues({
 }): boolean {
   if (!canReadCapturedContent(protections)) return false;
   const probe = { [key]: "" };
-  return (
-    TraceAttributeRedactionService.create(protections.hiddenAttributes).redact(probe) === probe
-  );
+  return createAttributeRedactor({ hidden: protections.hiddenAttributes })(probe) === probe;
 }
 
 function unknownFacetError(

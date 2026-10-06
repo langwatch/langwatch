@@ -3,7 +3,7 @@
  * @see specs/home/guided-onboarding-offer.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -208,6 +208,33 @@ describe("GuidedOnboardingOffer", () => {
       expect(beginPathMutate).toHaveBeenCalledWith({ organizationId: "org_1", path: "gateway" });
       expect(dock).toHaveBeenCalledTimes(1);
       expect(emitMock).toHaveBeenCalledWith("clicked", "home_offer", { path: "gateway" });
+    });
+
+    /** @scenario the kickoff continues the attached conversation when the tour ends */
+    it("queues one kickoff that continues the attached conversation once the tour ends", async () => {
+      guided.state = guidedState({ conversationId: "conv_1" });
+      beginPathMutate.mockResolvedValue(
+        guidedState({ currentPath: "gateway", conversationId: "conv_1" }),
+      );
+      renderOffer({ space: "gateway", spaceInUse: false });
+      fireEvent.click(pill() as HTMLElement);
+      await waitFor(() => expect(useGuidedTourStore.getState().running).toBe(true));
+      expect(queueKickoff).not.toHaveBeenCalled();
+
+      act(() => useGuidedTourStore.getState().end("completed"));
+
+      expect(queueKickoff).toHaveBeenCalledTimes(1);
+      expect(queueKickoff).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "conv_1",
+          brief: expect.stringMatching(/^Let's set up Gateway then\./),
+          onConversationNamed: undefined,
+          parts: [
+            expect.objectContaining({ type: "guided-onboarding-kickoff", path: "gateway" }),
+            expect.objectContaining({ type: "text" }),
+          ],
+        }),
+      );
     });
 
     /** @scenario the coding offer queues the kickoff with no tour */

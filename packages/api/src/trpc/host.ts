@@ -3,6 +3,7 @@
  * SAME router. tRPC is session-authenticated by definition, so the session reader is required.
  */
 import {
+  DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   MembershipDisabledError,
   type AuthzScopeLineageResult,
@@ -19,7 +20,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 
-import type { Authorize, Entitlements } from "../access/access.ts";
+import type { Authorize, Entitlements, PlatformDecision } from "../access/access.ts";
 import type { TrpcAuditSink, TrpcSessionVersions } from "../hosting/api-door.ts";
 import type { SessionCaller, SessionReader } from "../hosting/session-reader.ts";
 import type {
@@ -95,10 +96,11 @@ export type TrpcRequestContext = {
 /** Whatever this root made of one declared namespace. */
 export type TrpcNamespace = unknown;
 
-/** This transport's own refusal copy: the two answers the declared check gives. */
+/** This transport's own refusal copy: the answers the declared check gives. */
 const DENIALS: TrpcAuthorizationDenial = {
   membershipDisabled: () => new MembershipDisabledError(),
   liteMemberRestricted: (resource: string) => new LiteMemberRestrictedError(resource),
+  developerSeatRestricted: (resource: string) => new DeveloperSeatRestrictedError(resource),
 };
 
 export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
@@ -362,6 +364,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
         record: (entry) => this.#record(entry),
         redact: ({ procedure, args }) => redactAuditArgs({ input: args, action: procedure }),
         exempt: (procedure) => isAuditLogExempt(procedure),
+        ...this.#organizationOf(options.audit),
       },
       errors: {
         report: (failure) => this.#logger.error({ error: failure }, "tRPC call failed"),
@@ -372,17 +375,24 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   }
 
   /**
+   * Where a declared audit target is resolved. A process with no sink writes no row, so it
+   * resolves nothing; a sink that cannot answer leaves the port absent and the mount refuses.
+   */
+  #organizationOf(
+    audit: TrpcAuditSink | undefined,
+  ): Pick<TrpcRuntimeMembers<TrpcRequestContext>["audit"], "organizationOf"> {
+    if (!audit) return { organizationOf: async () => null };
+
+    const organizationOf = audit.organizationOf?.bind(audit);
+
+    return organizationOf ? { organizationOf: async (scope) => organizationOf(scope) } : {};
+  }
+
+  /**
    * One mutation on the deployment's trail. A build that installed no audit
    * sink says so once per call rather than dropping the row silently.
    */
-  async #record(entry: {
-    userId: string;
-    organizationId?: string;
-    projectId?: string;
-    action: string;
-    args?: unknown;
-    error?: Error;
-  }): Promise<void> {
+  async #record(entry: Parameters<TrpcAuditSink["record"]>[0]): Promise<void> {
     const audit = this.#options.audit;
 
     if (!audit) {
@@ -405,6 +415,9 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       ...(organizationId === void 0 ? {} : { organizationId }),
       ...(projectId === void 0 ? {} : { projectId }),
       ...(entry.error ? { error: entry.error } : {}),
+      ...(entry.targetKind === void 0 ? {} : { targetKind: entry.targetKind }),
+      ...(entry.targetId === void 0 ? {} : { targetId: entry.targetId }),
+      ...(entry.metadata === void 0 ? {} : { metadata: entry.metadata }),
     });
   }
 }
@@ -413,6 +426,8 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
 function decidingOnce(authz: Authorize): Authorize {
   const decisions = new Map<string, Promise<PermissionDecision>>();
   const lineages = new Map<string, Promise<AuthzScopeLineageResult>>();
+  const platform = new Map<string, Promise<PlatformDecision>>();
+  const askPlatform = authz.getPlatformDecision?.bind(authz);
 
   return {
     getDecision: (input) =>
@@ -424,6 +439,12 @@ function decidingOnce(authz: Authorize): Authorize {
       askOnce(lineages, JSON.stringify([input.organizationId, input.teamId, input.projectId]), () =>
         authz.checkScopeLineage(input),
       ),
+    ...(askPlatform === void 0
+      ? {}
+      : {
+          getPlatformDecision: (input) =>
+            askOnce(platform, JSON.stringify(input), () => askPlatform(input)),
+        }),
   };
 }
 

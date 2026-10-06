@@ -4,9 +4,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { GatewayClickHouseClient } from "../../../app/gateway.members.ts";
 import { MemoryGatewayPrincipalSpendRepository } from "../../memory/memory.gateway-principal-spend.repository.ts";
 import { ClickHouseGatewayPrincipalSpendRepository } from "../clickhouse.gateway-principal-spend.repository.ts";
+import type { GatewayClickHouseClient } from "../clickhouse.gateway-session.store.ts";
 
 const WINDOW = {
   startMs: Date.parse("2026-08-01T00:00:00.000Z"),

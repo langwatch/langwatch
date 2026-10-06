@@ -19,18 +19,18 @@ import {
   pickRecommendedChatModel,
   getProviderModelOptions,
 } from "@langwatch/model-provider-contract";
-import type { GuidedPath } from "@langwatch/onboarding-contract";
+import {
+  buildGuidedKickoffParts,
+  type GuidedKickoffInput,
+  type GuidedKickoffTourStatus,
+  type GuidedPath,
+} from "@langwatch/onboarding-contract";
 import { expect } from "vitest";
 
 import {
   GUIDED_PROVIDERS,
   type GuidedProvider,
 } from "../../src/shell/features/guided-onboarding/model/guided-providers.ts";
-import {
-  buildGuidedKickoffParts,
-  type GuidedKickoffInput,
-  type GuidedKickoffTourStatus,
-} from "../../src/shell/features/guided-onboarding/model/kickoff.ts";
 import { APP_BASE, CONFIG, useAccount, useProject } from "./config";
 import type { LangyAdapter, LangyToolEvent } from "./langy-agent";
 import {

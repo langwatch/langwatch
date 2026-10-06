@@ -26,7 +26,9 @@ on:
     # ready_for_review is NOT a default pull_request activity type. Without
     # it, taking a PR out of draft fires no event at all, so the job's draft
     # guard below would never get its first non-draft run.
-    types: [opened, synchronize, reopened, ready_for_review]
+    # `labeled` fires for every label; a run starts only for `ci:full`, which
+    # also lifts the draft gate. Any other label is skipped by the gates below.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths:
       - "plugins/**"
       # The launcher runs the CLI, and the integration test runs the launcher
@@ -52,7 +54,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  # A label event for any label but `ci:full` gets its own group, so it neither
+  # cancels a running full run nor is cancelled by one.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name != 'ci:full') && format('label-{0}', github.run_id) || github.event.pull_request.number || github.ref }}
   # Supersede an outdated run on a PR branch, never on main: every commit
   # that lands on main has to keep its own validation, and cancelling here
   # would let a merge silently void the run for the commit before it.
@@ -66,7 +70,12 @@ jobs:
     # Draft PRs release the runner slot entirely; the work returns on
     # ready_for_review and in the merge queue. This was `needs.changes.outputs
     # .heavy`, which cost a whole gate job to compute the same expression.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # A PR labelled `ci:full` runs on a draft too; a label event for any other
+    # label skips the job.
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false
+       || contains(github.event.pull_request.labels.*.name, 'ci:full'))
+      && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

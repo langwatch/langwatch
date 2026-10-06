@@ -32,7 +32,7 @@ import { MetricSeriesCatalogMapProjection } from "./metric-series-catalog.projec
 import { MetricTimeRollupMapProjection } from "./metric-time-rollup.projection.ts";
 import { RecordMetricDataPointCommand } from "./metric.commands.ts";
 
-export interface MetricProcessingPipelineDeps {
+interface MetricProcessingPipelineDeps {
   metricDataPointAppendStore: AppendStore<CanonicalMetricDataPoint>;
   metricSeriesCatalogAppendStore: AppendStore<CanonicalMetricDataPoint>;
   metricTimeRollupAppendStore: AppendStore<CanonicalMetricDataPoint>;
@@ -41,7 +41,7 @@ export interface MetricProcessingPipelineDeps {
   retention?: RetentionPolicyResolver;
 }
 
-export interface MetricProcessingPipelineOptions {
+interface MetricProcessingPipelineOptions {
   repository: MetricDataPointAppendRepository;
   defaultRetentionDays: number;
   metricCommandShardCount: number;

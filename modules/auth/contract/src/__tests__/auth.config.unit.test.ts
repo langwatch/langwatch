@@ -111,6 +111,8 @@ describe("auth server configuration", () => {
             auth0ManagementClientId: undefined,
             isSaas: false,
             signUpMode: "open",
+            publicBaseUrl: undefined,
+            nodeEnvironment: undefined,
             signInProviders: {
               authProvider: undefined,
               legacyProvider: undefined,

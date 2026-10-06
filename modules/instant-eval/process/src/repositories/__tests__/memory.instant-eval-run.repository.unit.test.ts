@@ -1,7 +1,7 @@
 /**
  * The run's own row: the definition read back verbatim, scoped to its
  * project, listed newest first and paged by the instant-and-id pair.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { Temporal } from "@langwatch/time";

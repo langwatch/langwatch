@@ -638,6 +638,84 @@ func readWaiterClaim(path string) (WaiterClaim, bool) {
 	return claim, true
 }
 
+func (s *Store) holdersDir(name string) string { return filepath.Join(s.home, "holders", name) }
+
+// HolderClaim is one `haven slot run` holding name's slot: the label a waiter
+// sees it under and when it took the slot.
+type HolderClaim struct {
+	Label     string    `json:"label"`
+	StartedAt time.Time `json:"startedAt"`
+}
+
+// HolderSnapshot is one live slot holder, with the pid it registered under.
+type HolderSnapshot struct {
+	PID int
+	HolderClaim
+}
+
+// ClaimHolder records this process as holding name's slot, so a queued run can
+// name what it is waiting behind. Like ClaimWaiter it is telemetry only: the
+// flock admits, and a holder that dies just leaves a dead pid file.
+func (s *Store) ClaimHolder(pid int, name string, claim HolderClaim) (func(), error) {
+	dir := s.holdersDir(name)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return func() {}, err
+	}
+	path := filepath.Join(dir, strconv.Itoa(pid)+".json")
+	b, err := json.Marshal(claim)
+	if err != nil {
+		return func() {}, err
+	}
+	if err := writeFileAtomic(path, b, 0o644); err != nil {
+		return func() {}, err
+	}
+	return func() { _ = os.Remove(path) }, nil
+}
+
+// HolderSnapshots lists the live holders of name's slot. A dead pid, a marker
+// past HeavyRunClaimTTL or one this cannot parse is dropped, as for waiters.
+func (s *Store) HolderSnapshots(name string) []HolderSnapshot {
+	dir := s.holdersDir(name)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var out []HolderSnapshot
+	for _, e := range entries {
+		if snap, ok := holderFromEntry(dir, e.Name()); ok {
+			out = append(out, snap)
+		}
+	}
+	return out
+}
+
+// holderFromEntry reads one holder marker, sweeping it away when its process
+// is dead or its claim is past the TTL.
+func holderFromEntry(dir, name string) (HolderSnapshot, bool) {
+	pid, err := strconv.Atoi(strings.TrimSuffix(name, ".json"))
+	if err != nil {
+		return HolderSnapshot{}, false
+	}
+	path := filepath.Join(dir, name)
+	if !processAlive(pid) {
+		_ = os.Remove(path)
+		return HolderSnapshot{}, false
+	}
+	b, err := os.ReadFile(path) // #nosec G304 -- path is built from haven's own home dir
+	if err != nil {
+		return HolderSnapshot{}, false
+	}
+	var claim HolderClaim
+	if json.Unmarshal(b, &claim) != nil || claim.StartedAt.IsZero() {
+		return HolderSnapshot{}, false
+	}
+	if age := time.Since(claim.StartedAt); age < 0 || age > HeavyRunClaimTTL {
+		_ = os.Remove(path)
+		return HolderSnapshot{}, false
+	}
+	return HolderSnapshot{PID: pid, HolderClaim: claim}, true
+}
+
 // processAlive reports whether a pid is a live process. Signal 0 tests for
 // existence without delivering anything; EPERM means it exists but belongs to
 // someone else, which still counts as occupied — a heavy run started under

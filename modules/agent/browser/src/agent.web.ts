@@ -3,6 +3,7 @@
  * bar opens (`?drawer.open=<name>`).
  */
 
+import { HttpConfigEditorToken } from "@langwatch/agent-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 
 export const agentWeb = defineBrowserModule("agent")
@@ -89,10 +90,8 @@ export const agentWeb = defineBrowserModule("agent")
     },
   })
   /** The HTTP agent's configuration editor, lent to the studio's panels (§3.4 rule 7). */
-  .withCapabilities({
-    httpConfigEditor: {
-      load: async () => ({
-        default: (await import("./ui/sections/http-config-editor.tsx")).HttpConfigEditor,
-      }),
-    },
+  .lends(HttpConfigEditorToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/http-config-editor.tsx")).HttpConfigEditor,
+    }),
   });

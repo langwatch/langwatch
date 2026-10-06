@@ -14,7 +14,6 @@ import {
   type SkippedAutomation,
 } from "../rules/slack-connection-migration.rules.ts";
 import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
-import type { AutomationSecretCrypto } from "./automation-slack-secrets.service.ts";
 
 /** Who a migrated connection is stored for; main's fallback actor. */
 const MIGRATION_ACTOR_ID = "system:migration";
@@ -37,6 +36,12 @@ interface MigrationProjects {
   }>;
 }
 
+/** The trigger rows a pass reads and rewrites, and the open of a stored token. */
+type MigrationTriggers = Pick<
+  TriggerRepository,
+  "findSlackTriggers" | "replaceActionParamsIfUnchanged" | "openSecret"
+>;
+
 /**
  * One organization's Slack connection pass (ARCHITECTURE.md §7): plan with the
  * pure rules, move each secret forward through `SlackApi`, clear what is left,
@@ -45,20 +50,18 @@ interface MigrationProjects {
 export class SlackConnectionMigrationService {
   private constructor(
     private readonly deps: {
-      triggers: TriggerRepository;
+      triggers: MigrationTriggers;
       projects: MigrationProjects;
       slack: MigrationSlack;
       slackConnections: Pick<AutomationSlackConnectionService, "updateConnectionClaim">;
-      crypto: AutomationSecretCrypto;
     },
   ) {}
 
   static create(deps: {
-    triggers: TriggerRepository;
+    triggers: MigrationTriggers;
     projects: MigrationProjects;
     slack: MigrationSlack;
     slackConnections: Pick<AutomationSlackConnectionService, "updateConnectionClaim">;
-    crypto: AutomationSecretCrypto;
   }): SlackConnectionMigrationService {
     return new SlackConnectionMigrationService(deps);
   }
@@ -105,7 +108,7 @@ export class SlackConnectionMigrationService {
         .filter((project) => project.archivedAt)
         .map((project) => project.id),
       projectBots,
-      decryptSecret: ({ ciphertext }) => this.deps.crypto.decrypt(ciphertext),
+      decryptSecret: ({ ciphertext }) => this.deps.triggers.openSecret({ sealed: ciphertext }),
     });
     return { ...plan, projectIds };
   }

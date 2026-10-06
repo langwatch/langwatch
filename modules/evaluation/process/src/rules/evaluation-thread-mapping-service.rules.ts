@@ -17,7 +17,7 @@ import type { EvaluationSpanDigestService } from "../services/evaluation-span-di
  * Callback that fetches all traces belonging to a thread.
  * Callers provide their own implementation to decouple I/O from resolution logic.
  */
-export type GetThreadTraces = (threadId: string) => Promise<Trace[]>;
+type GetThreadTraces = (threadId: string) => Promise<Trace[]>;
 
 /**
  * Check if any mapping in the state has type "thread".

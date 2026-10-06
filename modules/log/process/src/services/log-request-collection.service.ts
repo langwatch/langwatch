@@ -17,12 +17,12 @@ import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
 /** Trace's share of a log: its canonical names, its I/O preview and its contribution command. */
-export type LogTraceSlice = Pick<
+type LogTraceSlice = Pick<
   TraceApi,
   "canonicalizeLogRecord" | "extractLogRecordIO" | "recordLogContributions"
 >;
 
-export interface LogRequestCollectionDeps {
+interface LogRequestCollectionDeps {
   traces: LogTraceSlice;
   /** Only the preparation half of `LogApi`: this collector sends its own batch, itself. */
   logs: Pick<LogApi, "prepareCanonicalLogRecords">;

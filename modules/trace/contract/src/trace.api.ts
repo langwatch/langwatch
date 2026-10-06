@@ -1,6 +1,7 @@
 import type { PrincipalRef } from "@langwatch/authorization";
 import type {
   InstantEvalEstimateWire,
+  InstantEvalOptInAccess,
   InstantEvalRunProgress,
   InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
@@ -761,6 +762,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): Promise<InstantEvalRunProgress>;
   /** One run's counters, which is all a chip and a progress bar read. */
   getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress>;
+  /** Whether the Explorer may judge, and what its refusal popover offers this member. */
+  getExplorerEvalAccess(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<InstantEvalOptInAccess>;
+  /** The organization's own switch, thrown from the popover; the organization is the project's. */
+  enableExplorerEvals(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<InstantEvalOptInAccess>;
   /**
    * The runs a query's `eval` chips claim, checked against the project and
    * dated for the compiler. A claim the project does not own is dropped, so

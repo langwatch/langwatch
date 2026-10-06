@@ -6,10 +6,10 @@
  * id and an issuer are not credentials. Every `*ClientSecret` resolves through
  * `@langwatch/secrets` (`signInProviderSecrets`); the platform license key is licensing's, asked through its API.
  */
-import { Config, signInProviders, type ConfigOf } from "@langwatch/config";
+import { Config, isSaas, publicBaseUrl, signInProviders, type ConfigOf } from "@langwatch/config";
 
 /** The shared leaves (`@langwatch/config`): auth reads the same ones to build the providers. */
-export const ssoConfig = Config.define(() => ({ ...signInProviders }));
+export const ssoConfig = Config.define(() => ({ ...signInProviders, isSaas, publicBaseUrl }));
 
 export type SsoConfig = ConfigOf<typeof ssoConfig>;
 
@@ -18,11 +18,7 @@ export type SsoConfig = ConfigOf<typeof ssoConfig>;
  * public and credentialed halves in one object, assembled by `SsoModule.create`
  * from `ssoConfig`, `signInProviderSecrets`, and the process's public base URL.
  *
- * `isSaas` is a known gap, not a value this module can resolve on its own:
- * `IS_SAAS` is already declared by the `licensing` module's own config slice,
- * so a second declaration here would refuse the whole process by name at
- * boot (`ConfigClaimsSecretError`'s sibling, `ConfigCollisionError`). See the
- * lane handoff for `config-schema-nuke-sso`.
+ * `isSaas` is a shared leaf the licensing slice picks too (one claim), so there is no collision.
  */
 export interface SsoConfiguration {
   isSaas: boolean;

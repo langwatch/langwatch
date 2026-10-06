@@ -3,8 +3,9 @@ import {
   type GraphTriggerEvaluationResult,
 } from "@langwatch/automation-contract";
 
-import type { GraphEvaluationPlan, GraphSeriesEvaluation } from "../app/automation.members.ts";
 import { GraphTriggerAlertDeliveryService } from "./graph-trigger-alert-delivery.service.ts";
+import type { GraphEvaluationPlan } from "./graph-trigger-evaluation-plan.service.ts";
+import type { GraphSeriesEvaluation } from "./graph-trigger-series-evaluation.service.ts";
 
 export class GraphTriggerIncidentService {
   private constructor(private readonly delivery: GraphTriggerAlertDeliveryService) {}

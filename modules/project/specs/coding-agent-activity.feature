@@ -5,13 +5,12 @@ Feature: Recording coding-agent activity on a project
   updates of one column, and both are reached from a background worker's event
   pipelines rather than from a request.
 
-  Reaching them used to mean composing `ProjectService`, which is a Prisma
-  repository, an authorization service, a topic clustering port, a credentials
-  adapter and both transports' collaborators — none of which either update asks
-  anything. This is the seam that makes them reachable on their own, and its
-  predicates are the App's, pinned literally: two graphs writing one column
-  under different staleness windows would either flood Postgres or leave a
-  settings surface reading a date the other has already moved.
+  Other modules reach both through the project's own `ProjectApi`, so neither
+  needs to compose anything of the project's. The predicates are the App's,
+  pinned literally: two writers of one column under different staleness windows
+  would either flood Postgres or leave a settings surface reading a date the
+  other has already moved. The window is one hour, applied by the project service
+  and enforced by the single project repository that owns the table.
 
   @unit
   Scenario: An active project is stamped when its activity is stale

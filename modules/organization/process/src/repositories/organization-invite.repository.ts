@@ -15,6 +15,8 @@ export type WriteInviteInput = {
   teamIds: string;
   teamAssignments?: unknown;
   role: OrganizationUserRole;
+  /** The user who sent it; null for an invitation a service created. */
+  requestedBy?: string | null;
 };
 
 /** One listed invitation, with the admin who asked for it. */
@@ -127,10 +129,12 @@ export abstract class OrganizationInviteRepository {
     acceptedByUserId: string;
     acceptedViaIdentifierId: string | null;
   }): Promise<number>;
+  /** A Developer row also writes its admission audit row, in the same write (ADR-171). */
   abstract addMembership(input: {
     userId: string;
     organizationId: string;
     role: OrganizationUserRole;
+    admission?: { inviteId: string; actorUserId: string | null };
   }): Promise<void>;
   /** Throws `InviteNotFoundError`. */
   abstract getInviteStatus(input: { inviteId: string }): Promise<{ status: string }>;

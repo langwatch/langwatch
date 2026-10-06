@@ -1,7 +1,8 @@
 import { RawHttpHost, RawSocketHost, type TransportPeers, WebSocketHost } from "@langwatch/api";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
+import { releaseVersionOf } from "@langwatch/config";
 import { ModuleApiToken } from "@langwatch/module";
-import { otlpHeadersFrom, resourceAttributesFrom } from "@langwatch/observability/node";
+import { otlpHeadersFrom } from "@langwatch/observability/node";
 import { OperatorReadsResolver } from "@langwatch/prisma-client";
 import {
   MEMBER_NAMES,
@@ -16,7 +17,6 @@ import { z } from "zod";
 import { bootInstalledProcess } from "./boot-installed-process.ts";
 import { storesBackedMembers } from "./module-members.ts";
 import { observabilityOwner } from "./observability-owner.ts";
-import { processOwner } from "./owner.ts";
 import {
   ApiProcessContainer,
   TasksProcessContainer,
@@ -121,7 +121,6 @@ export class ProcessServer implements ProcessBoot {
     role,
     modules,
     pipelines,
-    members: suppliedMembers,
     transports,
   }: ProcessBootInput): Promise<BootedApplication> {
     if (!this.config.stores)
@@ -136,12 +135,6 @@ export class ProcessServer implements ProcessBoot {
         .into(observabilityOwner.secrets.otlpHeaders, (rawHeaders) =>
           telemetryExporterOf({ observability: this.config.observability, rawHeaders }),
         );
-      // Resolved once at the root and handed on as a member: its destinations
-      // are a request header and a scenario child's environment, so unlike a
-      // client credential it cannot stay inside the closure.
-      const nlpInternalSecret = await this.resolver
-        .scopeTo(processOwner.name, Object.values(processOwner.secrets))
-        .into(processOwner.secrets.nlpInternal, (secret) => secret);
       const stores = await openStores({
         name: this.server.name,
         config,
@@ -194,12 +187,13 @@ export class ProcessServer implements ProcessBoot {
         // refuses every resolve attempted after boot.
         secrets: (owner, declared) => this.resolver.scopeTo(owner, declared),
         operatorReads: (scope) => operatorReadsResolver.scopeTo(scope),
-        // The stores answer the declared members; what this process composed
-        // itself overrides them and extends the order, so a module naming a
-        // member no store carries is answered rather than refused at boot.
+        // The stores answer the declared members; the process facts below extend them
+        // until the last module reading members takes each from its config slice (§3.3).
         members: {
           ...storesBackedMembers(
             {
+              // The opened stores state their tier; boot selects every registry from it (§7).
+              ...(opened.tier === void 0 ? {} : { tier: opened.tier }),
               order: MEMBER_NAMES,
               read(name) {
                 const member = MEMBER_NAMES.find((candidate) => candidate === name);
@@ -216,18 +210,8 @@ export class ProcessServer implements ProcessBoot {
               telemetryExporter,
               nodeEnvironment: this.settings.nodeEnvironment,
               isSaas: this.settings.isSaas ?? false,
-              nlpServiceUrl: this.settings.nlpServiceUrl,
-              nlpCodeBlockTimeoutSeconds: this.settings.nlpCodeBlockTimeoutSeconds,
-              nlpInternalSecret,
-              // The proxy spellings, raw; each module's outbound calls parse and follow them.
-              outboundProxy: this.settings.outboundProxy ?? {},
-              // The raw-socket door's port, which a module tunnelling to that door reads.
-              rawSocketPort: this.settings.rawSocketPort,
               // Role facts: the composition's word, never a deployment's.
               processName: this.server.name,
-              ...Object.fromEntries(
-                Object.entries(suppliedMembers).map(([name, build]) => [name, build(opened)]),
-              ),
             },
           ),
           close: () => opened.close(),
@@ -280,17 +264,13 @@ const releaseSettings = z.object({
   resourceAttributes: z.string().optional(),
 });
 
-/**
- * The release this install runs, as the license sync, usage report and checkup
- * name it: `SERVICE_VERSION`, then `service.version` in
- * `OTEL_RESOURCE_ATTRIBUTES`, and `unknown` rather than a number made up here.
- */
+/** The release this install runs, read from observability's slice of the shared leaves. */
 export function serviceVersionOf(observability: unknown): string {
   const settings = releaseSettings.parse(observability ?? {});
-  const explicit = settings.serviceVersion?.trim();
-  if (explicit) return explicit;
-  const attribute = resourceAttributesFrom(settings.resourceAttributes)["service.version"];
-  return attribute || "unknown";
+  return releaseVersionOf({
+    serviceVersion: settings.serviceVersion,
+    otelResourceAttributes: settings.resourceAttributes,
+  });
 }
 
 const exporterSettings = z.object({ otlpEndpoint: z.string().optional() });

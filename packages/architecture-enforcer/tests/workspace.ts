@@ -46,14 +46,29 @@ export function parsedSource(name: string, text: string): ts.SourceFile {
 export const POLICY_ANCHORS: Readonly<Record<string, string>> = {
   "packages/prisma-client/prisma/schema.prisma": "",
   "packages/clickhouse-migrations/migrations/.keep": "",
-  "apps/api/src/process-modules.generated.ts":
-    "export const processModules = [\n] as const;\n",
+  "apps/api/src/process-modules.generated.ts": "export const processModules = [\n] as const;\n",
   "dev/tsconfig.declarations.json": '{ "files": [], "references": [] }\n',
   "apps/api/src/main.ts": "",
   "apps/worker/src/main.ts": "",
   "apps/tasks/src/main.ts": "",
   "apps/server/src/cli.ts": "",
   "apps/scenario-child/src/main.ts": "",
+  "dev/docs/ARCHITECTURE.md": "",
+  "packages/oxlint-rules/src/rules/.keep": "",
+  "dev/docs/deleted-spellings.json": `${JSON.stringify({
+    record: "fixture",
+    listed: "2026-10-05",
+    spellings: [
+      {
+        spelling: "a fixture shape",
+        kind: "prose",
+        replacement: "nothing",
+        section: "§15",
+        ruled: null,
+        note: "Matches nothing.",
+      },
+    ],
+  })}\n`,
 };
 
 /** Writes each anchor that is not already there, so a fixture's own copy wins. */

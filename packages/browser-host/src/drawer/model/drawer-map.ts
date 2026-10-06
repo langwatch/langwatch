@@ -44,7 +44,7 @@ export type UiFlowCallbacksStore = {
 
 /**
  * A module's own drawers as a props map, read off what it registered: a component per name, or
- * the `{ load }` its `withDrawers` declares. `useDrawer<DrawerPropsMapOf<typeof drawers>>()`.
+ * the `{ load }` its `withDrawers` declares.
  */
 export type DrawerPropsMapOf<Drawers> = {
   [Name in keyof Drawers]: Drawers[Name] extends ComponentType<infer Props>

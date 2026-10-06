@@ -24,7 +24,7 @@ vi.mock("@langwatch/observability", () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import type { TraceMediaStore } from "../../app/trace.members.ts";
+import type { TraceMediaStore } from "../trace-stored-media-store.service.ts";
 
 // ---------------------------------------------------------------------------
 // Test helpers

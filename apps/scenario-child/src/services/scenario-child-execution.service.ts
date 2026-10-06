@@ -196,8 +196,16 @@ async function executeScenarioChildValue({
   jobData: ChildProcessJobData;
   runtime: ScenarioChildRuntime;
 }): Promise<ScenarioChildExecutionResult> {
-  const { context, scenario, parameters, adapterData, modelParams, nlpServiceUrl, target } =
-    jobData;
+  const {
+    context,
+    scenario,
+    parameters,
+    adapterData,
+    modelParams,
+    nlpServiceUrl,
+    executeSyncRoute,
+    target,
+  } = jobData;
 
   const { langwatchEndpoint, langwatchApiKey, logger } = runtime;
 
@@ -213,6 +221,7 @@ async function executeScenarioChildValue({
     nlpServiceUrl,
     nlpInternalSecret: runtime.nlpInternalSecret,
     projectApiKey: langwatchApiKey,
+    executeSyncRoute,
     parameters,
     httpPort: runtime.httpPort,
     logger,

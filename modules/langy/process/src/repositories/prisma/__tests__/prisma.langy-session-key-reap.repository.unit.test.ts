@@ -2,7 +2,7 @@
  * revokedAt: null (no rewrites), and expiresAt not null (keys without expiry). */
 import type { Prisma } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { Temporal, nowInstant, toDate } from "@langwatch/time";
+import { Temporal, fromDate, nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaLangySessionKeyReapRepository } from "../prisma.langy-session-key-reap.repository.ts";
@@ -82,7 +82,10 @@ describe("PrismaLangySessionKeyReapRepository", () => {
         const now = new Date("2026-02-02T00:00:00.000Z");
         const database = prismaDouble({ apiKey: { updateMany } });
 
-        await PrismaLangySessionKeyRepository.create(database).reapExpired(now, "Langy session");
+        await PrismaLangySessionKeyRepository.create(database).revokeExpiredByName({
+          name: "Langy session",
+          now: fromDate(now),
+        });
 
         expect(updateMany).toHaveBeenCalledWith({
           where: {

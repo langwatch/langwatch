@@ -26,10 +26,9 @@ and nothing that reads or writes.
 `tsconfig.json` declares `"types": []`: a `node:*` import or a `Buffer`
 reference does not compile here, which is the whole boundary. Deriving an
 identifier id, hashing a value, reading heads, appending a fact — all of
-that is [`@langwatch/identity-process`](../server/README.md), over
-repository interfaces that package implements with Prisma and
-`apps/api/src/app/api-trpc-collaborators.identity.composition.ts` composes
-once.
+that is [`@langwatch/identity-process`](../process/README.md), over
+repository interfaces that package implements with Prisma, built once by the
+process container from the module's registries (ARCHITECTURE.md §5).
 
 Spec: `specs/identity/identifier-model.feature`,
 `specs/identity/identifier-aggregate.feature`.

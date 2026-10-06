@@ -320,10 +320,12 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           // Self-defaulting so the built bundle is usable even when the server hasn't
           // injected the resolver: `vite preview`, the boot-smoke, and any raw-`dist/`
           // static server fall back to same-origin ("/"+path).
+          const literal = JSON.stringify(filename).replace(
+            /[<>/\u2028\u2029]/g,
+            (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
+          );
           return {
-            runtime: `(globalThis.${UI_ASSET_URL_GLOBAL}||function(p){return "/"+p})(${JSON.stringify(
-              filename,
-            )})`,
+            runtime: `(globalThis.${UI_ASSET_URL_GLOBAL}||function(p){return "/"+p})(${literal})`,
           };
         }
         if (hostType === "css") return { relative: true };

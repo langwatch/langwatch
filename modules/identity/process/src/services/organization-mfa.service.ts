@@ -15,7 +15,7 @@ import {
 import type { TwoStepVerificationRepository } from "../repositories/two-step-verification.repository.ts";
 import type { OrganizationMfaNotifierService } from "./organization-mfa-notifier.service.ts";
 
-export type OrganizationMfaServiceDeps = {
+type OrganizationMfaServiceDeps = {
   accounts: TwoStepVerificationRepository;
   /** What a session proved, the provider's assertions, and whether the deployment offers it. */
   auth: Pick<

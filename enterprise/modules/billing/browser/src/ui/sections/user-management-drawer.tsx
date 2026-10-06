@@ -45,6 +45,13 @@ function invalidEmailErrors(plannedUsers: PlannedUser[]): Record<string, string>
   return errors;
 }
 
+/** One badge per seat. A Developer (ADR-171) is neither a Full seat nor a capped Lite seat. */
+const SEAT_BADGE: Record<MemberType, { tone: string; label: string }> = {
+  FullMember: { tone: "blue", label: "Full Member" },
+  LiteMember: { tone: "yellow", label: "Lite Member" },
+  Developer: { tone: "teal", label: "Developer" },
+};
+
 export function UserManagementDrawer({
   open,
   onClose,
@@ -325,11 +332,8 @@ function CurrentMembersSection({
                   </Text>
                 </Box>
                 <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
-                  <Badge
-                    colorPalette={user.memberType === "FullMember" ? "blue" : "yellow"}
-                    variant="outline"
-                  >
-                    {user.memberType === "FullMember" ? "Full Member" : "Lite Member"}
+                  <Badge colorPalette={SEAT_BADGE[user.memberType].tone} variant="outline">
+                    {SEAT_BADGE[user.memberType].label}
                   </Badge>
                 </Box>
               </Box>
@@ -350,11 +354,8 @@ function CurrentMembersSection({
                   </Text>
                 </Box>
                 <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
-                  <Badge
-                    colorPalette={invite.memberType === "FullMember" ? "blue" : "yellow"}
-                    variant="outline"
-                  >
-                    {invite.memberType === "FullMember" ? "Full Member" : "Lite Member"}
+                  <Badge colorPalette={SEAT_BADGE[invite.memberType].tone} variant="outline">
+                    {SEAT_BADGE[invite.memberType].label}
                   </Badge>
                 </Box>
               </Box>

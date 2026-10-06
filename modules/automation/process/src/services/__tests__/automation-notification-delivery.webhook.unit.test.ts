@@ -2,9 +2,9 @@ import { AlertType, type TestFireWebhookDestination } from "@langwatch/automatio
 import type { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ApiAutomationTestFire } from "../../app/automation-composition.build.ts";
 import type { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
 import { AutomationTemplateService } from "../automation-template.service.ts";
+import { AutomationTestFireService } from "../automation-test-fire.service.ts";
 
 type SendRequest = WebhookApi["sendRequest"];
 
@@ -19,7 +19,7 @@ function testFireOverWebhooks() {
   };
   const service = AutomationTemplateService.create({
     baseHost: "https://app.langwatch.ai",
-    delivery: ApiAutomationTestFire.create({
+    delivery: AutomationTestFireService.create({
       mail: { sendEmail: unused, getMailDelivery: unused },
       delivery,
       webhooks: { sendRequest: send },

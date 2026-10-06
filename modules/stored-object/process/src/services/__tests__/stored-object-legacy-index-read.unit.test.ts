@@ -1,14 +1,19 @@
 import { ClickHouseQueryClient, TenantGuard, type QueryDriver } from "@langwatch/clickhouse-client";
-import type { Logger } from "@langwatch/observability";
-import type { Encryption, ObjectStorage } from "@langwatch/process-stores/members";
+import type { ObjectStorage } from "@langwatch/process-stores/members";
 /**
  * @vitest-environment node
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { buildStoredObjectInfrastructure } from "#app/stored-object-composition.build";
-import { StoredObjectFileReadService } from "#services/stored-object-file-read.service";
+import {
+  ClickHouseStoredObjectsRepository,
+  RoutedStoredObjectsClickHouse,
+} from "../../repositories/clickhouse/stored-objects.repository.ts";
+import { ObjectStorageStoredObjectLegacyStorageRepository } from "../../repositories/object-storage/object-storage.stored-object-legacy-storage.repository.ts";
+import { StoredObjectFileReadService } from "../stored-object-file-read.service.ts";
+import { StoredObjectsTelemetryService } from "../stored-objects-telemetry.service.ts";
+import { StoredObjectsService } from "../stored-objects.service.ts";
 
 const PROJECT = "project-1";
 
@@ -20,17 +25,17 @@ const emptyDriver: QueryDriver = {
 };
 
 function readServiceOverLegacyIndex(): StoredObjectFileReadService {
-  const { files } = buildStoredObjectInfrastructure({
-    members: {
-      clickhouse: new ClickHouseQueryClient({
-        driver: emptyDriver,
-        tenantGuard: new TenantGuard(),
-      }),
-      logger: createApiFixture<Logger>({}),
-      objectStorage: createApiFixture<ObjectStorage>({}),
-      encryption: createApiFixture<Encryption>({}),
-      publicBaseUrl: undefined,
-    },
+  const legacyStorage = ObjectStorageStoredObjectLegacyStorageRepository.create(
+    createApiFixture<ObjectStorage>({}),
+  );
+  const files = StoredObjectsService.create({
+    repository: ClickHouseStoredObjectsRepository.create(
+      RoutedStoredObjectsClickHouse.create(
+        new ClickHouseQueryClient({ driver: emptyDriver, tenantGuard: new TenantGuard() }),
+      ),
+    ),
+    registry: (projectId) => legacyStorage.forProject(projectId),
+    telemetry: StoredObjectsTelemetryService.create(),
   });
 
   return StoredObjectFileReadService.create({

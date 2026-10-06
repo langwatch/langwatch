@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -74,7 +75,7 @@ func runFlowSetups(ctx context.Context, request setupRequest) (map[string]string
 			key = request.fixtures[FixtureIsolatedKey]
 		}
 		group.Go(func() error {
-			values, err := runSetup(ctx, request, key, flow)
+			values, err := runSetup(ctx, request, setupTarget{key: key, flow: flow})
 			mutex.Lock()
 			defer mutex.Unlock()
 			maps.Copy(captured, values)
@@ -88,52 +89,89 @@ func runFlowSetups(ctx context.Context, request setupRequest) (map[string]string
 	return captured, warnings
 }
 
+// setupTarget is one flow's setup and the project key it posts with.
+type setupTarget struct {
+	key  string
+	flow Flow
+}
+
 // runSetup walks one flow's setup and returns what it captured, under the flow's id.
-func runSetup(ctx context.Context, request setupRequest, key string, flow Flow) (map[string]string, error) {
+func runSetup(ctx context.Context, request setupRequest, target setupTarget) (map[string]string, error) {
 	values := map[string]string{"uid": fmt.Sprintf("%x", time.Now().UnixNano()%0xfffff)}
 	maps.Copy(values, request.fixtures)
 	if request.scimToken != "" {
 		values[FixtureScimToken] = request.scimToken
 	}
-	captured := map[string]string{flow.ID + "/uid": values["uid"]}
-	for index, step := range flow.Setup {
-		body, err := fillBody(step.Body, values)
-		if err != nil {
-			return captured, fmt.Errorf("step %d: %w", index, err)
-		}
-		path := fillText(step.Post, values)
-		origin, bearer := request.apiURL, ""
-		switch step.Auth {
-		case "":
-		case SetupAuthScim:
-			if request.scimToken == "" {
-				return captured, fmt.Errorf("step %d: auth scim, but this stack has no seeded SCIM token", index)
-			}
-			bearer = request.scimToken
-		default:
-			return captured, fmt.Errorf("step %d: unknown auth %q", index, step.Auth)
-		}
-		if step.Bearer != "" {
-			origin = Stack{HavenURL: request.apiURL}.GatewayURL()
-			bearer = fillText(step.Bearer, values)
-			if origin == "" {
-				return captured, fmt.Errorf("step %d: %s has no gateway origin", index, request.apiURL)
-			}
-		}
-		answer, err := postReading(ctx, request.client, postSpec{url: origin + path, key: key, body: body, bearer: bearer})
-		if err != nil {
-			return captured, fmt.Errorf("step %d: %w", index, err)
-		}
-		for name, path := range step.As {
-			value, err := StringAt(answer, path)
-			if err != nil {
-				return captured, fmt.Errorf("step %d %s: %w", index, name, err)
-			}
-			values[name] = value
-			captured[flow.ID+"/"+name] = value
+	walk := &setupWalk{request: request, key: target.key, flowID: target.flow.ID, values: values,
+		captured: map[string]string{target.flow.ID + "/uid": values["uid"]}}
+	for index, step := range target.flow.Setup {
+		if err := walk.step(ctx, index, step); err != nil {
+			return walk.captured, err
 		}
 	}
-	return captured, nil
+	return walk.captured, nil
+}
+
+// setupWalk is one flow's setup in progress: the values its later steps read
+// and the captures filed under the flow's id.
+type setupWalk struct {
+	request  setupRequest
+	key      string
+	flowID   string
+	values   map[string]string
+	captured map[string]string
+}
+
+// step posts one setup step and keeps the values it names.
+func (walk *setupWalk) step(ctx context.Context, index int, step SetupStep) error {
+	body, err := fillBody(step.Body, walk.values)
+	if err != nil {
+		return fmt.Errorf("step %d: %w", index, err)
+	}
+	path := fillText(step.Post, walk.values)
+	origin, bearer, err := walk.destination(step)
+	if err != nil {
+		return fmt.Errorf("step %d: %w", index, err)
+	}
+	answer, err := postReading(ctx, walk.request.client, postSpec{url: origin + path, key: walk.key, body: body, bearer: bearer})
+	if err != nil {
+		return fmt.Errorf("step %d: %w", index, err)
+	}
+	for name, path := range step.As {
+		value, err := StringAt(answer, path)
+		if err != nil {
+			return fmt.Errorf("step %d %s: %w", index, name, err)
+		}
+		walk.values[name] = value
+		walk.captured[walk.flowID+"/"+name] = value
+	}
+	return nil
+}
+
+// destination is the origin a step posts to and the bearer it carries: the API
+// origin, with the SCIM token under `auth: scim`, or the gateway origin with
+// the step's own virtual key secret.
+func (walk *setupWalk) destination(step SetupStep) (origin, bearer string, err error) {
+	apiURL := walk.request.apiURL
+	origin = apiURL
+	switch step.Auth {
+	case "":
+	case SetupAuthScim:
+		if walk.request.scimToken == "" {
+			return "", "", errors.New("auth scim, but this stack has no seeded SCIM token")
+		}
+		bearer = walk.request.scimToken
+	default:
+		return "", "", fmt.Errorf("unknown auth %q", step.Auth)
+	}
+	if step.Bearer == "" {
+		return origin, bearer, nil
+	}
+	origin = Stack{HavenURL: apiURL}.GatewayURL()
+	if origin == "" {
+		return "", "", fmt.Errorf("%s has no gateway origin", apiURL)
+	}
+	return origin, fillText(step.Bearer, walk.values), nil
 }
 
 // fillBody substitutes each {name} in the body's strings, JSON-escaped.
@@ -160,15 +198,25 @@ func fillText(text string, values map[string]string) string {
 	return text
 }
 
+// scimTokenRequest is where stackScimToken asks: haven through run, in the
+// environment environ answers, for stack, when one of flows needs the token.
+type scimTokenRequest struct {
+	run     runner
+	environ func() []string
+	stack   Stack
+	flows   []Flow
+}
+
 // stackScimToken reads the SCIM token haven minted for the stack, through
 // `haven env --json --reveal` and never printed. It asks only when a flow's setup
 // uses one, and answers "" when the stack has none or haven will not say.
-func stackScimToken(ctx context.Context, run runner, environ func() []string, stack Stack, flows []Flow) string {
-	if stack.HavenSlug == "" || !setupUsesScim(flows) {
+func stackScimToken(ctx context.Context, request scimTokenRequest) string {
+	run, stack := request.run, request.stack
+	if stack.HavenSlug == "" || !setupUsesScim(request.flows) {
 		return ""
 	}
 	var out bytes.Buffer
-	spec := commandSpec{name: havenrun.Command, args: []string{"env", "--json", "--reveal"}, dir: stack.Dir, env: havenEnv(environ(), stack.HavenSlug)}
+	spec := commandSpec{name: havenrun.Command, args: []string{"env", "--json", "--reveal"}, dir: stack.Dir, env: havenEnv(request.environ(), stack.HavenSlug)}
 	if err := run(ctx, spec, &out); err != nil {
 		return ""
 	}

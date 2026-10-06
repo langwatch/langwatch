@@ -17,8 +17,6 @@ import {
 } from "./transport/coding-agent.rest.ts";
 import { codingAgentTrpcTransport } from "./transport/coding-agent.trpc.ts";
 
-export type { CodingAgentInfrastructure } from "./app/coding-agent.app.ts";
-
 export const codingAgentProcessModule = defineProcessModule("coding-agent")
   .withRepositories(codingAgentRepositories)
   .withApi(CodingAgentModule)

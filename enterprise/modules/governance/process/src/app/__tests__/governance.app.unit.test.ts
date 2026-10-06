@@ -24,13 +24,11 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { memoryRateLimiter } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import { governanceProcessModule } from "../../governance.module.ts";
 import type { GovernanceRepositories } from "../../repositories/governance.repositories.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
@@ -65,11 +63,6 @@ async function buildApp() {
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
     },
-    members: {
-      encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
-      rateLimiter: memoryRateLimiter(),
-    },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
@@ -85,6 +78,10 @@ async function buildCliApp(planType = "ENTERPRISE") {
     organizationId: "organization-1",
     tokenKey: "lwcli:access:lw_at_token",
     clientInfo: { deviceLabel: "Work laptop", hostname: "laptop" },
+  }));
+  const getDecision = vi.fn<AuthzApi["getDecision"]>(async ({ permission }) => ({
+    permitted: permission === "ingestionSources:view",
+    organizationRole: "MEMBER",
   }));
   const getActivePlan = vi.fn<EntitlementApi["getActivePlan"]>(
     async () =>
@@ -102,7 +99,7 @@ async function buildCliApp(planType = "ENTERPRISE") {
       auth: createApiFixture<AuthApi>({ getCliAccessSession }),
       entitlements: createApiFixture<EntitlementApi>({ getActivePlan }),
       organizations: createApiFixture<OrganizationApi>(),
-      permissions: createApiFixture<AuthzApi>(),
+      permissions: createApiFixture<AuthzApi>({ getDecision }),
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
       traces: createApiFixture<TraceApi>(),
@@ -115,16 +112,11 @@ async function buildCliApp(planType = "ENTERPRISE") {
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
     },
-    members: {
-      encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
-      rateLimiter: memoryRateLimiter(),
-    },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
-  return { app, getCliAccessSession, getActivePlan };
+  return { app, getCliAccessSession, getActivePlan, getDecision };
 }
 
 describe("GovernanceModule ingestion templates", () => {
@@ -342,6 +334,41 @@ describe("GovernanceModule as the module a process installs", () => {
 
       expect(getCliAccessSession).toHaveBeenCalledWith({ authorization: "Bearer lw_at_token" });
       expect(getActivePlan).toHaveBeenCalledWith({ organizationId: "organization-2" });
+    });
+
+    describe("given a route asking a permission behind the CLI token door", () => {
+      const request = () =>
+        new Request("http://api.test/api/auth/cli/governance/status", {
+          headers: { authorization: "Bearer lw_at_token" },
+        });
+
+      it("asks it of the token's person at the token's organization", async () => {
+        const { app, getDecision } = await buildCliApp();
+
+        await expect(
+          app.cliTokenDoor.authenticate({
+            request: request(),
+            permissions: ["ingestionSources:view"],
+          }),
+        ).resolves.toMatchObject({ actor: { type: "user", id: "user-1" } });
+
+        expect(getDecision).toHaveBeenCalledWith({
+          userId: "user-1",
+          permission: "ingestionSources:view",
+          scope: { tier: "organization", id: "organization-1" },
+        });
+      });
+
+      it("refuses at the door, before the body, when the person lacks it", async () => {
+        const { app } = await buildCliApp();
+
+        await expect(
+          app.cliTokenDoor.authenticate({
+            request: request(),
+            permissions: ["activityMonitor:view"],
+          }),
+        ).rejects.toMatchObject({ code: "permission_denied", httpStatus: 403 });
+      });
     });
 
     it("refuses the caller organization when its plan is not Enterprise", async () => {

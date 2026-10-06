@@ -15,12 +15,12 @@ import {
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import type { StoredObjectFileStreamRead } from "#app/stored-object.members";
 import {
   StoredObjectFileReadService,
   type StoredObjectFileGate,
 } from "#services/stored-object-file-read.service";
 
+import type { StoredObjectFileStreamRead } from "../../rules/stored-object-file-access.rules.ts";
 import { storedObjectFileRest, type StoredObjectFileApi } from "../stored-object-file.rest.ts";
 
 const OWNER_PROJECT = "project-owner";

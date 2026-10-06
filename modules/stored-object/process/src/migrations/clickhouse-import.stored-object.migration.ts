@@ -25,10 +25,10 @@ import type {
   StoredObjectRecordRepository,
 } from "../repositories/stored-object-record.repository.ts";
 
-export const STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME =
+const STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME =
   "stored-objects-clickhouse-import-v0" as const;
 
-export type ClickHouseImportStoredObjectMigrationOptions = Readonly<{
+type ClickHouseImportStoredObjectMigrationOptions = Readonly<{
   projects: StoredObjectProjectSourceRepository;
   legacy: StoredObjectLegacySourceRepository;
   locations: StoredObjectLegacyLocationRepository;

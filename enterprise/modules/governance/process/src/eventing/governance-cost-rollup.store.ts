@@ -41,7 +41,7 @@ const exactOrEstimateSchema = z.enum(["exact", "estimate"]);
 
 const toUnixSeconds = (epochMs: number): number => Math.floor(epochMs / 1000);
 
-export function governanceCostRollupRowOf({
+function governanceCostRollupRowOf({
   state,
   tenantId,
   appliedEventIds,
@@ -84,9 +84,7 @@ export function governanceCostRollupRowOf({
 }
 
 /** Throws on an undecodable item map: a money row read as empty would be overwritten. */
-export function governanceCostRollupStateOf(
-  row: GovernanceCostRollupRow,
-): GovernanceCostRollupState {
+function governanceCostRollupStateOf(row: GovernanceCostRollupRow): GovernanceCostRollupState {
   const items = row.PulledItemsJson
     ? pulledItemsSchema.safeParse(parseJson(row.PulledItemsJson))
     : null;

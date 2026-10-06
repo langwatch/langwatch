@@ -237,6 +237,7 @@ describe("LangyDeclarativeCard", () => {
 
   describe("given a collection read that matched nothing", () => {
     describe("when the card renders", () => {
+      /** @scenario "A genuinely empty read still earns its card" */
       it("says there are none — a real answer, not a failure", () => {
         renderCard({
           name: "langwatch.evaluator.list",
@@ -296,6 +297,7 @@ describe("LangyDeclarativeCard", () => {
 
   describe("given a prompt push (diff widget)", () => {
     describe("when the result names what changed", () => {
+      /** @scenario "A prompt push renders what changed" */
       it("shows the prompt, its new version, and the changed fields", () => {
         renderCard({
           name: "langwatch.prompt.push",
@@ -421,6 +423,7 @@ describe("LangyDeclarativeCard", () => {
 
   describe("given a resource the catalog has never heard of", () => {
     describe("when the card renders", () => {
+      /** @scenario "A LangWatch action the panel does not recognise yet still reads cleanly" */
       it("still shows a readable card worded from the command", () => {
         renderCard({
           name: "langwatch.flux-capacitor.list",
@@ -433,6 +436,7 @@ describe("LangyDeclarativeCard", () => {
         expect(screen.getByText("Prototype")).toBeTruthy();
       });
 
+      /** @scenario "A LangWatch action the panel does not recognise yet still reads cleanly" */
       it("offers no link rather than a broken one", () => {
         renderCard({
           name: "langwatch.flux-capacitor.list",
@@ -454,6 +458,15 @@ describe("LangyDeclarativeCard", () => {
 
         expect(screen.getByText(/Couldn.t read this result/)).toBeTruthy();
         expect(screen.queryByText("No evaluators yet.")).toBeNull();
+      });
+
+      /** @scenario "Any card that cannot read its result says so" */
+      it("says it could not read the result, invents no rows and keeps the way into the surface", () => {
+        renderCard({ name: "langwatch.evaluator.list", output: truncated });
+
+        expect(screen.getByText(/Couldn.t read this result/)).toBeTruthy();
+        expect(screen.queryByText("No evaluators yet.")).toBeNull();
+        expect(screen.getByText(/Open in Evaluators/)).toBeTruthy();
       });
 
       it("still offers the way into the surface", () => {
@@ -545,6 +558,7 @@ describe("LangyDeclarativeCard", () => {
     });
 
     describe("when none of the referenced prompts exist any more", () => {
+      /** @scenario "A deleted entity renders honestly" */
       it("says so honestly instead of inventing an empty list", () => {
         useCapabilityDataMock.mockReturnValue({
           status: "hydrated",
@@ -556,6 +570,8 @@ describe("LangyDeclarativeCard", () => {
         renderHydrated();
 
         expect(screen.getByText("These prompts are no longer available.")).toBeTruthy();
+        expect(screen.getByText("7 prompts")).toBeTruthy();
+        expect(screen.getByText(/Open in Prompts/)).toBeTruthy();
         expect(screen.queryByText("No prompts yet.")).toBeNull();
       });
     });

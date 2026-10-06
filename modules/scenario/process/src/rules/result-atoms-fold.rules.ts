@@ -172,7 +172,7 @@ export function toGroup({
  * scenario that ran from code has no row to read, so it reads under the name
  * its runs carried, and under its key when they carried none.
  */
-export function carriedName(row: RawGroupRow): string {
+function carriedName(row: RawGroupRow): string {
   return row.Name !== "" ? row.Name : row.GroupKey;
 }
 
@@ -181,11 +181,11 @@ export function carriedName(row: RawGroupRow): string {
  * the runs reported, and the key itself when it reported none. A platform
  * target reports none, and the client names it from its own target map.
  */
-export function carriedTargetName(row: RawGroupRow): string {
+function carriedTargetName(row: RawGroupRow): string {
   return row.TargetName !== "" ? row.TargetName : row.GroupKey;
 }
 
-export function headline({
+function headline({
   row,
   groupBy,
   titles,

@@ -95,7 +95,7 @@ export const planLiteralsRule = defineRule({
     statesPlanFacts: {
       what: "{{name}} states {{fields}} itself.",
       why: "An object giving two or more limit fields literal values is a plan definition, and there is one catalogue of those.",
-      fix: 'Read them from the catalogue: `planCatalogue.plan("<TYPE>").limits` from @langwatch/plans. If this is a fixture, build it from `planCatalogue.plan(...)` and override the one field the test is about.',
+      fix: 'Read them from the catalogue: `planCatalogue.plan("<TYPE>").limits` from @langwatch/plans. If this is a fixture, build it from `planCatalogue.plan(...)` and override the one field the test is about. Read the `module-dependencies` skill.',
     },
   },
   create(context, _file) {

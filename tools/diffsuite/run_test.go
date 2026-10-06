@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/diffkit"
-	"github.com/langwatch/langwatch/tools/havenrun"
 	"github.com/langwatch/langwatch/tools/visualdiff"
 )
 
@@ -196,8 +195,8 @@ func fakeStarts(t *testing.T) *[]string {
 	t.Helper()
 	saved, calls := haven, &[]string{}
 	t.Cleanup(func() { haven = saved })
-	haven.up = func(_ context.Context, _, slug string, deltas []string, env havenrun.EnvOptions, _ io.Writer) error {
-		*calls = append(*calls, strings.TrimSpace("up "+slug+" "+strings.Join(append(deltas, env.Extra...), " ")))
+	haven.up = func(_ context.Context, request upRequest) error {
+		*calls = append(*calls, strings.TrimSpace("up "+request.slug+" "+strings.Join(append(request.deltas, request.env.Extra...), " ")))
 		return nil
 	}
 	haven.destroy = func(_, slug string, _ io.Writer) { *calls = append(*calls, "destroy "+slug) }

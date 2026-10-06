@@ -86,6 +86,10 @@ class FakeWorkflowRepository extends WorkflowRepository {
       ...(input.includeVersion ? { currentVersion: current, latestVersion: current } : {}),
     };
   }
+  async findProjectIds(): Promise<string[]> {
+    const live = [...this.workflows.values()].filter((item) => !item.archivedAt);
+    return [...new Set(live.map((item) => item.projectId))];
+  }
   async findAll(input: { projectId: string }): Promise<Workflow[]> {
     return [...this.workflows.values()].filter(
       (item) => item.projectId === input.projectId && !item.archivedAt,
@@ -263,6 +267,7 @@ const service = (
   });
 
 describe("WorkflowService", () => {
+  /** @scenario "Workflow prepares a Studio event through typed runtime ports" */
   it("delegates Studio preparation through its canonical collaborator", async () => {
     const studioEvents = new FakeStudioEventPreparer();
     const workflowService = service(undefined, { studioEvents });

@@ -7,7 +7,7 @@ const logger = createLogger("langwatch:identity:break-glass:expiry-warn");
 /** Outbox rows are bookkeeping, one per tick, pruned like every recurring process's. */
 const WARN_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
-export interface BreakGlassExpiryWarnDeps {
+interface BreakGlassExpiryWarnDeps {
   /** Sends any warnings newly due; answers how many bindings were warned. */
   warn: () => Promise<{ warned: number }>;
   deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { simulationAllSuitesRunDataSchema, simulationRunDataSchema } from "../index.ts";
 
 describe("Simulation contract", () => {
+  /** @scenario "Provider-specific message fields survive validation" */
   it("accepts a stored run while preserving provider-specific message fields", () => {
     const run = simulationRunDataSchema.parse({
       scenarioId: "scenario_1",

@@ -15,6 +15,7 @@ import { MemoryModelProviderRepositories } from "../../repositories/memory/memor
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import { CodexAccountService } from "../../services/codex-account.service.ts";
 import { CodexOAuthModelProviderTokenRefresherService } from "../../services/codex-oauth-model-provider-token-refresher.service.ts";
+import type { ModelProviderCredentialProbe } from "../../services/http-model-provider-credential-probe.service.ts";
 import { PrefixedModelProviderIdService } from "../../services/prefixed-model-provider-id.service.ts";
 import { RegistryModelProviderCatalogService } from "../../services/registry-model-provider-catalog.service.ts";
 import { UnavailableModelProviderCredentialProbeService } from "../../services/unavailable-model-provider-credential-probe.service.ts";
@@ -22,7 +23,6 @@ import { UnmanagedModelProviderGatewayService } from "../../services/unmanaged-m
 import { VercelAiModelTranslationService } from "../../services/vercel-ai-model-translation.service.ts";
 import { WindowedModelProviderConnectionRateLimiterService } from "../../services/windowed-model-provider-connection-rate-limiter.service.ts";
 import { ModelProviderModule, type ModelProviderInfrastructure } from "../model-provider.app.ts";
-import type { ModelProviderCredentialProbe } from "../model-provider.members.ts";
 
 /** A suite that did not decide the issuer's answers must not reach one. */
 const refuseFetch: typeof fetch = () => {
@@ -128,7 +128,7 @@ export function createModelProviderTestInfrastructure(
 export function createModelProviderTestApp(
   input: Readonly<{
     repositories?: ModelProviderRepositories;
-    members?: Partial<ModelProviderInfrastructure>;
+    infrastructure?: Partial<ModelProviderInfrastructure>;
     dependencies?: Partial<{
       projects: ProjectApi;
       organizations: OrganizationApi;
@@ -140,7 +140,7 @@ export function createModelProviderTestApp(
 ): ModelProviderModule {
   return ModelProviderModule.createForTesting({
     repositories: input.repositories ?? MemoryModelProviderRepositories.create(),
-    members: createModelProviderTestInfrastructure(input.members ?? {}),
+    infrastructure: createModelProviderTestInfrastructure(input.infrastructure ?? {}),
     dependencies: {
       projects: input.dependencies?.projects ?? createModelProviderTestProjects(),
       organizations: input.dependencies?.organizations ?? createModelProviderTestOrganizations(),

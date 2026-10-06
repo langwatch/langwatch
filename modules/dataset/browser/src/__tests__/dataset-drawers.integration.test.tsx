@@ -3,8 +3,8 @@
  * Surfaces open dataset's editor by its drawer name; the name must resolve to the editor.
  */
 
-import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { screen } from "@testing-library/react";
 import { Suspense } from "react";
 import { describe, expect, it, vi } from "vitest";

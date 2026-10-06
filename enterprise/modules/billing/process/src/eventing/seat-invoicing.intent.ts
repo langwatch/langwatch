@@ -4,7 +4,7 @@ import { SEAT_INVOICING_PROCESS_NAME } from "./seat-invoicing.process.ts";
 /** One outbox row a minute is bookkeeping; a day of them is kept. */
 const PASS_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
 
-export interface SeatInvoicingRunDeps {
+interface SeatInvoicingRunDeps {
   /** One pass; each seat change reports its own failure and never stops the next. */
   readonly pass: () => Promise<void>;
   readonly deleteDispatchedBefore: (params: {

@@ -12,11 +12,11 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { PrismaIdentityUsersRepository } from "../prisma.identity-users.repository.ts";
-import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -37,8 +37,12 @@ describe.skipIf(!DB_URL)("PrismaIdentityUsersRepository.storeUserHashKeyIfMissin
     /** @scenario "A user's hash key is minted once, whichever writer arrives first" */
     it("keeps the first key, because the second write re-reads the row it waited for", async () => {
       await prisma.user.create({ data: { id: userId, email: `${userId}@acme.com` } });
-      const mint = (userHashKey: string) => (tx: Prisma.TransactionClient) =>
-        PrismaIdentityUsersRepository.create(tx).storeUserHashKeyIfMissing({ userId, userHashKey });
+      const mint = (userHashKey: string) => async (tx: Prisma.TransactionClient) => {
+        await PrismaIdentityUsersRepository.create(tx).storeUserHashKeyIfMissing({
+          userId,
+          userHashKey,
+        });
+      };
 
       await raceOnOneRow({ prisma, table: "User", first: mint("first"), second: mint("second") });
 

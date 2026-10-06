@@ -16,12 +16,12 @@ import { deriveProbeCause } from "../rules/probe-cause.rules.ts";
 
 const logger = createLogger("langwatch:langy-canary");
 
-export type LangyCanaryPeers = Pick<
+type LangyCanaryPeers = Pick<
   LangyApi,
   "getRestCaller" | "getRestActor" | "startConversationTurn" | "awaitTurnSettlement"
 >;
 
-export type LangyCanaryClock = Readonly<{ now: () => number; budgetMs: number }>;
+type LangyCanaryClock = Readonly<{ now: () => number; budgetMs: number }>;
 
 const REAL_CLOCK: LangyCanaryClock = {
   now: () => nowInstant().epochMilliseconds,

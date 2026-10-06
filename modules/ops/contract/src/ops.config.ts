@@ -2,8 +2,13 @@ import {
   adminEmails,
   Config,
   environmentOneOrTrueSchema,
+  isSaas,
+  nodeEnvironment,
+  otelResourceAttributes,
   posthogHost,
   posthogKey,
+  publicBaseUrl,
+  serviceVersion,
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
@@ -41,6 +46,13 @@ export const opsConfig = Config.define((c) => ({
   cloudOps: c.env("LANGWATCH_CLOUD_OPS", z.stringbool().default(false)),
   /** Read only by the one-time platform-operator seed; set afterwards, boot warns it is ignored. */
   adminEmails,
+  /** Process facts (§3.3) the checkup, the usage report and EXPLAIN's fail-closed rule read. */
+  nodeEnvironment,
+  isSaas,
+  publicBaseUrl,
+  /** The release, read through `releaseVersionOf`. */
+  serviceVersion,
+  otelResourceAttributes,
 }));
 
 export type OpsServerConfig = ConfigOf<typeof opsConfig>;

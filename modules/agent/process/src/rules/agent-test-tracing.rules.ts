@@ -4,7 +4,7 @@ import { isCredentialHeader, type HttpAuth } from "@langwatch/agent-contract";
 import { nowInstant } from "@langwatch/time";
 import type { CustomMetadata, Span } from "@langwatch/trace-contract";
 
-export type TraceTestContext = {
+type TraceTestContext = {
   url: string;
   method: string;
   has_auth: boolean;
@@ -81,7 +81,7 @@ export function buildTraceparentHeader({
 }
 
 /** One agent test, as a span and the metadata that says which agent it was. */
-export type AgentTestTrace = Readonly<{
+type AgentTestTrace = Readonly<{
   traceId: string;
   span: Span;
   customMetadata: CustomMetadata;

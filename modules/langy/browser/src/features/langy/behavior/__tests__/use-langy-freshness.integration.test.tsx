@@ -6,6 +6,7 @@
  */
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
+  langyConversationUpdateSignalSchema,
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
   type LangyConversationUpdateSignal,
@@ -476,6 +477,57 @@ describe("the open conversation's catch-up from the recorded tail", () => {
           conversationId: CONVERSATION_ID,
         });
         expect(messagesInvalidate).not.toHaveBeenCalled();
+      });
+    });
+  });
+});
+
+describe("the conversation list's freshness", () => {
+  beforeEach(() => {
+    listInvalidate.mockClear();
+    listCancel.mockClear();
+    messagesInvalidate.mockClear();
+    eventsAfterFetch.mockReset();
+    capturedOnUpdate = null;
+    useLangyStore.setState({ scopeAnnounced: false });
+    useLangyStore.getState().resetForProject(PROJECT_ID);
+    useLangyStore.setState({ activeConversationId: CONVERSATION_ID });
+  });
+
+  describe("given a list request may be in flight", () => {
+    describe("when a freshness signal lands", () => {
+      /** @scenario "A stale in-flight list response cannot overwrite a fresher one" */
+      it("cancels the in-flight list request before it invalidates the list for a newer one", () => {
+        renderHook(() => useLangyFreshness(CONVERSATION_ID));
+
+        deliverSignal(at(100, "evt_a"));
+
+        expect(listCancel).toHaveBeenCalledTimes(1);
+        expect(listInvalidate).toHaveBeenCalledTimes(1);
+        expect(listCancel.mock.invocationCallOrder[0]).toBeLessThan(
+          listInvalidate.mock.invocationCallOrder[0]!,
+        );
+      });
+    });
+  });
+
+  describe("given the backend broadcasts that a conversation changed", () => {
+    describe("when the signal is for a conversation the panel has not opened", () => {
+      /** @scenario "A conversation update arrives as a signal, not as data" */
+      it("only cancels and invalidates the list, taking no rows from the signal", () => {
+        renderHook(() => useLangyFreshness(CONVERSATION_ID));
+        const signal = { ...signalAt(at(100, "evt_a")), conversationId: "conv_elsewhere" };
+
+        capturedOnUpdate?.([signal]);
+
+        const carried = Object.keys(langyConversationUpdateSignalSchema.shape);
+        expect(carried).toContain("conversationId");
+        expect(carried).not.toEqual(expect.arrayContaining(["title"]));
+        expect(carried).not.toEqual(expect.arrayContaining(["messages"]));
+        expect(listCancel).toHaveBeenCalledTimes(1);
+        expect(listInvalidate).toHaveBeenCalledTimes(1);
+        expect(messagesInvalidate).not.toHaveBeenCalled();
+        expect(eventsAfterFetch).not.toHaveBeenCalled();
       });
     });
   });

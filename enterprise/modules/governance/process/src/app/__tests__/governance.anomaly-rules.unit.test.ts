@@ -4,7 +4,10 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import { DEFAULT_SPEND_SPIKE_CONFIG } from "@langwatch/enterprise-governance-contract";
+import {
+  DEFAULT_SPEND_SPIKE_CONFIG,
+  SHARED_SECRET_REDACTED,
+} from "@langwatch/enterprise-governance-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -21,7 +24,6 @@ import { ScopedSecrets } from "@langwatch/secrets";
  * The console's anomaly-rule ops over memory rows: main's Enterprise gate is a
  * per-organization refusal here, and a bad config reads as main's handled complaint.
  */
-import { memoryRateLimiter } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -29,7 +31,6 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { GovernanceModule } from "../governance.app.ts";
-import type { GovernanceEncryptor } from "../governance.members.ts";
 
 const ADMIN = { id: "user-1" };
 
@@ -76,11 +77,6 @@ async function buildApp(planType: string) {
       logs: createApiFixture<LogApi>(),
       metrics: createApiFixture<MetricApi>(),
     },
-    members: {
-      encryption: createApiFixture<GovernanceEncryptor>(),
-      isSaas: false,
-      rateLimiter: memoryRateLimiter(),
-    },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
@@ -126,6 +122,58 @@ describe("anomaly rules from the console", () => {
       await app.anomalyRuleList({ organizationId: "org-1" }, ADMIN);
 
       expect(plansAsked).toEqual([{ organizationId: "org-1", operator: { id: "user-1" } }]);
+    });
+  });
+
+  describe("given a rule whose destination carries a shared secret", () => {
+    const withSecret = {
+      ...rule,
+      thresholdConfig: { ...DEFAULT_SPEND_SPIKE_CONFIG },
+      destinationConfig: {
+        destinations: [
+          {
+            type: "webhook",
+            url: "https://siem.example/ingest",
+            sharedSecret: "TheRealSigningSecret",
+          },
+        ],
+      },
+    };
+
+    describe("when the rule is read by a viewer", () => {
+      /** @scenario "Reading an anomaly rule reports that a shared secret is set, not what it is" */
+      it("serves the marker in place of the secret on every read and write result", async () => {
+        const { app } = await buildApp("ENTERPRISE");
+        const created = await app.anomalyRuleCreate(withSecret, ADMIN);
+        const listed = await app.anomalyRuleList({ organizationId: "org-1" }, ADMIN);
+        const fetched = await app.anomalyRuleGetById(
+          { id: created.id, organizationId: "org-1" },
+          ADMIN,
+        );
+        const renamed = await app.anomalyRuleUpdate(
+          { id: created.id, organizationId: "org-1", name: "Renamed" },
+          ADMIN,
+        );
+
+        const archived = await app.anomalyRuleArchive(
+          { id: created.id, organizationId: "org-1" },
+          ADMIN,
+        );
+
+        for (const served of [created, listed, fetched, renamed, archived]) {
+          expect(JSON.stringify(served)).not.toContain("TheRealSigningSecret");
+        }
+        expect(fetched.destinationConfig).toEqual({
+          destinations: [
+            {
+              type: "webhook",
+              url: "https://siem.example/ingest",
+              sharedSecret: SHARED_SECRET_REDACTED,
+            },
+          ],
+        });
+        expect(fetched.name).toBe("Spend spike");
+      });
     });
   });
 

@@ -17,8 +17,9 @@ type Client struct {
 	HTTP *http.Client
 }
 
-func (c Client) do(ctx context.Context, method, path string, query url.Values) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path+"?"+query.Encode(), nil)
+// do sends one request to target, a path with its query string.
+func (c Client) do(ctx context.Context, method, target string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+target, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +38,7 @@ func (c Client) Records(ctx context.Context, f Filter) ([]Record, error) {
 			query.Set(key, value)
 		}
 	}
-	resp, err := c.do(ctx, http.MethodGet, "/_sim/api/records", query)
+	resp, err := c.do(ctx, http.MethodGet, "/_sim/api/records?"+query.Encode())
 	if err != nil {
 		return nil, fmt.Errorf("reading analyticssim at %s: %w", c.BaseURL, err)
 	}
@@ -56,7 +57,7 @@ func (c Client) Records(ctx context.Context, f Filter) ([]Record, error) {
 
 // Clear forgets every record.
 func (c Client) Clear(ctx context.Context) error {
-	resp, err := c.do(ctx, http.MethodDelete, "/_sim/api/records", nil)
+	resp, err := c.do(ctx, http.MethodDelete, "/_sim/api/records?")
 	if err != nil {
 		return fmt.Errorf("clearing analyticssim at %s: %w", c.BaseURL, err)
 	}

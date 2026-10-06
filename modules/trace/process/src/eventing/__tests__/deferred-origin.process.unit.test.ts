@@ -2,8 +2,8 @@ import type { ProcessHandlerContext } from "@langwatch/eventing";
 import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
-import type { DeferredOriginPayload } from "../../app/trace.members.ts";
 import {
+  type DeferredOriginPayload,
   DEFERRED_ORIGIN_INITIAL_STATE,
   type DeferredOriginIntents,
   onOriginResolvedDisarm,

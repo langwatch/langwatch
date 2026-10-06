@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -239,6 +240,7 @@ function buildService() {
   agents = new Map();
   startedRuns = [];
   suiteService = SuiteService.create({
+    featureFlags: createApiFixture<FeatureFlagApi>({}),
     repository: PrismaSuiteRepository.create(database()),
     scenarios: fakeScenarioService(),
     agents: fakeAgentApi(agents),

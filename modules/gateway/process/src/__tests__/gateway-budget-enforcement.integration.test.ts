@@ -13,13 +13,13 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
+import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
 
 const databaseUrl = process.env.DATABASE_URL;

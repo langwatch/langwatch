@@ -22,11 +22,11 @@ export const WEB_PUSH_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export const webPushPruneSchema = z.object({ scheduledFor: z.number().int() });
 
 export const webPushProcessStateSchema = z.object({ lastPruneAt: z.number().nullable() });
-export type WebPushProcessState = z.infer<typeof webPushProcessStateSchema>;
+type WebPushProcessState = z.infer<typeof webPushProcessStateSchema>;
 
 export const WEB_PUSH_INITIAL_STATE: WebPushProcessState = { lastPruneAt: null };
 
-export type WebPushIntents = {
+type WebPushIntents = {
   send: IntentSpec<typeof webPushSendSchema>;
   prune: IntentSpec<typeof webPushPruneSchema>;
 };

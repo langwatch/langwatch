@@ -3,11 +3,14 @@
 // reports such a mint, and `id-generation-origin`, which stops claiming these
 // values: an idempotency key is not an entity id and no ksuid fixes it.
 
+const IDEMPOTENCY_KEY = "idempotencykey";
+
 /** `idempotencyKey`, `idempotency_key` and the `Idempotency-Key` header, in any case. */
 function isIdempotencyKeyName(name) {
-  return (
-    typeof name === "string" && name.replaceAll(/[-_]/g, "").toLowerCase() === "idempotencykey"
-  );
+  // A name shorter than the bare word cannot spell it, so most names skip the rewrite.
+  if (typeof name !== "string" || name.length < IDEMPOTENCY_KEY.length) return false;
+
+  return name.replaceAll(/[-_]/g, "").toLowerCase() === IDEMPOTENCY_KEY;
 }
 
 /** `headers.set("Idempotency-Key", value)` and `.append(...)` write a header, not a field. */

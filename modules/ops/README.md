@@ -13,7 +13,7 @@ composition. Ops snapshots are read, written, and streamed through the single
 `OpsSnapshotService`. Scheduler and queue controls are methods on the
 canonical `OpsService`; queue Redis state and DLQ audit writes stay private to
 the server package, while payload decoding is a named app storage adapter.
-The Ops server owns backoffice resource queries behind private repositories;
+The Ops process half owns Ops instance admin resource queries (ARCHITECTURE.md §3.5) behind private repositories;
 generated Prisma does not cross the contract or transport boundary.
 
 ## Operator journey

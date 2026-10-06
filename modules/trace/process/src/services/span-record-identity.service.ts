@@ -4,6 +4,10 @@ import { EventUtils } from "@langwatch/eventing";
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import type { SpanReceivedEvent } from "@langwatch/trace-contract";
 
+import {
+  convertUnixNanoToUnixMs,
+  normalizeOtlpUnixNano,
+} from "../rules/otlp-span-identity.rules.ts";
 import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
 
 /**
@@ -65,8 +69,8 @@ export class SpanRecordIdentityService {
 
   generateDeterministicSpanRecordId(event: SpanReceivedEvent): string {
     const { traceId, spanId } = OtlpTraceRequestService.normalizeOtlpSpanIds(event.data.span);
-    const startTimeUnixMs = OtlpTraceRequestService.convertUnixNanoToUnixMs(
-      OtlpTraceRequestService.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
+    const startTimeUnixMs = convertUnixNanoToUnixMs(
+      normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
     );
 
     return this.generateDeterministicSpanRecordIdFromData({
@@ -99,8 +103,8 @@ export class SpanRecordIdentityService {
 
   generateDeterministicTraceSummaryId(event: SpanReceivedEvent): string {
     const { traceId } = OtlpTraceRequestService.normalizeOtlpSpanIds(event.data.span);
-    const startTimeUnixMs = OtlpTraceRequestService.convertUnixNanoToUnixMs(
-      OtlpTraceRequestService.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
+    const startTimeUnixMs = convertUnixNanoToUnixMs(
+      normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
     );
 
     return this.generateDeterministicTraceSummaryIdFromData(

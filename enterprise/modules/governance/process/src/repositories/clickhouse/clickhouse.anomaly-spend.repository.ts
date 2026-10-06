@@ -8,8 +8,8 @@ import type {
   AnomalySpendSourceFilter,
   GovernanceKpiContribution,
   GovernanceKpiContributionWriter,
-} from "../../app/governance.members.ts";
-import type { GovernanceClickHouseTenantResolver } from "../governance.repositories.ts";
+  GovernanceClickHouseTenantResolver,
+} from "../governance.repositories.ts";
 
 /**
  * ClickHouseAnomalySpendRepository — reads and writes the

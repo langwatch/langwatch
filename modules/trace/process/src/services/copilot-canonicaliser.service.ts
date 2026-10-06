@@ -29,7 +29,7 @@ function attributeText(value: unknown): string {
  * Matching by scope rather than only by a `github.copilot.*` attribute is what lets an
  * `execute_tool` span, which may carry no vendor attribute, still be classified as a tool span.
  */
-export const COPILOT_SCOPES = ["github.copilot", "@github/copilot"];
+const COPILOT_SCOPES = ["github.copilot", "@github/copilot"];
 
 /** Copilot's gen_ai.operation.name values → langwatch span types. */
 const OPERATION_TO_SPAN_TYPE: Record<string, string> = {

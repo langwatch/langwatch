@@ -71,6 +71,7 @@ export abstract class OrganizationService {
   abstract getSettings(input: GetOrganizationSettingsInput): Promise<OrganizationSettings>;
   abstract updateSettings(
     input: UpdateOrganizationSettingsInput,
+    by: Readonly<{ id: string }> | null,
   ): Promise<UpdateOrganizationSettingsResult>;
   /** Returns the requested members or throws UserNotInOrganizationError. */
   abstract getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]>;

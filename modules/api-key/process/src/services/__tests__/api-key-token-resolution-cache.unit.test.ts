@@ -203,6 +203,7 @@ describe("checking an API key through the shared answers", () => {
 
   describe("when a key held on both pods is revoked on one", () => {
     /** @scenario "A revoked key is refused on another pod's next request" */
+    /** @scenario A revoke made on another process reaches this one within five seconds */
     it("is refused on the other pod's next request, with no time passing", async () => {
       const { podA, podB, lifecycleOnA, mint } = harness();
       const { token, id } = await mint({ organizationId: "acme" });
@@ -442,6 +443,7 @@ describe("checking an API key through the shared answers", () => {
 
   describe("when a held key reaches its expiry", () => {
     /** @scenario "A key past its expiry is refused even while held" */
+    /** @scenario An expired key is refused at its moment, not at the cache bound */
     it("refuses it once expired", async () => {
       const { podA, podB, mint, secondsPass } = harness();
       const { token } = await mint({

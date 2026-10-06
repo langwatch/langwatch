@@ -1,4 +1,3 @@
-import { anyAuthenticated } from "@langwatch/api/access";
 import {
   apiErrorSchema,
   canonicalBaseResponses,
@@ -85,14 +84,6 @@ export const gatewayVirtualKeyCaller = defineRestMiddleware(
   "gatewayVirtualKeyCaller",
   gatewayVirtualKeyCallerSchema,
 );
-
-/** The key door reads the credential; the application asks each route's permission. */
-const VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION =
-  "a virtual key lives in the scopes it names, so the credential is read here and the application asks the route's permission at the caller's project, or for a key that names no project at the scopes of each virtual key";
-
-/** The key door reads any API key; the application asks the permission at the reach needed. */
-const ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION =
-  "budgets and cache rules belong to the organization, so any API key is read here and the application asks the route's permission at the key's own reach for a read and at the organization for a write";
 
 /** With `reveal_once` the response withholds the secret and names the reveal instead. */
 function createdVirtualKeyWire(
@@ -260,7 +251,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .get("/virtual-keys", "getApiGatewayV1VirtualKeys")
   .withCredential("api_key")
   .withQuery(gatewayVirtualKeyListQuerySchema)
-  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("virtualKeys:view", { at: "grants" })
   .withOutput(
     z.object({ data: z.array(gatewayVirtualKeyDtoSchema), next_cursor: gatewayNextCursorSchema }),
   )
@@ -272,10 +263,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const authorized = await app.authorizeVirtualKeyCaller({
-      caller,
-      permission: "virtualKeys:view",
-    });
+    const authorized = await app.getVirtualKeyCaller({ caller });
     const rows = await app.getVirtualKeyPage({
       organizationId: authorized.organizationId,
       limit: input.limit,
@@ -295,7 +283,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .post("/virtual-keys", "postApiGatewayV1VirtualKeys")
   .withCredential("api_key")
   .withInput(gatewayCreateVirtualKeySchema)
-  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("virtualKeys:create", { at: "grants" })
   .withStatus(201)
   .withOutput(
     z.object({
@@ -325,9 +313,8 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const { actor, actorUserId, organizationId, projectId } = await app.authorizeVirtualKeyCaller({
+    const { actor, actorUserId, organizationId, projectId } = await app.getVirtualKeyCaller({
       caller,
-      permission: "virtualKeys:create",
     });
     const scopes = scopesFromWire(input.scopes, projectId);
     await app.authorizeVirtualKeyCreate({
@@ -361,15 +348,12 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .get("/virtual-keys/:id", "getApiGatewayV1VirtualKeysById")
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
-  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("virtualKeys:view", { at: "grants" })
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({ summary: "Get virtual key", responses: canonicalBaseResponses })
   .withMiddleware(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const authorized = await app.authorizeVirtualKeyCaller({
-      caller,
-      permission: "virtualKeys:view",
-    });
+    const authorized = await app.getVirtualKeyCaller({ caller });
     const vk = await app.getVirtualKeyForCaller({
       caller: authorized,
       id: input.id,
@@ -382,7 +366,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withQuery(gatewayVkSpendWindowSchema)
-  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("gatewayUsage:view", { at: "grants" })
   .withOutput(gatewaySpendSummaryDtoSchema)
   .withDocs({
     summary: "Read a virtual key's spend",
@@ -392,10 +376,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const authorized = await app.authorizeVirtualKeyCaller({
-      caller,
-      permission: "gatewayUsage:view",
-    });
+    const authorized = await app.getVirtualKeyCaller({ caller });
     const { fromDate, toDate } = resolveVirtualKeySpendWindow({
       from: input.from,
       to: input.to,
@@ -423,7 +404,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayUpdateVirtualKeySchema)
-  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("virtualKeys:update", { at: "grants" })
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
     summary: "Update virtual key",
@@ -432,9 +413,8 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const { actor, actorUserId, organizationId, projectId } = await app.authorizeVirtualKeyCaller({
+    const { actor, actorUserId, organizationId, projectId } = await app.getVirtualKeyCaller({
       caller,
-      permission: "virtualKeys:update",
     });
     const scopes = input.scopes ? scopesFromWire(input.scopes, projectId) : undefined;
     await app.authorizeVirtualKeyUpdate({
@@ -468,7 +448,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayRotateVirtualKeyBodySchema)
-  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("virtualKeys:rotate", { at: "grants" })
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema, secret: z.string() }))
   // Also mints a new secret, so a retried rotate must not mint twice.
   .withIdempotency({ operation: "gateway.v1.virtual-keys.rotate" })
@@ -479,10 +459,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const { actor, actorUserId, organizationId } = await app.authorizeVirtualKeyCaller({
-      caller,
-      permission: "virtualKeys:rotate",
-    });
+    const { actor, actorUserId, organizationId } = await app.getVirtualKeyCaller({ caller });
     await app.authorizeVirtualKeyOperation({
       actor,
       organizationId,
@@ -501,7 +478,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayDisableVkSchema)
-  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("virtualKeys:update", { at: "grants" })
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
     summary: "Disable virtual key",
@@ -511,10 +488,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const { actor, actorUserId, organizationId } = await app.authorizeVirtualKeyCaller({
-      caller,
-      permission: "virtualKeys:update",
-    });
+    const { actor, actorUserId, organizationId } = await app.getVirtualKeyCaller({ caller });
     await app.authorizeVirtualKeyOperation({
       actor,
       organizationId,
@@ -534,7 +508,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayEnableVirtualKeyBodySchema)
-  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("virtualKeys:update", { at: "grants" })
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
     summary: "Enable virtual key",
@@ -543,10 +517,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const { actor, actorUserId, organizationId } = await app.authorizeVirtualKeyCaller({
-      caller,
-      permission: "virtualKeys:update",
-    });
+    const { actor, actorUserId, organizationId } = await app.getVirtualKeyCaller({ caller });
     await app.authorizeVirtualKeyOperation({
       actor,
       organizationId,
@@ -561,7 +532,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayRevokeVirtualKeyBodySchema)
-  .withAccess(anyAuthenticated({ reason: VIRTUAL_KEYS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("virtualKeys:delete", { at: "grants" })
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
     summary: "Revoke virtual key",
@@ -570,10 +541,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayVirtualKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const { actor, actorUserId, organizationId } = await app.authorizeVirtualKeyCaller({
-      caller,
-      permission: "virtualKeys:delete",
-    });
+    const { actor, actorUserId, organizationId } = await app.getVirtualKeyCaller({ caller });
     await app.authorizeVirtualKeyOperation({
       actor,
       organizationId,
@@ -589,7 +557,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .get("/budgets", "getApiGatewayV1Budgets")
   .withCredential("api_key")
   .withQuery(gatewayBudgetListQuerySchema)
-  .withAccess(anyAuthenticated({ reason: ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("gatewayBudgets:view")
   .withOutput(
     z.object({
       data: z.array(gatewayPlatformBudgetDtoSchema),
@@ -605,11 +573,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const { organizationId } = await app.authorizeKeyCaller({
-      caller,
-      permission: "gatewayBudgets:view",
-      reach: "caller",
-    });
+    const { organizationId } = await app.getKeyCaller({ caller });
     const { budgets, spendAvailable, scopeReach } = await app.listBudgetPageWithHealth({
       organizationId,
       limit: input.limit,
@@ -637,7 +601,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .get("/budgets/:id", "getApiGatewayV1BudgetsById")
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
-  .withAccess(anyAuthenticated({ reason: ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("gatewayBudgets:view")
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema, spend_available: z.boolean() }))
   .withDocs({
     summary: "Get budget",
@@ -647,18 +611,14 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const { organizationId } = await app.authorizeKeyCaller({
-      caller,
-      permission: "gatewayBudgets:view",
-      reach: "caller",
-    });
+    const { organizationId } = await app.getKeyCaller({ caller });
     return liveBudgetAnswer({ app, id: input.id, organizationId });
   })
 
   .post("/budgets", "postApiGatewayV1Budgets")
   .withCredential("api_key")
   .withInput(gatewayCreateBudgetSchema)
-  .withAccess(anyAuthenticated({ reason: ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("gatewayBudgets:create", { at: "organization" })
   .withStatus(201)
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema }))
   .withIdempotency({ operation: "gateway.v1.budgets.create" })
@@ -670,11 +630,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const { organizationId, actorUserId } = await app.authorizeKeyCaller({
-      caller,
-      permission: "gatewayBudgets:create",
-      reach: "organization",
-    });
+    const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
     const row = await app.createBudget({
       organizationId,
       scope: scopeFromWire(input.scope),
@@ -708,7 +664,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayUpdateBudgetSchema)
-  .withAccess(anyAuthenticated({ reason: ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("gatewayBudgets:update", { at: "organization" })
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema }))
   .withDocs({
     summary: "Update budget",
@@ -718,11 +674,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const { organizationId, actorUserId } = await app.authorizeKeyCaller({
-      caller,
-      permission: "gatewayBudgets:update",
-      reach: "organization",
-    });
+    const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
     const row = await app.updateBudget({
       id: input.id,
       organizationId,
@@ -742,7 +694,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .delete("/budgets/:id", "deleteApiGatewayV1BudgetsById")
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
-  .withAccess(anyAuthenticated({ reason: ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("gatewayBudgets:delete", { at: "organization" })
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema }))
   .withDocs({
     summary: "Archive budget",
@@ -752,11 +704,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const { organizationId, actorUserId } = await app.authorizeKeyCaller({
-      caller,
-      permission: "gatewayBudgets:delete",
-      reach: "organization",
-    });
+    const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
     const row = await app.archiveBudget({ id: input.id, organizationId, actorUserId });
     return { budget: toBudgetDto({ budget: row }) };
   })
@@ -766,7 +714,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withParams(gatewayIdParamsSchema)
   .withQuery(gatewayResetBudgetQuerySchema)
   .withInput(gatewayResetBudgetSchema)
-  .withAccess(anyAuthenticated({ reason: ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
+  .withPermission("gatewayBudgets:update", { at: "organization" })
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema }))
   .withDocs({
     summary: "Reset budget period",
@@ -776,11 +724,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .withMiddleware(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
-    const { organizationId, actorUserId } = await app.authorizeKeyCaller({
-      caller,
-      permission: "gatewayBudgets:update",
-      reach: "organization",
-    });
+    const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
     const row = await app.resetBudget({
       id: input.id,
       organizationId,

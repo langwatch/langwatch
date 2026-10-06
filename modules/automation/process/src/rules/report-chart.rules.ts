@@ -81,7 +81,7 @@ export function bucketKeysOf(seriesInputs: AnalyticsSeries[]): string[] {
  * groups (by model, by user, …), each group is a slice; when it does not, each
  * series is its own slice.
  */
-export function pieSegments({
+function pieSegments({
   buckets,
   bucketKeys,
   seriesInputs,
@@ -162,12 +162,10 @@ export function trendChartOf({
 }): ReportChart {
   const series = seriesInputs.map((input, index) => ({
     name: graphData.series?.[index]?.name ?? bucketKeys[index]!,
-    data: extractSeriesPoints(buckets, bucketKeys[index]!, graphData.groupBy).map(
-      (point, pointIndex) => ({
-        label: categories[pointIndex] ?? point.timestamp,
-        value: point.value,
-      }),
-    ),
+    data: extractSeriesPoints(buckets, bucketKeys[index]!).map((point, pointIndex) => ({
+      label: categories[pointIndex] ?? point.timestamp,
+      value: point.value,
+    })),
   }));
 
   const primary = series[0];

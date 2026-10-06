@@ -1,8 +1,8 @@
-import { timingSafeEqual } from "node:crypto";
-
 import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-key-contract";
+import type { RestIdentity } from "@langwatch/api/hosting";
+import { BearerIdentity } from "@langwatch/api/rest";
 /**
  * Operator back office application: holds every capability the feature api reaches, and centralizes
  * rules the transport was deciding separately.
@@ -12,6 +12,7 @@ import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contra
 import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import { releaseVersionOf } from "@langwatch/config";
 import { DashboardApi } from "@langwatch/dashboard-contract";
 import {
   DataRetentionApi,
@@ -46,6 +47,7 @@ import { LangyApi } from "@langwatch/langy-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   AdminSessionExpiredError,
   AdminSurfaceHiddenError,
@@ -89,7 +91,6 @@ import {
   OpsConfirmationRequiredError,
   OpsImpersonatedOperatorRefusedError,
   OpsOperatorRequiredError,
-  OpsOperatorSecretRequiredError,
   OpsOperatorSessionRequiredError,
   OpsUnknownFeatureFlagError,
   type OpsOperatorPermission,
@@ -226,7 +227,7 @@ import {
   type OpsDoorAnswer,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import type { FeatureSetup } from "@langwatch/process";
+import type { FeatureSetup, ServerRole } from "@langwatch/process";
 import { storesOwner } from "@langwatch/process-stores/config";
 import {
   ProjectApi,
@@ -236,6 +237,7 @@ import {
 import { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import type { MigrationPassSummary, SystemMigrationPass } from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
@@ -245,6 +247,7 @@ import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickho
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
 import { toCallerKey, toDoorStatus, toExplainDoorAnswer } from "#rules/ops-door.rules";
+import { OPS_OPERATOR_DOOR } from "#rules/ops-intake-refusal.rules";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
@@ -285,7 +288,7 @@ import {
   type OpsProcessMembers,
   sharedStorageStatsInstance,
 } from "./ops-composition.build.ts";
-/** The back-office methods that only read; every other one needs `ops:manage`. */
+/** The instance admin methods that only read; every other one needs `ops:manage`. */
 const ADMIN_READ_METHODS: ReadonlySet<string> = new Set([
   "getList",
   "getOne",
@@ -295,7 +298,7 @@ const ADMIN_READ_METHODS: ReadonlySet<string> = new Set([
 
 /**
  * Who an operator request is attributed to: the impersonator where there is
- * one, so a back-office read is recorded against the human who made it rather
+ * one, so an instance admin read is recorded against the human who made it rather
  * than against the account they were borrowing.
  */
 function actingIdentityOf(operator: OpsOperator): OpsOperator;
@@ -532,6 +535,8 @@ export interface OpsSystemMigrationRunner {
   startPass(input: { actorUserId: string }): Promise<void>;
   /** One pass on this worker: the hourly re-drive only when a tenant could still move. */
   executePass(input: { redrive: boolean }): Promise<void>;
+  /** One pass of the tasks process's startup convergence, stopping at `signal`. */
+  runConvergencePass(input: { signal: AbortSignal }): Promise<MigrationPassSummary>;
   assertLegacyWritersDrained(input: {
     migrationName: string;
     tenantId: string;
@@ -614,9 +619,8 @@ export interface OpsAppInfrastructure {
   /** The ClickHouse account an operator EXPLAIN runs as. */
   explainClients: OpsExplainClients;
   /**
-   * The operator secret a caller presents, read PER REQUEST so a deployment
-   * that rotates it without a restart is honoured. Null where this deployment
-   * configured none, which refuses every call.
+   * The operator secret the EXPLAIN door compares a caller's bearer with. Null
+   * where this deployment configured none, which refuses every call.
    */
   findOpsApiKey(): string | null;
   /** The product-analytics target this deployment configured, for peers that send to it. */
@@ -685,6 +689,13 @@ export interface OpsBadgeReading {
   computedAt: OpsApiGetBadgeCountsOutput["computedAt"];
 }
 
+/** The role names main's checkup printed ("running as the web process"), not the role ids. */
+const CHECKUP_ROLE_NAMES: Readonly<Record<ServerRole, string>> = {
+  api: "web",
+  worker: "worker",
+  tasks: "migration",
+};
+
 export class OpsModule implements OpsApi {
   static readonly contract = OpsApi;
   static readonly dependencies = {
@@ -728,18 +739,7 @@ export class OpsModule implements OpsApi {
     clickhouseUrl: storesOwner.secrets.clickhouse,
   } as const;
   static readonly publicConfig = opsBrowserConfig.project;
-  static readonly reads = [
-    "prisma",
-    "redis",
-    "clickhouse",
-    "eventing",
-    "logger",
-    "nodeEnvironment",
-    "isSaas",
-    "serviceVersion",
-    "publicBaseUrl",
-    "processName",
-  ] as const;
+  static readonly reads = ["prisma", "redis", "clickhouse", "eventing"] as const;
 
   /**
    * Builds this process's own {@link OpsAppInfrastructure} from the members it
@@ -759,19 +759,28 @@ export class OpsModule implements OpsApi {
       redis: setup.members.redis,
       featureFlags: setup.dependencies.featureFlags,
     });
+    const logger = createLogger("langwatch:ops");
     const infrastructure = buildOpsInfrastructure({
       members: setup.members,
+      logger,
       config: setup.config,
       resources: setup.resources,
       processStore: setup.repositories.processStore,
+      repositories: setup.repositories,
       rateTracker,
       cloudOps,
     });
 
-    const { dependencies } = setup;
+    const { dependencies, config } = setup;
     const { members } = setup;
     const checkup = OpsCheckupService.create({
-      members,
+      facts: {
+        isSaas: config.isSaas,
+        serviceVersion: releaseVersionOf(config),
+        publicBaseUrl: config.publicBaseUrl,
+        nodeEnvironment: config.nodeEnvironment,
+        processRole: setup.role ? CHECKUP_ROLE_NAMES[setup.role] : "web",
+      },
       config: setup.config,
       peers: {
         ...dependencies,
@@ -820,12 +829,12 @@ export class OpsModule implements OpsApi {
       resolveInstances: async () => [sharedStorageStatsInstance(members.clickhouse)],
       readings: storageReadings,
       collectBackups: setup.config.collectClickHouseBackupMetrics,
-      logger: members.logger,
+      logger,
     });
 
     const { adminEmails } = setup.config;
     for (const warning of PlatformOperatorsService.bootWarnings({ adminEmails })) {
-      members.logger.warn(warning);
+      logger.warn(warning);
     }
 
     const app = OpsModule.fromInfrastructure({
@@ -1164,7 +1173,7 @@ export class OpsModule implements OpsApi {
   async startAdminImpersonation(
     input: StartAdminImpersonationInput,
   ): Promise<AdminImpersonationStarted> {
-    const staff = await this.#admitHiddenStaff({ operator: input.actor, permission: "ops:manage" });
+    const staff = actingIdentityOf(input.actor);
     const session = this.#adminSession(input.session);
 
     await this.#dependencies.ops.startImpersonation({
@@ -1181,7 +1190,6 @@ export class OpsModule implements OpsApi {
   async stopAdminImpersonation(
     input: StopAdminImpersonationInput,
   ): Promise<AdminImpersonationStopped> {
-    await this.#admitHiddenStaff({ operator: input.actor, permission: "ops:manage" });
     const session = this.#adminSession(input.session);
 
     await this.#dependencies.ops.stopImpersonation({ sessionId: session.id });
@@ -1190,10 +1198,11 @@ export class OpsModule implements OpsApi {
   }
 
   async runAdminOperation(input: RunAdminOperationInput): Promise<AdminOperationResult> {
-    const staff = await this.#admitHiddenStaff({
-      operator: input.actor,
-      permission: ADMIN_READ_METHODS.has(input.method) ? "ops:view" : "ops:manage",
-    });
+    // The door asked ops:view; a write method is the one question that depends on the body.
+    if (!ADMIN_READ_METHODS.has(input.method)) {
+      await this.#admitHiddenStaff({ operator: input.actor, permission: "ops:manage" });
+    }
+    const staff = actingIdentityOf(input.actor);
     const resource = adminResourceNameSchema.safeParse(
       ADMIN_RESOURCE_NAMES[input.resource] ?? input.resource,
     );
@@ -1405,19 +1414,6 @@ export class OpsModule implements OpsApi {
   }
 
   /**
-   * The staff gate on the support inbox. The same grant, named for what
-   * it decides there: a bug report carries no tenant, so staff is the only
-   * question that could be asked about it.
-   */
-  async admitStaff(operator: OpsOperator | null): Promise<OpsOperator> {
-    if (!(await this.#operatorOf({ operator, permission: "ops:view" }))) {
-      throw new OpsOperatorRequiredError("ops:view");
-    }
-
-    return actingIdentityOf(operator);
-  }
-
-  /**
    * The staff list refused as not-found, so a probe learns nothing about the
    * surface, and only where the cloud-ops capability is on.
    */
@@ -1493,20 +1489,14 @@ export class OpsModule implements OpsApi {
   // -- the operator-only ClickHouse EXPLAIN ----------------------------------
 
   /**
-   * The operator secret, compared in constant time. A deployment that
-   * configured none refuses every call: a blank expected secret must never
-   * match a blank presented one.
+   * The EXPLAIN route's door: this deployment's operator secret as a bearer.
+   * A deployment that set none refuses every call, as one that set it blank does.
    */
-  authorizeOperatorSecret(input: { presented: string | null }): void {
-    const expected = this.#dependencies.findOpsApiKey();
-
-    if (!expected || !input.presented) throw new OpsOperatorSecretRequiredError();
-
-    const presented = Buffer.from(input.presented);
-    const secret = Buffer.from(expected);
-
-    if (presented.length !== secret.length) throw new OpsOperatorSecretRequiredError();
-    if (!timingSafeEqual(presented, secret)) throw new OpsOperatorSecretRequiredError();
+  get operatorDoor(): RestIdentity {
+    return BearerIdentity.create({
+      name: OPS_OPERATOR_DOOR,
+      token: this.#dependencies.findOpsApiKey() ?? void 0,
+    });
   }
 
   /** One EXPLAIN, wrapped so it cannot execute, audited by its shape. */
@@ -1634,6 +1624,11 @@ export class OpsModule implements OpsApi {
   /** One pass of `ops_system_migrations`, on the worker hosting it; not on {@link OpsApi}. */
   executeSystemMigrationPass(input: { redrive: boolean }): Promise<void> {
     return this.#dependencies.systemMigrations.executePass(input);
+  }
+
+  /** The startup convergence's pass, for the tasks process's own task; not on {@link OpsApi}. */
+  systemMigrationPass(): SystemMigrationPass {
+    return ({ signal }) => this.#dependencies.systemMigrations.runConvergencePass({ signal });
   }
 
   /** One requested run of `ops_projection_replay`, on its worker; not on {@link OpsApi}. */

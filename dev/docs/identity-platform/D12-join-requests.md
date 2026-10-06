@@ -2,6 +2,12 @@
 
 Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D03 (router) + D13 (sign-up interstitial hook) · Flag: `JOIN_REQUESTS`
 
+> **Historical (marked 2026-10-05):** written against main's monolith, before `platform/app` was
+> deleted. Paths under `src/server/`, `server/app-layer/` and `packages/authz*` describe that tree.
+> Today a feature is a module (ARCHITECTURE.md §3), pipelines are `definePipeline` in
+> `modules/<name>/process/src/eventing` (§9), and the permission registry is
+> `packages/authorization/src/registry.ts`. Check the current tree before treating a path below as live.
+
 > **D05 is not a dependency.** Approvals land in the existing `/settings/members` UI beside D11's invitation management, which D05 later absorbs anyway. They need no new permission either: every invite procedure in `modules/organization/process/src/transport/organization.trpc.ts` (`platform/app` is deleted; amended 2026-09-03) is already gated on `organization:manage`, an existing registered permission, and answering a request is the same authority pointed the other way. Nothing from the authz precondition checklist is required.
 
 # Overview

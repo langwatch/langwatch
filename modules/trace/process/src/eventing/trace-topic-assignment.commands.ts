@@ -13,7 +13,10 @@ import {
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
-import { type TraceTopicAssignmentCommand } from "../app/trace.members.ts";
+/** Process-composed sender for Trace's registered durable topic command. */
+export interface TraceTopicAssignmentCommand {
+  sendAssignTopic(input: AssignTopicCommandData): Promise<void>;
+}
 
 /**
  * Command handler for assigning topics to traces in the trace processing pipeline.

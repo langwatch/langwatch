@@ -6,7 +6,7 @@ Feature: PostHog guided onboarding events
 
   Background:
     Given the PostHog events channel captures server-side product events with the user id as the distinct id
-    And every write of an organization's guided onboarding state is tracked through that channel by the guided onboarding service
+    And every write of an organization's guided onboarding state is recorded as a fact by the guided onboarding service, and nurturing sends it through that channel
     And the nurturing delivery turns the product milestones into PostHog events against the organization admin
 
   # ============================================================================

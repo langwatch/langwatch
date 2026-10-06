@@ -24,34 +24,35 @@ When a lower one disagrees with a higher one, the lower one is the defect
 
 ## Question to section
 
-| You are asking | Read | Then skill |
-| --- | --- | --- |
-| What runs where; what an app is | §1 | `repo-tree` |
-| Which package; where code lives; Chakra, colour | §2 | `repo-tree`, `design-system` |
-| Module anatomy; dependency direction | §3 | `module` |
-| `*Api` token, schemas, errors, verbs | §3.1, §12 | `contract` |
-| Services, repositories, channels, rules, file grammar | §3.2 | `process-module` |
-| What a module may demand; peers, supply, capabilities | §3.3, §3.5, §6, §11 | `module-dependencies` (future) |
-| Browser half; no kits; closed packages | §3.4, §10 | `browser-module` |
-| Reading another module's data in the browser | §3.4, §10.1 | `module-client` |
-| `main.ts`, `boot()`, config, stores | §4, §5, §6, §7 | `process-composition` (future) |
-| REST routes, tRPC procedures, `/api/<x>` | §8 | `api-transports` |
-| Projections, subscribers, process managers, purge | §9, §9.1 | `eventing-and-worker` |
-| Browser state tiers, one global store | §10.2, ADR-169 | `browser-module` |
-| Enterprise, entitlement, licences | §11 | `module-dependencies` (future) |
-| Throwing, error codes, REST error bodies | §12 | `contract` |
-| Tests, memory tier, spec binding | §13, §14 | `testing` |
-| Is this spelling dead? | §15 | none: do not write it |
-| Does the target name exist yet? | §16 | none |
-| What a finding means; baselines | §17 | `linting` |
-| Nx, `test:affected`, caches | §18 | `.claude/skills/core/testing-rules.md` |
+| You are asking                                        | Read                        | Then skill                                   | Backed by (`langwatch/*` rule; enforcer policy)                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| What runs where; what an app is                       | §1                          | `repo-tree`                                  | policy `application-boundaries`                                                                                                                                                                                                                                                                                                                               |
+| Which package; where code lives; Chakra, colour       | §2                          | `repo-tree`, `design-system`                 | `package-boundaries`, `environment-boundaries`; policies `workspace-seams`, `manifests`, `cycles`                                                                                                                                                                                                                                                             |
+| Module anatomy; dependency direction                  | §3                          | `module`                                     | `module-layers`, `module-classes`, `feature-source-filename`, `feature-source-layout`, `feature-source-subject`; policies `feature-layout`, `feature-shape`, `source-folder-shape`                                                                                                                                                                            |
+| `*Api` token, schemas, errors, verbs                  | §3.1, §12                   | `contract`                                   | `schema-outside-contract`, `handled-error-outside-contract`, `refusal-is-a-handled-error`, `banned-verb-prefix`, `fallible-result-naming`                                                                                                                                                                                                                     |
+| Services, repositories, channels, rules, file grammar | §3.2                        | `process-module`                             | `service-does-not-open-a-channel`, `service-loads-its-own-config`, `store-containment`, `pass-through-class`; policies `prisma-table-ownership`, `clickhouse-table-ownership`, `memory-twin-drift`, `service-ceilings`                                                                                                                                        |
+| What a module may demand; peers, supply, capabilities | §3.3, §3.5, §6, §11         | `module-dependencies`                        | `package-boundaries`, `store-containment`, `module-classes`, `environment-boundaries`, `service-loads-its-own-config`, `no-hand-rolled-plan-gate`, `plan-literals`, `enterprise-license-header`; policies `peer-cycles`, `cycles`, `feature-configuration`; boot `config_collision`, `secret_sealed`                                                          |
+| Browser half; no kits; closed packages                | §3.4, §10                   | `browser-module`                             | `web-imports-server-shaped-value`, `environment-boundaries`; policies `browser-package-closure`, `browser-package-exports`, `browser-node-leak`                                                                                                                                                                                                               |
+| Reading another module's data in the browser          | §3.4, §10.1                 | `module-client`                              | policies `browser-package-exports`, `framework-module-contracts`                                                                                                                                                                                                                                                                                              |
+| `main.ts`, `boot()`, config, stores                   | §4, §5, §6, §7              | `process-composition`                        | `no-boot-hook-outside-guard`, `environment-boundaries`, `package-boundaries`, `store-containment`, `service-loads-its-own-config`; policies `application-boundaries`, `feature-configuration`, `peer-cycles`, `prisma-migration-access`, `eventing-table-access`; enforcer tests `generated-module-lists`, `redis-cache-ttl`, `system-migrations-start-order` |
+| REST routes, tRPC procedures, `/api/<x>`              | §8                          | `api-transports`                             | `transport-declares`, `rest-route`; policy `platform-operator-calls`                                                                                                                                                                                                                                                                                          |
+| Projections, subscribers, process managers, purge     | §9, §9.1                    | `eventing-and-worker`                        | `eventing-role-purity`, `idempotency-key-is-stable`; policies `eventing-table-access`, `service-projection-boundaries`                                                                                                                                                                                                                                        |
+| Browser state tiers, one global store                 | §10.2, ADR-169              | `browser-module`                             | `browser-store-containment`, `query-data-in-state`, `no-redux`                                                                                                                                                                                                                                                                                                |
+| Enterprise, entitlement, licences                     | §11                         | `module-dependencies`                        | `no-hand-rolled-plan-gate`, `enterprise-license-header`, `package-boundaries` (`coreImportsEnterprise`)                                                                                                                                                                                                                                                       |
+| Throwing, error codes, REST error bodies              | §12                         | `contract`                                   | `handled-error-outside-contract`, `refusal-is-a-handled-error`                                                                                                                                                                                                                                                                                                |
+| Tests, memory tier, spec binding                      | §13, §14                    | `testing`                                    | `test-description-is-an-action`, `unit-test-does-not-render`, `stand-in-cast`, `no-logger-spy`, `no-tautological-assertion`; policy `default-test-lane`; `check:feature-parity`                                                                                                                                                                               |
+| Is this spelling dead?                                | §15                         | none: do not write it                        | none (some spellings are caught by the rules above)                                                                                                                                                                                                                                                                                                           |
+| Does the target name exist yet?                       | §16                         | none                                         | none                                                                                                                                                                                                                                                                                                                                                          |
+| What a finding means; baselines; disables             | §17                         | `linting`                                    | `suppression-states-why`, `comment-block-size`, `id-generation-origin`; every policy (`pnpm lint:architecture --list-policies`)                                                                                                                                                                                                                               |
+| Is this diff or bind ready to commit?                 | §3.1, §5, §8, §12, §13, §15 | `architecture-review`, `spec-binding-review` | every policy; `check:feature-parity`                                                                                                                                                                                                                                                                                                                          |
+| Nx, `test:affected`, caches; how the drive runs       | §18                         | `.claude/skills/core/testing-rules.md`       | none                                                                                                                                                                                                                                                                                                                                                          |
+| The local stack, haven, the sims, `apps/server`       | §19                         | `haven`, `sims`, `dev-runtime`, `server-cli` | none                                                                                                                                                                                                                                                                                                                                                          |
 
 A skill marked planned or future may not exist yet (check the skill list). Until it does, `backend`
 and `frontend` still cover that ground (partly stale; the record wins).
 Members and supply tokens are deleted (§3.3, §15): a module class receives
 repositories, channels, peers, config and secrets, and decides its own availability.
-For `Secret.load`, capabilities and entitlements read §3.3 and §6 directly and ask
-before inventing a shape.
+For `Secret.load`, capabilities and entitlements, the `module-dependencies` skill.
 
 ## Rules for using the record
 
@@ -107,12 +108,32 @@ before inventing a shape.
 ## Known disagreements between the record and the tree
 
 Prefer the tree for names and the linter for rules; report, do not fix a record
-you do not own. Current list:
+you do not own. Current list (brought current 2026-10-05, after Alex's evening answers):
 
-- §3.2/§5 put the module class in `<f>.module.ts`; most modules still keep it in
-  `app/<f>.app.ts`, the grammar accepts it, and §16 has no row yet (awaiting a ruling).
-- `useReleaseFlag` (§3.4, §10.1) is the target; code spells `useFeatureFlag`, no §16 row.
-- `requestDelivery` (ADR-167, §9) has no code hits and no §16 row naming today's spelling.
+- Members: removal is ruled now (Alex, 2026-10-05; §3.3 says where each kind goes), but the
+  deleted (§15) `ProcessContainer.withMember` still exists (only tests call it) and the grammar
+  still accepts the deleted (§15) `app/<f>.members.ts` and `-composition.build.ts` (8 and 10 files
+  left, from 36).
+- §7's "no mixing" is unenforced: a module's own `withMemoryRepositories` (deleted, §15) still wins
+  over the stores' tier. The fail-closed tier and the skipped surface (§4, §7) have landed.
+- §7 gives each module its own event store handle (Alex, 2026-10-05); ops still holds the
+  shared `EventSourcing` client.
+- §10.1's `UiFlags` host service is not in the tree: `useFeatureFlag` (kept, off §15's deleted list, Alex 2026-10-05) in
+  `packages/browser-host/src/feature-flag.ts` queries `featureFlag.isEnabled` itself.
+- `requestDelivery` (ADR-167, §9) is ruled to be built now on the outbox (Alex, 2026-10-05); no code
+  spells it yet.
+- §8/§17's guard rules that accept a justified disable are not built yet: `defineRule({ escape })` exists,
+  but no rule opts in, so today every `langwatch/*` disable is refused.
+- §5 expects no peer cycle; the `peer-cycles` policy stays red until the last is cut (ruled, not drift).
+- github declares its secret handles in the process half (`github.app.ts`); §6 and Alex (2026-10-05)
+  put them in the contract.
+- §10 has project lend `projectSwitcher` by token; it still sits in `withCapabilities` (ruled to move,
+  Alex 2026-10-05).
+- §2 makes `@langwatch/module` a contract's only framework import; analytics and trace contracts import
+  `@langwatch/api/dates` and gateway's imports `@langwatch/api/hosting` until the helpers move and the
+  lint lands (Alex, 2026-10-05).
+- Open items are proposals, not rules: §16 "Open for Alex" (the E1 to E8 questions). Do not build or
+  teach them as ruled.
 
 ## Links
 

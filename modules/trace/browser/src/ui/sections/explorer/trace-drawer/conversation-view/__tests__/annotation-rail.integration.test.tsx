@@ -1,9 +1,9 @@
-import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import type {
-  UiAnnotateBodyProps,
-  UiAnnotationFormFooterProps,
-  UiSuggestBodyProps,
-} from "@langwatch/browser-host/declarations";
+  AnnotateBodyProps,
+  AnnotationFormFooterProps,
+  AnnotationFormState,
+  SuggestBodyProps,
+} from "@langwatch/annotation-contract";
 // Annotation rail: existence, placement, init, typed content survives
 // virtualizer unmount.
 // @vitest-environment jsdom
@@ -130,8 +130,8 @@ vi.mock("../../../../../../behavior/lent-annotation-form.tsx", () => {
     );
   }
   return {
-    AnnotateBody: ({ state }: UiAnnotateBodyProps) => <CommentAndScores state={state} />,
-    SuggestBody: ({ state, originalOutput }: UiSuggestBodyProps) => (
+    AnnotateBody: ({ state }: AnnotateBodyProps) => <CommentAndScores state={state} />,
+    SuggestBody: ({ state, originalOutput }: SuggestBodyProps) => (
       <>
         <span>{state.suggestTarget === "input" ? "Suggested input" : "Expected output"}</span>
         <textarea
@@ -145,7 +145,7 @@ vi.mock("../../../../../../behavior/lent-annotation-form.tsx", () => {
         <CommentAndScores state={state} />
       </>
     ),
-    FormFooter: ({ state }: UiAnnotationFormFooterProps) => (
+    FormFooter: ({ state }: AnnotationFormFooterProps) => (
       <>
         <button type="button" onClick={state.onCancel}>
           Cancel

@@ -4,6 +4,7 @@ import { defineProcessModule } from "@langwatch/process";
 
 import { AnalyticsModule } from "./app/analytics.app.ts";
 import { lwqlReconvergenceEventing } from "./eventing/analytics-lwql-reconvergence.pipeline.ts";
+import { analyticsRepositories } from "./repositories/analytics-repositories.registry.ts";
 import { AnalyticsComparisonWindowService } from "./services/analytics-comparison-window.service.ts";
 import { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
 import { analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
@@ -11,9 +12,8 @@ import { analyticsRest } from "./transport/analytics.rest.ts";
 import { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
 import { queryRest } from "./transport/query.rest.ts";
 
-export type { AnalyticsInfrastructure } from "./app/analytics.app.ts";
-
 export const analyticsProcessModule = defineProcessModule("analytics")
+  .withRepositories(analyticsRepositories)
   .withApi(AnalyticsModule)
   .withTransports(
     analyticsRest,

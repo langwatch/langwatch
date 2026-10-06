@@ -53,6 +53,7 @@ Each rule lives in the record or CLAUDE.md; this table only points at it.
 | 3    | `contract/src/monitor.errors.ts`               | `HandledError` subclasses                             |
 | 4    | `contract/src/monitor.trpc.ts`                 | every procedure declared once                         |
 | 5    | `process/src/monitor.module.ts`                | the installer: repositories, module class, transports |
+| 5a   | `process/src/app/monitor.app.ts`               | the module class, `MonitorModule` (§3.2)              |
 | 6    | `process/src/transport/monitor.{rest,trpc}.ts` | permission and handler per route                      |
 | 7    | `process/src/repositories/`                    | interface, `prisma/`, `memory/`, registry             |
 | 8    | `process/src/services/monitor.service.ts`      | behaviour over the repository                         |
@@ -70,8 +71,10 @@ For a module with a `client/` package read `modules/dataset/client`.
    (`process-module` skill).
 4. Add the catalogue entry, run `pnpm generate:modules`, and
    `pnpm sync:references` (new workspace packages).
-5. Prove it with an installation test through the real createApp chain
-   (`modules/monitor/process/src/app/__tests__/monitor-installation.unit.test.ts`).
+5. Prove it with an installation test that boots the installed list over
+   memory twins (record §13; `apps/api/src/__tests__/api-installation.fixture.ts`).
+   `monitor-installation.unit.test.ts` still uses the deleted `createApp`
+   chain and `withMemoryRepositories` (§15); do not copy it.
 6. Scoped checks only, then `pnpm --filter @langwatch/<name>-process typecheck`.
 
 ## Traps
@@ -88,10 +91,13 @@ For a module with a `client/` package read `modules/dataset/client`.
   is the one map.
 - **Old spellings are deleted** (`defineServerModule`, `*App` classes,
   `<f>.server.ts`; §15). Write `defineProcessModule`, `*Module` and `<f>.module.ts`.
-- **Peer cycles.** A module may not depend back on its dependent. Use events
-  and a pending answer (§3, §17; `pnpm lint:architecture --list-policies`).
+- **Peer cycles.** A module may not depend back on its dependent: every cycle
+  is refused (§5, §17; the `peer-cycles` policy). Cut from the reactor's side
+  with a peer subscriber (§9), and cut or list no edge without asking Alex
+  first (§5, 2026-10-05). The `module-dependencies` skill walks it.
 
 ## Not here
 
-What a module may demand of its process (peers, config, supply, entitlements;
-§3.3) and composing a process (`main.ts`, `boot()`; §4, §5): `backend`.
+What a module may demand of its process (peers, config, secrets, availability,
+entitlements; §3.3): `module-dependencies`. Composing a process (`main.ts`,
+`boot()`; §4, §5): `process-composition`.

@@ -7,7 +7,8 @@
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
 import { featuresByRole } from "@langwatch/model-provider-contract";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ModelProviderHostProvider } from "../../../model/model-provider-host.ts";
@@ -76,6 +77,9 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
     },
   },
 }));
+
+// jsdom has no Element.scrollTo, which the select machine calls when an item is picked.
+Element.prototype.scrollTo = () => undefined;
 
 const ORG_CONFIG_ROW = {
   id: "cfg_org",
@@ -200,6 +204,43 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
       fireEvent.click(screen.getByTestId("config-save"));
       await vi.waitFor(() => expect(mockSave).toHaveBeenCalled());
       expect(savedConfig()).not.toHaveProperty("DEFAULT");
+    });
+  });
+
+  describe("when a project-scoped config pins keys the organization also supplies", () => {
+    /** @scenario Inherit row is a real, selectable option in the model picker */
+    it("lets the user click the inherit row, which drops that key from the saved config", async () => {
+      const pinned = {
+        ...PROJECT_CONFIG_ROW,
+        id: "cfg_pinned",
+        config: { DEFAULT: "openai/gpt-5.4", FAST: "openai/gpt-5.4-mini" },
+      };
+      mockGetDefaultModels.mockReturnValue({ data: payloadWith([pinned]), isLoading: false });
+      mockGetInheritedValues.mockReturnValue({
+        data: {
+          inherited: {
+            DEFAULT: { model: "openai/gpt-5.5", source: "role_default", scope: "organization" },
+          },
+          referenceScope: { scopeType: "PROJECT", scopeId: "proj-1" },
+        },
+        isLoading: false,
+      });
+      renderDrawer("cfg_pinned");
+
+      const row = screen.getByTestId("role-row-default");
+      await userEvent.setup().click(within(row).getByRole("combobox"));
+      const listbox = document.getElementById(
+        within(row).getByRole("combobox").getAttribute("aria-controls") ?? "",
+      );
+      const inheritRow = within(listbox as HTMLElement).getByTestId(
+        "provider-model-selector-inherit",
+      );
+      expect(within(inheritRow).getByText("Inherit (from organization)")).toBeInTheDocument();
+      await userEvent.setup().click(inheritRow);
+      fireEvent.click(screen.getByTestId("config-save"));
+
+      await vi.waitFor(() => expect(mockSave).toHaveBeenCalled());
+      expect(savedConfig()).toEqual({ FAST: "openai/gpt-5.4-mini" });
     });
   });
 

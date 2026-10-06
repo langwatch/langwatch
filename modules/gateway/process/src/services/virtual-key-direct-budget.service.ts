@@ -9,13 +9,13 @@ import type { ProjectApi } from "@langwatch/project-contract";
  */
 import { type Instant, nowInstant } from "@langwatch/time";
 
-import { type GatewayBudgetSpend } from "../app/gateway.members.ts";
+import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
 import type { VirtualKeyDirectBudgetRepository } from "../repositories/gateway-virtual-key-direct-budget.repository.ts";
 import { budgetSpendTargetsFor } from "../rules/gateway-budget-spend-targets.rules.ts";
 
 const logger = createLogger("langwatch:gateway:virtual-key-direct-budget");
 
-export type VirtualKeyDirectBudget = {
+type VirtualKeyDirectBudget = {
   budgetId: string;
   window: GatewayBudget["window"];
   limitUsd: string;
@@ -85,7 +85,7 @@ async function loadPeriodSpend(args: {
   projects: Pick<ProjectApi, "listIdsByOrganization">;
   organizationId: string;
   budgets: GatewayBudget[];
-  chRepo: GatewayBudgetSpend | undefined;
+  chRepo: GatewayBudgetSpendRepository | undefined;
   now: Instant;
 }): Promise<PeriodSpend> {
   const { projects, organizationId, budgets, chRepo, now } = args;
@@ -95,7 +95,7 @@ async function loadPeriodSpend(args: {
 
   const projectIds = await projects.listIdsByOrganization({ organizationId });
   try {
-    const spends = await chRepo.getSpendForTargetsAcrossTenants(
+    const spends = await chRepo.findSpendForTargetsAcrossTenants(
       projectIds,
       budgetSpendTargetsFor({ budgets, now }),
       now,
@@ -140,7 +140,7 @@ export class VirtualKeyDirectBudgetService {
   async loadDirectBudgetsForKeys(args: {
     organizationId: string;
     virtualKeyIds: string[];
-    chRepo: GatewayBudgetSpend | undefined;
+    chRepo: GatewayBudgetSpendRepository | undefined;
     /**
      * The instant the periods are computed from. Injectable so a test that
      * wrote a debit at a known time reads the same period back instead of

@@ -6,10 +6,10 @@ import { z } from "zod";
 export const SCIM_DIRECTORY_PIPELINE_NAME = "scim_directory" as const;
 export const SCIM_DIRECTORY_AGGREGATE_TYPE = "scim_directory_move" as const;
 export const SCIM_DIRECTORY_MOVE_REQUESTED_EVENT_TYPE = "lw.scim.directory_move_requested" as const;
-export const SCIM_DIRECTORY_MOVE_REQUESTED_EVENT_VERSION = "2026-09-25" as const;
-export const REQUEST_DIRECTORY_MOVE_COMMAND_TYPE = "lw.scim.request_directory_move" as const;
+const SCIM_DIRECTORY_MOVE_REQUESTED_EVENT_VERSION = "2026-09-25" as const;
+const REQUEST_DIRECTORY_MOVE_COMMAND_TYPE = "lw.scim.request_directory_move" as const;
 
-export const requestDirectoryMoveCommandDataSchema = z.object({
+const requestDirectoryMoveCommandDataSchema = z.object({
   tenantId: z.string().min(1),
   organizationId: z.string().min(1),
   fromConnectionId: z.string().min(1),
@@ -24,7 +24,7 @@ export const scimDirectoryMoveRequestedEventSchema = z.object({
   version: z.literal(SCIM_DIRECTORY_MOVE_REQUESTED_EVENT_VERSION),
   data: requestDirectoryMoveCommandDataSchema,
 });
-export type ScimDirectoryMoveRequestedEvent = z.infer<typeof scimDirectoryMoveRequestedEventSchema>;
+type ScimDirectoryMoveRequestedEvent = z.infer<typeof scimDirectoryMoveRequestedEventSchema>;
 
 /**
  * One directory sync re-homed onto the connection that replaced its own. The aggregate is the

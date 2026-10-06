@@ -1,7 +1,8 @@
 /**
  * @vitest-environment node
  *
- * user_lifecycle records an account's deactivation and reactivation; peers react from their side (§9).
+ * user_lifecycle records an account's deactivation and reactivation; peers react from their side
+ * (§9).
  * @see modules/user/specs/user.feature
  */
 import { createTenantId } from "@langwatch/eventing";
@@ -9,12 +10,14 @@ import {
   USER_DEACTIVATED_EVENT_TYPE,
   USER_LIFECYCLE_PIPELINE_NAME,
   USER_REACTIVATED_EVENT_TYPE,
+  USER_REGISTERED_EVENT_TYPE,
 } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   RecordUserDeactivatedCommand,
   RecordUserReactivatedCommand,
+  RecordUserRegisteredCommand,
 } from "../user-lifecycle.commands.ts";
 import type { RecordUserLifecycleCommandData } from "../user-lifecycle.events.ts";
 import { buildUserLifecyclePipeline } from "../user-lifecycle.pipeline.ts";
@@ -50,6 +53,18 @@ describe("user's lifecycle pipeline", () => {
 
     expect(event?.type).toBe(USER_REACTIVATED_EVENT_TYPE);
     expect(event?.idempotencyKey).toBe(`user_1:reactivated:${FACT.occurredAt}`);
+  });
+
+  /** @scenario "A self-service registration is recorded as user's fact" */
+  it("records a registration on the user, keyed once per user", async () => {
+    const [event] = await new RecordUserRegisteredCommand().handle(
+      command(RecordUserRegisteredCommand.schema.type),
+    );
+
+    expect(event?.type).toBe(USER_REGISTERED_EVENT_TYPE);
+    expect(event?.aggregateId).toBe("user_1");
+    expect(event?.data).toEqual(FACT);
+    expect(event?.idempotencyKey).toBe("user_1:registered");
   });
 
   it("hosts no reaction on its own events", () => {

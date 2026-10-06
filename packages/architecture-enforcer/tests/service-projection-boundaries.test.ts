@@ -125,6 +125,43 @@ describe("service projection boundaries", () => {
     );
   });
 
+  it("follows a dependency through declarations in other files of the package", () => {
+    write(
+      "modules/example/process/src/eventing/example.store.ts",
+      `
+        import type { FoldProjectionStore as Fold } from "@langwatch/eventing";
+
+        export interface ExampleWriter extends Fold<unknown> {}
+      `,
+    );
+    write(
+      "modules/example/process/src/app/example.ports.ts",
+      `
+        import type { ExampleWriter as Writer } from "../eventing/example.store";
+
+        export type ExamplePorts = { read(): void; writer: Writer };
+      `,
+    );
+    write(
+      "modules/example/process/src/services/example.service.ts",
+      `
+        import type { ExamplePorts as Ports } from "../app/example.ports";
+
+        export class ExampleService {
+          constructor(private readonly ports: Ports) {}
+        }
+      `,
+    );
+
+    expect(lint()).toEqual([
+      expect.objectContaining({
+        file: join(root, "modules/example/process/src/services/example.service.ts"),
+        line: 5,
+        message: 'Service dependency "Ports" exposes projection writes.',
+      }),
+    ]);
+  });
+
   it("accepts read-model ports and write stores owned by eventing roles", () => {
     write(
       "modules/example/process/src/ports/example-read-model.port.ts",

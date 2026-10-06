@@ -83,7 +83,7 @@ func SeedToolOrg(ctx context.Context, options SeedOptions) (ToolOrg, error) {
 	if say == nil {
 		say = func(string) {}
 	}
-	unlock, err := Lock(options.Dir, options.Tool+"-seed.lock", "seed: another lane is seeding "+options.Tool+"; waiting", say)
+	unlock, err := Lock(LockOptions{Dir: options.Dir, Name: options.Tool + "-seed.lock", Waiting: "seed: another lane is seeding " + options.Tool + "; waiting", Progress: say})
 	if err != nil {
 		return ToolOrg{}, err
 	}
@@ -131,7 +131,7 @@ func (seeder *orgSeeder) reuse(ctx context.Context, path string) (ToolOrg, bool)
 	if json.Unmarshal(content, &org) != nil || len(org.Projects) < seeder.options.Projects {
 		return ToolOrg{}, false
 	}
-	status, _ := seeder.call(ctx, http.MethodGet, "/api/projects", bearer(org.OrgKey), nil)
+	status, _ := seeder.call(ctx, apiCall{method: http.MethodGet, path: "/api/projects", headers: bearer(org.OrgKey)})
 	return org, status == http.StatusOK
 }
 
@@ -198,7 +198,7 @@ func (seeder *orgSeeder) baseOrg(ctx context.Context) (ToolOrg, error) {
 // signIn signs in as the seeded local-dev admin; the cookie jar carries the
 // session onward.
 func (seeder *orgSeeder) signIn(ctx context.Context) error {
-	status, body := seeder.call(ctx, http.MethodPost, "/api/auth/sign-in/email", nil, map[string]any{"email": SeededAdminEmail, "password": SeededAdminPassword})
+	status, body := seeder.call(ctx, apiCall{method: http.MethodPost, path: "/api/auth/sign-in/email", body: map[string]any{"email": SeededAdminEmail, "password": SeededAdminPassword}})
 	if !created(status) {
 		return fmt.Errorf("ceremony sign-in: status %d %v", status, excerpt(body))
 	}
@@ -209,7 +209,7 @@ func (seeder *orgSeeder) signIn(ctx context.Context) error {
 }
 
 func (seeder *orgSeeder) authenticated(ctx context.Context) bool {
-	status, _ := seeder.call(ctx, http.MethodGet, "/api/auth/session", nil, nil)
+	status, _ := seeder.call(ctx, apiCall{method: http.MethodGet, path: "/api/auth/session"})
 	return status == http.StatusOK
 }
 
@@ -234,31 +234,52 @@ func (seeder *orgSeeder) createOrganization(ctx context.Context) (orgID, teamID 
 func (seeder *orgSeeder) awaitOrganization(ctx context.Context) (string, string, error) {
 	deadline := time.Now().Add(15 * time.Second)
 	for attempt := 0; ; attempt++ {
-		raw, code, err := seeder.trpcGet(ctx, "organization.getAll", map[string]any{})
-		if err == nil {
-			if orgID, teamID, ok := findOrg(raw, seeder.options.Tool); ok {
-				return orgID, teamID, nil
-			}
-		}
-		if attempt == 0 && seeder.options.Progress != nil {
-			names := ""
-			if list, ok := raw.([]any); ok {
-				for _, entry := range list {
-					if org, ok := entry.(map[string]any); ok {
-						names += fmt.Sprintf("%v ", org["name"])
-					}
-				}
-			}
-			seeder.options.Progress(fmt.Sprintf("seed: getAll err=%v code=%q orgs=[%s]", err, code, names))
+		if orgID, teamID, ok := seeder.lookupOrganization(ctx, attempt == 0); ok {
+			return orgID, teamID, nil
 		}
 		if time.Now().After(deadline) {
 			return "", "", errGrantUnconfirmed
 		}
-		select {
-		case <-ctx.Done():
-			return "", "", ctx.Err()
-		case <-time.After(time.Second):
+		if err := pause(ctx); err != nil {
+			return "", "", err
 		}
+	}
+}
+
+// lookupOrganization asks getAll once for the tool's organisation; on a first
+// miss with report set it tells Progress what getAll answered.
+func (seeder *orgSeeder) lookupOrganization(ctx context.Context, report bool) (orgID, teamID string, ok bool) {
+	raw, code, err := seeder.trpcGet(ctx, "organization.getAll", map[string]any{})
+	if err == nil {
+		if orgID, teamID, ok = findOrg(raw, seeder.options.Tool); ok {
+			return orgID, teamID, true
+		}
+	}
+	if report && seeder.options.Progress != nil {
+		seeder.options.Progress(fmt.Sprintf("seed: getAll err=%v code=%q orgs=[%s]", err, code, orgNames(raw)))
+	}
+	return "", "", false
+}
+
+// orgNames lists getAll's organisation names, each followed by a space.
+func orgNames(raw any) string {
+	names := ""
+	list, _ := raw.([]any)
+	for _, entry := range list {
+		if org, ok := entry.(map[string]any); ok {
+			names += fmt.Sprintf("%v ", org["name"])
+		}
+	}
+	return names
+}
+
+// pause waits a second between polls, or returns ctx's error once it is done.
+func pause(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(time.Second):
+		return nil
 	}
 }
 
@@ -292,33 +313,41 @@ func (seeder *orgSeeder) mintOrgKey(ctx context.Context, orgID string) (string, 
 	input := map[string]any{"organizationId": orgID, "name": seeder.options.Tool + "-org", "keyType": "service", "permissionMode": "all", "bindings": []any{}}
 	deadline := time.Now().Add(15 * time.Second)
 	for {
-		result, code, err := seeder.trpcPost(ctx, "apiKey.create", input)
-		if err == nil {
-			object, _ := result.(map[string]any)
-			if token, _ := object["token"].(string); token != "" {
-				return token, nil
-			}
-			return "", fmt.Errorf("apiKey.create returned no token")
+		token, retry, err := seeder.tryMintOrgKey(ctx, input)
+		if !retry {
+			return token, err
 		}
-		if code == "api_key_admin_required" && time.Now().After(deadline) {
+		if time.Now().After(deadline) {
 			return "", errGrantUnconfirmed
 		}
-		if code != "api_key_admin_required" {
-			return "", fmt.Errorf("apiKey.create: %s: %w", code, err)
-		}
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-time.After(time.Second):
+		if err := pause(ctx); err != nil {
+			return "", err
 		}
 	}
+}
+
+// tryMintOrgKey makes one apiKey.create call; retry is true only while the
+// founder grant is still confirming.
+func (seeder *orgSeeder) tryMintOrgKey(ctx context.Context, input map[string]any) (token string, retry bool, err error) {
+	result, code, err := seeder.trpcPost(ctx, "apiKey.create", input)
+	if code == "api_key_admin_required" && err != nil {
+		return "", true, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("apiKey.create: %s: %w", code, err)
+	}
+	object, _ := result.(map[string]any)
+	if token, _ = object["token"].(string); token != "" {
+		return token, false, nil
+	}
+	return "", false, fmt.Errorf("apiKey.create returned no token")
 }
 
 // trpcPost posts one tRPC mutation over the session cookie. The wire is
 // {"json": input} in, result.data.json out; a domain error is returned with its
 // code so the caller can tell a pending grant from a real failure.
 func (seeder *orgSeeder) trpcPost(ctx context.Context, path string, input any) (any, string, error) {
-	status, body := seeder.call(ctx, http.MethodPost, "/api/trpc/"+path, nil, input)
+	status, body := seeder.call(ctx, apiCall{method: http.MethodPost, path: "/api/trpc/" + path, body: input})
 	return trpcResult(path, status, body)
 }
 
@@ -326,7 +355,7 @@ func (seeder *orgSeeder) trpcPost(ctx context.Context, path string, input any) (
 // has no superjson transformer, so input is sent and read unwrapped.
 func (seeder *orgSeeder) trpcGet(ctx context.Context, path string, input any) (any, string, error) {
 	encoded, _ := json.Marshal(input)
-	status, body := seeder.call(ctx, http.MethodGet, "/api/trpc/"+path+"?input="+url.QueryEscape(string(encoded)), nil, nil)
+	status, body := seeder.call(ctx, apiCall{method: http.MethodGet, path: "/api/trpc/" + path + "?input=" + url.QueryEscape(string(encoded))})
 	return trpcResult(path, status, body)
 }
 
@@ -386,7 +415,7 @@ func (seeder *orgSeeder) seedProject(ctx context.Context, org ToolOrg, index int
 	} else {
 		body["newTeamName"] = fmt.Sprintf("%s-t%d", seeder.options.Tool, index)
 	}
-	status, created := seeder.call(ctx, http.MethodPost, "/api/projects", bearer(org.OrgKey), body)
+	status, created := seeder.call(ctx, apiCall{method: http.MethodPost, path: "/api/projects", headers: bearer(org.OrgKey), body: body})
 	id, _ := created["id"].(string)
 	key, _ := created["serviceApiKey"].(string)
 	if !succeeded(status) || id == "" || key == "" {
@@ -405,18 +434,29 @@ func (seeder *orgSeeder) mintRestricted(ctx context.Context, org ToolOrg) string
 		"keyType": "service", "name": seeder.options.Tool + "-restricted", "permissionMode": "readonly",
 		"bindings": []map[string]any{{"role": "VIEWER", "scopeType": "PROJECT", "scopeId": org.Projects[0].ID}},
 	}
-	_, minted := seeder.call(ctx, http.MethodPost, "/api/api-keys", bearer(org.OrgKey), body)
+	_, minted := seeder.call(ctx, apiCall{method: http.MethodPost, path: "/api/api-keys", headers: bearer(org.OrgKey), body: body})
 	token, _ := minted["token"].(string)
 	return token
 }
 
-func (seeder *orgSeeder) call(ctx context.Context, method, path string, headers map[string]string, body any) (int, map[string]any) {
+// apiCall is one request to the stack: a method, a path under BaseURL, extra
+// headers and an optional JSON body.
+type apiCall struct {
+	method  string
+	path    string
+	headers map[string]string
+	body    any
+}
+
+// call sends one JSON request and returns the status and decoded object body;
+// a transport failure reads as status 0.
+func (seeder *orgSeeder) call(ctx context.Context, req apiCall) (int, map[string]any) {
 	var reader io.Reader
-	if body != nil {
-		encoded, _ := json.Marshal(body)
+	if req.body != nil {
+		encoded, _ := json.Marshal(req.body)
 		reader = bytes.NewReader(encoded)
 	}
-	request, err := http.NewRequestWithContext(ctx, method, seeder.options.BaseURL+path, reader)
+	request, err := http.NewRequestWithContext(ctx, req.method, seeder.options.BaseURL+req.path, reader)
 	if err != nil {
 		return 0, nil
 	}
@@ -424,7 +464,7 @@ func (seeder *orgSeeder) call(ctx context.Context, method, path string, headers 
 	if seeder.origin != "" {
 		request.Header.Set("Origin", seeder.origin) // better-auth CSRF wants the app origin
 	}
-	for key, value := range headers {
+	for key, value := range req.headers {
 		request.Header.Set(key, value)
 	}
 	response, err := seeder.client.Do(request)

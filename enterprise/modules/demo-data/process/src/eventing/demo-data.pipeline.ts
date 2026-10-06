@@ -19,7 +19,7 @@ import {
   demoDataRunStateSchema,
 } from "./demo-data.process.ts";
 
-export const DEMO_DATA_PIPELINE_NAME = "seed_demo";
+const DEMO_DATA_PIPELINE_NAME = "seed_demo";
 
 /** Replaces main's `/api/cron/seed_demo`: one run a day across the fleet, with no events of its own. */
 export function buildDemoDataPipeline(

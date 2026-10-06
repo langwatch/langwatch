@@ -29,7 +29,7 @@ func recordSpanForUsage(t *testing.T, u aitrace.Usage) sdktrace.ReadOnlySpan {
 	e := &Emitter{tp: tp, tracer: tp.Tracer("test"), propagator: propagation.TraceContext{}}
 
 	ctx, _ := e.BeginSpan(context.Background(), "proj-test", aitrace.RequestTypeMessages)
-	e.EndSpan(ctx, aitrace.AITraceParams{
+	e.EndSpan(ctx, aitrace.Params{
 		ProviderID: aitrace.ProviderAnthropic,
 		Model:      "claude-opus-4-7",
 		Usage:      u,

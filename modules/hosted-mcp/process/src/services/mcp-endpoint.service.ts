@@ -1,13 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { registerRoutePolicy } from "@langwatch/api";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { initConfig, tryGetConfig } from "@langwatch/mcp-server/config";
 import { classifyClient, createLogger, endpointClassOf } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { McpSessionRelayChannel } from "../channels/mcp-session-relay.channel.ts";
 import type { McpOAuthClientRepository } from "../repositories/mcp-oauth-client.repository.ts";
 import type { McpOAuthTokenRepository } from "../repositories/mcp-oauth-token.repository.ts";
+import type { McpSessionRelayRepository } from "../repositories/mcp-session-relay.repository.ts";
 import type { McpSessionRepository } from "../repositories/mcp-session.repository.ts";
 import {
   AUTHORIZATION_SERVER_METADATA_PATH,
@@ -21,16 +22,11 @@ import type { HeaderMcpClientAddressService } from "./header-mcp-client-address.
 import { McpCallerAuthService } from "./mcp-caller-auth.service.ts";
 import { McpHttpService } from "./mcp-http.service.ts";
 import { McpOAuthEndpointService } from "./mcp-oauth-endpoint.service.ts";
-import {
-  type McpApiKeyCipher,
-  type McpCliSessions,
-  McpOAuthTokenService,
-} from "./mcp-oauth-token.service.ts";
+import { type McpCliSessions, McpOAuthTokenService } from "./mcp-oauth-token.service.ts";
 import { McpSessionService } from "./mcp-session.service.ts";
 import { McpSseTransportService } from "./mcp-sse-transport.service.ts";
 import { McpStreamableTransportService } from "./mcp-streamable-transport.service.ts";
 import type { ProjectMcpProjectLookupService } from "./project-mcp-project-lookup.service.ts";
-import { registerRoutePolicy } from "@langwatch/api";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -48,15 +44,14 @@ export interface McpHandler {
   closeAllSessions: () => Promise<void>;
 }
 
-export type McpEndpointCollaborators = Readonly<{
+type McpEndpointCollaborators = Readonly<{
   sessionRecords: McpSessionRepository;
-  relay: McpSessionRelayChannel;
+  relay: McpSessionRelayRepository;
   oauthTokenRecords: McpOAuthTokenRepository;
   oauthClients: McpOAuthClientRepository;
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
   grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
   cliSessions: McpCliSessions;
-  cipher: McpApiKeyCipher;
   address: Pick<HeaderMcpClientAddressService, "clientIp">;
   sessionTools?: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
   /** The public origin the MCP client is told to come back to. */
@@ -98,7 +93,6 @@ export class McpEndpointService implements McpHandler {
     this.#sessions = McpSessionService.create({
       records: collaborators.sessionRecords,
       relay: collaborators.relay,
-      cipher: collaborators.cipher,
       sessionTools: collaborators.sessionTools,
     });
     this.#oauth = McpOAuthEndpointService.create({

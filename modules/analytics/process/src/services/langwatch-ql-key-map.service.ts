@@ -16,7 +16,7 @@ const lwqlCapability = LangWatchQLCapabilityService.create();
 const logger = createLogger("langwatch:lwql-key-map-service");
 
 /** Where the rows go: the restricted identity's names, and the database the approved views read. */
-export type LwqlKeyMapTarget = Readonly<{
+type LwqlKeyMapTarget = Readonly<{
   connection: LangWatchQLConnection;
   /** The app's own ClickHouse database, which holds the key map (migration 00084). */
   sourceDatabase: string;

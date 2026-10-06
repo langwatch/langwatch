@@ -37,12 +37,12 @@ const SIGNIN_INITIATION_SUFFIXES = [
   "/sign-in/oauth2",
 ] as const;
 
-export function isSignInInitiationPath(pathname: string): boolean {
+function isSignInInitiationPath(pathname: string): boolean {
   return SIGNIN_INITIATION_SUFFIXES.some((suffix) => pathname.endsWith(suffix));
 }
 
 /** What a shadow run answers, so a test can assert on it without a log. */
-export interface ShadowRun {
+interface ShadowRun {
   ran: boolean;
   matches?: boolean;
   routerProvider?: string;

@@ -122,6 +122,18 @@ describe("the browser application on the door", () => {
     expect(await response.text()).toContain("<body>app</body>");
   });
 
+  /** @scenario The HTML shell is served with a revalidate cache so reloads pick up new hashes */
+  it("serves the shell requested by its own name as html that caches must revalidate", async () => {
+    const response = await bundleOver(await fixture()).fetch(
+      new Request("http://localhost/index.html"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/html");
+    expect(response.headers.get("cache-control")).toBe("no-cache");
+    expect(await response.text()).toContain("<body>app</body>");
+  });
+
   /** @scenario "A built asset is missing" */
   it("answers 404 for a content-hashed asset that is gone, never the shell", async () => {
     const response = await bundleOver(await fixture()).fetch(

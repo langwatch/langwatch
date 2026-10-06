@@ -3,6 +3,7 @@
  */
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { EvaluatorApi, EvaluatorWithFields } from "@langwatch/evaluator-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type {
   EvaluatorAttachment,
@@ -86,6 +87,7 @@ beforeEach(() => {
   writes = [];
   created = 0;
   service = SuiteService.create({
+    featureFlags: createApiFixture<FeatureFlagApi>({}),
     repository: MemorySuiteRepository.create({ database: MemorySuiteDatabase.create() }),
     scenarios: createApiFixture<ScenarioApi>({
       findTestSuite: async () => stored,

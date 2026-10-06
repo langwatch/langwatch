@@ -4,7 +4,7 @@ import { Temporal, type Instant } from "@langwatch/time";
 import type { AuthSessionRepository } from "../repositories/auth-session.repository.ts";
 import { presentedSessionCookie } from "../rules/session-cookie.rules.ts";
 
-export interface PriorSessionServiceDeps {
+interface PriorSessionServiceDeps {
   sessions: Pick<AuthSessionRepository, "findExpiryByToken">;
   /** The address to greet; null when the account went after the session did. */
   findEmail(input: { userId: string }): Promise<string | null>;

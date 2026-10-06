@@ -162,7 +162,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
 
   @integration @regression
   Scenario: Repeating an inactive creation does not restore a departed person's access
-    Given a directory deactivated a person and their membership was removed
+    Given a directory deactivated a person, who stays a member holding nothing
     When it submits that person for creation with active false again
     Then the same directory resource remains inactive
     And no membership, role binding or department assignment is restored

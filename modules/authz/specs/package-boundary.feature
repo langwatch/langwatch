@@ -11,7 +11,7 @@ Feature: AuthZ package boundary
   I want authorization to follow the strict feature package layout
   So that every caller uses one portable contract and runtime details stay private
 
-  @architecture @typecheck
+  @unit @architecture @typecheck
   Scenario: AuthZ has one versioned feature root
     Given the AuthZ feature declares layoutVersion 0
     Then @langwatch/authz-contract contains its portable vocabulary, schemas, errors and service capabilities
@@ -27,14 +27,14 @@ Feature: AuthZ package boundary
     And the permission registry retains its exact append-only order
     And the package imports no Node, Prisma, Redis, Eventing, Hono, tRPC server code or application source
 
-  @architecture @contract @security
+  @unit @architecture @contract @security
   Scenario: Authorization witnesses can only be minted by the service
     Given a caller needs an Authorized witness
     When AuthzService authorizes the request
     Then the service returns the opaque witness after an allowed decision
     And the contract exports the witness type but no witness-minting function or subpath
 
-  @architecture @services
+  @unit @architecture @services
   Scenario: AuthZ exposes two service capabilities
     Given a runtime composes AuthZ
     Then AuthzService owns decisions, scope resolution and access reads
@@ -56,20 +56,13 @@ Feature: AuthZ package boundary
     When it builds the feature
     Then its engine-gate read failure and queue-bypassing write counters are in the process registry
 
-  @architecture @persistence
+  @unit @architecture @persistence
   Scenario: Persistence stays behind the server package
     Given AuthZ reads or writes authorization state
     Then its repository ports are abstract classes
     And Prisma-compatible implementations live only below repositories/prisma
     And generated Prisma types never cross a package export
     And ordinary app modules import neither an AuthZ repository nor @langwatch/authz-process
-
-  @architecture @persistence
-  Scenario: The move changes no durable model
-    Given the AuthZ packages move into the feature root
-    Then no authorization table is added or removed
-    And every grant and role event keeps its type, aggregate identity, tenant and idempotency semantics
-    And existing projection rows and migration tenant states remain readable
 
   @integration @eventing
   Scenario: Eventing registration is explicit

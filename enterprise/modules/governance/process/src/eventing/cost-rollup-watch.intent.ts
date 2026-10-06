@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import type { CostRollupDayComparer } from "../app/governance.members.ts";
+import type { CostRollupDayComparer } from "../services/cost-rollup-day-comparer.service.ts";
 
 const logger = createLogger("langwatch:governance:cost-rollup:watch");
 
@@ -54,7 +54,7 @@ export const compareCostRollupDaySchema = z.object({
   costSource: z.string().min(1),
 });
 
-export type CompareCostRollupDayPayload = z.infer<typeof compareCostRollupDaySchema>;
+type CompareCostRollupDayPayload = z.infer<typeof compareCostRollupDaySchema>;
 
 /**
  * Where a disagreement becomes drift, or does not — the attempt number is

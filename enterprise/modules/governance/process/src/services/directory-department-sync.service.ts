@@ -13,7 +13,7 @@ import type { IdentityMatchService } from "./identity-match.service.ts";
 
 const logger = createLogger("langwatch:governance:directory-departments");
 
-export interface DirectoryDepartmentSyncDependencies {
+interface DirectoryDepartmentSyncDependencies {
   departments: Pick<
     DepartmentService,
     "resolveByNameOrCreate" | "assignUser" | "findOpenUserLinks"

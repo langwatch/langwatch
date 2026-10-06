@@ -1,4 +1,4 @@
-import { bindRestHeader } from "@langwatch/api/rest";
+import { bindRestHeader, canonicalErrorResponse } from "@langwatch/api/rest";
 import { scenarioRestResponseWithPlatformUrlSchema } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
@@ -7,7 +7,6 @@ import {
   createScenarioRestTestApp,
   createScenarioRestTestRuntime,
   PROJECT_ID,
-  scenarioRestTestErrors,
 } from "./scenario-rest.harness.ts";
 
 async function buildScenarioFamily(
@@ -17,7 +16,7 @@ async function buildScenarioFamily(
   const { runtime, projectFacts } = createScenarioRestTestRuntime(runtimeOptions);
   const mounted = runtime.mount(createScenarioRest().router(), {
     app: () => app,
-    onError: scenarioRestTestErrors,
+    onError: canonicalErrorResponse,
     facts: [projectFacts, bindRestHeader(scenarioRestSurface, "x-langwatch-surface")],
   });
 
@@ -114,6 +113,34 @@ describe("the scenarios REST declaration", () => {
     });
   });
 
+  describe("when a scenario is created with field values", () => {
+    /** @scenario "The scenario API accepts and returns field values" */
+    it("answers the fields on create and on read", async () => {
+      const family = await buildScenarioFamily();
+      const suite = await family.app.createTestSuite({
+        projectId: PROJECT_ID,
+        name: "Case lookups",
+        fields: [{ identifier: "golden_sql", type: "text" }],
+      });
+
+      const createdResponse = await createScenario(family, {
+        name: "Chargebacks by quarter",
+        situation: "An analyst asks for chargebacks per quarter",
+        testSuiteId: suite.id,
+        fields: { golden_sql: "SELECT 1" },
+      });
+
+      expect(createdResponse.status).toBe(201);
+      const created = scenarioRestResponseWithPlatformUrlSchema.parse(await createdResponse.json());
+      expect(created.fields).toEqual({ golden_sql: "SELECT 1" });
+      const readResponse = await family.request(`/api/scenarios/${created.id}`);
+      expect(readResponse.status).toBe(200);
+      await expect(readResponse.json()).resolves.toMatchObject({
+        fields: { golden_sql: "SELECT 1" },
+      });
+    });
+  });
+
   describe("when clearing a model override", () => {
     /** @scenario "Update over REST clears a model override with null" */
     it("stores and returns null", async () => {
@@ -175,6 +202,36 @@ describe("the scenarios REST declaration", () => {
       });
     });
   });
+
+  describe("when the body carries a field the endpoint does not have", () => {
+    it.each(["PUT", "PATCH"])(
+      "%s answers 422 naming the field and changes nothing",
+      async (method) => {
+        const family = await buildScenarioFamily();
+        const createdResponse = await createScenario(family, {
+          name: "Strict Update",
+          situation: "Original situation",
+          labels: ["original"],
+        });
+        const created = scenarioRestResponseWithPlatformUrlSchema.parse(
+          await createdResponse.json(),
+        );
+
+        const response = await family.request(`/api/scenarios/${created.id}`, {
+          method,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ labels: ["relabelled"], status: "active" }),
+        });
+
+        expect(response.status).toBe(422);
+        const body = await response.text();
+        expect(JSON.parse(body)).toMatchObject({ code: "validation_error" });
+        expect(body).toContain("status");
+        const row = await family.app.getById({ id: created.id, projectId: PROJECT_ID });
+        expect(row.labels).toEqual(["original"]);
+      },
+    );
+  });
 });
 
 describe("given an id no scenario in this project carries", () => {
@@ -193,6 +250,6 @@ describe("given an id no scenario in this project carries", () => {
 
     expect(response.status).toBe(404);
     // The code, not the sentence: the sentence is copy the registry owns.
-    await expect(response.json()).resolves.toMatchObject({ error: "scenario_not_found" });
+    await expect(response.json()).resolves.toMatchObject({ code: "scenario_not_found" });
   });
 });

@@ -20,7 +20,6 @@ import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
-import type { GatewayClickHouseResolver } from "../../app/gateway.members.ts";
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
 import {
   GatewaySpendEventsRepository,
@@ -34,6 +33,7 @@ import {
   EMPTY_SPEND_USAGE,
   GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
 } from "../../rules/gateway-spend-projection.rules.ts";
+import type { GatewayClickHouseResolver } from "./clickhouse.gateway-session.store.ts";
 
 const asString = (value: unknown): string =>
   typeof value === "string" || typeof value === "number" || typeof value === "bigint"
@@ -55,7 +55,7 @@ const SUMMARIES_MAX_EXECUTION_SECONDS = 60;
 
 const logger = createLogger("langwatch:gateway:spend-repository");
 
-export const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
+const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
           PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
           TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
           TokensReasoning, TokensInputImage, TokensOutputImage, ImageCount,

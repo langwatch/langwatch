@@ -55,7 +55,7 @@ export const scimWebhookRest = defineRestRouter(ScimApi)
   .post("/api/webhooks/auth0-scim", "receiveAuth0ScimWebhook")
   // The HMAC is computed over these exact characters, so nothing parses them
   // first: a parse-then-reserialise verifies nothing.
-  .withRawBody("text", { mediaType: "application/json" })
+  .withRawBody("text", { mediaType: "application/json", mismatch: "accepted" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(
     publicRoute({

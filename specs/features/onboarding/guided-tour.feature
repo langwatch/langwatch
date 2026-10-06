@@ -249,6 +249,13 @@ Feature: Guided onboarding tour
     Then the action is no longer registered
 
   @unit
+  Scenario: a page outside onboarding registers its tour actions through the guided tour lend
+    Given onboarding lends the guided tour and the virtual keys page reads it
+    When the page registers "openVirtualKeyCreate" through the lend
+    Then the tour can call it while the page is mounted
+    And a composition without onboarding gives the page a lend that registers nothing
+
+  @unit
   Scenario: the gateway tour opens the real create drawer, types the name and submits it
     Given the gateway tour is running on the virtual keys page
     When the cursor lands on the New key button

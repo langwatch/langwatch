@@ -14,20 +14,21 @@ import {
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ExecutionSummary, Experiment, ExperimentRun } from "@langwatch/experiment-contract";
 import { NotFoundError } from "@langwatch/handled-error";
+import { resolveRequestBound } from "@langwatch/plans";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { ExperimentModule, type ExperimentAppDependencies } from "../../app/experiment.app.ts";
-import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
-import type { ExperimentRunStreamMessage } from "../../channels/experiment-run-event-stream.channel.ts";
 import type { ExperimentRunProcessingPipeline } from "../../eventing/experiment-run-processing.pipeline.ts";
 import { experimentProcessModule } from "../../experiment.module.ts";
 import type { ExperimentIdLookupRepository } from "../../repositories/experiment-id-lookup.repository.ts";
+import type { ExperimentRunStreamMessage } from "../../repositories/experiment-run-event-stream.repository.ts";
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
-import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment-run-abort.repository.ts";
+import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
+import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment.repositories.ts";
 import { runRefusalsOf } from "../../rules/experiment-run-availability.rules.ts";
 import type {
   ExecutionDataServices,
@@ -135,7 +136,7 @@ function runPipeline({
       state: folded({ ...run, projectId: run.tenantId, status: "running", progress: 0 }),
     });
   };
-  const stream = experimentRunEventStreamChannels.memory.create();
+  const stream = MemoryExperimentRunEventStreamRepository.create();
   const commands = ExperimentRunCommandDispatcherService.create();
   const sent: { starts: unknown[]; completions: unknown[]; aborts: unknown[] } = {
     starts: [],
@@ -410,6 +411,20 @@ describe("POST /api/experiments/:slug/run", () => {
 
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({ code: "experiment_evaluation_input_invalid" });
+    });
+  });
+
+  describe("when the body is past the route's cap", () => {
+    it("refuses 413 with the framework's payload-too-large code before the experiment is read", async () => {
+      const findBySlugAndType = vi.fn();
+      const { request } = await harness({ experiments: { findBySlugAndType } });
+      const cap = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
+
+      const response = await request("/checkout-eval/run", runOf(" ".repeat(cap + 1)));
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toMatchObject({ code: "payload_too_large" });
+      expect(findBySlugAndType).not.toHaveBeenCalled();
     });
   });
 
@@ -847,7 +862,10 @@ describe("GET /api/experiments/runs/:runId/results", () => {
 });
 
 describe("POST /api/experiments/abort", () => {
-  /** @scenario "Aborting a run reads its progress fold and refuses another project's run" */
+  /**
+   * @scenario "Aborting a run reads its progress fold and refuses another project's run"
+   * @scenario "A resource id from the body is verified against the authenticated tenant"
+   */
   it("answers 404 for a run another project owns, and stops nothing", async () => {
     const { abortRun, abort, aborts } = await harness({
       redis: true,
@@ -955,6 +973,73 @@ describe("POST /api/experiments/execute", () => {
       "execution_started",
       "done",
     ]);
+  });
+
+  describe("when the run API is asked for a run the page started", () => {
+    const pageRun = async () => {
+      const made = await harness({
+        experiments: { isActive: async () => true },
+        redis: true,
+        worker,
+      });
+      const frames = (await framesOf(await made.execute(request))) as {
+        type: string;
+        runId?: string;
+      }[];
+      const runId = frames.find((frame) => frame.type === "execution_started")?.runId;
+      if (runId === undefined) throw new Error("the page's stream never named its run");
+
+      return { ...made, runId };
+    };
+    const ended = (runId: string, overrides: Partial<ExperimentRunProgressState>) =>
+      folded({ runId, status: "completed", finishedAt: 20, ...overrides });
+
+    /** @scenario "A run started from the open page is readable by the run API" */
+    it("reports its progress, and its summary once it ends", async () => {
+      const { request: poll, folds, runId } = await pageRun();
+
+      expect(await (await poll(`/runs/${runId}`)).json()).toMatchObject({
+        runId,
+        status: "running",
+      });
+
+      const summary = { ...doneSummary(runId), runUrl: `https://app.test/acme/${runId}` };
+      await folds.writeProgress({ state: ended(runId, { summary }) });
+
+      expect(await (await poll(`/runs/${runId}`)).json()).toMatchObject({
+        runId,
+        status: "completed",
+        summary,
+      });
+    });
+
+    /** @scenario "A run started from the open page is readable by the run API" */
+    it("reads a stopped run as stopped, and a failed one by its code alone", async () => {
+      const { request: poll, folds, runId } = await pageRun();
+
+      await folds.writeProgress({ state: ended(runId, { status: "stopped" }) });
+      expect(await (await poll(`/runs/${runId}`)).json()).toMatchObject({
+        status: "stopped",
+        finishedAt: 20,
+      });
+
+      await folds.writeProgress({
+        state: ended(runId, { status: "failed", error: "boom_code", traceId: "trace-1" }),
+      });
+      const failed = await (await poll(`/runs/${runId}`)).json();
+      expect(failed).toMatchObject({ status: "failed", error: "boom_code" });
+      expect(Object.keys(failed)).not.toContain("message");
+    });
+
+    /** @scenario "A run started from the open page is readable by the run API" */
+    it("still answers run_not_found for a run id nothing knows", async () => {
+      const { request: poll } = await pageRun();
+
+      const response = await poll("/runs/run-nothing-knows");
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ code: "run_not_found" });
+    });
   });
 
   /** @scenario "A streamed workbench run subscribes to its frames, then starts on the run's pipeline" */

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { AutomationEvaluationQueryClassification } from "../../app/automation.members.ts";
+import type { AutomationEvaluationQueryClassification } from "../automation-evaluation-trigger-filter.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "../automation-evaluation-trigger-filter.service.ts";
 
 class TestTraceService implements AutomationEvaluationQueryClassification {

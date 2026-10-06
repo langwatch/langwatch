@@ -136,12 +136,11 @@ describe.skipIf(!databaseUrl)("the version a suite run reads for its stamp", () 
       ["simulationSuite", { projectId }],
     ]);
     scenarios = ScenarioService.create({
-      repository: PrismaScenarioRepository.create(db),
+      repository: PrismaScenarioRepository.create(db, new TestSecretCipher()),
       simulations: createApiFixture<SimulationService>(),
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),
       clock: new TestClock(),
-      secretCipher: new TestSecretCipher(),
     });
   });
 

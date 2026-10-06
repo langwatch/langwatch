@@ -6,13 +6,14 @@ import { ClickHouseEvaluationRepository } from "../clickhouse/evaluation.reposit
 import { ClickHouseMonitorPerformanceRepository } from "../clickhouse/monitor-performance.repository.ts";
 import type { EvaluationRepositories } from "../evaluation.repositories.ts";
 import { ObjectStorageEvaluationInputRepository } from "../object-storage/object-storage.evaluation-input.repository.ts";
+import { ObjectStorageEvaluationLangevalsStagingRepository } from "../object-storage/object-storage.evaluation-langevals-staging.repository.ts";
 import { PostgresEvaluationRepositories } from "../prisma/prisma.evaluation.repositories.ts";
 import { RedisEvaluationAnalyticsFoldCacheRepository } from "../redis/redis.evaluation-analytics-fold-cache.repository.ts";
 
 /**
  * Evaluation's live stores: the cost ledger in Prisma, run history and the
  * trend in ClickHouse, the analytics fold's cache in Redis, oversized inputs
- * in object storage.
+ * in object storage, and so are the payloads staged for langevals.
  */
 export class LiveEvaluationRepositories {
   static readonly requires = ["prisma", "clickhouse", "redis", "objectStorage"] as const;
@@ -36,6 +37,7 @@ export class LiveEvaluationRepositories {
       monitorPerformance: ClickHouseMonitorPerformanceRepository.create({ resolveClient }),
       analyticsFoldCache: RedisEvaluationAnalyticsFoldCacheRepository.create(redis),
       inputs: ObjectStorageEvaluationInputRepository.create({ objectStorage }),
+      langevalsStaging: ObjectStorageEvaluationLangevalsStagingRepository.create({ objectStorage }),
     };
   }
 }

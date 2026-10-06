@@ -1,11 +1,14 @@
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { UserNotFoundError } from "@langwatch/user-contract";
 
-type Database = Pick<PrismaClient, "user" | "organization" | "organizationUser" | "project">;
+import type { AuthDirectoryRepository } from "../auth-directory.repository.ts";
 
-export class PrismaAuthDirectoryRepository {
+type Database = Pick<PrismaClient, "user" | "organization" | "organizationUser" | "project">;
+type LiveProject = Prisma.ProjectGetPayload<{ select: typeof PROJECT_FIELDS }>;
+
+export class PrismaAuthDirectoryRepository implements AuthDirectoryRepository {
   private constructor(private readonly database: Database) {}
 
   static create(database: Database): PrismaAuthDirectoryRepository {
@@ -65,13 +68,27 @@ export class PrismaAuthDirectoryRepository {
     return membership !== null;
   }
 
+  async findActiveMemberRole({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<string | null> {
+    const membership = await this.database.organizationUser.findFirst({
+      where: { userId, organizationId, disabledAt: null },
+      select: { role: true },
+    });
+    return membership?.role ?? null;
+  }
+
   async getLiveProject({
     projectId,
     organizationId,
   }: {
     projectId: string;
     organizationId: string;
-  }) {
+  }): Promise<LiveProject> {
     const project = await this.database.project.findFirst({
       where: { id: projectId, archivedAt: null, team: { organizationId } },
       select: PROJECT_FIELDS,
@@ -87,7 +104,7 @@ export class PrismaAuthDirectoryRepository {
   }: {
     projectRef: string;
     organizationId: string;
-  }) {
+  }): Promise<LiveProject> {
     const live = { archivedAt: null, team: { organizationId } };
     const project =
       (await this.database.project.findFirst({

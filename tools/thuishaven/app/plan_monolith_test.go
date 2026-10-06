@@ -29,7 +29,7 @@ func planMonolith(t *testing.T, sel domain.Selection) (children []Child, repo st
 	t.Helper()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 	repo = t.TempDir()
-	return o.planChildren(monolithStack(), PlanOptions{RepoRoot: repo, Selection: sel}, repo, ""), repo
+	return o.planChildren(monolithStack(), PlanOptions{RepoRoot: repo, Selection: sel}, repo), repo
 }
 
 // One process serves the browser application and its API in that checkout, so
@@ -127,7 +127,7 @@ func TestMonolithAppLaneCapturesItsOwnLog(t *testing.T) {
 			repo := t.TempDir()
 			st := monolithStack()
 			st.WorktreeDir = repo
-			children := o.planChildren(st, PlanOptions{RepoRoot: repo}, repo, "")
+			children := o.planChildren(st, PlanOptions{RepoRoot: repo}, repo)
 
 			app, _ := findChild(children, domain.MonolithAppLane)
 			want := filepath.Join(st.WorktreeDir, ".haven", "logs", st.Slug, "app.log")

@@ -13,13 +13,13 @@ export const topicClusteringSeedSchema = z.object({
 export const topicClusteringSeedStateSchema = z.object({
   lastSeededAt: z.number().nullable(),
 });
-export type TopicClusteringSeedState = z.infer<typeof topicClusteringSeedStateSchema>;
+type TopicClusteringSeedState = z.infer<typeof topicClusteringSeedStateSchema>;
 
 export const TOPIC_CLUSTERING_SEED_INITIAL_STATE: TopicClusteringSeedState = {
   lastSeededAt: null,
 };
 
-export type TopicClusteringSeedIntents = {
+type TopicClusteringSeedIntents = {
   seedTopicModels: IntentSpec<typeof topicClusteringSeedSchema>;
   seedSchedules: IntentSpec<typeof topicClusteringSeedSchema>;
 };

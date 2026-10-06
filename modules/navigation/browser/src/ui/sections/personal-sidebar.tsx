@@ -1,7 +1,7 @@
 /**
  * Personal column entries (usage, traces, sessions, library). PersonalSidebarLinks
  * only; column came from DashboardLayout (deleted). Personal project from host.
- * Spec: specs/navigation/product-sidebars.feature
+ * Spec: modules/navigation/specs/product-sidebars.feature
  */
 
 import {

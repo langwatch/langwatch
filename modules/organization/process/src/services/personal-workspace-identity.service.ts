@@ -3,8 +3,11 @@ import { randomBytes } from "node:crypto";
 import { newAuthzGrantId } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 
-import type { PersonalWorkspaceIdentity } from "../app/organization.members.ts";
 import type { PersonalWorkspaceResourceIds } from "../repositories/organization.repository.ts";
+
+export interface PersonalWorkspaceIdentity {
+  create(input: { userId: string; organizationId: string }): PersonalWorkspaceResourceIds;
+}
 
 /** KSUID resource prefixes: a persisted format, since each id is written into a customer's row. */
 const TEAM_KSUID_RESOURCE = "team";

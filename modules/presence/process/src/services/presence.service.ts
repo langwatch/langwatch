@@ -10,18 +10,21 @@ import {
   type PresenceSession,
   type PresenceUpdateInput,
 } from "@langwatch/presence-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { PresenceBroadcast, PresenceDiagnostics } from "../app/presence.app.ts";
 import type { PresenceRepository } from "../repositories/presence.repository.ts";
+import type { PresenceSettingsService } from "./presence-settings.service.ts";
+
+/** Whether presence is on for a project, as presence's own fold answers it. */
+type PresenceSettings = Pick<PresenceSettingsService, "isEnabledForProject">;
 
 export const PRESENCE_TTL_SECONDS = 30;
 
 export class PresenceService {
   private readonly repository: PresenceRepository;
   private readonly broadcast: PresenceBroadcast;
-  private readonly projects: ProjectApi;
+  private readonly settings: PresenceSettings;
   private readonly diagnostics: PresenceDiagnostics;
   private readonly ttlSeconds: number;
   private readonly now: () => number;
@@ -29,21 +32,21 @@ export class PresenceService {
   private constructor({
     repository,
     broadcast,
-    projects,
+    settings,
     diagnostics,
     ttlSeconds,
     now,
   }: {
     repository: PresenceRepository;
     broadcast: PresenceBroadcast;
-    projects: ProjectApi;
+    settings: PresenceSettings;
     diagnostics: PresenceDiagnostics;
     ttlSeconds: number;
     now: () => number;
   }) {
     this.repository = repository;
     this.broadcast = broadcast;
-    this.projects = projects;
+    this.settings = settings;
     this.diagnostics = diagnostics;
     this.ttlSeconds = ttlSeconds;
     this.now = now;
@@ -52,7 +55,7 @@ export class PresenceService {
   static create(options: {
     repository: PresenceRepository;
     broadcast: PresenceBroadcast;
-    projects: ProjectApi;
+    settings: PresenceSettings;
     diagnostics: PresenceDiagnostics;
     ttlSeconds?: number;
     now?: () => number;
@@ -65,7 +68,7 @@ export class PresenceService {
     return new PresenceService({
       repository: options.repository,
       broadcast: options.broadcast,
-      projects: options.projects,
+      settings: options.settings,
       diagnostics: options.diagnostics,
       ttlSeconds,
       now: options.now ?? (() => nowInstant().epochMilliseconds),
@@ -73,7 +76,7 @@ export class PresenceService {
   }
 
   isEnabledForProject(input: PresenceProjectInput): Promise<boolean> {
-    return this.projects.isPresenceEnabled(input);
+    return this.settings.isEnabledForProject(input);
   }
 
   async update(input: PresenceUpdateInput): Promise<PresenceSession> {

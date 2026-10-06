@@ -7,16 +7,16 @@ import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract
 import { describe, expect, it } from "vitest";
 
 import {
-  type TraceIoExtraction,
-  type TraceIoSide,
-  type TraceIoValue,
-} from "../../app/trace.members.ts";
-import {
   createInitState,
   createTestSpan,
 } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
 import { TraceIOAccumulationService } from "../trace-io-accumulation.service.ts";
+import type {
+  TraceIoExtraction,
+  TraceIoSide,
+  TraceIoValue,
+} from "../trace-io-extraction.service.ts";
 import { TraceMediaReferenceService } from "../trace-media-reference.service.ts";
 
 type Rich = { raw: unknown; text: string; source: "gen_ai" | "langwatch" };

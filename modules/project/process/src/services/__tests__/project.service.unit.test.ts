@@ -10,9 +10,12 @@ import {
 } from "@langwatch/organization-contract";
 import {
   DestinationTeamNotFoundError,
+  GovernanceProjectProtectedError,
+  GOVERNANCE_PROJECT_ROUTE_REFUSAL,
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
   PROJECT_KIND,
+  ProjectNotFoundError,
   projectSchema,
   type InternalProject,
   type Project,
@@ -380,7 +383,11 @@ const createService = (
   organizations = new StubOrganizationService(),
   created = ProjectCreatedNoticeService.create({
     logger: { error: () => void 0 },
-    projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+    projects: {
+      findWithOrgAdmin: async () => null,
+      findIdsByOrganization: async () => [],
+      findWithTeam: async () => null,
+    },
   }),
 ): ProjectService =>
   ProjectService.create({
@@ -487,6 +494,7 @@ describe("ProjectService", () => {
     expect(repository.countLiveNonGovernanceProjects).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A feature reads an internal project" */
   it("returns the existing internal project without creating", async () => {
     const repository = new StubRepository();
     repository.existing = project;
@@ -500,6 +508,7 @@ describe("ProjectService", () => {
     expect(repository.createInternalOrFindWinner).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A feature ensures an internal project" */
   it("creates the internal project on the oldest team", async () => {
     const repository = new StubRepository();
 
@@ -518,6 +527,7 @@ describe("ProjectService", () => {
     });
   });
 
+  /** @scenario "A feature ensures an internal project" */
   it("rejects an organization with no team", async () => {
     const repository = new StubRepository();
     const organizations = new StubOrganizationService();
@@ -540,6 +550,7 @@ describe("ProjectService", () => {
     expect(repository.isPresenceEnabled).toHaveBeenCalledWith("project-1");
   });
 
+  /** @scenario The organization is resolved through the project's team */
   it("returns the project organization through the throwing Project service", async () => {
     const repository = new StubRepository();
     repository.findWithTeam.mockResolvedValue({
@@ -561,6 +572,17 @@ describe("ProjectService", () => {
     await expect(createService(repository).getOrganizationId("project_1")).resolves.toBe("org");
   });
 
+  /** @scenario An unknown or archived project has no organization */
+  it("fails with ProjectNotFoundError when the tenant names no active project", async () => {
+    const repository = new StubRepository();
+    repository.findWithTeam.mockResolvedValue(null);
+
+    await expect(
+      createService(repository).getOrganizationId("project_missing"),
+    ).rejects.toBeInstanceOf(ProjectNotFoundError);
+  });
+
+  /** @scenario "A compatibility caller resolves a project tenant target" */
   it("returns absence for a missing or orphaned compatibility tenant lookup", async () => {
     const repository = new StubRepository();
     repository.findOrganizationId.mockResolvedValue(undefined);
@@ -571,6 +593,7 @@ describe("ProjectService", () => {
     expect(repository.findOrganizationId).toHaveBeenCalledWith("project_missing");
   });
 
+  /** @scenario "A project is created in an existing shared team" */
   it("creates an application project through its own repository", async () => {
     const repository = new StubRepository();
     const organizations = new StubOrganizationService();
@@ -613,11 +636,16 @@ describe("ProjectService", () => {
       const send = vi.fn(() => Promise.resolve());
       const created = ProjectCreatedNoticeService.create({
         logger: { error: () => void 0 },
-        projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+        projects: {
+          findWithOrgAdmin: async () => null,
+          findIdsByOrganization: async () => [],
+          findWithTeam: async () => null,
+        },
       });
       created.connect({
         recordProjectCreated: { send },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
+        recordPresenceSettingChanged: { send: async () => undefined },
       });
 
       await createService(new StubRepository(), new StubOrganizationService(), created).create(
@@ -638,11 +666,16 @@ describe("ProjectService", () => {
       const error = vi.fn();
       const created = ProjectCreatedNoticeService.create({
         logger: { error },
-        projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+        projects: {
+          findWithOrgAdmin: async () => null,
+          findIdsByOrganization: async () => [],
+          findWithTeam: async () => null,
+        },
       });
       created.connect({
         recordProjectCreated: { send: () => Promise.reject(new Error("queue down")) },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
+        recordPresenceSettingChanged: { send: async () => undefined },
       });
 
       await expect(
@@ -655,6 +688,7 @@ describe("ProjectService", () => {
     });
   });
 
+  /** @scenario "A project is created with a new team" */
   it("asks Organization to create and grant a new team", async () => {
     const repository = new StubRepository();
     const organizations = new StubOrganizationService();
@@ -797,6 +831,8 @@ describe("ProjectService", () => {
     expect(repository.findActiveByScopes).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A project is created in an existing shared team" */
+  /** @scenario "A personal workspace project is protected" */
   it("does not allow an application project into a personal workspace", async () => {
     const repository = new StubRepository();
     const organizations = new StubOrganizationService();
@@ -872,6 +908,7 @@ describe("ProjectService", () => {
   };
 
   /** @scenario Editing a project cannot move it out of a personal workspace */
+  /** @scenario "A personal workspace project is protected" */
   it("refuses to move a personal project into a shared team", async () => {
     const { outcome, repository } = await attemptBoundaryMove({
       current: projectWithTeam({ isPersonal: true, teamId: "personal" }),
@@ -883,6 +920,7 @@ describe("ProjectService", () => {
   });
 
   /** @scenario Editing a project cannot move it into a personal workspace */
+  /** @scenario "A personal workspace project is protected" */
   it("refuses to move a shared project into a personal workspace", async () => {
     const { outcome, repository } = await attemptBoundaryMove({
       current: projectWithTeam({ isPersonal: false, teamId: "shared" }),
@@ -922,6 +960,7 @@ describe("ProjectService", () => {
   });
 
   /** @scenario tRPC project.update rejects cross-org team */
+  /** @scenario "Project settings cross an organization boundary" */
   it("refuses a destination team that belongs to another organization", async () => {
     const repository = new StubRepository();
     const organizations = new StubOrganizationService();
@@ -958,6 +997,7 @@ describe("ProjectService", () => {
   });
 
   /** @scenario Deleting a project cannot empty a personal workspace */
+  /** @scenario "A personal workspace project is protected" */
   it("refuses to archive a personal project", async () => {
     const repository = new StubRepository();
     repository.findWithTeam.mockResolvedValue(projectWithTeam({ isPersonal: true }));
@@ -969,6 +1009,76 @@ describe("ProjectService", () => {
       }),
     ).rejects.toBeInstanceOf(PersonalProjectProtectedError);
     expect(repository.archive).not.toHaveBeenCalled();
+  });
+
+  describe("given the hidden governance project", () => {
+    const governance = () =>
+      projectWithTeam({ kind: PROJECT_KIND.INTERNAL_GOVERNANCE, id: "governance-project" });
+
+    /** @scenario The governance area cannot be archived through the projects API */
+    it("refuses to archive it, naming it an internal record", async () => {
+      const repository = new StubRepository();
+      repository.findWithTeam.mockResolvedValue(governance());
+
+      const refusal = await createService(repository)
+        .archive({ id: "governance-project", organizationId: "org" })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toBeInstanceOf(GovernanceProjectProtectedError);
+      expect((refusal as Error).message).toBe(GOVERNANCE_PROJECT_ROUTE_REFUSAL);
+      expect((refusal as Error).message).toContain("internal governance record, not a workspace");
+      expect(repository.archive).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The governance area cannot be renamed or moved through the projects API */
+    it("refuses to rename it and refuses to move it to another team", async () => {
+      const repository = new StubRepository();
+      repository.findWithTeam.mockResolvedValue(governance());
+      const organizations = new StubOrganizationService();
+      organizations.findActiveTeam.mockResolvedValue({ id: "team_2", isPersonal: false });
+      const service = createService(repository, organizations);
+
+      await expect(
+        service.update({ id: "governance-project", organizationId: "org", data: { name: "x" } }),
+      ).rejects.toBeInstanceOf(GovernanceProjectProtectedError);
+      await expect(
+        service.update({
+          id: "governance-project",
+          organizationId: "org",
+          data: { teamId: "team_2" },
+        }),
+      ).rejects.toBeInstanceOf(GovernanceProjectProtectedError);
+      expect(repository.update).not.toHaveBeenCalled();
+    });
+
+    it("leaves another organization's project to the repository, not to the guard", async () => {
+      const repository = new StubRepository();
+      repository.findWithTeam.mockResolvedValue(
+        projectWithTeam({
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+          team: { ...projectWithTeam().team, organizationId: "someone-else" },
+        }),
+      );
+
+      await expect(
+        createService(repository).archive({ id: "governance-project", organizationId: "org" }),
+      ).resolves.toMatchObject({ id: applicationProject.id });
+      expect(repository.archive).toHaveBeenCalledOnce();
+    });
+
+    /** @scenario An ordinary project is unaffected by the guard */
+    it("renames and archives an ordinary project as before", async () => {
+      const repository = new StubRepository();
+      repository.findWithTeam.mockResolvedValue(projectWithTeam());
+      const service = createService(repository);
+
+      await expect(
+        service.update({ id: applicationProject.id, organizationId: "org", data: { name: "x" } }),
+      ).resolves.toBe(applicationProject);
+      await expect(
+        service.archive({ id: applicationProject.id, organizationId: "org" }),
+      ).resolves.toMatchObject({ id: applicationProject.id });
+    });
   });
 
   it("mints a slug from the name and generated project id", async () => {
@@ -987,6 +1097,8 @@ describe("ProjectService", () => {
     );
   });
 
+  /** @scenario An active project is stamped when its activity is stale */
+  /** @scenario A mapped pull request stamps its own column */
   it("keeps coding-agent activity columns on independent clocks", async () => {
     const repository = new StubRepository();
     const at = fromDate(new Date("2026-08-25T12:00:00.000Z"));

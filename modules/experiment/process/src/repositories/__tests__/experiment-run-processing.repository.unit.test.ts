@@ -2,7 +2,6 @@ import { createTenantId } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
 import { ExecuteExperimentCellCommand } from "../../eventing/experiment-run-cell.commands.ts";
 import type { ExperimentRunExecutionEffects } from "../../eventing/experiment-run-execution.process.ts";
 import { createExperimentRunFramesSubscriber } from "../../eventing/experiment-run-frames.subscriber.ts";
@@ -13,6 +12,7 @@ import type { ClickHouseExperimentRunResultRecord } from "../../eventing/experim
 import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
 import type { WorkflowEvaluationRunner } from "../../eventing/experiment-workflow-evaluation.subscriber.ts";
 import type { ExperimentRunCellService } from "../../services/experiment-run-cell.service.ts";
+import { MemoryExperimentRunEventStreamRepository } from "../memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../memory/memory.experiment-run-fold.repository.ts";
 import { RedisExperimentRunProcessingRepository } from "../redis/redis.experiment-run-processing.repository.ts";
 
@@ -112,7 +112,7 @@ function compose(options: { foldCacheTtlSeconds?: number } = {}) {
     }),
     runExecution: createApiFixture<ExperimentRunExecutionEffects>({}, "runExecution"),
     runFrames: createExperimentRunFramesSubscriber({
-      stream: experimentRunEventStreamChannels.memory.create(),
+      stream: MemoryExperimentRunEventStreamRepository.create(),
     }),
   });
 

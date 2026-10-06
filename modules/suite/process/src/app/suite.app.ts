@@ -2,7 +2,6 @@ import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contra
 /**
  * The suite feature's application: what both of its doors call.
  */
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   EvaluatorApi,
@@ -10,7 +9,6 @@ import {
   type EvaluatorWithFields,
 } from "@langwatch/evaluator-contract";
 import {
-  RepositoryFoldStore,
   type EventingCommands,
   type FoldProjectionStore,
   type RetentionPolicyResolver,
@@ -41,12 +39,13 @@ import {
 import {
   SuiteApi,
   SuiteNotFoundError,
-  SUITE_RUN_PROJECTION_VERSIONS,
   type SuiteRunParameters,
   type SuiteRunResult,
   type SuiteRunStateData,
   SuiteScopeNotAllowedError,
+  type SuiteServerConfig,
   type SuiteTarget,
+  suiteConfig,
   type CreateSuiteCommand,
   type CompleteSuiteRunItemCommandData,
   type ConnectedTargetAgent,
@@ -66,14 +65,11 @@ import {
   OrganizationNotFoundForProjectError,
 } from "@langwatch/suite-contract";
 import type { Instant } from "@langwatch/time";
-import type { Cluster, Redis } from "ioredis";
 
 import {
   buildSuiteRunProcessingPipeline,
   type SuiteRunProcessingPipeline,
 } from "../eventing/suite-run-processing.pipeline.ts";
-import { ClickhouseSuiteEventingRepository } from "../repositories/clickhouse/clickhouse.suite-eventing.repository.ts";
-import { RedisSuiteRunProcessingRepository } from "../repositories/redis/redis.suite-run-processing.repository.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
 import { AgentOwnerNamesService } from "../services/agent-owner-names.service.ts";
@@ -96,11 +92,11 @@ import { SuiteService } from "../services/suite.service.ts";
  * are stored and shaped differently, so the application says which it found
  * and each door renders it the way its own wire contract always has.
  */
-export type SuiteOrTestSuite =
+type SuiteOrTestSuite =
   | Readonly<{ kind: "suite"; suite: Suite }>
   | Readonly<{ kind: "test_suite"; testSuite: ScenarioTestSuite }>;
 
-export interface SuiteAppDependencies {
+interface SuiteAppDependencies {
   scenarios: ScenarioApiType;
   agents: AgentApiType;
   prompts: PromptApiType;
@@ -109,27 +105,10 @@ export interface SuiteAppDependencies {
   featureFlags: FeatureFlagApiType;
 }
 
-/**
- * Shapes restated rather than imported from `@langwatch/process-stores`: a
- * module depends on contracts. `publicBaseUrl` is the process's own fact,
- * absent where the deployment named no `BASE_HOST`.
- */
-type SuiteProcessMembers = Readonly<{
-  clickhouse: ClickHouseQueryClient;
-  publicBaseUrl: string | undefined;
-  /** Absent in a deployment without Redis; the run fold reads the ClickHouse store uncached. */
-  redis: Redis | Cluster | null;
-}>;
-
-/**
- * The run projection reads from ClickHouse only, so this module reads the
- * process's `clickhouse` member. A deployment naming none refuses at boot
- * naming this module and member, rather than serving an empty history from nothing.
- */
 type SuiteSetup = FeatureSetup<
   typeof SuiteModule.dependencies,
-  SuiteProcessMembers,
-  undefined,
+  never,
+  SuiteServerConfig,
   SuiteRepositories
 >;
 
@@ -150,16 +129,15 @@ export class SuiteModule implements SuiteApi {
     evaluators: EvaluatorApi,
     /** Owns `LANGWATCH_DEFAULT_RETENTION_DAYS`; a suite run is stamped with its default. */
     retention: DataRetentionApi,
-    /** Decides which testing interface a run plan's platform link opens in. */
+    /** Picks a run plan link's testing interface; refuses a voice target while voice is off. */
     featureFlags: FeatureFlagApi,
     /** The project's default model per role, stamped on each queued run as main did. */
     modelProviders: ModelProviderApi,
   };
-  /** Every name is from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["clickhouse", "publicBaseUrl", "redis"] as const;
+  static readonly config = suiteConfig;
 
   static create(setup: SuiteSetup): SuiteModule {
-    const { members, dependencies, repositories } = setup;
+    const { config, dependencies, repositories } = setup;
     const runItems = SuiteRunItemCommandsService.create();
     const infrastructure = SuiteModule.infrastructureOver({
       agents: dependencies.agents,
@@ -169,7 +147,7 @@ export class SuiteModule implements SuiteApi {
         scenarios: dependencies.scenarios,
         modelProviders: dependencies.modelProviders,
       }).resolve,
-      publicBaseUrl: members.publicBaseUrl,
+      publicBaseUrl: config.publicBaseUrl,
     });
     const defaultRetentionDays = () => dependencies.retention.getPlatformDefaultRetentionDays();
 
@@ -179,6 +157,7 @@ export class SuiteModule implements SuiteApi {
       agents: dependencies.agents,
       prompts: dependencies.prompts,
       evaluators: dependencies.evaluators,
+      featureFlags: dependencies.featureFlags,
       execution: infrastructure.execution,
       connectedPresence: infrastructure.connectedPresence,
     });
@@ -194,9 +173,9 @@ export class SuiteModule implements SuiteApi {
       }),
       publicBaseUrl: infrastructure.publicBaseUrl,
       pipeline: SuiteModule.buildEventingPipeline({
-        clickhouse: members.clickhouse,
-        redis: members.redis,
-        defaultRetentionDays,
+        suiteRunStateFoldStore: repositories.runProcessing.openRunStateFoldStore({
+          defaultRetentionDays,
+        }),
         retention: {
           resolve: (tenantId) =>
             dependencies.retention.getResolvedForProject({ projectId: tenantId }),
@@ -205,35 +184,12 @@ export class SuiteModule implements SuiteApi {
     });
   }
 
-  /**
-   * `suite_run_processing` (ADR-144), ported from the deleted
-   * `SuiteWorkerFeatureInstaller`: the fold caches through Redis where this
-   * deployment has one, and reads the ClickHouse store uncached otherwise.
-   */
+  /** `suite_run_processing` (ADR-144), over the fold store the repositories open. */
   private static buildEventingPipeline(options: {
-    clickhouse: ClickHouseQueryClient;
-    redis: Redis | Cluster | null;
-    defaultRetentionDays: () => number;
+    suiteRunStateFoldStore: FoldProjectionStore<SuiteRunStateData>;
     retention: RetentionPolicyResolver;
   }) {
-    const suiteRunStateFoldStore: FoldProjectionStore<SuiteRunStateData> = options.redis
-      ? RedisSuiteRunProcessingRepository.create({
-          clickhouse: options.clickhouse,
-          defaultRetentionDays: options.defaultRetentionDays,
-          redis: options.redis,
-        }).buildRunStateFoldStore()
-      : new RepositoryFoldStore(
-          ClickhouseSuiteEventingRepository.create({
-            clickhouse: options.clickhouse,
-            defaultRetentionDays: options.defaultRetentionDays,
-          }).build().suiteRunState,
-          SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
-        );
-
-    return buildSuiteRunProcessingPipeline({
-      suiteRunStateFoldStore,
-      retention: options.retention,
-    });
+    return buildSuiteRunProcessingPipeline(options);
   }
 
   private static buildRunPlans(input: {
@@ -297,6 +253,7 @@ export class SuiteModule implements SuiteApi {
       agents: setup.dependencies.agents,
       prompts: setup.dependencies.prompts,
       evaluators: setup.dependencies.evaluators,
+      featureFlags: setup.dependencies.featureFlags,
       execution: infrastructure.execution,
       connectedPresence: infrastructure.connectedPresence,
       ...(setup.generateId ? { generateId: setup.generateId } : {}),

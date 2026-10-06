@@ -1,7 +1,7 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
-export type EvaluationClickHouseResult = {
+type EvaluationClickHouseResult = {
   json<T>(): Promise<T[]>;
 };
 

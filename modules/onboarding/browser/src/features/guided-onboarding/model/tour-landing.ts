@@ -4,12 +4,13 @@
  * @see specs/features/onboarding/guided-tour.feature
  */
 import type {
+  GuidedKickoff,
+  GuidedKickoffTourStatus,
   GuidedOnboardingState,
   GuidedOnboardingStateWithInstance,
   GuidedPath,
 } from "@langwatch/onboarding-contract";
 
-import type { GuidedKickoff, GuidedKickoffTourStatus } from "./kickoff.ts";
 import { pathHasTour } from "./tour-steps.ts";
 
 /** The first name the greeting uses, or nothing when the account has none. */

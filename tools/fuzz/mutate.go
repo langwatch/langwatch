@@ -46,32 +46,19 @@ func MutateBody(schema map[string]any, valid any, mutation Mutation) any {
 	}
 	switch mutation.Name {
 	case "missing-required":
-		for _, name := range diffkit.RequiredNames(schema) {
-			delete(body, name)
-			return body
-		}
-	case "wrong-type":
-		if name := firstStringProp(schema); name != "" {
-			body[name] = map[string]any{"fuzz": "type-confused"}
+		if names := diffkit.RequiredNames(schema); len(names) > 0 {
+			delete(body, names[0])
 		}
 	case "boundary-number":
 		if name := firstProp(schema, diffkit.KindNumber); name != "" {
 			body[name] = 1e308
 		}
-	case "huge-string":
-		if name := firstStringProp(schema); name != "" {
-			body[name] = strings.Repeat("A", hugeStringLength)
-		}
-	case "empty-string":
-		if name := firstStringProp(schema); name != "" {
-			body[name] = ""
-		}
-	case "unicode-string":
-		if name := firstStringProp(schema); name != "" {
-			body[name] = "😀\u0000�‮中文"
-		}
 	case "extra-keys":
 		body["__fuzz_extra"] = "unexpected"
+	default:
+		if value, ok := stringPropMutations[mutation.Name]; ok {
+			setFirstStringProp(body, schema, value)
+		}
 	}
 	return body
 }
@@ -108,4 +95,21 @@ func firstProp(schema map[string]any, kind string) string {
 		}
 	}
 	return ""
+}
+
+// stringPropMutations are the mutations that replace the first string
+// property's value, each building its value fresh.
+var stringPropMutations = map[string]func() any{
+	"wrong-type":     func() any { return map[string]any{"fuzz": "type-confused"} },
+	"huge-string":    func() any { return strings.Repeat("A", hugeStringLength) },
+	"empty-string":   func() any { return "" },
+	"unicode-string": func() any { return "😀\u0000�‮中文" },
+}
+
+// setFirstStringProp sets the schema's first string property to value(),
+// when it has one.
+func setFirstStringProp(body map[string]any, schema map[string]any, value func() any) {
+	if name := firstStringProp(schema); name != "" {
+		body[name] = value()
+	}
 }

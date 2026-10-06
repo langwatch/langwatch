@@ -9,7 +9,6 @@ import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, type Instant, toDate } from "@langwatch/time";
 import { z } from "zod";
 
-import type { GatewayPersistenceTransaction } from "../../app/gateway.members.ts";
 import {
   gatewayRoutingPolicySelect,
   GatewayVirtualKeyRepository,
@@ -19,16 +18,17 @@ import {
   type UpdateGatewayVirtualKeyInput,
 } from "../../repositories/gateway-virtual-key.repository.ts";
 import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
+import type { GatewayPersistenceTransaction } from "../gateway-transaction.repository.ts";
 
 /**
  * Routing-policy columns the materialiser reads off a virtual key — one constant, not a copy
  * per query: a site missing a column doesn't fail, it silently materializes a bundle without
  * it (a policy's tier fallthrough stops reaching the gateway with nothing to notice).
  */
-export type VirtualKeyWithScopes = GatewayVirtualKeyRecord;
-export type ScopeInput = GatewayVirtualKeyScope;
-export type CreateVirtualKeyData = CreateGatewayVirtualKeyInput;
-export type SetVirtualKeyDisabledData = SetGatewayVirtualKeyDisabledInput;
+type VirtualKeyWithScopes = GatewayVirtualKeyRecord;
+type ScopeInput = GatewayVirtualKeyScope;
+type CreateVirtualKeyData = CreateGatewayVirtualKeyInput;
+type SetVirtualKeyDisabledData = SetGatewayVirtualKeyDisabledInput;
 
 export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyRepository {
   static create(database: PrismaClient): PrismaGatewayVirtualKeyRepository {

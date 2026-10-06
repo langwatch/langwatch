@@ -3,12 +3,12 @@ import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { UserNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { JoinRequestMail } from "../../app/identity.members.ts";
 import type {
   JoinRequestAdmin,
   JoinRequestAudienceRepository,
   JoinRequestAudienceProfile,
 } from "../../repositories/join-request-audience.repository.ts";
+import type { JoinRequestMail } from "../join-request-notification.service.ts";
 import { JoinRequestNotificationService } from "../join-request-notification.service.ts";
 
 /**

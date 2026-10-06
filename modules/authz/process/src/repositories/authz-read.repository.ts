@@ -8,7 +8,7 @@ import type { AuthzPrincipalRef, CollectedBinding } from "@langwatch/authz-contr
 import type { Instant } from "@langwatch/time";
 
 /** OrganizationUser.role, or null when no membership row exists. */
-export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL";
+export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
 
 /**
  * OrganizationUser row: role + disabled flag. Both are facts; collector
@@ -56,7 +56,7 @@ type FindManyDelegate = {
  * but generated client types and values never cross this package boundary.
  */
 export type AuthzDatabase = Readonly<{
-  organizationUser: FindFirstDelegate;
+  organizationUser: FindFirstDelegate & FindManyDelegate;
   roleBinding: FindManyDelegate;
   teamUser: FindManyDelegate;
   customRole: FindManyDelegate;

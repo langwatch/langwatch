@@ -48,7 +48,7 @@ func (runner *scenarioRunner) judgePair(result *scenarioResult) {
 	switch {
 	case branch.Error != "" || main.Error != "":
 		result.Verdict = verdictError
-		result.FirstFail = firstOf("branch", branch.Error, "main", main.Error)
+		result.FirstFail = firstFailure(branch.Error, main.Error)
 	case branch.Failure != "" && main.Failure != "":
 		result.Verdict = verdictFailBoth
 		result.FirstFail = "branch " + branch.Failure
@@ -74,11 +74,12 @@ func judgeSingle(result *scenarioResult) {
 	}
 }
 
-func firstOf(nameA, textA, nameB, textB string) string {
-	if textA != "" {
-		return nameA + ": " + textA
+// firstFailure names the branch's error when it has one, else main's.
+func firstFailure(branchError, mainError string) string {
+	if branchError != "" {
+		return "branch: " + branchError
 	}
-	return nameB + ": " + textB
+	return "main: " + mainError
 }
 
 // judgeAgreement holds the two sides' main responses to the normalizer: a
@@ -91,7 +92,7 @@ func (runner *scenarioRunner) judgeAgreement(result *scenarioResult) {
 	method, path, _ := strings.Cut(result.Endpoint, " ")
 	comparison := Comparison{Method: method, Path: path, Case: result.ID, ExactStatus: true}
 	outcome := CompareResults(comparison, result.Main.main, result.Branch.main)
-	if len(outcome.Findings) == 0 {
+	if len(unruledFindings(outcome.Findings)) == 0 {
 		return
 	}
 	result.Verdict, result.Diff = verdictFailDiff, outcome.Findings

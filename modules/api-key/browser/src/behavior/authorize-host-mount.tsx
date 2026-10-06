@@ -5,13 +5,10 @@
  */
 
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
-import {
-  useUiCapabilities,
-  useUiDeclarations,
-  useUiScope,
-} from "@langwatch/browser-host/capabilities";
-import type { UiProjectSwitcherProps } from "@langwatch/browser-host/declarations";
-import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
+import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import { useLent } from "@langwatch/browser-host/lent";
+import { ProjectSwitcherToken, type ProjectSwitcherProps } from "@langwatch/project-contract";
+import { Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
 import {
@@ -48,7 +45,7 @@ class CapabilityAuthorizeHost extends AuthorizeHostApi {
       navigate: (to: string) => void;
       replace: (to: string) => void;
       mintProjectToken: () => Promise<string | undefined>;
-      Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
+      Switcher: ComponentType<ProjectSwitcherProps> | undefined;
       succeeded: (notice: AuthorizeSuccessNotice) => void;
       failed: (failure: AuthorizeFailureNotice) => void;
     },
@@ -85,7 +82,7 @@ class CapabilityAuthorizeHost extends AuthorizeHostApi {
     return this.deps.mintProjectToken();
   }
 
-  /** The switcher project lends by declaration (ARCHITECTURE §10), drawn inside the card. */
+  /** The switcher project lends by token (ARCHITECTURE §10), drawn inside the card. */
   projectSwitcher(): ReactNode {
     const { Switcher } = this.deps;
     if (!Switcher) return null;
@@ -137,12 +134,7 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
   const { mutateAsync: mintToken, reset: resetMint } = apiKeyApi.apiKey.create.useMutation({
     gcTime: 0,
   });
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so the switcher is not remounted.
-  const Switcher = useMemo(() => {
-    const [lent] = declarations.declared("projectSwitcher");
-    return lent ? lazy(lent.capability.load) : void 0;
-  }, [declarations]);
+  const Switcher = useLent(ProjectSwitcherToken);
 
   const host = useMemo(
     () =>

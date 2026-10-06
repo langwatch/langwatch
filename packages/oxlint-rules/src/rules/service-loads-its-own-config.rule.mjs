@@ -31,7 +31,7 @@ export const serviceLoadsItsOwnConfigRule = defineRule({
     configFunction: {
       what: "`{{name}}` in `{{path}}` resolves its own configuration.",
       why: "A caller that already validated its config forces every callee to re-validate what it was handed.",
-      fix: "Delete it; add a named `config` member to the argument object `create` takes and resolve it once at the composition root.",
+      fix: "Delete it; add a named `config` member to the argument object `create` takes and resolve it once at the composition root. Read the `process-composition` skill.",
     },
   },
   create(context, file) {

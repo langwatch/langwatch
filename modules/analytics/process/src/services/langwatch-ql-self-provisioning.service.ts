@@ -43,7 +43,7 @@ export const LWQL_SELF_PROVISION_DEFAULTS = {
 } as const;
 
 /** The PostgreSQL endpoint the named collection dials, from `DATABASE_URL`. */
-export type LwqlPostgresEndpoint = Readonly<{
+type LwqlPostgresEndpoint = Readonly<{
   host: string;
   port: number;
   database: string;

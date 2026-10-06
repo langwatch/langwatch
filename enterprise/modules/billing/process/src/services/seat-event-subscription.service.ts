@@ -34,7 +34,7 @@ export type SeatCheckoutInvites = Pick<
 >;
 
 /** A checkout's invitations and who sent them: organization bounds them by the sender. */
-export type SeatCheckoutInvitations = Readonly<{
+type SeatCheckoutInvitations = Readonly<{
   invites: InviteInput[];
   by: OrganizationCaller;
 }>;

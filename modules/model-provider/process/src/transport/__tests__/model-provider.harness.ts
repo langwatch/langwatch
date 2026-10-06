@@ -16,10 +16,10 @@ import type {
   ModelProviderModule,
   ModelProviderCodexDeviceFlow,
 } from "../../app/model-provider.app.ts";
-import { ModelProviderCredentialProbe } from "../../app/model-provider.members.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import type { CodexDeviceCode, CodexPollResult } from "../../services/codex-account.service.ts";
+import { ModelProviderCredentialProbe } from "../../services/http-model-provider-credential-probe.service.ts";
 
 /** What a mount reads off the request: who is calling. */
 export type ModelProviderTrpcTestContext = { actor: { id: string } };
@@ -150,7 +150,7 @@ export function mountableModelProviderApp(options: {
         }),
       }),
     },
-    members: {
+    infrastructure: {
       credentialProbe: probe,
       spans: options.spans ?? {},
       ...(options.codexAccounts ? { codexAccounts: options.codexAccounts } : {}),

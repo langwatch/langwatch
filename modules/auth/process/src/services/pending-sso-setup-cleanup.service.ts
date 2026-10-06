@@ -14,7 +14,7 @@ const logger = createLogger("langwatch:auth:pending-sso-setup-cleanup");
 
 const BATCH_SIZE = 200;
 
-export type PendingSsoSetupCleanupResult = {
+type PendingSsoSetupCleanupResult = {
   scanned: number;
   cleared: number;
   stillPending: number;
@@ -25,7 +25,7 @@ export type PendingSsoSetupCleanupResult = {
 
 type Outcome = "cleared" | "stillPending" | "skipped";
 
-export interface PendingSsoSetupCleanupServiceDeps {
+interface PendingSsoSetupCleanupServiceDeps {
   candidates: PendingSsoSetupRepository;
   organizations: OrganizationSsoProviderLookup;
 }

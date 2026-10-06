@@ -1189,7 +1189,8 @@ describe("the guided-onboarding skill", () => {
       const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
       expect(section).toContain("The credentials call answers that the key was refused");
       expect(section).toContain("the tracing edit cannot be applied");
-      expect(section).toContain("from the project's settings page");
+      expect(section).toContain("offers to write the credentials again");
+      expect(section).toContain("never tells the user to copy LANGWATCH_API_KEY");
     });
 
     it("uses no em dash", () => {

@@ -53,6 +53,7 @@ describe("PrismaOrganizationMembershipRepository.deleteProvisionedOrganization",
       const { prisma, deletions } = purgingPrisma();
       const repository = PrismaOrganizationMembershipRepository.create({
         database: prisma,
+        cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
         grants: createApiFixture<AuthzGrantsService>(),
       });
 
@@ -83,6 +84,7 @@ describe("PrismaOrganizationMembershipRepository.deleteProvisionedOrganization",
       const { prisma, deletions } = purgingPrisma();
       const repository = PrismaOrganizationMembershipRepository.create({
         database: prisma,
+        cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
         grants: createApiFixture<AuthzGrantsService>(),
       });
 
@@ -100,6 +102,7 @@ describe("PrismaOrganizationMembershipRepository.deleteProvisionedOrganization",
       const { prisma, transaction, deletions } = purgingPrisma();
       const repository = PrismaOrganizationMembershipRepository.create({
         database: prisma,
+        cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
         grants: createApiFixture<AuthzGrantsService>(),
       });
 

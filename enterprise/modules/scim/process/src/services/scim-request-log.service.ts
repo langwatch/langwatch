@@ -13,7 +13,7 @@ import type { ScimRepository } from "../repositories/scim.repository.ts";
 const logger = createLogger("langwatch:scim:request-log");
 
 /** The four members the evidence table needs, and nothing else. */
-export type ScimRequestLogStore = Pick<
+type ScimRequestLogStore = Pick<
   ScimRepository,
   "recordRequest" | "findRequestLog" | "findExpiredRequestIds" | "deleteRequests"
 >;

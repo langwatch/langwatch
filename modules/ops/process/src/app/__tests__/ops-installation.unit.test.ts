@@ -48,8 +48,11 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { opsProcessModule } from "../../ops.module.ts";
-import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
-import { SNAPSHOT_LEASE_KEY } from "../../repositories/redis/redis.ops-snapshot.repository.ts";
+import { MemorySystemMigrationStateRepository } from "../../repositories/memory/memory.system-migration-state.repository.ts";
+import {
+  SNAPSHOT_EPOCH_KEY,
+  SNAPSHOT_LEASE_KEY,
+} from "../../repositories/redis/redis.ops-snapshot.repository.ts";
 import { OPS_STAFF_ADDRESS, platformOperatorAuthz } from "./ops.fixture.ts";
 
 /** A store that holds nothing: every command is written down, a lease `SET` is granted. */
@@ -96,14 +99,13 @@ function process(
         productAnalytics: { key: undefined, host: undefined },
         cloudOps: cloud.asked ?? false,
         adminEmails: [],
+        nodeEnvironment: undefined,
+        isSaas: false,
+        publicBaseUrl: undefined,
+        serviceVersion: "test",
+        otelResourceAttributes: undefined,
       },
     })
-
-    .withMember("nodeEnvironment", undefined)
-    .withMember("isSaas", false)
-    .withMember("serviceVersion", "test")
-    .withMember("publicBaseUrl", undefined)
-    .withMember("processName", "langwatch-test")
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
     .withAnalytical(memberWithoutStore<ClickHouseQueryClient>())
     .withKeyvalue(memberWithoutStore<RedisConnection>(redisCommands))
@@ -149,6 +151,9 @@ function process(
 
 describe("ops app installation", () => {
   describe("given a process that boots the feature over memory", () => {
+    /** @scenario "The deployment's operator list reaches the back office" */
+    /** @scenario "The operator scope of a platform operator is platform" */
+    /** @scenario "The operator scope of a user outside the operator list is none, never a refusal" */
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
       const runtime = await process(role).boot();
 
@@ -229,6 +234,27 @@ describe("ops app installation", () => {
     );
   });
 
+  describe("given a worker holding the queue's Redis", () => {
+    /** @scenario "The worker publishes the operations snapshot the dashboard reads" */
+    it("claims the writer lease and takes an epoch from the same store", async () => {
+      const redisCommands: unknown[][] = [];
+      const runtime = await process("worker", redisCommands).boot();
+
+      try {
+        await runtime.start();
+
+        await vi.waitFor(() => {
+          expect(redisCommands).toContainEqual(expect.arrayContaining(["set", SNAPSHOT_LEASE_KEY]));
+          expect(redisCommands).toContainEqual(
+            expect.arrayContaining(["incr", SNAPSHOT_EPOCH_KEY]),
+          );
+        });
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
   describe("given the api role and a peer that registers migrations", () => {
     const migration = (name: string, title: string): SystemMigration => ({
       name,
@@ -251,11 +277,11 @@ describe("ops app installation", () => {
     /** @scenario "A migration registered by a peer module appears on the page with its title and description" */
     it("lists each peer's migrations, in running order, with the owner's title and description", async () => {
       vi.spyOn(
-        PrismaSystemMigrationStateRepository.prototype,
+        MemorySystemMigrationStateRepository.prototype,
         "findStatusCounts",
       ).mockResolvedValue({ migrated: 0, finalized: 3, parked: 0, rolled_back: 0 });
       vi.spyOn(
-        PrismaSystemMigrationStateRepository.prototype,
+        MemorySystemMigrationStateRepository.prototype,
         "findRecordsByStatus",
       ).mockResolvedValue([]);
       const runtime = await process("api", [], identity, authz).boot();

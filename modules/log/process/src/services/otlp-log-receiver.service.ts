@@ -24,12 +24,12 @@ import type { LogRequestCollectionService } from "./log-request-collection.servi
 const CANONICAL_LOGS_PATH = "/api/otel/v1/logs";
 
 /** Trace's share of the door: the key, the allowance, the key's clock and the failure report. */
-export type LogReceiverTraceSlice = Pick<
+type LogReceiverTraceSlice = Pick<
   TraceApi,
   "otlpCredential" | "otlpUsageLimit" | "otlpMarkCredentialUsed" | "otlpReportError"
 >;
 
-export interface OtlpLogReceiverDeps {
+interface OtlpLogReceiverDeps {
   traces: LogReceiverTraceSlice;
   collection: Pick<LogRequestCollectionService, "handleOtlpLogRequest">;
 }

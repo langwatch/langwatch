@@ -185,7 +185,9 @@ Feature: Groups REST API
     Given group "Engineering" exists
     And team "External" belongs to a different organization
     When I send POST /api/groups/:id/bindings with scopeId of "External"
-    Then the response status is 400
+    Then the response status is 422
+    And the response code is scope_not_in_organization
+    And no binding is stored
 
   @unit
   Scenario: DELETE /api/groups/:id/bindings/:bindingId removes a binding

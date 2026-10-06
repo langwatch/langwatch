@@ -24,13 +24,14 @@ function memoryRedis(): LangyFeedbackPromptRedis & { store: Map<string, string> 
   };
 }
 
-function service(redis: LangyFeedbackPromptRedis | null, now = NOW): LangyFeedbackPromptService {
-  const prompts = redis ? LangyFeedbackPromptRedisRepository.create({ redis }) : null;
+function service(redis: LangyFeedbackPromptRedis, now = NOW): LangyFeedbackPromptService {
+  const prompts = LangyFeedbackPromptRedisRepository.create({ redis });
   return LangyFeedbackPromptService.create({ prompts, now: () => now });
 }
 
 describe("LangyFeedbackPromptService", () => {
   /** @scenario "feedback prompt keeps its existing cadence" */
+  /** @scenario "Langy never asks under a conversation's first answer" */
   it("does not ask before two assistant answers", async () => {
     await expect(
       service(memoryRedis()).shouldAsk({
@@ -41,6 +42,7 @@ describe("LangyFeedbackPromptService", () => {
     ).resolves.toBe(false);
   });
 
+  /** @scenario "Langy asks once a conversation has a couple of answers" */
   it("asks after two answers when there is no prior record", async () => {
     await expect(
       service(memoryRedis()).shouldAsk({
@@ -52,6 +54,7 @@ describe("LangyFeedbackPromptService", () => {
   });
 
   /** @scenario "feedback prompt keeps its existing cadence" */
+  /** @scenario "Showing the ask starts the quiet period even when it is ignored" */
   it("keeps a user quiet for three days after the card is shown", async () => {
     const redis = memoryRedis();
     await service(redis).markShown({ userId: "u1", conversationId: "c1" });
@@ -72,6 +75,7 @@ describe("LangyFeedbackPromptService", () => {
   });
 
   /** @scenario "feedback prompt keeps its existing cadence" */
+  /** @scenario "A long conversation may ask once more despite the quiet period" */
   it("allows one long-conversation exception in another conversation", async () => {
     const redis = memoryRedis();
     await service(redis).markShown({ userId: "u1", conversationId: "c1" });
@@ -111,20 +115,6 @@ describe("LangyFeedbackPromptService", () => {
     ).resolves.toBe(false);
     await expect(
       service(broken).markShown({ userId: "u1", conversationId: "c1" }),
-    ).resolves.toBeUndefined();
-  });
-
-  /** @scenario "feedback prompt is safe when Redis is unavailable" */
-  it("fails closed when Redis is not configured", async () => {
-    await expect(
-      service(null).shouldAsk({
-        userId: "u1",
-        conversationId: "c1",
-        assistantAnswerCount: 5,
-      }),
-    ).resolves.toBe(false);
-    await expect(
-      service(null).markShown({ userId: "u1", conversationId: "c1" }),
     ).resolves.toBeUndefined();
   });
 

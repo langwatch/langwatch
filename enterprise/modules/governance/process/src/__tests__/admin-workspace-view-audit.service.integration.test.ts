@@ -12,7 +12,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
-import type { GovernanceOcsfEventWriter } from "../app/governance.members.ts";
+import type { GovernanceOcsfEventWriter } from "../repositories/governance.repositories.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
