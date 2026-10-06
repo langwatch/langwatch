@@ -87,7 +87,9 @@ type StoreSuppliedNames =
   | "eventing"
   | "rateLimiter"
   | "cache"
-  | "idempotency";
+  | "idempotency"
+  | "clickhouseAdmin"
+  | "databaseTarget";
 
 declare const supplyState: unique symbol;
 declare const missingSupply: unique symbol;
