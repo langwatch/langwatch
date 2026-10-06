@@ -265,3 +265,65 @@ Feature: The fence a customer-supplied webhook leaves through
       When the settlement notifies it
       Then automation hands one attempt to the webhook module with a stable dispatch id
       And the webhook module's refusal reaches automation's outbox unchanged, so it retries
+
+  Rule: A producer requests delivery; the outbox retries, dead-letters and redrives it (ADR-167)
+    Each destination kind owns its sending (ARCHITECTURE §9). A producer calls
+    WebhookApi.requestDelivery with a destination, a message and an idempotency key; webhook
+    writes one outbox row and answers at once. The ladder is the endpoint's own, and the fence
+    runs at send. Open questions: .claude/handoffs/request-delivery.md §11.
+
+    @integration @unimplemented
+    Scenario: The delivery row is written in the producer's transaction
+      Given a producer step that requests delivery to an active endpoint
+      When the producer's step commits
+      Then one outbox row for the delivery is stored by that same commit
+      And when the producer's step rolls back instead, no row is stored and nothing is sent
+
+    @unit @unimplemented
+    Scenario: A requested delivery answers at once with a stable delivery id
+      Given an active endpoint subscribed to the message's type
+      When a producer requests delivery of a message to it
+      Then the answer carries a delivery id before any request reaches the receiver
+      And the receiver later gets the envelope whose id is that delivery id
+
+    @unit @unimplemented
+    Scenario: A repeated request under one idempotency key is delivered once
+      Given an active endpoint subscribed to the message's type
+      When a producer requests delivery twice under one idempotency key
+      Then both answers carry the same delivery id
+      And the receiver gets one request
+
+    @integration @unimplemented
+    Scenario: A requested delivery's retryable failure waits the endpoint's ladder
+      Given a receiver that answers 503 once and then 200
+      When a requested delivery is sent
+      Then the second attempt waits one minute, or the receiver's Retry-After when that is longer
+      And both attempts are recorded in the endpoint's delivery log
+
+    @integration @unimplemented
+    Scenario: A requested delivery that fails every attempt is dead-lettered after the last one
+      Given a receiver that always answers 503
+      When a requested delivery is sent
+      Then the outbox row is dead after the eleventh attempt
+      And no twelfth attempt is made
+
+    @integration @unimplemented
+    Scenario: A terminal answer dead-letters a requested delivery at once
+      Given a receiver that answers 410
+      When a requested delivery is sent
+      Then the outbox row is dead after one attempt
+      And the endpoint's failure streak grows by one
+
+    @integration @unimplemented
+    Scenario: A dead-lettered requested delivery is sent again when ops redrives it
+      Given a requested delivery whose outbox row is dead
+      And a receiver that now answers 200
+      When ops redrives the dead row
+      Then the receiver gets the envelope under the same delivery id
+
+    @unit @unimplemented
+    Scenario: A requested delivery to a private address is refused at send
+      Given an endpoint whose host resolves to a private address when the delivery is sent
+      When a requested delivery is sent
+      Then no connection is opened to that address
+      And the attempt is recorded as refused and dead-lettered without a retry
