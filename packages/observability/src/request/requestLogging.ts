@@ -1,5 +1,6 @@
 import { REQUEST_CAUSE_FIELD } from "../constants";
-import { type Logger, summarizeError } from "../logger";
+import { type Logger } from "../logger";
+import { summarizeError } from "./errorSummary";
 
 /**
  * Common request logging data structure.

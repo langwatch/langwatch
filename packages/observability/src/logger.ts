@@ -24,127 +24,10 @@ export function registerLogContextProvider(provider: LogContextProvider): void {
 }
 
 /**
- * A failure reduced to the four fields worth reading.
- *
- * Loki accepts at most 128 structured-metadata keys per record, and every
- * nested key of a logged error becomes one: a ZodError's `issues` or a Prisma
- * error's `meta` pushed request records past 250 keys, and Loki dropped them
- * whole (#8483). Type, message, code and stack are what a failure is triaged
- * by, and they stay a fixed four keys however wide the error is.
- *
- * Credential masking survives because an `Error` summary is cut from the
- * already-redacted pino serialization. That serialization folds the messages
- * of nested `cause`s into `message` and their stacks into `stack`, so inner
- * causes stay readable. Other fields of a cause, and extras such as a
- * HandledError's `reasons` or `meta`, are dropped by design.
- *
- * Non-Error throwables are summarised too: a string and an error-like object
- * (string `message`) keep their text, while any other value is described by
- * type and top-level key names only, never contents, because a thrown plain
- * object can hold secrets (e.g. request headers). Message and stack are
- * length-capped on every path, and the function never throws.
- */
-export function summarizeError(error: unknown): ErrorSummary {
-  try {
-    return summarizeUnsafe(error);
-  } catch {
-    return { type: "unknown", message: UNSERIALIZABLE_MESSAGE };
-  }
-}
-
-type ErrorSummary = {
-  type: string;
-  message: string;
-  code?: string | number;
-  stack?: string;
-};
-
-function summarizeUnsafe(error: unknown): ErrorSummary {
-  if (typeof error === "string") {
-    return { type: "string", message: truncate(error, MAX_SUMMARY_MESSAGE_LENGTH) };
-  }
-
-  if (!(error instanceof Error)) {
-    if (isErrorLike(error)) {
-      const { name, message, code, stack } = error;
-      return {
-        type: typeof name === "string" && name ? name : "Object",
-        message: truncate(message, MAX_SUMMARY_MESSAGE_LENGTH),
-        ...(typeof code === "string" || typeof code === "number"
-          ? { code }
-          : {}),
-        ...(typeof stack === "string"
-          ? { stack: truncate(stack, MAX_SUMMARY_STACK_LENGTH) }
-          : {}),
-      };
-    }
-    return describeOpaqueValue(error);
-  }
-
-  const serialized = redactCommandCredentials(pino.stdSerializers.err(error));
-  const { message, stack } = serialized;
-  // A subclass that only sets `name` would otherwise group as "Error".
-  const type =
-    typeof error.name === "string" && error.name && error.name !== "Error"
-      ? error.name
-      : serialized.type;
-  const code = (error as { code?: unknown }).code;
-  return {
-    type,
-    message: truncate(message, MAX_SUMMARY_MESSAGE_LENGTH),
-    ...(typeof code === "string" || typeof code === "number" ? { code } : {}),
-    ...(stack === undefined
-      ? {}
-      : { stack: truncate(stack, MAX_SUMMARY_STACK_LENGTH) }),
-  };
-}
-
-const MAX_SUMMARY_MESSAGE_LENGTH = 1000;
-const MAX_SUMMARY_STACK_LENGTH = 8000;
-const MAX_SUMMARY_KEYS = 10;
-const UNSERIALIZABLE_MESSAGE = "Unserializable thrown value";
-
-function truncate(text: string, max: number): string {
-  return text.length > max ? text.slice(0, max) : text;
-}
-
-function isErrorLike(value: unknown): value is {
-  message: string;
-  name?: unknown;
-  code?: unknown;
-  stack?: unknown;
-} {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    typeof (value as { message?: unknown }).message === "string"
-  );
-}
-
-/** Describes a non-error value without ever reading its contents. */
-function describeOpaqueValue(value: unknown): ErrorSummary {
-  if (value !== null && typeof value === "object") {
-    const keys = Object.keys(value).slice(0, MAX_SUMMARY_KEYS).join(", ");
-    return {
-      type: "Object",
-      message: truncate(
-        `Non-error value thrown (keys: ${keys})`,
-        MAX_SUMMARY_MESSAGE_LENGTH,
-      ),
-    };
-  }
-  return {
-    type: typeof value,
-    message: truncate(String(value), MAX_SUMMARY_MESSAGE_LENGTH),
-  };
-}
-
-/**
- * Error serializer for every cause key. Request logging hands it an
- * already-bounded {@link summarizeError} summary - a plain object, passed
- * through untouched (pino's err serializer would relabel it `type: "Object"`).
- * Every other `Error` keeps its full pino serialization; only `_superjson` is
- * gone.
+ * Error serializer for every cause key. A plain object (such as the bounded
+ * summary request logging produces) passes through untouched, since pino's err
+ * serializer would relabel it `type: "Object"`. Every `Error` gets its full
+ * redacted pino serialization; any other value goes to pino's err serializer.
  */
 const errorSerializer = (error: unknown) => {
   if (error instanceof Error) {
@@ -201,7 +84,7 @@ function maskValues(text: unknown, values: string[]): unknown {
  * serialized error with those values replaced; every other error passes
  * through unchanged.
  */
-function redactCommandCredentials<T extends object>(serialized: T): T {
+export function redactCommandCredentials<T extends object>(serialized: T): T {
   const command = (serialized as { command?: unknown }).command;
   if (!command || typeof command !== "object") return serialized;
   const { name, args } = command as { name?: unknown; args?: unknown };

@@ -252,6 +252,7 @@ describe("emitted request-log records", () => {
     }
 
     describe("when it is a string", () => {
+      /** @scenario A thrown string is logged as its message */
       it("summarises it as type string with the text as message", () => {
         expect(emittedFor("boom")).toEqual({ type: "string", message: "boom" });
       });
@@ -263,6 +264,7 @@ describe("emitted request-log records", () => {
         code: "P1001",
       });
 
+      /** @scenario An error-like object keeps its message and code */
       it("keeps its message and code", () => {
         expect(cause()).toMatchObject({
           message: "database unavailable",
@@ -280,8 +282,11 @@ describe("emitted request-log records", () => {
     });
 
     describe("when it is a plain object without a message", () => {
-      it("names its keys in the message", () => {
-        expect(emittedFor({ reason: "x" }).message).toContain("reason");
+      /** @scenario A thrown plain object is described without its contents */
+      it("states a fixed message with the key count only", () => {
+        const cause = emittedFor({ reason: "x" });
+        expect(cause.message).toBe("Non-error object thrown (1 keys)");
+        expect(JSON.stringify(cause)).not.toContain("reason");
       });
 
       it("labels it Object", () => {
@@ -298,16 +303,21 @@ describe("emitted request-log records", () => {
         );
       });
 
-      it("names the top-level key", () => {
-        expect(emittedFor(thrown).message).toContain("headers");
+      /** @scenario A thrown plain object is described without its contents */
+      it("emits neither its keys nor its values", () => {
+        const cause = emittedFor(thrown);
+        expect(cause.message).toBe("Non-error object thrown (1 keys)");
+        expect(JSON.stringify(cause)).not.toContain("headers");
+        expect(JSON.stringify(cause)).not.toContain("authorization");
       });
     });
 
     describe("when it is a string of 5000 characters", () => {
-      it("caps the message at 1000 characters", () => {
-        expect(emittedFor("x".repeat(5000)).message.length).toBeLessThanOrEqual(
-          1000,
-        );
+      /** @scenario Long messages and stacks are cut with a marker */
+      it("caps the message at 1000 characters and marks the cut", () => {
+        const { message } = emittedFor("x".repeat(5000));
+        expect(message.length).toBeLessThanOrEqual(1000);
+        expect(message.endsWith("… [truncated]")).toBe(true);
       });
     });
 
@@ -322,6 +332,7 @@ describe("emitted request-log records", () => {
         return value;
       }
 
+      /** @scenario A value that cannot be described still produces a record */
       it("still emits a record", () => {
         expect(() => emittedFor(hostile())).not.toThrow();
         expect(emittedFor(hostile())).toBeDefined();
@@ -353,6 +364,7 @@ describe("emitted request-log records", () => {
       { label: "error", statusCode: 500 },
     ]) {
       describe(`when it is logged at ${label} level`, () => {
+        /** @scenario Credentials in a failed Redis command never reach the summary */
         it("does not emit the password anywhere in the line", () => {
           const chunks: string[] = [];
           const sink = new Writable({

@@ -124,3 +124,35 @@ Feature: Request log level and where the cause is attached
   Scenario: Error records carry no superjson metadata
     When any failure is logged
     Then no field named "_superjson" is emitted
+
+  @unit @regression
+  Scenario: A thrown string is logged as its message
+    When a string is thrown
+    Then the cause has type "string" and the string as its message
+
+  @unit @regression
+  Scenario: An error-like object keeps its message and code
+    When an object with a message and a code is thrown
+    Then the cause keeps that message and code
+
+  @unit @regression
+  Scenario: A thrown plain object is described without its contents
+    When a plain object without a message is thrown
+    Then the cause states only how many keys the object has
+    And neither its keys nor its values are emitted
+
+  @unit @regression
+  Scenario: Long messages and stacks are cut with a marker
+    When a message longer than the cap is thrown
+    Then the cause stays within the cap
+    And it ends with a truncation marker
+
+  @unit @regression
+  Scenario: A value that cannot be described still produces a record
+    When a circular object with a throwing toString is thrown
+    Then a record is still emitted
+
+  @unit @regression
+  Scenario: Credentials in a failed Redis command never reach the summary
+    When a failed AUTH command error is logged
+    Then the emitted line does not contain the password
