@@ -31,7 +31,7 @@ function isRedrivable(op: string): op is ScimRemovalOperation {
   return REDRIVABLE_OPS.includes(op);
 }
 
-export interface ScimOversightDeps {
+interface ScimOversightDeps {
   syncs: Pick<ScimSyncReadsService, "listForOperator" | "findForOperator">;
   organizations: Pick<OrganizationApi, "findProvisioningSummary">;
   identities: Pick<ScimRepository, "findDirectoryIdentities">;

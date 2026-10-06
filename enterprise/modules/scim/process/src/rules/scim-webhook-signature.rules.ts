@@ -15,7 +15,7 @@ export const SCIM_WEBHOOK_SIGNATURE_HEADER = "x-langwatch-signature";
 /** Receiver-side freshness window; the same five minutes egress publishes. */
 export const SCIM_WEBHOOK_TOLERANCE_SECONDS = 5 * 60;
 
-export type ScimWebhookSignatureVerdict =
+type ScimWebhookSignatureVerdict =
   | { readonly verified: true; readonly nonce: string }
   | { readonly verified: false };
 

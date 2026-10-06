@@ -46,7 +46,7 @@ export interface ScimGroupMembershipRecord {
   groupId: string;
   user: ScimGroupMemberUserRecord;
 }
-export interface ScimGroupMemberUserRecord {
+interface ScimGroupMemberUserRecord {
   id: string;
   email: string | null;
   name: string | null;

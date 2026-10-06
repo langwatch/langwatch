@@ -121,7 +121,7 @@ export function directoryFailureCopy(errorCode: string): { title: string; descri
 }
 
 /** Who an activity line was about when the person could not be resolved. */
-export const DIRECTORY_ACTIVITY_UNKNOWN_PERSON = "a person";
+const DIRECTORY_ACTIVITY_UNKNOWN_PERSON = "a person";
 
 /**
  * One line of the activity feed (ADR-126), said as the directory's act in the

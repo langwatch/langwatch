@@ -12,13 +12,13 @@ export const scimRequestLogRetentionSchema = z.object({
 export const scimRequestLogRetentionStateSchema = z.object({
   lastSweepAt: z.number().nullable(),
 });
-export type ScimRequestLogRetentionState = z.infer<typeof scimRequestLogRetentionStateSchema>;
+type ScimRequestLogRetentionState = z.infer<typeof scimRequestLogRetentionStateSchema>;
 
 export const SCIM_REQUEST_LOG_RETENTION_INITIAL_STATE: ScimRequestLogRetentionState = {
   lastSweepAt: null,
 };
 
-export type ScimRequestLogRetentionIntents = {
+type ScimRequestLogRetentionIntents = {
   sweep: IntentSpec<typeof scimRequestLogRetentionSchema>;
 };
 

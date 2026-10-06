@@ -10,7 +10,7 @@ import type { ScimRemovalOperation, ScimSyncLifecycle } from "./scim-sync-lifecy
 const logger = createLogger("langwatch:scim:deprovision");
 const SCIM_ACTOR = { type: "system", name: "scim" } as const;
 
-export type ScimRemovalManifest = {
+type ScimRemovalManifest = {
   ownedApiKeys: { id: string; name: string }[];
   personalTeams: { id: string; name: string }[];
 };

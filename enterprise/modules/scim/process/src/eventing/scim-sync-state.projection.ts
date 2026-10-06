@@ -38,58 +38,58 @@ export const scimTokenIssuedEventSchema = z.object({
   type: z.literal(SCIM_TOKEN_ISSUED_EVENT_TYPE),
   data: scimTokenIssuedPayloadSchema,
 });
-export type ScimTokenIssuedEvent = z.infer<typeof scimTokenIssuedEventSchema>;
+type ScimTokenIssuedEvent = z.infer<typeof scimTokenIssuedEventSchema>;
 
 export const scimUserPushedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(SCIM_USER_PUSHED_EVENT_TYPE),
   data: scimUserPushedPayloadSchema,
 });
-export type ScimUserPushedEvent = z.infer<typeof scimUserPushedEventSchema>;
+type ScimUserPushedEvent = z.infer<typeof scimUserPushedEventSchema>;
 
 export const scimGroupMappedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(SCIM_GROUP_MAPPED_EVENT_TYPE),
   data: scimGroupMappedPayloadSchema,
 });
-export type ScimGroupMappedEvent = z.infer<typeof scimGroupMappedEventSchema>;
+type ScimGroupMappedEvent = z.infer<typeof scimGroupMappedEventSchema>;
 
 export const scimApplyFailedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(SCIM_APPLY_FAILED_EVENT_TYPE),
   data: scimApplyFailedPayloadSchema,
 });
-export type ScimApplyFailedEvent = z.infer<typeof scimApplyFailedEventSchema>;
+type ScimApplyFailedEvent = z.infer<typeof scimApplyFailedEventSchema>;
 
 export const scimApplyRecoveredEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(SCIM_APPLY_RECOVERED_EVENT_TYPE),
   data: scimApplyRecoveredPayloadSchema,
 });
-export type ScimApplyRecoveredEvent = z.infer<typeof scimApplyRecoveredEventSchema>;
+type ScimApplyRecoveredEvent = z.infer<typeof scimApplyRecoveredEventSchema>;
 
 export const scimApplyRetiredEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(SCIM_APPLY_RETIRED_EVENT_TYPE),
   data: scimApplyRetiredPayloadSchema,
 });
-export type ScimApplyRetiredEvent = z.infer<typeof scimApplyRetiredEventSchema>;
+type ScimApplyRetiredEvent = z.infer<typeof scimApplyRetiredEventSchema>;
 
 export const scimApplyRedrivenEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(SCIM_APPLY_REDRIVEN_EVENT_TYPE),
   data: scimApplyRedrivenPayloadSchema,
 });
-export type ScimApplyRedrivenEvent = z.infer<typeof scimApplyRedrivenEventSchema>;
+type ScimApplyRedrivenEvent = z.infer<typeof scimApplyRedrivenEventSchema>;
 
 export const scimTokenRevokedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(SCIM_TOKEN_REVOKED_EVENT_TYPE),
   data: scimTokenRevokedPayloadSchema,
 });
-export type ScimTokenRevokedEvent = z.infer<typeof scimTokenRevokedEventSchema>;
+type ScimTokenRevokedEvent = z.infer<typeof scimTokenRevokedEventSchema>;
 
-export const scimSyncEventSchema = z.discriminatedUnion("type", [
+const scimSyncEventSchema = z.discriminatedUnion("type", [
   scimTokenIssuedEventSchema,
   scimUserPushedEventSchema,
   scimGroupMappedEventSchema,
@@ -103,7 +103,7 @@ export type ScimSyncEvent = z.infer<typeof scimSyncEventSchema>;
 
 const SCIM_SYNC_PROJECTION_VERSION = "2026-08-24";
 
-export const SCIM_SYNC_PROJECTION_NAME = "scimSyncState" as const;
+const SCIM_SYNC_PROJECTION_NAME = "scimSyncState" as const;
 
 const scimSyncEvents = [
   scimTokenIssuedEventSchema,

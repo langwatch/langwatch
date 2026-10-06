@@ -71,13 +71,3 @@ function splitName(fullName: string): {
     familyName: fullName.substring(spaceIndex + 1),
   };
 }
-
-export function parseUserNameFilter(filter?: string): string | null {
-  if (!filter) {
-    return null;
-  }
-
-  const match = filter.match(/^userName\s+eq\s+"([^"]+)"$/);
-
-  return match?.[1] ?? null;
-}
