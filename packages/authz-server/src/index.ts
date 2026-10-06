@@ -73,6 +73,7 @@ export {
   grantFactToCompatBinding,
   grantFactToCompatShareLink,
   grantFactToRow,
+  grantConditionFromDb,
   grantRowToFact,
   isBindingGrant,
   PRINCIPAL_TO_DB,

@@ -19,11 +19,13 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { prisma } from "../../db";
+import { AuthorizationService } from "./authorization.service";
 import { demoProjectId } from "./demo-project";
 import { bumpAuthzEpoch, getAuthzEpoch } from "./epoch";
 import { grantsLedgerWriter } from "./ledger";
 import { LedgerAuthzGrantsRepository } from "./repositories/authz-grants.ledger.repository";
 import { GrantsAuthzReadRepository } from "./repositories/authz-read.grants.repository";
+import { SharedReadsGrantsRepository } from "./repositories/shared-reads.grants.repository";
 
 /**
  * COLLECT policies over the grants projection. Migration status remains
@@ -57,6 +59,13 @@ export const authz = new AuthzService(authzCollector, {
  * grants-ledger command, and the audit trail is the pipeline's insert-only
  * subscriber (decision 17), not a writer dependency here.
  */
+/** ADR-144 block B: the door that mints the proof trace reads carry. */
+export const authorization = new AuthorizationService({
+  authz,
+  collector: authzCollector,
+  sharedReads: new SharedReadsGrantsRepository(prisma),
+});
+
 export function grantsService(): GrantsService {
   return new GrantsService(
     new LedgerAuthzGrantsRepository(prisma, grantsLedgerWriter()),
