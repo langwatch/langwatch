@@ -337,7 +337,10 @@ describe("AutomationEvaluationSubscriberService", () => {
   });
 
   describe("given a trace the origin guard refuses", () => {
-    /** @scenario "Automation applies trace's origin guard to the folded summary" */
+    /**
+     * @scenario "Automation applies trace's origin guard to the folded summary"
+     * @scenario "A replayed trace does not re-fire an alert"
+     */
     it("records nothing for a trace with no resolved origin", async () => {
       const { reactions, sent } = service({ found: summary({ attributes: {} }) });
 

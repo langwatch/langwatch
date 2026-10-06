@@ -7,6 +7,9 @@
  * @see specs/traces-v2/instant-eval-search.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TopicApi } from "@langwatch/topic-contract";
 import {
   explorerHiddenOrigins,
   LANGY_TRACE_ORIGIN,
@@ -15,13 +18,19 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { createFacetFilterResolver } from "../../../rules/trace-facet-filter.rules.ts";
 import {
   andFilterConditions,
+  explorerOriginExclusion,
   findHiddenOriginConditions,
   type TraceFilterWhere,
 } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 import { translateFilter } from "../../../rules/trace-query.rules.ts";
-import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
+import { TraceListService } from "../../../services/trace-list-read.service.ts";
+import {
+  CLICKHOUSE_FACET_CATALOG,
+  FACET_REGISTRY,
+} from "../clickhouse.trace-facet-registry.mapper.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
   startMigratedTraceClickHouse,
@@ -41,11 +50,13 @@ function traceRow({
   traceId,
   offset,
   attributes,
+  containsErrorStatus = false,
 }: {
   tenantId: string;
   traceId: string;
   offset: number;
   attributes: Record<string, string>;
+  containsErrorStatus?: boolean;
 }) {
   const at = new Date(base + offset);
   return {
@@ -63,8 +74,8 @@ function traceRow({
     ComputedOutput: "done",
     TotalDurationMs: 100,
     SpanCount: 1,
-    ContainsErrorStatus: false,
-    ContainsOKStatus: true,
+    ContainsErrorStatus: containsErrorStatus,
+    ContainsOKStatus: !containsErrorStatus,
     Models: ["gpt-5-mini"],
     TraceName: "checkout flow",
   };
@@ -364,6 +375,105 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
       });
 
       expect(page.totalHits).toBe(0);
+    });
+  });
+});
+
+/** The sidebar's counts as the app composes them, over the real trace list store. */
+async function sidebarCounts({
+  tenantId,
+  query,
+}: {
+  tenantId: string;
+  query: string;
+}): Promise<Map<string, Record<string, number>>> {
+  const service = TraceListService.create({
+    discoverUpdates: { publishProjectEvent: async () => {} },
+    facets: CLICKHOUSE_FACET_CATALOG,
+    repository: repo,
+    evaluations: createApiFixture<EvaluationApi>({}),
+    topicService: createApiFixture<TopicApi>({ getNamesByIds: async () => new Map() }),
+  });
+  const facets = await service.getFacets({
+    tenantId,
+    timeRange,
+    filterFor: createFacetFilterResolver({
+      queryText: query,
+      compile: (text) => translateFilter({ queryText: text, tenantId, timeRange }) ?? undefined,
+      hide: explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(query) }),
+    }),
+  });
+  const counts = new Map<string, Record<string, number>>();
+  for (const facet of facets) {
+    if (facet.kind !== "categorical") continue;
+    counts.set(
+      facet.key,
+      Object.fromEntries(facet.topValues.map((entry) => [entry.value, entry.count])),
+    );
+  }
+  return counts;
+}
+
+describe.skipIf(!clickHouseConfigured)("the sidebar's counts against the table", () => {
+  const tenantId = `test-facet-table-${nanoid()}`;
+
+  beforeAll(async () => {
+    const trace = (traceId: string, offset: number, service: string, error: boolean) =>
+      traceRow({
+        tenantId,
+        traceId,
+        offset,
+        attributes: { "service.name": service },
+        containsErrorStatus: error,
+      });
+    await insertTraces([
+      trace("ft-api-error-1", 0, "api", true),
+      trace("ft-api-error-2", 1, "api", true),
+      trace("ft-web-error", 2, "web", true),
+      trace("ft-api-ok", 3, "api", false),
+    ]);
+  }, 120_000);
+
+  afterAll(async () => {
+    if (!ch) return;
+    await ch.exec({
+      query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+      query_params: { tenantId },
+    });
+  });
+
+  describe("given Error is checked under Status and the Service facet shows api", () => {
+    /** @scenario "A facet value's count equals the table count after selecting it" */
+    it("shows a table total equal to that count once api is checked", async () => {
+      const before = await sidebarCounts({ tenantId, query: "status:error" });
+      const apiCount = before.get("service")?.api;
+      expect(apiCount).toBe(2);
+
+      const page = await listWith({
+        tenantId,
+        filterWhere: explorerFilter({ tenantId, query: "status:error AND service:api" }),
+      });
+
+      expect(page.totalHits).toBe(apiCount);
+    });
+  });
+
+  describe("given a query that matches no trace", () => {
+    /** @scenario "Facets show nothing under a query the table answers with zero traces" */
+    it("shows no traces and no count on a facet the query does not name", async () => {
+      const everything = await sidebarCounts({ tenantId, query: "" });
+      expect(everything.get("status")).toEqual({ error: 3, ok: 1 });
+
+      const query = "service:nobody";
+      const page = await listWith({ tenantId, filterWhere: explorerFilter({ tenantId, query }) });
+      expect(page.totalHits).toBe(0);
+
+      const counts = await sidebarCounts({ tenantId, query });
+      const shown = [...counts]
+        .filter(([key]) => key !== "service")
+        .flatMap(([key, values]) => Object.values(values).map((count) => [key, count] as const))
+        .filter(([, count]) => count > 0);
+      expect(shown).toEqual([]);
     });
   });
 });
