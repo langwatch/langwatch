@@ -241,7 +241,7 @@ export async function resolveSignInProviders({
   into,
   baseUrl,
 }: {
-  config: SsoConfig;
+  config: Omit<SsoConfig, "isSaas" | "publicBaseUrl">;
   into: SecretInto;
   baseUrl: string;
 }): Promise<SignInProviderConfiguration> {
