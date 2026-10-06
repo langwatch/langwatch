@@ -92,12 +92,6 @@ Ruling: restore `collectDefaultMetrics` (main had it; a regression); an unconfig
 404 and boot names the missing token. Paths: the process metrics setup in `packages/observability` or
 `packages/process` (find where the registry is built), a scenario in `specs/server`.
 
-### W-04 Python SDK e2e against the branch stack (S)
-
-Ruling: point the Python SDK e2e job at this branch's own stack instead of production. The regenerated
-client calls `/api/v1/prompts/tags*`, which the branch serves and main does not. Paths: the Python SDK
-workflow in `.github/workflows/`; `go run ./cmd/ciguard` must pass.
-
 ### W-05 Permission sweeps, the remaining two (M)
 
 Ruling Q133: three sweeps; the synthetic-router sweep is ported. Build (a) an `apps/api` test sweeping the
@@ -171,6 +165,16 @@ Plan: `dev/docs/plans/migrations-rethink-2026-10-06.md` §8 S2 (S1 ledger landed
 The stamp generator in the release PR; manifests backfilled since the LTS; `upgrade status` and `plan`;
 the reader the ops page uses. S3 and S4 follow (claim separately once S2 merges). Paths:
 `packages/upgrade/**`, `apps/tasks/**`, the release workflow.
+
+## Done
+
+### W-04 Python SDK e2e against the branch stack (S)
+
+Done: landed in d1bfd81a40, plus prompt-tag seeding in 24fd9354a8.
+
+Ruling: point the Python SDK e2e job at this branch's own stack instead of production. The regenerated
+client calls `/api/v1/prompts/tags*`, which the branch serves and main does not. Paths: the Python SDK
+workflow in `.github/workflows/`; `go run ./cmd/ciguard` must pass.
 
 ## Opens when its dependency lands
 
