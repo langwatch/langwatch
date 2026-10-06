@@ -31,6 +31,10 @@ recommendation, and "default taken" if a lane proceeded on it.
 - Q-U10 Organization admins see held or archived state: recommendation no (legacy path serves, refusals opaque, record §3.5).
 - Q-U11 Steps carry a required one-line description shown in UI and CLI (SQL steps take the first comment): recommendation yes.
 
+### Entitlement merge (M1 hand-back, 2026-10-06 night)
+
+- Q1-upcast How stored `lw.usage.*` events become `lw.entitlement.*` (ruled: rename with an upcast). Eventing has no upcast hook (one type literal per schema, eventSchemas.ts:20-25; projections filter the exact type, projectionRouter.ts:1209,1383; replay discovers by type). Options: (a) a framework upcaster in packages/eventing applied at dispatch, store read and replay; (b) dual-read: legacy schemas beside the new, the process manager and billing's two peer subscribers registered on both types; (c) a ClickHouse step rewriting stored EventType and AggregateType plus a drain of the old queue keys. A pipeline rename also changes queue and dedup keys (queueManager.ts:338-339,359), so in-flight `countMonth` jobs need a drain. Facts: no usage projection reads these events back after delivery; only live subscribers and the process manager do. No recommendation yet; the rename slice waits on this. M1 landed with stored names unchanged.
+
 ### Older numbered questions
 
 - Up to 79 ids in `.claude/coordinator/questions-2026-10-06.md` that no ruling cites (Q11 to Q13, Q29 to Q39, Q43 to Q78, Q86 to Q152, Q155 to Q220); an upper bound, several are coordinator defaults for review.
