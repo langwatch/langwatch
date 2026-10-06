@@ -55,3 +55,29 @@ export const projectPresenceSettingChangedEventDataSchema = z.object({
 export type ProjectPresenceSettingChangedEventData = z.infer<
   typeof projectPresenceSettingChangedEventDataSchema
 >;
+
+export const PROJECT_MOVED_EVENT_TYPE = "lw.project.moved" as const;
+export const PROJECT_MOVED_EVENT_VERSION = "2026-10-06" as const;
+
+/** A project now sits under another team of the same organization; ids only. */
+export const projectMovedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  fromTeamId: z.string().min(1),
+  toTeamId: z.string().min(1),
+});
+export type ProjectMovedEventData = z.infer<typeof projectMovedEventDataSchema>;
+
+export const PROJECT_ARCHIVED_EVENT_TYPE = "lw.project.archived" as const;
+export const PROJECT_ARCHIVED_EVENT_VERSION = "2026-10-06" as const;
+
+/** A project was archived and no longer resolves as a scope; ids only. */
+export const projectArchivedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type ProjectArchivedEventData = z.infer<typeof projectArchivedEventDataSchema>;

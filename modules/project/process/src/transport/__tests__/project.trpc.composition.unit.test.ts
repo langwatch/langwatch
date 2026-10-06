@@ -190,6 +190,8 @@ function application(
     recordProjectCreated: { send: async () => undefined },
     recordProjectLegacyKeyRevoked: { send: options.revoked ?? (async () => undefined) },
     recordPresenceSettingChanged: { send: async () => undefined },
+    recordProjectMoved: { send: async () => undefined },
+    recordProjectArchived: { send: async () => undefined },
   });
 
   return { app, database, asked, logged: reported.entries };

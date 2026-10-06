@@ -2,6 +2,8 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
 import type {
+  RecordProjectArchivedCommandData,
+  RecordProjectMovedCommandData,
   RecordProjectCreatedCommandData,
   RecordProjectLegacyKeyRevokedCommandData,
   RecordProjectPresenceSettingChangedCommandData,
@@ -18,6 +20,8 @@ export type ProjectLifecycleSenders = Readonly<{
     EventingCommandSender<RecordProjectPresenceSettingChangedCommandData>,
     "send"
   >;
+  recordProjectMoved: Pick<EventingCommandSender<RecordProjectMovedCommandData>, "send">;
+  recordProjectArchived: Pick<EventingCommandSender<RecordProjectArchivedCommandData>, "send">;
 }>;
 
 type NoticeLogger = Readonly<{
@@ -127,6 +131,45 @@ export class ProjectCreatedNoticeService {
     }
   }
 
+  /** Best effort: the move is saved, so a failed record is logged; held lineage ages out. */
+  async moved(
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      fromTeamId: string;
+      toTeamId: string;
+    }>,
+  ): Promise<void> {
+    try {
+      await this.#connected().recordProjectMoved.send({
+        tenantId: input.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        ...input,
+      });
+    } catch (error) {
+      this.dependencies.logger.error(
+        { projectId: input.projectId, error },
+        "recording the project move failed; authz's held lineage ages out within a minute",
+      );
+    }
+  }
+
+  /** Best effort, as a move's record is. */
+  async archived(input: Readonly<{ projectId: string; organizationId: string }>): Promise<void> {
+    try {
+      await this.#connected().recordProjectArchived.send({
+        tenantId: input.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        ...input,
+      });
+    } catch (error) {
+      this.dependencies.logger.error(
+        { projectId: input.projectId, error },
+        "recording the project archive failed; authz's held lineage ages out within a minute",
+      );
+    }
+  }
+
   /** Records each project's stored presence setting, marked backfilled and keyed per project. */
   async recordExistingPresenceSettings(
     input: Readonly<{ organizationId: string }>,
@@ -145,6 +188,12 @@ export class ProjectCreatedNoticeService {
       recorded += 1;
     }
     return recorded;
+  }
+
+  #connected(): ProjectLifecycleSenders {
+    const senders = this.#senders;
+    if (!senders) throw new Error("project_lifecycle is not registered in this process");
+    return senders;
   }
 
   async #sendPresenceSetting(

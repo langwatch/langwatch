@@ -641,6 +641,8 @@ describe("ProjectService", () => {
         recordProjectCreated: { send },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
         recordPresenceSettingChanged: { send: async () => undefined },
+        recordProjectMoved: { send: async () => undefined },
+        recordProjectArchived: { send: async () => undefined },
       });
 
       await createService(new StubRepository(), new StubOrganizationService(), created).create(
@@ -671,6 +673,8 @@ describe("ProjectService", () => {
         recordProjectCreated: { send: () => Promise.reject(new Error("queue down")) },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
         recordPresenceSettingChanged: { send: async () => undefined },
+        recordProjectMoved: { send: async () => undefined },
+        recordProjectArchived: { send: async () => undefined },
       });
 
       await expect(
@@ -1115,5 +1119,133 @@ describe("ProjectService", () => {
     };
     expect(repository.touchCodingAgentSessionSeen).toHaveBeenCalledWith(expected);
     expect(repository.touchCodingAgentPullRequestSeen).toHaveBeenCalledWith(expected);
+  });
+});
+
+describe("ProjectService lifecycle facts for authz's lineage", () => {
+  function recording({ failing = false }: { failing?: boolean } = {}) {
+    const moved = vi.fn(async (_payload: unknown) =>
+      failing ? Promise.reject(new Error("queue down")) : undefined,
+    );
+    const archived = vi.fn(async (_payload: unknown) =>
+      failing ? Promise.reject(new Error("queue down")) : undefined,
+    );
+    const error = vi.fn();
+    const created = ProjectCreatedNoticeService.create({
+      logger: { error },
+      projects: {
+        findWithOrgAdmin: async () => null,
+        findIdsByOrganization: async () => [],
+        findWithTeam: async () => null,
+      },
+    });
+    created.connect({
+      recordProjectCreated: { send: async () => undefined },
+      recordProjectLegacyKeyRevoked: { send: async () => undefined },
+      recordPresenceSettingChanged: { send: async () => undefined },
+      recordProjectMoved: { send: moved },
+      recordProjectArchived: { send: archived },
+    });
+    const repository = new StubRepository();
+    repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_alpha" }));
+    const organizations = new StubOrganizationService();
+    organizations.findActiveTeam.mockImplementation(async ({ teamId }) => ({
+      id: teamId,
+      isPersonal: false,
+    }));
+
+    return {
+      service: createService(repository, organizations, created),
+      repository,
+      moved,
+      archived,
+      error,
+    };
+  }
+
+  describe("when a project is moved to another team", () => {
+    /** @scenario "A project moved to another team is recorded as project's fact" */
+    it("records a moved fact naming both teams and the organization", async () => {
+      const { service, moved } = recording();
+
+      await service.update({
+        id: applicationProject.id,
+        organizationId: "org",
+        data: { teamId: "team_beta" },
+      });
+
+      expect(moved).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: applicationProject.id,
+          projectId: applicationProject.id,
+          organizationId: "org",
+          fromTeamId: "team_alpha",
+          toTeamId: "team_beta",
+        }),
+      );
+    });
+  });
+
+  describe("when a project's settings are saved without a team change", () => {
+    /** @scenario "Saving a project without changing its team records no moved fact" */
+    it("records no moved fact for the same team or no team", async () => {
+      const { service, moved } = recording();
+
+      await service.update({
+        id: applicationProject.id,
+        organizationId: "org",
+        data: { teamId: "team_alpha" },
+      });
+      await service.update({
+        id: applicationProject.id,
+        organizationId: "org",
+        data: { name: "Renamed" },
+      });
+
+      expect(moved).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a project is archived", () => {
+    /** @scenario "An archived project is recorded as project's fact" */
+    it("records an archived fact with the organization", async () => {
+      const { service, archived } = recording();
+
+      await service.archive({ id: applicationProject.id, organizationId: "org" });
+
+      expect(archived).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: applicationProject.id,
+          projectId: applicationProject.id,
+          organizationId: "org",
+        }),
+      );
+    });
+  });
+
+  describe("when the lifecycle record fails", () => {
+    /** @scenario "A move or archive whose fact cannot be recorded still stands" */
+    it("saves the move and the archive and logs each failure", async () => {
+      const { service, repository, error } = recording({ failing: true });
+
+      await expect(
+        service.update({
+          id: applicationProject.id,
+          organizationId: "org",
+          data: { teamId: "team_beta" },
+        }),
+      ).resolves.toBe(applicationProject);
+      await expect(
+        service.archive({ id: applicationProject.id, organizationId: "org" }),
+      ).resolves.toMatchObject({ id: applicationProject.id });
+
+      expect(repository.update).toHaveBeenCalled();
+      expect(repository.archive).toHaveBeenCalled();
+      expect(error).toHaveBeenCalledTimes(2);
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: applicationProject.id }),
+        expect.any(String),
+      );
+    });
   });
 });

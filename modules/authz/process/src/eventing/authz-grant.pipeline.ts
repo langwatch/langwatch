@@ -6,6 +6,12 @@ import {
 } from "@langwatch/eventing";
 import { USER_ERASED_EVENT_TYPE, userErasedPayloadSchema } from "@langwatch/identity-contract";
 import {
+  PROJECT_ARCHIVED_EVENT_TYPE,
+  PROJECT_MOVED_EVENT_TYPE,
+  projectArchivedEventDataSchema,
+  projectMovedEventDataSchema,
+} from "@langwatch/project-contract";
+import {
   USER_DEACTIVATED_EVENT_TYPE,
   USER_REACTIVATED_EVENT_TYPE,
   userLifecycleEventDataSchema,
@@ -17,6 +23,7 @@ import type { AuthzGrantProjectionRepository } from "../repositories/authz-grant
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import type { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
 import type { AuthzUserStandingService } from "../services/authz-user-standing.service.ts";
+import type { AuthzService } from "../services/authz.service.ts";
 import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,
@@ -42,6 +49,8 @@ interface EventingAuthzAdapterOptions {
   sessionVersions?: AuthzSessionVersionService;
   /** Absent on the consumer-only twin, which keeps no user standing. */
   userStandings?: AuthzUserStandingService;
+  /** Absent on the consumer-only twin, which holds no scope lineage. */
+  scopeLineage?: Pick<AuthzService, "lineageChanged">;
 }
 
 const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
@@ -76,7 +85,21 @@ const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
     .withCommand("defineRole", DefineRoleCommand)
     .withCommand("changeRolePermissions", ChangeRolePermissionsCommand)
     .withCommand("deleteRole", DeleteRoleCommand);
-  const { sessionVersions, userStandings } = options;
+  const { sessionVersions, userStandings, scopeLineage } = options;
+  if (scopeLineage) {
+    // Where a project sits is project's fact; authz moves its own lineage signal from it (§9).
+    pipeline
+      .withPeerSubscriber("projectMoved", {
+        eventType: PROJECT_MOVED_EVENT_TYPE,
+        data: projectMovedEventDataSchema,
+        handle: ({ organizationId }) => scopeLineage.lineageChanged({ organizationId }),
+      })
+      .withPeerSubscriber("projectArchived", {
+        eventType: PROJECT_ARCHIVED_EVENT_TYPE,
+        data: projectArchivedEventDataSchema,
+        handle: ({ organizationId }) => scopeLineage.lineageChanged({ organizationId }),
+      });
+  }
   if (userStandings) {
     // Who is gone is user's and identity's fact; authz keeps its own table from them (§9).
     pipeline
