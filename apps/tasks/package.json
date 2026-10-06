@@ -100,6 +100,7 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-process": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-process": "workspace:*",
     "@langwatch/usage-process": "workspace:*",
     "@langwatch/user-process": "workspace:*",

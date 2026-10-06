@@ -1941,6 +1941,9 @@ importers:
       '@langwatch/topic-process':
         specifier: workspace:*
         version: link:../../modules/topic/process
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../modules/trace/contract
       '@langwatch/trace-process':
         specifier: workspace:*
         version: link:../../modules/trace/process
