@@ -144,6 +144,20 @@ Feature: Web Push delivery
       When another process starts and a browser asks for the public key
       Then it receives the stored public key
 
+  Rule: A send is picked up without waiting for the outbox poll
+
+    @unit
+    Scenario: An enqueue that stores a send wakes the outbox once
+      Given a person with two sends to enqueue
+      When both sends are enqueued
+      Then the web push outbox is woken once
+
+    @unit
+    Scenario: An enqueue of sends already stored does not wake the outbox
+      Given sends that were already enqueued
+      When the same sends are enqueued again
+      Then the web push outbox is not woken
+
   Rule: A person who leaves takes their devices with them
 
     @unit

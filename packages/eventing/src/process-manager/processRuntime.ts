@@ -395,6 +395,11 @@ export class ProcessRuntime {
     return result as SignalHandleResult<State>;
   }
 
+  /** Wakes the named process manager's outbox worker; a no-op where it is not mounted here. */
+  notifyOutbox(processName: string): void {
+    this.managers.get(processName)?.outboxWorker.notify();
+  }
+
   /**
    * Hosts an outbox the runtime's own machinery writes (failed hand-offs),
    * with the lease, backoff and dead letters a process manager's intents get.
@@ -466,7 +471,7 @@ export class ProcessRuntime {
           store: this.store,
           managers: this.wakeManagers,
           logger: this.logger,
-          notifyOutbox: (processName) => this.managers.get(processName)?.outboxWorker.notify(),
+          notifyOutbox: (processName) => this.notifyOutbox(processName),
         });
         if (this.running) this.wakeWorker.start();
       }

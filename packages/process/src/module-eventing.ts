@@ -134,6 +134,8 @@ export interface EventingHost {
   holdConsumers?(): void;
   /** Starts consuming; the kernel calls it when the booted runtime starts. */
   startConsumers?(): void;
+  /** Wakes one process manager's outbox in this process; absent where none runs. */
+  notifyOutbox?(processName: string): void;
 }
 
 /**
@@ -326,6 +328,9 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
       : {}),
     ...(typeof host.projectionNames === "function"
       ? { projectionNames: host.projectionNames.bind(candidate) }
+      : {}),
+    ...(typeof host.notifyOutbox === "function"
+      ? { notifyOutbox: host.notifyOutbox.bind(candidate) }
       : {}),
     ...(typeof host.holdConsumers === "function" && typeof host.startConsumers === "function"
       ? {
