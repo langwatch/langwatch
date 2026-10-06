@@ -275,6 +275,7 @@ Rule: Conversations lens
     Then 5 turns are shown
     And "... 3 more turns" with a "Show all" link appears
 
+  @integration
   Scenario: Clicking a turn row opens the trace drawer
     When the user clicks a turn row
     Then the trace drawer opens in Trace mode for that specific trace
