@@ -133,3 +133,17 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - DB clock (mig-ledger-widen): DATABASE clock
 - Checkup row (U3-a): NEW code checkup_clickhouse_migration_failed (not the recommended reuse)
 - Doctor (U3-b): RUN the task; status unavailable leaves the exit code alone
+
+## Round 19 (C, held:70 (presence clock), held:71 (oldWritersGoneFor), held:75 (presence name), held:89 (presence timings))
+
+- No clock (mig-cloud-presence): Alex: 'inject a service/repo, so mocking time possible?'. Read as: presence goes through an injected repository; the Prisma tier stamps and judges on the database clock, the memory twin takes a controllable clock so tests can move time; no process clock in production
+- No writers (mig-cloud-presence): TRUE when no process is live
+- Name clash (mig-cloud-presence): RENAME the upgrade 'presence' table and code (proposed 'serving roster'); table, code and docs
+- Heartbeat (mig-entry-points): 15 s refresh, 60 s stale
+
+## Round 20 (C, held:84 (gate data source), S3-NO-CLICKHOUSE, S3-FIRST-INSTALL, S3-PREPARE-PASS)
+
+- Gate pool (mig-entry-points): OWN pool
+- No CH target (S3-NO-CLICKHOUSE): ALWAYS count ClickHouse steps (not the recommended ignore-if-absent); clarification on installs with no ClickHouse asked
+- First boot (S3-FIRST-INSTALL): API runs upgrade once on a first install
+- Tenant pass (S3-PREPARE-PASS): AFTER upgrade in the preparation script
