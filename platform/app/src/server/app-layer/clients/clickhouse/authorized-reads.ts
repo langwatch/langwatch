@@ -72,8 +72,12 @@ const SET_MARKER = /\{\{tenantSet\}\}/g;
  * dedup tuple member is fine; `TenantId =`, `TenantId IN` and the comparison
  * forms are not, because the fence is the only predicate allowed to pick
  * tenants.
+ *
+ * Exported so the source-scanning gate over the converted repositories
+ * (`__tests__/store-call-carries-authorization.unit.test.ts`) refuses the
+ * same shapes the reader refuses at run time, and the two cannot drift.
  */
-const HAND_WRITTEN_TENANT_PREDICATE =
+export const HAND_WRITTEN_TENANT_PREDICATE =
   /\bTenantId\s*(?:=|!=|<>|<=|>=|<|>|(?:NOT\s+)?IN\b|(?:NOT\s+)?LIKE\b)/i;
 
 /** The marker a repository writes where its tenant predicate used to go. */
