@@ -171,10 +171,11 @@ function gatewayModelsEndpointUrl(baseUrl: string): string {
 }
 
 /**
- * Every models URL worth asking for one credential: the one the gateway will use first, the
- * as-typed one second for an endpoint whose models route sits outside the "/v1" convention.
+ * The models URL to ask for one credential. Where the gateway normalises the base URL only the
+ * address it will call is asked: a key that answers only at the as-typed address would pass
+ * here and fail on every request.
  */
-function modelsEndpointUrls({
+function modelsEndpointUrl({
   provider,
   baseUrl,
   defaultBaseUrl,
@@ -182,13 +183,11 @@ function modelsEndpointUrls({
   provider: string;
   baseUrl: string;
   defaultBaseUrl: string;
-}): string[] {
-  const asTyped = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
+}): string {
   if (!baseUrl || !GATEWAY_NORMALISED_BASE_URL_PROVIDERS.has(provider)) {
-    return [asTyped];
+    return buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
   }
-  const asDispatched = gatewayModelsEndpointUrl(baseUrl);
-  return asDispatched === asTyped ? [asTyped] : [asDispatched, asTyped];
+  return gatewayModelsEndpointUrl(baseUrl);
 }
 
 const logger = createLogger("langwatch:api:providerValidation");
@@ -481,21 +480,27 @@ function buildProbeCandidates({
   agentPlatform?: { project: string; location: string };
 }): ProbeRequest[] {
   const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
-  const urls = modelsEndpointUrls({ provider, baseUrl, defaultBaseUrl });
+  const normalisedUrl = modelsEndpointUrl({
+    provider,
+    baseUrl,
+    defaultBaseUrl,
+  });
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
 
   switch (strategy) {
     case "anthropic":
-      return urls.map((candidateUrl) => ({
-        url: candidateUrl,
-        headers: {
-          ...headers,
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
+      return [
+        {
+          url: normalisedUrl,
+          headers: {
+            ...headers,
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
         },
-      }));
+      ];
     case "elevenlabs":
       return [{ url, headers: { ...headers, "xi-api-key": apiKey } }];
     case "gemini": {
@@ -550,10 +555,12 @@ function buildProbeCandidates({
     }
     case "bearer":
     default:
-      return urls.map((candidateUrl) => ({
-        url: candidateUrl,
-        headers: { ...headers, Authorization: `Bearer ${apiKey}` },
-      }));
+      return [
+        {
+          url: normalisedUrl,
+          headers: { ...headers, Authorization: `Bearer ${apiKey}` },
+        },
+      ];
   }
 }
 

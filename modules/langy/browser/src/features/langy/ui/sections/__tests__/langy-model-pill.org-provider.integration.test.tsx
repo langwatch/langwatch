@@ -7,7 +7,7 @@
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
@@ -68,19 +68,30 @@ function renderPill() {
 
 describe("given the project's only model provider is connected at the organization", () => {
   describe("when the composer's model picker opens", () => {
-    /** @scenario "A provider configured on the organization enables its models in the picker" */
-    it("offers that provider's models and none from an unconnected provider", async () => {
+    beforeEach(async () => {
       const user = userEvent.setup();
       renderPill();
-
       await user.click(screen.getByTestId("langy-model-picker"));
+    });
 
+    /** @scenario "A provider configured on the organization enables its models in the picker" */
+    it("offers that provider's models and none from an unconnected provider", async () => {
       const offered = (await screen.findAllByRole("option")).map((option) =>
         option.textContent?.trim(),
       );
       expect(offered).toContain("claude-sonnet-4-5");
       expect(offered).toContain("claude-haiku-4-5");
       expect(offered.join(" ")).not.toContain("gpt-5-mini");
+    });
+
+    /** @scenario "The model list opens above the panel when Langy rides beside a drawer" */
+    it("puts the model list on the overlay layer, above a panel riding beside a drawer", async () => {
+      const positioner = (await screen.findAllByRole("option"))[0]?.closest<HTMLElement>(
+        '[data-part="positioner"]',
+      );
+      // The panel sits at z 1600 beside a drawer and the drawer at 1500.
+      expect(Number(positioner?.style.getPropertyValue("z-index"))).toBe(2010);
+      expect(positioner?.style.getPropertyPriority("z-index")).toBe("important");
     });
   });
 });

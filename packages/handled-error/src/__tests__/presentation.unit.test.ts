@@ -446,6 +446,13 @@ describe("explainHandledError", () => {
       "permission_error",
       "invalid_api_key",
       "AccessDeniedException",
+      "InvalidSignatureException",
+      "UnrecognizedClientException",
+      "ExpiredTokenException",
+      "InvalidClientTokenId",
+      "SignatureDoesNotMatch",
+      "UNAUTHENTICATED",
+      "PERMISSION_DENIED",
     ])("explains the provider's own %s code as a refused credential", (code) => {
       const { description } = explainHandledError(
         shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
@@ -906,6 +913,32 @@ describe("explainHandledError", () => {
 describe("provider_config_invalid", () => {
   const explain = (meta: Record<string, unknown>) =>
     explainHandledError(shape({ code: "provider_config_invalid", meta })).description;
+  const headline = (meta: Record<string, unknown>) =>
+    explainHandledError(shape({ code: "provider_config_invalid", meta })).title;
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("gives each gap a headline that names the same gap as its body", () => {
+    expect(headline({ problem: "api_key_missing" })).toBe("This provider has no API key saved");
+    expect(headline({ problem: "endpoint_missing" })).toBe(
+      "This provider has no endpoint URL saved",
+    );
+    expect(headline({ problem: "deployment_missing" })).toBe(
+      "This provider has no deployment for that model",
+    );
+    expect(headline({ problem: "operation_unsupported" })).toBe(
+      "This provider does not support this kind of request",
+    );
+  });
+
+  it("keeps the model headline when no gap is named or the model is not served", () => {
+    expect(headline({})).toBe("This provider is not set up to serve that model");
+    expect(headline({ problem: "model_not_served" })).toBe(
+      "This provider is not set up to serve that model",
+    );
+    expect(headline({ problem: "sk-not-a-problem" })).toBe(
+      "This provider is not set up to serve that model",
+    );
+  });
 
   /** @scenario "Each provider setup gap gets its own instruction" */
   it("tells a provider with no API key to add the key", () => {

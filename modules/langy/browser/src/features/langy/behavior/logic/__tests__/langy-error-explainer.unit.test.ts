@@ -204,6 +204,35 @@ describe("explainLangyError", () => {
         });
       });
 
+      /** @scenario "A refused credential in a dialect the client does not know still reads as a credential to check" */
+      it.each([
+        // A wrong AWS secret, by Bedrock's own exception name.
+        [[{ kind: "InvalidSignatureException" }]],
+        [[{ kind: "UnrecognizedClientException" }]],
+        // A discriminant no list names, with the status reason beside it.
+        [[{ kind: "SomeFutureAuthException" }, { kind: "upstream_forbidden" }]],
+        [[{ kind: "invalid_request_error" }, { kind: "upstream_unauthorized" }]],
+      ])("reads %j as the provider refusing the key, and offers the settings", (reasons) => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 403, provider: "bedrock" },
+                reasons,
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.description).toBe(
+          "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",
+        );
+        expect(presentation.action).toEqual({ label: "Configure model", kind: "configure-model" });
+      });
+
       /** @scenario A model the provider does not know reads as a model to check */
       it("reads a model_not_found as a model to check, and offers the settings", () => {
         const presentation = explainLangyError(

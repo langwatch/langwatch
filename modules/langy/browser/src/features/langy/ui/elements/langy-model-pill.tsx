@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { useOverlayZIndex } from "@langwatch/design-system";
 import {
   Box,
   Combobox,
@@ -186,6 +187,7 @@ export const LangyModelPill = memo(function LangyModelPill({
   // The catalogue is the right list and the wrong front door — see
   // logic/langyModelSuggestions.ts. A short derived shortlist leads; everything
   // else waits behind "More models".
+  const { zIndex } = useOverlayZIndex();
   const searching = query.trim().length > 0;
   const { suggested, more } = useMemo(
     () =>
@@ -311,7 +313,13 @@ export const LangyModelPill = memo(function LangyModelPill({
         </Combobox.Trigger>
       </Combobox.Control>
       <Portal>
-        <Combobox.Positioner>
+        <Combobox.Positioner
+          ref={(node: HTMLElement | null) => {
+            // Zag's own layer lands under the panel when Langy rides beside a
+            // drawer (z 1600), so the list takes the shared overlay layer.
+            node?.style.setProperty("z-index", zIndex, "important");
+          }}
+        >
           <Combobox.Content
             minWidth="240px"
             maxHeight="340px"

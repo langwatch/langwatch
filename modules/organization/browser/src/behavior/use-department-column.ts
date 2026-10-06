@@ -21,7 +21,8 @@ export function useDepartmentColumn(
   // The control also renders on pages every member can open, and the lists behind it need
   // `governance:view`. Without the grant there is nothing to read, so nothing is asked.
   const { hasPermission } = useOrganizationTeamProject();
-  const enabled = !!organizationId && ffOn && hasPermission("governance:view");
+  const canRead = hasPermission("governance:view");
+  const enabled = !!organizationId && ffOn && canRead;
 
   const listQuery = api.departments.list.useQuery(
     { organizationId },
@@ -41,7 +42,7 @@ export function useDepartmentColumn(
   const byProject = new Map(assignments?.projects.map((p) => [p.id, p.departmentId]) ?? []);
 
   return {
-    show: ffOn && departments.length > 0,
+    show: ffOn && canRead && departments.length > 0,
     departments,
     byUser,
     byTeam,
