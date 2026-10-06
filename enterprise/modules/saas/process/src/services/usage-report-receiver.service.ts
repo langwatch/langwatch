@@ -7,9 +7,10 @@ import {
 } from "@langwatch/enterprise-saas-contract";
 import type { Logger } from "@langwatch/observability";
 import { countUnknownUsageFields, usageReportBodySchema } from "@langwatch/ops-contract";
-import type { Clock, RateLimiter } from "@langwatch/process-stores/members";
+import { nowInstant } from "@langwatch/time";
 
 import type { ProductAnalyticsChannel } from "../channels/product-analytics.channel.ts";
+import type { SaasRateLimitRepository } from "../repositories/saas-rate-limit.repository.ts";
 import {
   senderAddressesOf,
   USAGE_REPORT_GLOBAL_KEY,
@@ -30,34 +31,30 @@ type UsageReportRecorder = Pick<LicensingApi, "recordUsageReport">;
  */
 export class UsageReportReceiverService {
   readonly #cloud: LangWatchCloudService;
-  readonly #rateLimiter: RateLimiter;
+  readonly #rateLimits: SaasRateLimitRepository;
   readonly #registry: UsageReportRecorder;
   readonly #analytics: ProductAnalyticsChannel;
-  readonly #clock: Clock;
   readonly #logger: Logger;
 
   private constructor(parts: {
     cloud: LangWatchCloudService;
-    rateLimiter: RateLimiter;
+    rateLimits: SaasRateLimitRepository;
     registry: UsageReportRecorder;
     analytics: ProductAnalyticsChannel;
-    clock: Clock;
     logger: Logger;
   }) {
     this.#cloud = parts.cloud;
-    this.#rateLimiter = parts.rateLimiter;
+    this.#rateLimits = parts.rateLimits;
     this.#registry = parts.registry;
     this.#analytics = parts.analytics;
-    this.#clock = parts.clock;
     this.#logger = parts.logger;
   }
 
   static create(parts: {
     cloud: LangWatchCloudService;
-    rateLimiter: RateLimiter;
+    rateLimits: SaasRateLimitRepository;
     registry: UsageReportRecorder;
     analytics: ProductAnalyticsChannel;
-    clock: Clock;
     logger: Logger;
   }): UsageReportReceiverService {
     return new UsageReportReceiverService(parts);
@@ -90,7 +87,7 @@ export class UsageReportReceiverService {
   }
 
   async #admit(key: string, limit: { requests: number; seconds: number }): Promise<void> {
-    const decision = await this.#rateLimiter.check(key, limit);
+    const decision = await this.#rateLimits.check(key, limit);
     if (!decision.allowed) throw new UsageReportRateLimitedError();
   }
 
@@ -102,7 +99,7 @@ export class UsageReportReceiverService {
     try {
       await this.#registry.recordUsageReport({
         ...report,
-        receivedAt: this.#clock.now().toString({ fractionalSecondDigits: 3 }),
+        receivedAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
       });
     } catch (error) {
       this.#logger.error(

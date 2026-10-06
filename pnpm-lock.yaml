@@ -4243,6 +4243,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../../packages/time
       posthog-node:
         specifier: 'catalog:'
         version: 5.48.1(rxjs@7.8.2)
@@ -4603,6 +4606,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../../packages/observability
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../../../modules/ops/contract

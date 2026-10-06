@@ -56,7 +56,9 @@ import {
   type SsoSetupRegistered,
   type SsoSetupRegisterInput,
   type SsoSetupRemovalInput,
+  type SsoSetupIdentityProviderUpdate,
   type SsoSetupIdentityProviderView,
+  type SsoSetupRegistration,
   type SsoSetupRenameInput,
   type SsoSetupUpdateIdentityProviderInput,
   type SsoSelfServeAvailability,
@@ -70,6 +72,7 @@ import {
 } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { IdentityApi, SsoConnectionNotFoundError } from "@langwatch/identity-contract";
+import { createLogger } from "@langwatch/observability";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { signInProviderSecrets } from "@langwatch/secrets";
@@ -82,25 +85,173 @@ import {
   findDeploymentSignIns,
   ssoServiceProviderAddresses,
 } from "../rules/sso-service-provider.rules.ts";
-import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
-import { SsoHistoryActivityService } from "../services/sso-history-activity.service.ts";
+import {
+  SsoGateService,
+  SsoProviderMountInspector,
+  type SsoGateLogger,
+} from "../services/sso-gate.service.ts";
+import {
+  SsoHistoryActivityService,
+  type SsoActivityLogger,
+  type SsoConnectionHistoryReads,
+} from "../services/sso-history-activity.service.ts";
 import {
   InstanceLicenseProof,
   LicenseDomainClaimAuthority,
   SsoSelfServeContextService,
 } from "../services/sso-self-serve-context.service.ts";
-import type {
-  SsoActivityLogger,
-  SsoBreakGlassLedger,
-  SsoConnectionLedgerOperator,
-  SsoConnectionHistoryReads,
-  SsoConnectionLedger,
-  SsoDomainCeremonyLedger,
-  SsoGateLogger,
-  SsoSelfServeActor,
-  SsoSetupCommandLedger,
-  SsoSetupReads,
-} from "./sso.members.ts";
+
+/** The operator a command is appended under. The ledger mints nothing itself. */
+export type SsoConnectionLedgerOperator = Readonly<{ userId: string }>;
+
+type Commanded<Input> = Input & Readonly<{ operator: SsoConnectionLedgerOperator }>;
+
+/** How long a removal stays reversible before the process manager completes it. */
+export type SsoConnectionTeardownRequest = Commanded<SsoConnectionReasonInput> &
+  Readonly<{ graceMs: number }>;
+
+export interface SsoConnectionLedger {
+  list(input: ListSsoConnectionsInput): Promise<BackofficeSsoConnectionPage>;
+  /** `null` when no connection carries that id; absence is a normal answer here. */
+  findById(input: SsoConnectionByIdInput): Promise<BackofficeSsoConnection | null>;
+  registerConnection(input: Commanded<RegisterSsoConnectionInput>): Promise<unknown>;
+  claimDomain(input: Commanded<SsoDomainTarget>): Promise<void>;
+  approveDomainClaim(input: Commanded<SsoDomainTarget>): Promise<void>;
+  rejectDomainClaim(input: Commanded<RejectSsoDomainClaimInput>): Promise<void>;
+  attestDomain(input: Commanded<AttestSsoDomainInput>): Promise<void>;
+  activateConnection(input: Commanded<ActivateSsoConnectionInput>): Promise<void>;
+  suspendConnection(input: Commanded<SsoConnectionReasonInput>): Promise<void>;
+  resumeConnection(input: Commanded<SsoConnectionTarget>): Promise<void>;
+  requestTeardown(input: SsoConnectionTeardownRequest): Promise<void>;
+}
+
+/** The administrator the ceremony's facts name. Minted from the session by
+ *  the transport, never taken from an input. */
+type SsoSelfServeActor = Readonly<{ userId: string }>;
+
+/** A claim or an ask to prove, with how this organization proves a domain. */
+type SsoProvingDomainInput = SsoSetupDomainInput &
+  Readonly<{ proof: Extract<SsoSelfServeAvailability, { available: true }>["proof"] }>;
+
+/**
+ * The organization's own half of the domain ceremony (ADR-123), as identity
+ * offers it. Separate from the back office's ledger above because the two
+ * surfaces are gated apart and only share the aggregate underneath.
+ */
+interface SsoDomainCeremonyLedger {
+  claimDomain(
+    input: SsoProvingDomainInput,
+    actor: SsoSelfServeActor,
+  ): Promise<SsoDomainClaimOutcome>;
+  proveDomain(input: SsoProvingDomainInput, actor: SsoSelfServeActor): Promise<SsoDomainProof>;
+  removeDomain(input: SsoSetupDomainInput, actor: SsoSelfServeActor): Promise<void>;
+  checkDomainRecord(input: SsoSetupDomainInput, actor: SsoSelfServeActor): Promise<SsoDomainProved>;
+  checkDomainFile(input: SsoSetupDomainInput, actor: SsoSelfServeActor): Promise<SsoDomainProved>;
+}
+
+/**
+ * The rest of the organization's own journey, as identity offers it: the
+ * ceremony above is its domain half, and these are the presses either side of
+ * it. Stated as this module's own demand, so a signature identity changes
+ * stops this from compiling rather than reaching a screen half-wired.
+ */
+interface SsoSetupCommandLedger {
+  register(
+    input: {
+      organizationId: string;
+      /** What the administrator calls this provider. */
+      providerId: string;
+      registration: SsoSetupRegistration;
+    },
+    actor: SsoSelfServeActor,
+  ): Promise<{ connectionId: string }>;
+  /** The replacement for a grandfathered connection, registered with the same
+   *  evidence and carrying over the domains that one already proved. */
+  startLegacyMigration(
+    input: {
+      organizationId: string;
+      legacyConnectionId: string;
+      providerId: string;
+      registration: SsoSetupRegistration;
+    },
+    actor: SsoSelfServeActor,
+  ): Promise<{ connectionId: string }>;
+  /** Which half of the pair decides ordinary sign-ins. */
+  selectMigrationRoute(
+    input: SsoSetupConnectionInput & { route: SsoSetupMigrationRouteInput["route"] },
+    actor: SsoSelfServeActor,
+  ): Promise<void>;
+  /** The cutover's end, re-read and resumable where identity states it. */
+  finalizeLegacyMigration(input: SsoSetupConnectionInput, actor: SsoSelfServeActor): Promise<void>;
+  rename(
+    input: SsoSetupConnectionInput & { name: string },
+    actor: SsoSelfServeActor,
+  ): Promise<void>;
+  /** A grandfathered connection answers `grandfathered`: it has no settings of its own. */
+  getIdentityProvider(
+    input: SsoSetupConnectionInput,
+  ): Promise<SsoSetupIdentityProviderView | { protocol: "grandfathered" }>;
+  updateIdentityProvider(
+    input: SsoSetupConnectionInput & { idp: SsoSetupIdentityProviderUpdate },
+    actor: SsoSelfServeActor,
+  ): Promise<void>;
+  setArrivals(
+    input: SsoSetupConnectionInput & { arrivalPolicy: SsoSetupArrivalsInput["policy"] },
+    actor: SsoSelfServeActor,
+  ): Promise<void>;
+  /** Going live reads its own evidence: what the connection recorded decides,
+   *  never an account the caller names. */
+  activate(input: SsoSetupConnectionInput, actor: SsoSelfServeActor): Promise<void>;
+  discardConnection(input: SsoSetupConnectionInput, actor: SsoSelfServeActor): Promise<void>;
+  /** Which removal it was is read from where the connection stands, never
+   *  chosen by the caller. */
+  removeConnection(
+    input: SsoSetupRemovalInput & { graceMs: number },
+    actor: SsoSelfServeActor,
+  ): Promise<{ removal: "discarded" | "teardown-requested" }>;
+}
+
+/**
+ * The way back in (D05, ADR-117 §5), as identity offers it. Two reads and
+ * three presses, kept apart from the journey above because none of them is
+ * plan-gated: a lapsed subscription must never close an organization's own
+ * recovery path.
+ */
+interface SsoBreakGlassLedger {
+  findGrants(input: SsoSetupOrganizationInput): Promise<SsoBreakGlassGrant[]>;
+  findCandidates(input: SsoSetupOrganizationInput): Promise<SsoBreakGlassCandidate[]>;
+  /** The grantor is the actor, never an argument — one is never self-served. */
+  grant(
+    input: { organizationId: string; userId: string; expiresAtMs: number },
+    actor: SsoSelfServeActor,
+  ): Promise<SsoBreakGlassBinding>;
+  /** Writes a NEW grant naming the old, so the date the previous one ended
+   *  stays readable. */
+  renew(
+    input: { organizationId: string; bindingId: string; expiresAtMs: number },
+    actor: SsoSelfServeActor,
+  ): Promise<SsoBreakGlassRenewal>;
+  /** Ends one now. Refused while it is a live connection's only way back in. */
+  revoke(input: SsoBreakGlassBindingInput): Promise<SsoBreakGlassBinding>;
+}
+
+/**
+ * Identity's own folding of where the setup stands — everything the page
+ * reads except the addresses this module serves, which is the half it adds.
+ * Demanded as exactly that half, so a field identity stops answering stops
+ * this from compiling rather than reaching a screen as undefined.
+ */
+type SsoSetupJourney = Omit<SsoSetupPageView, "serviceProvider" | "availability">;
+
+interface SsoSetupReads {
+  getSetup(input: SsoSetupOrganizationInput): Promise<SsoSetupJourney>;
+  /** One cutover's members, paged. The migration is null where the
+   *  organization is running none, or where the connection named is not the
+   *  replacement in one. */
+  getMigrationProgress(
+    input: SsoSetupMigrationProgressInput,
+  ): Promise<{ migration: SsoSetupMigration | null }>;
+}
 
 /** Whether the NAMED provider mounts on Better Auth (main's `authProviderIsMounted`). */
 class BetterAuthSsoProviderMount extends SsoProviderMountInspector {
@@ -113,31 +264,17 @@ class BetterAuthSsoProviderMount extends SsoProviderMountInspector {
   }
 }
 
-/**
- * Shapes restated rather than imported from `@langwatch/process-stores`: a
- * module depends on contracts. `publicBaseUrl` is the process's own fact,
- * drilled in — absent where the deployment named no `BASE_HOST`.
- * `isSaas` is the process's own fact too: `IS_SAAS` has one owner, the process
- * slice, and every module that needs it reads it here.
- */
-export type SsoInfrastructure = Readonly<{
-  /** Where the gate's decisions are written. */
-  logger: SsoGateLogger;
-  publicBaseUrl: string | undefined;
-  isSaas: boolean;
-}>;
-
-type SsoSetup = FeatureSetup<typeof SsoModule.dependencies, SsoInfrastructure, SsoConfig>;
+type SsoSetup = FeatureSetup<typeof SsoModule.dependencies, never, SsoConfig>;
 
 /** Every credential this module resolves, alongside the deployment facts. */
 async function resolveConfiguration(
   config: SsoConfig,
-  members: SsoInfrastructure,
+  logger: SsoGateLogger,
   secrets: SsoSetup["secrets"],
 ): Promise<SsoConfiguration> {
   const { deprecatedNameUsed } = configuredAuthProvider(config);
   if (deprecatedNameUsed) {
-    members.logger.warn(
+    logger.warn(
       { module: "sso" },
       "NEXTAUTH_PROVIDER is deprecated - set AUTH_PROVIDER instead. The configured value still applies.",
     );
@@ -147,9 +284,9 @@ async function resolveConfiguration(
     ...(await resolveSignInProviders({
       config,
       into: secrets.into,
-      baseUrl: members.publicBaseUrl ?? "http://localhost",
+      baseUrl: config.publicBaseUrl ?? "http://localhost",
     })),
-    isSaas: members.isSaas,
+    isSaas: config.isSaas,
   };
 }
 
@@ -190,8 +327,6 @@ export class SsoModule implements SsoApiContract {
   };
   static readonly config = ssoConfig;
   static readonly secrets = signInProviderSecrets;
-  /** `publicBaseUrl` is not one of the closed `reads()` members. */
-  static readonly reads = ["logger", "publicBaseUrl", "isSaas"] as const;
 
   readonly #gate: SsoGateService;
   readonly #connections: SsoConnectionLedger;
@@ -269,7 +404,8 @@ export class SsoModule implements SsoApiContract {
     this.#auditLog = dependencies.auditLog;
   }
 
-  static async create({ dependencies, members, config, secrets }: SsoSetup): Promise<SsoModule> {
+  static async create({ dependencies, config, secrets }: SsoSetup): Promise<SsoModule> {
+    const logger = createLogger("langwatch:sso");
     // A peer may not be invoked while the process constructs, so the ledger
     // forwards to identity per call rather than being fetched here.
     const backoffice = () => dependencies.identity.ssoBackoffice();
@@ -317,12 +453,12 @@ export class SsoModule implements SsoApiContract {
       renew: (input, actor) => ways().renew({ ...input, actor }),
       revoke: (input) => ways().revoke(input),
     };
-    const configuration = await resolveConfiguration(config, members, secrets);
+    const configuration = await resolveConfiguration(config, logger, secrets);
     return new SsoModule({
       gate: SsoGateService.create({
         configuration,
         licensing: dependencies.licensing,
-        logger: members.logger,
+        logger,
         providerMountInspector: BetterAuthSsoProviderMount.create(),
       }),
       connections,
@@ -338,7 +474,7 @@ export class SsoModule implements SsoApiContract {
           dependencies.identity.ssoSetup().getMigrationProgress(input),
       },
       configuration,
-      logger: members.logger,
+      logger,
       dependencies,
     });
   }

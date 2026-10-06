@@ -19,8 +19,7 @@ import { ScopedSecrets, signInProviderSecrets, type SecretHandle } from "@langwa
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
-import { SsoModule, type SsoInfrastructure } from "../sso.app.ts";
-import type { SsoConnectionLedger, SsoGateLogger } from "../sso.members.ts";
+import { SsoModule, type SsoConnectionLedger } from "../sso.app.ts";
 
 export function createSsoTestConfig(overrides: Partial<SsoConfig> = {}): SsoConfig {
   return {
@@ -41,6 +40,8 @@ export function createSsoTestConfig(overrides: Partial<SsoConfig> = {}): SsoConf
     oneLoginIssuer: undefined,
     oidcClientId: undefined,
     oidcIssuer: undefined,
+    isSaas: false,
+    publicBaseUrl: "https://acme.test",
     ...overrides,
   };
 }
@@ -142,16 +143,6 @@ export class RecordingSsoDomainCeremony implements SsoDomainCeremonyApi {
   readonly checkDomainFile = vi.fn<SsoDomainCeremonyApi["checkDomainFile"]>(async () => ({
     proved: true,
   }));
-}
-
-/** The gate's log lines, kept so a test can read what an operator would. */
-export class RecordingSsoGateLogger implements SsoGateLogger {
-  static create(): RecordingSsoGateLogger {
-    return new RecordingSsoGateLogger();
-  }
-
-  readonly info = vi.fn<SsoGateLogger["info"]>();
-  readonly warn = vi.fn<SsoGateLogger["warn"]>();
 }
 
 /** The identity peer, narrowed to the capabilities sso reads off it. */
@@ -308,7 +299,6 @@ export function createSsoTestApp(
   input: Readonly<{
     config?: SsoConfig;
     secrets?: SsoSecretOverrides;
-    members?: Partial<SsoInfrastructure>;
     connections?: RecordingSsoConnectionLedger;
     dependencies?: Partial<{
       licensing: LicensingApi;
@@ -328,11 +318,6 @@ export function createSsoTestApp(
       auditLog: input.dependencies?.auditLog ?? createSsoTestAuditLog(),
       identity: input.dependencies?.identity ?? createSsoTestIdentity({ connections }),
       featureFlags: input.dependencies?.featureFlags ?? createSsoTestFeatureFlags(),
-    },
-    members: {
-      logger: input.members?.logger ?? RecordingSsoGateLogger.create(),
-      publicBaseUrl: input.members?.publicBaseUrl ?? "https://acme.test",
-      isSaas: input.members?.isSaas ?? false,
     },
     resources: new ResourceScope(),
     secrets: createSsoTestSecrets({ auth0ClientSecret: "secret", ...input.secrets }),

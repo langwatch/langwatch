@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createSsoTestApp,
+  createSsoTestConfig,
   createSsoTestFeatureFlags,
   createSsoTestIdentity,
   RecordingSsoConnectionLedger,
@@ -50,7 +51,7 @@ async function appReading(
 ) {
   const getSetup = vi.fn<SsoSetupApi["getSetup"]>(async () => journeyOf(connection));
   const app = await createSsoTestApp({
-    members: { isSaas: optedIn },
+    config: createSsoTestConfig({ isSaas: optedIn }),
     dependencies: {
       featureFlags: createSsoTestFeatureFlags(optedIn ? [ORGANIZATION] : []),
       identity: createSsoTestIdentity({
@@ -85,7 +86,7 @@ describe("reading where an organization's setup stands", () => {
       record: { domain: "acme.test", method: "dns-txt", expiresAtMs: null, expired: false },
     }));
     const app = await createSsoTestApp({
-      members: { isSaas: true },
+      config: createSsoTestConfig({ isSaas: true }),
       dependencies: {
         featureFlags: createSsoTestFeatureFlags([ORGANIZATION]),
         identity: createSsoTestIdentity({
@@ -123,7 +124,7 @@ describe("reading where an organization's setup stands", () => {
     /** @scenario "A self-hosted administrator is not offered attestation either" */
     it("offers the licence as the proof, and no way to attest a domain", async () => {
       const app = await createSsoTestApp({
-        members: { isSaas: false },
+        config: createSsoTestConfig({ isSaas: false }),
         dependencies: {
           licensing: createApiFixture<LicensingApi>({
             inspectPlatformAccess: async () => ({ allowed: true, inspections: [] }),

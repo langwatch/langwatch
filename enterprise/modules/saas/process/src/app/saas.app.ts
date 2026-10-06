@@ -2,25 +2,27 @@
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
   SaasApi,
+  saasConfig,
+  type SaasServerConfig,
   type IncomingUsageReportRequest,
   type SaasApi as SaasApiContract,
   type UsageReportReceipt,
 } from "@langwatch/enterprise-saas-contract";
+import { createLogger } from "@langwatch/observability";
 import { OpsApi } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 
 import { productAnalyticsChannels } from "../channels/product-analytics-channels.registry.ts";
+import type { SaasRepositories } from "../repositories/saas.repositories.ts";
 import { LangWatchCloudService } from "../services/langwatch-cloud.service.ts";
 import { UsageReportReceiverService } from "../services/usage-report-receiver.service.ts";
 
-const SAAS_CLOSED_READS = ["logger", "clock", "rateLimiter"] as const;
-
-/** The process members Cloud reads: three of the closed record, and the process's `isSaas` fact. */
-export type SaasProcessMembers = MembersRead<typeof SAAS_CLOSED_READS> &
-  Readonly<{ isSaas: boolean }>;
-
-type SaasSetup = FeatureSetup<typeof SaasModule.dependencies, SaasProcessMembers, undefined>;
+type SaasSetup = FeatureSetup<
+  typeof SaasModule.dependencies,
+  never,
+  SaasServerConfig,
+  SaasRepositories
+>;
 
 export class SaasModule implements SaasApiContract {
   static readonly contract = SaasApi;
@@ -30,8 +32,8 @@ export class SaasModule implements SaasApiContract {
     /** The registry of self-hosted installs an accepted report is recorded in. */
     licensing: LicensingApi,
   };
-  /** `isSaas` is the process's own fact; IS_SAAS has one owner, and this module only reads it. */
-  static readonly reads = [...SAAS_CLOSED_READS, "isSaas"] as const;
+  /** `isSaas` is the shared leaf, so IS_SAAS keeps one owner and this module only reads it. */
+  static readonly config = saasConfig;
 
   readonly #usageReports: UsageReportReceiverService;
 
@@ -39,21 +41,21 @@ export class SaasModule implements SaasApiContract {
     this.#usageReports = usageReports;
   }
 
-  static create({ dependencies, members, resources }: SaasSetup): SaasModule {
+  static create({ config, dependencies, repositories, resources }: SaasSetup): SaasModule {
+    const logger = createLogger("langwatch:saas");
     const analytics = productAnalyticsChannels.live.create({
       targets: () => dependencies.ops.findProductAnalyticsTargets(),
-      logger: members.logger,
+      logger,
     });
     resources.own("LangWatch Cloud product-analytics client", () => analytics.close());
 
     return new SaasModule(
       UsageReportReceiverService.create({
-        cloud: LangWatchCloudService.create({ isSaas: members.isSaas }),
-        rateLimiter: members.rateLimiter,
+        cloud: LangWatchCloudService.create({ isSaas: config.isSaas }),
+        rateLimits: repositories.rateLimits,
         registry: dependencies.licensing,
         analytics,
-        clock: members.clock,
-        logger: members.logger,
+        logger,
       }),
     );
   }

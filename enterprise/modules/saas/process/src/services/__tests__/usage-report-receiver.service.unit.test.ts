@@ -1,11 +1,12 @@
 import type { IncomingUsageReport, LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import type { RateLimiter } from "@langwatch/process-stores/members";
-import { createTestLogger, frozenAt, memoryRateLimiter } from "@langwatch/test-harness";
+import { createTestLogger } from "@langwatch/test-harness";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryProductAnalyticsChannel } from "../../channels/memory/memory.product-analytics.channel.ts";
+import { MemorySaasRateLimitRepository } from "../../repositories/memory/memory.saas-rate-limit.repository.ts";
+import type { SaasRateLimitRepository } from "../../repositories/saas-rate-limit.repository.ts";
 import { LangWatchCloudService } from "../langwatch-cloud.service.ts";
 import { UsageReportReceiverService } from "../usage-report-receiver.service.ts";
 
@@ -13,7 +14,7 @@ const RECEIVED_AT = "2026-09-23T08:00:00.000Z";
 const recorded: IncomingUsageReport[] = [];
 
 /** Refuses exactly the keys it is told to, and remembers every key it was asked about. */
-function limiterRefusing(...refused: string[]): RateLimiter & { asked: string[] } {
+function limiterRefusing(...refused: string[]): SaasRateLimitRepository & { asked: string[] } {
   const asked: string[] = [];
   return {
     asked,
@@ -26,24 +27,23 @@ function limiterRefusing(...refused: string[]): RateLimiter & { asked: string[] 
 
 function setup({
   isSaas = true,
-  rateLimiter = memoryRateLimiter(),
+  rateLimits = MemorySaasRateLimitRepository.create(),
   recordUsageReport = (report: IncomingUsageReport) => {
     recorded.push(report);
     return Promise.resolve([]);
   },
 }: {
   isSaas?: boolean;
-  rateLimiter?: RateLimiter;
+  rateLimits?: SaasRateLimitRepository;
   recordUsageReport?: LicensingApi["recordUsageReport"];
 } = {}) {
   const analytics = MemoryProductAnalyticsChannel.create();
   const { logger, lines } = createTestLogger();
   const receiver = UsageReportReceiverService.create({
     cloud: LangWatchCloudService.create({ isSaas }),
-    rateLimiter,
+    rateLimits,
     registry: createApiFixture<LicensingApi>({ recordUsageReport }),
     analytics,
-    clock: frozenAt(RECEIVED_AT),
     logger,
   });
   return { receiver, analytics, lines };
@@ -57,6 +57,15 @@ function report(extra: Record<string, unknown> = {}) {
 }
 
 describe("UsageReportReceiverService", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(RECEIVED_AT));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("when Cloud receives a report", () => {
     /** @scenario "An accepted report is recorded and sent to product analytics" */
     it("records the known fields and sends the same event on, counting the unknown ones", async () => {
@@ -128,7 +137,7 @@ describe("UsageReportReceiverService", () => {
       ["per-install", "track_usage:instance:install-1"],
     ])("refuses at the %s limit before recording anything", async (_, key) => {
       recorded.length = 0;
-      const { receiver, analytics } = setup({ rateLimiter: limiterRefusing(key) });
+      const { receiver, analytics } = setup({ rateLimits: limiterRefusing(key) });
 
       await expect(receiver.receive(report())).rejects.toMatchObject({ code: "rate_limited" });
       expect(recorded).toEqual([]);
@@ -137,7 +146,7 @@ describe("UsageReportReceiverService", () => {
 
     it("counts no per-address bucket where the sender named no address", async () => {
       const limiter = limiterRefusing();
-      const { receiver } = setup({ rateLimiter: limiter });
+      const { receiver } = setup({ rateLimits: limiter });
 
       await receiver.receive({ ...report(), addressHeaders: {} });
 
@@ -150,7 +159,7 @@ describe("UsageReportReceiverService", () => {
     it("refuses before counting, recording or sending anything", async () => {
       recorded.length = 0;
       const limiter = limiterRefusing();
-      const { receiver, analytics } = setup({ isSaas: false, rateLimiter: limiter });
+      const { receiver, analytics } = setup({ isSaas: false, rateLimits: limiter });
 
       await expect(receiver.receive(report())).rejects.toMatchObject({
         code: "langwatch_cloud_only",

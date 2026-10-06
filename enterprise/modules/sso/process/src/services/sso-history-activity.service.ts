@@ -5,11 +5,28 @@
  * history read the page's own query calls, on a timer instead of a page load,
  * and only ever for the connection it was constructed with.
  */
-import type { SsoActivityLogger, SsoConnectionHistoryReads } from "../app/sso.members.ts";
 import {
   historyActivityChanged,
   HISTORY_ACTIVITY_POLL_MS,
 } from "../rules/sso-history-activity.rules.ts";
+import type { SsoGateLogger } from "./sso-gate.service.ts";
+
+/**
+ * The organization's own read of its connection's history. Identity owns the
+ * facts and the words; this is the one call the administrator's page makes.
+ */
+export interface SsoConnectionHistoryReads {
+  getHistory(input: {
+    organizationId: string;
+    connectionId: string;
+    limit?: number;
+  }): Promise<
+    readonly { eventId: string; occurredAtMs: number; summary: string; carriedOver: boolean }[]
+  >;
+}
+
+/** The one line the history signal ever writes: a poll that could not read. */
+export type SsoActivityLogger = Pick<SsoGateLogger, "warn">;
 
 /** What a subscriber is told: which connection moved, never what changed. */
 export interface SsoHistoryActivity {

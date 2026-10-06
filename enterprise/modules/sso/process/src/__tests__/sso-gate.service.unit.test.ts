@@ -7,8 +7,11 @@ import { isNamedProviderMounted } from "@langwatch/enterprise-sso-contract/sign-
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { SsoGateLogger } from "../app/sso.members.ts";
-import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
+import {
+  SsoGateService,
+  SsoProviderMountInspector,
+  type SsoGateLogger,
+} from "../services/sso-gate.service.ts";
 
 class FakeLogger implements SsoGateLogger {
   readonly info = vi.fn<SsoGateLogger["info"]>();

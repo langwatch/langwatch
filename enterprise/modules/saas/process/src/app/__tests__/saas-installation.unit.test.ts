@@ -3,7 +3,6 @@ import { SaasApi } from "@langwatch/enterprise-saas-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import { createTestLogger, frozenAt, memoryRateLimiter } from "@langwatch/test-harness";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -14,12 +13,10 @@ import { describe, expect, it } from "vitest";
 import { saasProcessModule } from "../../saas.module.ts";
 
 function boot({ isSaas, recorded }: { isSaas: boolean; recorded: IncomingUsageReport[] }) {
-  const { logger } = createTestLogger();
   return createApp({ role: "api" })
     .withModules([saasProcessModule])
     .withStores(memoryStores())
-    .withMembers({ isSaas, rateLimiter: memoryRateLimiter(), clock: frozenAt() })
-    .withObservability((observability) => observability.withLogging(logger))
+    .withConfig({ saas: { isSaas } })
     .provide({
       ops: createApiFixture<OpsApi>({ findProductAnalyticsTargets: () => [] }),
       licensing: createApiFixture<LicensingApi>({
