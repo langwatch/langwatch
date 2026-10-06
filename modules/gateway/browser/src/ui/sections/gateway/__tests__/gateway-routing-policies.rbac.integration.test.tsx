@@ -27,7 +27,6 @@ const POLICIES = [
   },
 ];
 
-/** What the policy list answers with instead of rows, when set. */
 const harness = vi.hoisted(() => ({ listError: null as unknown }));
 
 vi.mock("../../../../behavior/gateway-api.ts", () => {

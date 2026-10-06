@@ -242,7 +242,7 @@ func IsNoFallback(err error) bool {
 // ConfigProblem names what a provider slot is missing when a request fails
 // with ErrProviderConfigInvalid. It travels as meta["problem"] and is a closed
 // vocabulary: clients match on it to pick their sentence, so a value is added
-// here and in features/errors/logic/presentation.ts together.
+// here and in packages/handled-error/src/presentation.ts together.
 type ConfigProblem string
 
 const (

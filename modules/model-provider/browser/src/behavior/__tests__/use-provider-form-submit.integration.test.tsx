@@ -702,7 +702,7 @@ describe("useProviderFormSubmit()", () => {
     };
     const scopes = [{ scopeType: "ORGANIZATION" as const, scopeId: "org_test" }];
 
-    async function saveFirstProvider() {
+    function renderFirstProviderSave() {
       const writesAtCompletion: number[] = [];
       const snapshot = buildSnapshot({
         provider: {
@@ -728,6 +728,11 @@ describe("useProviderFormSubmit()", () => {
           },
         }),
       );
+      return { result, writesAtCompletion };
+    }
+
+    async function saveFirstProvider() {
+      const { result, writesAtCompletion } = renderFirstProviderSave();
       await act(async () => {
         await result.current.submit();
       });
@@ -759,8 +764,23 @@ describe("useProviderFormSubmit()", () => {
 
     /** @scenario The step completes only after the credentials are stored */
     it("reports completion once, after the write that carries the credentials", async () => {
-      const { writesAtCompletion } = await saveFirstProvider();
+      let storeCredentials: (value: object) => void = () => undefined;
+      mockUpdateMutateAsync.mockImplementationOnce(
+        () => new Promise((resolve) => (storeCredentials = resolve)),
+      );
+      const { result, writesAtCompletion } = renderFirstProviderSave();
 
+      let saving: Promise<unknown> = Promise.resolve();
+      await act(async () => {
+        saving = result.current.submit();
+        await Promise.resolve();
+      });
+      expect(writesAtCompletion).toEqual([]);
+
+      await act(async () => {
+        storeCredentials({});
+        await saving;
+      });
       expect(writesAtCompletion).toEqual([1]);
     });
 
