@@ -1,7 +1,7 @@
 /**
  * Judging one page: what it sends, what it writes, and where it says the next
  * page starts — including when a stop reaches it part way.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {

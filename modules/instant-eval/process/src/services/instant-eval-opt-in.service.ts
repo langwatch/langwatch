@@ -2,7 +2,7 @@
  * An organization's own switch for Instant Evals (main #8348): a self-serve
  * organization on the hosted service throws it from the refusal popover; an
  * enterprise one, or a self-hosted install, is offered a word with us instead.
- * @see specs/instant-evals/instant-eval-opt-in.feature
+ * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
 
 import {

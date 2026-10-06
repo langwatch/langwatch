@@ -1,7 +1,7 @@
 /**
  * Finishing a run: what it cost, recorded once, and the hold it was accepted
  * under, dropped only after that record landed.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { Temporal } from "@langwatch/time";

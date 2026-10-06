@@ -1,7 +1,7 @@
 /**
  * The GitHub card: connect the app, see the accounts it reaches, disconnect.
  * Reads github through `GithubHostApi` and a client from github's contract.
- * Spec: specs/integrations/github-connection.feature.
+ * Spec: modules/integration/specs/github-connection.feature.
  */
 
 import {

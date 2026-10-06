@@ -1,7 +1,7 @@
 /**
  * The run's effects: plan it, judge a page, finish it. The work costs money, so
  * an attempt below the cap rethrows and the final one fails the run instead.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { IntentContext, IntentExecutor } from "@langwatch/eventing";

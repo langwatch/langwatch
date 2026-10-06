@@ -2,7 +2,7 @@
  * The free Instant Evals budget: one dollar across every project of an
  * organization without a paid plan, read once a minute.
  *
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { Temporal } from "@langwatch/time";

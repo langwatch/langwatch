@@ -1,6 +1,6 @@
 /**
  * A judged page, turned into the rows kept and the numbers reported.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { LangWatchQLJudgementCall } from "@langwatch/analytics-contract";

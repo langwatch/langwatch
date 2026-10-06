@@ -1,7 +1,7 @@
 /**
  * Which judge a deployment judges with, from its classifier setting and whether it holds a key.
  * @see specs/self-hosting/connected-services/connect-settings.feature
- * @see specs/instant-evals/classifier.feature
+ * @see modules/instant-eval/specs/classifier.feature
  */
 
 import { InstantEvalMemoryJudgeInProductionError } from "@langwatch/instant-eval-contract";

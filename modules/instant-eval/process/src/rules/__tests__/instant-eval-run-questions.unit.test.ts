@@ -1,7 +1,7 @@
 /**
  * A run's questions are read off the run row, so a finished run reports what
  * was asked rather than today's catalogue.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import type { LangWatchQLJudgementCall } from "@langwatch/analytics-contract";

@@ -1,6 +1,6 @@
 /**
  * The run's counters, folded from its own events.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {

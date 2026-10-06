@@ -1,6 +1,6 @@
 /**
  * The shared hold store: what it asks Redis for, and how it reads the answer
- * back. @see specs/instant-evals/instant-eval-billing.feature
+ * back. @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { describe, expect, it } from "vitest";

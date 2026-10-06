@@ -2,7 +2,7 @@
  * The shared token buckets, driven against a fake Redis that runs the real
  * script's arithmetic: the Lua itself needs a server, so the fake keeps the
  * same state and applies the same refill rule to both buckets.
- * @see specs/instant-evals/classifier.feature
+ * @see modules/instant-eval/specs/classifier.feature
  */
 
 import { Temporal } from "@langwatch/time";

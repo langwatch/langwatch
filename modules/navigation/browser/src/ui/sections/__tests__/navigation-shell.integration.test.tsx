@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Spec: specs/navigation/product-switcher-navigation.feature
+ * Spec: modules/navigation/specs/product-switcher-navigation.feature
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";

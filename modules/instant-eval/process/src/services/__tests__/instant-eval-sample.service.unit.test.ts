@@ -1,7 +1,7 @@
 /**
  * Sampling a run: the verdicts it already wrote, and the texts they were made
  * about, read again as the caller rather than stored.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { Temporal } from "@langwatch/time";

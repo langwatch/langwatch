@@ -2,7 +2,7 @@
  * What one Instant Eval's spend looks like on the gateway spend spine: a
  * confirmed outcome with no admission in front of it, priced here once, the
  * customer price on the record and our own cost beside it in the metadata.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import {

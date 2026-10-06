@@ -1,6 +1,6 @@
 /**
  * The cancellation hint, and the two directions it fails soft in.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import { describe, expect, it } from "vitest";

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  * The Slack connection drawer: create, refusals, and deleting a claimed connection.
- * Spec: specs/automations/slack-connections.feature.
+ * Spec: modules/slack/specs/slack-connections.feature.
  */
 import "@testing-library/jest-dom/vitest";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";

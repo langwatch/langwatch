@@ -1,7 +1,7 @@
 /**
  * What the Instant Evals family accepts and what it answers.
  *
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";

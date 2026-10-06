@@ -1,7 +1,7 @@
 /**
  * What the row source does to a result before anyone reads it: it refuses a
  * truncated one, because every read here is a read whose length is part of
- * the answer. @see specs/instant-evals/instant-eval-pipeline.feature
+ * the answer. @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { LangWatchQLPassInput, LangWatchQLQueryResult } from "@langwatch/analytics-contract";

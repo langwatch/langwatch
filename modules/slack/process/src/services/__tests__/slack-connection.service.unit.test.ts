@@ -10,7 +10,7 @@ import {
   composeSlack,
 } from "./slack-connection.fixture.ts";
 
-/** Spec: specs/automations/slack-connections.feature */
+/** Spec: modules/slack/specs/slack-connections.feature */
 const BOT = "xoxb-1111-secret-abcd";
 const WEBHOOK = "https://hooks.slack.com/services/T/B/wxyz";
 const team = { teamId: "T1", teamName: "Acme Slack" };

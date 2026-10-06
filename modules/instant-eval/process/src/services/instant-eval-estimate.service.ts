@@ -2,7 +2,7 @@
  * What a run would read, and what judging it would cost, without judging any
  * of it: the count bounds the rows, a sample of texts measures what one row
  * sends, and the judge's own published rate turns that into a price.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import type {

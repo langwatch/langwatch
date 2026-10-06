@@ -2,7 +2,7 @@
  * A few of a run's rows, with the text that was judged beside the verdict. The
  * text is re-read through the statement's own extraction functions rather than
  * stored, and nothing is judged again, which is what makes a sample free.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import type { LangWatchQLCaller, LangWatchQLProtections } from "@langwatch/analytics-contract";

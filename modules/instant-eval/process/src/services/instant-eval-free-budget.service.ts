@@ -2,7 +2,7 @@
  * What an organization without a paid plan may have of Instant Evals: the
  * gateway spend ledger, cached for a minute, counted beside the holds taken
  * for work the ledger has not learned about yet.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import {

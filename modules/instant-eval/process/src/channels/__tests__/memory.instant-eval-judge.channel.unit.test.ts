@@ -1,7 +1,7 @@
 /**
  * The memory stand-in judge: every question answered from a hash of the text,
  * so a development run completes and repeats exactly.
- * @see specs/instant-evals/classifier.feature
+ * @see modules/instant-eval/specs/classifier.feature
  */
 
 import type { InstantEvalQuestion } from "@langwatch/instant-eval-contract";

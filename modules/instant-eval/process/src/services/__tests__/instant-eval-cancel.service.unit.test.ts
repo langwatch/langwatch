@@ -1,6 +1,6 @@
 /**
  * Stopping a run: the command is the record, the hint only saves a page.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { Temporal } from "@langwatch/time";

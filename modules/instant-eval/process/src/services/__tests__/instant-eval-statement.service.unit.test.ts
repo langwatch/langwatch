@@ -1,6 +1,6 @@
 /**
  * What makes a statement acceptable as a run.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import {

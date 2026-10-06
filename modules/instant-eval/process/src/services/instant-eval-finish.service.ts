@@ -1,7 +1,7 @@
 /**
  * What a run cost, recorded once, whatever ended it. A recorder that fails is
  * raised: the finish intent retries onto the same request id.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import type { InstantEvalOutcome, InstantEvalPricing } from "@langwatch/instant-eval-contract";

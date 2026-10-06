@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MANAGER, OTHER_PROJECT, PROJECT, composeSlack } from "./slack-connection.fixture.ts";
 
-/** Spec: specs/automations/slack-connections.feature */
+/** Spec: modules/slack/specs/slack-connections.feature */
 const WEBHOOK = "https://hooks.slack.com/services/T/B/wxyz";
 
 async function connected() {

@@ -1,7 +1,7 @@
 /**
  * Product-native scope in top bar. Groups from useProjectPickItems (host's
  * workspace graph), with a per-team "New Project" entry. Spec:
- * specs/navigation/product-switcher-navigation.feature
+ * modules/navigation/specs/product-switcher-navigation.feature
  */
 
 import { Menu } from "@langwatch/design-system/menu";

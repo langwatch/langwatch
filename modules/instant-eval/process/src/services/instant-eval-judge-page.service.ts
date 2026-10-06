@@ -2,7 +2,7 @@
  * Judging one page of a run: what it reads, what it judges, and where it says
  * the next page starts. The only step that spends money, and the only one a
  * cancel or an expiring lease may stop part way.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {

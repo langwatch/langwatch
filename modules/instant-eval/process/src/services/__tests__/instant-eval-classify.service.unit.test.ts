@@ -1,7 +1,7 @@
 /**
  * A classification asked for outside any run, which is how a peer routes a
  * sentence: the judge answers, or skips and the peer falls back.
- * @see specs/instant-evals/classifier.feature
+ * @see modules/instant-eval/specs/classifier.feature
  */
 
 import type { InstantEvalJudgement, InstantEvalQuestion } from "@langwatch/instant-eval-contract";

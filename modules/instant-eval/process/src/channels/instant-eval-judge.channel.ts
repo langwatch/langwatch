@@ -1,7 +1,7 @@
 /**
  * The judge behind a judged column. `classify` answers or skips; it throws
  * only when the judge itself is unusable, which refuses the whole query.
- * @see specs/instant-evals/classifier.feature
+ * @see modules/instant-eval/specs/classifier.feature
  */
 
 import type {

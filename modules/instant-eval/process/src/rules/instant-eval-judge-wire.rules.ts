@@ -1,7 +1,7 @@
 /**
  * Questions on the wire and the answers read back: `boolean` is `noul`,
  * `score` is `score`, `category` is `choice`, matched by id never position.
- * @see specs/instant-evals/classifier.feature
+ * @see modules/instant-eval/specs/classifier.feature
  */
 
 import type {

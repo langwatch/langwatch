@@ -1,7 +1,7 @@
 /**
  * The Instant Eval run process: pure state logic, no effects. Requested plans,
  * planned judges page one, a judged page judges the next or finishes.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type {

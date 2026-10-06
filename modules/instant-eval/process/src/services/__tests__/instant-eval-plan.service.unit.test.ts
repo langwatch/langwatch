@@ -1,7 +1,7 @@
 /**
  * Planning a run: the count that bounds it, the cap that says so, and the page
  * size a spread of its own texts chooses.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { LangWatchQLColumn } from "@langwatch/analytics-contract";

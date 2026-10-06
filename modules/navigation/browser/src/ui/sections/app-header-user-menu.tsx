@@ -1,7 +1,7 @@
 /**
  * Avatar dropdown menu (account, nav mode, graphics toggle). Logout via host
  * identity client; experiments and presence toggles handed in as nodes.
- * Spec: specs/navigation/navigation-modes.feature
+ * Spec: modules/navigation/specs/navigation-modes.feature
  */
 
 import { UserAvatar } from "@langwatch/design-system/avatar";

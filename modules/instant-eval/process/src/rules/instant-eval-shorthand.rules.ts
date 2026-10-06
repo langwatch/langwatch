@@ -2,7 +2,7 @@
  * The shorthand, expanded into the one statement a run executes. Nothing
  * downstream knows one was used, and the target settles what a judged row is.
  *
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 
 import {

@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Spec: specs/navigation/icon-rail-navigation.feature
+ * Spec: modules/navigation/specs/icon-rail-navigation.feature
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";

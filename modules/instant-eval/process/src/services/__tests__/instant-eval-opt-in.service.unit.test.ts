@@ -1,6 +1,6 @@
 /**
  * The offer and the switch, each peer stated rather than read.
- * @see specs/instant-evals/instant-eval-opt-in.feature
+ * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
 
 import { describe, expect, it } from "vitest";

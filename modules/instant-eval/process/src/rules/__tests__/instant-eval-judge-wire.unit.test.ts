@@ -1,7 +1,7 @@
 /**
  * The question and answer shapes, against the API measured in September 2026.
  * Every response fixture is a body the live classifier returned.
- * @see specs/instant-evals/classifier.feature
+ * @see modules/instant-eval/specs/classifier.feature
  */
 
 import type { InstantEvalQuestion } from "@langwatch/instant-eval-contract";

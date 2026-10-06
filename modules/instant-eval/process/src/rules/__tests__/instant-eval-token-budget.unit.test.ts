@@ -1,6 +1,6 @@
 /**
  * How much text fits beside the questions, and what happens when it does not.
- * @see specs/instant-evals/classifier.feature
+ * @see modules/instant-eval/specs/classifier.feature
  */
 
 import {

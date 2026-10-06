@@ -1,6 +1,6 @@
 /**
  * The shipped judge: one POST per text, with LangWatch's own key — a customer
- * key is never sent here. @see specs/instant-evals/classifier.feature
+ * key is never sent here. @see modules/instant-eval/specs/classifier.feature
  */
 
 import {

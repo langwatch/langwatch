@@ -1,7 +1,7 @@
 /**
  * The Slack card: every connection the current project can use, its own and its organization's.
  * Rows and "Add Slack connection" open slack's `slackConnection` drawer by name (§10).
- * Spec: specs/automations/slack-connections.feature.
+ * Spec: modules/slack/specs/slack-connections.feature.
  */
 
 import { describeError } from "@langwatch/browser-host/errors";

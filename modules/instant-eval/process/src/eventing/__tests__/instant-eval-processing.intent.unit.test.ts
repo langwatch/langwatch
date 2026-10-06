@@ -2,7 +2,7 @@
  * The failure contract of a run's three steps: an attempt below the cap is
  * rethrown so the outbox retries it, the final attempt records the run as
  * failed and retires the message, and a lost outcome write never costs a page.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { IntentContext } from "@langwatch/eventing";

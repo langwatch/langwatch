@@ -1,7 +1,7 @@
 /**
  * Every Instant Eval command, defined from its event's own data schema. The
  * aggregate is the RUN, so one run's events fold in order; the queue lane is
- * the TENANT. @see specs/instant-evals/instant-eval-pipeline.feature
+ * the TENANT. @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import { defineCommand } from "@langwatch/eventing";

@@ -1,7 +1,7 @@
 /**
  * The next page of a run, read while the current one is judged, and handed to
  * the intent that asks for it so it is read once.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {

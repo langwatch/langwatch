@@ -2,7 +2,7 @@
  * `/api/v1/instant-evals` — the statement `POST /api/v1/query` runs, judged as
  * a job: creating one answers 202 and its progress is polled, which is what
  * lets a hundred thousand rows be a run rather than a held-open request.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 import {
   canonicalConflictResponses,

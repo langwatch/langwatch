@@ -2,8 +2,8 @@
  * Instant Evals installed the way a process installs it, over the memory tier
  * and real peer resolution: no ClickHouse, no queue, no HTTP.
  * @vitest-environment node
- * @see specs/instant-evals/instant-eval-api.feature
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 import type {
   AnalyticsApi,

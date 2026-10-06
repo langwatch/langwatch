@@ -2,7 +2,7 @@
  * Everything a step of a run needs about the run it is a step of: the row that
  * says what to run, the identity it runs as, and what that identity may read.
  * A job has neither a session nor a credential, so both come from the project.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { LangWatchQLCaller, LangWatchQLProtections } from "@langwatch/analytics-contract";

@@ -1,7 +1,7 @@
 /**
  * What a run asks, read off its row: derived once at creation, so a finished
  * run reports what was asked rather than today's catalog.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import type {

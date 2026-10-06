@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * The Integrations screen's Slack card lists every connection the project can use and opens
  * slack's one connection drawer to add or edit them.
- * Spec: specs/automations/slack-connections.feature.
+ * Spec: modules/slack/specs/slack-connections.feature.
  */
 
 import "@testing-library/jest-dom/vitest";

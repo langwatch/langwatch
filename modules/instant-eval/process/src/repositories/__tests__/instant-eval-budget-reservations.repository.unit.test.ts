@@ -1,6 +1,6 @@
 /**
  * The in-memory hold store: the same contract the Redis store keeps, driven
- * without a datastore. @see specs/instant-evals/instant-eval-billing.feature
+ * without a datastore. @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { Temporal } from "@langwatch/time";

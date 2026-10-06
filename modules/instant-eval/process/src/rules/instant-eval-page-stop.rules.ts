@@ -2,7 +2,7 @@
  * A page that stopped before its last row: what is kept, and where the run
  * resumes. A cancellation and an expiring lease both stop a page, and either
  * way the classifications that came back were paid for, so they are written.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {

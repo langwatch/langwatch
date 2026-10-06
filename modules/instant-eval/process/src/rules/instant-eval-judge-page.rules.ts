@@ -2,7 +2,7 @@
  * A page of extracted texts and what judging it produces: the requests it
  * sends, the ceiling it may not send past, and the cells the answers fill.
  * One request per distinct text of a row, and it carries every question asked.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import {

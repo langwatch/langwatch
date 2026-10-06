@@ -1,6 +1,6 @@
 /**
  * The price on the pricing page is the price in the code.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { readFileSync } from "node:fs";

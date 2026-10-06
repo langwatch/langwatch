@@ -2,7 +2,7 @@
  * The one statement a request means, whichever of the two ways it was written.
  * Both at once could not state their relationship and neither has nothing to
  * judge, so each is refused before the gate, under the gate's own code.
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 
 import { HandledError } from "@langwatch/handled-error";

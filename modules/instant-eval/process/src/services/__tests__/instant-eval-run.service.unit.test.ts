@@ -1,7 +1,7 @@
 /**
  * The run surface: the gate first, then the plan's cap, then the budget, and
  * only then anything that reads on the caller's behalf.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { InstantEvalNotEnabledError } from "@langwatch/instant-eval-contract";

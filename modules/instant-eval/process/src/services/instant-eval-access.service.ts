@@ -2,7 +2,7 @@
  * Whether a project may run Instant Evals: the flag or the organization's own switch is the
  * product decision, a judge for the project's organization the operational one, and a rollout
  * rule distinguishes the PROJECT, never the member.
- * @see specs/instant-evals/instant-eval-opt-in.feature
+ * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
 
 import { INSTANT_EVALS_FLAG } from "@langwatch/instant-eval-contract";

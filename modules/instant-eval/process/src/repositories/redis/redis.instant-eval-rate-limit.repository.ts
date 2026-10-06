@@ -1,6 +1,6 @@
 /**
  * The buckets in Redis, because the quota is the key's, not a pod's: one
- * EVAL refills and takes from both. @see specs/instant-evals/classifier.feature
+ * EVAL refills and takes from both. @see modules/instant-eval/specs/classifier.feature
  */
 
 import type {

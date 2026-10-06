@@ -1,7 +1,7 @@
 /**
  * The only thing between a caller's words and a statement: an eval function's
  * options are literals, so they are written, not bound.
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 
 import { Temporal } from "@langwatch/time";

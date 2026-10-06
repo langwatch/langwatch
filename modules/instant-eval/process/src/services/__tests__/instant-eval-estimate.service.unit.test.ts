@@ -1,6 +1,6 @@
 /**
  * What a run would read and what judging it would cost, measured without
- * judging anything. @see specs/instant-evals/instant-eval-api.feature
+ * judging anything. @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import type { LangWatchQLPassInput, LangWatchQLQueryResult } from "@langwatch/analytics-contract";

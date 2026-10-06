@@ -1,7 +1,7 @@
 /**
  * How a judgement is addressed on the way out: the cursor, the split between
  * what a WHERE can read and what only a HAVING can, and the row shape.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { Temporal } from "@langwatch/time";

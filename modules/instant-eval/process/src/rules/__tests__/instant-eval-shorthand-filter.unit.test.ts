@@ -1,7 +1,7 @@
 /**
  * Where a shorthand's filter lands in the statement it becomes, and what a
  * resolved selection replaces it with.
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 
 import {

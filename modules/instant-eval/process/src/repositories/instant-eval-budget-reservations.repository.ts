@@ -1,7 +1,7 @@
 /**
  * Holds against the free Instant Evals budget: what a run or a judged query
  * expects to spend, kept from acceptance until its spend reaches the ledger.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 /** What a reservation attempt answered. */

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Spec: specs/navigation/navigation-modes.feature
+ * Spec: modules/navigation/specs/navigation-modes.feature
  */
 
 import { clearReaderUiStorage, setUiStorageReader } from "@langwatch/browser-host/storage";

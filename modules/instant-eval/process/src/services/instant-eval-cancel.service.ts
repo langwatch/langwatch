@@ -1,7 +1,7 @@
 /**
  * Asking a run to stop: the durable command first, then the hint. A hint that
  * landed while the command was refused would stop the page with no record that
- * anyone asked. @see specs/instant-evals/instant-eval-api.feature
+ * anyone asked. @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import {

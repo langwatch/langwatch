@@ -2,7 +2,7 @@
  * The next page of each run, read while the current one is judged. The judge
  * is what saturates, so a page's reads only lengthen a run on its critical
  * path. Per process and best-effort: a miss reads the page itself.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import { createLogger } from "@langwatch/observability";

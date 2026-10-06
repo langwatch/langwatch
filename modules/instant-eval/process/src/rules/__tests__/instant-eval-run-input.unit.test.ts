@@ -1,6 +1,6 @@
 /**
  * Which of the two ways in a request meant, and what the gate is then handed.
- * @see specs/instant-evals/instant-eval-shorthand.feature
+ * @see modules/instant-eval/specs/instant-eval-shorthand.feature
  */
 
 import {

@@ -1,7 +1,7 @@
 /**
  * One dollar across every project of an organization without a paid plan,
  * compared in the ledger's own integer nano-USD so no float decides it.
- * @see specs/instant-evals/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { NANO_USD_PER_USD } from "./instant-eval-spend-outcome.rules.ts";

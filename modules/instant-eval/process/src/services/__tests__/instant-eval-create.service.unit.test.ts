@@ -1,7 +1,7 @@
 /**
  * Accepting a run writes the row before it sends the command, and fails the
  * row when the command never lands.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { describe, expect, it } from "vitest";

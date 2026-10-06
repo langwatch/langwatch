@@ -3,7 +3,7 @@
  * caller can act on it. No message names a provider, key, host or table.
  *
  * @see dev/docs/best_practices/error-handling.md
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { HandledError, remediation } from "@langwatch/handled-error";
@@ -39,7 +39,7 @@ export class InstantEvalQueryBudgetExceededError extends HandledError {
 /**
  * The organization's own switch was thrown where the popover does not offer it:
  * an enterprise plan, or a self-hosted install. A word with us is the remedy.
- * @see specs/instant-evals/instant-eval-opt-in.feature
+ * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
 export class InstantEvalOptInNotOfferedError extends HandledError {
   declare readonly code: "instant_eval_opt_in_not_offered";

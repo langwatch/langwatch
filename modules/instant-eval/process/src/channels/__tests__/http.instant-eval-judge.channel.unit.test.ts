@@ -2,7 +2,7 @@
  * The shipped judge's transport: what it retries, what it cuts, what it
  * refuses. Driven through undici's MockAgent, so the real request is built
  * and the real response handling runs; only the socket is replaced.
- * @see specs/instant-evals/classifier.feature
+ * @see modules/instant-eval/specs/classifier.feature
  */
 
 import {

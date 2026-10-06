@@ -1,6 +1,6 @@
 /**
  * Every `slackIntegration.*` procedure, declared once (ADR-031). The wire name
- * is main's. Spec: specs/automations/slack-connections.feature.
+ * is main's. Spec: modules/slack/specs/slack-connections.feature.
  */
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";

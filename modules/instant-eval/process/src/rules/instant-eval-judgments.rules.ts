@@ -2,7 +2,7 @@
  * A judged page, turned into the rows that are kept and the numbers that are
  * reported: one row per judged text per question, and the only place that
  * knows which part of a verdict each eval function's column carries.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { InstantEvalJudgmentStatus } from "@langwatch/instant-eval-contract";

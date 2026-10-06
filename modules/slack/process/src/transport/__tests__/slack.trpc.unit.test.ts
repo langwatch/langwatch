@@ -2,7 +2,7 @@
  * @vitest-environment node
  * The `slackIntegration.*` namespace over the real tRPC runtime and the
  * composed services on memory twins.
- * @see specs/automations/slack-connections.feature
+ * @see modules/slack/specs/slack-connections.feature
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import { initTRPC } from "@trpc/server";

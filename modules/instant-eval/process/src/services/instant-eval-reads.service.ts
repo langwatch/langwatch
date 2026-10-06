@@ -2,7 +2,7 @@
  * Reading a run back. Every judgement read is bounded by the run's own
  * timestamps, which is what prunes partitions instead of walking the table.
  *
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import {

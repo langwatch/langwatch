@@ -1,6 +1,6 @@
 /**
  * The refusals a save or a delete of a connection can carry, read off the handled error.
- * Spec: specs/automations/slack-connections.feature.
+ * Spec: modules/slack/specs/slack-connections.feature.
  */
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {

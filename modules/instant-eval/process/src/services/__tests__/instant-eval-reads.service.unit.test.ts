@@ -1,7 +1,7 @@
 /**
  * Reading a run back: every judgement read is bounded by the run's own
  * timestamps, which is what prunes partitions instead of walking the table.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { HandledError } from "@langwatch/handled-error";

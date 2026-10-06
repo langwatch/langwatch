@@ -2,7 +2,7 @@
  * The cancellation hint as a Redis key rather than a message: a message
  * reaches whoever is listening at the instant it is sent, and the next page
  * may be dispatched to a pod that was not. A key is a fact that page can read.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import { createLogger } from "@langwatch/observability";

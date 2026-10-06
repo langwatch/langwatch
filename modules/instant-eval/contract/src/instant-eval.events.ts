@@ -1,7 +1,7 @@
 /**
  * What one run records as it goes. None of the five carries judged text: a page
  * event carries counts and a cursor, so a hundred thousand rows is a couple of
- * hundred events. @see specs/instant-evals/instant-eval-pipeline.feature
+ * hundred events. @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import { z } from "zod";

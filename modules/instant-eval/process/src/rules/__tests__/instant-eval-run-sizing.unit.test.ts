@@ -1,7 +1,7 @@
 /**
  * The page size a sample of texts earns, the average size of those texts, and
  * the hydration plan read back off a run.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { LangWatchQLAppFunctionCall } from "@langwatch/analytics-contract";

@@ -2,7 +2,7 @@
  * What a judge is asked and what it answers, portable because the run, the
  * wire and the judge all name them.
  *
- * @see specs/instant-evals/classifier.feature
+ * @see modules/instant-eval/specs/classifier.feature
  */
 
 import { z } from "zod";

@@ -1,7 +1,7 @@
 /**
  * The `instantEval` process manager's state, intents and payload boundary, all
  * persisted verbatim: ids, counts and instants, never a statement or a verdict.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import { INSTANT_EVAL_OUTCOMES } from "@langwatch/instant-eval-contract";

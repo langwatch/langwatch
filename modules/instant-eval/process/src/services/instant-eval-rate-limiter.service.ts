@@ -1,7 +1,7 @@
 /**
  * How many input tokens this deployment may send the judge per second, and
  * one tenant's share of that, paced over the shared buckets with a local
- * fallback. @see specs/instant-evals/classifier.feature
+ * fallback. @see modules/instant-eval/specs/classifier.feature
  */
 
 import { createLogger } from "@langwatch/observability";

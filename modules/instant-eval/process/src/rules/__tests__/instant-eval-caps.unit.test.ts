@@ -1,6 +1,6 @@
 /**
  * The row cap rule: what a run gets, and what it is refused for asking.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import { HandledError } from "@langwatch/handled-error";

@@ -2,7 +2,7 @@
  * A judged cell and the verdict its question asked for, each read from the
  * other: one entry per `reads`, so a new question kind is two table rows
  * rather than two new branches.
- * @see specs/instant-evals/instant-eval-pipeline.feature
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
 import type { InstantEvalVerdict } from "@langwatch/instant-eval-contract";

@@ -1,7 +1,7 @@
 /**
  * How much text one classification may carry: the state cap less the
  * questions less the reserve the answers need.
- * @see specs/instant-evals/classifier.feature
+ * @see modules/instant-eval/specs/classifier.feature
  */
 
 import {

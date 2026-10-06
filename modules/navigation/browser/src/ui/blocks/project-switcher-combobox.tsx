@@ -13,7 +13,7 @@ import { ProjectComboboxPopup } from "./project-switcher-combobox-popup.tsx";
 
 /**
  * Project switch combobox for long lists: searchable, grouped by team,
- * keyboard navigation. Spec: specs/navigation/product-switcher-navigation.feature
+ * keyboard navigation. Spec: modules/navigation/specs/product-switcher-navigation.feature
  */
 export function ProjectSwitcherCombobox({
   groups,

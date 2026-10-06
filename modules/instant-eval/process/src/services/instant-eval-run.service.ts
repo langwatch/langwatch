@@ -1,7 +1,7 @@
 /**
  * What a caller may do to a run: the gate, the cap, the statement, the budget's
  * hold, then the unit that does it. The judging is the pipeline's, not this.
- * @see specs/instant-evals/instant-eval-api.feature
+ * @see modules/instant-eval/specs/instant-eval-api.feature
  */
 
 import type { LangWatchQLRunCaller } from "@langwatch/analytics-contract";
