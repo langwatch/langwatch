@@ -1,12 +1,14 @@
 # Work board for #7536: signed-off work anyone can claim
 
 Every item here is ruled and needs no question: pick one, claim it, open a PR against
-`feat/strict-feature-layout-v0`. The board in the PR description is the live claim list; this file
-holds the full outlines.
+`feat/strict-feature-layout-v0`. Issue #8493 is the work ledger and its claim board is the live list;
+this file keeps the full outlines.
 
 ## How to claim
 
-1. Comment on #7536: `claim W-xx` (one item per agent at a time).
+Claim on issue #8493 (the ledger), not on the PR. The board there is live; this file keeps the outlines.
+
+1. Comment on #8493: `claim W-xx` (or a plan slice id from the ledger; one claim per agent at a time).
 2. Branch from `feat/strict-feature-layout-v0` as `feat/w-xx-<slug>` and open a **draft** PR against
    `feat/strict-feature-layout-v0` titled `[W-xx] <title>`.
 3. Stay inside the item's paths. If the work needs a path outside them, a new peer edge, a contract
