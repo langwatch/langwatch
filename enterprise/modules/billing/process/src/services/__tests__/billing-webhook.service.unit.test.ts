@@ -7,6 +7,7 @@ import { traced } from "@langwatch/observability/node";
 import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
+import { HttpStripeSubscriptionsChannel } from "../../channels/http/http.stripe-subscriptions.channel.ts";
 import type { RecordSubscriptionStartedCommandData } from "../../eventing/billing-lifecycle.events.ts";
 import { type BillingWebhookHost, type SubscriptionWithOrg } from "../../index.ts";
 import { type BillingWebhookOrganizationRepository } from "../../repositories/billing-webhook-organization.repository.ts";
@@ -144,6 +145,12 @@ const createMockStripe = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+/** One SDK double behind the subscriptions channel and the annual threshold (Q69-4). */
+const overTheSdk = (stripe: ReturnType<typeof createMockStripe>) => ({
+  stripeSubscriptions: HttpStripeSubscriptionsChannel.create({ stripe: stripe as any }),
+  stripe: stripe as any,
+});
+
 describe("EEWebhookService", () => {
   let subRepo: ReturnType<typeof createMockBillingSubscription>;
   let orgRepo: ReturnType<typeof createMockOrganizationRepository>;
@@ -163,7 +170,7 @@ describe("EEWebhookService", () => {
     service = EEWebhookService.create({
       subscriptionRepository: subRepo,
       organizationRepository: orgRepo,
-      stripe: mockStripeInstance as any,
+      ...overTheSdk(mockStripeInstance),
       itemCalculator,
       host: host,
       retention,
@@ -292,7 +299,7 @@ describe("EEWebhookService", () => {
             EEWebhookService.create({
               subscriptionRepository: subRepo,
               organizationRepository: orgRepo,
-              stripe: mockStripeInstance as any,
+              ...overTheSdk(mockStripeInstance),
               itemCalculator,
               host: host,
               retention,
@@ -343,7 +350,7 @@ describe("EEWebhookService", () => {
         service = EEWebhookService.create({
           subscriptionRepository: subRepo,
           organizationRepository: orgRepo,
-          stripe: mockStripeInstance as any,
+          ...overTheSdk(mockStripeInstance),
           itemCalculator,
           host: host,
           retention,
@@ -641,7 +648,7 @@ describe("EEWebhookService", () => {
         service = EEWebhookService.create({
           subscriptionRepository: subRepo,
           organizationRepository: orgRepo,
-          stripe: localStripe as any,
+          ...overTheSdk(localStripe),
           itemCalculator,
           host: host,
           retention,
@@ -690,7 +697,7 @@ describe("EEWebhookService", () => {
         service = EEWebhookService.create({
           subscriptionRepository: subRepo,
           organizationRepository: orgRepo,
-          stripe: localStripe as any,
+          ...overTheSdk(localStripe),
           itemCalculator,
           host: host,
           retention,
@@ -1616,7 +1623,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
     service = EEWebhookService.create({
       subscriptionRepository: subRepo,
       organizationRepository: createMockOrganizationRepository(),
-      stripe: createMockStripe() as any,
+      ...overTheSdk(createMockStripe()),
       itemCalculator: createMockItemCalculator(),
       host: createMockHost(),
       retention,

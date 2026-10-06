@@ -23,11 +23,13 @@ const PREVIEW = {
   amount_due: 1500,
 } as Stripe.Invoice;
 
-const missing = (id: string) =>
+const LINE_ITEMS = [{ id: "li_1", object: "item", quantity: 4 }] as Stripe.LineItem[];
+
+const missing = (message: string) =>
   new Stripe.errors.StripeInvalidRequestError({
     type: "invalid_request_error",
     code: "resource_missing",
-    message: `No such subscription: '${id}'`,
+    message,
   });
 
 /** The provider's endpoints as the SDK answers them, holding one active subscription. */
@@ -35,7 +37,7 @@ function overTheProvider(): StripeSubscriptionsChannel {
   const held = new Map<string, Stripe.Subscription>([[ACTIVE.id, ACTIVE]]);
   const find = (id: string) => {
     const subscription = held.get(id);
-    if (!subscription) throw missing(id);
+    if (!subscription) throw missing(`No such subscription: '${id}'`);
     return subscription;
   };
   const stripe = stripeDouble({
@@ -49,7 +51,13 @@ function overTheProvider(): StripeSubscriptionsChannel {
       },
     },
     checkout: {
-      sessions: { create: async () => ({ url: "https://checkout.stripe.com/c/pay/cs_1" }) },
+      sessions: {
+        create: async () => ({ url: "https://checkout.stripe.com/c/pay/cs_1" }),
+        listLineItems: async (id: string) => {
+          if (id !== "cs_1") throw missing(`No such checkout.session: '${id}'`);
+          return { object: "list", data: LINE_ITEMS, has_more: false };
+        },
+      },
     },
     billingPortal: {
       sessions: { create: async () => ({ url: "https://billing.stripe.com/p/session/bps_1" }) },
@@ -63,6 +71,7 @@ function overTheTwin(): StripeSubscriptionsChannel {
   const subscriptions = MemoryStripeSubscriptionsChannel.create();
   subscriptions.seed({ subscription: ACTIVE });
   subscriptions.seedPreview({ invoice: PREVIEW });
+  subscriptions.seedCheckoutLineItems({ checkoutSessionId: "cs_1", lineItems: LINE_ITEMS });
   return subscriptions;
 }
 
@@ -99,6 +108,12 @@ describe.each(tiers)("Stripe subscriptions over $tier", ({ compose }) => {
       ).resolves.toMatchObject({ status: "canceled" });
     });
 
+    it("cancels it with proration when asked to prorate", async () => {
+      await expect(
+        compose().cancelSubscription({ subscriptionId: "sub_1", params: { prorate: true } }),
+      ).resolves.toMatchObject({ id: "sub_1", status: "canceled" });
+    });
+
     it("answers an invoice preview of a change", async () => {
       await expect(
         compose().previewInvoice({
@@ -130,11 +145,59 @@ describe.each(tiers)("Stripe subscriptions over $tier", ({ compose }) => {
     });
   });
 
+  describe("given a completed checkout session", () => {
+    it("answers its line items with their quantities", async () => {
+      await expect(
+        compose().listCheckoutLineItems({ checkoutSessionId: "cs_1" }),
+      ).resolves.toMatchObject([{ quantity: 4 }]);
+    });
+  });
+
+  describe("when the checkout session was never held", () => {
+    it("refuses its line items with resource_missing", async () => {
+      await expect(
+        compose().listCheckoutLineItems({ checkoutSessionId: "cs_unknown" }),
+      ).rejects.toMatchObject({ code: "resource_missing" });
+    });
+  });
+
   describe("when the subscription was never held", () => {
     it("refuses the read with resource_missing", async () => {
       await expect(
         compose().getSubscription({ subscriptionId: "sub_unknown" }),
       ).rejects.toMatchObject({ code: "resource_missing" });
     });
+  });
+});
+
+describe("when a superseded subscription is cancelled with proration", () => {
+  it("passes the proration to the provider", async () => {
+    const cancelled: unknown[][] = [];
+    const stripe = stripeDouble({
+      subscriptions: {
+        cancel: async (...call: unknown[]) => {
+          cancelled.push(call);
+          return { ...ACTIVE, status: "canceled" };
+        },
+      },
+    });
+
+    await HttpStripeSubscriptionsChannel.create({ stripe }).cancelSubscription({
+      subscriptionId: "sub_1",
+      params: { prorate: true },
+    });
+
+    expect(cancelled).toEqual([["sub_1", { prorate: true }]]);
+  });
+
+  it("records the proration on the memory twin", async () => {
+    const subscriptions = MemoryStripeSubscriptionsChannel.create();
+    subscriptions.seed({ subscription: ACTIVE });
+
+    await subscriptions.cancelSubscription({ subscriptionId: "sub_1", params: { prorate: true } });
+
+    expect(subscriptions.cancellations).toEqual([
+      { subscriptionId: "sub_1", params: { prorate: true } },
+    ]);
   });
 });

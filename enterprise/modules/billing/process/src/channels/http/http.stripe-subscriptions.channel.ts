@@ -4,7 +4,7 @@ import type Stripe from "stripe";
 
 import { StripeSubscriptionsChannel } from "../stripe-subscriptions.channel.ts";
 
-/** Stripe's subscriptions, checkout and billing portal over billing's one client. */
+/** Stripe's subscriptions, checkout and its line items, and billing portal over billing's one client. */
 export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
   private constructor(private readonly stripe: Stripe) {
     super();
@@ -28,8 +28,16 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
     return this.stripe.subscriptions.update(subscriptionId, params);
   }
 
-  cancelSubscription({ subscriptionId }: { subscriptionId: string }): Promise<Stripe.Subscription> {
-    return this.stripe.subscriptions.cancel(subscriptionId);
+  cancelSubscription({
+    subscriptionId,
+    params,
+  }: {
+    subscriptionId: string;
+    params?: Stripe.SubscriptionCancelParams;
+  }): Promise<Stripe.Subscription> {
+    return params
+      ? this.stripe.subscriptions.cancel(subscriptionId, params)
+      : this.stripe.subscriptions.cancel(subscriptionId);
   }
 
   async createCheckoutSession(
@@ -37,6 +45,15 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
   ): Promise<{ url: string | null }> {
     const session = await this.stripe.checkout.sessions.create(params);
     return { url: session.url };
+  }
+
+  async listCheckoutLineItems({
+    checkoutSessionId,
+  }: {
+    checkoutSessionId: string;
+  }): Promise<Stripe.LineItem[]> {
+    const page = await this.stripe.checkout.sessions.listLineItems(checkoutSessionId);
+    return page.data;
   }
 
   async createBillingPortalSession({

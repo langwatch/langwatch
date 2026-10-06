@@ -8,17 +8,20 @@ type Operation = keyof StripeSubscriptionsChannel;
 
 /**
  * Stripe's subscriptions where no provider is composed: keeps what a test seeds
- * and every change and session asked for, cancels in place, and answers an
+ * and every change and session asked for, cancels in place (recording Stripe's
+ * cancel params), answers seeded checkout line items, and answers an
  * invoice preview only once one is scripted (no proration arithmetic here).
  */
 export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
   readonly reads: string[] = [];
   readonly updates: { subscriptionId: string; params: Stripe.SubscriptionUpdateParams }[] = [];
-  readonly cancellations: string[] = [];
+  readonly cancellations: { subscriptionId: string; params?: Stripe.SubscriptionCancelParams }[] =
+    [];
   readonly checkoutSessions: { params: Stripe.Checkout.SessionCreateParams; url: string }[] = [];
   readonly portalSessions: { customerId: string; returnUrl: string; url: string }[] = [];
   readonly previews: Stripe.InvoiceCreatePreviewParams[] = [];
   private readonly held = new Map<string, Stripe.Subscription>();
+  private readonly lineItems = new Map<string, Stripe.LineItem[]>();
   private readonly refusals = new Map<Operation, Error>();
   private preview: Stripe.Invoice | undefined;
 
@@ -33,6 +36,17 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   /** Puts a subscription at the provider, as a test declares it. */
   seed({ subscription }: { subscription: Stripe.Subscription }): void {
     this.held.set(subscription.id, subscription);
+  }
+
+  /** Puts a completed checkout session's line items at the provider. */
+  seedCheckoutLineItems({
+    checkoutSessionId,
+    lineItems,
+  }: {
+    checkoutSessionId: string;
+    lineItems: Stripe.LineItem[];
+  }): void {
+    this.lineItems.set(checkoutSessionId, lineItems);
   }
 
   /** What every invoice preview answers from now on. */
@@ -70,14 +84,27 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
 
   async cancelSubscription({
     subscriptionId,
+    params,
   }: {
     subscriptionId: string;
+    params?: Stripe.SubscriptionCancelParams;
   }): Promise<Stripe.Subscription> {
     this.throwIfRefused("cancelSubscription");
     const cancelled: Stripe.Subscription = { ...this.find(subscriptionId), status: "canceled" };
     this.held.set(subscriptionId, cancelled);
-    this.cancellations.push(subscriptionId);
+    this.cancellations.push(params ? { subscriptionId, params } : { subscriptionId });
     return cancelled;
+  }
+
+  async listCheckoutLineItems({
+    checkoutSessionId,
+  }: {
+    checkoutSessionId: string;
+  }): Promise<Stripe.LineItem[]> {
+    this.throwIfRefused("listCheckoutLineItems");
+    const lineItems = this.lineItems.get(checkoutSessionId);
+    if (lineItems) return lineItems;
+    throw missing(`No such checkout.session: '${checkoutSessionId}'`);
   }
 
   async createCheckoutSession(
@@ -117,10 +144,14 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   private find(subscriptionId: string): Stripe.Subscription {
     const subscription = this.held.get(subscriptionId);
     if (subscription) return subscription;
-    throw new Stripe.errors.StripeInvalidRequestError({
-      type: "invalid_request_error",
-      code: "resource_missing",
-      message: `No such subscription: '${subscriptionId}'`,
-    });
+    throw missing(`No such subscription: '${subscriptionId}'`);
   }
+}
+
+function missing(message: string): Error {
+  return new Stripe.errors.StripeInvalidRequestError({
+    type: "invalid_request_error",
+    code: "resource_missing",
+    message,
+  });
 }

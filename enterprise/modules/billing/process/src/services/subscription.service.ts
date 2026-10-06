@@ -18,9 +18,9 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationCaller } from "@langwatch/organization-contract";
-import type Stripe from "stripe";
 
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
+import type { StripeInvoicesChannel } from "../channels/stripe-invoices.channel.ts";
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import type {
@@ -56,7 +56,7 @@ export class BillingSubscriptionService {
     repository,
     organizationRepository,
     stripeSubscriptions,
-    stripe,
+    stripeInvoices,
     itemCalculator,
     seatEventService,
     notifier,
@@ -65,7 +65,7 @@ export class BillingSubscriptionService {
     repository: BillingSubscriptionRepository;
     organizationRepository: BillingAccountFactsRepository;
     stripeSubscriptions: StripeSubscriptionsChannel;
-    stripe: Stripe;
+    stripeInvoices: StripeInvoicesChannel;
     itemCalculator: SubscriptionItemCalculatorService;
     seatEventService: SeatEventSubscriptionService | undefined;
     notifier: BillingSubscriptionNotifier;
@@ -78,15 +78,18 @@ export class BillingSubscriptionService {
     this.seatEventService = seatEventService;
     this.notifier = notifier;
     this.stripeErrors = stripeErrors;
-    this.invoices = BillingInvoicesService.create({ organizationRepository, stripe, stripeErrors });
+    this.invoices = BillingInvoicesService.create({
+      organizationRepository,
+      stripeInvoices,
+      stripeErrors,
+    });
   }
 
   static create(options: {
     repository: BillingSubscriptionRepository;
     organizationRepository: BillingAccountFactsRepository;
     stripeSubscriptions: StripeSubscriptionsChannel;
-    /** Only `invoices.list`, until the invoices subject is a channel (Q69-3). */
-    stripe: Stripe;
+    stripeInvoices: StripeInvoicesChannel;
     itemCalculator: SubscriptionItemCalculatorService;
     seatEventService?: SeatEventSubscriptionService;
     notifier: BillingSubscriptionNotifier;
@@ -97,7 +100,7 @@ export class BillingSubscriptionService {
       repository: options.repository,
       organizationRepository: options.organizationRepository,
       stripeSubscriptions: options.stripeSubscriptions,
-      stripe: options.stripe,
+      stripeInvoices: options.stripeInvoices,
       itemCalculator: options.itemCalculator,
       seatEventService: options.seatEventService,
       notifier: options.notifier,

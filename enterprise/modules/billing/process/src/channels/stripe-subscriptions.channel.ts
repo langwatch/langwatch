@@ -17,11 +17,18 @@ export abstract class StripeSubscriptionsChannel {
     params: Stripe.SubscriptionUpdateParams;
   }): Promise<Stripe.Subscription>;
 
-  abstract cancelSubscription(input: { subscriptionId: string }): Promise<Stripe.Subscription>;
+  /** `params` as Stripe takes them, `{ prorate: true }` for a superseded plan. */
+  abstract cancelSubscription(input: {
+    subscriptionId: string;
+    params?: Stripe.SubscriptionCancelParams;
+  }): Promise<Stripe.Subscription>;
 
   abstract createCheckoutSession(
     params: Stripe.Checkout.SessionCreateParams,
   ): Promise<{ url: string | null }>;
+
+  /** The first page of a checkout session's line items; `resource_missing` for an unknown one. */
+  abstract listCheckoutLineItems(input: { checkoutSessionId: string }): Promise<Stripe.LineItem[]>;
 
   abstract createBillingPortalSession(input: {
     customerId: string;

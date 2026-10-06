@@ -131,5 +131,16 @@ Feature: Enterprise billing compatibility
     Given the Stripe subscriptions channel over the provider and over its memory twin, each holding an active subscription
     When the subscription is read, updated and cancelled, an invoice preview is asked for, and a checkout and a billing portal session are opened
     Then each tier answers the subscription with its items, then answers it cancelled
+    And each tier cancels a superseded subscription with proration when asked to prorate
     And each tier answers the preview and each session with a url
+    And each tier answers a completed checkout session's line items with their quantities
     And each tier refuses a read of a subscription it never held with resource_missing
+    And each tier refuses the line items of a checkout session it never held with resource_missing
+
+  @unit
+  Scenario: A Stripe customer's invoices list alike over the provider and its memory twin
+    Given the Stripe invoices channel over the provider and over its memory twin, each holding five invoices for one customer and one for another
+    When the customer's invoices are listed with a limit of four
+    Then each tier answers that customer's four newest invoices, newest first
+    And each tier answers an empty list for a customer with no invoices
+    And each tier passes a refused listing through as the provider's own error

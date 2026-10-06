@@ -60,6 +60,7 @@ import { connectedStatementMailChannels } from "../channels/connected-statement-
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
 import { licenseEmailChannels } from "../channels/license-email-channels.registry.ts";
 import { stripeCustomersChannels } from "../channels/stripe-customers-channels.registry.ts";
+import { stripeInvoicesChannels } from "../channels/stripe-invoices-channels.registry.ts";
 import { stripeSubscriptionsChannels } from "../channels/stripe-subscriptions-channels.registry.ts";
 import { stripeWebhooksChannels } from "../channels/stripe-webhooks-channels.registry.ts";
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
@@ -157,7 +158,7 @@ const STRIPE_API_VERSION = "2024-04-10";
 /** Billing's Stripe, built once per deployment that holds the key. */
 type BillingStripe = Readonly<{
   channels: BillingStripeChannels;
-  /** The one SDK client, for the services not yet on a subject channel (Q69-3 and Q69-4). */
+  /** The one SDK client, for the services not yet on a subject channel (Q69-4). */
   client: Stripe;
 }>;
 
@@ -305,6 +306,7 @@ export class BillingModule
         webhooks,
         customers: stripeCustomersChannels.http.create({ stripe: client }),
         subscriptions: stripeSubscriptionsChannels.http.create({ stripe: client }),
+        invoices: stripeInvoicesChannels.http.create({ stripe: client }),
         connectedInvoicing,
       },
     };
@@ -560,7 +562,7 @@ export class BillingModule
     repositories,
   }: {
     subscription: SubscriptionComposition;
-    stripe: BillingStripe;
+    stripe: Pick<BillingStripe, "channels">;
     nodeEnvironment: string | undefined;
     repositories: Pick<
       BillingRepositories,
@@ -578,7 +580,7 @@ export class BillingModule
         repository: repositories.subscriptions,
         organizationRepository: repositories.organizations,
         stripeSubscriptions,
-        stripe: stripe.client,
+        stripeInvoices: stripe.channels.invoices,
         itemCalculator: SubscriptionItemCalculatorService.create(prices),
         seatEventService: SeatEventSubscriptionService.create({
           stripeSubscriptions,
@@ -712,6 +714,7 @@ export class BillingModule
     const events = EEWebhookService.create({
       subscriptionRepository: repositories.webhookSubscriptions,
       organizationRepository: repositories.webhookOrganizations,
+      stripeSubscriptions: stripe.channels.subscriptions,
       stripe: stripe.client,
       itemCalculator: SubscriptionItemCalculatorService.create(prices),
       licensePaymentLinkId,

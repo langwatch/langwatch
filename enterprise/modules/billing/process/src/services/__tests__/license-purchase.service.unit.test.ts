@@ -1,7 +1,7 @@
-import { stripeDouble } from "@langwatch/test-harness/client-doubles/stripe";
 import type Stripe from "stripe";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
 import {
   LicensePurchaseService,
   type LicenseEmailDelivery,
@@ -24,14 +24,14 @@ function checkoutSession(): PurchasedCheckout {
   };
 }
 
-function fakeStripe(): Stripe {
-  return stripeDouble({
-    checkout: {
-      sessions: {
-        listLineItems: vi.fn(async () => ({ data: [{ quantity: 1 }] })),
-      },
-    },
+/** The provider holding the one seat the checkout bought. */
+function purchasedSeats(): MemoryStripeSubscriptionsChannel {
+  const stripeSubscriptions = MemoryStripeSubscriptionsChannel.create();
+  stripeSubscriptions.seedCheckoutLineItems({
+    checkoutSessionId: "cs_1",
+    lineItems: [{ id: "li_1", object: "item", quantity: 1 } as Stripe.LineItem],
   });
+  return stripeSubscriptions;
 }
 
 function composeService(licenseFeatures?: LicenseFeaturesResolver) {
@@ -79,7 +79,7 @@ describe("LicensePurchaseService", () => {
 
       await service.handle({
         checkoutSession: checkoutSession(),
-        stripe: fakeStripe(),
+        stripeSubscriptions: purchasedSeats(),
       });
 
       expect(licenseFeatures.find).toHaveBeenCalledWith({ planType: "ACCELERATE" });
@@ -104,7 +104,7 @@ describe("LicensePurchaseService", () => {
 
       await service.handle({
         checkoutSession: checkoutSession(),
-        stripe: fakeStripe(),
+        stripeSubscriptions: purchasedSeats(),
       });
 
       expect(sendLicenseEmail).toHaveBeenCalledWith(
@@ -122,7 +122,7 @@ describe("LicensePurchaseService", () => {
 
       await service.handle({
         checkoutSession: checkoutSession(),
-        stripe: fakeStripe(),
+        stripeSubscriptions: purchasedSeats(),
       });
 
       const sent = sendLicenseEmail.mock.calls[0]?.[0];

@@ -1,6 +1,7 @@
 import type { BillingDisplayInvoice } from "@langwatch/enterprise-billing-contract";
 import type Stripe from "stripe";
 
+import type { StripeInvoicesChannel } from "../channels/stripe-invoices.channel.ts";
 import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
 
@@ -11,14 +12,14 @@ export class BillingInvoicesService {
   private constructor(
     private readonly options: {
       organizationRepository: BillingAccountFactsRepository;
-      stripe: Stripe;
+      stripeInvoices: StripeInvoicesChannel;
       stripeErrors: StripeErrorTranslator;
     },
   ) {}
 
   static create(options: {
     organizationRepository: BillingAccountFactsRepository;
-    stripe: Stripe;
+    stripeInvoices: StripeInvoicesChannel;
     stripeErrors: StripeErrorTranslator;
   }): BillingInvoicesService {
     return new BillingInvoicesService(options);
@@ -35,17 +36,17 @@ export class BillingInvoicesService {
       return [];
     }
 
-    let invoices: Stripe.ApiList<Stripe.Invoice>;
+    let invoices: Stripe.Invoice[];
     try {
-      invoices = await this.options.stripe.invoices.list({
-        customer: stripeCustomerId,
+      invoices = await this.options.stripeInvoices.listInvoices({
+        customerId: stripeCustomerId,
         limit: RECENT_INVOICES_LIMIT,
       });
     } catch (error) {
       throw this.options.stripeErrors.translate(error);
     }
 
-    return invoices.data
+    return invoices
       .filter((invoice) => invoice.status !== "draft")
       .map((invoice) => ({
         id: invoice.id,

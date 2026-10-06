@@ -22,6 +22,7 @@ import { nowInstant } from "@langwatch/time";
 import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
+import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type {
   BillingWebhookSubscriptionRepository,
@@ -43,7 +44,7 @@ const waitForStripeConsistency = () =>
 type BillingSubscriptionLifecycleOptions = {
   subscriptionRepository: BillingWebhookSubscriptionRepository;
   organizationRepository: BillingWebhookOrganizationRepository;
-  stripe: Stripe;
+  stripeSubscriptions: Pick<StripeSubscriptionsChannel, "getSubscription" | "cancelSubscription">;
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
   };
@@ -67,7 +68,7 @@ export class BillingSubscriptionLifecycleService {
 
   private readonly subscriptionRepository: BillingWebhookSubscriptionRepository;
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
-  private readonly stripe: Stripe;
+  private readonly stripeSubscriptions: BillingSubscriptionLifecycleOptions["stripeSubscriptions"];
   private readonly itemCalculator: BillingSubscriptionLifecycleOptions["itemCalculator"];
   private readonly host: BillingWebhookHost;
   private readonly retention: SeatRetentionRules;
@@ -77,7 +78,7 @@ export class BillingSubscriptionLifecycleService {
   private constructor(options: BillingSubscriptionLifecycleOptions) {
     this.subscriptionRepository = options.subscriptionRepository;
     this.organizationRepository = options.organizationRepository;
-    this.stripe = options.stripe;
+    this.stripeSubscriptions = options.stripeSubscriptions;
     this.itemCalculator = options.itemCalculator;
     this.host = options.host;
     this.retention = options.retention;
@@ -347,7 +348,9 @@ export class BillingSubscriptionLifecycleService {
     previousSubscription: BillingSubscriptionRecord;
   }): Promise<boolean> {
     try {
-      const stripeSubscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+      const stripeSubscription = await this.stripeSubscriptions.getSubscription({
+        subscriptionId,
+      });
       if (stripeSubscription.status !== "canceled") {
         return true;
       }
@@ -391,7 +394,10 @@ export class BillingSubscriptionLifecycleService {
       }
 
       try {
-        await this.stripe.subscriptions.cancel(oldSub.stripeSubscriptionId, { prorate: true });
+        await this.stripeSubscriptions.cancelSubscription({
+          subscriptionId: oldSub.stripeSubscriptionId,
+          params: { prorate: true },
+        });
       } catch (err) {
         logger.error(
           { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
