@@ -5,13 +5,13 @@
  * underneath is the one seam that was redesigned rather than moved.
  */
 
+import { uiTokens } from "@langwatch/module";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type Location, MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { clearFlowCallbacks, useDrawer } from "../../../behavior/use-drawer.ts";
-import type { DrawerPropsMapOf } from "../../../model/drawer-map.ts";
 import { CurrentDrawer } from "../current-drawer.tsx";
 
 function ReadableDrawer({ subject }: { subject?: string }) {
@@ -52,14 +52,17 @@ function StrictDrawer({ open }: { open?: boolean }) {
 
 const drawers = { readable: ReadableDrawer, other: OtherDrawer, strict: StrictDrawer };
 
+const ReadableToken = uiTokens("trace").drawer<{ subject?: string }>("readable");
+const OtherToken = uiTokens("trace").drawer<object>("other");
+
 function Opener() {
-  const { openDrawer } = useDrawer<DrawerPropsMapOf<typeof drawers>>();
+  const { openDrawer } = useDrawer();
   return (
     <>
-      <button type="button" onClick={() => openDrawer("readable", { subject: "a trace" })}>
+      <button type="button" onClick={() => openDrawer(ReadableToken, { subject: "a trace" })}>
         open readable
       </button>
-      <button type="button" onClick={() => openDrawer("other")}>
+      <button type="button" onClick={() => openDrawer(OtherToken)}>
         open other
       </button>
     </>

@@ -44,10 +44,6 @@ export {
   lazyDrawer,
   preloadDrawer,
   primeLazyComponent,
-  type DrawerCallbacksOf,
-  type DrawerPropsOf,
-  type DrawerTypeOf,
-  type FlowCallbacksRegistryOf,
   type UiDrawerComponent,
   type UiDrawerRegistry,
 } from "./model/drawer-registry.ts";
