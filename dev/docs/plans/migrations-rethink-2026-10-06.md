@@ -1,16 +1,17 @@
-# Migrations rethink: plan for Alex (2026-10-06, revision 2)
+# Migrations rethink: plan for Alex (2026-10-06, revision 3)
 
-Status: proposal. No code has changed. Q5 and Q8 are answered (section 9); the rest is not ruled.
+Status: design ruled by Alex on 2026-10-06 (section 9 lists his answers); three genuinely new
+questions remain (section 9). No code has changed.
 Ruling it answers: Q215, `.claude/coordinator/rulings-2026-10-05.md:168` ("rethink how migrations
 work rather than restore the one task: version-aware, schema-aware, and no held or stuck runs. Big
 work: plan it carefully first"). The question that prompted it is
 `.claude/coordinator/questions-2026-10-06.md:264` (the unreachable `ObjectStorageMigrateTask`).
 
-Revision 2 folds in Alex's answers of 2026-10-06: only the pre-roll Job and first boot migrate, and
-api and worker read the ledger and refuse by name if behind (Q5); nothing lands before the redesign
-(Q8). It answers his Q3 note ("i don't want 3 ways to do things ... how it works with version of
-langwatch etc? and cloud vs self host vs local dev?") with one mechanism (6.1), the three shapes
-weighed (6.2), how a step is tied to a version (6.3, 6.4) and how it runs everywhere (6.9).
+Revision 3 replaces revision 2's "all schema first, then data; drops wait for the floor" with
+version-by-version stepping, per Alex's answer to Q1: "prisma/clickhouse migrations should know which
+version they're attached to, so if you're upgrading multiple versions at once it upgrades to a version,
+runs the scripts, then upgrades the next version and runs its scripts, et cetera". Section 6.5 states
+what stepping needs and the cheapest design that makes it true.
 
 Every claim cites a file and line on this branch (or a commit on `origin/main` at `2687513eaa`).
 Where a claim is an inference rather than an observation it says so.
@@ -18,113 +19,79 @@ Where a claim is an inference rather than an observation it says so.
 ## 0. Summary
 
 Today "migrations" are eight different mechanisms with four locks, seven entry points and no record
-of which release an installation is on. Schema migrations run in order inside their own kind, but
-nothing orders them against data migrations, most data migrations are manual commands an operator
-has to know about, and the per-tenant migrations have a `held` state with no exit.
+of which release an installation is on. Schema migrations run in order inside their own kind, nothing
+orders them against data migrations, most data migrations are manual commands, and per-tenant
+migrations have a `held` state with no exit.
 
-The proposal:
+The ruled design:
 
-1. **One mechanism.** Every step of every kind (Postgres schema, ClickHouse schema, data and
-   backfill, tenant migration, object-storage move) is a declared migration with one shape, recorded
-   in one ledger, run by one runner through one command, shown on one ops page (6.1).
-2. **Declared by its owner.** Code steps are declared by the module that owns the data, through one
-   module declaration (`.withMigrations`, recommended over a central registry or a privileged folder,
-   6.2). Schema SQL stays where the schema is (one Prisma history, one goose directory) and enters the
-   same ledger.
-3. **Tied to a version by the release that ships it.** A step is identified by a stable id; the
-   release PR stamps every new step with the release being cut. The runner runs what the ledger has
-   not seen, in release order; the release number decides only the floor (6.3, 6.4).
-4. **Schema-aware by one invariant.** A contract (a drop, a type change) may only remove what data
-   steps at or below the floor needed. Then all schema runs first, data steps run after it in release
-   order, and nothing a pending data step reads can be gone. A fresh install runs no historical data
-   step; anything older than the floor can be deleted (6.5).
-5. **No holds.** Only the pre-roll Job and first boot migrate (Q5); api and worker read the ledger and
-   refuse by name if behind, so no serving process ever waits on a lock or a tenant pass. Locks that
-   remain have deadlines; held tenants have a reason, an age and an alert (6.7, 6.8).
+1. **One mechanism** (Q3 = B). Every step of every kind is a declared migration with one shape,
+   recorded in one ledger, run by one runner through one command (`upgrade`), shown on one ops page.
+   Code steps are declared by their owning module with `.withMigrations(...)`; schema SQL stays in the
+   one Prisma history and the one goose directory and enters the same ledger (6.1, 6.2).
+2. **Every step knows its release.** The release PR stamps each new step, SQL or code, with the
+   release being cut (6.3).
+3. **Version-by-version stepping** (Q1). An upgrade across several releases applies one release's
+   Prisma and goose migrations, then that release's blocking steps, then the next release (6.4).
+   To make that true with an image that carries only the newest code, a blocking step is frozen SQL
+   pinned to its own release's schema; anything that needs live domain code is a background step that
+   runs after the last release, and a later drop of its source waits for the LTS floor (6.5).
+4. **Ledger in runner-owned tables** beside `_prisma_migrations` and `goose_db_version` (Q4); ops'
+   page reads them through the runner.
+5. **No holds.** Only the pre-roll Job and the api's first boot on a fresh install migrate (Q5, Q10);
+   api and worker read the ledger and refuse by name if behind. A held tenant fails visibly, named and
+   alerted, and never blocks the floor or cleanup (Q7). The floor is a named LTS release (Q2).
 
 ## 1. Goals
 
-From Alex's words, each made checkable:
-
-- **G1 Version-aware.** An installation on release N upgraded straight to N+3 runs exactly the steps
-  of N+1, N+2 and N+3, data steps in release order, and no contract removes something an outstanding
-  step still needs. Check: an integration test that upgrades a database recorded at N to N+3 and
-  asserts the ledger order.
-- **G2 Schema-aware, so old ones can be cleaned up.** A fresh install runs none of the historical
-  data steps; an upgrade from below the supported floor is refused by name; anything below the floor
-  can be deleted from the tree without breaking a supported upgrade. Check: a fresh-install test
-  records every historical data step as `not-needed`; a floor test refuses by name.
-- **G3 No held or stuck runs.** No process waits without a deadline; no step can be left half-applied
-  without the next run knowing; no tenant stays held without a reason, an age and an alert. Check:
-  section 2's four senses each get a scenario.
-- **G4 One way to do it** (Alex, 2026-10-06: "i don't want 3 ways to do things"). One step shape, one
-  ledger, one runner, one command (`upgrade`), one ops page, for every kind.
-- **G5 Observable.** "What release is this database on, what ran, what is outstanding, what is held
-  and why" is answered from the ops page and one CLI command.
-- **G6 Keeps ADR-155.** Expand/contract, no down migrations, the pre-roll gate
-  (`dev/docs/adr/155-migrations-are-never-breaking.md:30-66`).
+- **G1 Version-aware.** N upgraded to N+3 steps through N+1, N+2, N+3: each release's schema, then
+  its blocking steps, then the next. Check: an integration test upgrades a database recorded at N to
+  N+3 over the real migration directories and asserts the ledger order and the schema after each step.
+- **G2 Schema-aware, so old ones can be cleaned up.** Each migration is attached to its release; a
+  fresh install runs no historical data step; an upgrade from below the LTS floor is refused by name;
+  steps and migrations below the floor can be deleted or squashed. Check: fresh-install and floor tests.
+- **G3 No held or stuck runs.** No process waits without a deadline; no step is left half-applied
+  without the next run knowing; a held tenant is a visible, named, alerted failure. Check: one
+  scenario per sense of section 2.
+- **G4 One way to do it** (Alex: "i don't want 3 ways to do things"). One step shape, one ledger, one
+  runner, one command, one ops page.
+- **G5 Observable.** "What release is this database on, what ran, what is outstanding, what failed and
+  why" from the ops page and one CLI command.
+- **G6 Keeps ADR-155**, with one gap stepping exposes (6.7, question N1).
 
 Non-goals: replacing Prisma or goose as SQL appliers; down migrations; changing what any existing
 migration does.
 
 ## 2. What "held" means, precisely
 
-The word is used for four different things in the tree. The plan treats each separately.
-
 **H1 Tenant held.** A per-tenant system migration whose work ran but whose own proof disagreed:
-outcome status `migrated` (`packages/system-migrations/src/types.ts:41-48`, "`migrated` is the held
-state ... the tenant stays on its legacy path until a later pass's proof passes"). It is re-counted
-every pass and never counts as progress (`types.ts:72-77`). Nothing ages it or alerts on it; the
-upgrade guide tells operators to look at Ops > Migrations themselves (`docs/self-hosting/upgrade.mdx:20-28`).
-Also held: work the boot preflight queued that has not drained, which leaves the tenant `migrated`
-(`specs/migration/system-migrations-runner.feature:186-210`, commit `d7f39800b5`, #8249).
+outcome `migrated` (`packages/system-migrations/src/types.ts:41-48`, "`migrated` is the held state ...
+the tenant stays on its legacy path until a later pass's proof passes"), re-counted every pass and
+never progress (`types.ts:72-77`). Nothing ages it or alerts on it (`docs/self-hosting/upgrade.mdx:20-28`).
+Also held: preflight work that has not drained (`specs/migration/system-migrations-runner.feature:186-210`,
+`d7f39800b5`, #8249).
 
-**H2 Boot held.** A process that cannot start because the startup migration loop does not end.
-Seen three times on main within days:
+**H2 Boot held.** A process that cannot start because the startup migration loop does not end. Three
+times on main within days: #8244 (`73d814c1b2`: the secret-heal cohort became every user, then peers'
+leases read as `claimed`, 25 passes, crash loop), #8247 (`9f320b52e7`: 9,004 users, 4m43s a pass, two
+passes mandatory), #8249 (`d7f39800b5`: a drain barrier waiting on a dead worker's group, every replica
+crash-looping). The loop (`packages/system-migrations/src/convergence.ts:206-238`, `MAX_PASSES` `:42`,
+5 s apart `:35`) still runs from `start:prepare:db` in every api and worker start
+(`apps/api/package.json:19`, `apps/worker/package.json:20`).
 
-- #8244 (`73d814c1b2`): the secret-heal cohort became every user; two mandatory passes overran the
-  startup probe; every replica in CrashLoopBackOff. Then peers' leases read as `claimed`, so
-  `advanced: 0`, `claimed` climbing 100 to 1243, 25 passes, preflight failure, crash loop.
-- #8247 (`9f320b52e7`): every pass enumerated every tenant; 9,004 users, 4m43s a pass, two passes
-  mandatory, fleet crash-looped.
-- #8249 (`d7f39800b5`): the drain barrier waited on a group whose claim outlived its dead worker;
-  `pending` climbing 32 to 50 across boots, every replica crash-looping on one group id.
+**H3 Lock held.** `apps/tasks/src/migration-lock.ts:19-27` blocks on `pg_advisory_lock` with no
+timeout. `apps/tasks/src/main.ts:59-64` holds it around the whole chain, including
+`system-migrations-pass`, pinned by `apps/tasks/src/__tests__/main.unit.test.ts:71-74`, while the
+task's header says it takes no lock (`apps/tasks/src/system-migrations-pass.ts:2-4`). Inference: each
+extra replica waits for the first replica's whole loop. No migration session sets `lock_timeout`.
 
-Each was fixed by teaching the loop a new exception. The shape that produced them (a convergence loop
-inside every replica's boot) is still there: `packages/system-migrations/src/convergence.ts:206-238`
-(25 passes, `MAX_PASSES` at `:42`, 5 s apart at `:35`) runs from `start:prepare:db` on every api and
-worker start (`apps/api/package.json:19`, `apps/worker/package.json:20`). Q5 removes it from serving
-processes altogether.
+**H4 Half-run.** A failed Prisma migration blocks later deploys until `prisma migrate resolve`, and our
+task says only "exited with code N" (`apps/tasks/src/prisma-migrate.ts:27`); goose on ClickHouse has no
+transactions; manual backfills keep no record (3.2 K4).
 
-**H3 Lock held.** A runner waiting on another runner's lock with no deadline:
-
-- `apps/tasks/src/migration-lock.ts:19-27` tries `pg_try_advisory_lock`, then blocks on
-  `pg_advisory_lock` with no timeout.
-- `apps/tasks/src/main.ts:59-64` takes that lock around the WHOLE chain whenever any task in it needs
-  the database, so `system-migrations-pass` (up to 25 passes) runs under it, and the test pins that
-  (`apps/tasks/src/__tests__/main.unit.test.ts:71-74`, order `lock, prisma, clickhouse, lwql, system,
-unlock`). The task's own header says the opposite: "No migration lock: the pass leases per tenant"
-  (`apps/tasks/src/system-migrations-pass.ts:2-4`). Inference: every replica after the first waits for
-  the first replica's entire convergence loop, and a no-op second pass still queues on the lock.
-- No migration session sets `lock_timeout` or `statement_timeout` (no match in `apps/tasks`,
-  `packages/prisma-client`, `packages/clickhouse-migrations`). Inference: a DDL that needs an
-  `ACCESS EXCLUSIVE` lock behind a long query queues every later query on that table behind it. Not
-  observed in an incident; a standard Postgres hazard.
-
-**H4 Half-run.** A step that stopped part way and leaves the next run unable to tell:
-
-- Prisma marks a failed migration failed and refuses later deploys until someone runs
-  `prisma migrate resolve`; our task reports only "prisma migrate deploy exited with code N"
-  (`apps/tasks/src/prisma-migrate.ts:27`). Nothing in the tree mentions `migrate resolve`.
-- goose on ClickHouse has no transactions; a statement that ran before a failure is not recorded in
-  `goose_db_version`, so the re-run repeats it. One statement per block (`adr/155...:49-50`) narrows
-  this, it does not close it.
-- Manual backfills keep no record of having run (3.2 K4).
-
-Not "held" but often confused with it: **gated** tenant migrations that ship inert on self-hosted
-until a later release flips them (`runsAutomaticallyOnSelfHosted = false`,
-`modules/identity/process/src/services/system-migration-identity-identifier-backfill.service.ts:25`,
-`system-migration-identity-secret-heal.service.ts:24`). A release act; the ledger models it (6.3).
+Not held: **gated** tenant migrations that ship inert on self-hosted
+(`runsAutomaticallyOnSelfHosted = false`,
+`modules/identity/process/src/services/system-migration-identity-identifier-backfill.service.ts:25`).
 
 ## 3. Current state
 
@@ -135,467 +102,379 @@ until a later release flips them (`runsAutomaticallyOnSelfHosted = false`,
 | api container start    | prisma-migrate, clickhouse-migrate, lwql-provision, system-migrations-pass, under one advisory lock | `apps/api/package.json:19-20`, `infra/docker/Dockerfile:299-316`                               |
 | worker container start | the same chain                                                                                      | `apps/worker/package.json:19-20`, `infra/docker/Dockerfile:314-315`                            |
 | Helm pre-roll Job      | `start:prepare:db` on the new image, `pre-upgrade` only, one attempt, 2100 s deadline               | `charts/langwatch/templates/app/migrate-pre-roll-job.yaml:47-75,113`                           |
-| self-hosted compose    | app and workers each `pnpm run start`, so both run the chain                                        | `infra/compose.yml:3,33-34`                                                                    |
-| npx server             | prisma-migrate, then clickhouse-migrate; no lwql-provision, no system pass                          | `apps/server/src/services/migrate.ts:53,60`                                                    |
-| dev compose            | `prisma migrate deploy` directly (no advisory lock), then clickhouse-migrate                        | `dev/compose.dev.yml:308-309`                                                                  |
+| self-hosted compose    | app (image CMD) and workers (`pnpm run start`) each run the chain                                   | `infra/compose.yml:3,33-34`                                                                    |
+| npx server             | prisma-migrate, then clickhouse-migrate only                                                        | `apps/server/src/services/migrate.ts:53,60`                                                    |
+| dev compose            | `prisma migrate deploy` directly (no lock), then clickhouse-migrate                                 | `dev/compose.dev.yml:308-309`                                                                  |
 | pnpm dev / haven       | `start:prepare:db` once before the lanes                                                            | `dev/scripts/dev-stack.sh:256`, `tools/thuishaven/app/orchestrator.go:573-575,621`             |
-| CI and test fixtures   | clickhouse-migrate or prisma-migrate alone; suites migrate ClickHouse themselves                    | `.github/workflows/e2e-ci.yml:290`, `apps/worker/src/__tests__/worker-live.fixture.ts:7,30-33` |
-
-The record says migrations are tasks run before serve by the start script and the deploy pipeline
-(`dev/docs/ARCHITECTURE.md:1297-1305`).
+| CI and test fixtures   | one task alone; suites migrate ClickHouse themselves                                                | `.github/workflows/e2e-ci.yml:290`, `apps/worker/src/__tests__/worker-live.fixture.ts:7,30-33` |
 
 ### 3.2 The eight kinds
 
-**K1 Postgres schema.** 363 Prisma migration folders, timestamp-keyed, in
-`packages/prisma-client/prisma/migrations`. Applied by `prisma migrate deploy`
-(`apps/tasks/src/prisma-migrate.ts:18`). 67 of them carry inline `UPDATE`/`INSERT`/`DELETE` data steps.
+**K1 Postgres schema.** 363 Prisma folders, timestamp-keyed, `packages/prisma-client/prisma/migrations`,
+applied by `prisma migrate deploy` (`apps/tasks/src/prisma-migrate.ts:18`) over the path configured at
+`apps/tasks/prisma.config.ts:10-11`. 67 carry inline `UPDATE`/`INSERT`/`DELETE`.
 
-**K2 ClickHouse schema.** 95 goose files, sequence-keyed, in `packages/clickhouse-migrations/migrations`,
-applied with `goose up` (`packages/clickhouse-migrations/src/goose.migration-runner.ts:824`; `up-to` is
-already accepted, `:720`). goose runs only above the recorded version
-(`.claude/skills/clickhouse-migration/SKILL.md:23-26`). Several migrations leave a historical backfill
-to the operator in a comment (`00034_add_query_pruning_indexes.sql:26`, `00035_...:28`, `00062_...:36`,
-`00063_...:29`, `00076_gateway_spend_filter_indices.sql:41-43`); nothing records whether anyone did.
+**K2 ClickHouse schema.** 95 goose files, sequence-keyed, `packages/clickhouse-migrations/migrations`,
+`goose up` (`goose.migration-runner.ts:824`); `up-to` already accepted (`:720`). goose runs only above
+the recorded version (`.claude/skills/clickhouse-migration/SKILL.md:23-26`). Some leave a historical
+backfill to the operator in a comment (`00034_...:26`, `00035_...:28`, `00062_...:36`, `00063_...:29`,
+`00076_...:41-43`).
 
-**K3 Convergent reconcilers, every boot.** The TTL reconciler inside clickhouse-migrate
-(`packages/clickhouse-migrations/src/ttl.reconciler.ts:488-532`, metadata-only `MODIFY TTL`),
-LangWatchQL provisioning (`apps/tasks/src/lwql-provision.ts:22`), the access-config render. Desired
-state, not versioned. Healthy.
+**K3 Convergent reconcilers, every boot.** TTL (`packages/clickhouse-migrations/src/ttl.reconciler.ts:488-532`),
+LangWatchQL provisioning (`apps/tasks/src/lwql-provision.ts:22`), the access-config render. Healthy.
 
-**K4 Installation-wide data migrations (backfills).** Manual module tasks (`pnpm task <name>`) that
-nothing runs on upgrade and nothing records. Of the 30 module tasks
-(`modules/*/process/src/tasks/*.task.ts`), these move or derive data:
-`backfill-http-agent-credentials-to-secrets`, `backfill-http-credentials-to-secrets`,
-`backfill-annotations-to-clickhouse`, `agent-audit-log-ids-backfill`, `report-schedule-backfill`,
-`dataset-content-backfill`, `virtual-key-config-backfill`, `model-provider-migrate-credentials`,
-`model-provider-migrate-custom-models`, `backfill-organization-presence-setting`,
-`backfill-project-created`, `backfill-project-presence-setting`, `stalled-runs-backfill`,
-`tiered-free-to-seat-event`. Conventions differ: `--dry-run` opts out of writing
-(`modules/audit-log/process/src/tasks/agent-audit-log-ids.task.ts:13-14`), gateway's defaults to a dry
-run (`modules/gateway/process/src/tasks/virtual-key-config-backfill.task.ts:46,89`), others have none.
-One is already schema-aware: the dataset backfill returns `schema-pending` and skips when its columns
-are missing (`modules/dataset/process/src/services/dataset-migration.service.ts:38`,
-`.../repositories/prisma/prisma.dataset-migration.repository.ts:147`). The upgrade guide calls the
-dataset move automatic (`docs/self-hosting/upgrade.mdx:284`); its own page says the operator must run
-it (`docs/self-hosting/upgrade-dataset-storage.mdx:15,118-128`).
+**K4 Installation-wide backfills.** Manual module tasks nothing runs or records: of the 30 in
+`modules/*/process/src/tasks/*.task.ts`, `backfill-http-agent-credentials-to-secrets`,
+`backfill-http-credentials-to-secrets`, `backfill-annotations-to-clickhouse`,
+`agent-audit-log-ids-backfill`, `report-schedule-backfill`, `dataset-content-backfill`,
+`virtual-key-config-backfill`, `model-provider-migrate-credentials`, `model-provider-migrate-custom-models`,
+`backfill-organization-presence-setting`, `backfill-project-created`, `backfill-project-presence-setting`,
+`stalled-runs-backfill`, `tiered-free-to-seat-event`. Dry-run conventions differ
+(`modules/audit-log/process/src/tasks/agent-audit-log-ids.task.ts:13-14` against
+`modules/gateway/process/src/tasks/virtual-key-config-backfill.task.ts:46,89`). The dataset backfill is
+already schema-aware (`modules/dataset/process/src/services/dataset-migration.service.ts:38`). Most of
+these call other modules or object storage (the credential backfills store project secrets; the dataset
+one writes object storage), which matters for 6.5.
 
-**K5 Per-tenant system migrations.** `packages/system-migrations`; ops owns the runner, the subjects
-own the migrations and answer them through their `*Api` (`dev/docs/ARCHITECTURE.md:1307-1314`) with
-`registeredMigrations()` (`modules/authz/contract/src/authz.api.ts:247`,
-`modules/automation/contract/src/automation.api.ts:111`, `modules/identity/contract/src/identity.api.ts:780-782`).
-Registered in main's order (`modules/ops/process/src/services/system-migration-pass.service.ts:447-453`):
-authz grant import, identity SSO connection grandfather and SSO domain ownership
-(`modules/identity/process/src/app/identity.app.ts:1077-1085`), automation Slack connections;
-user-rooted: identifier backfill and secret heal (`identity.app.ts:1070-1075`). State tables
-`SystemMigrationTenantState`, `SystemMigrationEnrollment` (`packages/prisma-client/prisma/schema.prisma:6240-6273`).
-Re-drive: an hourly scheduled process manager (`modules/ops/process/src/eventing/ops-system-migrations.pipeline.ts:66`).
-Dead paths: `SystemMigrationPassService.runStartup` (`system-migration-pass.service.ts:108-142`) has
-only test callers, so `executionMode: "startup"` (`packages/system-migrations/src/system-migration.ts:11`)
-does nothing; `ClickHouseImportStoredObjectMigration`
-(`modules/stored-object/process/src/migrations/clickhouse-import.stored-object.migration.ts:42-52`) is
-registered by no module and does not exist on main. Stored-object has no `registeredMigrations()`
-operation, so under today's shape it could not register one without a new `*Api` operation.
+**K5 Per-tenant system migrations.** Ops owns the runner; subjects answer through their `*Api`
+(`dev/docs/ARCHITECTURE.md:1307-1314`; `modules/authz/contract/src/authz.api.ts:247`,
+`modules/automation/contract/src/automation.api.ts:111`, `modules/identity/contract/src/identity.api.ts:780-782`),
+collected in `modules/ops/process/src/services/system-migration-pass.service.ts:447-453`. State in
+`SystemMigrationTenantState` and `SystemMigrationEnrollment` (`packages/prisma-client/prisma/schema.prisma:6240-6273`).
+Hourly re-drive (`modules/ops/process/src/eventing/ops-system-migrations.pipeline.ts:66`). Dead:
+`SystemMigrationPassService.runStartup` (`:108-142`, test callers only) and the unregistered
+`ClickHouseImportStoredObjectMigration` (`modules/stored-object/process/src/migrations/clickhouse-import.stored-object.migration.ts:42-52`).
 
-**K6 Projection rebuilds.** `ReplayService` (`packages/eventing/src/replay/replayService.ts:40`), driven
-from ops (`modules/ops/process/src/services/replay.service.ts`); ADR-155 rule 6 makes a projection change
-a rebuild beside the old one (`adr/155...:56-60`). Operator-triggered.
+**K6 Projection rebuilds.** `packages/eventing/src/replay/replayService.ts:40`, driven from
+`modules/ops/process/src/services/replay.service.ts`; ADR-155 rule 6 (`adr/155...:56-60`).
 
-**K7 Operator procedures.** The object-storage provider migration, phases plan, copy, finalize, verify
+**K7 Operator procedures.** The object-storage provider move
 (`modules/stored-object/process/src/tasks/object-storage-migrate.task.ts:93,304-307`), registered by no
-module (`stored-object.module.ts` has no `.withTasks`); its inventory port has no implementation
-(questions file `:264`). It runs on an operator's schedule with traffic paused (main's header,
-`platform/app/src/tasks/migrateObjectStorage.ts:1-14` on `origin/main`).
+module, inventory port unimplemented (questions file `:264`).
 
-**K8 One-time latches as process managers.** The operator bootstrap seed runs once behind a marker
-(`dev/docs/ARCHITECTURE.md:1462-1476`; `modules/ops/process/src/eventing/ops-platform-operator-seed.pipeline.ts:44,62`).
+**K8 One-time latches.** The operator seed (`modules/ops/process/src/eventing/ops-platform-operator-seed.pipeline.ts:44,62`).
 
 ### 3.3 Locks
 
-| Lock                                          | Scope                             | Wait                        | Evidence                                                   |
-| --------------------------------------------- | --------------------------------- | --------------------------- | ---------------------------------------------------------- |
-| Postgres advisory lock `langwatch:migrations` | installation, session-scoped      | unbounded                   | `apps/tasks/src/migration-lock.ts:3-27`                    |
-| ClickHouse schema lock                        | one host: a file in `os.tmpdir()` | 110 s, sized for test files | `packages/clickhouse-client/src/schema-lock.ts:27-36`      |
-| Tenant leases (Redis)                         | per tenant per pass               | none, fails safe to "held"  | `packages/system-migrations/src/lease.repository.ts:6-15`  |
-| Drain barrier                                 | preflight queue groups            | deadline, then gives up     | `specs/migration/system-migrations-runner.feature:186-210` |
+| Lock                   | Scope                         | Wait                     | Evidence                                                   |
+| ---------------------- | ----------------------------- | ------------------------ | ---------------------------------------------------------- |
+| Postgres advisory lock | installation, session         | unbounded                | `apps/tasks/src/migration-lock.ts:3-27`                    |
+| ClickHouse schema lock | one host (`os.tmpdir()` file) | 110 s                    | `packages/clickhouse-client/src/schema-lock.ts:27-36`      |
+| Tenant leases (Redis)  | tenant per pass               | none, fails safe to held | `packages/system-migrations/src/lease.repository.ts:6-15`  |
+| Drain barrier          | preflight groups              | deadline                 | `specs/migration/system-migrations-runner.feature:186-210` |
 
-Across pods, ClickHouse migrations are serialised only because they run inside the Postgres advisory
-lock (`0b5f84cf0c`, #8313). The file lock does nothing between two pods.
-
-### 3.4 What records exist, and what a version is today
+### 3.4 Records and versions today
 
 `_prisma_migrations`, `goose_db_version` (pre-created at `goose.migration-runner.ts:583-607`),
-`SystemMigrationTenantState`. Nothing records the release. The release number comes from release-please
-(`.github/.release-please-manifest.json`, `".": "3.20.1"`; `.github/release-please-config.json` writes
-it into `apps/api/package.json:3` and `charts/langwatch/Chart.yaml:5-6`), and releases are tagged
-`langwatch@v*` (`.github/workflows/publish-docker-ecr.yml:32,126-129`). Cloud does not run releases:
-the SaaS deployment pins a `git-<sha>` image published on every merge to main
-(`publish-docker-ecr.yml:4-14`). So a release number cannot be cloud's migration key. ADR-155's contract
-note names a release (`-- contract: retired in 1.42.0`, `adr/155...:61-66`); no migration carries one yet.
+`SystemMigrationTenantState`. Nothing records the release. Releases come from release-please
+(`.github/.release-please-manifest.json`, `".": "3.20.1"`; `.github/release-please-config.json` writes it
+into `apps/api/package.json:3` and `charts/langwatch/Chart.yaml:5-6`), tagged `langwatch@v*`
+(`.github/workflows/publish-docker-ecr.yml:32,126-129`). Cloud runs `git-<sha>` images from every merge
+to main (`publish-docker-ecr.yml:4-14`). The contract note names the release whose code stopped using a
+thing (`.claude/skills/postgres-migration/SKILL.md:39-42`); no migration carries one yet.
 
 ## 4. Failure modes, seen and latent
 
-| #   | Failure                                                                                        | Seen?                                       | Evidence                                                                |
-| --- | ---------------------------------------------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------- |
-| F1  | Boot loops on tenant migrations crash-loop the fleet                                           | seen x3                                     | #8244, #8247, #8249 (section 2, H2)                                     |
-| F2  | Two pods apply the same ClickHouse migration; one crash-loops on TABLE_ALREADY_EXISTS          | seen                                        | `specs/clickhouse/concurrent-boot-migrations.feature:1-6`, `0b5f84cf0c` |
-| F3  | ClickHouse not up yet; bootstrap dies on ECONNREFUSED; every new install restarts once         | seen                                        | `e494045ab0` (#8326)                                                    |
-| F4  | Every replica after the first waits for the first's whole chain, including the system pass     | inferred                                    | `main.ts:59-64`, `main.unit.test.ts:71-74`                              |
-| F5  | A skipped-version upgrade runs a later contract before an earlier release's data move          | latent; the first contract step will hit it | 6.5; no contract note in tree yet                                       |
-| F6  | Manual backfills never run on self-hosted, or run while old pods still write                   | latent, an operator burden                  | `upgrade-dataset-storage.mdx:118-128`                                   |
-| F7  | A failed Prisma migration blocks every later boot until a manual resolve, with a generic error | latent                                      | `prisma-migrate.ts:27`                                                  |
-| F8  | Held tenants stay on legacy paths indefinitely with no alert; legacy code can never be deleted | ongoing                                     | `types.ts:41-48`, `upgrade.mdx:20-28`                                   |
-| F9  | Entry points drift: npx server skips lwql and the system pass; dev compose bypasses the lock   | ongoing                                     | 3.1                                                                     |
-| F10 | A long-running branch and main number migrations independently                                 | ongoing                                     | below                                                                   |
+| #   | Failure                                                                          | Seen?    | Evidence                                                                |
+| --- | -------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------- |
+| F1  | Boot loops on tenant migrations crash-loop the fleet                             | seen x3  | #8244, #8247, #8249                                                     |
+| F2  | Two pods apply the same ClickHouse migration; one crash-loops                    | seen     | `specs/clickhouse/concurrent-boot-migrations.feature:1-6`, `0b5f84cf0c` |
+| F3  | ClickHouse not up yet; every new install restarts once                           | seen     | `e494045ab0` (#8326)                                                    |
+| F4  | Each replica waits for the first's whole chain                                   | inferred | `main.ts:59-64`, `main.unit.test.ts:71-74`                              |
+| F5  | A multi-release jump runs a later contract before an earlier release's data move | latent   | 6.5                                                                     |
+| F6  | Manual backfills never run on self-hosted, or run while old pods still write     | latent   | `upgrade-dataset-storage.mdx:118-128`                                   |
+| F7  | A failed Prisma migration blocks every later boot with a generic error           | latent   | `prisma-migrate.ts:27`                                                  |
+| F8  | Held tenants stay on legacy paths with no alert; legacy code never deletable     | ongoing  | `types.ts:41-48`                                                        |
+| F9  | Entry points drift (npx server skips steps; dev compose skips the lock)          | ongoing  | 3.1                                                                     |
+| F10 | This branch and main number migrations independently                             | ongoing  | below                                                                   |
 
-F10: main's newest Prisma migration `20261002090000_join_request_origin` is not on this branch yet,
-and three branch-only migrations sort below it (`20261001130000_authz_user_standing`,
-`20261001140000_gateway_trace_export_key`, `20261001150000_api_key_system_managed`). ClickHouse: the
-branch adds `00101` to `00104` above main's `00100`; the next main ClickHouse migration will collide on
-`00101`. `tools/migrationorder/set.go:40-66` checks a PR against its base branch, so it cannot see this.
+F10: main's `20261002090000_join_request_origin` is not on this branch; three branch-only Prisma
+migrations sort below it (`20261001130000_authz_user_standing`, `20261001140000_gateway_trace_export_key`,
+`20261001150000_api_key_system_managed`); the branch's goose `00101` to `00104` will collide with main's
+next `00101`. `tools/migrationorder/set.go:40-66` checks a PR against its base only. With stepping, a
+goose version in a later release that sorts below an earlier release's last version is refused by goose,
+so F10 must be resolved before the first release (Q9).
 
 ## 5. Contradictions the redesign resolves (Q8: not fixed early)
 
 1. `specs/setup/schema-migrations-on-start.feature:68` ("the worker never migrates") against
-   `apps/worker/package.json:19-20`. Q5 makes the spec right: S3 rewrites the start scripts.
-2. `specs/migration/system-migrations-runner.feature:323` ("a pass that fails outright ends the task
-   without failing the boot chain") against `:326` ("A failed pass prevents startup"). Tenant passes
-   leave the boot chain in S5, so both scenarios are rewritten there.
-3. `specs/migration/system-migrations-runner.feature:167-169`: steps orphaned after a comment block.
-4. `apps/tasks/src/system-migrations-pass.ts:2-4` ("No migration lock") against `main.ts:59-64`.
-5. `charts/langwatch/templates/NOTES.txt:184,241` describe a dataset-migration Job no template defines.
-6. `docs/self-hosting/upgrade.mdx:284` ("automatic") against `upgrade-dataset-storage.mdx:15` (manual).
+   `apps/worker/package.json:19-20`: Q5 makes the spec right (S3).
+2. `specs/migration/system-migrations-runner.feature:323` against `:326` (pass failure ends the task
+   versus prevents startup): rewritten when tenant passes leave the boot (S5).
+3. `specs/migration/system-migrations-runner.feature:167-169`: orphaned steps (S5).
+4. `apps/tasks/src/system-migrations-pass.ts:2-4` against `main.ts:59-64` (S3).
+5. `charts/langwatch/templates/NOTES.txt:184,241`: a dataset-migration Job no template defines (S3).
+6. `docs/self-hosting/upgrade.mdx:284` against `upgrade-dataset-storage.mdx:15` (S7).
 
-## 6. Target design
+## 6. Design
 
 ### 6.1 One mechanism
 
-One shape for every step, whatever its kind:
+Every step has one shape:
 
-- **id**: stable and unique, never reused; the ledger key. For SQL kinds the id is the file's own name
-  (`prisma:20261002120016_user_notification_preferences`, `clickhouse:00104`); for code steps, the
-  owner module plus a name (`dataset:content-to-object-storage`).
+- **id**: stable, never reused, the ledger key. SQL steps use their file name
+  (`prisma:20261002120016_user_notification_preferences`, `clickhouse:00104`); code steps the owning
+  module plus a name (`dataset:content-to-object-storage`).
 - **kind**: `postgres-schema`, `clickhouse-schema`, `data`, `tenant`, `procedure`.
-- **release**: stamped when a release is cut (6.3); absent means unreleased.
-- **mode**: `blocking` (runs inside `upgrade`, before any process may serve), `background` (runs on the
-  worker after serve), `operator` (runs only when an operator asks, with arguments).
-- **requires**: ids that must be `done` first (rare; release order covers most).
-- **run**: for SQL kinds, the file, applied by Prisma or goose as today; for code kinds, a function
-  over the owning module's repositories with a checkpoint and a dry run.
+- **release**: stamped when the release is cut (6.3).
+- **mode** (Q6, each step declares it): `blocking` (runs inside `upgrade`, at its release, before the
+  next release's schema), `background` (runs on the worker after the last release), `operator` (runs
+  when an operator asks, with arguments).
+- **run**: for SQL kinds the file, applied by Prisma or goose; for code kinds a function with a
+  checkpoint and one dry-run flag.
 
-| Today                                                     | Becomes                                                                               |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| K1 Prisma folders                                         | `postgres-schema`, `blocking`, applied by `prisma migrate deploy`                     |
-| K2 goose files                                            | `clickhouse-schema`, `blocking`, applied by `goose up`                                |
-| K2 operator-comment backfills (`MATERIALIZE INDEX` notes) | `data`, `background`                                                                  |
-| K3 reconcilers (TTL, LangWatchQL)                         | stay convergent, run by `upgrade` every time, not ledger steps                        |
-| K4 manual backfills                                       | `data`, `blocking` or `background` by size; the task name stays as an operator re-run |
-| K5 tenant migrations                                      | `tenant`, `background`; the `SystemMigration` interface is the run function           |
-| K6 projection rebuilds a release needs                    | `data`, `background`                                                                  |
-| K7 object-storage provider move                           | `procedure`, `operator` (plan, copy, finalize, verify as arguments)                   |
-| K8 one-time latches                                       | `data`, `background`                                                                  |
+| Today                                   | Becomes                                                                                    |
+| --------------------------------------- | ------------------------------------------------------------------------------------------ |
+| K1 Prisma folders (inline DML included) | `postgres-schema`, blocking                                                                |
+| K2 goose files                          | `clickhouse-schema`, blocking                                                              |
+| K2 operator-comment backfills           | `data`, background                                                                         |
+| K3 reconcilers                          | run by `upgrade` every time after the last release; not ledger steps                       |
+| K4 manual backfills                     | `data`, background (they need live domain code, 6.5); task name kept as an operator re-run |
+| K5 tenant migrations                    | `tenant`, background; `SystemMigration` is the run function                                |
+| K6 rebuilds a release needs             | `data`, background                                                                         |
+| K7 provider move                        | `procedure`, operator (plan, copy, finalize, verify as arguments)                          |
+| K8 latches                              | `data`, background                                                                         |
 
-One ledger records every step (6.4). One runner applies them: `pnpm task upgrade` for the blocking
-part, the worker's existing scheduled process manager (`ops-system-migrations.pipeline.ts:66`) for the
-background part, `pnpm task upgrade run <id> [args]` for operator steps. One ops page lists them all.
+One ledger (6.6), one runner, `pnpm task upgrade` for the blocking part, the worker's existing
+scheduled process manager (`ops-system-migrations.pipeline.ts:66`) for background steps,
+`pnpm task upgrade run <id> [args]` for operator steps, one ops page.
 
-### 6.2 Where a step is declared: the three shapes Alex named
+### 6.2 Declaration: `.withMigrations` (Q3 = B)
 
-A step's run function has to live somewhere. The three candidates:
+The owning module declares its code steps beside its tasks, built over its own repositories, as
+`.withTasks(({ app, repositories, dependencies }) => [task])` does (`dev/docs/ARCHITECTURE.md:819-825`;
+`packages/process/src/feature-installer.ts:1340`). The tasks container collects them from the installed
+list as it collects tasks (`apps/tasks/src/module-task.ts:61`). Ops' runner and page read that list
+instead of peer answers, so the three `registeredMigrations()` operations retire and the record's
+"answer the migrations they own through their `*Api`" (`ARCHITECTURE.md:1307-1308`) is amended in the
+same change. A step that writes its own tables raw uses the owner's `prisma.*-migration.repository.ts`
+seam, already policed (`packages/architecture-enforcer/src/policies/persistence/prisma-migration-access.ts:16-18`).
+A cross-module move goes through the other module's `*Api` or a fact, as any cross-module code does.
 
-**(A) Central registry (today's `SystemMigration` shape).** Each owning module exposes its steps
-through its `*Api` (`registeredMigrations()`), and ops collects them
-(`system-migration-pass.service.ts:447-453`).
-Keeps: one list in one place; ops' page and runner exist and work.
-Loses: every owning module needs a new `*Api` operation, a contract change, to take part (stored-object
-has none, 3.2 K5); ops gains a peer edge to every owner (today authz, identity, automation), and peer
-cycles must be cut, not added (`dev/docs/ARCHITECTURE.md:885-893`); an `*Api` returning runtime objects
-leaks runner machinery into contracts; schema SQL cannot be answered through an `*Api`, so the SQL kinds
-stay a second way.
+### 6.3 How a step is attached to a release
 
-**(B) Per-module `.withMigrations(...)` (recommended).** The owning module declares its steps beside
-its tasks, built over its own repositories, exactly like `.withTasks(({ app, repositories, dependencies })
-=> [task])` (`dev/docs/ARCHITECTURE.md:819-825`; `packages/process/src/feature-installer.ts:1340`). The
-tasks container collects them from the installed list as it already collects tasks
-(`apps/tasks/src/module-task.ts:61`, `app.tasks(isTask)`), and the runner reads that list.
-Keeps: the domain together (a step sits beside the repositories it uses, the module owns every query
-against its tables, CLAUDE.md rule 2); no `*Api` operation; no peer edge from ops; stored-object can
-declare its procedure with no contract change. A step that must write its own tables raw uses the
-existing `prisma.*-migration.repository.ts` seam, which the `prisma-migration-access` policy already
-polices (`packages/architecture-enforcer/src/policies/persistence/prisma-migration-access.ts:16-18`),
-so "break the rule and reach Prisma directly" is available, scoped to the owner's own tables.
-Loses: a step that reads one module's data and writes another's has to go through the other's `*Api`
-or a fact, as any cross-module code does (the stored-object inventory needs project and organization
-data: that is still the peer-edge question `:264` asks); the runner needs the tasks container booted,
-so code steps run after schema (which 6.5 wants anyway). Schema SQL is not per module, because
-`schema.prisma` and the goose directory are one each; it enters the same ledger with the same id, kind
-and release, so it is one mechanism with two places a step's body can live, not two mechanisms.
+- When release-please opens the release PR, a stamp generator (run in that PR) writes
+  `migrations/releases/<version>.json`: every step id declared since the previous release, in order
+  (Prisma folders in name order, goose versions ascending, then code steps in installed-module order
+  and declaration order). All manifests ship in the image.
+- The manifest is what "attached to a version" means for SQL: release 3.21.0's Prisma migrations are
+  exactly the folders its manifest names, its goose range ends at the highest version it names.
+- A step in no manifest is unreleased and belongs to the next release. Cloud deploys `git-<sha>`
+  images (3.4); each cloud deploy runs its unreleased steps as one virtual release, and the ledger
+  records them by id, so stamping them later changes nothing that already ran.
+- The **LTS floor** (Q2) is a named LTS release declared beside the manifests: the oldest release this
+  image can upgrade from. Manifests below it may be deleted.
 
-**(C) One privileged migrations place.** A single folder (say `apps/tasks/src/migrations/`) allowed to
-import any module's repositories or use Prisma and ClickHouse directly, as apps/tasks already may for
-seeding (`dev/docs/ARCHITECTURE.md:823-825`) and for the migration runners (`:1301-1303`).
-Keeps: one place for every step, cross-module moves are easy, schema and data side by side.
-Loses: table ownership (a step writes a module's table without its services, rules or events; for an
-event-sourced projection that is wrong data, not a style point); the domain splits from its migration,
-so a module refactor breaks a step nobody in the module sees; the folder grows into a second backend
-that every module's internals leak into; the record and lint have to carve a standing exception.
+### 6.4 How an upgrade across several releases picks and orders steps
 
-**Recommendation: (B).** It is the only shape where adding a step needs neither a contract change nor an
-exception to ownership, it reuses a declaration the framework already has, and it lets (A)'s ops runner
-and page stay as they are, reading the declared list instead of peer answers. (A)'s strength (one list)
-survives as the ledger and the ops page; (C)'s strength (direct access) survives as the owner's
-migration repository. Under (B) the record's sentence "each subject answers the migrations they own
-through their `*Api`" (`:1307-1308`) changes, and the three `registeredMigrations()` operations retire.
+Installation recorded at 3.20.1, image 3.23.0, LTS floor 3.19.0 (illustrative):
 
-### 6.3 How a step is tied to a LangWatch version
+| Release | Manifest                                                                                                                                            |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3.21.0  | `prisma:..._add_storage_key` (expand), `dataset:...-copy-keys` (data, blocking, frozen SQL), `dataset:content-to-object-storage` (data, background) |
+| 3.22.0  | `prisma:..._add_identifier`, `clickhouse:00110`, `identity:identifier-backfill` (tenant, background)                                                |
+| 3.23.0  | `prisma:..._drop_legacy_key` (contract, retired in 3.22.0)                                                                                          |
 
-- **Identity, not version, decides what runs.** The runner runs every declared step whose id the
-  ledger has not recorded, in order. That works the same for cloud, which runs `git-<sha>` images and
-  not releases (3.4), for self-hosted releases, and for a developer's unreleased steps.
-- **The release decides order and the floor.** When release-please opens the release PR, a stamp step
-  (a generator, run in that PR) writes `migrations/releases/<version>.json`: the ids of every step
-  declared since the previous release, in their declared order (SQL ids in Prisma and goose order,
-  code ids in installed-module order then declaration order). Every manifest ships in the image. A step
-  not yet in any manifest is "unreleased" and sorts after every release.
-- **Order**: by release, then within a release by kind (`postgres-schema`, `clickhouse-schema`,
-  `data`, `tenant`), then by position in the manifest. Code never names a version; reviewers never
-  guess a number.
-- **The floor** is the oldest release this image can upgrade from, declared once beside the
-  manifests. It is what lets old steps be deleted (6.5).
-- **The ledger** records, per step: id, kind, release, status (`pending | running | done | not-needed
-| failed`), started, finished, attempt, last error, report (checkpoint); and per run: image release
-  or sha, started, finished, outcome. It also records the installation's **origin**: the release the
-  database was created at (or `pre-ledger`).
+`upgrade` (pre-roll Job of 3.23.0):
 
-### 6.4 How an upgrade across several versions picks and orders steps
+1. Read the ledger: installed 3.20.1, at or above the floor (below: refuse, "upgrade to 3.19.0 LTS first").
+2. Plan: releases 3.21.0, 3.22.0, 3.23.0; print the plan.
+3. **3.21.0**: `prisma migrate deploy` over a directory holding only the folders of manifests up to
+   3.21.0; `goose up-to` 3.21.0's last version; then 3.21.0's blocking steps (`dataset:...-copy-keys`);
+   record 3.21.0.
+4. **3.22.0**: the same, up to 3.22.0; no blocking steps; record.
+5. **3.23.0**: the same; before the contract, check its preconditions (6.5); record.
+6. Reconcilers (TTL, LangWatchQL); record the run done. api and worker, which only read the ledger,
+   now start.
+7. The worker runs background and tenant steps of 3.21.0 to 3.23.0 in release order.
 
-Installation recorded at 3.20.1, image 3.23.0, floor 3.19.0:
+Fresh 3.23.0 install: apply all schema at once (nothing to step through), record every data, tenant and
+procedure step of every manifest `not-needed`, start. Pre-ledger installation: S1 seeds the installed
+release as the newest manifest whose schema ids are all applied, marked `inferred`.
 
-| Release | Steps in its manifest                                                                              |
-| ------- | -------------------------------------------------------------------------------------------------- |
-| 3.21.0  | `prisma:...add_dataset_storage_key` (expand), `dataset:content-to-object-storage` (data, blocking) |
-| 3.22.0  | `prisma:...add_identifier` (expand), `identity:identifier-backfill` (tenant, background)           |
-| 3.23.0  | `clickhouse:00110` (expand), `prisma:...drop_legacy_x` (contract retiring a 3.18 data step)        |
+### 6.5 What stepping needs, and the cheapest way to make it true
 
-`upgrade` on the 3.23.0 pre-roll Job:
+The image carries only the newest code and the newest generated Prisma client. When 3.21.0's blocking
+step runs, the schema is at 3.21.0, not 3.23.0. Four things follow.
 
-1. Read the ledger. Installed 3.20.1 is at or above the floor 3.19.0, so proceed (below: refuse,
-   "upgrade to 3.19.0 first").
-2. Check every contract in the jump: `drop_legacy_x` retires a 3.18 data step, at or below the floor,
-   and the ledger shows that step `done` or `not-needed`. Otherwise refuse by name before touching the
-   schema (6.5).
-3. Apply all schema: `prisma migrate deploy`, then `goose up`, exactly as today. Safe in one go because
-   of the invariant in 6.5.
-4. Run blocking data steps of 3.21.0, 3.22.0, 3.23.0 in release order: here
-   `dataset:content-to-object-storage`.
-5. Run the reconcilers (TTL, LangWatchQL).
-6. Record 3.23.0 done. api and worker, which only read the ledger, now start.
-7. The worker runs background and tenant steps in release order: `identity:identifier-backfill`.
+1. **Prisma over a subset directory.** `apps/tasks/prisma.config.ts:10-11` names the migrations path;
+   the runner writes a temporary directory per release (the manifest's folders plus every earlier one,
+   and `migration_lock.toml`) and deploys over it. The subset only grows, so the database never holds
+   an applied migration the directory lacks. Unproven: S4 must show `migrate deploy` over successive
+   subsets leaves `_prisma_migrations` consistent, including F10's out-of-order timestamps. goose needs
+   nothing new (`up-to`).
+2. **A blocking code step cannot use the newest model client.** Prisma's generated client selects,
+   returns and defaults every field it knows (an inference about Prisma's default select, `RETURNING`
+   and client-side defaults; S4 confirms it), so a 3.23 client against a 3.21 table missing a 3.22
+   column fails. Options weighed:
+   - _Keep old code paths in the image_ (each release's services and repositories): the image would
+     carry several versions of every module. Rejected: unbounded.
+   - _A per-release schema snapshot_ (one generated Prisma client per release): heavy (a client per
+     release in the image, regenerated for every release since the floor). Rejected.
+   - **Frozen SQL (chosen, cheapest).** A blocking code step is written against its own release's
+     schema in raw SQL (`$queryRaw`/`$executeRaw` through its owner's `*-migration.repository.ts`, or a
+     ClickHouse query), names its columns explicitly, and is immutable once released. Most blocking data
+     moves are plain SQL already (67 Prisma migrations carry inline DML); a code step is only for
+     batching a large table or crossing Postgres and ClickHouse.
+     Enforced by: a lint rule that a blocking step's file imports only its owner's migration repository and
+     the step contract (no services, no peer `*Api`, no model client); and the immutability check the
+     migration-order workflow already applies to merged migrations
+     (`specs/ci/migration-order.feature:43-47`), extended to released step files.
+3. **Steps that need live domain code are background.** The K4 backfills call other modules, object
+   storage or event pipelines; tenant migrations emit events. They cannot be frozen SQL. They run on
+   the worker after the last release, against the newest schema and code, which is what they are
+   written for.
+4. **A drop must not remove what a pending background step reads.** In stepping, a 3.23 contract runs
+   before 3.21's background step. So the floor rule survives in exactly one case: a contract that
+   retires a background or tenant step's source may ship only in a release whose LTS floor is at or
+   above that step's release, so every supported installation has finished the step before it can
+   reach the drop. The contract names the step it retires (`-- contract: retired in 3.22.0; retires
+dataset:content-to-object-storage`), and the stamp fails the release otherwise. Contracts that
+   retire nothing a background step reads (most of them) keep ADR-155's one release. A blocking step's
+   source can be dropped in the very next release: stepping guarantees the step already ran.
 
-A fresh 3.23.0 install records every data, tenant and procedure step of every manifest as
-`not-needed` (there is no legacy data to move), applies the schema, and starts.
+**Held tenants at a drop** (Q7: never blocking). If a tenant step's legacy source reaches its drop while
+some tenants are held, the drop proceeds and those tenants fail visibly (named, alerted, `failed` in the
+ledger). Whether their legacy rows are archived first is question N2.
 
-### 6.5 Schema awareness, the floor and cleanup
+### 6.6 The ledger (Q4)
 
-**Why not apply schema release by release.** Revision 1 proposed stopping Prisma at each release
-boundary. It does not work cleanly: the image carries only the newest code, so a 3.21 data step would
-run 3.23 code, whose generated Prisma client selects every column it knows, against a 3.21 schema that
-lacks 3.22's columns (an inference about Prisma's default select; S4 confirms it). Data steps would
-have to be written against old schemas forever.
+Runner-owned infrastructure tables beside `_prisma_migrations` and `goose_db_version`, outside the
+module catalogue (names illustrative): `_langwatch_upgrade_run` (image release or sha, started,
+finished, outcome, plan) and `_langwatch_upgrade_step` (id, kind, release, mode, status
+`pending | running | done | not-needed | failed | gated`, attempt, last error, checkpoint report), plus
+the installation's origin release and the current lease. Ops' page reads them through a reader the
+runner package exports, as ops already drives `packages/eventing`'s `ReplayService`
+(`modules/ops/process/src/services/replay.service.ts`). `SystemMigrationTenantState` stays ops' per-tenant
+truth; the ledger holds each tenant step's summary.
 
-**The invariant instead.** A contract (drop, type change, `NOT NULL` without a default) may only
-remove what is needed by data or tenant steps at or below the floor. The manifest check in CI enforces
-it: a contract names, in its ADR-155 note, the step or release it retires, and the stamp fails a
-release whose contract names something above the floor. With that:
+### 6.7 Locking without holds (Q5, Q10)
 
-- every expand is additive and safe to run before any data step (ADR-155 rule 1);
-- no contract in a supported jump can remove anything a pending step reads, because every such step is
-  above the floor and every retired thing is at or below it;
-- so all schema can run first, with today's tools, and every data step runs against the newest schema
-  with the newest code. Each step is "schema-aware" by construction rather than by checking.
+- **Serving processes never migrate and never wait.** api and worker read the ledger at boot and refuse
+  by name, listing outstanding step ids and the command, if any blocking step up to their release (or
+  sha) is not `done`/`not-needed`. The one exception (Q10): on a Helm first install the api's first boot
+  finds an empty ledger on an empty schema and runs `upgrade` once.
+- **Only `upgrade` takes the lease**: one row (owner, image, host, heartbeat, expiry). A second runner
+  logs the holder and waits up to a deadline, then exits naming it; a dead holder's lease expires; a step
+  left `running` resumes from its checkpoint.
+- **DDL timeouts**: migration sessions set `lock_timeout` and retry with backoff.
+- **ClickHouse under the same lease**; the file lock stays for tests.
+- **Background and tenant steps run on the worker**, under today's per-tenant leases; never in a boot.
+- **Old pods during a multi-release jump.** ADR-155 promises the previous image works on the new schema,
+  one release apart. In a jump from N to N+3 the old N pods keep serving while the pre-roll Job steps to
+  N+3, and a contract retired in N+2 drops something N still uses. The runner can see it (the contract
+  note names its retired-in release, above the installed one). What it should then do is question N1.
 
-The price: a drop waits until the floor passes the data step that needed it, not one release. With a
-floor of "the previous minor" that is roughly ADR-155's one release; a wider floor makes drops wait
-longer (question Q2).
+### 6.8 Tenant migrations: fail visibly, never block (Q7)
 
-**Fresh installs** run no historical data or tenant step: the ledger records them `not-needed` (6.4).
-Today's dataset `schema-pending` check (`dataset-migration.service.ts:38`) becomes unnecessary.
-
-**Cleanup.** Once the floor passes a step's release, every supported installation has it `done` or
-`not-needed`. Then the step's code and the legacy path it served can be deleted, and the Prisma and
-goose history below the floor can be squashed into a baseline (Prisma's documented baselining; goose
-likewise). The upgrade refuses an installation below the floor by name, so no deleted step is ever
-needed. A tenant migration with tenants still held blocks the floor from passing its release, by name
-(6.8), so legacy code is never deleted under a held tenant.
-
-### 6.6 Idempotency and half-run rules
-
-- Every code step is idempotent and checkpointed in its ledger `report`, and resumes from it; one
-  dry-run flag with one meaning for every step.
-- No new DML inside a schema migration: a migration-safety rule beside the existing scanners
-  (`packages/prisma-client/src/__tests__/migration-safety.rules.ts`,
-  `packages/clickhouse-migrations/src/__tests__/migration-safety.rules.ts`). Historical ones stay baselined.
-- ClickHouse DDL uses `IF NOT EXISTS` / `IF EXISTS` forms so a repeat after a half-run is a no-op.
-- A failed Prisma migration is detected before `deploy` (a `_prisma_migrations` row with `finished_at`
-  and `rolled_back_at` null) and reported with its name and the exact resolve command.
-- A step marked `running` whose runner died is visible in the ledger with its holder and age; the next
-  `upgrade` resumes it from its checkpoint after the lease expires.
-
-### 6.7 Locking without holds (with Q5)
-
-- **Serving processes never migrate and never wait.** api and worker read the ledger at boot. If the
-  image's steps up to its own release (or sha) are not all `done`/`not-needed` for the blocking ones,
-  they refuse to start with a refusal naming the outstanding step ids and the command that runs them.
-  No lock, no pass, no convergence loop: H2 and H3 cannot happen in a serving process.
-- **Only `upgrade` takes the lease**: one installation lease row (owner, image, host, heartbeat,
-  expiry). A second `upgrade` (a retried Job) logs the holder and waits up to a deadline, then exits
-  naming it. A dead holder's lease expires. The advisory lock can stay underneath for mutual exclusion;
-  nobody waits on it without a deadline.
-- **DDL timeouts.** Migration sessions set `lock_timeout` and retry with backoff.
-- **ClickHouse under the same lease**; the file lock stays for tests only.
-- **Tenant and background steps run on the worker**, already serving, under today's per-tenant leases;
-  they never gate a boot. A contract that needs one finalized waits for it through the floor (6.5).
-
-### 6.8 Tenant migrations: no silent holds
-
-- The held state splits by reason: `held:proof` (the proof disagreed; needs a repair or a decision) and
-  `held:pending` (work queued, not drained; resolves itself). Today both are `migrated` (`types.ts:41-48`).
-- Every held row carries `heldSince`; ops alerts past a threshold; the page sorts by age.
-- A tenant step is either finite (it finalizes every tenant) or `recurring` (`startupSettlement`,
-  `system-migration.ts:13`), and a recurring one never gates a contract.
-- Cloud pacing stays a property of the tenant step: `enrolledAutomatically = false` keeps it to
-  enrolled organizations on cloud, `runsAutomaticallyOnSelfHosted = false` keeps it inert on
-  self-hosted (`system-migration.ts:52,59`). Flipping either is a change to the declaration, and the
-  ledger shows the step as `gated` rather than `pending`, so a gate is never mistaken for a hold.
+- `migrated` splits by reason: `held:proof` (the proof disagreed) and `held:pending` (queued work not
+  drained).
+- Every held row carries `heldSince`; past a threshold ops raises an alert naming migration and tenant,
+  and the ledger shows the tenant step `failed` for that tenant. Nothing waits on it: not a boot, not the
+  floor, not cleanup.
+- Cloud pacing stays on the step (`enrolledAutomatically`, `runsAutomaticallyOnSelfHosted`,
+  `packages/system-migrations/src/system-migration.ts:52,59`); a gated step is `gated`, not `pending`.
 
 ### 6.9 How it runs: cloud, self-hosted, local dev
 
-`upgrade` is one command everywhere. What differs is who calls it.
-
-| Environment                                     | First install                                                                                                                                                                                                                                                        | Upgrade                                                                                                                                                                                              | api and worker                                            | Background and tenant steps                                                 |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Cloud (Helm, many replicas, `git-<sha>` images) | not expected; same as self-hosted Helm                                                                                                                                                                                                                               | pre-roll Job runs `upgrade` on the new image before any Deployment rolls (`migrate-pre-roll-job.yaml:62-75`); every merge to main is a deploy, so the ledger keys on ids, not releases (6.3)         | read the ledger; refuse by name if behind                 | worker; tenant steps paced by enrolment (`enrolledAutomatically`)           |
-| Self-hosted Helm                                | Helm cannot run a pre-install Job that reads the release's Secrets (`migrate-pre-roll-job.yaml:29-32`), so the first boot of the api finds an empty ledger and runs `upgrade` itself under the lease; the worker refuses until it is done and Kubernetes restarts it | pre-roll Job, as cloud. `app.migrations.preRoll: false` (`:43-45`) now means "the operator runs `upgrade` as a pipeline step"; api refuses until they do                                             | as cloud                                                  | worker; tenant steps run automatically when `runsAutomaticallyOnSelfHosted` |
-| Self-hosted docker compose                      | a one-shot `migrate` service runs `upgrade`; app and workers `depends_on` it with `service_completed_successfully` (today both start with `pnpm run start`, `infra/compose.yml:33-34`)                                                                               | the same service on every `docker compose up`; a no-op read when done                                                                                                                                | as cloud                                                  | worker                                                                      |
-| npx `@langwatch/server`                         | the CLI runs `upgrade` before starting the services (replacing its two task calls, `apps/server/src/services/migrate.ts:53,60`)                                                                                                                                      | the same, on every start                                                                                                                                                                             | as cloud                                                  | worker                                                                      |
-| Local dev: haven, `pnpm dev`, dev compose       | the prepare step runs `upgrade` once (`orchestrator.go:573-575`, `dev-stack.sh:256`, `dev/compose.dev.yml:308-309`); a reset database is a fresh install                                                                                                             | the same; unreleased steps run because their ids are new                                                                                                                                             | lanes never migrate (`specs/setup/boot-sequence.feature`) | the worker lane                                                             |
-| Tests                                           | integration suites keep applying schema directly through the appliers (`worker-live.fixture.ts:7,30-33`): the fresh-install path, no data steps                                                                                                                      | a data step's own test runs it over a seeded legacy fixture; a CI job upgrades a database migrated by the previous release, and one from the floor (ADR-155's "still to land", `adr/155...:119-122`) | n/a                                                       | n/a                                                                         |
-
-First install versus upgrade is the ledger's answer, not the caller's: an empty ledger on an empty
-schema is a first install; an empty ledger on an existing schema is a pre-ledger installation, seeded
-once (6.10, slice S1).
+| Environment                                | First install                                                                                                                                                                                     | Upgrade                                                                                                                                                                               | api and worker                                            | Background and tenant steps                             |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------- |
+| Cloud (Helm, replicas, `git-<sha>`)        | as self-hosted Helm                                                                                                                                                                               | pre-roll Job runs `upgrade` before any Deployment rolls (`migrate-pre-roll-job.yaml:62-75`); each deploy is one virtual release of its unreleased steps                               | read the ledger; refuse by name if behind                 | worker; tenant steps paced by enrolment                 |
+| Self-hosted Helm                           | api's first boot runs `upgrade` once on an empty schema (Q10; a pre-install Job cannot read the release's Secrets, `migrate-pre-roll-job.yaml:29-32`); the worker refuses and restarts until done | pre-roll Job steps release by release; `app.migrations.preRoll: false` (`:43-45`) now means the operator runs `upgrade` themselves                                                    | as cloud                                                  | worker; automatic where `runsAutomaticallyOnSelfHosted` |
+| Self-hosted compose                        | a one-shot `migrate` service runs `upgrade`; app and workers `depends_on` it (`service_completed_successfully`), replacing their own chains (`infra/compose.yml:3,33-34`)                         | the same service on every `up`; a ledger read when done                                                                                                                               | as cloud                                                  | worker                                                  |
+| npx `@langwatch/server`                    | the CLI runs `upgrade` before the services (replacing `apps/server/src/services/migrate.ts:53,60`)                                                                                                | the same on every start                                                                                                                                                               | as cloud                                                  | worker                                                  |
+| Local dev (haven, `pnpm dev`, dev compose) | the prepare step runs `upgrade` once (`orchestrator.go:573-575`, `dev-stack.sh:256`, `dev/compose.dev.yml:308-309`); a reset database is a fresh install                                          | the same; unreleased steps run as one virtual release                                                                                                                                 | lanes never migrate (`specs/setup/boot-sequence.feature`) | the worker lane                                         |
+| Tests                                      | suites apply schema through the appliers (`worker-live.fixture.ts:7,30-33`): the fresh-install path                                                                                               | a step's test runs it over a fixture at its release's schema; CI upgrades a database from the previous release and from the LTS floor (ADR-155 "still to land", `adr/155...:119-122`) | n/a                                                       | n/a                                                     |
 
 ### 6.10 Observability
 
-- `pnpm task upgrade status`: origin, installed release or sha, image, floor, outstanding steps by
-  release, held tenants by age.
-- `pnpm task upgrade plan`: what `upgrade` would run; the pre-roll Job prints it first, so a failed
-  Job's log starts with the plan.
-- The ops migrations page (`docs/self-hosting/upgrade.mdx:43-48`) lists every step of every kind with
-  its release, status and report, and the run history.
-- Metrics: step duration, oldest held tenant age, held, parked and gated counts.
+`pnpm task upgrade status` (origin, installed, image, floor, outstanding by release, failed tenants by
+age) and `pnpm task upgrade plan` (printed first by the pre-roll Job); the ops page lists every step of
+every kind with release, status and report, and the run history; metrics for step duration, failed and
+held tenant counts and the oldest held age.
 
-### 6.11 Open design points that remain
+### 6.11 Idempotency and half-run rules
 
-Ledger table ownership (Q4) and the stored-object inventory's peer data (`questions-2026-10-06.md:264`)
-are not decided by this plan.
+- Code steps are idempotent and checkpointed in the ledger; one dry-run flag.
+- A failed Prisma migration is detected before `deploy` (a `_prisma_migrations` row with `finished_at`
+  and `rolled_back_at` null) and reported with its name and the resolve command.
+- ClickHouse DDL uses `IF NOT EXISTS` / `IF EXISTS` forms (a migration-safety rule beside
+  `packages/clickhouse-migrations/src/__tests__/migration-safety.rules.ts`).
+- Inline DML in a Prisma migration stays allowed: under stepping it is the simplest blocking data step.
 
 ## 7. Migration path
 
-Nothing is renumbered; nothing already applied runs again. Per Q8, nothing lands before the redesign;
-the contradictions of section 5 are fixed inside the slice that changes their behaviour.
+Nothing is renumbered; nothing already applied runs again; per Q8 nothing lands before the redesign,
+and per Q9 S1 to S4 land before this branch's first release.
 
-1. Ledger tables land and are seeded from today's records: `_prisma_migrations` and `goose_db_version`
-   rows become `done` steps; `SystemMigrationTenantState` summaries become tenant step rows; the
-   installed release is the newest manifest whose schema ids are all applied, marked `inferred`.
-2. `upgrade status` and `plan` read it; the stamp generator writes the first manifests (backfilled for
-   releases since the floor from git tags `langwatch@v*`).
-3. `upgrade` replaces `start:prepare:db` in every entry point at once (6.9); api and worker switch to
-   reading the ledger.
-4. Tenant passes leave the boot entirely; the worker's process manager drives them.
-5. `.withMigrations` lands; manual backfills move over one owner at a time.
-6. The contract invariant is enforced; the floor is declared; cleanup and squash follow.
+1. Ledger tables, seeded from `_prisma_migrations`, `goose_db_version` and `SystemMigrationTenantState`.
+2. Manifests stamped from the release PR, and backfilled for every release since the current LTS from
+   the `langwatch@v*` tags.
+3. `upgrade` replaces `start:prepare:db` everywhere; api and worker read the ledger.
+4. Stepping switches on (proved by S4), then tenant passes leave the boot, then `.withMigrations`, then
+   backfills move over, then the floor and cleanup.
 
-## 8. Phased slices
+## 8. Slices
 
-Each slice is lane-sized, has its own scenarios and lands green on its own. The former S0 items are
-folded in where their behaviour changes (Q8).
+Lane-sized, each with its own scenarios, each green on its own. S1 to S4 before the first release (Q9).
 
-- **S1 Ledger.** Tables (after Q4), seeding from existing records; integration test against the local
-  Postgres. Fixes nothing yet, changes nothing.
-- **S2 Read side.** `upgrade status` and `plan`; the stamp generator and the first manifests; CI that
-  the stamp is in the release PR.
-- **S3 One entry point (Q5).** `upgrade` with the lease, bounded waits and `lock_timeout`; api and
-  worker read the ledger and refuse by name; first-boot path; repoint Helm Job, chart opt-out, self-hosted
-  compose (new `migrate` service), npx server, haven, `pnpm dev`, dev compose, CI. Rewrites
-  `specs/setup/schema-migrations-on-start.feature` and `boot-sequence.feature` (section 5 items 1, 4),
-  removes the system pass from the advisory lock (`main.ts:38,59-64`, `main.unit.test.ts:73`), fixes
-  the chart NOTES (item 5).
-- **S4 Ordering.** All schema, then blocking data in release order; the N to N+3 integration test; the
-  fresh-install `not-needed` path; confirm the Prisma default-select inference of 6.5.
-- **S5 Tenant steps.** Off the boot; held reason split, `heldSince`, ops alert; rewrite the runner spec
-  (section 5 items 2, 3); delete `runStartup` and the `startup` execution mode.
-- **S6 `.withMigrations` (after Q3).** Framework declaration beside `.withTasks`; the runner reads the
-  installed list; tenant migrations move from `registeredMigrations()` to it and the three `*Api`
-  operations retire; ARCHITECTURE.md §7 amended in the same change.
-- **S7 Backfills.** The K4 tasks become declared steps (first `dataset-content-backfill`, which fixes
-  section 5 item 6, then one small one such as `backfill-project-created`, then the rest); the K2
-  operator-comment backfills become steps; scanner rules for DML in schema migrations and idempotent
-  ClickHouse DDL.
-- **S8 Procedures.** Stored-object declares the provider move as a `procedure` step (answers Q215's
-  original question once the inventory's peer data is ruled); decide the unregistered
-  `ClickHouseImportStoredObjectMigration`.
-- **S9 Floor.** The contract invariant in CI, the floor, refusal below it.
-- **S10 Cleanup.** Squash below the floor; delete steps and legacy paths the floor has passed.
+- **S1 Ledger.** Runner-owned tables (Q4) and seeding; integration test against the local Postgres.
+- **S2 Manifests and read side.** The stamp generator in the release PR; manifests backfilled since the
+  LTS; `upgrade status` and `plan`; the reader ops' page uses.
+- **S3 One entry point** (Q5, Q10). `upgrade` with the lease, deadlines and `lock_timeout`; api and
+  worker read the ledger and refuse by name; the Helm first-boot path; repoint the pre-roll Job and its
+  opt-out, self-hosted compose (`migrate` service), npx server, haven, `pnpm dev`, dev compose, CI.
+  Resolves section 5 items 1, 4 and 5.
+- **S4 Stepping.** Prisma over successive subset directories and goose `up-to` per release; prove the
+  Prisma subset deploy (including out-of-order timestamps) and the default-select inference of 6.5; the
+  N to N+3 integration test over the real directories; fresh-install `not-needed`; resolve F10's goose
+  collision with the merge drive.
+- **S5 Tenant steps off the boot** (Q7). Held reason split, `heldSince`, alert, visible failure; delete
+  `runStartup` and the `startup` execution mode; rewrite the runner spec (section 5 items 2, 3).
+- **S6 `.withMigrations`** (Q3). Framework declaration beside `.withTasks`; tenant migrations move to it;
+  the three `registeredMigrations()` operations retire; ARCHITECTURE.md §7 amended in the same change.
+- **S7 Steps.** The lint rule and immutability check for frozen blocking steps; K4 backfills become
+  background steps (first `dataset-content-backfill`, resolving section 5 item 6); K2 comment backfills
+  become steps; the ClickHouse idempotent-DDL scanner rule.
+- **S8 Procedures.** Stored-object declares the provider move as a `procedure` step (needs the
+  inventory's peer data ruled, questions file `:264`); decide `ClickHouseImportStoredObjectMigration`.
+- **S9 LTS floor and contracts.** The floor and its refusal; the contract note's `retires` check in the
+  stamp (6.5 point 4); the old-pod check (N1).
+- **S10 Cleanup.** When a new LTS is named: delete manifests, steps and legacy paths below it; squash
+  the Prisma and goose history below it into a baseline.
 
-## 9. Questions for Alex
+## 9. Questions
 
-**Q3 (open, asked again with options).** How does a module declare a migration step?
+**Ruled by Alex, 2026-10-06:** Q1 version-by-version stepping (6.4, 6.5). Q2 the floor is a named LTS
+release. Q3 (B) `.withMigrations`, one mechanism. Q4 runner-owned infrastructure tables; ops' page reads
+them through the runner. Q5 only the pre-roll Job and first boot migrate; api and worker refuse by name
+if behind. Q6 each step declares blocking or background. Q7 a held tenant fails visibly, named and
+alerted, and blocks nothing. Q8 nothing lands before the redesign. Q9 S1 to S4 land before this branch's
+first release. Q10 on a Helm first install the api's first boot migrates once.
 
-- **(A) Central registry**: keep `SystemMigration` and `registeredMigrations()` on each owner's `*Api`;
-  ops collects. One list, but a contract operation per owning module, an ops peer edge to every owner,
-  and schema SQL still separate.
-- **(B) Per-module `.withMigrations(...)`** (recommended): the owner declares steps beside `.withTasks`,
-  over its own repositories (raw Prisma allowed through its own `*-migration.repository.ts`); the tasks
-  container collects them; ops' runner and page read that list. No contract change, no ops peer edges,
-  domain kept together; a cross-module move still goes through the other module's `*Api`.
-- **(C) One privileged migrations folder** allowed to reach any module's repositories or Prisma: one
-  place and easy cross-module moves, at the cost of table ownership and event-sourced invariants, a
-  standing exception in the record and lint, and migrations that drift from the domain they change.
+**New, raised by stepping:**
 
-In all three the ledger, the runner, the `upgrade` command, the ordering and the ops page are the same
-single mechanism (6.1); the choice is only where a step's body lives.
-
-**Answered 2026-10-06.** Q5: only the pre-roll Job and first boot migrate; api and worker read the
-ledger and refuse by name if behind (6.7, 6.9). Q8: nothing lands before the redesign; the S0 fixes
-are folded into S3 and S5 (section 8).
-
-Still open:
-
-1. **Q1 Interpretation.** Is "schema aware, run only up to where needed, so we can clean up" what 6.5
-   describes (fresh installs skip history; contracts wait for the floor; a floor that lets old steps
-   and old migrations be deleted)? Or something narrower, such as only squashing?
-2. **Q2 Floor policy.** How far back must a self-hosted install upgrade in one go: the previous minor,
-   a fixed number of minors, or a named long-term release? A wider floor makes drops wait longer (6.5).
-3. **Q4 Ledger ownership.** Infrastructure tables beside `_prisma_migrations` and `goose_db_version`,
-   owned by the runner and outside the catalogue, or ops' tables (ops owns `SystemMigration*` today)?
-4. **Q6 Blocking or background.** May a release serve while its background data steps run (as tenant
-   migrations do today), or must every data step finish before serve? The plan lets each step choose.
-5. **Q7 Held tenants.** Which alert threshold, and should held tenants of a finite migration block the
-   floor from passing its release (6.8)?
-6. **Q9 This branch's first release.** It is a multi-version upgrade from main's 3.20.x with diverged
-   numbering (F10). Ship it on the ledger (S1 to S4 first) or on today's machinery with a one-off check?
-7. **Q10 First install on Helm.** The api's first boot migrating (6.9) keeps one serving process
-   migrating once. Acceptable, or should the chart create its Secrets as earlier-weight hooks so a
-   pre-install Job can migrate instead?
+1. **N1 Old pods during a multi-release jump.** While the pre-roll Job steps from N to N+3, the N pods
+   still serve, and a contract retired in N+2 can drop something N still uses (6.7). Options: (a) when
+   the plan contains such a contract, the Job scales the app and workers to 0 first and says so (the
+   chart already has a Job that scales workers to 0, `charts/langwatch/templates/app/stored-objects-serialize-upgrade.yaml:20-24`),
+   accepting downtime for that jump; (b) refuse such jumps and require an intermediate image; (c) accept
+   errors on old pods until the rollout. The lane leans to (a).
+2. **N2 Held tenants at a drop.** When cleanup or a contract removes a tenant step's legacy source while
+   tenants are held, archive their legacy rows to a retained table before the drop, or accept losing them
+   after the alert? The lane leans to archiving.
+3. **N3 The one surviving floor rule.** Is it acceptable that a drop of a background or tenant step's
+   source waits until the LTS floor passes that step (6.5 point 4), or should such data moves be forced
+   into frozen blocking steps instead, at the cost of rewriting them as SQL?
 
 ## 10. Risks
 
-- The Prisma default-select claim behind 6.5 is an inference; S4 confirms it. If it is wrong the
-  invariant is still the simpler design.
-- The contract invariant makes drops wait for the floor; with a wide floor, dead columns linger.
-- Seeding the ledger from existing records can misread a hand-patched database; the seed is marked
-  `inferred` and `upgrade status` says so.
-- Refusing to start when behind (Q5) turns a forgotten `upgrade` into an outage of new pods; the old
-  pods keep serving, and the refusal names the command, but it must be loud in the chart notes.
-- Moving tenant passes off the boot finalizes tenants later after a deploy; the legacy path stays
-  correct meanwhile (`system-migrations-runner.feature:220-226`).
+- S4 may show Prisma does not tolerate successive subset deploys; then stepping needs our own applier
+  writing `_prisma_migrations`-compatible rows, a larger slice.
+- Frozen SQL steps are harder to write than service code; most moves will choose background, which N3
+  makes slower to clean up.
+- Refusing to start when behind turns a forgotten `upgrade` into new pods that will not start; old pods
+  keep serving and the refusal names the command, but the chart notes must say it loudly.
+- Seeding from existing records can misread a hand-patched database; the seed is marked `inferred`.
+- Tenant passes off the boot finalize tenants later after a deploy; the legacy path stays correct
+  meanwhile (`system-migrations-runner.feature:220-226`).
