@@ -163,6 +163,8 @@ export interface AnalyticsAppDependencies {
   /** The host's filter catalogue; see {@link AnalyticsFilterOptionsLookup}. */
   filterOptions: AnalyticsFilterOptionsLookup;
   langWatchQL: LangWatchQLService;
+  /** One hydration stage, shared by the synchronous query and a run's text pages. */
+  hydration: LangWatchQLHydrationService;
   /** The Workbench's rollout gate and its two independent protection sources. */
   featureFlags: FeatureFlagApi;
   authz: AuthzApi;
@@ -386,14 +388,24 @@ export class AnalyticsModule
               }),
           )
         : LWQL_UNAVAILABLE;
+    const hydration = LangWatchQLHydrationService.create({
+      reads: LangWatchQLHydrationReadService.create({
+        traces: new TraceApiHydrationSource(setup.dependencies.traces),
+      }),
+      compute: LangWatchQLHydrationComputeService.create({ renderer: setup.dependencies.traces }),
+      // The page is a pass: the statement re-validated, then read inside its wrapper.
+      runner: { executeLangWatchQLPass: (input) => app.executeLangWatchQLPass(input) },
+    });
     const langWatchQL = LangWatchQLServiceClass.create({
       executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,
+      hydration,
     });
     setup.resources.own("Analytics LangWatchQL identity", () => langWatchQL.close());
-    return new AnalyticsModule(
+    const app = new AnalyticsModule(
       {
         analytics,
+        hydration,
         filterOptions: FilterService.create({
           repository: FilterOptionsClickHouseRepository.create({ resolveClient }),
         }),
@@ -421,6 +433,8 @@ export class AnalyticsModule
       },
       setup.config.publicBaseUrl,
     );
+
+    return app;
   }
 
   #dependencies: AnalyticsAppDependencies;
@@ -441,14 +455,7 @@ export class AnalyticsModule
     });
     this.#publicBaseUrl = publicBaseUrl;
     this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
-    this.#hydration = LangWatchQLHydrationService.create({
-      reads: LangWatchQLHydrationReadService.create({
-        traces: new TraceApiHydrationSource(dependencies.traces),
-      }),
-      compute: LangWatchQLHydrationComputeService.create({ renderer: dependencies.traces }),
-      // The page is a pass: the statement re-validated, then read inside its wrapper.
-      runner: { executeLangWatchQLPass: (input) => this.executeLangWatchQLPass(input) },
-    });
+    this.#hydration = dependencies.hydration;
   }
 
   /** Who owns the LangWatchQL access model now; the reconvergence watch probes this. */

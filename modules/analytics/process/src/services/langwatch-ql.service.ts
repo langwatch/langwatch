@@ -27,6 +27,9 @@ import type {
   LangWatchQLExecutorRepository,
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
+import type { LangWatchQLAppFunctionDiagnosticsInput } from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
+import { DEFAULT_LWQL_HYDRATION_LIMITS } from "../rules/langwatch-ql-hydration-assembly.rules.ts";
+import { langWatchQLExtractionCalls } from "../rules/langwatch-ql-hydration-plan.rules.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { appendDefaultRowLimit } from "../rules/langwatch-ql-row-limit.rules.ts";
@@ -39,6 +42,7 @@ import {
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
+import type { LangWatchQLHydrationService } from "./langwatch-ql-hydration.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import {
   type LangWatchQLGranularityResolution,
@@ -88,6 +92,11 @@ export interface LangWatchQLServiceDependencies {
   readonly limits?: LangWatchQLResultLimits;
   /** The clock the diagnostics ask "has this period finished yet" against. */
   readonly now?: () => Instant;
+  /**
+   * Turns the keys an app function answered with into values. Absent only in a suite measuring
+   * the database's own answer, which then comes back as the database gave it.
+   */
+  readonly hydration?: Pick<LangWatchQLHydrationService, "hydrate">;
 }
 
 export class LangWatchQLService {
@@ -355,6 +364,7 @@ export class LangWatchQLService {
     return this.executeValidated({
       executor,
       projects,
+      protections,
       sql,
       validation,
       granularity,
@@ -394,15 +404,60 @@ export class LangWatchQLService {
       : sql;
   }
 
+  /**
+   * Replaces each extraction call's key with its value, as main's query did; an eval column
+   * keeps what the database answered until the query judges (held, lwql-sync-eval).
+   */
+  private async hydrateExtraction({
+    projects,
+    protections,
+    validation,
+    execution,
+  }: {
+    readonly projects: readonly LangWatchQLCaller[];
+    readonly protections: LangWatchQLProtections;
+    readonly validation: ValidatedLangWatchQL;
+    readonly execution: Pick<LangWatchQLQueryResult, "columns" | "rows">;
+  }): Promise<
+    Pick<LangWatchQLQueryResult, "columns" | "rows"> & {
+      readonly appFunctions?: LangWatchQLAppFunctionDiagnosticsInput;
+    }
+  > {
+    const calls = langWatchQLExtractionCalls(validation.appFunctions);
+    const { hydration } = this.deps;
+    if (!hydration || calls.length === 0) return execution;
+    const hydrated = await hydration.hydrate({
+      projectIds: projects.map((project) => project.id),
+      protections,
+      calls,
+      columns: execution.columns,
+      rows: execution.rows,
+    });
+
+    return {
+      columns: hydrated.columns,
+      rows: hydrated.rows,
+      appFunctions: {
+        isTruncatedByBytes: hydrated.isTruncatedByBytes,
+        maxHydratedBytes: DEFAULT_LWQL_HYDRATION_LIMITS.maxHydratedBytes,
+        rowsReturned: hydrated.rows.length,
+        valueTruncations: hydrated.valueTruncations,
+        unresolvedKeys: hydrated.unresolvedKeys,
+      },
+    };
+  }
+
   private async executeValidated({
     executor,
     projects,
+    protections,
     sql,
     validation,
     granularity,
   }: {
     readonly executor: LangWatchQLExecutorRepository;
     readonly projects: readonly LangWatchQLCaller[];
+    readonly protections: LangWatchQLProtections;
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
@@ -429,6 +484,7 @@ export class LangWatchQLService {
     // Refused rather than cut: a body that looks whole but is missing its tail is the worse
     // failure for an analytics caller. The row count is already bounded by the LIMIT above.
     this.assertResultWithinByteCeiling(execution.rows);
+    const answer = await this.hydrateExtraction({ projects, protections, validation, execution });
 
     // The facts the walk recorded, plus what actually came back. Both halves
     // are needed and neither is re-derived: a rule about the query's shape
@@ -437,16 +493,17 @@ export class LangWatchQLService {
       validation,
       database: this.deps.database,
       views: this.views,
-      columns: execution.columns,
-      rows: execution.rows,
+      columns: answer.columns,
+      rows: answer.rows,
       now: this.now(),
+      ...(answer.appFunctions ? { appFunctions: answer.appFunctions } : {}),
     });
 
     logger.info(
       {
         projectIds: projects.map((project) => project.id),
         tables: validation.tables,
-        rowsReturned: execution.statistics.rowsReturned,
+        rowsReturned: answer.rows.length,
         rowsRead: execution.statistics.rowsRead,
         elapsedMs: execution.statistics.elapsedMs,
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
@@ -457,9 +514,10 @@ export class LangWatchQLService {
     );
 
     return {
-      columns: execution.columns,
-      rows: execution.rows,
-      statistics: execution.statistics,
+      columns: answer.columns,
+      rows: answer.rows,
+      // Hydration can drop trailing rows at its own ceiling: the count is what the caller received.
+      statistics: { ...execution.statistics, rowsReturned: answer.rows.length },
       diagnostics,
       followsTimeWindow: validation.followsTimeWindow,
       followsGranularity: granularity.followsGranularity,
