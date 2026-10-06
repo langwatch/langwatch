@@ -3355,6 +3355,8 @@ export class TraceModule implements TraceApi, CollectorApp {
     try {
       await this.recordTrackedEvent({ project: { id: input.projectId }, body, eventId });
     } catch (error) {
+      // A process with no recorder refuses by name (parity Trace 9); other failures stay swallowed.
+      if (error instanceof TraceIngestionUnavailableError) throw error;
       logger.error({ error }, "unable to dispatch tracked event span");
     }
     return { message: "Event tracked" };
