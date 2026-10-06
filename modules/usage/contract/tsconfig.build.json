@@ -13,10 +13,10 @@
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
   "references": [
     {
-      "path": "../../entitlement/contract/tsconfig.build.json"
+      "path": "../../../packages/config/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/config/tsconfig.build.json"
+      "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/module/tsconfig.build.json"

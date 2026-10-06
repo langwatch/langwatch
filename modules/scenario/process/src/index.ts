@@ -10,7 +10,6 @@ export {
   type RecordEvaluationsDeps,
   evaluationsFingerprint,
 } from "./eventing/record-evaluations.commands.ts";
-export * from "./repositories/redis/redis.scenario-cancellation.repository.ts";
 export type { SimulationStalledRun } from "./eventing/simulation-eventing.store.ts";
 export * from "./eventing/simulation-processing.commands.ts";
 export {
