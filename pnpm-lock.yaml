@@ -14603,6 +14603,9 @@ importers:
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../../instant-eval/contract
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../packages/ksuid
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -14618,6 +14621,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@opentelemetry/core':
+        specifier: 'catalog:'
+        version: 2.10.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/otlp-transformer':
         specifier: 'catalog:'
         version: 0.55.0(@opentelemetry/api@1.9.1)
@@ -17153,6 +17159,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../ksuid
+      prisma:
+        specifier: 'catalog:'
+        version: 7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -17163,6 +17172,12 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
+      '@prisma/adapter-pg':
+        specifier: 7.10.0
+        version: 7.10.0
+      '@prisma/client':
+        specifier: 'catalog:'
+        version: 7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2)
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -17172,9 +17187,6 @@ importers:
       pg:
         specifier: ^8.22.0
         version: 8.22.0
-      prisma:
-        specifier: 'catalog:'
-        version: 7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
