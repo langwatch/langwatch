@@ -1,12 +1,14 @@
 Feature: Shared organization service
   Organization, team, and group invariants are implemented once for all features.
 
+  @unit
   Scenario: A caller requires the oldest team
     Given an organization has one or more teams
     When a feature gets the organization's oldest team
     Then the organization service returns the oldest team identifier
     And the caller performs no nullable check
 
+  @unit
   Scenario: An organization has no team
     Given an organization has no team
     When a feature gets the organization's oldest team
@@ -17,12 +19,14 @@ Feature: Shared organization service
     Then it receives the process-owned organization service
     And it does not query Organization or Team persistence directly
 
+  @unit
   Scenario: A disabled member is checked for active access
     Given the user still has a disabled organization membership
     When a feature checks whether the user is a member without including deactivated members
     Then the organization service returns false
     And the same check can include the retained disabled membership when required
 
+  @unit
   Scenario: Trace sharing is disabled for an organization
     Given trace sharing is currently enabled
     When a management transport commits the organization settings update
@@ -35,12 +39,14 @@ Feature: Shared organization service
     Then the request delegates to the process-owned organization service
     And no service or repository is constructed for that request
 
+  @unit
   Scenario: A request changes team membership
     Given the target is a shared team
     And the user belongs to the organization
     When the request adds or removes the user
     Then the organization service writes the membership through AuthZ grants
 
+  @unit
   Scenario: A request mutates a personal team
     Given the target is a personal workspace team
     When the request archives it or changes its membership
@@ -51,6 +57,7 @@ Feature: Shared organization service
     Then it composes the AuthZ and Project services
     And it does not query role binding or project persistence directly
 
+  @unit
   Scenario: Team membership is projected from grants
     Given a user has more than one binding on the same team
     When the organization service presents the team's members
@@ -58,22 +65,26 @@ Feature: Shared organization service
     And it presents the highest-priority effective role once
     And it preserves the lower-priority additive binding
 
+  @unit
   Scenario: A non-manager reads team membership
     Given the caller belongs to the team but cannot manage it
     When the caller reads the team
     Then the caller can see only their own member email
 
+  @unit
   Scenario: A non-member gets a team by slug
     Given the caller does not belong to the requested team
     When the caller gets that team by slug
     Then the organization service throws the same error as for a missing team
 
+  @unit
   Scenario: A team edit would remove the last administrator
     Given the proposed direct membership leaves no direct administrator
     And no administrator is inherited through a group
     When the organization service validates the edit
     Then it refuses before changing the team or emitting grant commands
 
+  @unit
   Scenario: A group supplies the remaining administrator
     Given the proposed edit removes the last direct administrator
     And a member of an administrator group remains
@@ -104,6 +115,7 @@ Feature: Shared organization service
     Then the organization service writes it through the AuthZ grants service
     And no Organization repository reads or writes RoleBinding rows
 
+  @unit
   Scenario: A group batch edit partially fails
     When bindings are removed and group membership is changed in one request
     Then the service revokes access before changing membership

@@ -219,6 +219,10 @@ function buildService(options?: {
 }
 
 describe("OrganizationService team membership", () => {
+  /**
+   * @scenario "A non-manager reads team membership"
+   * @scenario "Team membership is projected from grants"
+   */
   it("reads role-binding-only members, collapses duplicate roles and redacts other email addresses", async () => {
     const { service } = buildService({
       memberBindings: [
@@ -243,19 +247,24 @@ describe("OrganizationService team membership", () => {
     });
   });
 
+  /** @scenario "A non-member gets a team by slug" */
   it("throws the same not-found error when a slug exists but the caller is not a member", async () => {
     const { service } = buildService({
       memberBindings: [memberBinding("someone_else", "ADMIN")],
     });
-    await expect(
-      service.getTeamBySlugForMember({
-        organizationId: "org_1",
-        slug: "shared",
-        userId: "caller",
-      }),
-    ).rejects.toBeInstanceOf(TeamNotFoundError);
+    const refusedAsOutsider = await service
+      .getTeamBySlugForMember({ organizationId: "org_1", slug: "shared", userId: "caller" })
+      .catch((error: unknown) => error);
+    const refusedAsMissing = await service
+      .getTeamBySlugForMember({ organizationId: "org_1", slug: "no-such-team", userId: "caller" })
+      .catch((error: unknown) => error);
+
+    expect(refusedAsOutsider).toBeInstanceOf(TeamNotFoundError);
+    expect(refusedAsMissing).toBeInstanceOf(TeamNotFoundError);
+    expect(refusedAsOutsider).toMatchObject({ code: (refusedAsMissing as TeamNotFoundError).code });
   });
 
+  /** @scenario "Team membership is projected from grants" */
   it("edits only the displayed binding and preserves an additive custom binding", async () => {
     const { service, calls } = buildService({
       accessBindings: [
@@ -381,6 +390,7 @@ describe("OrganizationService team membership", () => {
     expect(calls.attach).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A team edit would remove the last administrator" */
   it("refuses removal of the last effective admin before fencing or revoking", async () => {
     const { service, teams, calls } = buildService({
       accessBindings: [accessBinding({ id: "admin", userId: "admin", role: "ADMIN" })],
@@ -397,7 +407,10 @@ describe("OrganizationService team membership", () => {
     expect(calls.revoke).not.toHaveBeenCalled();
   });
 
-  /** @scenario "A team administered only through a group accepts member edits" */
+  /**
+   * @scenario "A team administered only through a group accepts member edits"
+   * @scenario "A group supplies the remaining administrator"
+   */
   it("counts members of an admin group when applying the last-admin guard", async () => {
     const groups = new MemoryGroups();
     groups.members.set("group", [{ userId: "group_admin", name: null, email: null, image: null }]);

@@ -584,6 +584,7 @@ describe("OrganizationService", () => {
     expect(teams.organizationMemberReads).toBe(1);
   });
 
+  /** @scenario "A disabled member is checked for active access" */
   it("distinguishes active membership from a disabled membership", async () => {
     const teams = new MemoryTeams();
     teams.activeMember = false;
@@ -597,6 +598,7 @@ describe("OrganizationService", () => {
     ).resolves.toBe(true);
   });
 
+  /** @scenario "A caller requires the oldest team" */
   it("returns the required oldest team", async () => {
     await expect(
       createService(new StubRepository("oldest-team")).getOldestTeamId({
@@ -605,6 +607,7 @@ describe("OrganizationService", () => {
     ).resolves.toBe("oldest-team");
   });
 
+  /** @scenario "An organization has no team" */
   it("propagates the organization-owned missing-team error", async () => {
     await expect(
       createService(new StubRepository(null)).getOldestTeamId({
@@ -639,6 +642,7 @@ describe("OrganizationService", () => {
     ).resolves.toMatchObject({ id: "team", slug: "team" });
   });
 
+  /** @scenario "A request mutates a personal team" */
   it("protects personal teams from archive and membership mutation", async () => {
     const teams = new MemoryTeams();
     teams.team = { ...sharedTeam, isPersonal: true, ownerUserId: "owner" };
@@ -658,6 +662,7 @@ describe("OrganizationService", () => {
     ).rejects.toBeInstanceOf(PersonalTeamProtectedError);
   });
 
+  /** @scenario "A request changes team membership" */
   it("uses AuthZ grants for team membership writes", async () => {
     const teams = new MemoryTeams();
     const grants = new RecordingGrants();

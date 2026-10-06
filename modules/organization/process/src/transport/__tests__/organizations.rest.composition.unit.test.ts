@@ -156,6 +156,29 @@ describe("given an instance administrator and an instance with no organizations"
     });
   });
 
+  describe("when a second organization is created with a slug that is taken", () => {
+    /** @scenario "A duplicate organization slug is refused" */
+    it("refuses with organization_slug_taken and 409 and creates no second organization", async () => {
+      const { app, repositories, permissions, keyRequests } = await application();
+      const { send } = mountProvisioning(app);
+      const first = await send("/api/organizations", {
+        method: "POST",
+        body: { name: "Acme", slug: "acme" },
+      });
+      expect(first.status).toBe(201);
+
+      const second = await send("/api/organizations", {
+        method: "POST",
+        body: { name: "Acme Again", slug: "acme" },
+      });
+
+      expect(second.status).toBe(409);
+      expect(((await second.json()) as { code: string }).code).toBe("organization_slug_taken");
+      expect(await storedSlugs(repositories, permissions)).toEqual(["acme"]);
+      expect(keyRequests).toHaveLength(1);
+    });
+  });
+
   describe("when the organization's bootstrap key cannot be created", () => {
     /** @scenario "A failed bootstrap key leaves no organization behind" */
     it("fails, leaves no organization with that slug, and lets the slug be provisioned again", async () => {
